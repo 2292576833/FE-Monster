@@ -1,0 +1,50 @@
+# 默认所有者
+* @2292576833
+
+# Java 后端 — 核心服务
+src/main/java/com/femonster/FeMonsterJavaApp.java @2292576833
+src/main/java/com/femonster/core/ @2292576833
+src/main/java/com/femonster/api/ @2292576833
+
+# Java 后端 — HTTP / JSON 工具
+src/main/java/com/femonster/http/ @2292576833
+src/main/java/com/femonster/json/ @2292576833
+
+# Java 后端 — 数据模型
+src/main/java/com/femonster/model/ @2292576833
+src/main/java/com/femonster/netease/ @2292576833
+
+# Java 后端 — 桌面客户端启动器
+src/main/java/com/femonster/desktop/ @2292576833
+
+# 前端 — 主界面
+web/index.html @2292576833
+web/app.js @2292576833
+web/styles.css @2292576833
+web/boot-lightfall-react.js @2292576833
+
+# 前端 — 桌面歌词 / 壁纸 / 预设
+web/desktop-lyrics.html @2292576833
+web/wallpaper.html @2292576833
+web/sonic-topography-preset.js @2292576833
+
+# 前端 — 第三方依赖
+web/vendor/ @2292576833
+
+# 前端 — Reactbits
+web/reactbits/ @2292576833
+
+# UI 组件库
+components/ @2292576833
+
+# 项目配置和文档
+README.md @2292576833
+PRODUCT.md @2292576833
+PROJECT_STATUS.md @2292576833
+NETEASE_LOGIN_PERSISTENCE.md @2292576833
+FE_MONSTER_使用说明书.md @2292576833
+.gitignore @2292576833
+jsrepo.config.mjs @2292576833
+build.cmd @2292576833
+clean.cmd @2292576833
+run.cmd @2292576833
