@@ -1,4 +1,4 @@
-# FE Monster Java
+﻿# FE Monster Java
 
 This is a Java 17 clean-room rewrite target for the FE Player / FE Monster backend shell and local client.
 
@@ -47,3 +47,7 @@ The current local player was checked with the Java jar running locally, Microsof
 
 - `build/web-player-final-1365x768.png`
 - `build/web-player-final-390x844.png`
+
+## GitHub
+
+Source code: https://github.com/2292576833/FE-Monster
