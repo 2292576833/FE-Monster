@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer" />
+    <title>FE Monster Java</title>
+    <link rel="stylesheet" href="/components/GlassSurface.css?v=20260701-main-blue-orb" />
+    <link rel="stylesheet" href="styles.css?v=20260701-main-blue-orb" />
+  </head>
+  <body>
+    <section class="boot-screen" id="bootScreen" aria-label="FE moster launch screen">
+      <div class="boot-lightfall" id="bootLightfallMount" aria-hidden="true"></div>
+      <button class="boot-logo-button" id="bootLogoButton" type="button" aria-label="Enter FE moster" disabled>
+        <span class="boot-logo-text" id="bootLogoText">FE moster</span>
+      </button>
+    </section>
+
+    <div class="app-shell">
+      <form
+        class="top-search glass-surface glass-surface--fallback"
+        id="topSearchForm"
+        role="search"
+        aria-label="搜索音乐"
+        data-glass-surface
+        data-glass-radius="16"
+        data-glass-brightness="58"
+        data-glass-opacity="0.92"
+        data-glass-blur="11"
+        data-glass-displace="0.44"
+        data-glass-background-opacity="0.14"
+        data-glass-saturation="1.22"
+        data-glass-distortion-scale="-168"
+        data-glass-red-offset="-6"
+        data-glass-green-offset="50"
+        data-glass-blue-offset="50"
+      >
+        <div class="glass-surface__content">
+          <span class="top-search-icon" aria-hidden="true"><span></span></span>
+          <label class="sr-only" for="topSearchInput">搜索音乐</label>
+          <input
+            id="topSearchInput"
+            type="search"
+            name="q"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="搜索歌曲、歌手"
+          />
+          <button class="top-search-submit" type="submit" aria-label="搜索">
+            <span class="search-submit-icon" aria-hidden="true"></span>
+          </button>
+        </div>
+      </form>
+
+      <button
+        class="netease-login-button glass-surface glass-surface--fallback"
+        id="neteaseLoginButton"
+        type="button"
+        aria-haspopup="dialog"
+        aria-controls="neteaseLoginDialog"
+        data-glass-surface
+        data-glass-radius="16"
+        data-glass-brightness="62"
+        data-glass-opacity="0.9"
+        data-glass-blur="12"
+        data-glass-displace="0.36"
+        data-glass-background-opacity="0.16"
+        data-glass-saturation="1.16"
+        data-glass-distortion-scale="-158"
+        data-glass-red-offset="-4"
+        data-glass-green-offset="18"
+        data-glass-blue-offset="32"
+      >
+        <span class="glass-surface__content">
+          <span class="netease-login-mark" aria-hidden="true"></span>
+          <span class="netease-login-label" id="neteaseLoginLabel">网易云登录</span>
+        </span>
+      </button>
+
+      <button
+        class="home-button glass-surface glass-surface--fallback"
+        id="homeButton"
+        type="button"
+        aria-label="回到粒子球主页面"
+        data-glass-surface
+        data-glass-radius="23"
+        data-glass-brightness="66"
+        data-glass-opacity="0.88"
+        data-glass-blur="13"
+        data-glass-displace="0.34"
+        data-glass-background-opacity="0.18"
+        data-glass-saturation="1.18"
+        data-glass-distortion-scale="-156"
+        data-glass-red-offset="-4"
+        data-glass-green-offset="20"
+        data-glass-blue-offset="36"
+      >
+        <span class="glass-surface__content">
+          <span class="home-button-icon" aria-hidden="true"></span>
+        </span>
+      </button>
+
+      <button
+        class="diy-button glass-surface glass-surface--fallback"
+        id="diyButton"
+        type="button"
+        aria-label="Open DIY panel"
+        aria-controls="diySidebar"
+        aria-expanded="false"
+        data-glass-surface
+        data-glass-radius="23"
+        data-glass-brightness="66"
+        data-glass-opacity="0.88"
+        data-glass-blur="13"
+        data-glass-displace="0.34"
+        data-glass-background-opacity="0.18"
+        data-glass-saturation="1.18"
+        data-glass-distortion-scale="-156"
+        data-glass-red-offset="-4"
+        data-glass-green-offset="20"
+        data-glass-blue-offset="36"
+      >
+        <span class="glass-surface__content">DIY</span>
+      </button>
+
+      <main class="stage" aria-label="白色粒子球播放舞台">
+        <canvas id="orbCanvas" aria-hidden="true"></canvas>
+        <div class="stage-glow" aria-hidden="true"></div>
+        <section class="dynamic-cube-scene" id="dynamicCubeScene" aria-label="动感魔方" hidden>
+          <div class="dynamic-cube-rig" id="dynamicCubeRig" aria-hidden="true">
+            <div class="dynamic-cube-core" id="dynamicCubeCore"></div>
+          </div>
+        </section>
+        <section class="playback-lyric-scene" id="playbackLyricScene" aria-label="3D playback lyric" hidden>
+          <div class="playback-lyric-rig" id="playbackLyricRig" aria-live="polite">
+            <div class="playback-lyric-core" id="playbackLyricCore">
+              <span class="playback-lyric-layer lyric-depth-5" id="playbackLyricDepth5"></span>
+              <span class="playback-lyric-layer lyric-depth-4" id="playbackLyricDepth4"></span>
+              <span class="playback-lyric-layer lyric-depth-3" id="playbackLyricDepth3"></span>
+              <span class="playback-lyric-layer lyric-depth-2" id="playbackLyricDepth2"></span>
+              <span class="playback-lyric-layer lyric-depth-1" id="playbackLyricDepth1"></span>
+              <span class="playback-lyric-layer lyric-depth-0" id="playbackLyricText"></span>
+              <span class="playback-lyric-layer lyric-back" id="playbackLyricBack"></span>
+            </div>
+            <div class="playback-lyric-subtitle" id="playbackLyricSubtitle"></div>
+          </div>
+        </section>
+        <section class="orb-playlists" id="orbPlaylists" aria-label="网易云用户歌单" hidden>
+          <div class="orb-playlist-status" id="orbPlaylistStatus">网易云歌单</div>
+          <div class="orb-playlist-cards" id="orbPlaylistCards"></div>
+        </section>
+
+        <section class="playlist-shelf" id="playlistShelf" aria-label="3D 歌单架" hidden>
+          <div class="playlist-shelf-stage" id="playlistShelfStage" tabindex="0" role="region" aria-labelledby="playlistShelfTitle">
+            <div class="playlist-shelf-panel">
+              <header class="playlist-shelf-head">
+                <span class="playlist-shelf-cover" id="playlistShelfCover">
+                  <img id="playlistShelfCoverImage" alt="" />
+                  <span>歌单</span>
+                </span>
+                <span class="playlist-shelf-copy">
+                  <span class="playlist-shelf-kicker">网易云歌单架</span>
+                  <strong id="playlistShelfTitle">选择歌单</strong>
+                  <small id="playlistShelfMeta">未选择歌单</small>
+                </span>
+                <button class="playlist-shelf-hide" id="playlistShelfClose" type="button">隐藏</button>
+              </header>
+              <div class="playlist-shelf-scroll" id="playlistShelfScroll">
+                <div class="playlist-song-stack" id="playlistSongStack"></div>
+              </div>
+            </div>
+            <div class="playlist-shelf-back" id="playlistShelfBack" role="button" tabindex="0" aria-label="显示歌单架正面">
+              <div class="playlist-shelf-back-content">
+                <header class="playlist-shelf-head playlist-shelf-back-head">
+                  <span class="playlist-shelf-cover" id="playlistShelfBackCover">
+                    <img id="playlistShelfBackCoverImage" alt="" />
+                    <span>歌单</span>
+                  </span>
+                  <span class="playlist-shelf-copy">
+                    <span class="playlist-shelf-kicker">BACK SIDE</span>
+                    <strong id="playlistShelfBackTitle">选择歌单</strong>
+                    <small id="playlistShelfBackMeta">未选择歌单</small>
+                  </span>
+                </header>
+                <div class="playlist-shelf-scroll playlist-shelf-back-scroll" id="playlistShelfBackScroll">
+                  <div class="playlist-song-stack playlist-song-stack--back" id="playlistSongStackBack"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer
+        class="player-dock glass-surface glass-surface--fallback"
+        aria-label="播放控制栏"
+        data-glass-surface
+        data-glass-radius="20"
+        data-glass-brightness="54"
+        data-glass-opacity="0.94"
+        data-glass-blur="12"
+        data-glass-displace="0.4"
+        data-glass-background-opacity="0.1"
+        data-glass-saturation="1.2"
+        data-glass-distortion-scale="-174"
+        data-glass-red-offset="-6"
+        data-glass-green-offset="18"
+        data-glass-blue-offset="34"
+      >
+        <div class="glass-surface__content">
+          <div class="dock-track">
+            <div class="mini-cover">
+              <img id="dockCover" alt="" />
+              <span>FE</span>
+            </div>
+            <div class="track-copy">
+              <span class="dock-status" id="dockStatus">READY</span>
+              <strong id="dockTitle">未播放</strong>
+              <small id="dockArtist">选择一首歌开始</small>
+            </div>
+          </div>
+
+          <div class="dock-center">
+            <div class="transport" aria-label="播放控制">
+              <button class="icon-button transport-prev" id="prevButton" type="button" title="上一首" aria-label="上一首">
+                <span class="control-icon control-icon-prev" aria-hidden="true"></span>
+              </button>
+              <button class="icon-button play" id="playButton" type="button" title="播放" aria-label="播放">
+                <span class="control-icon control-icon-play" aria-hidden="true"></span>
+              </button>
+              <button class="icon-button transport-next" id="nextButton" type="button" title="下一首" aria-label="下一首">
+                <span class="control-icon control-icon-next" aria-hidden="true"></span>
+              </button>
+            </div>
+
+            <div class="progress-area">
+              <input id="progressRange" type="range" min="0" max="1000" value="0" aria-label="播放进度" />
+              <div class="time-row">
+                <span id="currentTime">00:00</span>
+                <span id="totalTime">00:00</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="volume-area">
+            <span class="volume-icon" aria-hidden="true"></span>
+            <span id="volumeLabel">80%</span>
+            <input id="volumeRange" type="range" min="0" max="100" value="80" aria-label="音量" />
+          </div>
+        </div>
+      </footer>
+
+      <aside class="diy-sidebar" id="diySidebar" aria-label="DIY playback preset" aria-hidden="true">
+        <div class="diy-sidebar-head">
+          <span>DIY</span>
+          <button class="diy-close-button" id="diyCloseButton" type="button" aria-label="Close DIY panel"></button>
+        </div>
+        <button class="diy-preset-button glass-surface glass-surface--fallback" id="diyPresetButton" type="button" aria-expanded="true" aria-controls="diyPresetPage" data-glass-surface>
+          <span class="glass-surface__content">预设</span>
+        </button>
+        <section class="diy-preset-page is-expanded" id="diyPresetPage" aria-label="预设页">
+          <div class="diy-preset-options">
+            <button class="diy-preset-card is-active" id="diyLyricPreset" type="button" data-preset="lyric">
+              <strong>3D歌词</strong>
+              <small>封面取色</small>
+            </button>
+            <button class="diy-preset-card" id="diyCubePreset" type="button" data-preset="cube">
+              <strong>动感魔方</strong>
+              <small>低频驱动</small>
+            </button>
+          </div>
+          <div class="diy-spectrum">
+            <span>低频</span>
+            <div class="diy-spectrum-track" aria-hidden="true">
+              <i id="spectrumBassFill"></i>
+            </div>
+            <strong id="spectrumStatus">待机</strong>
+          </div>
+          <div class="diy-control">
+            <label for="lyricBrightnessRange">歌词亮度</label>
+            <input id="lyricBrightnessRange" type="range" min="60" max="180" value="112" />
+            <span id="lyricBrightnessValue">112%</span>
+          </div>
+          <div class="diy-control">
+            <label for="lyricSpeedRange">跳动速度</label>
+            <input id="lyricSpeedRange" type="range" min="60" max="180" value="100" />
+            <span id="lyricSpeedValue">100%</span>
+          </div>
+          <div class="diy-control">
+            <label for="cubeIntensityRange">魔方强度</label>
+            <input id="cubeIntensityRange" type="range" min="40" max="180" value="110" />
+            <span id="cubeIntensityValue">110%</span>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+    <div class="netease-login-dialog" id="neteaseLoginDialog" role="dialog" aria-modal="true" aria-labelledby="neteaseLoginTitle" hidden>
+      <div class="netease-login-backdrop" data-login-close></div>
+      <section
+        class="netease-login-panel glass-surface glass-surface--fallback"
+        data-glass-surface
+        data-glass-radius="20"
+        data-glass-brightness="58"
+        data-glass-opacity="0.92"
+        data-glass-blur="14"
+        data-glass-displace="0.38"
+        data-glass-background-opacity="0.14"
+        data-glass-saturation="1.18"
+        data-glass-distortion-scale="-168"
+        data-glass-red-offset="-4"
+        data-glass-green-offset="20"
+        data-glass-blue-offset="36"
+      >
+        <div class="glass-surface__content">
+          <header class="login-panel-head">
+            <div>
+              <strong id="neteaseLoginTitle">网易云二维码登录</strong>
+              <span>使用网易云音乐 App 扫码确认</span>
+            </div>
+            <button class="login-close-button" id="neteaseLoginClose" type="button" aria-label="关闭登录弹窗"></button>
+          </header>
+
+          <div class="qr-login-stage">
+            <div class="qr-code-shell" id="neteaseQrShell">
+              <img id="neteaseQrImage" alt="网易云登录二维码" />
+              <span id="neteaseQrPlaceholder">生成二维码</span>
+            </div>
+            <p class="qr-login-status" id="neteaseQrStatus">点击右上角按钮开始登录</p>
+            <button class="qr-refresh-button" id="neteaseQrRefresh" type="button">刷新二维码</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <audio id="audio" preload="metadata"></audio>
+    <script src="vendor/three.r128.min.js?v=20260701-main-blue-orb"></script>
+    <script type="module" src="boot-lightfall-react.js?v=20260701-main-blue-orb"></script>
+    <script src="app.js?v=20260701-main-blue-orb"></script>
+  </body>
+</html>

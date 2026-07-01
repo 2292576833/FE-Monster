@@ -1,0 +1,126 @@
+.reactbits-glass-panel-target,
+.reactbits-glass-target {
+  position: relative !important;
+  isolation: isolate;
+}
+
+.reactbits-glass-target {
+  overflow: hidden;
+  background: transparent !important;
+  border-color: rgba(142, 226, 255, 0.22) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.reactbits-glass-target > .rb-glass-mount,
+.reactbits-glass-panel-target > .rb-glass-panel-mount {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.reactbits-glass-target > :not(.rb-glass-mount),
+.reactbits-glass-panel-target > :not(.rb-glass-panel-mount) {
+  position: relative;
+  z-index: 1;
+}
+
+.rb-glass-surface {
+  width: 100%;
+  height: 100%;
+  color: rgba(240, 250, 255, 0.94);
+  background:
+    radial-gradient(circle at 26% 4%, rgba(255, 255, 255, 0.18), transparent 34%),
+    linear-gradient(138deg, rgba(0, 0, 0, 0.38), rgba(8, 28, 45, 0.46) 55%, rgba(0, 0, 0, 0.34));
+  border: 1px solid rgba(149, 229, 255, 0.22);
+  box-shadow:
+    inset 0 0 1px rgba(255, 255, 255, 0.48),
+    inset 0 12px 28px rgba(255, 255, 255, 0.04),
+    0 12px 26px rgba(0, 0, 0, 0.18);
+}
+
+.rb-glass-surface--primary {
+  border-color: rgba(var(--fc-accent-rgb), 0.44);
+  background:
+    radial-gradient(circle at 30% 0%, rgba(255, 255, 255, 0.24), transparent 36%),
+    linear-gradient(138deg, rgba(var(--fc-accent-rgb), 0.14), rgba(4, 18, 28, 0.62) 54%, rgba(0, 0, 0, 0.36));
+  box-shadow:
+    inset 0 0 1px rgba(255, 255, 255, 0.58),
+    inset 0 12px 34px rgba(255, 255, 255, 0.055),
+    0 0 24px rgba(var(--fc-accent-rgb), 0.1),
+    0 12px 30px rgba(0, 0, 0, 0.22);
+}
+
+.rb-glass-surface--player {
+  border-color: rgba(164, 232, 255, 0.28);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.13), transparent 30%),
+    radial-gradient(circle at 84% 8%, rgba(var(--fc-accent-rgb), 0.11), transparent 34%),
+    linear-gradient(112deg, rgba(0, 0, 0, 0.36), rgba(10, 30, 45, 0.44) 52%, rgba(0, 0, 0, 0.32));
+  box-shadow:
+    inset 0 0 2px 1px rgba(255, 255, 255, 0.22),
+    inset 0 0 20px rgba(255, 255, 255, 0.06),
+    0 18px 56px rgba(0, 0, 0, 0.28);
+}
+
+.rb-glass-surface .glass-surface__content {
+  padding: 0;
+}
+
+#bottom-bar.reactbits-glass-panel-target {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+#bottom-bar.reactbits-glass-panel-target.visible {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+#bottom-bar .ctrl-btn.reactbits-glass-target,
+#top-right .icon-btn.reactbits-glass-target,
+.desktop-mode-btn.reactbits-glass-target,
+#bottom-handle.reactbits-glass-target {
+  color: rgba(239, 250, 255, 0.78);
+}
+
+#bottom-bar .ctrl-btn.reactbits-glass-target:hover,
+#top-right .icon-btn.reactbits-glass-target:hover,
+.desktop-mode-btn.reactbits-glass-target:hover,
+.home-chip.reactbits-glass-target:hover,
+.fx-mini-btn.reactbits-glass-target:hover,
+.modal-btn.reactbits-glass-target:hover {
+  color: #fff !important;
+  transform: translateY(-1px);
+}
+
+#play-btn.reactbits-glass-target {
+  color: #f8feff !important;
+}
+
+#progress-bar {
+  background:
+    linear-gradient(90deg, rgba(var(--fc-accent-rgb), 0.2), rgba(255, 255, 255, 0.12)),
+    rgba(255, 255, 255, 0.08) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 0 18px rgba(var(--fc-accent-rgb), 0.06) !important;
+}
+
+#progress-fill {
+  background: linear-gradient(90deg, rgba(235, 253, 255, 0.98), rgba(var(--fc-accent-rgb), 0.92)) !important;
+  box-shadow: 0 0 16px rgba(var(--fc-accent-rgb), 0.18);
+}
+
+#volume-slider {
+  accent-color: var(--fc-accent);
+}
