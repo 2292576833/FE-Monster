@@ -10,9 +10,11 @@ import java.util.Map;
 
 public final class VisualBridgeService {
     private final PlayerService player;
+    private final NativeAudioEngine audioEngine;
 
-    public VisualBridgeService(PlayerService player) {
+    public VisualBridgeService(PlayerService player, NativeAudioEngine audioEngine) {
         this.player = player;
+        this.audioEngine = audioEngine;
     }
 
     public Map<String, Object> health() {
@@ -20,7 +22,8 @@ public final class VisualBridgeService {
         body.put("ok", true);
         body.put("ready", true);
         body.put("schema", "fe.visual-state.v1");
-        body.put("runtime", "java17");
+        body.put("runtime", "java" + Runtime.version().feature());
+        body.put("javaVersion", System.getProperty("java.version", ""));
         return body;
     }
 
@@ -37,7 +40,7 @@ public final class VisualBridgeService {
         root.put("song", songState(song, SimpleJson.asInt(playerState.get("queueIndex"), -1)));
         root.put("playback", playbackState(playing, position, duration));
         root.put("lyric", lyricState(position, duration));
-        root.put("audio", audioState(position, playing));
+        root.put("audio", audioState(position, playing, audioEngine.samplePayload()));
         root.put("colors", colors());
         root.put("fx", fx());
         root.put("shelf", shelf());
@@ -74,16 +77,48 @@ public final class VisualBridgeService {
         return map;
     }
 
-    private static Map<String, Object> audioState(double position, boolean playing) {
+    private static Map<String, Object> audioState(double position, boolean playing, Map<String, Object> nativeSample) {
+        boolean nativeActive = SimpleJson.asBoolean(nativeSample.get("active"), false);
+        double nativeLow = clamp01(SimpleJson.asDouble(nativeSample.get("lowFrequencyAmplitude"), 0));
+        double nativeEnergy = clamp01(SimpleJson.asDouble(nativeSample.get("energy"), 0));
+        double nativeBeat = clamp01(SimpleJson.asDouble(nativeSample.get("beat"), 0));
+        if (nativeActive && (nativeLow > 0.0005 || nativeEnergy > 0.0005 || nativeBeat > 0.0005)) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            double energy = clamp01(Math.max(nativeEnergy, nativeLow * 0.72));
+            map.put("energy", energy);
+            map.put("bass", nativeLow);
+            map.put("lowFrequencyAmplitude", nativeLow);
+            map.put("lowFrequencyMinHz", 20);
+            map.put("lowFrequencyMaxHz", 150);
+            map.put("mid", clamp01(energy * 0.48));
+            map.put("treble", clamp01(energy * 0.28));
+            map.put("beat", nativeBeat);
+            map.put("onset", nativeBeat > 0.58);
+            map.put("sampleRate", SimpleJson.asInt(nativeSample.get("sampleRate"), 0));
+            map.put("source", SimpleJson.asString(nativeSample.get("source"), "xaudio2-native-loopback"));
+            return map;
+        }
+
         double t = playing ? position : System.currentTimeMillis() / 1000.0;
+        double bass = 0.50 + 0.30 * wave(t * 1.7);
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("energy", 0.46 + 0.18 * wave(t * 2.2));
-        map.put("bass", 0.50 + 0.30 * wave(t * 1.7));
+        map.put("bass", bass);
+        map.put("lowFrequencyAmplitude", bass);
+        map.put("lowFrequencyMinHz", 20);
+        map.put("lowFrequencyMaxHz", 150);
         map.put("mid", 0.38 + 0.22 * wave(t * 3.3));
         map.put("treble", 0.32 + 0.28 * wave(t * 7.1));
         map.put("beat", wave(t * 2.0));
         map.put("onset", wave(t * 2.0) > 0.92);
+        map.put("sampleRate", 0);
+        map.put("source", "java-fallback");
         return map;
+    }
+
+    private static double clamp01(double value) {
+        if (!Double.isFinite(value)) return 0;
+        return Math.max(0, Math.min(1, value));
     }
 
     private static double wave(double t) {

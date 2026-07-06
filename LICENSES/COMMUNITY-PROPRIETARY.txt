@@ -1,0 +1,22 @@
+FE Monster Community Proprietary License
+
+Copyright (c) 2026 2292576833
+All rights reserved.
+
+This license applies only to FE Monster community proprietary components,
+including the community server, official closed community modules, community
+signing implementations, device fingerprint implementations, certificate
+pinning implementations, and any files explicitly marked as community
+proprietary.
+
+You may not copy, modify, publish, distribute, sublicense, sell, decompile,
+reverse engineer, or create derivative works of these proprietary components
+unless you have separate written permission from the copyright holder.
+
+The public open-source FE Monster client may call the community proprietary
+components only through the documented public interfaces and runtime plugin or
+server boundaries. The public interfaces themselves remain under the open-source
+license of the FE Monster client unless a file states otherwise.
+
+The proprietary components are provided without warranty. The copyright holder
+reserves all rights not expressly granted in writing.

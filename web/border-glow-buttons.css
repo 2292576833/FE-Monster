@@ -1,0 +1,61 @@
+.border-glow-button-target {
+  isolation: isolate;
+}
+
+.rb-border-glow-mount {
+  position: absolute;
+  inset: -1px;
+  display: block;
+  border-radius: inherit;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.rb-button-border-glow.border-glow-card {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.rb-button-border-glow.border-glow-card::after {
+  mix-blend-mode: screen;
+}
+
+.rb-button-border-glow.border-glow-card .border-glow-inner {
+  display: none;
+}
+
+.rb-button-border-glow.border-glow-card.is-button-glow-active::before {
+  opacity: calc((var(--edge-proximity) - var(--color-sensitivity)) / (100 - var(--color-sensitivity)));
+  transition: opacity 180ms ease-out;
+}
+
+.rb-button-border-glow.border-glow-card.is-button-glow-active::after {
+  opacity: calc(var(--fill-opacity, 0.08) * (var(--edge-proximity) - var(--color-sensitivity)) / (100 - var(--color-sensitivity)));
+  transition: opacity 180ms ease-out;
+}
+
+.rb-button-border-glow.border-glow-card.is-button-glow-active > .edge-light {
+  opacity: calc((var(--edge-proximity) - var(--edge-sensitivity)) / (100 - var(--edge-sensitivity)));
+  transition: opacity 180ms ease-out;
+}
+
+.border-glow-button-target > :not(.rb-border-glow-mount) {
+  position: relative;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rb-button-border-glow.border-glow-card::before,
+  .rb-button-border-glow.border-glow-card::after,
+  .rb-button-border-glow.border-glow-card > .edge-light {
+    transition-duration: 0.01ms;
+  }
+}

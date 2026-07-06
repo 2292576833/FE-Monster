@@ -30,6 +30,15 @@
 # 版权与授权
 Copyright (C) 2026 2292576833
 
+开源客户端主体使用 MIT License，详见 `LICENSE`。
+
+社区服务端、官方闭源社区模块、社区签名实现、设备指纹实现和社区安全实现使用 Proprietary License，详见 `LICENSES/COMMUNITY-PROPRIETARY.txt` 与 `COMMUNITY_LICENSE_BOUNDARY.md`。
+
+# 文档
+
+- `功能介绍.md`：完整功能说明，重点介绍社区功能。
+- `更新日志.md`：按时间记录客户端、社区服务器和后台能力的更新。
+
 
 
 

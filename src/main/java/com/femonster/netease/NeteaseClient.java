@@ -1,6 +1,8 @@
 package com.femonster.netease;
 
 import com.femonster.json.SimpleJson;
+import com.femonster.music.CommentPayloads;
+import com.femonster.music.MusicProviderClient;
 import com.femonster.model.Playlist;
 import com.femonster.model.Song;
 
@@ -22,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
 
-public final class NeteaseClient {
+public final class NeteaseClient implements MusicProviderClient {
     private final String baseUrl;
     private final HttpClient client;
     private final Path authFile;
@@ -37,6 +39,21 @@ public final class NeteaseClient {
         this.authFile = authFile == null ? null : authFile.toAbsolutePath().normalize();
         this.client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
         restoreAuth();
+    }
+
+    @Override
+    public String id() {
+        return "netease";
+    }
+
+    @Override
+    public String label() {
+        return "网易云";
+    }
+
+    @Override
+    public String baseUrl() {
+        return baseUrl;
     }
 
     public String rawGet(String path) {
@@ -59,15 +76,20 @@ public final class NeteaseClient {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
             Map<String, Object> error = new LinkedHashMap<>();
             error.put("ok", false);
-            error.put("error", "netease unavailable: " + e.getMessage());
+            error.put("provider", "netease");
+            error.put("label", label());
+            error.put("baseUrl", baseUrl);
+            error.put("error", label() + " API unavailable at " + baseUrl + ": " + exceptionDetail(e));
             return SimpleJson.stringify(error);
         }
     }
 
+    @Override
     public String loginQrKeyPayload() {
         return rawGet("/login/qr/key", timestampParams(), false);
     }
 
+    @Override
     public String loginQrCreatePayload(String key, boolean qrimg) {
         Map<String, String> params = timestampParams();
         params.put("key", key == null ? "" : key);
@@ -75,6 +97,7 @@ public final class NeteaseClient {
         return rawGet("/login/qr/create", params, false);
     }
 
+    @Override
     public String loginQrCheckPayload(String key) {
         Map<String, String> params = timestampParams();
         params.put("key", key == null ? "" : key);
@@ -109,22 +132,27 @@ public final class NeteaseClient {
         body.put("ok", true);
         body.put("loggedIn", !uid.isBlank() || !SimpleJson.asString(account.get("nickname"), "").isBlank());
         body.put("provider", "netease");
+        body.put("label", label());
         body.put("account", account);
         body.put("status", SimpleJson.asInt(login.get("_httpStatus"), 0));
+        if (login.containsKey("error")) body.put("error", login.get("error"));
         return body;
     }
 
+    @Override
     public Map<String, Object> serviceStatus() {
         Map<String, Object> body = new LinkedHashMap<>();
         Object login = jsonGet("/login/status", Map.of());
         body.put("ok", true);
         body.put("provider", "netease");
+        body.put("label", label());
         body.put("baseUrl", baseUrl);
         body.put("reachable", !SimpleJson.asMap(login).containsKey("error"));
         body.put("login", login);
         return body;
     }
 
+    @Override
     public Map<String, Object> search(String keyword, int page, int limit) {
         int offset = Math.max(0, page - 1) * limit;
         Map<String, String> params = new LinkedHashMap<>();
@@ -138,7 +166,35 @@ public final class NeteaseClient {
             Song song = songFromNetease(item);
             if (song.hasIdentity()) songs.add(song);
         }
+        enrichSongDetails(songs);
         return songsPayload(songs, "search");
+    }
+
+    private void enrichSongDetails(List<Song> songs) {
+        List<String> missingCoverIds = songs.stream()
+            .filter((song) -> song != null && song.hasIdentity() && (song.cover == null || song.cover.isBlank()))
+            .map((song) -> song.id)
+            .distinct()
+            .toList();
+        if (missingCoverIds.isEmpty()) return;
+
+        try {
+            Object detailRoot = jsonGet("/song/detail", Map.of("ids", String.join(",", missingCoverIds)));
+            Map<String, Song> details = new LinkedHashMap<>();
+            for (Object item : SimpleJson.asList(SimpleJson.asMap(detailRoot).get("songs"))) {
+                Song detail = songFromNetease(item);
+                if (detail.hasIdentity()) details.put(detail.id, detail);
+            }
+            for (Song song : songs) {
+                Song detail = details.get(song.id);
+                if (detail == null) continue;
+                if ((song.cover == null || song.cover.isBlank()) && detail.cover != null) song.cover = detail.cover;
+                if ((song.album == null || song.album.isBlank()) && detail.album != null) song.album = detail.album;
+                if ((song.artist == null || song.artist.isBlank()) && detail.artist != null) song.artist = detail.artist;
+                if (song.duration <= 0) song.duration = detail.duration;
+            }
+        } catch (RuntimeException ignored) {
+        }
     }
 
     public String songUrl(String id, String quality) {
@@ -155,11 +211,13 @@ public final class NeteaseClient {
     public Map<String, Object> songUrlPayload(String id, String quality) {
         String url = songUrl(id, quality);
         Map<String, Object> body = new LinkedHashMap<>();
+        body.put("provider", "netease");
         body.put("url", url);
         body.put("playable", !url.isBlank());
         return body;
     }
 
+    @Override
     public Map<String, Object> userPlaylistsPayload() {
         String uid = currentUid();
         Map<String, Object> body = new LinkedHashMap<>();
@@ -168,6 +226,8 @@ public final class NeteaseClient {
             body.put("loggedIn", false);
             body.put("playlists", List.of());
             body.put("error", "netease login required");
+            body.put("provider", "netease");
+            body.put("label", label());
             return body;
         }
         List<Map<String, Object>> playlists = new ArrayList<>();
@@ -175,6 +235,8 @@ public final class NeteaseClient {
         body.put("ok", true);
         body.put("loggedIn", true);
         body.put("uid", uid);
+        body.put("provider", "netease");
+        body.put("label", label());
         body.put("playlists", playlists);
         return body;
     }
@@ -197,16 +259,68 @@ public final class NeteaseClient {
     }
 
     public Map<String, Object> playlistTracksPayload(String playlistId, int limit) {
-        Object root = jsonGet("/playlist/track/all", Map.of("id", playlistId, "limit", String.valueOf(limit)));
+        int requestLimit = limit > 0 ? limit : 100000;
+        Object root = jsonGet("/playlist/track/all", Map.of("id", playlistId, "limit", String.valueOf(requestLimit)));
         List<Song> songs = new ArrayList<>();
         for (Object item : SimpleJson.asList(SimpleJson.asMap(root).get("songs"))) {
             Song song = songFromNetease(item);
             if (song.hasIdentity()) songs.add(song);
-            if (songs.size() >= limit) break;
+            if (limit > 0 && songs.size() >= limit) break;
         }
         Map<String, Object> payload = songsPayload(songs, "playlist");
         payload.put("ok", true);
         return payload;
+    }
+
+    @Override
+    public Map<String, Object> addSongToPlaylistPayload(String playlistId, Song song) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("provider", "netease");
+        body.put("label", label());
+        body.put("playlistId", playlistId == null ? "" : playlistId);
+        body.put("song", song == null ? Song.empty().toMap() : song.toMap());
+
+        if (playlistId == null || playlistId.isBlank()) {
+            body.put("ok", false);
+            body.put("error", "playlist id is missing");
+            return body;
+        }
+        if (song == null || !song.hasIdentity()) {
+            body.put("ok", false);
+            body.put("error", "song id is missing");
+            return body;
+        }
+
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("op", "add");
+        params.put("pid", playlistId);
+        params.put("tracks", song.id);
+        params.put("timestamp", String.valueOf(System.currentTimeMillis()));
+        Object root = jsonGet("/playlist/tracks", params);
+        Map<String, Object> map = SimpleJson.asMap(root);
+        boolean ok = SimpleJson.asInt(map.get("code"), 0) == 200 ||
+            SimpleJson.asBoolean(map.get("ok"), false) ||
+            SimpleJson.asBoolean(SimpleJson.asMap(map.get("body")).get("success"), false);
+        body.put("ok", ok);
+        if (!ok) {
+            body.put("error", firstNonBlank(
+                SimpleJson.asString(map.get("message"), ""),
+                SimpleJson.asString(map.get("msg"), ""),
+                "failed to add song to playlist"
+            ));
+        }
+        return body;
+    }
+
+    @Override
+    public Map<String, Object> commentsPayload(String songId, int limit) {
+        if (songId == null || songId.isBlank()) return CommentPayloads.error("netease", label(), "song id is missing");
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("id", songId);
+        params.put("limit", String.valueOf(limit > 0 ? limit : 20));
+        params.put("offset", "0");
+        Object root = jsonGet("/comment/music", params);
+        return CommentPayloads.fromRoot("netease", label(), root, limit);
     }
 
     public Map<String, Object> dailyRecommendPayload(int limit) {
@@ -372,6 +486,21 @@ public final class NeteaseClient {
 
     private static String encode(String value) {
         return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
+    }
+
+    private static String exceptionDetail(Exception error) {
+        Throwable current = error;
+        while (current.getCause() != null) current = current.getCause();
+        String message = current.getMessage();
+        if (message == null || message.isBlank()) return current.getClass().getSimpleName();
+        return message;
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) return value;
+        }
+        return "";
     }
 
     private static String normalizeBase(String value) {

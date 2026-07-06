@@ -5,6 +5,7 @@ import com.femonster.core.AppContext;
 import com.femonster.core.ProjectPaths;
 import com.femonster.desktop.LocalClientLauncher;
 import com.femonster.http.StaticFileHandler;
+import com.femonster.music.MusicApiBootstrap;
 import com.sun.net.httpserver.HttpServer;
 
 import java.awt.Desktop;
@@ -14,6 +15,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.file.Files;
 import java.util.concurrent.Executors;
+import java.util.concurrent.CountDownLatch;
 
 public final class FeMonsterJavaApp {
     private FeMonsterJavaApp() {
@@ -23,6 +25,7 @@ public final class FeMonsterJavaApp {
         int preferredPort = parsePort();
         ProjectPaths paths = ProjectPaths.detect();
         Files.createDirectories(paths.dataDir);
+        MusicApiBootstrap.ensureAvailable(paths);
 
         AppContext context = new AppContext(paths);
         HttpServer server = createServer(preferredPort);
@@ -45,7 +48,7 @@ public final class FeMonsterJavaApp {
 
         ClientMode clientMode = clientMode(args);
         if (clientMode == ClientMode.LOCAL) {
-            boolean opened = LocalClientLauncher.open(url, paths);
+            boolean opened = LocalClientLauncher.open(url, paths, context.runtimeSettings.snapshot());
             if (!opened) {
                 System.out.println("Local client window could not be launched; opening the default browser instead.");
                 openBrowser(url);
@@ -53,6 +56,8 @@ public final class FeMonsterJavaApp {
         } else if (clientMode == ClientMode.BROWSER) {
             openBrowser(url);
         }
+
+        new CountDownLatch(1).await();
     }
 
     private static HttpServer createServer(int preferredPort) throws IOException {

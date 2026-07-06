@@ -10,7 +10,7 @@ FE Monster Java is for Windows listeners and builders who want the FE-Monster mu
 
 ## Product Purpose
 
-FE Monster Java migrates the local service, API contract, client UI, and playback surface into a Java 17 project. Success means the user can start `run.cmd`, get a local client window, search or load playlists, play tracks locally, manage queue state, and see a visual stage that reflects playback and Visual Bridge data.
+FE Monster Java migrates the local service, API contract, client UI, and playback surface into a Java 26-preferred, Java 17+ compatible project. Success means the user can start `run.cmd`, get a local client window, search or load playlists, play tracks locally, manage queue state, and see a visual stage that reflects playback and Visual Bridge data.
 
 ## Brand Personality
 

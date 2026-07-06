@@ -1,25 +1,14 @@
 {
-  "name": "fe-moster",
-  "version": "1.0.0",
-  "description": "<img width=\"1579\" height=\"978\" alt=\"QQ_1782917846092\" src=\"https://github.com/user-attachments/assets/e7855f47-035b-4b34-8d80-76de5dd4f628\" />",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/2292576833/FE-Monster.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/2292576833/FE-Monster/issues"
-  },
-  "homepage": "https://github.com/2292576833/FE-Monster#readme",
-  "dependencies": {
-    "@tsparticles/engine": "^4.3.1",
-    "@tsparticles/slim": "^4.3.1"
-  }
+	"license": "MIT",
+	"dependencies": {
+		"@chakra-ui/react": "^3.36.0",
+		"@sansenjian/qq-music-api": "^2.4.0",
+		"@tsparticles/configs": "^4.3.0",
+		"@tsparticles/engine": "^4.3.0",
+		"@tsparticles/slim": "^4.3.0",
+		"NeteaseCloudMusicApi": "^4.32.0",
+		"kugoumusicapi": "github:MakcRe/KuGouMusicApi",
+		"motion": "^12.42.1",
+		"react-icons": "^5.7.0"
+	}
 }

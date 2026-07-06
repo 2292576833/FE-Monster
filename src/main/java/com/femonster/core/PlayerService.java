@@ -2,7 +2,7 @@ package com.femonster.core;
 
 import com.femonster.json.SimpleJson;
 import com.femonster.model.Song;
-import com.femonster.netease.NeteaseClient;
+import com.femonster.music.MusicProviderRegistry;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -15,7 +15,7 @@ import java.util.Map;
 
 public final class PlayerService {
     private final Path stateFile;
-    private final NeteaseClient netease;
+    private final MusicProviderRegistry music;
     private final List<Song> queue = new ArrayList<>();
     private Song currentSong = Song.empty();
     private int queueIndex = -1;
@@ -29,9 +29,9 @@ public final class PlayerService {
     private long clockStartedAt = System.currentTimeMillis();
     private int positionAtClockStart = 0;
 
-    public PlayerService(Path stateFile, NeteaseClient netease) {
+    public PlayerService(Path stateFile, MusicProviderRegistry music) {
         this.stateFile = stateFile;
-        this.netease = netease;
+        this.music = music;
         restore();
     }
 
@@ -122,7 +122,7 @@ public final class PlayerService {
         position = 0;
         positionAtClockStart = 0;
         clockStartedAt = System.currentTimeMillis();
-        url = netease.songUrl(song.id, quality);
+        url = music.songUrl(MusicProviderRegistry.providerFromSong(song), song.id, quality);
         audioLoaded = !url.isBlank();
         playing = audioLoaded;
         error = audioLoaded ? "" : "song url unavailable";

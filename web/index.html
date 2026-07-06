@@ -1,12 +1,14 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="referrer" content="no-referrer" />
     <title>FE Monster Java</title>
-    <link rel="stylesheet" href="/components/GlassSurface.css?v=20260701-main-blue-orb" />
-    <link rel="stylesheet" href="styles.css?v=20260701-main-blue-orb" />
+    <link rel="stylesheet" href="/components/GlassSurface.css?v=20260706-black-glass-scroll" />
+    <link rel="stylesheet" href="/components/BorderGlow.css?v=20260705-button-border-glow-fix" />
+    <link rel="stylesheet" href="border-glow-buttons.css?v=20260705-button-border-glow-fix" />
+    <link rel="stylesheet" href="styles.css?v=20260707-book-scene-sync" />
   </head>
   <body>
     <section class="boot-screen" id="bootScreen" aria-label="FE moster launch screen">
@@ -17,11 +19,64 @@
     </section>
 
     <div class="app-shell">
+      <div class="runtime-topbar">
+        <button class="window-control-button window-control-button--settings" id="runtimeSettingsButton" type="button" title="Runtime settings" aria-label="Runtime settings" aria-expanded="false" aria-controls="runtimeSettingsPanel">
+          <span aria-hidden="true"></span>
+        </button>
+        <button class="window-control-button window-control-button--fullscreen" id="windowExitFullscreenButton" type="button" title="Toggle fullscreen" aria-label="Toggle fullscreen">
+          <span aria-hidden="true"></span>
+        </button>
+        <button class="window-control-button window-control-button--minimize" id="windowTopMinimizeButton" type="button" title="Minimize" aria-label="Minimize">
+          <span aria-hidden="true"></span>
+        </button>
+        <button class="window-control-button window-control-button--close" id="windowQuitButton" type="button" title="退出程序" aria-label="退出程序">
+          <span aria-hidden="true"></span>
+        </button>
+      </div>
+
+      <section class="runtime-settings-panel" id="runtimeSettingsPanel" aria-label="Runtime settings" hidden>
+        <label class="runtime-toggle">
+          <input id="gpuAccelerationToggle" type="checkbox" />
+          <span>GPU</span>
+        </label>
+        <label class="runtime-toggle">
+          <input id="directX11Toggle" type="checkbox" />
+          <span>DirectX11</span>
+        </label>
+        <label class="runtime-toggle">
+          <input id="xAudio2Toggle" type="checkbox" />
+          <span>XAudio2</span>
+        </label>
+        <label class="runtime-toggle">
+          <input id="x3DAudioToggle" type="checkbox" />
+          <span>X3DAudio</span>
+        </label>
+        <label class="runtime-toggle runtime-toggle--gesture">
+          <span>
+            <strong>手势操作</strong>
+            <small id="gestureControlStatus">摄像头关闭</small>
+          </span>
+          <input id="gestureControlToggle" type="checkbox" />
+        </label>
+        <div class="runtime-camera-source" role="group" aria-label="手势输入来源">
+          <button class="runtime-camera-source-button is-active" id="gestureWebcamButton" type="button" data-gesture-camera-source="webcam" aria-pressed="true">摄像头</button>
+          <button class="runtime-camera-source-button" id="gestureCameraButton" type="button" data-gesture-camera-source="camera" aria-pressed="false">相机</button>
+        </div>
+        <button class="runtime-action-button runtime-recording-button" id="runtimeRecordingButton" type="button">录制</button>
+        <div class="runtime-low-frequency" aria-label="20Hz 到 150Hz 低频振幅">
+          <div class="runtime-low-frequency-head">
+            <span>低频振幅</span>
+            <strong id="lowFrequencyValue">0%</strong>
+          </div>
+          <canvas id="lowFrequencyGraph" width="202" height="64" aria-hidden="true"></canvas>
+        </div>
+      </section>
+
       <form
         class="top-search glass-surface glass-surface--fallback"
         id="topSearchForm"
         role="search"
-        aria-label="鎼滅储闊充箰"
+        aria-label="搜索音乐"
         data-glass-surface
         data-glass-radius="16"
         data-glass-brightness="58"
@@ -37,20 +92,34 @@
       >
         <div class="glass-surface__content">
           <span class="top-search-icon" aria-hidden="true"><span></span></span>
-          <label class="sr-only" for="topSearchInput">鎼滅储闊充箰</label>
+          <label class="sr-only" for="topSearchInput">搜索音乐</label>
           <input
             id="topSearchInput"
             type="search"
             name="q"
             autocomplete="off"
             spellcheck="false"
-            placeholder="鎼滅储姝屾洸銆佹瓕鎵?
+            placeholder="搜索歌曲、歌手"
           />
-          <button class="top-search-submit" type="submit" aria-label="鎼滅储">
+          <button class="top-favorites-button" id="topFavoritesButton" type="button" aria-label="收藏目录" title="收藏目录" aria-expanded="false" aria-controls="favoriteLibrary">
+            <span class="top-favorites-icon" aria-hidden="true"></span>
+          </button>
+          <button class="top-search-submit" type="submit" aria-label="搜索">
             <span class="search-submit-icon" aria-hidden="true"></span>
           </button>
         </div>
       </form>
+
+      <section class="search-suggestions" id="searchSuggestions" role="listbox" aria-label="相关歌曲" hidden></section>
+      <section class="favorite-library" id="favoriteLibrary" aria-label="收藏目录" hidden>
+        <div class="favorite-library-head">
+          <strong>收藏目录</strong>
+          <small id="favoriteLibraryMeta">按平台保存</small>
+        </div>
+        <div class="favorite-library-tabs" id="favoriteLibraryTabs" role="tablist" aria-label="收藏平台"></div>
+        <div class="favorite-library-list" id="favoriteLibraryList" role="list"></div>
+      </section>
+      <section class="playlist-favorite-popover" id="playlistFavoritePopover" aria-label="收藏到歌单" hidden></section>
 
       <button
         class="netease-login-button glass-surface glass-surface--fallback"
@@ -73,7 +142,10 @@
       >
         <span class="glass-surface__content">
           <span class="netease-login-mark" aria-hidden="true"></span>
-          <span class="netease-login-label" id="neteaseLoginLabel">缃戞槗浜戠櫥褰?/span>
+          <span class="login-avatar" id="loginAvatar" aria-hidden="true">
+            <img id="loginAvatarImage" alt="" />
+          </span>
+          <span class="netease-login-label" id="neteaseLoginLabel">网易云登录</span>
         </span>
       </button>
 
@@ -81,7 +153,7 @@
         class="home-button glass-surface glass-surface--fallback"
         id="homeButton"
         type="button"
-        aria-label="鍥炲埌绮掑瓙鐞冧富椤甸潰"
+        aria-label="回到粒子球主页面"
         data-glass-surface
         data-glass-radius="23"
         data-glass-brightness="66"
@@ -123,17 +195,163 @@
         <span class="glass-surface__content">DIY</span>
       </button>
 
-      <main class="stage" aria-label="鐧借壊绮掑瓙鐞冩挱鏀捐垶鍙?>
+      <main class="stage" aria-label="白色粒子球播放舞台">
         <canvas id="orbCanvas" aria-hidden="true"></canvas>
         <div class="stage-glow" aria-hidden="true"></div>
-        <section class="dynamic-cube-scene" id="dynamicCubeScene" aria-label="鍔ㄦ劅榄旀柟" hidden>
+        <section class="community-card" id="communityCard" aria-label="FE Monster 社区">
+          <div class="community-card__head">
+            <span class="community-avatar" id="communityAvatar" role="button" tabindex="0" aria-label="打开社区个人资料">
+              <img id="communityAvatarImage" alt="" />
+              <span>FE</span>
+            </span>
+            <span class="community-profile">
+              <span class="community-kicker">COMMUNITY</span>
+              <strong id="communityName">登录后启用社区</strong>
+              <small id="communityMeta">同步音乐平台账号</small>
+            </span>
+            <button class="community-collapse-button" id="communityCollapseButton" type="button" aria-label="折叠社区卡片" aria-expanded="true">
+              <span aria-hidden="true"></span>
+            </button>
+          </div>
+
+          <div class="community-id-row">
+            <span>FE ID</span>
+            <strong id="communityFeId">--------</strong>
+          </div>
+
+          <form class="community-add-form" id="communityAddForm">
+            <input id="communitySearchInput" type="search" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="搜索 8 位好友 ID" />
+            <button id="communityAddButton" type="submit">添加</button>
+          </form>
+
+          <div class="community-friends-head">
+            <span>在线好友</span>
+            <span class="community-friends-tools">
+              <button class="community-header-action" id="communityMessageButton" type="button">消息</button>
+              <button class="community-header-action" id="communityDndButton" type="button" aria-pressed="false">免扰</button>
+              <strong id="communityOnlineCount">0</strong>
+            </span>
+          </div>
+          <div class="community-friends-list" id="communityFriendsList">
+            <span class="community-empty">暂无在线好友</span>
+          </div>
+          <div class="community-status" id="communityStatus">社区服务准备中</div>
+        </section>
+        <section class="community-message-dialog" id="communityMessageDialog" aria-label="社区消息" hidden>
+          <div class="community-message-panel" id="communityMessagePanel">
+            <header class="community-message-head" id="communityMessageHead">
+              <div>
+                <span>COMMUNITY MESSAGE</span>
+                <strong id="communityMessageTitle">选择好友</strong>
+                <small id="communityMessageMeta">互发消息</small>
+              </div>
+              <button id="communityMessageClose" type="button" aria-label="关闭消息">×</button>
+            </header>
+            <div class="community-message-list" id="communityMessageList">
+              <span class="community-empty">选择在线好友后开始聊天</span>
+            </div>
+            <form class="community-message-form" id="communityMessageForm">
+              <input id="communityMessageInput" type="text" autocomplete="off" maxlength="500" placeholder="输入消息" />
+              <button id="communityMessageSend" type="submit">发送</button>
+            </form>
+            <div class="community-card-rotate-handle" id="communityMessageRotateHandle" aria-hidden="true"></div>
+          </div>
+        </section>
+        <div class="community-message-bubbles" id="communityMessageBubbles" aria-live="polite"></div>
+        <div class="community-listen-bubbles" id="communityListenBubbles" aria-live="polite"></div>
+        <section class="community-profile-dialog" id="communityProfileDialog" aria-label="社区个人资料" hidden>
+          <div class="community-profile-panel" id="communityProfilePanel">
+            <header class="community-profile-head" id="communityProfileHead">
+              <div>
+                <span>COMMUNITY PROFILE</span>
+                <strong id="communityProfileTitle">个人资料</strong>
+                <small id="communityProfileMeta">描述自己</small>
+              </div>
+              <span class="community-profile-head-actions">
+                <button class="community-profile-tab is-active" id="communityProfileSelfTab" type="button" data-community-profile-page="self">个人资料</button>
+                <button class="community-profile-tab" id="communityProfileGroupTab" type="button" data-community-profile-page="nearby">社区集体</button>
+                <button id="communityProfileClose" type="button" aria-label="关闭个人资料">×</button>
+              </span>
+            </header>
+            <div class="community-profile-pages">
+              <div class="community-profile-page is-active" id="communityProfileSelfPage">
+                <div class="community-profile-card">
+                  <span class="community-profile-avatar" id="communityProfileAvatar">FE</span>
+                  <span class="community-profile-copy">
+                    <strong id="communityProfileDisplayName">登录后启用社区</strong>
+                    <small id="communityProfileId">FE ID --------</small>
+                  </span>
+                </div>
+                <label class="community-profile-bio">
+                  <span>我的描述</span>
+                  <textarea id="communityProfileBio" maxlength="180" placeholder="写一句介绍，让附近社区成员认识你"></textarea>
+                </label>
+                <div class="community-profile-actions">
+                  <button id="communityProfileSave" type="button">保存描述</button>
+                  <span id="communityProfileStatus">点击头像打开个人资料</span>
+                </div>
+              </div>
+              <div class="community-profile-page" id="communityProfileNearbyPage" hidden>
+                <div class="community-nearby-head">
+                  <strong>社区集体</strong>
+                  <small id="communityNearbyMeta">显示同区域 5-10 公里内的社区账号</small>
+                </div>
+                <div class="community-nearby-list" id="communityNearbyList">
+                  <span class="community-empty">正在读取附近社区账号</span>
+                </div>
+              </div>
+            </div>
+            <div class="community-card-rotate-handle" id="communityProfileRotateHandle" aria-hidden="true"></div>
+          </div>
+        </section>
+        <section class="listen-mini" id="listenMini" aria-label="一起听歌" hidden>
+          <header class="listen-mini-head" id="listenMiniHandle">
+            <div>
+              <span>LISTEN TOGETHER</span>
+              <strong id="listenMiniTitle">一起听歌</strong>
+            </div>
+            <button id="listenMiniClose" type="button" aria-label="关闭一起听">×</button>
+          </header>
+          <div class="listen-mini-body">
+            <p id="listenMiniStatus">等待好友回应</p>
+            <div class="listen-mini-track" id="listenMiniTrack">当前歌曲同步中</div>
+            <div class="listen-mini-actions">
+              <button id="listenAcceptButton" type="button" hidden>同意</button>
+              <button id="listenDeclineButton" type="button" hidden>拒绝</button>
+              <button id="listenLeaveButton" type="button" hidden>退出</button>
+              <button id="listenCallButton" type="button">连麦</button>
+              <button id="listenHangupButton" type="button" hidden>挂断</button>
+            </div>
+          </div>
+        </section>
+        <section class="wallpaper-scene" id="wallpaperScene" aria-label="壁纸模式" hidden>
+          <img class="wallpaper-media wallpaper-media--image" id="wallpaperImage" alt="" />
+          <video class="wallpaper-media wallpaper-media--video" id="wallpaperVideo" muted loop playsinline></video>
+          <div class="wallpaper-empty" id="wallpaperEmpty">导入或选择壁纸</div>
+        </section>
+        <section class="dynamic-cube-scene" id="dynamicCubeScene" aria-label="动感魔方" hidden>
           <div class="dynamic-cube-rig" id="dynamicCubeRig" aria-hidden="true">
             <div class="dynamic-cube-core" id="dynamicCubeCore"></div>
           </div>
         </section>
+        <section class="sonic-topography-scene" id="sonicTopographyScene" aria-label="Sonic topography" hidden>
+          <div class="sonic-topography-rig" id="sonicTopographyRig" aria-hidden="true">
+            <div class="sonic-topography-core" id="sonicTopographyCore"></div>
+          </div>
+        </section>
         <section class="playback-lyric-scene" id="playbackLyricScene" aria-label="3D playback lyric" hidden>
+          <div class="book-lyric-stage" id="bookLyricStage" aria-hidden="true">
+            <figure class="book-lyric-cover" id="bookLyricCover">
+              <img id="bookLyricCoverImage" alt="" />
+              <figcaption>FE</figcaption>
+            </figure>
+            <div class="book-lyric-page" aria-label="书页歌词">
+              <div class="book-lyric-list" id="bookLyricList"></div>
+            </div>
+          </div>
           <div class="playback-lyric-rig" id="playbackLyricRig" aria-live="polite">
             <div class="playback-lyric-core" id="playbackLyricCore">
+              <div class="blur-lyric-mount" id="blurLyricMount" aria-hidden="true"></div>
               <span class="playback-lyric-layer lyric-depth-5" id="playbackLyricDepth5"></span>
               <span class="playback-lyric-layer lyric-depth-4" id="playbackLyricDepth4"></span>
               <span class="playback-lyric-layer lyric-depth-3" id="playbackLyricDepth3"></span>
@@ -145,56 +363,36 @@
             <div class="playback-lyric-subtitle" id="playbackLyricSubtitle"></div>
           </div>
         </section>
-        <section class="orb-playlists" id="orbPlaylists" aria-label="缃戞槗浜戠敤鎴锋瓕鍗? hidden>
-          <div class="orb-playlist-status" id="orbPlaylistStatus">缃戞槗浜戞瓕鍗?/div>
-          <div class="orb-playlist-cards" id="orbPlaylistCards"></div>
+        <section class="orb-playlists playlist-album-orbit" id="orbPlaylists" aria-label="User playlist albums" hidden>
+          <div class="orb-playlist-status" id="orbPlaylistStatus">Playlists</div>
+          <div class="orb-playlist-cards playlist-album-ring" id="orbPlaylistCards" tabindex="0" role="listbox" aria-label="User playlist albums"></div>
         </section>
 
-        <section class="playlist-shelf" id="playlistShelf" aria-label="3D 姝屽崟鏋? hidden>
-          <div class="playlist-shelf-stage" id="playlistShelfStage" tabindex="0" role="region" aria-labelledby="playlistShelfTitle">
-            <div class="playlist-shelf-panel">
-              <header class="playlist-shelf-head">
-                <span class="playlist-shelf-cover" id="playlistShelfCover">
-                  <img id="playlistShelfCoverImage" alt="" />
-                  <span>姝屽崟</span>
-                </span>
-                <span class="playlist-shelf-copy">
-                  <span class="playlist-shelf-kicker">缃戞槗浜戞瓕鍗曟灦</span>
-                  <strong id="playlistShelfTitle">閫夋嫨姝屽崟</strong>
-                  <small id="playlistShelfMeta">鏈€夋嫨姝屽崟</small>
-                </span>
-                <button class="playlist-shelf-hide" id="playlistShelfClose" type="button">闅愯棌</button>
-              </header>
-              <div class="playlist-shelf-scroll" id="playlistShelfScroll">
-                <div class="playlist-song-stack" id="playlistSongStack"></div>
-              </div>
-            </div>
-            <div class="playlist-shelf-back" id="playlistShelfBack" role="button" tabindex="0" aria-label="鏄剧ず姝屽崟鏋舵闈?>
-              <div class="playlist-shelf-back-content">
-                <header class="playlist-shelf-head playlist-shelf-back-head">
-                  <span class="playlist-shelf-cover" id="playlistShelfBackCover">
-                    <img id="playlistShelfBackCoverImage" alt="" />
-                    <span>姝屽崟</span>
-                  </span>
-                  <span class="playlist-shelf-copy">
-                    <span class="playlist-shelf-kicker">BACK SIDE</span>
-                    <strong id="playlistShelfBackTitle">閫夋嫨姝屽崟</strong>
-                    <small id="playlistShelfBackMeta">鏈€夋嫨姝屽崟</small>
-                  </span>
-                </header>
-                <div class="playlist-shelf-scroll playlist-shelf-back-scroll" id="playlistShelfBackScroll">
-                  <div class="playlist-song-stack playlist-song-stack--back" id="playlistSongStackBack"></div>
-                </div>
-              </div>
+        <section class="playlist-song-page" id="playlistShelf" aria-label="3D playlist songs" hidden>
+          <div class="playlist-song-page-stage" id="playlistShelfStage" tabindex="0" role="region" aria-labelledby="playlistShelfTitle">
+            <button class="playlist-song-back" id="playlistShelfBack" type="button" aria-label="Back to playlist albums"></button>
+            <article class="selected-playlist-album" id="selectedPlaylistAlbum">
+              <span class="playlist-shelf-cover selected-playlist-cover" id="playlistShelfCover">
+                <img id="playlistShelfCoverImage" alt="" />
+                <span>LIST</span>
+              </span>
+              <span class="playlist-shelf-copy selected-playlist-copy">
+                <span class="playlist-shelf-kicker">SELECTED PLAYLIST</span>
+                <strong id="playlistShelfTitle">Choose playlist</strong>
+                <small id="playlistShelfMeta">No playlist selected</small>
+              </span>
+            </article>
+            <div class="playlist-shelf-scroll playlist-song-card-viewport" id="playlistShelfScroll">
+              <div class="playlist-song-stack playlist-song-card-stack" id="playlistSongStack" tabindex="0" role="listbox" aria-label="Playlist songs"></div>
             </div>
           </div>
+          <button class="playlist-shelf-hide" id="playlistShelfClose" type="button" hidden>Back</button>
         </section>
       </main>
-      <div id="tsparticles" style="position:fixed;inset:0;z-index:0;pointer-events:none" aria-hidden="true"></div>
 
       <footer
         class="player-dock glass-surface glass-surface--fallback"
-        aria-label="鎾斁鎺у埗鏍?
+        aria-label="播放控制栏"
         data-glass-surface
         data-glass-radius="20"
         data-glass-brightness="54"
@@ -216,26 +414,26 @@
             </div>
             <div class="track-copy">
               <span class="dock-status" id="dockStatus">READY</span>
-              <strong id="dockTitle">鏈挱鏀?/strong>
-              <small id="dockArtist">閫夋嫨涓€棣栨瓕寮€濮?/small>
+              <strong id="dockTitle">未播放</strong>
+              <small id="dockArtist">选择一首歌开始</small>
             </div>
           </div>
 
           <div class="dock-center">
-            <div class="transport" aria-label="鎾斁鎺у埗">
-              <button class="icon-button transport-prev" id="prevButton" type="button" title="涓婁竴棣? aria-label="涓婁竴棣?>
+            <div class="transport" aria-label="播放控制">
+              <button class="icon-button transport-prev" id="prevButton" type="button" title="上一首" aria-label="上一首">
                 <span class="control-icon control-icon-prev" aria-hidden="true"></span>
               </button>
-              <button class="icon-button play" id="playButton" type="button" title="鎾斁" aria-label="鎾斁">
+              <button class="icon-button play" id="playButton" type="button" title="播放" aria-label="播放">
                 <span class="control-icon control-icon-play" aria-hidden="true"></span>
               </button>
-              <button class="icon-button transport-next" id="nextButton" type="button" title="涓嬩竴棣? aria-label="涓嬩竴棣?>
+              <button class="icon-button transport-next" id="nextButton" type="button" title="下一首" aria-label="下一首">
                 <span class="control-icon control-icon-next" aria-hidden="true"></span>
               </button>
             </div>
 
             <div class="progress-area">
-              <input id="progressRange" type="range" min="0" max="1000" value="0" aria-label="鎾斁杩涘害" />
+              <input id="progressRange" type="range" min="0" max="1000" value="0" aria-label="播放进度" />
               <div class="time-row">
                 <span id="currentTime">00:00</span>
                 <span id="totalTime">00:00</span>
@@ -246,8 +444,16 @@
           <div class="volume-area">
             <span class="volume-icon" aria-hidden="true"></span>
             <span id="volumeLabel">80%</span>
-            <input id="volumeRange" type="range" min="0" max="100" value="80" aria-label="闊抽噺" />
+            <input id="volumeRange" type="range" min="0" max="100" value="80" aria-label="音量" />
           </div>
+
+          <button class="dock-favorite-button" id="dockFavoriteButton" type="button" title="收藏当前歌曲" aria-label="收藏当前歌曲" aria-pressed="false" disabled>
+            <span class="dock-favorite-icon" aria-hidden="true"></span>
+          </button>
+
+          <button class="dock-pin-button" id="dockPinButton" type="button" title="固定播放栏" aria-label="固定播放栏" aria-pressed="false">
+            <span class="dock-pin-icon" aria-hidden="true"></span>
+          </button>
         </div>
       </footer>
 
@@ -256,44 +462,184 @@
           <span>DIY</span>
           <button class="diy-close-button" id="diyCloseButton" type="button" aria-label="Close DIY panel"></button>
         </div>
-        <button class="diy-preset-button glass-surface glass-surface--fallback" id="diyPresetButton" type="button" aria-expanded="true" aria-controls="diyPresetPage" data-glass-surface>
-          <span class="glass-surface__content">棰勮</span>
-        </button>
-        <section class="diy-preset-page is-expanded" id="diyPresetPage" aria-label="棰勮椤?>
-          <div class="diy-preset-options">
-            <button class="diy-preset-card is-active" id="diyLyricPreset" type="button" data-preset="lyric">
-              <strong>3D姝岃瘝</strong>
-              <small>灏侀潰鍙栬壊</small>
-            </button>
-            <button class="diy-preset-card" id="diyCubePreset" type="button" data-preset="cube">
-              <strong>鍔ㄦ劅榄旀柟</strong>
-              <small>浣庨椹卞姩</small>
-            </button>
+        <div class="diy-page-tabs" role="tablist" aria-label="DIY 页面">
+          <button class="diy-page-tab is-active glass-surface glass-surface--fallback" id="diyPresetButton" type="button" aria-pressed="true" aria-controls="diyPresetPage" data-glass-surface>
+            <span class="glass-surface__content">预设</span>
+          </button>
+          <button class="diy-page-tab glass-surface glass-surface--fallback" id="diyTextModeButton" type="button" aria-pressed="false" aria-controls="diyTextPage" data-glass-surface>
+            <span class="glass-surface__content">文字预设</span>
+          </button>
+          <button class="diy-page-tab glass-surface glass-surface--fallback" id="diyWallpaperModeButton" type="button" aria-pressed="false" aria-controls="diyWallpaperPage" data-glass-surface>
+            <span class="glass-surface__content">壁纸模式</span>
+          </button>
+        </div>
+        <section class="diy-preset-page is-expanded" id="diyPresetPage" aria-label="预设页">
+          <div class="diy-preset-group diy-preset-group--scene">
+            <span class="diy-preset-group-label">场景预设</span>
+            <div class="diy-preset-options diy-preset-options--scene">
+              <button class="diy-preset-card is-active" id="diySceneNonePreset" type="button" data-preset="lyric">
+                <strong>无场景</strong>
+                <small>只显示歌词</small>
+              </button>
+              <button class="diy-preset-card" id="diyCubePreset" type="button" data-preset="cube">
+                <strong>动感魔方</strong>
+                <small>低频驱动</small>
+              </button>
+              <button class="diy-preset-card" id="diyTopographyPreset" type="button" data-preset="topography">
+                <strong>Sonic</strong>
+                <small>Terrain</small>
+              </button>
+              <button class="diy-preset-card" id="diyBookLyricPreset" type="button" data-preset="book">
+                <strong>书页歌词</strong>
+                <small>封面取色</small>
+              </button>
+            </div>
           </div>
           <div class="diy-spectrum">
-            <span>浣庨</span>
+            <span>低频</span>
             <div class="diy-spectrum-track" aria-hidden="true">
               <i id="spectrumBassFill"></i>
             </div>
-            <strong id="spectrumStatus">寰呮満</strong>
+            <strong id="spectrumStatus">待机</strong>
           </div>
           <div class="diy-control">
-            <label for="lyricBrightnessRange">姝岃瘝浜害</label>
-            <input id="lyricBrightnessRange" type="range" min="60" max="180" value="112" />
-            <span id="lyricBrightnessValue">112%</span>
-          </div>
-          <div class="diy-control">
-            <label for="lyricSpeedRange">璺冲姩閫熷害</label>
-            <input id="lyricSpeedRange" type="range" min="60" max="180" value="100" />
-            <span id="lyricSpeedValue">100%</span>
-          </div>
-          <div class="diy-control">
-            <label for="cubeIntensityRange">榄旀柟寮哄害</label>
+            <label for="cubeIntensityRange">魔方强度</label>
             <input id="cubeIntensityRange" type="range" min="40" max="180" value="110" />
             <span id="cubeIntensityValue">110%</span>
           </div>
         </section>
+        <section class="diy-text-page" id="diyTextPage" aria-label="文字预设" hidden>
+          <div class="diy-preset-group diy-preset-group--text">
+            <span class="diy-preset-group-label">文字预设</span>
+            <div class="diy-preset-options diy-preset-options--text">
+              <button class="diy-preset-card is-active" id="diyLyricPreset" type="button" data-text-preset="depth">
+                <strong>3D歌词</strong>
+                <small>封面取色</small>
+              </button>
+              <button class="diy-preset-card" id="diyFlowTextPreset" type="button" data-text-preset="flow">
+                <strong>流动文字</strong>
+                <small>逐字显影</small>
+              </button>
+            </div>
+          </div>
+          <div class="diy-control">
+            <label for="lyricBrightnessRange">歌词亮度</label>
+            <input id="lyricBrightnessRange" type="range" min="60" max="180" value="112" />
+            <span id="lyricBrightnessValue">112%</span>
+          </div>
+          <div class="diy-control">
+            <label for="lyricSpeedRange">跳动速度</label>
+            <input id="lyricSpeedRange" type="range" min="60" max="180" value="100" />
+            <span id="lyricSpeedValue">100%</span>
+          </div>
+        </section>
+        <section class="diy-wallpaper-page" id="diyWallpaperPage" aria-label="壁纸模式" hidden>
+          <div class="diy-wallpaper-mode-tabs" role="tablist" aria-label="壁纸来源">
+            <button class="diy-wallpaper-mode-button is-active" id="wallpaperImportedModeButton" type="button" aria-pressed="true">导入壁纸</button>
+            <button class="diy-wallpaper-mode-button" id="wallpaperLiveModeButton" type="button" aria-pressed="false">实时壁纸</button>
+          </div>
+          <div class="diy-wallpaper-actions" id="wallpaperImportActions">
+            <button class="diy-wallpaper-import" id="wallpaperImportButton" type="button">添加本地壁纸</button>
+            <button class="diy-wallpaper-refresh" id="wallpaperRefreshButton" type="button">刷新</button>
+            <input id="wallpaperImportInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime" multiple hidden />
+          </div>
+          <div class="diy-wallpaper-status" id="wallpaperStatus">导入壁纸显示本地导入内容，实时壁纸显示 Wallpaper Engine 库</div>
+          <div class="diy-wallpaper-list" id="wallpaperList" role="listbox" aria-label="壁纸列表"></div>
+          <div class="diy-wallpaper-fit" role="group" aria-label="壁纸适配模式">
+            <button class="diy-wallpaper-fit-button is-active" type="button" data-wallpaper-fit="fill">填充</button>
+            <button class="diy-wallpaper-fit-button" type="button" data-wallpaper-fit="fit">适应</button>
+            <button class="diy-wallpaper-fit-button" type="button" data-wallpaper-fit="stretch">拉伸</button>
+            <button class="diy-wallpaper-fit-button" type="button" data-wallpaper-fit="center">居中</button>
+            <button class="diy-wallpaper-fit-button" type="button" data-wallpaper-fit="tile">平铺</button>
+          </div>
+          <div class="diy-control diy-control--wallpaper">
+            <label for="wallpaperOpacityRange">壁纸透明度</label>
+            <input id="wallpaperOpacityRange" type="range" min="30" max="100" value="100" />
+            <span id="wallpaperOpacityValue">100%</span>
+          </div>
+          <div class="diy-control diy-control--wallpaper">
+            <label for="wallpaperBrightnessRange">壁纸亮度</label>
+            <input id="wallpaperBrightnessRange" type="range" min="35" max="150" value="100" />
+            <span id="wallpaperBrightnessValue">100%</span>
+          </div>
+          <div class="diy-control diy-control--wallpaper">
+            <label for="wallpaperBlurRange">壁纸模糊</label>
+            <input id="wallpaperBlurRange" type="range" min="0" max="24" value="0" />
+            <span id="wallpaperBlurValue">0px</span>
+          </div>
+          <div class="diy-control diy-control--wallpaper">
+            <label for="wallpaperScaleRange">壁纸缩放</label>
+            <input id="wallpaperScaleRange" type="range" min="70" max="100" value="100" />
+            <span id="wallpaperScaleValue">100%</span>
+          </div>
+        </section>
       </aside>
+    </div>
+
+    <div class="recording-dialog recording-mini" id="recordingDialog" role="dialog" aria-modal="false" aria-labelledby="recordingDialogTitle" hidden>
+      <div class="recording-backdrop" data-recording-close></div>
+      <section class="recording-panel" id="recordingPanel">
+        <header class="recording-panel-head">
+          <div>
+            <strong id="recordingDialogTitle">录制</strong>
+            <span id="recordingStatus">只录制当前程序窗口或当前页面</span>
+          </div>
+          <button class="recording-close-button" id="recordingCloseButton" type="button" aria-label="关闭录制窗口"></button>
+        </header>
+
+        <div class="recording-preview-shell">
+          <video id="recordingPreview" muted playsinline></video>
+          <span id="recordingPreviewPlaceholder">预览录制画面</span>
+        </div>
+
+        <div class="recording-controls">
+          <label class="recording-field">
+            <span>清晰度</span>
+            <select id="recordingQualitySelect">
+              <option value="native">原始窗口</option>
+              <option value="1080">1080p</option>
+              <option value="720">720p</option>
+            </select>
+          </label>
+          <label class="recording-field">
+            <span>帧率</span>
+            <select id="recordingFpsSelect">
+              <option value="60" selected>60 FPS</option>
+              <option value="30">30 FPS</option>
+              <option value="24">24 FPS</option>
+            </select>
+          </label>
+          <label class="recording-field">
+            <span>码率</span>
+            <input id="recordingBitrateInput" type="number" min="12" max="80" step="1" value="36" />
+          </label>
+          <label class="recording-audio-toggle">
+            <input id="recordingAudioToggle" type="checkbox" />
+            <span>包含程序音频</span>
+          </label>
+        </div>
+
+        <div class="recording-actions">
+          <button class="recording-primary-button recording-round-button" id="recordingStartButton" type="button" title="开始录制" aria-label="开始录制">
+            <span class="recording-icon recording-icon--start" aria-hidden="true"></span>
+            <span class="recording-action-label">开始录制</span>
+          </button>
+          <button class="recording-secondary-button recording-round-button" id="recordingStopButton" type="button" title="停止录制" aria-label="停止录制" disabled>
+            <span class="recording-icon recording-icon--stop" aria-hidden="true"></span>
+            <span class="recording-action-label">停止录制</span>
+          </button>
+          <button class="recording-secondary-button recording-round-button" id="recordingResumeButton" type="button" title="继续录制" aria-label="继续录制" disabled>
+            <span class="recording-icon recording-icon--resume" aria-hidden="true"></span>
+            <span class="recording-action-label">继续录制</span>
+          </button>
+          <button class="recording-finish-button recording-round-button" id="recordingFinishButton" type="button" title="完成录制" aria-label="完成录制" disabled>
+            <span class="recording-icon recording-icon--finish" aria-hidden="true"></span>
+            <span class="recording-action-label">完成录制</span>
+          </button>
+          <a class="recording-download-button" id="recordingDownloadButton" href="#" download hidden>另存</a>
+          <span class="recording-timer" id="recordingTimer">00:00</span>
+        </div>
+      </section>
     </div>
 
     <div class="netease-login-dialog" id="neteaseLoginDialog" role="dialog" aria-modal="true" aria-labelledby="neteaseLoginTitle" hidden>
@@ -316,29 +662,60 @@
         <div class="glass-surface__content">
           <header class="login-panel-head">
             <div>
-              <strong id="neteaseLoginTitle">缃戞槗浜戜簩缁寸爜鐧诲綍</strong>
-              <span>浣跨敤缃戞槗浜戦煶涔?App 鎵爜纭</span>
+              <strong id="neteaseLoginTitle">音乐账号登录</strong>
+              <span id="loginProviderSubtitle">选择平台后使用对应 App 扫码确认</span>
             </div>
-            <button class="login-close-button" id="neteaseLoginClose" type="button" aria-label="鍏抽棴鐧诲綍寮圭獥"></button>
+            <button class="login-close-button" id="neteaseLoginClose" type="button" aria-label="关闭登录弹窗"></button>
           </header>
+
+          <div class="login-provider-tabs" id="loginProviderTabs" role="tablist" aria-label="选择音乐平台">
+            <button class="login-provider-tab is-active" type="button" data-login-provider="netease" aria-pressed="true">网易云</button>
+            <button class="login-provider-tab" type="button" data-login-provider="qq" aria-pressed="false">QQ音乐</button>
+            <button class="login-provider-tab" type="button" data-login-provider="kugou" aria-pressed="false">酷狗音乐</button>
+          </div>
 
           <div class="qr-login-stage">
             <div class="qr-code-shell" id="neteaseQrShell">
-              <img id="neteaseQrImage" alt="缃戞槗浜戠櫥褰曚簩缁寸爜" />
-              <span id="neteaseQrPlaceholder">鐢熸垚浜岀淮鐮?/span>
+              <img id="neteaseQrImage" alt="网易云登录二维码" />
+              <span id="neteaseQrPlaceholder">生成二维码</span>
             </div>
-            <p class="qr-login-status" id="neteaseQrStatus">鐐瑰嚮鍙充笂瑙掓寜閽紑濮嬬櫥褰?/p>
-            <button class="qr-refresh-button" id="neteaseQrRefresh" type="button">鍒锋柊浜岀淮鐮?/button>
+            <p class="qr-login-status" id="neteaseQrStatus">点击右上角按钮开始登录</p>
+            <button class="qr-refresh-button" id="neteaseQrRefresh" type="button">刷新二维码</button>
+            <div class="login-community-strip" id="loginCommunityStrip" hidden>
+              <span id="loginCommunityName">登录后生成社区 ID</span>
+              <strong id="loginCommunityId">FE ID --------</strong>
+            </div>
           </div>
         </div>
       </section>
     </div>
 
+    <section class="update-dialog" id="updateDialog" role="dialog" aria-modal="true" aria-labelledby="updateDialogTitle" hidden>
+      <div class="update-dialog-panel">
+        <header class="update-dialog-head">
+          <div>
+            <strong id="updateDialogTitle">发现新客户端</strong>
+            <span>版本 <b id="updateVersion">--</b></span>
+          </div>
+        </header>
+        <p class="update-dialog-notes" id="updateNotes">服务器已发布新客户端版本。</p>
+        <div class="update-progress">
+          <span id="updateProgressBar"></span>
+        </div>
+        <div class="update-progress-text" id="updateProgressText">等待确认</div>
+        <div class="update-dialog-actions">
+          <button class="update-secondary-button" id="updateLaterButton" type="button">稍后</button>
+          <button class="update-primary-button" id="updateInstallButton" type="button">立即更新</button>
+        </div>
+      </div>
+    </section>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <audio id="audio" preload="metadata"></audio>
     <script src="vendor/three.r128.min.js?v=20260701-main-blue-orb"></script>
-    <script type="module" src="boot-lightfall-react.js?v=20260701-main-blue-orb"></script>
-    <script src="app.js?v=20260701-main-blue-orb"></script>
-    <script type="module" src="particles-bg.js"></script>
+    <script type="module" src="boot-lightfall-react.js?v=20260702-perf-login-fix"></script>
+    <script type="module" src="blur-text-lyrics.js?v=20260702-window-provider"></script>
+    <script type="module" src="border-glow-buttons.js?v=20260705-button-border-glow-fix"></script>
+    <script src="app.js?v=20260707-book-scene-sync"></script>
   </body>
 </html>
