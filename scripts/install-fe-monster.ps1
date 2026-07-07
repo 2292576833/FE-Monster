@@ -9,7 +9,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $setupRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $payloadZip = Join-Path $setupRoot 'FE-Monster-Payload.zip'
-$installPath = [System.IO.Path]::GetFullPath($InstallDir)
+$installPath = [System.IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($InstallDir))
 $outDir = Join-Path $installPath 'out'
 $installLog = Join-Path $outDir 'install.log'
 
@@ -21,11 +21,32 @@ function Write-Log {
   Add-Content -Encoding UTF8 -Path $installLog -Value $line
 }
 
+function Resolve-FullPath {
+  param([string]$Path)
+  if ([string]::IsNullOrWhiteSpace($Path)) {
+    throw "Unsafe install directory: $Path"
+  }
+  return [System.IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($Path)).TrimEnd(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar
+  )
+}
+
 function Assert-SafeInstallPath {
   param([string]$Path)
-  $full = [System.IO.Path]::GetFullPath($Path).TrimEnd('\')
-  $root = [System.IO.Path]::GetPathRoot($full).TrimEnd('\')
-  if ([string]::IsNullOrWhiteSpace($full) -or $full.Length -lt 8 -or [string]::Equals($full, $root, [StringComparison]::OrdinalIgnoreCase)) {
+  $full = Resolve-FullPath $Path
+  $root = [System.IO.Path]::GetPathRoot($full).TrimEnd(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar
+  )
+  $windows = Resolve-FullPath ([Environment]::GetFolderPath([Environment+SpecialFolder]::Windows))
+  $system = Resolve-FullPath ([Environment]::SystemDirectory)
+  if (
+    [string]::IsNullOrWhiteSpace($full) -or
+    [string]::Equals($full, $root, [StringComparison]::OrdinalIgnoreCase) -or
+    [string]::Equals($full, $windows, [StringComparison]::OrdinalIgnoreCase) -or
+    [string]::Equals($full, $system, [StringComparison]::OrdinalIgnoreCase)
+  ) {
     throw "Unsafe install directory: $full"
   }
   return $full
@@ -236,6 +257,40 @@ function Install-Shortcuts {
     -Arguments ('"{0}"' -f $vbs) `
     -WorkingDirectory $installPath `
     -IconLocation $icon
+
+  $uninstallScript = Join-Path $installPath 'scripts\uninstall-fe-monster.ps1'
+  if (Test-Path $uninstallScript) {
+    New-Shortcut `
+      -Path (Join-Path $startMenu 'Uninstall FE Monster.lnk') `
+      -TargetPath 'powershell.exe' `
+      -Arguments ('-NoProfile -ExecutionPolicy Bypass -File "{0}" -Root "{1}"' -f $uninstallScript, $installPath) `
+      -WorkingDirectory $installPath `
+      -IconLocation $icon
+  }
+}
+
+function Register-Uninstaller {
+  $uninstallScript = Join-Path $installPath 'scripts\uninstall-fe-monster.ps1'
+  if (!(Test-Path $uninstallScript)) {
+    Write-Log 'Uninstaller script was not found; skipping uninstall registration.'
+    return
+  }
+
+  $keyPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\FE Monster'
+  $icon = Join-Path $installPath 'native\windows\build\winforms\fe-monster-client.exe'
+  $uninstallArgs = '-NoProfile -ExecutionPolicy Bypass -File {0} -Root {1}' -f (Quote-Arg $uninstallScript), (Quote-Arg $installPath)
+  $quietArgs = $uninstallArgs + ' -Quiet'
+
+  New-Item -Path $keyPath -Force | Out-Null
+  Set-ItemProperty -Path $keyPath -Name 'DisplayName' -Value 'FE Monster'
+  Set-ItemProperty -Path $keyPath -Name 'Publisher' -Value 'FE Monster'
+  Set-ItemProperty -Path $keyPath -Name 'DisplayIcon' -Value $icon
+  Set-ItemProperty -Path $keyPath -Name 'InstallLocation' -Value $installPath
+  Set-ItemProperty -Path $keyPath -Name 'UninstallString' -Value ('powershell.exe ' + $uninstallArgs)
+  Set-ItemProperty -Path $keyPath -Name 'QuietUninstallString' -Value ('powershell.exe ' + $quietArgs)
+  New-ItemProperty -Path $keyPath -Name 'NoModify' -Value 1 -PropertyType DWord -Force | Out-Null
+  New-ItemProperty -Path $keyPath -Name 'NoRepair' -Value 1 -PropertyType DWord -Force | Out-Null
+  Write-Log 'Uninstaller registered.'
 }
 
 function Install-UpdateAgent {
@@ -272,6 +327,7 @@ function Assert-RequiredFiles {
     'out\fe-monster-java.jar',
     'web\index.html',
     'scripts\launch-fe-monster.ps1',
+    'scripts\uninstall-fe-monster.ps1',
     'scripts\start-ncm-api.ps1',
     'scripts\start-qq-api.ps1',
     'scripts\start-kugou-api.ps1',
@@ -448,6 +504,7 @@ try {
   Assert-RequiredFiles
   Test-MusicApis
   Test-JavaServer
+  Register-Uninstaller
   if (!$NoShortcuts) {
     Install-Shortcuts
   }
