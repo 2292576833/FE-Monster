@@ -55,7 +55,7 @@ function Ensure-ApiDependencies {
   if (!(Test-Path $dependencyHelper)) {
     return $false
   }
-  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $dependencyHelper -Root $rootPath -RequiredPath @(
+  & powershell.exe -NoProfile -File $dependencyHelper -Root $rootPath -RequiredPath @(
     'node_modules\@sansenjian\qq-music-api\dist\cli.js'
   ) -InstallMissing
   return $LASTEXITCODE -eq 0

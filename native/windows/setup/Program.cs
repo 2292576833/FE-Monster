@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Drawing;
 using System.IO.Compression;
+using System.Reflection;
 using System.Text;
 using System.Windows.Forms;
 
@@ -47,6 +48,8 @@ internal sealed class SetupForm : Form
     private readonly Button installButton;
     private readonly Button closeButton;
     private readonly Button browseButton;
+    private readonly Button openFolderButton;
+    private readonly CheckBox launchAfterInstallBox;
     private readonly ProgressBar progressBar;
     private readonly System.Windows.Forms.Timer logTimer;
     private Process? installProcess;
@@ -117,7 +120,7 @@ internal sealed class SetupForm : Form
         Label pathLabel = new()
         {
             AutoSize = true,
-            Text = "Install path",
+            Text = "\u5b89\u88c5\u8def\u5f84",
             ForeColor = Color.FromArgb(218, 236, 244),
             Location = new Point(22, 18)
         };
@@ -126,7 +129,7 @@ internal sealed class SetupForm : Form
         installPathBox = new TextBox
         {
             Location = new Point(22, 44),
-            Size = new Size(486, 28),
+            Size = new Size(394, 28),
             Text = options.InstallDir,
             BackColor = Color.FromArgb(28, 36, 42),
             ForeColor = Color.White,
@@ -136,9 +139,9 @@ internal sealed class SetupForm : Form
 
         browseButton = new Button
         {
-            Location = new Point(518, 43),
-            Size = new Size(78, 30),
-            Text = "Browse",
+            Location = new Point(426, 43),
+            Size = new Size(82, 30),
+            Text = "\u9009\u62e9\u8def\u5f84",
             BackColor = Color.FromArgb(42, 54, 62),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat
@@ -146,6 +149,19 @@ internal sealed class SetupForm : Form
         browseButton.FlatAppearance.BorderColor = Color.FromArgb(74, 96, 108);
         browseButton.Click += (_, _) => BrowseInstallPath();
         content.Controls.Add(browseButton);
+
+        openFolderButton = new Button
+        {
+            Location = new Point(516, 43),
+            Size = new Size(80, 30),
+            Text = "\u6253\u5f00\u76ee\u5f55",
+            BackColor = Color.FromArgb(42, 54, 62),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat
+        };
+        openFolderButton.FlatAppearance.BorderColor = Color.FromArgb(74, 96, 108);
+        openFolderButton.Click += (_, _) => OpenInstallFolder();
+        content.Controls.Add(openFolderButton);
 
         statusLabel = new Label
         {
@@ -165,10 +181,22 @@ internal sealed class SetupForm : Form
         };
         content.Controls.Add(progressBar);
 
+        launchAfterInstallBox = new CheckBox
+        {
+            Location = new Point(22, 140),
+            Size = new Size(574, 24),
+            Text = "安装完成后启动 FE Monster",
+            Checked = options.LaunchAfterInstall,
+            BackColor = this.BackColor,
+            ForeColor = Color.FromArgb(218, 236, 244),
+            FlatStyle = FlatStyle.Flat
+        };
+        content.Controls.Add(launchAfterInstallBox);
+
         logBox = new TextBox
         {
-            Location = new Point(22, 150),
-            Size = new Size(574, 176),
+            Location = new Point(22, 170),
+            Size = new Size(574, 156),
             Multiline = true,
             ReadOnly = true,
             ScrollBars = ScrollBars.Vertical,
@@ -259,10 +287,14 @@ internal sealed class SetupForm : Form
 
     private void BrowseInstallPath()
     {
+        string selectedPath = installPathBox.Text.Trim();
+        string initialPath = ResolveExistingFolderForDialog(selectedPath);
         using FolderBrowserDialog dialog = new()
         {
-            Description = "Choose where FE Monster will be installed",
-            SelectedPath = installPathBox.Text
+            Description = "\u9009\u62e9 FE Monster \u7684\u5b89\u88c5\u8def\u5f84",
+            SelectedPath = initialPath,
+            UseDescriptionForTitle = true,
+            ShowNewFolderButton = true
         };
         if (dialog.ShowDialog(this) == DialogResult.OK)
         {
@@ -270,18 +302,67 @@ internal sealed class SetupForm : Form
         }
     }
 
-    private async Task StartInstallAsync()
+    private void OpenInstallFolder()
     {
         string installDir = installPathBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(installDir))
+        if (string.IsNullOrWhiteSpace(installDir)) return;
+
+        string folder = Directory.Exists(installDir) ? installDir : ResolveExistingFolderForDialog(installDir);
+        try
         {
-            MessageBox.Show("Choose an install path first.", "FE Monster Setup", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = folder,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception error)
+        {
+            MessageBox.Show(error.Message, "FE Monster Setup", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
+    private static string ResolveExistingFolderForDialog(string requestedPath)
+    {
+        if (!string.IsNullOrWhiteSpace(requestedPath))
+        {
+            try
+            {
+                string full = Path.GetFullPath(Environment.ExpandEnvironmentVariables(requestedPath));
+                if (Directory.Exists(full)) return full;
+
+                string? parent = Path.GetDirectoryName(full);
+                while (!string.IsNullOrWhiteSpace(parent))
+                {
+                    if (Directory.Exists(parent)) return parent;
+                    parent = Path.GetDirectoryName(parent);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        return Directory.Exists(local) ? local : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    }
+
+    private async Task StartInstallAsync()
+    {
+        string rawInstallDir = installPathBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(rawInstallDir))
+        {
+            MessageBox.Show("\u8bf7\u5148\u9009\u62e9\u5b89\u88c5\u8def\u5f84\u3002", "FE Monster Setup", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
+        string installDir = Path.GetFullPath(Environment.ExpandEnvironmentVariables(rawInstallDir));
+        installPathBox.Text = installDir;
 
         installButton.Enabled = false;
         installPathBox.Enabled = false;
         browseButton.Enabled = false;
+        openFolderButton.Enabled = false;
+        launchAfterInstallBox.Enabled = false;
         progressBar.Style = ProgressBarStyle.Marquee;
         statusLabel.Text = "Preparing installer payload...";
         logBox.Clear();
@@ -300,10 +381,11 @@ internal sealed class SetupForm : Form
             statusLabel.Text = "Installing FE Monster...";
             logTimer.Start();
 
-            string arguments = "-NoProfile -ExecutionPolicy Bypass -File " +
+            string arguments = "-NoProfile -File " +
                 SetupEngine.QuoteArg(installScript) +
                 " -InstallDir " + SetupEngine.QuoteArg(installDir) +
                 " -NoPopup" +
+                (launchAfterInstallBox.Checked ? "" : " -NoLaunch") +
                 options.ForwardedArgumentLine;
 
             installProcess = Process.Start(new ProcessStartInfo
@@ -334,6 +416,8 @@ internal sealed class SetupForm : Form
                 installButton.Enabled = true;
                 installPathBox.Enabled = true;
                 browseButton.Enabled = true;
+                openFolderButton.Enabled = true;
+                launchAfterInstallBox.Enabled = true;
             }
         }
         catch (Exception error)
@@ -346,6 +430,8 @@ internal sealed class SetupForm : Form
             installButton.Enabled = true;
             installPathBox.Enabled = true;
             browseButton.Enabled = true;
+            openFolderButton.Enabled = true;
+            launchAfterInstallBox.Enabled = true;
         }
         finally
         {
@@ -391,15 +477,17 @@ internal sealed class SetupForm : Form
 
 internal sealed class SetupOptions
 {
-    private SetupOptions(bool quiet, string installDir, IReadOnlyList<string> forwardedArgs)
+    private SetupOptions(bool quiet, string installDir, bool launchAfterInstall, IReadOnlyList<string> forwardedArgs)
     {
         Quiet = quiet;
         InstallDir = installDir;
+        LaunchAfterInstall = launchAfterInstall;
         ForwardedArgs = forwardedArgs;
     }
 
     public bool Quiet { get; }
     public string InstallDir { get; }
+    public bool LaunchAfterInstall { get; }
     public IReadOnlyList<string> ForwardedArgs { get; }
 
     public string ForwardedArgumentLine => ForwardedArgs.Count == 0
@@ -410,6 +498,7 @@ internal sealed class SetupOptions
     {
         bool quiet = false;
         string installDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FE Monster");
+        bool launchAfterInstall = true;
         List<string> forwarded = new();
 
         for (int i = 0; i < args.Length; i += 1)
@@ -428,10 +517,16 @@ internal sealed class SetupOptions
                 continue;
             }
 
+            if (IsNoLaunchArg(arg))
+            {
+                launchAfterInstall = false;
+                continue;
+            }
+
             forwarded.Add(arg);
         }
 
-        return new SetupOptions(quiet, installDir, forwarded);
+        return new SetupOptions(quiet, installDir, launchAfterInstall, forwarded);
     }
 
     private static bool IsInstallDirArg(string value)
@@ -440,11 +535,19 @@ internal sealed class SetupOptions
             string.Equals(value, "/InstallDir", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(value, "--install-dir", StringComparison.OrdinalIgnoreCase);
     }
+
+    private static bool IsNoLaunchArg(string value)
+    {
+        return string.Equals(value, "-NoLaunch", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(value, "/NoLaunch", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(value, "--no-launch", StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 internal static class SetupEngine
 {
     private static readonly byte[] Marker = Encoding.ASCII.GetBytes("FE_MONSTER_SETUP_PAYLOAD_V1");
+    private const string BundleFileName = "FE-Monster-Setup-Bundle.zip";
 
     public static int RunHeadless(string exePath, SetupOptions options)
     {
@@ -458,10 +561,11 @@ internal static class SetupEngine
                 throw new InvalidOperationException("Installer script was not found in setup payload.");
             }
 
-            string arguments = "-NoProfile -ExecutionPolicy Bypass -File " +
+            string arguments = "-NoProfile -File " +
                 QuoteArg(installScript) +
                 " -InstallDir " + QuoteArg(options.InstallDir) +
                 " -NoPopup" +
+                (options.LaunchAfterInstall ? "" : " -NoLaunch") +
                 options.ForwardedArgumentLine;
 
             using Process process = Process.Start(new ProcessStartInfo
@@ -475,8 +579,9 @@ internal static class SetupEngine
             process.WaitForExit();
             return process.ExitCode;
         }
-        catch
+        catch (Exception error)
         {
+            WriteHeadlessFailureLog(options.InstallDir, error);
             return 1;
         }
         finally
@@ -488,14 +593,92 @@ internal static class SetupEngine
         }
     }
 
+    private static void WriteHeadlessFailureLog(string installDir, Exception error)
+    {
+        try
+        {
+            string root = string.IsNullOrWhiteSpace(installDir)
+                ? Path.Combine(Path.GetTempPath(), "FE Monster")
+                : Path.GetFullPath(Environment.ExpandEnvironmentVariables(installDir));
+            string outDir = Path.Combine(root, "out");
+            Directory.CreateDirectory(outDir);
+            File.AppendAllText(
+                Path.Combine(outDir, "setup-headless.log"),
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {error}\r\n",
+                Encoding.UTF8
+            );
+        }
+        catch
+        {
+        }
+    }
+
     public static string ExtractBundle(string exePath)
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), "fe-monster-setup-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempRoot);
-        string bundleZip = Path.Combine(tempRoot, "setup-bundle.zip");
-        ExtractPayload(exePath, bundleZip);
+        string bundleZip = Path.Combine(tempRoot, BundleFileName);
+        if (ExtractEmbeddedResourceBundle(bundleZip))
+        {
+        }
+        else if (HasEmbeddedPayload(exePath))
+        {
+            ExtractPayload(exePath, bundleZip);
+        }
+        else
+        {
+            string? sidecarBundle = FindSidecarBundle(exePath);
+            if (!string.IsNullOrWhiteSpace(sidecarBundle))
+            {
+                File.Copy(sidecarBundle, bundleZip, true);
+            }
+            else
+            {
+                throw new InvalidOperationException("Setup payload was not found.");
+            }
+        }
+
         ZipFile.ExtractToDirectory(bundleZip, tempRoot, true);
         return tempRoot;
+    }
+
+    private static bool ExtractEmbeddedResourceBundle(string outputZip)
+    {
+        Stream? input = Assembly.GetExecutingAssembly().GetManifestResourceStream(BundleFileName);
+        if (input == null) return false;
+
+        using (input)
+        using (FileStream output = File.Create(outputZip))
+        {
+            input.CopyTo(output);
+        }
+        return true;
+    }
+
+    private static string? FindSidecarBundle(string exePath)
+    {
+        string? exeDir = Path.GetDirectoryName(exePath);
+        if (string.IsNullOrWhiteSpace(exeDir)) return null;
+
+        string sidecarBundle = Path.Combine(exeDir, BundleFileName);
+        return File.Exists(sidecarBundle) ? sidecarBundle : null;
+    }
+
+    private static bool HasEmbeddedPayload(string exePath)
+    {
+        try
+        {
+            using FileStream input = File.OpenRead(exePath);
+            if (input.Length < Marker.Length + sizeof(long)) return false;
+            input.Seek(-Marker.Length, SeekOrigin.End);
+            byte[] marker = new byte[Marker.Length];
+            ReadExactly(input, marker);
+            return marker.SequenceEqual(Marker);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public static Icon? AssociatedIcon(string exePath)

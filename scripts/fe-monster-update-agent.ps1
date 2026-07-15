@@ -54,7 +54,7 @@ function Get-CommunityUrl {
 }
 
 function Get-InstalledVersion {
-  return '1.0.1-java26'
+  return '1.0.6-java26'
 }
 
 function Invoke-AutoInstall {
@@ -73,8 +73,6 @@ function Invoke-AutoInstall {
   if (!(Test-Path $script)) { return }
   $process = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
     '-NoProfile',
-    '-ExecutionPolicy',
-    'Bypass',
     '-WindowStyle',
     'Hidden',
     '-File',

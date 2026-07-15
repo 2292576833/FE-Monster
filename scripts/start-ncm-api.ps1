@@ -56,7 +56,7 @@ function Ensure-ApiDependencies {
   if (!(Test-Path $dependencyHelper)) {
     return $false
   }
-  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $dependencyHelper -Root $rootPath -RequiredPath @(
+  & powershell.exe -NoProfile -File $dependencyHelper -Root $rootPath -RequiredPath @(
     'scripts\netease-api-server.cjs',
     'node_modules\NeteaseCloudMusicApi'
   ) -InstallMissing

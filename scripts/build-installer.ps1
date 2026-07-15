@@ -2,7 +2,9 @@ param(
   [string]$OutputDir = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..')).Path 'dist'),
   [switch]$SkipBuild,
   [switch]$NoNodeBundle,
-  [switch]$ReusePayloadZip
+  [switch]$ReusePayloadZip,
+  [switch]$EmbedPayload,
+  [switch]$AllowEmbeddedPayload
 )
 
 $ErrorActionPreference = 'Stop'
@@ -14,7 +16,17 @@ $payloadRoot = Join-Path $payloadParent 'FE Monster'
 $setupRoot = Join-Path $workRoot 'setup'
 $payloadZip = Join-Path $setupRoot 'FE-Monster-Payload.zip'
 $installerExe = Join-Path $outputPath 'FE-Monster-Setup.exe'
+$setupBundleOutput = Join-Path $outputPath 'FE-Monster-Setup-Bundle.zip'
 $setupProject = Join-Path $rootPath 'native\windows\setup\FeMonsterSetup.csproj'
+$setupProjectDir = Split-Path -Parent $setupProject
+$setupPayloadResource = Join-Path $setupProjectDir 'SetupPayload.zip'
+
+if (!$PSBoundParameters.ContainsKey('EmbedPayload')) {
+  $EmbedPayload = $true
+}
+if ($EmbedPayload -and !$AllowEmbeddedPayload) {
+  Write-Warning 'Building a single-file installer with embedded payload as requested.'
+}
 
 function Assert-UnderRoot {
   param([string]$Path)
@@ -112,9 +124,33 @@ function Invoke-Step {
   & $Action
 }
 
+function Stage-BundledSceneLibrary {
+  $preparer = Join-Path $rootPath 'scripts\prepare-android-bundled-library.ps1'
+  $serverRoot = Join-Path (Split-Path -Parent $rootPath) 'FE moster server'
+  $serverData = Join-Path $serverRoot 'data'
+  if (!(Test-Path $preparer) -or !(Test-Path $serverData)) {
+    Write-Warning 'Local scene library source was not found; the installer will omit server-authored offline presets.'
+    return
+  }
+
+  Invoke-Step 'Bundling local scene presets and playback assets' {
+    & powershell.exe -NoProfile -File $preparer `
+      -Root $rootPath `
+      -OutputDir (Join-Path $payloadRoot 'web') `
+      -ServerRoot $serverRoot
+    if ($LASTEXITCODE -ne 0) {
+      throw "prepare-android-bundled-library.ps1 failed with exit code $LASTEXITCODE"
+    }
+    $manifest = Join-Path $payloadRoot 'web\data\android-bundled-library.json'
+    if (!(Test-Path $manifest)) {
+      throw "Bundled scene library manifest was not produced: $manifest"
+    }
+  }
+}
+
 function Build-App {
   Invoke-Step 'Stopping stale FE Monster processes' {
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $rootPath 'scripts\stop-stale-fe-monster.ps1') -Root $rootPath
+    & powershell.exe -NoProfile -File (Join-Path $rootPath 'scripts\stop-stale-fe-monster.ps1') -Root $rootPath
   }
 
   Invoke-Step 'Building Java jar' {
@@ -125,13 +161,13 @@ function Build-App {
   $xaudioDll = Join-Path $rootPath 'native\windows\build\fe-monster-xaudio2.dll'
   if (!(Test-Path $xaudioDll)) {
     Invoke-Step 'Building XAudio2 bridge' {
-      & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $rootPath 'scripts\build-xaudio2.ps1') -Root $rootPath
+      & powershell.exe -NoProfile -File (Join-Path $rootPath 'scripts\build-xaudio2.ps1') -Root $rootPath
       if ($LASTEXITCODE -ne 0) { throw "build-xaudio2.ps1 failed with exit code $LASTEXITCODE" }
     }
   }
 
   Invoke-Step 'Building WinForms client' {
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $rootPath 'scripts\build-winforms-client.ps1') -Root $rootPath
+    & powershell.exe -NoProfile -File (Join-Path $rootPath 'scripts\build-winforms-client.ps1') -Root $rootPath
     if ($LASTEXITCODE -ne 0) { throw "build-winforms-client.ps1 failed with exit code $LASTEXITCODE" }
   }
 }
@@ -164,6 +200,8 @@ function Stage-Payload {
   foreach ($dir in @('web', 'components', 'scripts', 'src')) {
     Copy-Dir (Join-Path $rootPath $dir) (Join-Path $payloadRoot $dir)
   }
+
+  Stage-BundledSceneLibrary
 
   $communityUrlFile = Join-Path $rootPath 'data\community-server-url.txt'
   if (Test-Path $communityUrlFile) {
@@ -312,7 +350,7 @@ function New-SetupExe {
   Copy-File (Join-Path $rootPath 'scripts\install-fe-monster.ps1') (Join-Path $setupRoot 'install-fe-monster.ps1')
   Set-Content -Encoding ASCII -Path (Join-Path $setupRoot 'install.cmd') -Value @'
 @echo off
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0install-fe-monster.ps1"
+powershell.exe -NoProfile -File "%~dp0install-fe-monster.ps1"
 if errorlevel 1 pause
 '@
 
@@ -334,36 +372,30 @@ if errorlevel 1 pause
   )
 
   if (!(Test-Path $setupProject)) { throw "Setup project was not found: $setupProject" }
+  if (Test-Path $setupPayloadResource) { Remove-Item -LiteralPath $setupPayloadResource -Force }
+  if ($EmbedPayload) {
+    Write-Host '== Embedding setup payload resource'
+    Copy-Item -LiteralPath $bundleZip -Destination $setupPayloadResource -Force
+  }
   $publishDir = Join-Path $workRoot 'setup-publish'
   if (Test-Path $publishDir) { Remove-Item -LiteralPath $publishDir -Recurse -Force }
   Write-Host '== Publishing setup stub'
-  & dotnet publish $setupProject -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -o $publishDir
+  & dotnet publish $setupProject -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=false -p:PublishReadyToRun=false -p:DebugType=None -p:DebugSymbols=false -o $publishDir
   if ($LASTEXITCODE -ne 0) { throw "dotnet publish setup failed with exit code $LASTEXITCODE" }
 
   $stub = Join-Path $publishDir 'FE-Monster-Setup.exe'
   if (!(Test-Path $stub)) { throw "Setup stub was not created: $stub" }
-  $assembledInstaller = Join-Path $workRoot 'FE-Monster-Setup-assembled.exe'
-  Copy-Item -LiteralPath $stub -Destination $assembledInstaller -Force
 
-  Write-Host '== Attaching setup payload'
-  $marker = [System.Text.Encoding]::ASCII.GetBytes('FE_MONSTER_SETUP_PAYLOAD_V1')
-  $bundleInfo = Get-Item $bundleZip
-  $lengthBytes = [System.BitConverter]::GetBytes([Int64]$bundleInfo.Length)
-  $output = Open-FileForAppendWithRetry $assembledInstaller
-  try {
-    $input = [System.IO.File]::OpenRead($bundleZip)
-    try {
-      $input.CopyTo($output)
-    } finally {
-      $input.Dispose()
-    }
-    $output.Write($lengthBytes, 0, $lengthBytes.Length)
-    $output.Write($marker, 0, $marker.Length)
-  } finally {
-    $output.Dispose()
+  if ($EmbedPayload) {
+    Copy-Item -LiteralPath $stub -Destination $installerExe -Force
+    if (Test-Path $setupBundleOutput) { Remove-Item -LiteralPath $setupBundleOutput -Force }
+  } else {
+    Write-Host '== Using sidecar payload mode to reduce antivirus false positives'
+    Copy-Item -LiteralPath $stub -Destination $installerExe -Force
+    Copy-Item -LiteralPath $bundleZip -Destination $setupBundleOutput -Force
   }
 
-  Copy-Item -LiteralPath $assembledInstaller -Destination $installerExe -Force
+  if (Test-Path $setupPayloadResource) { Remove-Item -LiteralPath $setupPayloadResource -Force }
 }
 
 if (!$SkipBuild) {
@@ -379,3 +411,7 @@ New-SetupExe
 
 $size = [math]::Round((Get-Item $installerExe).Length / 1MB, 2)
 Write-Host "Built installer: $installerExe ($size MB)"
+if (Test-Path $setupBundleOutput) {
+  $bundleSize = [math]::Round((Get-Item $setupBundleOutput).Length / 1MB, 2)
+  Write-Host "Built setup bundle: $setupBundleOutput ($bundleSize MB)"
+}

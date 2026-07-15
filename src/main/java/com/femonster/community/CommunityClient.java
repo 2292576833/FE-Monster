@@ -36,5 +36,11 @@ public interface CommunityClient {
 
     Map<String, Object> callSignals(String provider, String providerLabel, Map<String, Object> accountPayload, String sessionId, String after);
 
+    Map<String, Object> sandboxGet(String path);
+
+    Map<String, Object> sandboxPost(String path, Map<String, Object> payload);
+
+    HttpResponse<InputStream> sandboxAsset(String path) throws IOException, InterruptedException;
+
     HttpResponse<InputStream> eventStream(String feId, String after) throws IOException, InterruptedException;
 }

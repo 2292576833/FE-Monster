@@ -65,10 +65,11 @@ const presets = [
   { id: 'orbit', name: 'Orbit', value: 58 }
 ];
 
-function GlassPanel({ children, className = '', height = 'auto', radius = 20, strong = false }) {
+function GlassPanel({ children, className = '', height = 'auto', radius = 20, strong = false, tone = 'clear' }) {
   return (
     <GlassSurface
       className={`fe-glass-panel ${strong ? 'is-strong' : ''} ${className}`.trim()}
+      tone={tone}
       width="100%"
       height={height}
       borderRadius={radius}
@@ -162,7 +163,7 @@ function TopBar() {
         ))}
       </nav>
 
-      <GlassPanel className="search-box" height={46} radius={18}>
+      <GlassPanel className="search-box" height={46} radius={18} tone="black">
         <Search size={17} aria-hidden="true" />
         <span>Search songs, playlists, lyrics</span>
       </GlassPanel>
@@ -322,7 +323,7 @@ function PlayerDock() {
   }, [isPlaying]);
 
   return (
-    <GlassPanel className="player-dock" height={104} radius={28} strong>
+    <GlassPanel className="player-dock" height={104} radius={28} strong tone="black">
       <div className="track-mini-cover" aria-hidden="true" />
 
       <div className="track-meta">

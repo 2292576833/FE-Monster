@@ -104,7 +104,7 @@ internal sealed class FeMonsterForm : Form
         if (!options.GpuAcceleration) return "--disable-gpu";
 
         var args = "--enable-gpu-rasterization --enable-accelerated-2d-canvas --force-high-performance-gpu --ignore-gpu-blocklist";
-        if (options.DirectX11) args += " --use-angle=d3d11";
+        if (options.DirectX11) args += " --use-gl=angle --use-angle=d3d11";
         return args;
     }
 
@@ -121,6 +121,12 @@ internal sealed class FeMonsterForm : Form
             if (string.Equals(type.GetString(), "fe-recording-toolbar", StringComparison.OrdinalIgnoreCase))
             {
                 HandleRecordingToolbarMessage(document.RootElement);
+                return;
+            }
+
+            if (string.Equals(type.GetString(), "fe-render-capabilities", StringComparison.OrdinalIgnoreCase))
+            {
+                HandleRenderCapabilitiesMessage(document.RootElement);
                 return;
             }
 
@@ -161,6 +167,47 @@ internal sealed class FeMonsterForm : Form
                 );
                 break;
         }
+    }
+
+    private void HandleRenderCapabilitiesMessage(JsonElement root)
+    {
+        if (webView.CoreWebView2 == null) return;
+        string requestId = ReadString(root, "requestId");
+        var response = new
+        {
+            type = "fe-render-capabilities-result",
+            requestId,
+            host = new
+            {
+                backend = options.DirectX11 ? "webview2-angle-d3d11" : "webview2-default",
+                gpuAcceleration = options.GpuAcceleration,
+                ownsNativeRenderTargets = false
+            },
+            upscalers = new
+            {
+                adaptiveSpatial = new
+                {
+                    available = options.GpuAcceleration,
+                    backend = "webgl2-fragment-pass"
+                },
+                fsrNative = new
+                {
+                    available = false,
+                    reason = "native-renderer-required"
+                },
+                dlss = new
+                {
+                    available = false,
+                    reason = "native-renderer-required"
+                }
+            },
+            rayTracing = new
+            {
+                realtime = false,
+                authoring = "blender-cycles"
+            }
+        };
+        webView.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(response));
     }
 
     private void ShowRecordingToolbar()

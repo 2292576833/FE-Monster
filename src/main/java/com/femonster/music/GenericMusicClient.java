@@ -532,6 +532,8 @@ public final class GenericMusicClient implements MusicProviderClient {
                 if (SimpleJson.asString(account.get("nickname"), "").isBlank()) putIfNotBlank(account, "nickname", session.get("nickname"));
                 if (SimpleJson.asString(account.get("avatarUrl"), "").isBlank()) putIfNotBlank(account, "avatarUrl", session.get("avatarUrl"));
             }
+            if (SimpleJson.asString(account.get("vipType"), "").isBlank()) putIfNotBlank(account, "vipType", session.get("vip_type"));
+            if (SimpleJson.asString(account.get("vipToken"), "").isBlank()) putIfNotBlank(account, "vipToken", session.get("vip_token"));
         }
     }
 
@@ -853,6 +855,7 @@ public final class GenericMusicClient implements MusicProviderClient {
         account.put("userId", firstString(profile, "userId", "uid", "uin", "id", "userid", "loginUin"));
         account.put("nickname", firstString(profile, "nickname", "nick", "name", "username", "userName", "nickName"));
         account.put("avatarUrl", firstString(profile, "avatarUrl", "avatar", "headimg", "headimgurl", "head", "pic", "photo", "avatarUrl100", "avatarUrl150"));
+        account.put("vipType", firstString(profile, "vipType", "vip_type", "viptype", "vip", "isVip", "isVIP", "isVipUser", "vipLevel", "vip_level", "svip", "superVip", "musicPackage"));
         return account;
     }
 

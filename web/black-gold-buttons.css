@@ -1,0 +1,661 @@
+/*
+ * FE Monster black-gold button skin.
+ *
+ * This file is intentionally limited to semantic button controls. Text fields,
+ * selects, checkboxes, and range inputs are outside its selector boundary.
+ * A control keeps its old look only when the control itself is a glass surface.
+ * Ordinary buttons placed inside glass panels still receive this skin.
+ */
+
+:root {
+  --fe-button-radius: 9px;
+  --fe-button-ink: #dfcfad;
+  --fe-button-ink-strong: #f3e4c5;
+  --fe-button-ink-disabled: #8d816c;
+  --fe-button-fill: linear-gradient(#0a0a0a, #0a0a0a);
+  --fe-button-fill-hover: linear-gradient(#0a0a0a, #0a0a0a);
+  --fe-button-fill-selected: linear-gradient(#0a0a0a, #0a0a0a);
+  --fe-button-edge:
+    linear-gradient(135deg, #8f754c 0%, #c9a96e 28%, #ddc18c 50%, #a98a59 72%, #c9a96e 100%);
+  --fe-button-edge-hover:
+    linear-gradient(135deg, #a68a5a 0%, #d7b97f 30%, #ead09b 50%, #b99a63 72%, #d7b97f 100%);
+  --fe-button-edge-selected:
+    linear-gradient(135deg, #9a7e51 0%, #c9a96e 34%, #e2c58f 52%, #ad8f5d 74%, #c9a96e 100%);
+  --fe-button-focus: #c9a96e;
+  --fe-button-inset: rgba(201, 169, 110, 0.035);
+  --fe-button-inset-hover: rgba(201, 169, 110, 0.06);
+  --fe-button-inset-selected: rgba(201, 169, 110, 0.075);
+  --fe-button-transition: 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/*
+ * Keep this boundary in one selector so dynamically-created buttons receive
+ * the same skin without app.js having to know about presentation details.
+ */
+:where(
+    button,
+    input[type="button"],
+    input[type="submit"],
+    input[type="reset"],
+    [role="button"]
+  ):not(
+    .glass-surface,
+    .glass-surface--fallback,
+    .glass-surface--svg,
+    [data-glass-surface],
+    .glass-control,
+    .glass-button-native,
+    .reactbits-glass-target,
+    .reactbits-glass-panel-target,
+    .rb-glass-surface,
+    .community-avatar, .boot-logo-button, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
+  ) {
+  --fe-button-current-fill: var(--fe-button-fill);
+  --fe-button-current-edge: var(--fe-button-edge);
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid transparent !important;
+  border-radius: var(--fe-button-radius) !important;
+  background:
+    var(--fe-button-current-fill) padding-box,
+    var(--fe-button-current-edge) border-box !important;
+  box-shadow: inset 0 0 0 1px var(--fe-button-inset), 0 1px 2px rgba(0, 0, 0, 0.42) !important;
+  color: var(--fe-button-ink) !important;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    color var(--fe-button-transition),
+    box-shadow var(--fe-button-transition),
+    filter var(--fe-button-transition),
+    opacity var(--fe-button-transition),
+    transform var(--fe-button-transition);
+}
+
+/* Keep the existing pointer-following border component inside the same gold
+ * material family; its original cyan/purple mesh would fight this skin. */
+.border-glow-button-target:not(
+    .glass-surface,
+    .glass-surface--fallback,
+    .glass-surface--svg,
+    [data-glass-surface],
+    .reactbits-glass-target
+  ) > .rb-border-glow-mount .rb-button-border-glow.border-glow-card {
+  --glow-color: rgb(201 169 110 / 100%) !important;
+  --glow-color-60: rgb(201 169 110 / 60%) !important;
+  --glow-color-50: rgb(201 169 110 / 50%) !important;
+  --glow-color-40: rgb(201 169 110 / 40%) !important;
+  --glow-color-30: rgb(201 169 110 / 30%) !important;
+  --glow-color-20: rgb(201 169 110 / 20%) !important;
+  --glow-color-10: rgb(201 169 110 / 10%) !important;
+  --gradient-one: radial-gradient(at 80% 55%, #ddc18c 0, transparent 50%) !important;
+  --gradient-two: radial-gradient(at 69% 34%, #a98a59 0, transparent 50%) !important;
+  --gradient-three: radial-gradient(at 8% 6%, #c9a96e 0, transparent 50%) !important;
+  --gradient-four: radial-gradient(at 41% 38%, #8f754c 0, transparent 50%) !important;
+  --gradient-five: radial-gradient(at 86% 85%, #c9a96e 0, transparent 50%) !important;
+  --gradient-six: radial-gradient(at 82% 18%, #ddc18c 0, transparent 50%) !important;
+  --gradient-seven: radial-gradient(at 51% 4%, #a98a59 0, transparent 50%) !important;
+  --gradient-base: linear-gradient(#c9a96e 0 100%) !important;
+}
+
+.border-glow-button-target:not(
+    .glass-surface,
+    .glass-surface--fallback,
+    .glass-surface--svg,
+    [data-glass-surface],
+    .reactbits-glass-target
+  ) > .rb-border-glow-mount .rb-button-border-glow.border-glow-card > .edge-light {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :where(
+      button,
+      input[type="button"],
+      input[type="submit"],
+      input[type="reset"],
+      [role="button"]
+    ):not(
+      .glass-surface,
+      .glass-surface--fallback,
+      .glass-surface--svg,
+      [data-glass-surface],
+      .glass-control,
+      .glass-button-native,
+      .reactbits-glass-target,
+      .reactbits-glass-panel-target,
+      .rb-glass-surface,
+      .community-avatar, .boot-logo-button, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
+    ):not(:disabled):not([aria-disabled="true"]):hover {
+    --fe-button-current-fill: var(--fe-button-fill-hover);
+    --fe-button-current-edge: var(--fe-button-edge-hover);
+    color: var(--fe-button-ink-strong) !important;
+    box-shadow: inset 0 0 0 1px var(--fe-button-inset-hover), 0 2px 3px rgba(0, 0, 0, 0.46) !important;
+    transform: translateY(-1px);
+  }
+}
+
+:where(
+    button,
+    input[type="button"],
+    input[type="submit"],
+    input[type="reset"],
+    [role="button"]
+  ):not(
+    .glass-surface,
+    .glass-surface--fallback,
+    .glass-surface--svg,
+    [data-glass-surface],
+    .glass-control,
+    .glass-button-native,
+    .reactbits-glass-target,
+    .reactbits-glass-panel-target,
+    .rb-glass-surface,
+    .community-avatar, .boot-logo-button, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
+  ):is(.is-active, .is-current, .is-selected, [aria-pressed="true"], [aria-selected="true"], [aria-expanded="true"]) {
+  --fe-button-current-fill: var(--fe-button-fill-selected);
+  --fe-button-current-edge: var(--fe-button-edge-selected);
+  color: var(--fe-button-ink-strong) !important;
+  box-shadow: inset 0 0 0 1px var(--fe-button-inset-selected), 0 2px 3px rgba(0, 0, 0, 0.48) !important;
+}
+
+:where(
+    button,
+    input[type="button"],
+    input[type="submit"],
+    input[type="reset"],
+    [role="button"]
+  ):not(
+    .glass-surface,
+    .glass-surface--fallback,
+    .glass-surface--svg,
+    [data-glass-surface],
+    .glass-control,
+    .glass-button-native,
+    .reactbits-glass-target,
+    .reactbits-glass-panel-target,
+    .rb-glass-surface,
+    .community-avatar, .boot-logo-button, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
+  ):not(:disabled):not([aria-disabled="true"]):active {
+  transform: translateY(1px) scale(0.985);
+}
+
+:where(
+    button,
+    input[type="button"],
+    input[type="submit"],
+    input[type="reset"],
+    [role="button"]
+  ):not(
+    .glass-surface,
+    .glass-surface--fallback,
+    .glass-surface--svg,
+    [data-glass-surface],
+    .glass-control,
+    .glass-button-native,
+    .reactbits-glass-target,
+    .reactbits-glass-panel-target,
+    .rb-glass-surface,
+    .community-avatar, .boot-logo-button, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
+  ):focus-visible {
+  outline: 2px solid var(--fe-button-focus) !important;
+  outline-offset: 3px !important;
+}
+
+:where(
+    button,
+    input[type="button"],
+    input[type="submit"],
+    input[type="reset"],
+    [role="button"]
+  ):not(
+    .glass-surface,
+    .glass-surface--fallback,
+    .glass-surface--svg,
+    [data-glass-surface],
+    .glass-control,
+    .glass-button-native,
+    .reactbits-glass-target,
+    .reactbits-glass-panel-target,
+    .rb-glass-surface,
+    .community-avatar, .boot-logo-button, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
+  ):is(:disabled, [aria-disabled="true"]) {
+  color: var(--fe-button-ink-disabled) !important;
+  cursor: not-allowed;
+  filter: grayscale(0.32) saturate(0.42);
+  opacity: 0.46 !important;
+  transform: none !important;
+}
+
+/* Android/coarse-pointer controls meet the 44px touch target minimum. */
+@media (pointer: coarse), (max-width: 767px) {
+  :where(
+      button,
+      input[type="button"],
+      input[type="submit"],
+      input[type="reset"],
+      [role="button"]
+    ):not(
+      .glass-surface,
+      .glass-surface--fallback,
+      .glass-surface--svg,
+      [data-glass-surface],
+      .glass-control,
+      .glass-button-native,
+      .reactbits-glass-target,
+      .reactbits-glass-panel-target,
+      .rb-glass-surface,
+      .community-avatar, .boot-logo-button, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
+    ) {
+    min-inline-size: 44px;
+    min-block-size: 44px;
+    border-radius: 10px !important;
+  }
+}
+
+/* Desktop chrome exceptions: matte-black controls without the champagne edge. */
+@media (min-width: 768px) {
+  /* The desktop shell is neutral by default. Community surfaces restore the
+   * existing champagne skin locally so the community page remains unchanged. */
+  :root {
+    --fe-button-ink: #d8d8df;
+    --fe-button-ink-strong: #ffffff;
+    --fe-button-ink-disabled: #77777f;
+    --fe-button-edge: linear-gradient(rgba(255, 255, 255, 0.1) 0 100%);
+    --fe-button-edge-hover: linear-gradient(rgba(255, 255, 255, 0.18) 0 100%);
+    --fe-button-edge-selected: linear-gradient(rgba(255, 255, 255, 0.2) 0 100%);
+    --fe-button-focus: #dedee6;
+    --fe-button-inset: rgba(255, 255, 255, 0.025);
+    --fe-button-inset-hover: rgba(255, 255, 255, 0.045);
+    --fe-button-inset-selected: rgba(255, 255, 255, 0.055);
+  }
+
+  :is(
+      .community-card,
+      .community-message-dialog,
+      .community-profile-dialog,
+      .community-message-bubbles,
+      .community-broadcast-toast,
+      .listen-mini
+    ) {
+    --fe-button-ink: #dfcfad;
+    --fe-button-ink-strong: #f3e4c5;
+    --fe-button-ink-disabled: #8d816c;
+    --fe-button-edge: linear-gradient(135deg, #8f754c 0%, #c9a96e 28%, #ddc18c 50%, #a98a59 72%, #c9a96e 100%);
+    --fe-button-edge-hover: linear-gradient(135deg, #a68a5a 0%, #d7b97f 30%, #ead09b 50%, #b99a63 72%, #d7b97f 100%);
+    --fe-button-edge-selected: linear-gradient(135deg, #9a7e51 0%, #c9a96e 34%, #e2c58f 52%, #ad8f5d 74%, #c9a96e 100%);
+    --fe-button-focus: #c9a96e;
+    --fe-button-inset: rgba(201, 169, 110, 0.035);
+    --fe-button-inset-hover: rgba(201, 169, 110, 0.06);
+    --fe-button-inset-selected: rgba(201, 169, 110, 0.075);
+  }
+
+  body
+    :where(button, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(
+      :where(
+          .community-card *,
+          .community-message-dialog *,
+          .community-profile-dialog *,
+          .community-message-bubbles *,
+          .community-broadcast-toast *,
+          .listen-mini *
+        )
+    ) > .rb-border-glow-mount {
+    display: none !important;
+  }
+
+  .runtime-topbar {
+    width: var(--runtime-topbar-width);
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+  }
+
+  :is(
+      #runtimeSettingsButton,
+      #windowExitFullscreenButton,
+      #windowTopMinimizeButton,
+      #windowQuitButton,
+      #neteaseLoginButton,
+      #homeButton,
+      #diyButton,
+      #sandboxModeButton,
+      #topFavoritesButton,
+      #topSearchForm .top-search-submit
+    ) {
+    border: 1px solid rgba(255, 255, 255, 0.09) !important;
+    color: rgba(232, 232, 238, 0.9) !important;
+    background: #0a0a0a !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.045),
+      0 2px 6px rgba(0, 0, 0, 0.42) !important;
+    filter: none !important;
+  }
+
+  :is(
+      #runtimeSettingsButton,
+      #windowExitFullscreenButton,
+      #windowTopMinimizeButton,
+      #windowQuitButton,
+      #neteaseLoginButton,
+      #homeButton,
+      #diyButton,
+      #sandboxModeButton,
+      #topFavoritesButton,
+      #topSearchForm .top-search-submit
+    ):hover {
+    border-color: rgba(255, 255, 255, 0.18) !important;
+    color: #ffffff !important;
+    background: #111111 !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.07),
+      0 0 8px rgba(211, 208, 217, 0.14) !important;
+  }
+
+  #windowQuitButton:hover {
+    border-color: rgba(255, 255, 255, 0.18) !important;
+    color: #ff9b9b !important;
+    background: #111111 !important;
+  }
+
+  :is(
+      #runtimeSettingsButton,
+      #windowExitFullscreenButton,
+      #windowTopMinimizeButton,
+      #windowQuitButton,
+      #neteaseLoginButton,
+      #homeButton,
+      #diyButton,
+      #sandboxModeButton,
+      #topFavoritesButton,
+      #topSearchForm .top-search-submit
+    ):focus-visible {
+    outline: 2px solid rgba(224, 224, 232, 0.9) !important;
+    outline-offset: 3px !important;
+  }
+
+  :is(
+      #runtimeSettingsButton,
+      #windowExitFullscreenButton,
+      #windowTopMinimizeButton,
+      #windowQuitButton,
+      #neteaseLoginButton,
+      #homeButton,
+      #diyButton,
+      #sandboxModeButton,
+      #topFavoritesButton,
+      #topSearchForm .top-search-submit
+    ) > .rb-border-glow-mount {
+    display: none !important;
+  }
+
+  .diy-quick-menu .diy-page-tab {
+    border: 0 !important;
+    color: #d8d8df !important;
+    background: #0a0a0a !important;
+    box-shadow: 0 0 8px rgba(211, 208, 217, 0.12) !important;
+    text-shadow: 0 0 7px rgba(224, 224, 232, 0.26);
+  }
+
+  .diy-quick-menu .diy-page-tab:hover,
+  .diy-quick-menu .diy-page-tab.is-active,
+  .diy-quick-menu .diy-page-tab[aria-pressed="true"] {
+    border: 0 !important;
+    color: #ffffff !important;
+    background: #101011 !important;
+    box-shadow: 0 0 14px rgba(211, 208, 217, 0.24) !important;
+    text-shadow: 0 0 10px rgba(238, 238, 244, 0.54);
+  }
+
+  .diy-quick-menu .diy-page-tab > .rb-border-glow-mount {
+    display: none !important;
+  }
+
+  #orbPlaylistCards .orb-playlist-card,
+  #orbPlaylistCards .orb-playlist-card:hover,
+  #orbPlaylistCards .orb-playlist-card.is-active,
+  #orbPlaylistCards .orb-playlist-card.is-focused {
+    border: 1px solid rgba(255, 255, 255, 0.09) !important;
+    color: #ededf2 !important;
+    background: #0a0a0a !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.045),
+      0 2px 6px rgba(0, 0, 0, 0.46) !important;
+    filter: none !important;
+  }
+
+  #orbPlaylistCards .orb-playlist-card:hover,
+  #orbPlaylistCards .orb-playlist-card.is-active,
+  #orbPlaylistCards .orb-playlist-card.is-focused {
+    border-color: rgba(255, 255, 255, 0.18) !important;
+    background: #101011 !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.065),
+      0 0 8px rgba(211, 208, 217, 0.13) !important;
+  }
+
+  #orbPlaylistCards .orb-playlist-card::before {
+    background: none !important;
+    opacity: 0 !important;
+  }
+
+  #orbPlaylistCards .orb-playlist-card::after,
+  #orbPlaylistCards .orb-playlist-card.is-active::after {
+    background: rgba(225, 225, 232, 0.82) !important;
+    box-shadow: 0 0 8px rgba(225, 225, 232, 0.26) !important;
+  }
+
+  #orbPlaylistCards .orb-playlist-card > .rb-border-glow-mount {
+    display: none !important;
+  }
+
+  #orbPlaylistCards .orb-playlist-copy small {
+    color: rgba(218, 218, 225, 0.68) !important;
+  }
+
+  /* React Bits GlassSurface: the generated SVG map owns refraction in SVG
+   * mode; the blur-only material is kept exclusively as its compatibility
+   * fallback. */
+  #topSearchForm.glass-surface--react-bits,
+  .player-dock.glass-surface--react-bits {
+    border: 0 !important;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.018)),
+      rgb(2 4 6 / var(--glass-frost, 0.56)) !important;
+    box-shadow:
+      0 0 2px 1px rgba(255, 255, 255, 0.22) inset,
+      0 0 10px 4px rgba(255, 255, 255, 0.055) inset,
+      0 8px 24px rgba(0, 0, 0, 0.28),
+      0 16px 40px rgba(0, 0, 0, 0.18),
+      0 6px 18px rgba(255, 255, 255, 0.025) inset !important;
+  }
+
+  #topSearchForm.glass-surface--react-bits.glass-surface--svg,
+  .player-dock.glass-surface--react-bits.glass-surface--svg {
+    backdrop-filter: var(--filter-id, blur(12px)) saturate(var(--glass-saturation, 1)) brightness(0.72) !important;
+    -webkit-backdrop-filter: var(--filter-id, blur(12px)) saturate(var(--glass-saturation, 1)) brightness(0.72) !important;
+  }
+
+  #topSearchForm.glass-surface--react-bits.glass-surface--fallback,
+  .player-dock.glass-surface--react-bits.glass-surface--fallback {
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    background: rgba(2, 4, 6, 0.62) !important;
+    backdrop-filter: blur(18px) saturate(1.25) brightness(0.72) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(1.25) brightness(0.72) !important;
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.045) !important;
+  }
+
+  #topSearchForm.glass-surface--react-bits::before,
+  #topSearchForm.glass-surface--react-bits::after,
+  .player-dock.glass-surface--react-bits::before {
+    content: none !important;
+  }
+
+  #topSearchForm.glass-surface--react-bits:focus-within {
+    box-shadow:
+      0 0 2px 1px rgba(255, 255, 255, 0.28) inset,
+      0 0 10px 4px rgba(255, 255, 255, 0.07) inset,
+      0 0 0 3px rgba(131, 228, 255, 0.14),
+      0 8px 24px rgba(0, 0, 0, 0.32) !important;
+  }
+
+  #topSearchForm :is(#topFavoritesButton, .top-search-submit),
+  #topSearchForm :is(#topFavoritesButton, .top-search-submit):hover,
+  #topSearchForm :is(#topFavoritesButton, .top-search-submit):active,
+  #topSearchForm :is(#topFavoritesButton, .top-search-submit)[aria-expanded="true"] {
+    border: 0 !important;
+    color: rgba(235, 244, 248, 0.84) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    transform: none !important;
+  }
+
+  #topSearchForm :is(#topFavoritesButton, .top-search-submit):hover {
+    color: #ffffff !important;
+    filter: none !important;
+  }
+
+  #topSearchForm input {
+    color: rgba(245, 250, 252, 0.92) !important;
+  }
+
+  #topSearchForm input::placeholder {
+    color: rgba(220, 231, 236, 0.72) !important;
+  }
+
+  #topSearchForm .top-search-icon span::before {
+    border-color: rgba(235, 244, 248, 0.82) !important;
+  }
+
+  #topSearchForm .top-search-icon span::after {
+    background: rgba(235, 244, 248, 0.82) !important;
+  }
+
+  /* The dock remains one surface; its controls do not create nested glass. */
+  .app-shell.is-dock-pinned .player-dock.glass-surface--react-bits {
+    box-shadow:
+      0 0 2px 1px rgba(255, 255, 255, 0.28) inset,
+      0 0 10px 4px rgba(255, 255, 255, 0.07) inset,
+      0 0 0 1px rgba(255, 255, 255, 0.15),
+      0 8px 24px rgba(0, 0, 0, 0.34) !important;
+  }
+
+  :is(#prevButton, #playButton, #nextButton, #dockQualityButton, #dockFavoriteButton, #dockPinButton),
+  :is(#prevButton, #playButton, #nextButton, #dockQualityButton, #dockFavoriteButton, #dockPinButton):hover,
+  :is(#prevButton, #playButton, #nextButton, #dockQualityButton, #dockFavoriteButton, #dockPinButton):active,
+  :is(#dockQualityButton.is-open, #dockFavoriteButton.is-active, #dockPinButton.is-active) {
+    border: 0 !important;
+    color: rgba(235, 244, 248, 0.84) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  :is(#prevButton, #playButton, #nextButton, #dockQualityButton, #dockFavoriteButton, #dockPinButton):not(:disabled):hover {
+    color: #ffffff !important;
+    filter: none !important;
+  }
+
+  .player-dock :is(.track-copy strong, .track-copy small, .volume-area, .time-row) {
+    color: rgba(236, 244, 248, 0.82) !important;
+  }
+
+  :is(#prevButton, #playButton, #nextButton, #dockQualityButton, #dockFavoriteButton, #dockPinButton) > .rb-border-glow-mount {
+    display: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(
+      button,
+      input[type="button"],
+      input[type="submit"],
+      input[type="reset"],
+      [role="button"]
+    ):not(
+      .glass-surface,
+      .glass-surface--fallback,
+      .glass-surface--svg,
+      [data-glass-surface],
+      .glass-control,
+      .glass-button-native,
+      .reactbits-glass-target,
+      .reactbits-glass-panel-target,
+      .rb-glass-surface,
+      .community-avatar, .boot-logo-button, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
+    ) {
+    transition-duration: 0.01ms;
+  }
+}
+
+/* The book-lyric preset is a matte control, not another glass or gold tile. */
+#diyBookLyricPreset,
+#diyBookLyricPreset:hover,
+#diyBookLyricPreset.is-selected,
+#diyBookLyricPreset.is-active {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: rgba(238, 238, 242, 0.9) !important;
+  background: #0a0a0a !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 2px 6px rgba(0, 0, 0, 0.46) !important;
+}
+
+#diyBookLyricPreset:hover,
+#diyBookLyricPreset.is-active {
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  background: #101011 !important;
+}
+
+@media (forced-colors: active) {
+  :where(
+      button,
+      input[type="button"],
+      input[type="submit"],
+      input[type="reset"],
+      [role="button"]
+    ):not(
+      .glass-surface,
+      .glass-surface--fallback,
+      .glass-surface--svg,
+      [data-glass-surface],
+      .glass-control,
+      .glass-button-native,
+      .reactbits-glass-target,
+      .reactbits-glass-panel-target,
+      .rb-glass-surface,
+      .community-avatar, .boot-logo-button, #diyBookLyricPreset, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
+    ) {
+    border: 1px solid ButtonText !important;
+    background: ButtonFace !important;
+    box-shadow: none !important;
+    color: ButtonText !important;
+    forced-color-adjust: auto;
+  }
+
+  :where(button, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]):not(
+      .glass-surface,
+      .glass-surface--fallback,
+      .glass-surface--svg,
+      [data-glass-surface],
+      .glass-control,
+      .glass-button-native,
+      .reactbits-glass-target,
+      .reactbits-glass-panel-target,
+      .rb-glass-surface,
+      .community-avatar, .boot-logo-button, #diyBookLyricPreset, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
+    ):focus-visible {
+    outline-color: Highlight !important;
+  }
+}

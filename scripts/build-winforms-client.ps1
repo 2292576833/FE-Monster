@@ -22,7 +22,7 @@ if ([string]::IsNullOrWhiteSpace($dotnetExe)) {
 }
 
 if (!(Test-Path $packageRoot)) {
-  powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $rootPath 'scripts\install-webview2-sdk.ps1') -Root $rootPath
+  powershell -NoProfile -File (Join-Path $rootPath 'scripts\install-webview2-sdk.ps1') -Root $rootPath
 }
 
 $publishArgs = @(

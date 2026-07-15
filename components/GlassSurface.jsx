@@ -21,6 +21,7 @@ const GlassSurface = ({
   xChannel = 'R',
   yChannel = 'G',
   mixBlendMode = 'difference',
+  tone = 'clear',
   className = '',
   style = {}
 }) => {
@@ -118,20 +119,6 @@ const GlassSurface = ({
   }, []);
 
   useEffect(() => {
-    if (!containerRef.current) return;
-
-    const resizeObserver = new ResizeObserver(() => {
-      setTimeout(updateDisplacementMap, 0);
-    });
-
-    resizeObserver.observe(containerRef.current);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, []);
-
-  useEffect(() => {
     setTimeout(updateDisplacementMap, 0);
   }, [width, height]);
 
@@ -170,7 +157,8 @@ const GlassSurface = ({
   return (
     <div
       ref={containerRef}
-      className={`glass-surface ${svgSupported ? 'glass-surface--svg' : 'glass-surface--fallback'} ${className}`}
+      className={`glass-surface glass-surface--${tone} ${svgSupported ? 'glass-surface--svg' : 'glass-surface--fallback'} ${className}`}
+      data-glass-tone={tone}
       style={containerStyle}
     >
       <svg className="glass-surface__filter" xmlns="http://www.w3.org/2000/svg">

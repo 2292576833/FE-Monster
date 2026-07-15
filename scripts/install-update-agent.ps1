@@ -11,7 +11,7 @@ if (!(Test-Path $agent)) { throw "Update agent script was not found: $agent" }
 $taskName = 'FE Monster Update Agent'
 $registeredTask = $false
 try {
-  $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" -Root "{1}"' -f $agent, $rootPath)
+  $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -WindowStyle Hidden -File "{0}" -Root "{1}"' -f $agent, $rootPath)
   $trigger = New-ScheduledTaskTrigger -AtLogOn
   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew
   Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Description 'FE Monster LAN update agent' -Force | Out-Null
@@ -24,7 +24,7 @@ try {
   $escapedRoot = $rootPath.Replace('"', '""')
   @(
     'Set shell = CreateObject("WScript.Shell")',
-    ('shell.Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{0}"" -Root ""{1}""", 0, False' -f $escapedAgent, $escapedRoot)
+    ('shell.Run "powershell.exe -NoProfile -WindowStyle Hidden -File ""{0}"" -Root ""{1}""", 0, False' -f $escapedAgent, $escapedRoot)
   ) | Set-Content -Encoding ASCII -Path $vbs
 }
 
@@ -34,8 +34,6 @@ if ($StartNow) {
   } else {
     Start-Process -FilePath 'powershell.exe' -ArgumentList @(
       '-NoProfile',
-      '-ExecutionPolicy',
-      'Bypass',
       '-WindowStyle',
       'Hidden',
       '-File',

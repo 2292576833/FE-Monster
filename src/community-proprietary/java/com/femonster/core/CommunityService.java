@@ -47,7 +47,6 @@ public final class CommunityService implements CommunityClient {
     private final CommunityModuleBridge communityModule;
     private Map<String, Object> lastProfile = new LinkedHashMap<>();
     private volatile long lastHealthCheckAt = 0L;
-    private volatile long lastHealthSuccessAt = 0L;
     private volatile boolean lastHealthCheckOk = false;
 
     public CommunityService() {
@@ -252,6 +251,26 @@ public final class CommunityService implements CommunityClient {
         return get("/api/community/call/signals?feId=" + encode(feId) + "&sessionId=" + encode(sessionId) + "&after=" + encode(after));
     }
 
+    public Map<String, Object> sandboxGet(String path) {
+        return getWithTimeout(path, Duration.ofSeconds(20));
+    }
+
+    public Map<String, Object> sandboxPost(String path, Map<String, Object> payload) {
+        Duration timeout = path != null && (path.endsWith("/generate") || path.endsWith("/rework"))
+            ? Duration.ofMinutes(7)
+            : Duration.ofSeconds(20);
+        return postWithTimeout(path, payload, timeout);
+    }
+
+    public HttpResponse<java.io.InputStream> sandboxAsset(String path) throws IOException, InterruptedException {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(baseUrl + path))
+            .timeout(Duration.ofMinutes(5))
+            .header("Accept", "model/gltf-binary,image/png,application/octet-stream")
+            .GET();
+        addSandboxApiKey(builder, path);
+        return sendWithRetry(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
+    }
+
     public HttpResponse<java.io.InputStream> eventStream(String feId, String after) throws IOException, InterruptedException {
         String id = feId == null ? "" : feId.trim();
         StringBuilder path = new StringBuilder("/api/community/events?feId=").append(encode(id));
@@ -316,7 +335,7 @@ public final class CommunityService implements CommunityClient {
 
     private boolean isOnline() {
         long now = System.currentTimeMillis();
-        if (now - lastHealthCheckAt < 1800) return lastHealthCheckOk;
+        if (!lastHealthCheckOk && now - lastHealthCheckAt < 1800) return false;
         boolean online = isOnlineOnce();
         if (!online) {
             try {
@@ -327,13 +346,6 @@ public final class CommunityService implements CommunityClient {
             }
         }
         if (online) {
-            lastHealthSuccessAt = now;
-            lastHealthCheckAt = now;
-            lastHealthCheckOk = true;
-            return true;
-        }
-
-        if (lastHealthSuccessAt > 0 && now - lastHealthSuccessAt < 12000) {
             lastHealthCheckAt = now;
             lastHealthCheckOk = true;
             return true;
@@ -362,13 +374,18 @@ public final class CommunityService implements CommunityClient {
     }
 
     private Map<String, Object> post(String path, Map<String, Object> payload) {
+        return postWithTimeout(path, payload, TIMEOUT);
+    }
+
+    private Map<String, Object> postWithTimeout(String path, Map<String, Object> payload, Duration timeout) {
         try {
             Map<String, Object> requestPayload = withDeviceBinding(payload);
             String requestBody = SimpleJson.stringify(requestPayload);
             HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(baseUrl + path))
-                .timeout(TIMEOUT)
+                .timeout(timeout)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody));
+            addSandboxApiKey(builder, path);
             if (communityModule != null) {
                 communityModule.signatureHeaders("POST", path, requestBody).forEach(builder::header);
             }
@@ -398,11 +415,16 @@ public final class CommunityService implements CommunityClient {
     }
 
     private Map<String, Object> get(String path) {
+        return getWithTimeout(path, TIMEOUT);
+    }
+
+    private Map<String, Object> getWithTimeout(String path, Duration timeout) {
         try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl + path))
-                .timeout(TIMEOUT)
-                .GET()
-                .build();
+            HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(baseUrl + path))
+                .timeout(timeout)
+                .GET();
+            addSandboxApiKey(builder, path);
+            HttpRequest request = builder.build();
             HttpResponse<String> response = sendWithRetry(request, HttpResponse.BodyHandlers.ofString());
             Map<String, Object> body = SimpleJson.parseObject(response.body());
             if (response.statusCode() >= 200 && response.statusCode() < 500) return body;
@@ -813,6 +835,15 @@ public final class CommunityService implements CommunityClient {
 
     private static String encode(String value) {
         return java.net.URLEncoder.encode(value == null ? "" : value, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private static void addSandboxApiKey(HttpRequest.Builder builder, String path) {
+        if (path == null || !path.startsWith("/api/sandbox") && !path.startsWith("/api/preset-market") &&
+            !path.startsWith("/api/component-market") && !path.startsWith("/api/creative-market")) {
+            return;
+        }
+        String key = System.getenv().getOrDefault("FE_SANDBOX_API_KEY", "").trim();
+        if (!key.isBlank()) builder.header("X-FE-Sandbox-Key", key);
     }
 
     private static String firstNonBlank(String... values) {

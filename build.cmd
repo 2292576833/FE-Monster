@@ -45,10 +45,10 @@ if not exist "%ROOT%build" mkdir "%ROOT%build"
 if exist "%OUT%" rmdir /s /q "%OUT%"
 mkdir "%OUT%"
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%scripts\check-license-boundaries.ps1" -Root "%ROOT_PATH%"
+powershell -NoProfile -File "%ROOT%scripts\check-license-boundaries.ps1" -Root "%ROOT_PATH%"
 if errorlevel 1 exit /b %ERRORLEVEL%
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$roots = @('%SRC%'); if (Test-Path '%COMMUNITY_SRC%') { $roots += '%COMMUNITY_SRC%' }; Get-ChildItem -Path $roots -Recurse -Filter *.java | ForEach-Object { '\"' + ($_.FullName -replace '\\','/') + '\"' } | Set-Content -Encoding ASCII -Path '%SOURCES%'"
+powershell -NoProfile -Command "$roots = @('%SRC%'); if (Test-Path '%COMMUNITY_SRC%') { $roots += '%COMMUNITY_SRC%' }; Get-ChildItem -Path $roots -Recurse -Filter *.java | ForEach-Object { '\"' + ($_.FullName -replace '\\','/') + '\"' } | Set-Content -Encoding ASCII -Path '%SOURCES%'"
 echo Using Java compiler: "%JAVAC%"
 "%JAVAC%" -encoding UTF-8 --release 17 -d "%OUT%" @"%SOURCES%"
 if errorlevel 1 exit /b %ERRORLEVEL%

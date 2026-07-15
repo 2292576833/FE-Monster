@@ -171,7 +171,10 @@ public final class LocalClientLauncher {
     private static List<String> launchFlags(Map<String, Object> settings) {
         if (!setting(settings, "gpuAcceleration", true)) return List.of("--disable-gpu");
         List<String> flags = new ArrayList<>();
-        if (setting(settings, "directX11", true)) flags.add("--use-angle=d3d11");
+        if (setting(settings, "directX11", true)) {
+            flags.add("--use-gl=angle");
+            flags.add("--use-angle=d3d11");
+        }
         flags.add("--enable-gpu-rasterization");
         flags.add("--enable-accelerated-2d-canvas");
         flags.add("--force-high-performance-gpu");

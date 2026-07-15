@@ -13,9 +13,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -71,6 +73,10 @@ public final class ApiRoutes {
                 context.runtimeSettings.snapshot()
             ));
             case "/api/app/runtime/settings" -> HttpUtil.sendJson(exchange, context.runtimeSettings.snapshot());
+            case "/api/sandbox/assets" -> handleSandboxAsset(exchange, query);
+            case "/api/sandbox/capabilities", "/api/sandbox/presets", "/api/sandbox/components",
+                "/api/preset-market", "/api/component-market", "/api/creative-market" ->
+                HttpUtil.sendJson(exchange, context.community.sandboxGet(sandboxPath(path, query)));
             case "/api/app/gesture" -> HttpUtil.sendJson(exchange, context.gestureControl.status(
                 context.runtimeSettings.gestureControlEnabled(),
                 context.runtimeSettings.gestureCameraSource()
@@ -236,6 +242,12 @@ public final class ApiRoutes {
                 ));
                 HttpUtil.sendJson(exchange, saved);
             }
+            case "/api/sandbox/generate", "/api/sandbox/codex/commit", "/api/sandbox/codex/rework",
+                "/api/sandbox/presets", "/api/sandbox/presets/delete",
+                "/api/sandbox/components", "/api/sandbox/components/delete",
+                "/api/preset-market/upload", "/api/preset-market/download",
+                "/api/component-market/upload", "/api/component-market/download" ->
+                HttpUtil.sendJson(exchange, context.community.sandboxPost(path, root));
             case "/api/playlist/add", "/api/netease/playlist/add", "/api/qq/playlist/add", "/api/kugou/playlist/add" -> handlePlaylistAdd(exchange, path, query, root);
             case "/api/community/friends/add" -> handleCommunityAddFriend(exchange, query, root);
             case "/api/community/profile" -> handleCommunityProfile(exchange, query, root);
@@ -369,6 +381,33 @@ public final class ApiRoutes {
             throw e;
         } catch (Exception e) {
             HttpUtil.sendJson(exchange, 502, HttpUtil.error("community event stream unavailable"));
+        }
+    }
+
+    private void handleSandboxAsset(HttpExchange exchange, Map<String, String> query) throws IOException {
+        try {
+            HttpResponse<InputStream> response = context.community.sandboxAsset(sandboxPath("/api/sandbox/assets", query));
+            String contentType = response.headers().firstValue("content-type").orElse("application/octet-stream");
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                byte[] body;
+                try (InputStream input = response.body()) {
+                    body = input.readAllBytes();
+                }
+                HttpUtil.sendBytes(exchange, response.statusCode(), contentType, body);
+                return;
+            }
+
+            HttpUtil.addCors(exchange);
+            exchange.getResponseHeaders().set("Content-Type", contentType);
+            response.headers().firstValue("cache-control").ifPresent(value -> exchange.getResponseHeaders().set("Cache-Control", value));
+            long contentLength = response.headers().firstValueAsLong("content-length").orElse(0L);
+            exchange.sendResponseHeaders(response.statusCode(), contentLength);
+            try (InputStream input = response.body(); OutputStream output = exchange.getResponseBody()) {
+                input.transferTo(output);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            HttpUtil.sendJson(exchange, 502, HttpUtil.error("sandbox asset transfer interrupted"));
         }
     }
 
@@ -608,7 +647,7 @@ public final class ApiRoutes {
     private static Map<String, Object> appVersion() {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("name", "FE Monster Java");
-        body.put("version", "1.0.1-java26");
+        body.put("version", "1.0.6-java26");
         body.put("runtime", System.getProperty("java.version"));
         body.put("ok", true);
         return body;
@@ -654,6 +693,20 @@ public final class ApiRoutes {
         return MusicProviderRegistry.normalize(HttpUtil.param(query, "provider", "netease"));
     }
 
+    private static String sandboxPath(String path, Map<String, String> query) {
+        if (query == null || query.isEmpty()) return path;
+        StringBuilder remote = new StringBuilder(path).append('?');
+        boolean first = true;
+        for (Map.Entry<String, String> entry : query.entrySet()) {
+            if (!first) remote.append('&');
+            first = false;
+            remote.append(URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8));
+            remote.append('=');
+            remote.append(URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8));
+        }
+        return remote.toString();
+    }
+
     private static List<Song> songsFromPayload(Map<String, Object> root) {
         List<Song> songs = new ArrayList<>();
         for (Object item : SimpleJson.asList(root.get("songs"))) {
@@ -681,9 +734,9 @@ public final class ApiRoutes {
 
     private static Map<String, Object> updatePayload() {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("version", "1.0.1-java26");
+        body.put("version", "1.0.6-java26");
         body.put("downloadUrl", "");
-        body.put("releaseNotes", "Java26 installer runtime check, book lyric scene preset, and smoother lyric sync.");
+        body.put("releaseNotes", "Android local client, accurate community health, and adaptive preset performance.");
         body.put("fileSize", 0);
         return body;
     }

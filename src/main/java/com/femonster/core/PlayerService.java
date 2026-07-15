@@ -25,6 +25,7 @@ public final class PlayerService {
     private int duration = 0;
     private double volume = 0.8;
     private String url = "";
+    private String quality = "standard";
     private String error = "";
     private long clockStartedAt = System.currentTimeMillis();
     private int positionAtClockStart = 0;
@@ -47,6 +48,7 @@ public final class PlayerService {
         body.put("queue", queueMaps());
         body.put("queueIndex", queueIndex);
         body.put("url", url);
+        body.put("quality", quality);
         body.put("volume", volume);
         body.put("playable", audioLoaded && error.isBlank());
         body.put("error", error);
@@ -83,7 +85,7 @@ public final class PlayerService {
 
     public synchronized Map<String, Object> play() {
         if (!audioLoaded && currentSong.hasIdentity()) {
-            return load(currentSong, "standard");
+            return load(currentSong, quality);
         }
         playing = audioLoaded && error.isBlank();
         positionAtClockStart = position;
@@ -122,7 +124,8 @@ public final class PlayerService {
         position = 0;
         positionAtClockStart = 0;
         clockStartedAt = System.currentTimeMillis();
-        url = music.songUrl(MusicProviderRegistry.providerFromSong(song), song.id, quality);
+        this.quality = normalizeQuality(quality);
+        url = music.songUrl(MusicProviderRegistry.providerFromSong(song), song.id, this.quality);
         audioLoaded = !url.isBlank();
         playing = audioLoaded;
         error = audioLoaded ? "" : "song url unavailable";
@@ -132,6 +135,7 @@ public final class PlayerService {
         Map<String, Object> body = transportBody(true);
         body.put("song", currentSong.toMap());
         body.put("url", url);
+        body.put("quality", this.quality);
         body.put("playable", audioLoaded && error.isBlank());
         return body;
     }
@@ -200,7 +204,7 @@ public final class PlayerService {
             queueIndex = offset > 0 ? -1 : queue.size();
         }
         queueIndex = (queueIndex + offset + queue.size()) % queue.size();
-        Map<String, Object> body = load(queue.get(queueIndex), "standard");
+        Map<String, Object> body = load(queue.get(queueIndex), quality);
         body.put("action", offset < 0 ? "previous" : "next");
         return body;
     }
@@ -212,9 +216,14 @@ public final class PlayerService {
         body.put("queueIndex", queueIndex);
         body.put("song", currentSong.toMap());
         body.put("url", url);
+        body.put("quality", quality);
         body.put("playable", audioLoaded && error.isBlank());
         body.put("error", error);
         return body;
+    }
+
+    private static String normalizeQuality(String value) {
+        return value == null || value.isBlank() ? "standard" : value.trim();
     }
 
     private List<Map<String, Object>> queueMaps() {
@@ -260,6 +269,7 @@ public final class PlayerService {
             position = SimpleJson.asInt(root.get("position"), 0);
             duration = SimpleJson.asInt(root.get("duration"), currentSong.duration);
             volume = SimpleJson.asDouble(root.get("volume"), 0.8);
+            quality = normalizeQuality(SimpleJson.asString(root.get("quality"), "standard"));
             queueIndex = SimpleJson.asInt(root.get("queueIndex"), -1);
             url = SimpleJson.asString(root.get("url"), "");
             audioLoaded = !url.isBlank();

@@ -68,10 +68,12 @@ function surfaceProfile(kind) {
 
 function GlassSkinSurface({ kind = 'button', radius = 999 }) {
   const profile = surfaceProfile(kind);
+  const tone = kind === 'player' ? 'black' : 'clear';
 
   return (
     <GlassSurface
       className={`rb-glass-surface rb-glass-surface--${kind}`}
+      tone={tone}
       width="100%"
       height="100%"
       borderRadius={radius}

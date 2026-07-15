@@ -133,7 +133,7 @@ try {
   } else {
     $dependencyScript = Join-Path $rootPath 'scripts\ensure-runtime-dependencies.ps1'
     $dependencyLog = Join-Path $outDir 'dependency-check.log'
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $dependencyScript -Root $rootPath -InstallMissing *> $dependencyLog
+    & powershell.exe -NoProfile -File $dependencyScript -Root $rootPath -InstallMissing *> $dependencyLog
     if ($LASTEXITCODE -ne 0) {
       $message = "Dependencies are missing and could not be installed automatically. See $outDir\dependency-check.log"
       Write-Log $message
@@ -145,7 +145,7 @@ try {
 
   $stopScript = Join-Path $rootPath 'scripts\stop-stale-fe-monster.ps1'
   $stopLog = Join-Path $outDir 'stop-stale.log'
-  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $stopScript -Root $rootPath *> $stopLog
+  & powershell.exe -NoProfile -File $stopScript -Root $rootPath *> $stopLog
 
   $communityBaseUrl = Resolve-CommunityBaseUrl
   if ([string]::IsNullOrWhiteSpace($communityBaseUrl)) {
@@ -186,8 +186,6 @@ try {
       $apiErrLog = Join-Path $outDir "$logPrefix-$launchRunId.launch.err.log"
       $argumentLine = @(
         '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
         '-WindowStyle',
         'Hidden',
         '-File',

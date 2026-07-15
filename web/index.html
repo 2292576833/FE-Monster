@@ -2,13 +2,14 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="referrer" content="no-referrer" />
     <title>FE Monster Java</title>
     <link rel="stylesheet" href="/components/GlassSurface.css?v=20260706-black-glass-scroll" />
     <link rel="stylesheet" href="/components/BorderGlow.css?v=20260705-button-border-glow-fix" />
     <link rel="stylesheet" href="border-glow-buttons.css?v=20260705-button-border-glow-fix" />
-    <link rel="stylesheet" href="styles.css?v=20260707-book-scene-sync" />
+    <link rel="stylesheet" href="styles.css?v=20260715-free-cubes-2" />
+    <link rel="stylesheet" href="black-gold-buttons.css?v=20260714-black-react-bits-glass-16" />
   </head>
   <body>
     <section class="boot-screen" id="bootScreen" aria-label="FE moster launch screen">
@@ -43,6 +44,11 @@
           <input id="directX11Toggle" type="checkbox" />
           <span>DirectX11</span>
         </label>
+        <div class="runtime-render-technology" aria-live="polite">
+          <span>渲染重建</span>
+          <strong id="upscalerStatus">正在检测 GPU</strong>
+          <small id="upscalerDetail">DLSS 仅在原生 RTX 渲染链可用</small>
+        </div>
         <label class="runtime-toggle">
           <input id="xAudio2Toggle" type="checkbox" />
           <span>XAudio2</span>
@@ -73,22 +79,22 @@
       </section>
 
       <form
-        class="top-search glass-surface glass-surface--fallback"
+        class="top-search glass-surface glass-surface--react-bits glass-surface--fallback"
         id="topSearchForm"
         role="search"
         aria-label="搜索音乐"
         data-glass-surface
         data-glass-radius="16"
-        data-glass-brightness="58"
-        data-glass-opacity="0.92"
+        data-glass-brightness="60"
+        data-glass-opacity="0.93"
         data-glass-blur="11"
-        data-glass-displace="0.44"
-        data-glass-background-opacity="0.14"
-        data-glass-saturation="1.22"
-        data-glass-distortion-scale="-168"
-        data-glass-red-offset="-6"
-        data-glass-green-offset="50"
-        data-glass-blue-offset="50"
+        data-glass-displace="0.35"
+        data-glass-background-opacity="0.52"
+        data-glass-saturation="1.18"
+        data-glass-distortion-scale="-150"
+        data-glass-red-offset="0"
+        data-glass-green-offset="10"
+        data-glass-blue-offset="20"
       >
         <div class="glass-surface__content">
           <span class="top-search-icon" aria-hidden="true"><span></span></span>
@@ -146,6 +152,7 @@
             <img id="loginAvatarImage" alt="" />
           </span>
           <span class="netease-login-label" id="neteaseLoginLabel">网易云登录</span>
+          <span class="login-vip-badge" id="loginVipBadge" aria-hidden="true" hidden>VIP</span>
         </span>
       </button>
 
@@ -173,27 +180,310 @@
       </button>
 
       <button
-        class="diy-button glass-surface glass-surface--fallback"
+        class="diy-button glass-surface"
         id="diyButton"
         type="button"
-        aria-label="Open DIY panel"
-        aria-controls="diySidebar"
+        aria-label="打开 DIY 菜单"
+        aria-controls="diyQuickMenu diySidebar"
         aria-expanded="false"
+      >
+        <span class="glass-surface__content">DIY</span>
+      </button>
+
+      <nav class="diy-quick-menu" id="diyQuickMenu" aria-label="DIY 类型" aria-hidden="true">
+        <button class="diy-page-tab glass-surface" id="diyPresetButton" type="button" aria-pressed="false" aria-controls="diyPresetPage" style="--diy-menu-index: 0">
+          <span class="glass-surface__content">场景预设</span>
+        </button>
+        <button class="diy-page-tab glass-surface" id="diyTextModeButton" type="button" aria-pressed="false" aria-controls="diyTextPage" style="--diy-menu-index: 1">
+          <span class="glass-surface__content">文字预设</span>
+        </button>
+        <button class="diy-page-tab glass-surface" id="diyWallpaperModeButton" type="button" aria-pressed="false" aria-controls="diyWallpaperPage" style="--diy-menu-index: 2">
+          <span class="glass-surface__content">壁纸模式</span>
+        </button>
+      </nav>
+
+      <button
+        class="sandbox-mode-button glass-surface glass-surface--fallback"
+        id="sandboxModeButton"
+        type="button"
+        aria-label="进入沙盒模式"
+        aria-controls="sandboxPage"
+        aria-pressed="false"
         data-glass-surface
-        data-glass-radius="23"
-        data-glass-brightness="66"
-        data-glass-opacity="0.88"
-        data-glass-blur="13"
+        data-glass-radius="16"
+        data-glass-brightness="62"
+        data-glass-opacity="0.92"
+        data-glass-blur="12"
         data-glass-displace="0.34"
-        data-glass-background-opacity="0.18"
+        data-glass-background-opacity="0.16"
         data-glass-saturation="1.18"
         data-glass-distortion-scale="-156"
         data-glass-red-offset="-4"
         data-glass-green-offset="20"
         data-glass-blue-offset="36"
       >
-        <span class="glass-surface__content">DIY</span>
+        <span class="glass-surface__content">
+          <span class="sandbox-mode-icon" aria-hidden="true"></span>
+          <span>沙盒模式</span>
+        </span>
       </button>
+
+      <section class="sandbox-page" id="sandboxPage" aria-label="沙盒场景搭建" hidden>
+        <header class="sandbox-header">
+          <div class="sandbox-title-block">
+            <span>场景搭建</span>
+            <label class="sr-only" for="sandboxSceneName">场景名称</label>
+            <input id="sandboxSceneName" type="text" value="我的音乐场景" maxlength="32" autocomplete="off" />
+          </div>
+          <div class="sandbox-header-actions">
+            <span class="sandbox-save-status" id="sandboxSaveStatus" aria-live="polite">所有更改保存在本机</span>
+            <button class="sandbox-secondary-button" id="sandboxResetViewButton" type="button">重置视角</button>
+            <button class="sandbox-primary-button" id="sandboxSavePresetButton" type="button">保存到客户端预设</button>
+          </div>
+        </header>
+
+        <div class="sandbox-workspace">
+          <main class="sandbox-stage" id="sandboxStage" aria-label="3D 场景画布">
+            <canvas id="sandboxCanvas" aria-label="可交互的 3D 场景"></canvas>
+            <div class="sandbox-stage-empty" id="sandboxStageEmpty">
+              <span class="sandbox-empty-object" aria-hidden="true"></span>
+              <strong>从右侧拖入一个组件</strong>
+              <small>拖动组件调整位置，滚轮缩放，拖动空白区域旋转视角</small>
+            </div>
+            <div class="sandbox-stage-toolbar" aria-label="场景操作">
+              <span id="sandboxObjectCount">0 个组件</span>
+              <button id="sandboxDuplicateButton" type="button" disabled>复制</button>
+              <button id="sandboxDeleteButton" type="button" disabled>删除</button>
+              <button id="sandboxClearButton" type="button" disabled>清空场景</button>
+            </div>
+            <div class="sandbox-stage-status" id="sandboxStageStatus" aria-live="polite">场景就绪</div>
+          </main>
+
+          <aside class="sandbox-sidebar" aria-label="组件库">
+            <div class="sandbox-sidebar-head">
+              <div>
+                <span>组件库</span>
+                <strong id="sandboxLibraryCount">0 个可用组件</strong>
+              </div>
+              <div class="sandbox-sidebar-tabs" role="tablist" aria-label="组件库页面">
+                <button class="is-active" id="sandboxLibraryTab" type="button" role="tab" aria-selected="true" aria-controls="sandboxLibraryPanel">组件</button>
+                <button id="sandboxGeneratorTab" type="button" role="tab" aria-selected="false" aria-controls="sandboxGeneratorPanel">创建</button>
+              </div>
+            </div>
+
+            <section class="sandbox-library-panel" id="sandboxLibraryPanel" role="tabpanel" aria-labelledby="sandboxLibraryTab">
+              <label class="sandbox-search">
+                <span class="sr-only">搜索组件</span>
+                <input id="sandboxLibrarySearch" type="search" placeholder="搜索组件" autocomplete="off" />
+              </label>
+              <div class="sandbox-library-grid" id="sandboxLibraryGrid"></div>
+              <div class="sandbox-library-empty" id="sandboxLibraryEmpty" hidden>
+                <strong>没有匹配的组件</strong>
+                <small>换个关键词，或创建一个新组件</small>
+              </div>
+
+              <section class="sandbox-sidebar-section">
+                <div class="sandbox-section-heading">
+                  <strong>当前场景</strong>
+                  <span id="sandboxSceneComponentCount">0</span>
+                </div>
+                <div class="sandbox-scene-list" id="sandboxSceneList"></div>
+              </section>
+
+              <section class="sandbox-sidebar-section">
+                <div class="sandbox-section-heading">
+                  <strong>客户端预设</strong>
+                  <span id="sandboxPresetCount">0</span>
+                </div>
+                <div class="sandbox-preset-list" id="sandboxPresetList"></div>
+              </section>
+            </section>
+
+            <section class="sandbox-generator-panel" id="sandboxGeneratorPanel" role="tabpanel" aria-labelledby="sandboxGeneratorTab" hidden>
+              <div class="sandbox-preview-card">
+                <canvas id="sandboxComponentPreview" aria-label="组件实时预览"></canvas>
+                <div>
+                  <span>实时预览</span>
+                  <strong id="sandboxPreviewName">新建组件</strong>
+                </div>
+              </div>
+
+              <div class="sandbox-form-group">
+                <label for="sandboxComponentName">组件名称</label>
+                <input id="sandboxComponentName" type="text" value="新建组件" maxlength="24" autocomplete="off" />
+              </div>
+
+              <div class="sandbox-form-row sandbox-form-row--split">
+                <div class="sandbox-form-group">
+                  <label for="sandboxCategory">组件类型</label>
+                  <select id="sandboxCategory">
+                    <option value="3d">3D 几何组件</option>
+                    <option value="2d">2D 平面组件</option>
+                    <option value="particle">粒子效果组件</option>
+                  </select>
+                </div>
+                <div class="sandbox-form-group">
+                  <label for="sandboxPrimitive">基础形态</label>
+                  <select id="sandboxPrimitive">
+                    <option value="sphere">球体</option>
+                    <option value="box">立方体</option>
+                    <option value="torus">圆环</option>
+                    <option value="cone">锥体</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="sandbox-form-row sandbox-form-row--split">
+                <div class="sandbox-form-group">
+                  <label for="sandboxComponentColor">颜色</label>
+                  <div class="sandbox-color-control">
+                    <input id="sandboxComponentColor" type="color" value="#83e4ff" />
+                    <output id="sandboxComponentColorValue" for="sandboxComponentColor">#83E4FF</output>
+                  </div>
+                </div>
+              </div>
+
+              <fieldset class="sandbox-fieldset sandbox-transform-fieldset">
+                <legend>场景位置 · 可堆叠</legend>
+                <div class="sandbox-dimension-grid">
+                  <label><span>X 左右</span><input id="sandboxPositionX" type="number" min="-5.2" max="5.2" step="0.1" value="0" /></label>
+                  <label><span>Y 高度</span><input id="sandboxPositionY" type="number" min="0" max="8" step="0.1" value="0" /></label>
+                  <label><span>Z 前后</span><input id="sandboxPositionZ" type="number" min="-4.2" max="4.2" step="0.1" value="0" /></label>
+                </div>
+                <small>选中场景组件后调整；Y 轴可让 3D 组件上下堆叠。Alt + 滚轮也可调高度。</small>
+              </fieldset>
+
+              <fieldset class="sandbox-fieldset">
+                <legend>尺寸</legend>
+                <div class="sandbox-dimension-grid">
+                  <label><span>宽</span><input id="sandboxWidth" type="number" min="0.2" max="4" step="0.1" value="1.2" /></label>
+                  <label><span>高</span><input id="sandboxHeight" type="number" min="0.2" max="4" step="0.1" value="1.2" /></label>
+                  <label><span>深</span><input id="sandboxDepth" type="number" min="0.2" max="4" step="0.1" value="1.2" /></label>
+                </div>
+              </fieldset>
+
+              <div class="sandbox-toggle-row">
+                <span><strong>360° 旋转</strong><small>允许用户从任意角度查看</small></span>
+                <label class="sandbox-switch"><input id="sandboxRotationToggle" type="checkbox" checked /><span></span></label>
+              </div>
+
+              <div class="sandbox-form-row sandbox-form-row--split">
+                <div class="sandbox-form-group">
+                  <label for="sandboxInteraction">画面交互</label>
+                  <select id="sandboxInteraction">
+                    <option value="drag">可拖拽</option>
+                    <option value="locked">锁定位置</option>
+                  </select>
+                </div>
+                <div class="sandbox-form-group">
+                  <label for="sandboxMotion">动态效果</label>
+                  <select id="sandboxMotion">
+                    <option value="music">跟随音乐</option>
+                    <option value="spin">持续旋转</option>
+                    <option value="float">轻柔悬浮</option>
+                    <option value="none">无动效</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="sandbox-music-controls" id="sandboxMusicControls">
+                <div class="sandbox-form-row sandbox-form-row--split">
+                  <div class="sandbox-form-group">
+                    <label for="sandboxBeatMode">跳动方式</label>
+                    <select id="sandboxBeatMode">
+                      <option value="scale">缩放律动</option>
+                      <option value="bounce">上下弹跳</option>
+                      <option value="wave">波纹呼吸</option>
+                    </select>
+                  </div>
+                  <div class="sandbox-form-group">
+                    <label for="sandboxMusicBand">音乐频段</label>
+                    <select id="sandboxMusicBand">
+                      <option value="bass">低频</option>
+                      <option value="energy">全频能量</option>
+                      <option value="treble">高频</option>
+                    </select>
+                  </div>
+                </div>
+                <label class="sandbox-range-control">
+                  <span><strong>动效幅度</strong><output id="sandboxAmplitudeValue" for="sandboxAmplitude">48%</output></span>
+                  <input id="sandboxAmplitude" type="range" min="0" max="100" value="48" />
+                </label>
+                <label class="sandbox-range-control">
+                  <span><strong>动效速度</strong><output id="sandboxSpeedValue" for="sandboxSpeed">1.0×</output></span>
+                  <input id="sandboxSpeed" type="range" min="20" max="240" value="100" />
+                </label>
+              </div>
+
+              <div class="sandbox-particle-controls" id="sandboxParticleControls" hidden>
+                <div class="sandbox-form-row sandbox-form-row--split">
+                  <div class="sandbox-form-group">
+                    <label for="sandboxParticleCount">粒子数量</label>
+                    <input id="sandboxParticleCount" type="number" min="8" max="2000" step="8" value="160" />
+                  </div>
+                  <div class="sandbox-form-group">
+                    <label for="sandboxOpacity">透明度</label>
+                    <input id="sandboxOpacity" type="range" min="5" max="100" value="92" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="sandbox-component-actions" aria-label="组件操作">
+                <button class="sandbox-secondary-button" id="sandboxSaveComponentButton" type="button">保存为组件</button>
+                <button class="sandbox-secondary-button" id="sandboxPublishComponentButton" type="button">上传组件市场</button>
+              </div>
+
+              <section class="sandbox-codex-request" aria-label="与服务端 Codex 沟通">
+                <div class="sandbox-section-heading">
+                  <strong>与 Codex 对话</strong>
+                  <span>连续上下文 + 2D 参考图</span>
+                </div>
+                <div class="sandbox-codex-chat" id="sandboxCodexChatMessages" role="log" aria-live="polite" aria-label="与 Codex 的对话"></div>
+                <label class="sandbox-form-group" for="sandboxCodexPrompt">
+                  <span>输入消息</span>
+                  <textarea id="sandboxCodexPrompt" rows="3" placeholder="直接告诉 Codex 你想要什么；它会记住本次对话，需求不清楚时会先询问。"></textarea>
+                </label>
+                <label class="sandbox-image-upload" for="sandboxReferenceImage">
+                  <input id="sandboxReferenceImage" type="file" accept="image/png,image/jpeg,image/webp" />
+                  <span>上传 2D 参考图</span>
+                  <small id="sandboxReferenceImageName">未选择图片 · 最大 12 MB</small>
+                </label>
+                <div class="sandbox-codex-response" id="sandboxCodexResponse" aria-live="polite" hidden></div>
+              </section>
+
+              <button class="sandbox-generate-button" id="sandboxGenerateButton" type="button">
+                <span>发送消息给 Codex</span>
+                <small>保留对话上下文与 2D 参考图 → 生成预览 → 决定保存、改进或重做</small>
+              </button>
+
+              <section class="sandbox-codex-decisions" id="sandboxCodexDecisions" aria-live="polite" hidden>
+                <div class="sandbox-section-heading">
+                  <strong>成品预览已就绪</strong>
+                  <span>尚未保存</span>
+                </div>
+                <p>当前画布已载入 Codex 方案。确认后才会写入客户端预设文件夹和组件库。</p>
+                <label class="sandbox-form-group" for="sandboxRevisionPrompt">
+                  <span>改进要求</span>
+                  <textarea id="sandboxRevisionPrompt" rows="3" placeholder="例如：把主色改为深海蓝，粒子更稀疏，低频跳动更明显。留空点击改进会先向你提问。"></textarea>
+                </label>
+                <div class="sandbox-codex-actions">
+                  <button class="is-primary" id="sandboxCommitCodexButton" type="button">保存成品</button>
+                  <button id="sandboxImproveCodexButton" type="button">按要求改进</button>
+                  <button id="sandboxRedoCodexButton" type="button">无新要求重做</button>
+                </div>
+              </section>
+
+              <section class="sandbox-pipeline" id="sandboxPipeline" aria-live="polite" hidden>
+                <div class="sandbox-section-heading">
+                  <strong>处理计划</strong>
+                  <span id="sandboxPipelineMode">等待提交</span>
+                </div>
+                <div class="sandbox-pipeline-list" id="sandboxPipelineList"></div>
+              </section>
+            </section>
+          </aside>
+        </div>
+      </section>
 
       <main class="stage" aria-label="白色粒子球播放舞台">
         <canvas id="orbCanvas" aria-hidden="true"></canvas>
@@ -209,6 +499,10 @@
               <strong id="communityName">登录后启用社区</strong>
               <small id="communityMeta">同步音乐平台账号</small>
             </span>
+            <button class="community-broadcast-button" id="communityBroadcastButton" type="button" aria-label="社区公告广播" title="社区公告广播">
+              <span class="community-broadcast-icon" aria-hidden="true"></span>
+              <span class="community-broadcast-dot" aria-hidden="true"></span>
+            </button>
             <button class="community-collapse-button" id="communityCollapseButton" type="button" aria-label="折叠社区卡片" aria-expanded="true">
               <span aria-hidden="true"></span>
             </button>
@@ -225,8 +519,9 @@
           </form>
 
           <div class="community-friends-head">
-            <span>在线好友</span>
+            <span id="communityFriendsLabel">在线好友</span>
             <span class="community-friends-tools">
+              <button class="community-header-action community-market-entry" id="communityMarketButton" type="button" aria-haspopup="dialog" aria-controls="communityProfileDialog" aria-expanded="false">市场</button>
               <button class="community-header-action" id="communityMessageButton" type="button">消息</button>
               <button class="community-header-action" id="communityDndButton" type="button" aria-pressed="false">免扰</button>
               <strong id="communityOnlineCount">0</strong>
@@ -258,6 +553,7 @@
           </div>
         </section>
         <div class="community-message-bubbles" id="communityMessageBubbles" aria-live="polite"></div>
+        <div class="community-broadcast-toast" id="communityBroadcastToast" aria-live="polite" hidden></div>
         <div class="community-listen-bubbles" id="communityListenBubbles" aria-live="polite"></div>
         <section class="community-profile-dialog" id="communityProfileDialog" aria-label="社区个人资料" hidden>
           <div class="community-profile-panel" id="communityProfilePanel">
@@ -268,13 +564,14 @@
                 <small id="communityProfileMeta">描述自己</small>
               </div>
               <span class="community-profile-head-actions">
-                <button class="community-profile-tab is-active" id="communityProfileSelfTab" type="button" data-community-profile-page="self">个人资料</button>
-                <button class="community-profile-tab" id="communityProfileGroupTab" type="button" data-community-profile-page="nearby">社区集体</button>
+                <button class="community-profile-tab is-active" id="communityProfileSelfTab" type="button" role="tab" aria-selected="true" aria-controls="communityProfileSelfPage" data-community-profile-page="self">个人资料</button>
+                <button class="community-profile-tab" id="communityProfileGroupTab" type="button" role="tab" aria-selected="false" aria-controls="communityProfileNearbyPage" data-community-profile-page="nearby">社区集体</button>
+                <button class="community-profile-tab" id="communityProfileMarketTab" type="button" role="tab" aria-selected="false" aria-controls="communityProfileMarketPage" data-community-profile-page="market">创作市场</button>
                 <button id="communityProfileClose" type="button" aria-label="关闭个人资料">×</button>
               </span>
             </header>
             <div class="community-profile-pages">
-              <div class="community-profile-page is-active" id="communityProfileSelfPage">
+              <div class="community-profile-page is-active" id="communityProfileSelfPage" role="tabpanel" aria-labelledby="communityProfileSelfTab">
                 <div class="community-profile-card">
                   <span class="community-profile-avatar" id="communityProfileAvatar">FE</span>
                   <span class="community-profile-copy">
@@ -291,13 +588,29 @@
                   <span id="communityProfileStatus">点击头像打开个人资料</span>
                 </div>
               </div>
-              <div class="community-profile-page" id="communityProfileNearbyPage" hidden>
+              <div class="community-profile-page" id="communityProfileNearbyPage" role="tabpanel" aria-labelledby="communityProfileGroupTab" hidden>
                 <div class="community-nearby-head">
                   <strong>社区集体</strong>
                   <small id="communityNearbyMeta">显示同区域 5-10 公里内的社区账号</small>
                 </div>
                 <div class="community-nearby-list" id="communityNearbyList">
                   <span class="community-empty">正在读取附近社区账号</span>
+                </div>
+              </div>
+              <div class="community-profile-page" id="communityProfileMarketPage" role="tabpanel" aria-labelledby="communityProfileMarketTab" hidden>
+                <div class="community-market-head">
+                  <div>
+                    <strong>创作市场</strong>
+                    <small id="communityMarketMeta">预览并下载社区组件与场景预设</small>
+                  </div>
+                  <button id="communityMarketRefresh" type="button">刷新</button>
+                </div>
+                <label class="community-market-search" for="communityMarketSearch">
+                  <span class="sr-only">搜索市场资产</span>
+                  <input id="communityMarketSearch" type="search" autocomplete="off" placeholder="搜索组件、预设、标签或创作者" />
+                </label>
+                <div class="community-market-list" id="communityMarketList">
+                  <span class="community-empty">正在读取创作市场</span>
                 </div>
               </div>
             </div>
@@ -329,6 +642,10 @@
           <video class="wallpaper-media wallpaper-media--video" id="wallpaperVideo" muted loop playsinline></video>
           <div class="wallpaper-empty" id="wallpaperEmpty">导入或选择壁纸</div>
         </section>
+        <section class="free-cube-scene has-soft-background" id="freeCubeScene" aria-label="自由方块" hidden>
+          <div class="free-cube-soft-background" aria-hidden="true"></div>
+          <div class="free-cube-core" id="freeCubeCore" aria-hidden="true"></div>
+        </section>
         <section class="dynamic-cube-scene" id="dynamicCubeScene" aria-label="动感魔方" hidden>
           <div class="dynamic-cube-rig" id="dynamicCubeRig" aria-hidden="true">
             <div class="dynamic-cube-core" id="dynamicCubeCore"></div>
@@ -339,14 +656,32 @@
             <div class="sonic-topography-core" id="sonicTopographyCore"></div>
           </div>
         </section>
+        <section class="cover-particle-scene" id="coverParticleScene" aria-label="&#31890;&#23376;&#23553;&#38754;" hidden>
+          <div class="cover-particle-rig" id="coverParticleRig" aria-hidden="true">
+            <div class="cover-particle-engine" id="coverParticleEngine"></div>
+            <canvas class="cover-particle-canvas" id="coverParticleCanvas"></canvas>
+          </div>
+        </section>
+        <section class="sandbox-playback-scene" id="sandboxPlaybackScene" aria-label="&#33258;&#23450;&#20041; 3D &#22330;&#26223;&#39044;&#35774;" hidden>
+          <div class="sandbox-playback-fallback" id="sandboxPlaybackFallback" role="img" aria-label="Blender &#22330;&#26223;&#39044;&#35272;"></div>
+          <div class="storm-lighting-controls" id="stormLightingControls" role="group" aria-label="风暴海域光照与天气" hidden>
+            <button class="is-active" type="button" data-storm-lighting-mode="realtime" aria-pressed="true">实时</button>
+            <button type="button" data-storm-lighting-mode="day" aria-pressed="false">白天</button>
+            <button type="button" data-storm-lighting-mode="sunset" aria-pressed="false">黄昏</button>
+            <button type="button" data-storm-lighting-mode="evening" aria-pressed="false">傍晚</button>
+            <button type="button" data-storm-weather-mode="thunderstorm" aria-pressed="false" aria-label="雷暴天气">雷暴</button>
+          </div>
+          <span class="sandbox-playback-status" id="sandboxPlaybackStatus" aria-live="polite">&#27491;&#22312;&#36733;&#20837;&#23454;&#26102; 3D</span>
+        </section>
         <section class="playback-lyric-scene" id="playbackLyricScene" aria-label="3D playback lyric" hidden>
           <div class="book-lyric-stage" id="bookLyricStage" aria-hidden="true">
             <figure class="book-lyric-cover" id="bookLyricCover">
               <img id="bookLyricCoverImage" alt="" />
               <figcaption>FE</figcaption>
             </figure>
-            <div class="book-lyric-page" aria-label="书页歌词">
+            <div class="book-lyric-page" id="bookLyricPage" aria-label="书页歌词">
               <div class="book-lyric-list" id="bookLyricList"></div>
+              <div class="book-lyric-artist" id="bookLyricArtist"></div>
             </div>
           </div>
           <div class="playback-lyric-rig" id="playbackLyricRig" aria-live="polite">
@@ -363,9 +698,17 @@
             <div class="playback-lyric-subtitle" id="playbackLyricSubtitle"></div>
           </div>
         </section>
+        <canvas class="rain-glass-overlay-canvas" id="rainGlassCanvas" aria-hidden="true"></canvas>
         <section class="orb-playlists playlist-album-orbit" id="orbPlaylists" aria-label="User playlist albums" hidden>
           <div class="orb-playlist-status" id="orbPlaylistStatus">Playlists</div>
           <div class="orb-playlist-cards playlist-album-ring" id="orbPlaylistCards" tabindex="0" role="listbox" aria-label="User playlist albums"></div>
+          <input
+            id="localPlaylistInput"
+            type="file"
+            accept="audio/*,.mp3,.flac,.wav,.wave,.m4a,.aac,.ogg,.oga,.opus,.webm,.mp4,.mka,.wma,.ape,.alac,.aif,.aiff,.aifc,.amr,.caf,.ac3,.eac3,.dts,.tta,.wv,.dsf,.dff,.mid,.midi,.m4b,.mpc,.tak"
+            multiple
+            hidden
+          />
         </section>
 
         <section class="playlist-song-page" id="playlistShelf" aria-label="3D playlist songs" hidden>
@@ -381,6 +724,7 @@
                 <strong id="playlistShelfTitle">Choose playlist</strong>
                 <small id="playlistShelfMeta">No playlist selected</small>
               </span>
+              <button class="playlist-local-add" id="playlistLocalAddButton" type="button" hidden>继续导入歌曲</button>
             </article>
             <div class="playlist-shelf-scroll playlist-song-card-viewport" id="playlistShelfScroll">
               <div class="playlist-song-stack playlist-song-card-stack" id="playlistSongStack" tabindex="0" role="listbox" aria-label="Playlist songs"></div>
@@ -391,20 +735,20 @@
       </main>
 
       <footer
-        class="player-dock glass-surface glass-surface--fallback"
+        class="player-dock glass-surface glass-surface--react-bits glass-surface--fallback"
         aria-label="播放控制栏"
         data-glass-surface
         data-glass-radius="20"
-        data-glass-brightness="54"
-        data-glass-opacity="0.94"
-        data-glass-blur="12"
-        data-glass-displace="0.4"
-        data-glass-background-opacity="0.1"
-        data-glass-saturation="1.2"
-        data-glass-distortion-scale="-174"
-        data-glass-red-offset="-6"
-        data-glass-green-offset="18"
-        data-glass-blue-offset="34"
+        data-glass-brightness="55"
+        data-glass-opacity="0.93"
+        data-glass-blur="11"
+        data-glass-displace="0.5"
+        data-glass-background-opacity="0.58"
+        data-glass-saturation="1.15"
+        data-glass-distortion-scale="-180"
+        data-glass-red-offset="0"
+        data-glass-green-offset="10"
+        data-glass-blue-offset="20"
       >
         <div class="glass-surface__content">
           <div class="dock-track">
@@ -447,6 +791,10 @@
             <input id="volumeRange" type="range" min="0" max="100" value="80" aria-label="音量" />
           </div>
 
+          <button class="dock-quality-button" id="dockQualityButton" type="button" title="音质" aria-label="音质" aria-expanded="false" aria-controls="dockQualityMenu" disabled>
+            <span class="dock-quality-icon" aria-hidden="true"></span>
+          </button>
+
           <button class="dock-favorite-button" id="dockFavoriteButton" type="button" title="收藏当前歌曲" aria-label="收藏当前歌曲" aria-pressed="false" disabled>
             <span class="dock-favorite-icon" aria-hidden="true"></span>
           </button>
@@ -455,28 +803,19 @@
             <span class="dock-pin-icon" aria-hidden="true"></span>
           </button>
         </div>
+        <div class="dock-quality-menu" id="dockQualityMenu" role="menu" aria-label="音质选择" hidden></div>
       </footer>
 
-      <aside class="diy-sidebar" id="diySidebar" aria-label="DIY playback preset" aria-hidden="true">
+      <aside class="diy-sidebar" id="diySidebar" aria-label="DIY 预设悬浮卡片" aria-hidden="true">
         <div class="diy-sidebar-head">
-          <span>DIY</span>
-          <button class="diy-close-button" id="diyCloseButton" type="button" aria-label="Close DIY panel"></button>
-        </div>
-        <div class="diy-page-tabs" role="tablist" aria-label="DIY 页面">
-          <button class="diy-page-tab is-active glass-surface glass-surface--fallback" id="diyPresetButton" type="button" aria-pressed="true" aria-controls="diyPresetPage" data-glass-surface>
-            <span class="glass-surface__content">预设</span>
-          </button>
-          <button class="diy-page-tab glass-surface glass-surface--fallback" id="diyTextModeButton" type="button" aria-pressed="false" aria-controls="diyTextPage" data-glass-surface>
-            <span class="glass-surface__content">文字预设</span>
-          </button>
-          <button class="diy-page-tab glass-surface glass-surface--fallback" id="diyWallpaperModeButton" type="button" aria-pressed="false" aria-controls="diyWallpaperPage" data-glass-surface>
-            <span class="glass-surface__content">壁纸模式</span>
-          </button>
+          <span id="diyCardTitle">场景预设</span>
+          <small>拖动标题可 360° 旋转</small>
+          <button class="diy-close-button" id="diyCloseButton" type="button" aria-label="关闭 DIY 悬浮卡片"></button>
         </div>
         <section class="diy-preset-page is-expanded" id="diyPresetPage" aria-label="预设页">
           <div class="diy-preset-group diy-preset-group--scene">
             <span class="diy-preset-group-label">场景预设</span>
-            <div class="diy-preset-options diy-preset-options--scene">
+            <div class="diy-preset-options diy-preset-options--scene" id="diyScenePresetList">
               <button class="diy-preset-card is-active" id="diySceneNonePreset" type="button" data-preset="lyric">
                 <strong>无场景</strong>
                 <small>只显示歌词</small>
@@ -485,9 +824,21 @@
                 <strong>动感魔方</strong>
                 <small>低频驱动</small>
               </button>
+              <button class="diy-preset-card" id="diyFreeCubePreset" type="button" data-preset="free-cubes">
+                <strong>自由方块</strong>
+                <small>漂浮 · 心动</small>
+              </button>
               <button class="diy-preset-card" id="diyTopographyPreset" type="button" data-preset="topography">
                 <strong>Sonic</strong>
                 <small>Terrain</small>
+              </button>
+              <button class="diy-preset-card" id="diyRainGlassPreset" type="button" data-preset="rain-glass">
+                <strong>&#38632;&#22825;&#29627;&#29827;</strong>
+                <small>&#27700;&#28404;&#28369;&#33853;</small>
+              </button>
+              <button class="diy-preset-card" id="diyCoverParticlesPreset" type="button" data-preset="cover-particles">
+                <strong>&#31890;&#23376;&#23553;&#38754;</strong>
+                <small>&#20302;&#39057;&#27874;&#28010;</small>
               </button>
               <button class="diy-preset-card" id="diyBookLyricPreset" type="button" data-preset="book">
                 <strong>书页歌词</strong>
@@ -495,18 +846,70 @@
               </button>
             </div>
           </div>
-          <div class="diy-spectrum">
+          <div class="diy-preset-group diy-preset-group--sandbox" id="diySandboxPresetGroup" hidden>
+            <button class="diy-preset-group-label diy-preset-group-toggle" id="diySandboxPresetToggle" type="button" aria-expanded="false" aria-controls="diySandboxPresetList">我的场景预设</button>
+            <div class="diy-preset-options diy-preset-options--sandbox" id="diySandboxPresetList" hidden></div>
+          </div>
+          <div class="diy-preset-group diy-preset-group--inline-text" data-inline-text-presets>
+            <span class="diy-preset-group-label">&#25991;&#23383;&#39044;&#35774;</span>
+            <div class="diy-preset-options diy-preset-options--text">
+              <button class="diy-preset-card is-active" type="button" data-text-preset="depth">
+                <strong>3D&#27468;&#35789;</strong>
+                <small>&#23553;&#38754;&#21462;&#33394;</small>
+              </button>
+              <button class="diy-preset-card" type="button" data-text-preset="flow">
+                <strong>&#27969;&#21160;&#25991;&#23383;</strong>
+                <small>&#36880;&#23383;&#26174;&#24433;</small>
+              </button>
+              <button class="diy-preset-card" type="button" data-text-preset="book-effect">
+                <strong>&#20070;&#39029;&#25928;&#26524;</strong>
+                <small>&#29420;&#31435;&#23383;&#20809;&#26248;</small>
+              </button>
+            </div>
+          </div>
+          <div class="diy-spectrum" hidden>
             <span>低频</span>
             <div class="diy-spectrum-track" aria-hidden="true">
               <i id="spectrumBassFill"></i>
             </div>
             <strong id="spectrumStatus">待机</strong>
           </div>
-          <div class="diy-control">
+          <div class="diy-control diy-control--cover-particle-background" id="diyCoverParticleControl" data-diy-preset-control="cover-particles" hidden>
+            <label class="diy-toggle" for="diyCoverParticleBackgroundToggle">
+              <span>&#32972;&#26223;</span>
+              <input id="diyCoverParticleBackgroundToggle" type="checkbox" aria-label="&#32972;&#26223;" />
+            </label>
+            <span id="diyCoverParticleBackgroundValue">OFF</span>
+          </div>
+          <div class="diy-control" id="diyCubeIntensityControl" data-diy-preset-control="cube" hidden>
             <label for="cubeIntensityRange">魔方强度</label>
             <input id="cubeIntensityRange" type="range" min="40" max="180" value="110" />
             <span id="cubeIntensityValue">110%</span>
           </div>
+          <div class="free-cube-preset-controls" id="freeCubePresetControls" role="group" aria-label="自由方块样式与背景" hidden>
+            <span>自由方块</span>
+            <div>
+              <button id="freeCubeHeartButton" type="button" aria-pressed="false">心动</button>
+              <button class="is-active" id="freeCubeBackgroundButton" type="button" aria-pressed="true">背景</button>
+            </div>
+          </div>
+          <div class="storm-preset-lighting-quick" id="stormPresetLightingQuickControls" role="group" aria-label="风暴海域光照与天气切换" hidden>
+            <span>光照与天气</span>
+            <div>
+              <button class="is-active" type="button" data-storm-lighting-mode="realtime" aria-pressed="true">实时</button>
+              <button type="button" data-storm-lighting-mode="day" aria-pressed="false">白天</button>
+              <button type="button" data-storm-lighting-mode="sunset" aria-pressed="false">黄昏</button>
+              <button type="button" data-storm-lighting-mode="evening" aria-pressed="false">傍晚</button>
+              <button type="button" data-storm-weather-mode="thunderstorm" aria-pressed="false" aria-label="雷暴天气">雷暴</button>
+            </div>
+          </div>
+          <section class="diy-selected-preset-config" id="diySelectedPresetConfig" aria-live="polite" hidden>
+            <header>
+              <strong id="diySelectedPresetConfigTitle">当前预设配置</strong>
+              <small id="diySelectedPresetConfigMeta">无场景</small>
+            </header>
+            <div class="diy-selected-preset-config-list" id="diySelectedPresetConfigList"></div>
+          </section>
         </section>
         <section class="diy-text-page" id="diyTextPage" aria-label="文字预设" hidden>
           <div class="diy-preset-group diy-preset-group--text">
@@ -519,6 +922,10 @@
               <button class="diy-preset-card" id="diyFlowTextPreset" type="button" data-text-preset="flow">
                 <strong>流动文字</strong>
                 <small>逐字显影</small>
+              </button>
+              <button class="diy-preset-card" id="diyBookEffectTextPreset" type="button" data-text-preset="book-effect">
+                <strong>&#20070;&#39029;&#25928;&#26524;</strong>
+                <small>&#29420;&#31435;&#23383;&#20809;&#26248;</small>
               </button>
             </div>
           </div>
@@ -571,6 +978,23 @@
             <label for="wallpaperScaleRange">壁纸缩放</label>
             <input id="wallpaperScaleRange" type="range" min="70" max="100" value="100" />
             <span id="wallpaperScaleValue">100%</span>
+          </div>
+          <div class="diy-preset-group diy-preset-group--inline-text diy-preset-group--wallpaper-text" data-inline-text-presets>
+            <span class="diy-preset-group-label">&#25991;&#23383;&#39044;&#35774;</span>
+            <div class="diy-preset-options diy-preset-options--text">
+              <button class="diy-preset-card is-active" type="button" data-text-preset="depth">
+                <strong>3D&#27468;&#35789;</strong>
+                <small>&#23553;&#38754;&#21462;&#33394;</small>
+              </button>
+              <button class="diy-preset-card" type="button" data-text-preset="flow">
+                <strong>&#27969;&#21160;&#25991;&#23383;</strong>
+                <small>&#36880;&#23383;&#26174;&#24433;</small>
+              </button>
+              <button class="diy-preset-card" type="button" data-text-preset="book-effect">
+                <strong>&#20070;&#39029;&#25928;&#26524;</strong>
+                <small>&#29420;&#31435;&#23383;&#20809;&#26248;</small>
+              </button>
+            </div>
           </div>
         </section>
       </aside>
@@ -636,7 +1060,7 @@
             <span class="recording-icon recording-icon--finish" aria-hidden="true"></span>
             <span class="recording-action-label">完成录制</span>
           </button>
-          <a class="recording-download-button" id="recordingDownloadButton" href="#" download hidden>另存</a>
+          <a class="recording-download-button" id="recordingDownloadButton" href="#" role="button" download hidden>另存</a>
           <span class="recording-timer" id="recordingTimer">00:00</span>
         </div>
       </section>
@@ -713,9 +1137,10 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <audio id="audio" preload="metadata"></audio>
     <script src="vendor/three.r128.min.js?v=20260701-main-blue-orb"></script>
-    <script type="module" src="boot-lightfall-react.js?v=20260702-perf-login-fix"></script>
-    <script type="module" src="blur-text-lyrics.js?v=20260702-window-provider"></script>
-    <script type="module" src="border-glow-buttons.js?v=20260705-button-border-glow-fix"></script>
-    <script src="app.js?v=20260707-book-scene-sync"></script>
+    <script type="module" src="client-runtime-loader.js?v=20260713-platform-split-3"></script>
+    <script src="render-quality.js?v=20260712-adaptive-spatial-2"></script>
+    <script src="storm-ocean-runtime.js?v=20260715-optics-82"></script>
+    <script src="free-cube-runtime.js?v=20260715-free-cubes-6"></script>
+    <script src="app.js?v=20260715-free-cubes-1"></script>
   </body>
 </html>

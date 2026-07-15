@@ -12,4 +12,7 @@
     <PublishSingleFile>true</PublishSingleFile>
     <ApplicationIcon>..\assets\fe-monster.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="SetupPayload.zip" LogicalName="FE-Monster-Setup-Bundle.zip" Condition="Exists('SetupPayload.zip')" />
+  </ItemGroup>
 </Project>

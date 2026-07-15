@@ -2,7 +2,19 @@ import React from 'https://esm.sh/react@19';
 import { createRoot } from 'https://esm.sh/react-dom@19/client?deps=react@19';
 import BorderGlow from '/components/BorderGlow.runtime.js';
 
-const BUTTON_SELECTOR = 'button';
+const BUTTON_SELECTOR = [
+  '[data-border-glow]',
+  '.runtime-topbar button',
+  '.top-search button',
+  '.netease-login-button',
+  '.home-button',
+  '.diy-button',
+  '.sandbox-mode-button',
+  '.player-dock button',
+  '.community-market-entry',
+  '.sandbox-primary-button',
+  '.update-primary-button'
+].join(',');
 const GLASS_BUTTON_SELECTOR = [
   '[data-glass-surface]',
   '.glass-surface',
@@ -11,7 +23,8 @@ const GLASS_BUTTON_SELECTOR = [
 ].join(',');
 const EXCLUDED_BUTTON_SELECTOR = [
   '#bootLogoButton',
-  '.boot-logo-button'
+  '.boot-logo-button',
+  '.book-lyric-line'
 ].join(',');
 
 const mountedButtons = new WeakMap();

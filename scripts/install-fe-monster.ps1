@@ -3,6 +3,7 @@ param(
   [switch]$NoLaunch,
   [switch]$NoShortcuts,
   [switch]$SkipSystemNodeInstall,
+  [switch]$NoRegistration,
   [switch]$NoPopup
 )
 
@@ -204,7 +205,7 @@ function Copy-Payload {
     $stopScript = Join-Path $sourceRoot 'scripts\stop-stale-fe-monster.ps1'
     if (!(Test-Path $stopScript)) { $stopScript = Join-Path $installSafe 'scripts\stop-stale-fe-monster.ps1' }
     if (Test-Path $stopScript) {
-      & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $stopScript -Root $installSafe *> (Join-Path $outDir 'stop-before-install.log')
+      & powershell.exe -NoProfile -File $stopScript -Root $installSafe *> (Join-Path $outDir 'stop-before-install.log')
     }
 
     Remove-KnownAppFiles $installSafe
@@ -301,7 +302,7 @@ function Install-UpdateAgent {
   }
 
   Write-Log 'Registering FE Monster update agent...'
-  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -Root $installPath -StartNow *> (Join-Path $outDir 'install-update-agent.log')
+  & powershell.exe -NoProfile -File $script -Root $installPath -StartNow *> (Join-Path $outDir 'install-update-agent.log')
   if ($LASTEXITCODE -ne 0) {
     Write-Log "Update agent registration failed. See $outDir\install-update-agent.log"
   } else {
@@ -314,7 +315,7 @@ function Invoke-RuntimeCheck {
   if (!(Test-Path $script)) { throw "Missing dependency checker: $script" }
 
   Write-Log 'Checking and installing runtime dependencies...'
-  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -Root $installPath -InstallMissing *> (Join-Path $outDir 'install-dependencies.log')
+  & powershell.exe -NoProfile -File $script -Root $installPath -InstallMissing *> (Join-Path $outDir 'install-dependencies.log')
   if ($LASTEXITCODE -ne 0) {
     throw "Runtime dependency check failed. See $outDir\install-dependencies.log"
   }
@@ -388,8 +389,6 @@ function Test-MusicApis {
     Write-Log ("Starting music API {0} on port {1}..." -f $service.Script, $service.Port)
     $argumentLine = @(
       '-NoProfile',
-      '-ExecutionPolicy',
-      'Bypass',
       '-WindowStyle',
       'Hidden',
       '-File',
@@ -504,11 +503,13 @@ try {
   Assert-RequiredFiles
   Test-MusicApis
   Test-JavaServer
-  Register-Uninstaller
-  if (!$NoShortcuts) {
-    Install-Shortcuts
+  if (!$NoRegistration) {
+    Register-Uninstaller
+    if (!$NoShortcuts) {
+      Install-Shortcuts
+    }
+    Install-UpdateAgent
   }
-  Install-UpdateAgent
   Write-Log 'FE Monster setup completed.'
 
   if (!$NoLaunch) {

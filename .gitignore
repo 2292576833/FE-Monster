@@ -44,3 +44,13 @@ native/windows/setup/bin/
 native/windows/setup/obj/
 native/windows/winforms/bin/
 native/windows/winforms/obj/
+
+# Android build output
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+
+# Local QA, render and release evidence (never ship as source)
+artifacts/
+*.blend1

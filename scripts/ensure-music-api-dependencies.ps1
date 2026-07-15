@@ -47,7 +47,7 @@ function Invoke-RuntimeDependencyCheck {
     return $false
   }
 
-  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $dependencyScript -Root $rootPath -InstallMissing *> $dependencyLog
+  & powershell.exe -NoProfile -File $dependencyScript -Root $rootPath -InstallMissing *> $dependencyLog
   return $LASTEXITCODE -eq 0
 }
 

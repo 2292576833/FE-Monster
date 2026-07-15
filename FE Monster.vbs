@@ -9,7 +9,7 @@ For i = 0 To WScript.Arguments.Count - 1
   args = args & " " & Quote(WScript.Arguments(i))
 Next
 
-command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File " & Quote(script) & " -Root " & Quote(root) & args
+command = "powershell.exe -NoProfile -WindowStyle Hidden -File " & Quote(script) & " -Root " & Quote(root) & args
 shell.Run command, 0, False
 
 Function Quote(value)

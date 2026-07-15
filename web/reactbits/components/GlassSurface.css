@@ -45,6 +45,28 @@
     0px 16px 56px rgba(17, 17, 26, 0.05) inset;
 }
 
+.glass-surface--black.glass-surface--svg,
+.glass-surface--black.glass-surface--fallback {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.11), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.018)),
+    rgba(0, 0, 0, 0.82);
+  border: 1px solid rgba(238, 246, 255, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.055),
+    0 14px 30px rgba(0, 0, 0, 0.42);
+}
+
+.glass-surface--black.glass-surface--svg {
+  backdrop-filter: var(--filter-id, url(#glass-filter)) saturate(var(--glass-saturation, 1)) brightness(0.76);
+}
+
+.glass-surface--black.glass-surface--fallback {
+  backdrop-filter: blur(24px) saturate(1.04) brightness(0.76);
+  -webkit-backdrop-filter: blur(24px) saturate(1.04) brightness(0.76);
+}
+
 .glass-surface--fallback {
   background: rgba(255, 255, 255, 0.25);
   backdrop-filter: blur(12px) saturate(1.8) brightness(1.1);
