@@ -100,6 +100,18 @@ html[data-fe-platform="android"] [aria-disabled="true"].is-server-offline {
   opacity: 0.58;
 }
 
+html[data-fe-platform="android"] .android-login-workflow[hidden] {
+  display: none !important;
+}
+
+html[data-fe-platform="android"][data-fe-runtime="local"] .community-card,
+html[data-fe-platform="android"][data-fe-runtime="local"] .community-message-dialog,
+html[data-fe-platform="android"][data-fe-runtime="local"] .community-profile-dialog,
+html[data-fe-platform="android"][data-fe-runtime="local"] .netease-login-dialog,
+html[data-fe-platform="android"][data-fe-runtime="local"] #feMonsterAndroidOfflineNotice {
+  display: none !important;
+}
+
 html[data-fe-platform="android"][data-android-performance="low"] .stage-glow,
 html[data-fe-platform="android"][data-android-performance="low"] .ambient-streaks,
 html[data-fe-platform="android"][data-android-performance="low"] .diy-sidebar::after {
@@ -114,7 +126,10 @@ html[data-fe-platform="android"][data-android-performance="low"] .diy-sidebar::a
     height: var(--android-control) !important;
     gap: 0 !important;
     padding: 0 !important;
+    border: 0 !important;
     border-radius: 12px !important;
+    background: transparent !important;
+    box-shadow: none !important;
   }
 
   html[data-fe-platform="android"] #runtimeSettingsButton,
@@ -126,6 +141,65 @@ html[data-fe-platform="android"][data-android-performance="low"] .diy-sidebar::a
     width: var(--android-control) !important;
     height: var(--android-control) !important;
     border-radius: 12px !important;
+  }
+
+  html[data-fe-platform="android"] #runtimeSettingsButton,
+  html[data-fe-platform="android"] .netease-login-button,
+  html[data-fe-platform="android"] .home-button,
+  html[data-fe-platform="android"] .diy-button,
+  html[data-fe-platform="android"] .sandbox-mode-button {
+    overflow: visible !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  html[data-fe-platform="android"] #runtimeSettingsButton::before {
+    content: "";
+    position: absolute;
+    inset: 4px;
+    border: 1px solid rgba(248, 253, 255, 0.16);
+    border-radius: 10px;
+    background: rgba(4, 7, 10, 0.92);
+    pointer-events: none;
+  }
+
+  html[data-fe-platform="android"] #runtimeSettingsButton > span:not(.rb-border-glow-mount) {
+    z-index: 1;
+  }
+
+  html[data-fe-platform="android"] .netease-login-button > .glass-surface__content,
+  html[data-fe-platform="android"] .home-button > .glass-surface__content,
+  html[data-fe-platform="android"] .diy-button > .glass-surface__content,
+  html[data-fe-platform="android"] .sandbox-mode-button > .glass-surface__content {
+    box-sizing: border-box;
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+    margin: 4px !important;
+    border: 1px solid rgba(248, 253, 255, 0.16);
+    border-radius: 10px !important;
+    padding: 0 !important;
+    background: rgba(4, 7, 10, 0.92);
+    box-shadow: none !important;
+  }
+
+  html[data-fe-platform="android"] .netease-login-label,
+  html[data-fe-platform="android"] .login-vip-badge,
+  html[data-fe-platform="android"] .sandbox-mode-button > .glass-surface__content > span:last-child {
+    display: none !important;
+  }
+
+  html[data-fe-platform="android"] .netease-login-mark,
+  html[data-fe-platform="android"] .login-avatar {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  html[data-fe-platform="android"] .sandbox-mode-icon {
+    width: 14px !important;
+    height: 14px !important;
   }
 
   html[data-fe-platform="android"] .netease-login-button {
@@ -186,6 +260,131 @@ html[data-fe-platform="android"][data-android-performance="low"] .diy-sidebar::a
     width: min(300px, calc(100vw - 16px - var(--safe-area-left) - var(--safe-area-right))) !important;
     max-height: calc(100dvh - var(--safe-area-top) - var(--safe-area-bottom) - 68px) !important;
     overflow-y: auto !important;
+  }
+
+  html[data-fe-platform="android"] .netease-login-dialog {
+    align-items: end !important;
+    padding:
+      max(8px, var(--safe-area-top))
+      var(--android-edge-right)
+      max(8px, var(--safe-area-bottom))
+      var(--android-edge-left) !important;
+  }
+
+  html[data-fe-platform="android"] .netease-login-backdrop {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  html[data-fe-platform="android"] .netease-login-panel {
+    width: 100% !important;
+    min-height: 0 !important;
+    max-height: calc(100dvh - var(--safe-area-top) - var(--safe-area-bottom) - 16px) !important;
+    overflow: hidden !important;
+    border-radius: 14px !important;
+    box-shadow: 0 8px 8px rgba(0, 0, 0, 0.28) !important;
+  }
+
+  html[data-fe-platform="android"] .netease-login-panel > .glass-surface__content {
+    box-sizing: border-box;
+    max-height: calc(100dvh - var(--safe-area-top) - var(--safe-area-bottom) - 16px) !important;
+    padding: 14px !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+  }
+
+  html[data-fe-platform="android"] .login-panel-head {
+    gap: 10px !important;
+  }
+
+  html[data-fe-platform="android"] .login-panel-head strong {
+    font-size: 15px !important;
+  }
+
+  html[data-fe-platform="android"] .login-panel-head span {
+    max-width: 34ch;
+    font-size: 11px !important;
+  }
+
+  html[data-fe-platform="android"] .login-close-button {
+    width: var(--android-control) !important;
+    height: var(--android-control) !important;
+    border-radius: 12px !important;
+  }
+
+  html[data-fe-platform="android"] .login-provider-tabs {
+    gap: 4px !important;
+    margin-top: 10px !important;
+    padding: 3px !important;
+  }
+
+  html[data-fe-platform="android"] .login-provider-tab {
+    height: var(--android-control) !important;
+    border-radius: 9px !important;
+    font-size: 12px !important;
+  }
+
+  html[data-fe-platform="android"] .qr-login-stage {
+    gap: 9px !important;
+    min-height: 0 !important;
+    padding-top: 10px;
+  }
+
+  html[data-fe-platform="android"] .qr-code-shell {
+    box-sizing: border-box;
+    width: min(154px, 44vw) !important;
+    height: min(154px, 44vw) !important;
+    border-radius: 12px !important;
+    padding: 8px !important;
+  }
+
+  html[data-fe-platform="android"] .qr-login-status {
+    min-height: 0 !important;
+    font-size: 12px !important;
+  }
+
+  html[data-fe-platform="android"] .qr-refresh-button {
+    min-width: 104px !important;
+    height: var(--android-control) !important;
+    border-radius: 10px !important;
+    font-size: 12px !important;
+  }
+
+  html[data-fe-platform="android"] .android-login-workflow {
+    display: grid;
+    width: min(100%, 310px);
+    gap: 8px;
+  }
+
+  html[data-fe-platform="android"] .android-login-workflow p {
+    margin: 0;
+    color: rgba(232, 249, 255, 0.74);
+    font: 500 12px/1.45 system-ui, sans-serif;
+    text-align: center;
+  }
+
+  html[data-fe-platform="android"] .android-login-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  html[data-fe-platform="android"] .android-login-actions button {
+    min-width: 0;
+    min-height: var(--android-control);
+    border: 1px solid rgba(232, 249, 255, 0.18);
+    border-radius: 10px;
+    color: rgba(246, 252, 255, 0.92);
+    background: rgba(255, 255, 255, 0.08);
+    font: 700 12px/1 system-ui, sans-serif;
+  }
+
+  html[data-fe-platform="android"] .android-login-actions button:active {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  html[data-fe-platform="android"] .android-login-actions button:disabled {
+    opacity: 0.48;
   }
 
   html[data-fe-platform="android"] .community-card {
@@ -415,7 +614,107 @@ html[data-fe-platform="android"][data-android-performance="low"] .diy-sidebar::a
   }
 }
 
+@media (max-width: 767px) and (max-height: 660px) and (orientation: portrait) {
+  html[data-fe-platform="android"] .netease-login-panel > .glass-surface__content {
+    padding: 10px 12px !important;
+  }
+
+  html[data-fe-platform="android"] .login-provider-tabs {
+    margin-top: 6px !important;
+  }
+
+  html[data-fe-platform="android"] .qr-login-stage {
+    gap: 6px !important;
+    padding-top: 6px;
+  }
+
+  html[data-fe-platform="android"] .qr-code-shell {
+    width: min(132px, 38vw) !important;
+    height: min(132px, 38vw) !important;
+    padding: 7px !important;
+  }
+
+  html[data-fe-platform="android"] .android-login-workflow {
+    gap: 6px;
+  }
+
+  html[data-fe-platform="android"] .android-login-workflow p {
+    font-size: 11px;
+    line-height: 1.35;
+  }
+}
+
 @media (max-width: 1024px) and (max-height: 600px) and (orientation: landscape) {
+  html[data-fe-platform="android"][data-fe-orientation="landscape"] .top-search {
+    top: var(--android-top) !important;
+    right: calc(var(--android-edge-right) + 200px) !important;
+    left: calc(var(--android-edge-left) + var(--android-control) + 8px) !important;
+  }
+
+  html[data-fe-platform="android"][data-fe-orientation="landscape"] .search-suggestions,
+  html[data-fe-platform="android"][data-fe-orientation="landscape"] .favorite-library,
+  html[data-fe-platform="android"][data-fe-orientation="landscape"] .playlist-favorite-popover {
+    top: calc(var(--android-top) + var(--android-control) + 8px) !important;
+    right: calc(var(--android-edge-right) + 200px) !important;
+    left: calc(var(--android-edge-left) + var(--android-control) + 8px) !important;
+    max-height: calc(100dvh - var(--safe-area-top) - var(--safe-area-bottom) - 68px) !important;
+  }
+
+  html[data-fe-platform="android"][data-fe-orientation="landscape"] .runtime-settings-panel {
+    top: calc(var(--android-top) + var(--android-control) + 8px) !important;
+  }
+
+  html[data-fe-platform="android"] .netease-login-dialog {
+    align-items: center !important;
+  }
+
+  html[data-fe-platform="android"] .netease-login-panel {
+    width: min(620px, calc(100vw - var(--safe-area-left) - var(--safe-area-right) - 16px)) !important;
+  }
+
+  html[data-fe-platform="android"] .netease-login-panel > .glass-surface__content {
+    padding: 10px 12px !important;
+  }
+
+  html[data-fe-platform="android"] .login-provider-tabs {
+    margin-top: 6px !important;
+  }
+
+  html[data-fe-platform="android"] .qr-login-stage {
+    grid-template-columns: 124px minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    justify-items: stretch;
+    align-items: center;
+    gap: 6px 12px !important;
+    padding-top: 8px;
+  }
+
+  html[data-fe-platform="android"] .qr-code-shell {
+    grid-row: 1 / 4;
+    width: 124px !important;
+    height: 124px !important;
+  }
+
+  html[data-fe-platform="android"] .qr-login-status,
+  html[data-fe-platform="android"] .android-login-workflow,
+  html[data-fe-platform="android"] .login-community-strip {
+    width: 100%;
+    max-width: none;
+  }
+
+  html[data-fe-platform="android"] .qr-login-status,
+  html[data-fe-platform="android"] .android-login-workflow p {
+    text-align: left;
+  }
+
+  html[data-fe-platform="android"] .qr-refresh-button {
+    width: 100%;
+  }
+
+  html[data-fe-platform="android"] .android-login-actions {
+    gap: 6px;
+  }
+
   html[data-fe-platform="android"] .sandbox-header {
     min-height: calc(56px + var(--safe-area-top));
     height: calc(56px + var(--safe-area-top)) !important;
@@ -442,7 +741,44 @@ html[data-fe-platform="android"][data-android-performance="low"] .diy-sidebar::a
   html[data-fe-platform="android"] .player-dock {
     left: var(--android-edge-left) !important;
     width: min(460px, calc(100vw - var(--safe-area-left) - var(--safe-area-right) - 16px)) !important;
+    max-height: calc(100dvh - var(--safe-area-top) - var(--safe-area-bottom) - 68px) !important;
     transform: none !important;
+  }
+
+  html[data-fe-platform="android"][data-fe-orientation="landscape"] .diy-quick-menu,
+  html[data-fe-platform="android"][data-fe-orientation="landscape"] .app-shell.is-playback-page.is-diy-open .diy-quick-menu {
+    top: calc(var(--android-top) + var(--android-control) + 8px) !important;
+  }
+
+  html[data-fe-platform="android"][data-fe-orientation="landscape"] .diy-sidebar,
+  html[data-fe-platform="android"][data-fe-orientation="landscape"] .app-shell.is-playback-page.is-diy-open.has-diy-card .diy-sidebar {
+    top: calc(var(--android-top) + var(--android-control) + 8px) !important;
+    right: var(--android-edge-right) !important;
+    bottom: calc(var(--safe-area-bottom) + 8px) !important;
+    left: auto !important;
+    width: min(420px, max(300px, 46vw)) !important;
+  }
+
+  html[data-fe-platform="android"][data-fe-orientation="landscape"] .playlist-song-page-stage {
+    top: calc(var(--android-top) + var(--android-control) + 8px) !important;
+  }
+}
+
+@media (max-width: 600px) and (max-height: 600px) and (orientation: landscape) {
+  html[data-fe-platform="android"] .qr-login-stage {
+    grid-template-columns: 108px minmax(0, 1fr);
+    gap: 5px 10px !important;
+  }
+
+  html[data-fe-platform="android"] .qr-code-shell {
+    width: 108px !important;
+    height: 108px !important;
+    padding: 7px !important;
+  }
+
+  html[data-fe-platform="android"] .android-login-workflow p {
+    font-size: 11px;
+    line-height: 1.3;
   }
 }
 

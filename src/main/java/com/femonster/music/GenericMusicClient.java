@@ -175,6 +175,23 @@ public final class GenericMusicClient implements MusicProviderClient {
     }
 
     @Override
+    public Map<String, Object> loginPhoneSendPayload(String phone) {
+        if (!"qishui".equals(id)) return MusicProviderClient.super.loginPhoneSendPayload(phone);
+        return phoneLoginPayload(rawJsonPost("/login/phone/send", Map.of("phone", phone == null ? "" : phone)));
+    }
+
+    @Override
+    public Map<String, Object> loginPhoneVerifyPayload(String phone, String code) {
+        if (!"qishui".equals(id)) return MusicProviderClient.super.loginPhoneVerifyPayload(phone, code);
+        Map<String, Object> payload = phoneLoginPayload(rawJsonPost("/login/phone/verify", Map.of(
+            "phone", phone == null ? "" : phone,
+            "code", code == null ? "" : code
+        )));
+        if (SimpleJson.asBoolean(payload.get("ok"), false)) rememberQishuiAccount(payload);
+        return payload;
+    }
+
+    @Override
     public Map<String, Object> search(String keyword, int page, int limit) {
         Map<String, String> params = new LinkedHashMap<>();
         String key = keyword == null ? "" : keyword;
@@ -203,9 +220,15 @@ public final class GenericMusicClient implements MusicProviderClient {
         Object root = SimpleJson.parse(raw);
         List<Song> songs = extractSongs(root, limit);
         if (songs.isEmpty() && "kugou".equals(id)) {
-            songs = extractSongs(SimpleJson.parse(kugouSearchFallback(key, page, limit)), limit);
+            root = SimpleJson.parse(kugouSearchFallback(key, page, limit));
+            songs = extractSongs(root, limit);
         }
-        return songsPayload(songs, "search");
+        Map<String, Object> body = songsPayload(songs, "search");
+        Map<String, Object> rootMap = SimpleJson.asMap(root);
+        boolean ok = !rootMap.containsKey("error");
+        body.put("ok", ok);
+        if (!ok) body.put("error", rootMap.get("error"));
+        return body;
     }
 
     @Override
@@ -235,15 +258,16 @@ public final class GenericMusicClient implements MusicProviderClient {
         };
         Object root = SimpleJson.parse(raw);
         String url = firstString(root, "url", "playUrl", "play_url", "src", "audio", "location", "purl");
-        if ("kugou".equals(id) && isKugouNativeAudio(url) && !"128".equals(effectiveQuality)) {
+        if ("kugou".equals(id) && !isPlayableWebAudio(url) && !"128".equals(effectiveQuality)) {
             Map<String, String> fallbackParams = new LinkedHashMap<>(params);
             fallbackParams.put("quality", "128");
             fallbackParams.put("level", "128");
             Object fallbackRoot = SimpleJson.parse(rawGetAny(fallbackParams, "/song/url", "/song/url/new", "/music/url"));
             String fallbackUrl = firstString(fallbackRoot, "url", "playUrl", "play_url", "src", "audio", "location", "purl");
-            if (!isKugouNativeAudio(fallbackUrl)) return fallbackUrl;
+            if (isPlayableWebAudio(fallbackUrl)) url = fallbackUrl;
         }
-        return url;
+        if ("kugou".equals(id) && !isPlayableWebAudio(url)) url = kugouSongUrlFallback(songId);
+        return "kugou".equals(id) && !isPlayableWebAudio(url) ? "" : url;
     }
 
     @Override
@@ -469,6 +493,7 @@ public final class GenericMusicClient implements MusicProviderClient {
             HttpRequest.Builder builder = HttpRequest.newBuilder(buildUri(path, params))
                 .timeout(Duration.ofSeconds(12))
                 .header("Accept", "application/json, text/plain, */*");
+            addQishuiCookieHeader(builder);
             if ("POST".equalsIgnoreCase(method)) {
                 builder.POST(HttpRequest.BodyPublishers.noBody());
             } else {
@@ -484,6 +509,45 @@ public final class GenericMusicClient implements MusicProviderClient {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
             return errorPayload(label + " API unavailable at " + baseUrl + ": " + exceptionDetail(e));
         }
+    }
+
+    private String rawJsonPost(String path, Map<String, String> body) {
+        try {
+            HttpRequest.Builder builder = HttpRequest.newBuilder(buildUri(path, Map.of()))
+                .timeout(Duration.ofSeconds(12))
+                .header("Accept", "application/json")
+                .header("Content-Type", "application/json; charset=utf-8");
+            addQishuiCookieHeader(builder);
+            HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(SimpleJson.stringify(body), StandardCharsets.UTF_8)).build();
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            rememberCookieHeaders(response.headers().allValues("Set-Cookie"));
+            String responseBody = cleanJsonBody(response.body());
+            if (!responseBody.isBlank() && !SimpleJson.asMap(SimpleJson.parse(responseBody)).isEmpty()) return responseBody;
+            return errorPayload(label + " API HTTP " + response.statusCode());
+        } catch (IOException | InterruptedException | IllegalArgumentException e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            return errorPayload(label + " API unavailable at " + baseUrl + ": " + exceptionDetail(e));
+        }
+    }
+
+    private void addQishuiCookieHeader(HttpRequest.Builder builder) {
+        if (!"qishui".equals(id)) return;
+        synchronized (session) {
+            String cookie = sessionCookieStringLocked();
+            if (!cookie.isBlank()) builder.header("Cookie", cookie);
+        }
+    }
+
+    private Map<String, Object> phoneLoginPayload(String raw) {
+        Map<String, Object> payload = new LinkedHashMap<>(SimpleJson.asMap(SimpleJson.parse(raw)));
+        if (payload.isEmpty()) {
+            payload.put("ok", false);
+            payload.put("code", "INVALID_ADAPTER_RESPONSE");
+            payload.put("error", "汽水音乐本地适配器返回了无效响应");
+        }
+        payload.putIfAbsent("provider", id);
+        payload.putIfAbsent("label", label);
+        return payload;
     }
 
     private Map<String, String> authParams() {
@@ -515,6 +579,13 @@ public final class GenericMusicClient implements MusicProviderClient {
                 return !firstNonBlank(session.get("token"), cookieValue(sessionCookieStringLocked(), "token")).isBlank()
                     && !firstNonBlank(session.get("userid"), cookieValue(sessionCookieStringLocked(), "userid")).isBlank();
             }
+            if ("qishui".equals(id)) {
+                String cookie = sessionCookieStringLocked();
+                return !firstNonBlank(
+                    session.get("sessionid"), session.get("sessionid_ss"), session.get("sid_tt"), session.get("sid_guard"),
+                    cookieValue(cookie, "sessionid"), cookieValue(cookie, "sessionid_ss"), cookieValue(cookie, "sid_tt"), cookieValue(cookie, "sid_guard")
+                ).isBlank();
+            }
             return false;
         }
     }
@@ -531,6 +602,13 @@ public final class GenericMusicClient implements MusicProviderClient {
                 if (SimpleJson.asString(account.get("userId"), "").isBlank() && !userid.isBlank()) account.put("userId", userid);
                 if (SimpleJson.asString(account.get("nickname"), "").isBlank()) putIfNotBlank(account, "nickname", session.get("nickname"));
                 if (SimpleJson.asString(account.get("avatarUrl"), "").isBlank()) putIfNotBlank(account, "avatarUrl", session.get("avatarUrl"));
+            } else if ("qishui".equals(id)) {
+                String cookie = sessionCookieStringLocked();
+                String userId = firstNonBlank(session.get("uid_tt"), session.get("uid_tt_ss"), cookieValue(cookie, "uid_tt"), cookieValue(cookie, "uid_tt_ss"));
+                if (SimpleJson.asString(account.get("userId"), "").isBlank()) putIfNotBlank(account, "userId", userId);
+                if (SimpleJson.asString(account.get("nickname"), "").isBlank()) putIfNotBlank(account, "nickname", session.get("nickname"));
+                if (SimpleJson.asString(account.get("avatarUrl"), "").isBlank()) putIfNotBlank(account, "avatarUrl", session.get("avatarUrl"));
+                if (SimpleJson.asString(account.get("nickname"), "").isBlank() && hasAuthSession()) account.put("nickname", "汽水音乐用户");
             }
             if (SimpleJson.asString(account.get("vipType"), "").isBlank()) putIfNotBlank(account, "vipType", session.get("vip_type"));
             if (SimpleJson.asString(account.get("vipToken"), "").isBlank()) putIfNotBlank(account, "vipToken", session.get("vip_token"));
@@ -544,6 +622,14 @@ public final class GenericMusicClient implements MusicProviderClient {
         } else if ("kugou".equals(id)) {
             rememberKugouSession(root);
         }
+    }
+
+    private void rememberQishuiAccount(Map<String, Object> payload) {
+        Map<String, Object> account = SimpleJson.asMap(payload.get("account"));
+        Map<String, String> updates = new LinkedHashMap<>();
+        putIfPresent(updates, "nickname", SimpleJson.asString(account.get("nickname"), ""));
+        putIfPresent(updates, "avatarUrl", SimpleJson.asString(account.get("avatarUrl"), ""));
+        rememberSession(updates);
     }
 
     private void rememberQqSession(Object root) {
@@ -613,6 +699,14 @@ public final class GenericMusicClient implements MusicProviderClient {
         if ("kugou".equals(id)) {
             return "token".equals(name) || "userid".equals(name) || "vip_token".equals(name) || "vip_type".equals(name)
                 || "dfid".equals(name) || name.startsWith("KUGOU_API_") || "t1".equals(name);
+        }
+        if ("qishui".equals(id)) {
+            return "sessionid".equals(name) || "sessionid_ss".equals(name) || "sid_tt".equals(name) || "sid_guard".equals(name)
+                || "uid_tt".equals(name) || "uid_tt_ss".equals(name)
+                || "passport_auth_status".equals(name) || "passport_auth_status_ss".equals(name)
+                || "passport_csrf_token".equals(name) || "passport_csrf_token_default".equals(name)
+                || "ttwid".equals(name) || "odin_tt".equals(name) || "install_id".equals(name)
+                || "store-idc".equals(name) || "store-country-code".equals(name) || "store-country-sign".equals(name);
         }
         return false;
     }
@@ -698,6 +792,16 @@ public final class GenericMusicClient implements MusicProviderClient {
         if (url == null || url.isBlank()) return false;
         String lower = url.toLowerCase();
         return lower.contains(".mgg") || lower.contains(".kgm");
+    }
+
+    private static boolean isPlayableWebAudio(String url) {
+        if (url == null || url.isBlank() || isKugouNativeAudio(url)) return false;
+        try {
+            String scheme = URI.create(url.trim()).getScheme();
+            return "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
     }
 
     private static String cookieValue(String cookie, String name) {
@@ -985,6 +1089,28 @@ public final class GenericMusicClient implements MusicProviderClient {
         } catch (IOException | InterruptedException | IllegalArgumentException e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
             return errorPayload(label + " fallback search unavailable: " + exceptionDetail(e));
+        }
+    }
+
+    private String kugouSongUrlFallback(String songId) {
+        String url = "https://m.kugou.com/app/i/getSongInfo.php?cmd=playInfo&hash=" + encode(songId);
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+                .timeout(Duration.ofSeconds(12))
+                .header("Accept", "application/json, text/plain, */*")
+                .header("Referer", "https://www.kugou.com/")
+                .header("User-Agent", "Mozilla/5.0")
+                .GET()
+                .build();
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (response.statusCode() >= 400) return "";
+            Map<String, Object> root = SimpleJson.asMap(SimpleJson.parse(cleanJsonBody(response.body())));
+            String playableUrl = directString(root, "url");
+            if (playableUrl.isBlank()) playableUrl = firstString(root.get("backup_url"), "url");
+            return isPlayableWebAudio(playableUrl) ? playableUrl : "";
+        } catch (IOException | InterruptedException | IllegalArgumentException e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            return "";
         }
     }
 

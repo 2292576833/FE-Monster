@@ -2,9 +2,16 @@
   'use strict';
 
   const PROFILE = 'storm-ocean-v1';
-  const runtimeVersion = '2026.07.15-storm-ocean-optics-70';
+  const runtimeVersion = '2026.07.18-storm-ocean-fine-waves-120';
+  const WATER_ROUGHNESS = 0.2;
+  const WATER_MESH_SEGMENTS = 60;
+  const IDLE_WAVE_RESPONSE_GAIN = 1.2;
+  const BASS_WAVE_RESPONSE_GAIN = 1.38;
   const ANDROID_CLIENT = Boolean(global.FeMonsterAndroid || /Android/i.test(global.navigator?.userAgent || ''));
   const LOW_END_ANDROID = ANDROID_CLIENT && global.feMonsterAndroidPerformanceTier === 'low';
+  const REDUCED_MOTION = Boolean(global.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+  const HIGH_PRECISION_REFLECTION = !ANDROID_CLIENT;
+  const CYCLES_ENVIRONMENT_URL = 'assets/cycles/storm-ocean/storm-ocean-cycles-environment.png?v=20260717-cycles-1';
   const BASS_SURGE_PACKETS = Object.freeze([
     Object.freeze({ x: 1, z: 0, frequency: 0.076, speed: 0.66, phase: 0.2, gateRate: 0.071, gatePhase: 0.4, warpFrequency: 0.019, warpSpeed: 0.1 }),
     Object.freeze({ x: -0.55, z: 0.835, frequency: 0.083, speed: 0.72, phase: 1.7, gateRate: 0.093, gatePhase: 2.1, warpFrequency: 0.023, warpSpeed: -0.08 }),
@@ -14,6 +21,10 @@
     Object.freeze({ x: -0.17, z: 0.985, frequency: 0.095, speed: 0.84, phase: 2.5, gateRate: 0.119, gatePhase: 5.3, warpFrequency: 0.028, warpSpeed: -0.13 })
   ]);
   let cachedEnvironment = null;
+  let cachedCyclesEnvironment = null;
+  let cyclesEnvironmentLoading = false;
+  let cyclesEnvironmentFailed = false;
+  const cyclesEnvironmentScenes = new Set();
   let cachedWaterTextureSet = null;
   let cachedTextureCapability = null;
 
@@ -108,9 +119,13 @@
     });
     const normalizedPacketHeight = packetHeight / Math.max(Math.sqrt(packetEnergy), 0.5);
     const amplitudeResponse = Math.pow(bassInput, 0.78) * (0.72 + bassInput * 0.68);
-    const surgeGain = clamp(Number(config.randomSurgeBassGain) || 1.12, 0.45, 1.6);
+    const surgeGain = clamp(Number(config.randomSurgeBassGain) || 0.76, 0.45, 1.6);
     const thunderstormGain = thunderstormWaveMultiplier(config, thunderstormIntensity);
-    const bassWaveHeight = clamp((Number(config.bassWaveHeight) || 2.8) * surgeGain * thunderstormGain, 0.35, 9.5);
+    const bassWaveHeight = clamp(
+      (Number(config.bassWaveHeight) || 2.2) * BASS_WAVE_RESPONSE_GAIN * surgeGain * thunderstormGain,
+      0.35,
+      9.5
+    );
     return normalizedPacketHeight * amplitudeResponse * bassWaveHeight;
   }
 
@@ -126,20 +141,19 @@
       (x * gustDirection[0] + z * gustDirection[1]) * 0.021 - seconds * 0.08 + longWarp * 0.72
     );
 
-    let swell = sampledStormWave(warpedX, warpedZ, 0.94, 0.34, 0.092, 0.39, 0, 0.72, seconds);
-    swell += sampledStormWave(warpedX, warpedZ, 0.98, 0.19, 0.148, 0.51, 1.7, 0.58, seconds) * 0.44;
-    swell += sampledStormWave(warpedX, warpedZ, 0.84, 0.54, 0.214, 0.63, 4.6, 0.48, seconds) * 0.2;
-    swell += sampledStormWave(warpedX, warpedZ, -0.2, 1, 0.116, -0.31, 2.8, 0.24, seconds) * 0.1;
+    let swell = sampledStormWave(warpedX, warpedZ, 0.08, 1, 0.102, 0.34, 0, 0.72, seconds);
+    swell += sampledStormWave(warpedX, warpedZ, 0.34, 0.94, 0.165, 0.46, 1.7, 0.58, seconds) * 0.38;
+    swell += sampledStormWave(warpedX, warpedZ, -0.28, 0.96, 0.244, 0.58, 4.6, 0.48, seconds) * 0.16;
+    swell += sampledStormWave(warpedX, warpedZ, -0.58, 0.82, 0.144, -0.26, 2.8, 0.24, seconds) * 0.06;
+
+    let crossSea = sampledStormWave(warpedX, warpedZ, -0.86, 0.51, 0.220, -0.31, 2.2, 0.38, seconds);
+    crossSea += sampledStormWave(warpedX, warpedZ, 0.72, 0.69, 0.332, 0.51, 5.1, 0.28, seconds) * 0.34;
 
     const windX = mixNumber(x, warpedX, 0.46);
     const windZ = mixNumber(z, warpedZ, 0.46);
-    let windSea = sampledStormWave(windX, windZ, 0.96, 0.29, 0.43, 0.89, 3.2, 0.44, seconds);
-    windSea += sampledStormWave(windX, windZ, 0.89, 0.46, 0.72, 1.17, 0.8, 0.38, seconds) * 0.43;
-    windSea += sampledStormWave(windX, windZ, 0.99, 0.11, 1.08, 1.46, 5.4, 0.31, seconds) * 0.19;
-
-    let capillary = sampledStormWave(x, z, 0.93, 0.37, 1.74, 1.82, 2.4, 0.2, seconds);
-    capillary += sampledStormWave(x, z, 0.98, 0.22, 2.62, 2.18, 3.8, 0.16, seconds) * 0.42;
-    capillary += sampledStormWave(x, z, 0.78, 0.63, 3.86, 2.55, 2.2, 0.12, seconds) * 0.2;
+    let windSea = sampledStormWave(windX, windZ, 0.19, 0.98, 0.341, 0.72, 3.2, 0.44, seconds);
+    windSea += sampledStormWave(windX, windZ, -0.54, 0.84, 0.442, 0.91, 0.8, 0.38, seconds) * 0.4;
+    windSea += sampledStormWave(windX, windZ, 0.82, 0.57, 0.575, 1.12, 5.4, 0.31, seconds) * 0.16;
 
     const thunderstormIntensity = clamp(
       Number.isFinite(Number(thunderstormIntensityOverride))
@@ -149,9 +163,14 @@
       1
     );
     const thunderstormGain = thunderstormWaveMultiplier(config, thunderstormIntensity);
-    const amplitude = clamp(Number(config.idleWaveHeight) || 0.46, 0.08, 2.4)
-      + clamp(Number(config.bassWaveHeight) || 2.8, 0, 7.2) * clamp(Number(lowFrequencyAmplitude) || 0, 0, 1) * 0.42 * thunderstormGain;
-    return (swell * 0.53 + windSea * 0.25 * gustEnvelope + capillary * 0.026) * amplitude
+    const amplitude = clamp(Number(config.idleWaveHeight) || 0.72, 0.08, 2.4) * IDLE_WAVE_RESPONSE_GAIN
+      + clamp(Number(config.bassWaveHeight) || 2.2, 0, 7.2) * BASS_WAVE_RESPONSE_GAIN
+        * clamp(Number(lowFrequencyAmplitude) || 0, 0, 1) * 0.42 * thunderstormGain;
+    const depthLayer = smoothstep01((z + 320) / 374);
+    const swellLayer = mixNumber(1.14, 0.88, depthLayer);
+    const crossLayer = mixNumber(0.74, 1.06, depthLayer);
+    const windLayer = mixNumber(0.48, 1.1, depthLayer);
+    return (swell * 0.38 * swellLayer + crossSea * 0.26 * crossLayer + windSea * 0.31 * windLayer * gustEnvelope) * amplitude
       + sampleOmnidirectionalBassWaveHeight(x, z, seconds, lowFrequencyAmplitude, config, thunderstormIntensity);
   }
 
@@ -176,15 +195,23 @@
       sun: [0.96, 0.95, 0.88],
       highlight: [0.76, 0.86, 0.9],
       ambient: 0.88,
-      exposure: 1.06
+      exposure: 1.02,
+      fillIntensity: 0.72,
+      keyIntensity: 1.35,
+      backlight: 0.12,
+      reflectionGain: 0.98
     }),
     sunset: Object.freeze({
-      zenith: [0.025, 0.052, 0.093],
-      horizon: [0.45, 0.2, 0.09],
-      sun: [1.0, 0.58, 0.3],
-      highlight: [0.93, 0.58, 0.31],
-      ambient: 0.6,
-      exposure: 0.98
+      zenith: [0.055, 0.046, 0.12],
+      horizon: [0.54, 0.26, 0.115],
+      sun: [1.0, 0.48, 0.22],
+      highlight: [0.34, 0.32, 0.52],
+      ambient: 0.54,
+      exposure: 0.87,
+      fillIntensity: 0.72,
+      keyIntensity: 3.1,
+      backlight: 1,
+      reflectionGain: 1.18
     }),
     evening: Object.freeze({
       zenith: [0.012, 0.025, 0.055],
@@ -192,7 +219,11 @@
       sun: [0.43, 0.34, 0.44],
       highlight: [0.39, 0.48, 0.65],
       ambient: 0.42,
-      exposure: 0.94
+      exposure: 0.9,
+      fillIntensity: 0.38,
+      keyIntensity: 0.5,
+      backlight: 0.18,
+      reflectionGain: 0.9
     })
   });
 
@@ -204,7 +235,11 @@
       sun: mixTriplet(start.sun, end.sun, eased),
       highlight: mixTriplet(start.highlight, end.highlight, eased),
       ambient: mixNumber(start.ambient, end.ambient, eased),
-      exposure: mixNumber(start.exposure, end.exposure, eased)
+      exposure: mixNumber(start.exposure, end.exposure, eased),
+      fillIntensity: mixNumber(start.fillIntensity, end.fillIntensity, eased),
+      keyIntensity: mixNumber(start.keyIntensity, end.keyIntensity, eased),
+      backlight: mixNumber(start.backlight, end.backlight, eased),
+      reflectionGain: mixNumber(start.reflectionGain, end.reflectionGain, eased)
     };
   }
 
@@ -222,7 +257,11 @@
       sun: mixTriplet(start.sun, end.sun, eased),
       highlight: mixTriplet(start.highlight, end.highlight, eased),
       ambient: mixNumber(start.ambient, end.ambient, eased),
-      exposure: mixNumber(start.exposure, end.exposure, eased)
+      exposure: mixNumber(start.exposure, end.exposure, eased),
+      fillIntensity: mixNumber(start.fillIntensity, end.fillIntensity, eased),
+      keyIntensity: mixNumber(start.keyIntensity, end.keyIntensity, eased),
+      backlight: mixNumber(start.backlight, end.backlight, eased),
+      reflectionGain: mixNumber(start.reflectionGain, end.reflectionGain, eased)
     };
   }
 
@@ -258,8 +297,9 @@
     }
 
     const progress = elapsedMinute / duration;
-    const solarEase = smoothstep01(progress);
-    const elevation = mixNumber(0.68, 0.035, solarEase);
+    const elevation = progress <= 0.5
+      ? mixNumber(0.58, 0.087, smoothstep01(progress / 0.5))
+      : mixNumber(0.087, -0.015, smoothstep01((progress - 0.5) / 0.5));
     const azimuth = mixNumber(-0.82, -0.25, progress);
     const sunDirection = [Math.cos(azimuth), elevation, Math.sin(azimuth)];
     const length = Math.hypot(...sunDirection) || 1;
@@ -275,7 +315,11 @@
       sun: [...look.sun],
       highlight: [...look.highlight],
       ambient: look.ambient,
-      exposure: look.exposure * exposureScale
+      exposure: look.exposure * exposureScale,
+      fillIntensity: look.fillIntensity,
+      keyIntensity: look.keyIntensity,
+      backlight: look.backlight,
+      reflectionGain: look.reflectionGain
     };
   }
 
@@ -533,6 +577,7 @@
   }
 
   function buildEnvironmentFace(index) {
+    const stormCinematicEnvironmentV1 = index === 0 || index === 5;
     const size = ANDROID_CLIENT ? (LOW_END_ANDROID ? 256 : 512) : 1024;
     const canvas = document.createElement('canvas');
     canvas.width = size;
@@ -540,8 +585,8 @@
     const context = canvas.getContext('2d');
     const random = seededRandom(9173 + index * 7919);
     const gradient = context.createLinearGradient(0, 0, 0, size);
-    gradient.addColorStop(0, index === 2 ? '#52616a' : '#263640');
-    gradient.addColorStop(0.42, '#17252d');
+    gradient.addColorStop(0, index === 2 ? '#5b6173' : '#303647');
+    gradient.addColorStop(0.42, '#1b2633');
     gradient.addColorStop(0.72, index === 3 ? '#03070a' : '#0a161c');
     gradient.addColorStop(1, '#02070a');
     context.fillStyle = gradient;
@@ -556,8 +601,8 @@
       const height = (0.09 + random() * 0.16) * size;
       const alpha = 0.045 + random() * 0.075;
       const cloud = context.createRadialGradient(x, y, 0, x, y, width * 0.58);
-      cloud.addColorStop(0, `rgba(164, 180, 186, ${alpha})`);
-      cloud.addColorStop(0.5, `rgba(66, 82, 91, ${alpha * 0.72})`);
+      cloud.addColorStop(0, `rgba(169, 166, 191, ${alpha})`);
+      cloud.addColorStop(0.5, `rgba(69, 75, 94, ${alpha * 0.72})`);
       cloud.addColorStop(1, 'rgba(10, 18, 24, 0)');
       context.save();
       context.translate(x, y);
@@ -569,8 +614,11 @@
     }
 
     const horizon = context.createLinearGradient(0, size * 0.56, 0, size * 0.9);
-    horizon.addColorStop(0, 'rgba(122, 161, 181, 0)');
-    horizon.addColorStop(0.42, index === 4 ? 'rgba(184, 204, 211, 0.28)' : 'rgba(116, 143, 154, 0.16)');
+    horizon.addColorStop(0, 'rgba(142, 147, 184, 0)');
+    horizon.addColorStop(
+      0.42,
+      stormCinematicEnvironmentV1 ? 'rgba(255, 178, 126, 0.22)' : 'rgba(139, 142, 174, 0.16)'
+    );
     horizon.addColorStop(1, 'rgba(4, 13, 18, 0)');
     context.fillStyle = horizon;
     context.fillRect(0, size * 0.52, size, size * 0.4);
@@ -586,6 +634,67 @@
     texture.needsUpdate = true;
     cachedEnvironment = texture;
     return texture;
+  }
+
+  function cyclesEnvironmentDiagnostics() {
+    const image = cachedCyclesEnvironment?.image;
+    return {
+      authoringRenderer: 'blender-cycles-5.1.2',
+      liveRenderer: 'three-webgl-pbr',
+      url: CYCLES_ENVIRONMENT_URL,
+      requested: cyclesEnvironmentLoading || Boolean(cachedCyclesEnvironment) || cyclesEnvironmentFailed,
+      ready: Boolean(cachedCyclesEnvironment),
+      failed: cyclesEnvironmentFailed,
+      resolution: [
+        Number(image?.naturalWidth || image?.width) || 0,
+        Number(image?.naturalHeight || image?.height) || 0
+      ]
+    };
+  }
+
+  function requestCyclesEnvironment(THREE, scene) {
+    if (!THREE?.TextureLoader || !scene) return;
+    cyclesEnvironmentScenes.add(scene);
+    if (cachedCyclesEnvironment) {
+      scene.environment = cachedCyclesEnvironment;
+      scene.userData.stormOceanCyclesEnvironment = cyclesEnvironmentDiagnostics();
+      return;
+    }
+    if (cyclesEnvironmentLoading || cyclesEnvironmentFailed) return;
+    cyclesEnvironmentLoading = true;
+    new THREE.TextureLoader().load(CYCLES_ENVIRONMENT_URL, (texture) => {
+      texture.mapping = THREE.EquirectangularReflectionMapping;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+      texture.generateMipmaps = true;
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      if ('encoding' in texture && THREE.sRGBEncoding !== undefined) texture.encoding = THREE.sRGBEncoding;
+      texture.name = 'StormOcean_CyclesEnvironment_2048x1024';
+      texture.needsUpdate = true;
+      cachedCyclesEnvironment = texture;
+      cyclesEnvironmentLoading = false;
+      const diagnostics = cyclesEnvironmentDiagnostics();
+      cyclesEnvironmentScenes.forEach((targetScene) => {
+        targetScene.environment = texture;
+        targetScene.userData.stormOceanCyclesEnvironment = diagnostics;
+        if (targetScene.userData.stormOceanRuntime) {
+          targetScene.userData.stormOceanRuntime.cyclesEnvironment = diagnostics;
+        }
+      });
+      if (typeof document !== 'undefined') document.documentElement.dataset.stormOceanCyclesEnvironment = 'ready';
+    }, undefined, () => {
+      cyclesEnvironmentLoading = false;
+      cyclesEnvironmentFailed = true;
+      const diagnostics = cyclesEnvironmentDiagnostics();
+      cyclesEnvironmentScenes.forEach((targetScene) => {
+        targetScene.userData.stormOceanCyclesEnvironment = diagnostics;
+        if (targetScene.userData.stormOceanRuntime) {
+          targetScene.userData.stormOceanRuntime.cyclesEnvironment = diagnostics;
+        }
+      });
+      if (typeof document !== 'undefined') document.documentElement.dataset.stormOceanCyclesEnvironment = 'fallback';
+    });
   }
 
   function configureWaterTexture(texture, THREE, anisotropy, tileCount, mapType) {
@@ -643,7 +752,7 @@
     const anisotropy = ANDROID_CLIENT
       ? Math.min(LOW_END_ANDROID ? 4 : 8, Number(config.maxAnisotropy) || 16)
       : Number(config.maxAnisotropy) || 16;
-    const tileCount = clamp(Number(config.waterTextureTiles) || 6.5, 4, 10);
+    const tileCount = clamp(Number(config.waterTextureTiles) || 2.5, 1, 10);
     const fallbackNormalUrl = `${root}water-normal-spectral-4k.png?v=20260713-2`;
     const fallbackRoughnessUrl = `${root}water-roughness-spectral-4k.png?v=20260713-2`;
     const requestedResolution = Number(config.waterTextureResolution) || 4096;
@@ -681,6 +790,41 @@
     roughnessMap.name = `StormOcean_SpectralRoughness_${use8K ? '8K' : '4K'}`;
     cachedWaterTextureSet = { normalMap, roughnessMap, textureState };
     return cachedWaterTextureSet;
+  }
+
+  function configureOceanGeometry(node, THREE, config = {}) {
+    const sourceGeometry = node?.geometry;
+    if (!sourceGeometry?.isBufferGeometry || !THREE?.PlaneGeometry) return;
+    const segments = WATER_MESH_SEGMENTS;
+    sourceGeometry.computeBoundingBox?.();
+    const bounds = sourceGeometry.boundingBox;
+    if (!bounds) return;
+    const width = bounds.max.x - bounds.min.x;
+    const depth = bounds.max.z - bounds.min.z;
+    if (!(width > 0) || !(depth > 0)) return;
+    const centerX = (bounds.min.x + bounds.max.x) * 0.5;
+    const centerY = (bounds.min.y + bounds.max.y) * 0.5;
+    const centerZ = (bounds.min.z + bounds.max.z) * 0.5;
+    const geometry = new THREE.PlaneGeometry(width, depth, segments, segments);
+    geometry.rotateX(-Math.PI / 2);
+    geometry.translate(centerX, centerY, centerZ);
+    geometry.name = sourceGeometry.name || 'StormOcean_RuntimeGrid';
+    geometry.userData = {
+      ...sourceGeometry.userData,
+      stormOceanGridSegments: segments,
+      stormOceanTriangleCount: segments * segments * 2
+    };
+    node.geometry = geometry;
+    node.morphTargetInfluences = [];
+    node.morphTargetDictionary = {};
+    node.frustumCulled = false;
+    (Array.isArray(node.material) ? node.material : [node.material]).forEach((material) => {
+      if (!material) return;
+      material.morphTargets = false;
+      material.morphNormals = false;
+      material.needsUpdate = true;
+    });
+    sourceGeometry.dispose?.();
   }
 
   function createSeagullWingGeometry(THREE, side) {
@@ -824,8 +968,8 @@
       activeSchedule: null,
       poseRevision: 0,
       poseChecksum: 0,
-      poses: [],
-      wingAngles: [],
+      poses: Array.from({ length: Math.min(4, count) }, () => [0, 0, 0]),
+      wingAngles: new Array(count).fill(0),
       birdScales: Array.from({ length: count }, () => mixNumber(0.88, 1.12, scaleRandom())),
       birdObject: new THREE.Object3D(),
       partObject: new THREE.Object3D(),
@@ -896,8 +1040,6 @@
     const birdObject = flock.birdObject;
     const partObject = flock.partObject;
     let poseChecksum = 0;
-    flock.poses.length = 0;
-    flock.wingAngles.length = 0;
     for (let birdIndex = 0; birdIndex < flock.count; birdIndex += 1) {
       const pose = sampleSunsetSeagullPose(
         birdIndex,
@@ -932,8 +1074,12 @@
         flock.partMatrix.multiplyMatrices(birdObject.matrix, partObject.matrix);
         part.mesh.setMatrixAt(birdIndex, flock.partMatrix);
       });
-      if (birdIndex < 4) flock.poses.push(pose.position.map((value) => Number(value.toFixed(3))));
-      flock.wingAngles.push(Number(pose.wingAngle.toFixed(4)));
+      if (birdIndex < 4) {
+        flock.poses[birdIndex][0] = Number(pose.position[0].toFixed(3));
+        flock.poses[birdIndex][1] = Number(pose.position[1].toFixed(3));
+        flock.poses[birdIndex][2] = Number(pose.position[2].toFixed(3));
+      }
+      flock.wingAngles[birdIndex] = Number(pose.wingAngle.toFixed(4));
       poseChecksum += pose.position[0] * 0.17 + pose.position[1] * 0.31 + pose.position[2] * 0.07
         + pose.wingAngle * 1.7 + pose.bank * 0.9;
     }
@@ -959,6 +1105,7 @@
         uStormHorizonColor: uniforms.horizonColor,
         uStormSkyHighlightColor: uniforms.highlightColor,
         uStormAmbientStrength: uniforms.ambient,
+        uStormBacklight: uniforms.backlight,
         uStormThunder: uniforms.thunder,
         uStormThunderFlow: uniforms.thunderFlow,
         uLightningFlash: uniforms.lightningFlash,
@@ -986,6 +1133,7 @@
         uniform vec3 uStormHorizonColor;
         uniform vec3 uStormSkyHighlightColor;
         uniform float uStormAmbientStrength;
+        uniform float uStormBacklight;
         uniform float uStormThunder;
         uniform float uStormThunderFlow;
         uniform float uLightningFlash;
@@ -1093,6 +1241,7 @@
           float cloudEdge = clamp(cloudDensity * (1.0 - cloudCore), 0.0, 1.0);
 
           vec3 lightDirection = normalize(uStormSunDirection);
+          float stormCinematicBacklightV1 = clamp(uStormBacklight, 0.0, 1.0);
           vec2 stormCloudLightSlopeV2 = normalize(vec2(lightDirection.x * 2.65, lightDirection.y * 5.8) + vec2(0.001));
           float stormCloudLightFrontV3 = stormSkyFbm(
             (warpedPoint + stormCloudLightSlopeV2 * 0.034) * 0.78 + slowDrift * 0.62
@@ -1103,11 +1252,17 @@
           float stormCloudReliefV2 = clamp(0.5 + (stormCloudLightBackV3 - stormCloudLightFrontV3) * 4.8, 0.0, 1.0);
           float lightGap = pow(max(dot(direction, lightDirection), 0.0), 18.0);
           lightGap *= 0.34 + (1.0 - cloudCore) * 0.72;
-          float solarHalo = pow(max(dot(direction, lightDirection), 0.0), 8.0);
-          float solarDisc = pow(max(dot(direction, lightDirection), 0.0), 420.0);
+          float solarHalo = pow(max(dot(direction, lightDirection), 0.0), mix(8.0, 11.0, stormCinematicBacklightV1));
+          float solarDisc = pow(max(dot(direction, lightDirection), 0.0), mix(420.0, 680.0, stormCinematicBacklightV1));
           float solarVisibility = 1.0 - cloudCore * 0.92;
           float horizonGlow = exp(-abs(direction.y + 0.062) * 9.2);
           horizonGlow *= 0.16 + (1.0 - cloudDensity) * 0.31;
+          float stormWarmHorizonAlignment = pow(max(dot(
+            normalize(direction.xz + vec2(0.0001)),
+            normalize(lightDirection.xz + vec2(0.0001))
+          ), 0.0), 4.5);
+          float stormWarmHorizonBand = exp(-abs(direction.y - lightDirection.y * 0.22) * 10.5)
+            * stormWarmHorizonAlignment * stormCinematicBacklightV1;
 
           float skyHeight = smoothstep(-0.34, 0.58, direction.y);
           vec3 horizonColor = uStormHorizonColor;
@@ -1180,6 +1335,7 @@
           float openSkyLight = lightGap * (1.0 - cloudCore * 0.84);
           finalColor += uStormSkyHighlightColor * openSkyLight * (0.35 + uStormAmbientStrength * 0.34);
           finalColor += uStormHorizonColor * horizonGlow * 0.22;
+          finalColor += uStormSunColor * stormWarmHorizonBand * (0.045 + (1.0 - cloudDensity) * 0.075);
           finalColor += uStormSunColor * solarVisibility * (solarHalo * 0.065 + solarDisc * 0.92);
           finalColor += vec3(0.34, 0.12, 0.78) * lightningBoltGlow * uLightningFlash * 0.72;
           finalColor += vec3(0.88, 0.82, 1.0)
@@ -1407,8 +1563,8 @@
           float caustic = pow(clamp(1.0 - abs(causticA + causticB + causticC - 1.52), 0.0, 1.0), 9.0);
           caustic *= 0.18 + (1.0 - depth) * 0.62;
           float particulate = smoothstep(0.91, 0.985, stormUnderwaterNoise(point * 3.8 + 41.0));
-          vec3 deep = vec3(0.004, 0.011, 0.016);
-          vec3 clear = vec3(0.024, 0.058, 0.068) + uStormHorizonColor * 0.008;
+          vec3 deep = vec3(0.009, 0.012, 0.014);
+          vec3 clear = vec3(0.038, 0.047, 0.051) + uStormHorizonColor * 0.014;
           float waterColumnSignal = broad * 0.38 + detail * 0.34 + fine * 0.28;
           float waterColumnWindow = smoothstep(0.18, 0.78, waterColumnSignal) * mix(0.78, 1.0, 1.0 - depth);
           vec3 color = mix(deep, clear, waterColumnWindow);
@@ -1437,9 +1593,12 @@
     if (!material || material.userData?.stormOceanPrepared) return material;
     material.userData = material.userData || {};
     material.userData.stormOceanPrepared = true;
-    material.envMapIntensity = clamp(Number(config.reflectionIntensity) || 0.64, 0.5, 0.82);
-    material.roughness = clamp(Number(config.waterRoughness) || 0.17, 0.12, 0.28);
-    material.metalness = 0;
+    material.precision = 'highp';
+    material.dithering = true;
+    material.envMapIntensity = clamp(Number(config.reflectionIntensity) || 0.82, 0.5, 0.82);
+    const configuredWaterMetalness = Number(config.waterMetalness);
+    material.roughness = WATER_ROUGHNESS;
+    material.metalness = clamp(Number.isFinite(configuredWaterMetalness) ? configuredWaterMetalness : 0, 0, 1);
     material.side = THREE.DoubleSide;
     material.map = null;
     material.metalnessMap = null;
@@ -1447,15 +1606,15 @@
     material.displacementMap = null;
     material.emissiveMap = null;
     material.alphaMap = null;
-    material.color?.setHex?.(0x0b2632);
+    material.color?.setHex?.(0x061229);
     material.emissive?.setHex?.(0x000000);
     if ('emissiveIntensity' in material) material.emissiveIntensity = 0;
-    if ('transmission' in material) material.transmission = clamp(Number(config.waterTransmission) || 0.82, 0.72, 0.9);
+    if ('transmission' in material) material.transmission = clamp(Number(config.waterTransmission) || 0.76, 0.72, 0.9);
     if ('ior' in material) material.ior = 1.333;
     if ('reflectivity' in material) material.reflectivity = 0.3;
     if ('thickness' in material) material.thickness = 0.72;
     if ('attenuationDistance' in material) material.attenuationDistance = 38;
-    material.attenuationColor?.setHex?.(0x2f7484);
+    material.attenuationColor?.setHex?.(0x0c315a);
     if ('clearcoat' in material) material.clearcoat = 0;
     if ('clearcoatRoughness' in material) material.clearcoatRoughness = 0.32;
     const spectralTextures = waterTextureSet(THREE, config);
@@ -1464,7 +1623,10 @@
       material.roughnessMap = spectralTextures.roughnessMap;
       material.userData.stormWaterTextures = spectralTextures;
     }
-    const textureNormalScale = clamp(Number(config.textureNormalScale) || 0.7, 0.58, 0.82);
+    // Keep the authored 4K texture as fine optical breakup, not a dominant
+    // fabric-like normal layer. Procedural wave normals carry the large form.
+    const textureNormalScale = clamp((Number(config.textureNormalScale) || 0.78) * 0.5, 0.3, 0.48);
+    const textureDetailNormalScale = clamp((Number(config.textureNormalScale) || 0.78) * 0.74, 0.4, 0.6);
     material.normalScale?.set?.(textureNormalScale, textureNormalScale);
     material.opacity = 1;
     material.transparent = false;
@@ -1476,11 +1638,12 @@
     material.userData.sandboxBaseEmissiveIntensity = 0;
     if (material.map && 'encoding' in material.map && THREE.sRGBEncoding) material.map.encoding = THREE.sRGBEncoding;
 
-    const foamCoverage = clamp(Number(config.foamCoverage) || 0.46, 0.2, 0.55);
-    const foamContrast = clamp(Number(config.foamContrast) || 0.7, 0.3, 0.92);
-    const waterMicroNormal = clamp(Number(config.waterMicroNormal) || 0.018, 0.009, 0.026);
+    const foamCoverage = clamp(Number(config.foamCoverage) || 0.27, 0.2, 0.55);
+    const foamContrast = clamp(Number(config.foamContrast) || 0.85, 0.3, 0.92);
+    const waterMicroNormal = clamp((Number(config.waterMicroNormal) || 0.022) * 2.35, 0.022, 0.052);
     const cloudSpeed = clamp(Number(config.cloudSpeed) || 0.012, 0.004, 0.04);
     const thunderstormBassWaveGain = clamp(Number(config.thunderstorm?.bassWaveGain) || 1.55, 1, 1.8);
+    const randomSurgeBassGain = clamp(Number(config.randomSurgeBassGain) || 0.76, 0.45, 1.6);
     const hybridRayTracing = config.rayTracingMode === 'hybrid-analytic';
     const rayTraceStrength = hybridRayTracing
       ? clamp(Number(config.rayTraceStrength) || 0.82, 0.35, 1)
@@ -1496,6 +1659,8 @@
       shader.uniforms.uStormHorizonColor = uniforms.horizonColor;
       shader.uniforms.uStormSkyHighlightColor = uniforms.highlightColor;
       shader.uniforms.uStormAmbientStrength = uniforms.ambient;
+      shader.uniforms.uStormBacklight = uniforms.backlight;
+      shader.uniforms.uStormReflectionGain = uniforms.reflectionGain;
       shader.uniforms.uStormThunder = uniforms.thunder;
       shader.uniforms.uStormLightningFlash = uniforms.lightningFlash;
       shader.uniforms.uStormLightningTarget = uniforms.lightningTarget;
@@ -1515,8 +1680,10 @@ varying float vStormEdgeFade;
 varying float vStormCrest;
 varying float vStormSlope;
 varying float vStormCurvature;
+varying float vStormSignedCurvature;
 varying float vStormNearness;
 varying vec2 vStormPoint;
+varying vec2 vStormWaveGradient;
 
 float stormWave(vec2 point, vec2 direction, float frequency, float speed, float phase, float steepness) {
   float wavePhase = dot(point, normalize(direction)) * frequency + uStormTime * speed + phase;
@@ -1551,17 +1718,16 @@ float stormHeight(vec2 point) {
   float crossWarp = sin(dot(point, normalize(vec2(0.62, 0.78))) * 0.047 - uStormTime * 0.16 + 2.1);
   vec2 warpedPoint = point + vec2(longWarp * 1.9 + crossWarp * 0.72, crossWarp * 1.45 - longWarp * 0.54);
   float gustEnvelope = 0.86 + 0.14 * sin(dot(point, normalize(vec2(0.18, 0.98))) * 0.021 - uStormTime * 0.08 + longWarp * 0.72);
-  float stormSwell = stormWave(warpedPoint, vec2(0.94, 0.34), 0.092, 0.39, 0.0, 0.72);
-  stormSwell += stormWave(warpedPoint, vec2(0.98, 0.19), 0.148, 0.51, 1.7, 0.58) * 0.44;
-  stormSwell += stormWave(warpedPoint, vec2(0.84, 0.54), 0.214, 0.63, 4.6, 0.48) * 0.2;
-  stormSwell += stormWave(warpedPoint, vec2(-0.2, 1.0), 0.116, -0.31, 2.8, 0.24) * 0.1;
+  float stormSwell = stormWave(warpedPoint, vec2(0.08, 1.0), 0.102, 0.34, 0.0, 0.72);
+  stormSwell += stormWave(warpedPoint, vec2(0.34, 0.94), 0.165, 0.46, 1.7, 0.58) * 0.38;
+  stormSwell += stormWave(warpedPoint, vec2(-0.28, 0.96), 0.244, 0.58, 4.6, 0.48) * 0.16;
+  stormSwell += stormWave(warpedPoint, vec2(-0.58, 0.82), 0.144, -0.26, 2.8, 0.24) * 0.06;
+  float stormCrossSea = stormWave(warpedPoint, vec2(-0.86, 0.51), 0.220, -0.31, 2.2, 0.38);
+  stormCrossSea += stormWave(warpedPoint, vec2(0.72, 0.69), 0.332, 0.51, 5.1, 0.28) * 0.34;
   vec2 windPoint = mix(point, warpedPoint, 0.46);
-  float stormWindSea = stormWave(windPoint, vec2(0.96, 0.29), 0.43, 0.89, 3.2, 0.44);
-  stormWindSea += stormWave(windPoint, vec2(0.89, 0.46), 0.72, 1.17, 0.8, 0.38) * 0.43;
-  stormWindSea += stormWave(windPoint, vec2(0.99, 0.11), 1.08, 1.46, 5.4, 0.31) * 0.19;
-  float stormCapillary = stormWave(point, vec2(0.93, 0.37), 1.74, 1.82, 2.4, 0.2);
-  stormCapillary += stormWave(point, vec2(0.98, 0.22), 2.62, 2.18, 3.8, 0.16) * 0.42;
-  stormCapillary += stormWave(point, vec2(0.78, 0.63), 3.86, 2.55, 2.2, 0.12) * 0.2;
+  float stormWindSea = stormWave(windPoint, vec2(0.19, 0.98), 0.341, 0.72, 3.2, 0.44);
+  stormWindSea += stormWave(windPoint, vec2(-0.54, 0.84), 0.442, 0.91, 0.8, 0.38) * 0.4;
+  stormWindSea += stormWave(windPoint, vec2(0.82, 0.57), 0.575, 1.12, 5.4, 0.31) * 0.16;
   float bassWeight0 = stormBassWeight(0.071, 0.4);
   float bassWeight1 = stormBassWeight(0.093, 2.1);
   float bassWeight2 = stormBassWeight(0.081, 4.6);
@@ -1580,8 +1746,14 @@ float stormHeight(vec2 point) {
   float stormThunderBassGain = mix(1.0, ${thunderstormBassWaveGain.toFixed(4)}, uStormThunder);
   float stormAmplitude = uStormIdleHeight + uStormBassHeight * uStormBass * 0.42 * stormThunderBassGain;
   float bassAmplitudeResponse = pow(uStormBass, 0.78) * (0.72 + uStormBass * 0.68);
-  float randomSurgeHeight = clamp(uStormBassHeight * 1.12 * stormThunderBassGain, 0.35, 9.5);
-  return (stormSwell * 0.53 + stormWindSea * 0.25 * gustEnvelope + stormCapillary * 0.026) * stormAmplitude
+  float randomSurgeHeight = clamp(uStormBassHeight * ${randomSurgeBassGain.toFixed(4)} * stormThunderBassGain, 0.35, 9.5);
+  float stormWaveDepthLayerV3 = smoothstep(-320.0, 54.0, point.y);
+  float stormSwellLayerV3 = mix(1.14, 0.88, stormWaveDepthLayerV3);
+  float stormCrossLayerV3 = mix(0.74, 1.06, stormWaveDepthLayerV3);
+  float stormWindLayerV3 = mix(0.48, 1.1, stormWaveDepthLayerV3);
+  return (stormSwell * 0.38 * stormSwellLayerV3
+      + stormCrossSea * 0.26 * stormCrossLayerV3
+      + stormWindSea * 0.31 * stormWindLayerV3 * gustEnvelope) * stormAmplitude
     + randomBassSurge * bassAmplitudeResponse * randomSurgeHeight;
 }`
         )
@@ -1604,15 +1776,19 @@ float stormAmplitude = uStormIdleHeight + uStormBassHeight * uStormBass * 0.42 *
 float stormSurfaceHeight = stormCenter;
 transformed.y += stormSurfaceHeight;
 float stormHorizontalPhase = dot(stormPoint, normalize(vec2(0.94, 0.34))) * 0.092 + uStormTime * 0.39;
-transformed.x += cos(stormHorizontalPhase) * stormAmplitude * 0.075;
-transformed.z += cos(stormHorizontalPhase) * stormAmplitude * 0.027;
+float stormCrossHorizontalPhase = dot(stormPoint, normalize(vec2(-0.62, 0.78))) * 0.137 - uStormTime * 0.27;
+transformed.x += (cos(stormHorizontalPhase) * 0.032 - cos(stormCrossHorizontalPhase) * 0.014) * stormAmplitude;
+transformed.z += (cos(stormHorizontalPhase) * 0.012 + cos(stormCrossHorizontalPhase) * 0.018) * stormAmplitude;
 float stormSideFade = 1.0 - smoothstep(146.0, 180.0, abs(position.x));
 float stormFarFade = smoothstep(-449.0, -392.0, position.z);
 float stormNearFade = 1.0 - smoothstep(45.0, 72.0, position.z);
 vStormEdgeFade = clamp(stormSideFade * stormFarFade * stormNearFade, 0.0, 1.0);
 vStormCrest = smoothstep(0.12, max(0.2, stormAmplitude * 0.82), stormSurfaceHeight);
-vStormSlope = clamp(length(vec2(stormLeft - stormRight, stormDown - stormUp)) / (stormNormalStep * 2.0), 0.0, 1.0);
-float stormCurvature = max(0.0, (stormCenter * 4.0 - stormLeft - stormRight - stormDown - stormUp) / (stormNormalStep * stormNormalStep));
+vStormWaveGradient = vec2(stormRight - stormLeft, stormUp - stormDown) / (stormNormalStep * 2.0);
+vStormSlope = clamp(length(vStormWaveGradient), 0.0, 1.0);
+float stormSignedCurvature = (stormCenter * 4.0 - stormLeft - stormRight - stormDown - stormUp) / (stormNormalStep * stormNormalStep);
+vStormSignedCurvature = clamp(stormSignedCurvature * 3.4, -1.0, 1.0);
+float stormCurvature = max(0.0, stormSignedCurvature);
 vStormCurvature = clamp(stormCurvature * 8.0, 0.0, 1.0);
 vStormNearness = smoothstep(-285.0, 54.0, position.z);
 vStormPoint = stormPoint;`
@@ -1629,18 +1805,23 @@ uniform vec3 uStormSkyZenithColor;
 uniform vec3 uStormHorizonColor;
 uniform vec3 uStormSkyHighlightColor;
 uniform float uStormAmbientStrength;
+uniform float uStormBacklight;
+uniform float uStormReflectionGain;
 uniform float uStormThunder;
 uniform float uStormLightningFlash;
 uniform vec2 uStormLightningTarget;
 uniform sampler2D uStormSceneColor;
 uniform vec2 uStormSceneResolution;
 uniform float uStormSceneRefractionReady;
+#define STORM_HIGH_PRECISION_REFLECTION ${HIGH_PRECISION_REFLECTION ? 1 : 0}
 varying float vStormEdgeFade;
 varying float vStormCrest;
 varying float vStormSlope;
 varying float vStormCurvature;
+varying float vStormSignedCurvature;
 varying float vStormNearness;
 varying vec2 vStormPoint;
+varying vec2 vStormWaveGradient;
 
 float stormSurfaceHash(vec2 point) {
   vec3 value = fract(vec3(point.xyx) * 0.1031);
@@ -1797,7 +1978,7 @@ float stormCrossCapillary = stormSurfaceDetail(mat2(0.36, -0.93, 0.93, 0.36) * v
 float stormFacetPatch = stormSurfaceDetail(mat2(0.73, -0.68, 0.68, 0.73) * vStormPoint * 0.91 + vec2(uStormTime * 0.019, -uStormTime * 0.014) + 18.4);
 float stormUnresolvedMicroVariance = smoothstep(0.16, 1.1, stormPixelFootprint)
   * mix(0.72, 1.0, stormFacetPatch);
-float stormNearCapillaryFade = stormStochasticFade * smoothstep(0.36, 0.94, vStormNearness);
+float stormNearCapillaryFade = stormStochasticFade * smoothstep(0.28, 0.92, vStormNearness);
 float stormUltraFineA = stormBandLimitedSine(dot(vStormPoint, normalize(vec2(0.57, 0.82))) * 48.2 + stormDetailWarp * 0.09 - uStormTime * 4.16);
 float stormUltraFineB = stormBandLimitedSine(dot(vStormPoint, normalize(vec2(-0.83, 0.56))) * 63.4 - stormDetailWarp * 0.07 + uStormTime * 4.73);
 float stormNanoCapillaryFade = stormStochasticFade * smoothstep(0.68, 0.98, vStormNearness);
@@ -1840,6 +2021,13 @@ float stormCoherentCapillary = (stormWindRibbonA * 0.37 + stormWindRibbonB * 0.2
 float stormCapillaryLace = (stormWindRibbonF * 0.62 + stormWindRibbonG * 0.38) * stormNanoCapillaryFade;
 float stormUltraCapillaryLace = (stormWindRibbonH * 0.61 + stormWindRibbonI * 0.39) * stormNanoCapillaryFade;
 float stormWindRidgeMask = smoothstep(0.62, 0.94, stormCoherentCapillary * 0.5 + 0.5) * stormNearCapillaryFade;
+float stormCoherentFacetEnergyV10 = clamp(
+  abs(stormMesoRipple) * 0.42
+  + abs(stormCoherentCapillary) * 0.38
+  + stormWindRidgeMask * 0.2,
+  0.0,
+  1.0
+);
 float stormFarFieldFade = (1.0 - smoothstep(0.34, 0.86, vStormNearness))
   * stormFootprintFade(vStormPoint * 0.18, 0.22, 1.15);
 float stormFarWindA = stormBandLimitedSine(dot(vStormPoint, normalize(vec2(0.982, 0.189))) * 2.86 + stormDetailWarp * 0.38 - uStormTime * 1.18);
@@ -1897,37 +2085,42 @@ float stormWaterMottle = stormSurfaceNoise(vStormPoint * 0.19 + vec2(-uStormTime
 float stormFineTone = stormMesoRipple * 0.4 + stormCrossMesoDetail * 0.28 + stormSurfaceDetailV8 * 0.2 + stormCoherentCapillary * 0.12 + stormSurfaceDetailV9 * 0.14;
 vec3 stormWaterSky = mix(uStormSkyZenithColor, uStormHorizonColor, 0.28);
 float stormWaterSkyLuminance = dot(stormWaterSky, vec3(0.2126, 0.7152, 0.0722));
-vec3 stormWaterNeutralSky = mix(vec3(stormWaterSkyLuminance), stormWaterSky, 0.26);
-vec3 stormDeepWater = vec3(0.0025, 0.0095, 0.0145) + stormWaterNeutralSky * vec3(0.003, 0.007, 0.009);
-vec3 stormLiftedWater = vec3(0.012, 0.031, 0.041) + stormWaterNeutralSky * vec3(0.008, 0.017, 0.021);
-float stormWaterLift = clamp(0.18 + vStormSlope * 0.12 + vStormCrest * 0.055 + vStormCurvature * 0.035 + stormWaterVariation * 0.07 + stormCoherentCapillary * stormNearCapillaryFade * 0.008 + stormFineTone * stormNearCapillaryFade * 0.016 + (stormWaterMottle - 0.5) * 0.012, 0.0, 0.5);
+vec3 stormWaterNeutralSky = mix(vec3(stormWaterSkyLuminance), stormWaterSky, 0.18);
+vec3 stormDeepWater = vec3(0.0008, 0.0036, 0.008) + stormWaterNeutralSky * vec3(0.0022, 0.0032, 0.0042);
+vec3 stormLiftedWater = vec3(0.0035, 0.009, 0.018) + stormWaterNeutralSky * vec3(0.0045, 0.0065, 0.0085);
+float stormWaterLift = clamp(0.13 + vStormSlope * 0.085 + vStormCrest * 0.04 + vStormCurvature * 0.028 + stormWaterVariation * 0.055 + stormCoherentCapillary * stormNearCapillaryFade * 0.006 + stormFineTone * stormNearCapillaryFade * 0.012 + (stormWaterMottle - 0.5) * 0.01, 0.0, 0.38);
 diffuseColor.rgb = mix(stormDeepWater, stormLiftedWater, stormWaterLift);
 diffuseColor.a *= vStormEdgeFade;`
         )
         .replace(
           '#include <normal_fragment_maps>',
           `#include <normal_fragment_maps>
-float stormMicroWarp = (stormSurfaceFbm(vStormPoint * 0.071 + vec2(uStormTime * 0.012, -uStormTime * 0.016)) - 0.5) * 1.3;
-float stormMicroHeight = stormBandLimitedSine(dot(vStormPoint, normalize(vec2(0.94, 0.34))) * 2.46 + stormMicroWarp - uStormTime * 0.94) * 0.46;
-stormMicroHeight += stormBandLimitedSine(dot(vStormPoint, normalize(vec2(0.98, 0.2))) * 5.28 - stormMicroWarp * 0.54 - uStormTime * 1.43) * 0.28;
-stormMicroHeight += stormBandLimitedSine(dot(vStormPoint, normalize(vec2(0.8, 0.6))) * 9.72 + stormMicroWarp * 0.31 - uStormTime * 1.92) * 0.16;
-stormMicroHeight += stormBandLimitedSine(dot(vStormPoint, normalize(vec2(-0.24, 0.97))) * 7.36 - stormMicroWarp * 0.22 + uStormTime * 1.16) * 0.1;
+float stormMicroWarp = (stormSurfaceFbm(vStormPoint * 0.071 + vec2(uStormTime * 0.012, -uStormTime * 0.016)) - 0.5) * 2.05;
+float stormLayeredMidWaveA = stormBandLimitedSine(dot(vStormPoint, normalize(vec2(0.31, 0.95))) * 0.72 + stormMicroWarp * 0.42 - uStormTime * 0.62);
+float stormLayeredMidWaveB = stormBandLimitedSine(dot(vStormPoint, normalize(vec2(-0.72, 0.69))) * 1.16 - stormMicroWarp * 0.31 + uStormTime * 0.81);
+float stormLayeredMidWaveC = stormBandLimitedSine(dot(vStormPoint, normalize(vec2(0.88, 0.47))) * 1.86 + stormMicroWarp * 0.22 - uStormTime * 1.02);
+float stormLayeredMidWaveV3 = stormLayeredMidWaveA * 0.52 + stormLayeredMidWaveB * 0.31 + stormLayeredMidWaveC * 0.17;
+float stormMicroHeight = stormLayeredMidWaveV3 * (0.48 + vStormNearness * 0.115);
+stormMicroHeight += stormBandLimitedSine(dot(vStormPoint, normalize(vec2(0.94, 0.34))) * 3.0 + stormMicroWarp - uStormTime * 1.08) * 0.27;
+stormMicroHeight += stormBandLimitedSine(dot(vStormPoint, normalize(vec2(0.98, 0.2))) * 6.2 - stormMicroWarp * 0.68 - uStormTime * 1.62) * 0.15;
+stormMicroHeight += stormBandLimitedSine(dot(vStormPoint, normalize(vec2(0.8, 0.6))) * 11.2 + stormMicroWarp * 0.44 - uStormTime * 2.18) * 0.07;
+stormMicroHeight += stormBandLimitedSine(dot(vStormPoint, normalize(vec2(-0.24, 0.97))) * 8.6 - stormMicroWarp * 0.36 + uStormTime * 1.34) * 0.115;
 stormMicroHeight += stormBandLimitedSine(dot(vStormPoint, normalize(vec2(0.66, 0.75))) * 13.4 + stormMicroWarp * 0.18 - uStormTime * 2.17) * (0.035 + vStormNearness * 0.025);
 stormMicroHeight += stormBandLimitedSine(dot(vStormPoint, normalize(vec2(-0.17, 0.985))) * 19.6 - stormMicroWarp * 0.13 + uStormTime * 2.63) * (0.018 + vStormNearness * 0.015);
 stormMicroHeight += stormBandLimitedSine(dot(vStormPoint, normalize(vec2(0.42, 0.91))) * 27.8 + stormFacetPatch * 0.46 - uStormTime * 3.08) * (0.008 + vStormNearness * 0.014) * stormStochasticFade;
 stormMicroHeight += stormBandLimitedSine(dot(vStormPoint, normalize(vec2(-0.74, 0.67))) * 35.6 - stormFacetPatch * 0.38 + uStormTime * 3.42) * (0.005 + vStormNearness * 0.01) * stormStochasticFade;
-stormMicroHeight += (stormUltraFineA * 0.0045 + stormUltraFineB * 0.003) * stormNearCapillaryFade;
-stormMicroHeight += (stormNanoFineA * 0.0018 + stormNanoFineB * 0.0012) * stormNanoCapillaryFade;
-stormMicroHeight += stormMesoRipple * (0.012 + vStormNearness * 0.006);
-stormMicroHeight += stormCrossMesoDetail * (0.004 + vStormNearness * 0.002);
+stormMicroHeight += (stormUltraFineA * 0.012 + stormUltraFineB * 0.008) * stormNearCapillaryFade;
+stormMicroHeight += (stormNanoFineA * 0.005 + stormNanoFineB * 0.0034) * stormNanoCapillaryFade;
+stormMicroHeight += stormMesoRipple * (0.018 + vStormNearness * 0.008);
+stormMicroHeight += stormCrossMesoDetail * (0.006 + vStormNearness * 0.003);
 stormMicroHeight += stormWeatherFine * (0.002 + vStormNearness * 0.001);
 stormMicroHeight += stormSurfaceDetailV8 * (0.005 + vStormNearness * 0.0035);
-stormMicroHeight += stormNaturalCapillaryV8 * (0.0014 + vStormNearness * 0.0012);
-stormMicroHeight += stormCoherentCapillary * (0.034 + vStormNearness * 0.018) * stormNearCapillaryFade;
-stormMicroHeight += stormCapillaryLace * (0.006 + vStormNearness * 0.006);
+stormMicroHeight += stormNaturalCapillaryV8 * (0.0024 + vStormNearness * 0.002);
+stormMicroHeight += stormCoherentCapillary * (0.028 + vStormNearness * 0.016) * stormNearCapillaryFade;
+stormMicroHeight += stormCapillaryLace * (0.007 + vStormNearness * 0.007);
 stormMicroHeight += stormUltraCapillaryLace * (0.0012 + vStormNearness * 0.001);
 stormMicroHeight += stormSurfaceDetailV9 * (0.012 + stormFarFieldFade * 0.01);
-stormMicroHeight += ((stormRandomCapillary - 0.5) * 0.085 + (stormCrossCapillary - 0.5) * 0.032) * stormStochasticFade;
+stormMicroHeight += ((stormRandomCapillary - 0.5) * 0.082 + (stormCrossCapillary - 0.5) * 0.044) * stormStochasticFade;
 stormMicroHeight += (stormWindFacet - 0.5) * 0.032;
 stormMicroHeight *= mix(0.86, 1.12, stormFacetPatch);
 normal = stormPerturbWaterNormal(
@@ -1937,18 +2130,51 @@ normal = stormPerturbWaterNormal(
   ${waterMicroNormal.toFixed(4)} * mix(1.0, 1.08, uStormThunder * uStormBass)
 );
 #if defined(USE_NORMALMAP) && defined(TANGENTSPACE_NORMALMAP)
-  vec2 stormSecondaryNormalUv = vUv * 2.37 + vec2(-uStormTime * 0.006, uStormTime * 0.004);
+  mat2 stormDetailNormalRotationV5 = mat2(0.9397, -0.342, 0.342, 0.9397);
+  vec2 stormSecondaryNormalUv = stormDetailNormalRotationV5 * (vUv - 0.5) * 2.5 + 0.5
+    + vec2(-uStormTime * 0.006, uStormTime * 0.004);
   float stormSecondaryNormalFade = stormFootprintFade(stormSecondaryNormalUv, 0.2, 0.88)
     * smoothstep(0.28, 0.96, vStormNearness);
   vec3 stormSecondaryNormalSample = texture2D(normalMap, stormSecondaryNormalUv).xyz * 2.0 - 1.0;
-  stormSecondaryNormalSample.xy *= normalScale * 0.14;
+  stormSecondaryNormalSample.xy = stormDetailNormalRotationV5 * stormSecondaryNormalSample.xy;
+  stormSecondaryNormalSample.xy *= ${textureDetailNormalScale.toFixed(4)} * 0.17;
   vec3 stormSecondaryNormalV3 = perturbNormal2Arb(
     -vViewPosition,
     normal,
     stormSecondaryNormalSample,
     faceDirection
   );
-  normal = normalize(mix(normal, stormSecondaryNormalV3, stormSecondaryNormalFade * 0.12));
+  normal = normalize(mix(normal, stormSecondaryNormalV3, stormSecondaryNormalFade * 0.19));
+  mat2 stormFineNormalRotationV4 = mat2(0.7547, -0.6561, 0.6561, 0.7547);
+  vec2 stormFineNormalUvV4 = stormFineNormalRotationV4 * vUv * 6.8
+    + vec2(uStormTime * 0.0082, -uStormTime * 0.0067);
+  float stormFineNormalFadeV4 = stormFootprintFade(stormFineNormalUvV4, 0.14, 0.72)
+    * smoothstep(0.42, 0.98, vStormNearness);
+  vec3 stormFineNormalSampleV4 = texture2D(normalMap, stormFineNormalUvV4).xyz * 2.0 - 1.0;
+  stormFineNormalSampleV4.xy = stormFineNormalRotationV4 * stormFineNormalSampleV4.xy;
+  stormFineNormalSampleV4.xy *= ${textureDetailNormalScale.toFixed(4)} * 0.09;
+  vec3 stormFineNormalV4 = perturbNormal2Arb(
+    -vViewPosition,
+    normal,
+    stormFineNormalSampleV4,
+    faceDirection
+  );
+  normal = normalize(mix(normal, stormFineNormalV4, stormFineNormalFadeV4 * 0.15));
+  mat2 stormUltraNormalRotationV11 = mat2(0.5592, -0.8290, 0.8290, 0.5592);
+  vec2 stormUltraNormalUvV11 = stormUltraNormalRotationV11 * vUv * 13.6
+    + vec2(-uStormTime * 0.0115, uStormTime * 0.0091);
+  float stormUltraNormalFadeV11 = stormFootprintFade(stormUltraNormalUvV11, 0.075, 0.42)
+    * smoothstep(0.68, 0.995, vStormNearness);
+  vec3 stormUltraNormalSampleV11 = texture2D(normalMap, stormUltraNormalUvV11).xyz * 2.0 - 1.0;
+  stormUltraNormalSampleV11.xy = stormUltraNormalRotationV11 * stormUltraNormalSampleV11.xy;
+  stormUltraNormalSampleV11.xy *= ${textureDetailNormalScale.toFixed(4)} * 0.045;
+  vec3 stormUltraNormalV11 = perturbNormal2Arb(
+    -vViewPosition,
+    normal,
+    stormUltraNormalSampleV11,
+    faceDirection
+  );
+  normal = normalize(mix(normal, stormUltraNormalV11, stormUltraNormalFadeV11 * 0.07));
 #endif
 float stormNormalDerivativeVarianceV3 = max(
   dot(dFdx(normal), dFdx(normal)),
@@ -1956,8 +2182,8 @@ float stormNormalDerivativeVarianceV3 = max(
 );
 roughnessFactor = clamp(
   sqrt(roughnessFactor * roughnessFactor + min(stormNormalDerivativeVarianceV3 * 0.05, 0.026)),
-  0.075,
-  0.32
+  0.045,
+  0.22
 );`
         )
         .replace(
@@ -1978,8 +2204,8 @@ float stormUltraLaceVariance = abs(stormUltraCapillaryLace);
 float stormSurfaceDetailV9Variance = abs(stormSurfaceDetailV9) * max(stormFarFieldFade, stormNearCapillaryFade * 0.42);
 float stormGrainVariance = abs(stormFacetGrain - 0.5) * 2.0;
 float stormRidgePolish = stormWindRidgeMask * mix(0.62, 1.0, stormFacetPatch);
-float stormPhysicalRoughness = 0.082 + stormMicroRoughness * 0.052 + stormCapillaryRoughness * 0.03 + stormFineFacetVariance * 0.011 + stormNanoFacetVariance * 0.005 + stormRibbonVariance * 0.012 + stormLaceVariance * 0.005 + stormMesoVariance * 0.008 + stormCrossMesoVariance * 0.006 + stormWeatherFineVariance * 0.003 + stormSurfaceDetailV8Variance * 0.005 + stormNaturalCapillaryV8Variance * 0.002 + stormUltraLaceVariance * 0.003 + stormSurfaceDetailV9Variance * 0.006 + stormUnresolvedMicroVariance * 0.022 + stormGrainVariance * 0.009 + stormWindFacet * 0.01 + (1.0 - stormFacetPatch) * 0.021 + vStormSlope * 0.025 + vStormCurvature * 0.009 - vStormCrest * 0.007 - stormRidgePolish * 0.006;
-roughnessFactor = clamp(mix(roughnessFactor, stormPhysicalRoughness, 0.9), 0.075, 0.29);
+float stormPhysicalRoughness = 0.048 + stormMicroRoughness * 0.034 + stormCapillaryRoughness * 0.018 + stormFineFacetVariance * 0.008 + stormNanoFacetVariance * 0.004 + stormRibbonVariance * 0.008 + stormLaceVariance * 0.004 + stormMesoVariance * 0.005 + stormCrossMesoVariance * 0.004 + stormWeatherFineVariance * 0.002 + stormSurfaceDetailV8Variance * 0.004 + stormNaturalCapillaryV8Variance * 0.002 + stormUltraLaceVariance * 0.002 + stormSurfaceDetailV9Variance * 0.004 + stormUnresolvedMicroVariance * 0.013 + stormGrainVariance * 0.004 + stormWindFacet * 0.006 + (1.0 - stormFacetPatch) * 0.011 + vStormSlope * 0.018 + vStormCurvature * 0.006 - vStormCrest * 0.008 - stormRidgePolish * 0.009 - stormCoherentFacetEnergyV10 * 0.006;
+roughnessFactor = ${WATER_ROUGHNESS.toFixed(4)};
 roughnessFactor = mix(roughnessFactor, 0.64, clamp(stormFoam * 0.76, 0.0, 0.76));`
         )
         .replace(
@@ -1996,6 +2222,7 @@ stormSilverGlint *= 0.08 + vStormNearness * 0.16;
 vec3 stormTransmissionTint = mix(stormDeepWater, stormLiftedWater, clamp(0.22 + stormWaterVariation * 0.15 + vStormNearness * 0.06 + stormFacing * 0.1, 0.0, 0.54));
 vec3 stormSkySpecularTint = mix(stormSkyHighlightColor, uStormHorizonColor, 0.46);
 stormSkySpecularTint = mix(stormSkySpecularTint, vec3(dot(stormSkySpecularTint, vec3(0.2126, 0.7152, 0.0722))), 0.24);
+float stormCinematicBacklight = clamp(uStormBacklight, 0.0, 1.0);
 vec3 stormReflection = outgoingLight * stormSkySpecularTint * 0.018;
 vec3 stormDirectSpecularV3 = vec3(0.0);
 stormReflection += stormSkySpecularTint * stormSilverGlint * 0.012;
@@ -2005,7 +2232,7 @@ vec3 stormTraceReference = abs(stormReflectedView.y) < 0.98 ? vec3(0.0, 1.0, 0.0
 vec3 stormTraceTangent = normalize(cross(stormTraceReference, stormReflectedView));
 vec3 stormTraceBitangent = normalize(cross(stormReflectedView, stormTraceTangent));
 float stormTraceHorizonStability = mix(0.74, 1.0, smoothstep(0.06, 0.58, abs(stormReflectedView.y)));
-float stormTraceCone = clamp((roughnessFactor * roughnessFactor * 1.35 + stormUnresolvedMicroVariance * 0.032) * stormTraceHorizonStability, 0.005, 0.095);
+float stormTraceCone = clamp((roughnessFactor * roughnessFactor * 1.08 + stormUnresolvedMicroVariance * 0.02) * stormTraceHorizonStability, 0.003, 0.064);
 float stormTraceRotation = stormSurfaceNoise(vStormPoint * 0.037 + vec2(57.2, -31.4)) * 6.2831853;
 vec3 stormTraceAxisA = normalize(stormTraceTangent * cos(stormTraceRotation) + stormTraceBitangent * sin(stormTraceRotation));
 vec3 stormTraceAxisB = normalize(cross(stormReflectedView, stormTraceAxisA));
@@ -2017,28 +2244,80 @@ vec3 stormReflectionRayE = normalize(stormReflectedView + (stormTraceAxisA + sto
 vec3 stormReflectionRayF = normalize(stormReflectedView - (stormTraceAxisA + stormTraceAxisB) * stormTraceCone * 0.48);
 vec3 stormReflectionRayG = normalize(stormReflectedView + (stormTraceAxisA - stormTraceAxisB) * stormTraceCone * 0.48);
 vec3 stormReflectionRayH = normalize(stormReflectedView - (stormTraceAxisA - stormTraceAxisB) * stormTraceCone * 0.48);
-vec3 stormRayColor = stormTraceSkyRadiance(stormReflectedView, vStormPoint, 0.0) * 0.24;
-stormRayColor += stormTraceSkyRadiance(stormReflectionRayA, vStormPoint, 1.7) * 0.095;
-stormRayColor += stormTraceSkyRadiance(stormReflectionRayB, vStormPoint, 4.3) * 0.095;
-stormRayColor += stormTraceSkyRadiance(stormReflectionRayC, vStormPoint, 7.1) * 0.095;
-stormRayColor += stormTraceSkyRadiance(stormReflectionRayD, vStormPoint, 10.9) * 0.095;
-stormRayColor += stormTraceSkyRadiance(stormReflectionRayE, vStormPoint, 13.7) * 0.095;
-stormRayColor += stormTraceSkyRadiance(stormReflectionRayF, vStormPoint, 17.3) * 0.095;
-stormRayColor += stormTraceSkyRadiance(stormReflectionRayG, vStormPoint, 20.1) * 0.095;
-stormRayColor += stormTraceSkyRadiance(stormReflectionRayH, vStormPoint, 23.9) * 0.095;
+vec3 stormRayColor;
+#if STORM_HIGH_PRECISION_REFLECTION == 1
+  vec3 stormReflectionRayI = normalize(stormReflectedView + stormTraceAxisA * stormTraceCone * 0.34);
+  vec3 stormReflectionRayJ = normalize(stormReflectedView - stormTraceAxisA * stormTraceCone * 0.34);
+  vec3 stormReflectionRayK = normalize(stormReflectedView + stormTraceAxisB * stormTraceCone * 0.34);
+  vec3 stormReflectionRayL = normalize(stormReflectedView - stormTraceAxisB * stormTraceCone * 0.34);
+  stormRayColor = stormTraceSkyRadiance(stormReflectedView, vStormPoint, 0.0) * 0.2;
+  stormRayColor += stormTraceSkyRadiance(stormReflectionRayA, vStormPoint, 1.7) * 0.07;
+  stormRayColor += stormTraceSkyRadiance(stormReflectionRayB, vStormPoint, 4.3) * 0.07;
+  stormRayColor += stormTraceSkyRadiance(stormReflectionRayC, vStormPoint, 7.1) * 0.07;
+  stormRayColor += stormTraceSkyRadiance(stormReflectionRayD, vStormPoint, 10.9) * 0.07;
+  stormRayColor += stormTraceSkyRadiance(stormReflectionRayE, vStormPoint, 13.7) * 0.07;
+  stormRayColor += stormTraceSkyRadiance(stormReflectionRayF, vStormPoint, 17.3) * 0.07;
+  stormRayColor += stormTraceSkyRadiance(stormReflectionRayG, vStormPoint, 20.1) * 0.07;
+  stormRayColor += stormTraceSkyRadiance(stormReflectionRayH, vStormPoint, 23.9) * 0.07;
+  stormRayColor += stormTraceSkyRadiance(stormReflectionRayI, vStormPoint, 27.1) * 0.06;
+  stormRayColor += stormTraceSkyRadiance(stormReflectionRayJ, vStormPoint, 30.7) * 0.06;
+  stormRayColor += stormTraceSkyRadiance(stormReflectionRayK, vStormPoint, 34.3) * 0.06;
+  stormRayColor += stormTraceSkyRadiance(stormReflectionRayL, vStormPoint, 37.9) * 0.06;
+#else
+  stormRayColor = stormTraceSkyRadiance(stormReflectedView, vStormPoint, 0.0) * 0.24;
+  stormRayColor += stormTraceSkyRadiance(stormReflectionRayA, vStormPoint, 1.7) * 0.095;
+  stormRayColor += stormTraceSkyRadiance(stormReflectionRayB, vStormPoint, 4.3) * 0.095;
+  stormRayColor += stormTraceSkyRadiance(stormReflectionRayC, vStormPoint, 7.1) * 0.095;
+  stormRayColor += stormTraceSkyRadiance(stormReflectionRayD, vStormPoint, 10.9) * 0.095;
+  stormRayColor += stormTraceSkyRadiance(stormReflectionRayE, vStormPoint, 13.7) * 0.095;
+  stormRayColor += stormTraceSkyRadiance(stormReflectionRayF, vStormPoint, 17.3) * 0.095;
+  stormRayColor += stormTraceSkyRadiance(stormReflectionRayG, vStormPoint, 20.1) * 0.095;
+  stormRayColor += stormTraceSkyRadiance(stormReflectionRayH, vStormPoint, 23.9) * 0.095;
+#endif
 float stormRayRadiance = dot(stormRayColor, vec3(0.2126, 0.7152, 0.0722));
 float stormReflectedCloud = clamp(stormRayRadiance * 2.25, 0.0, 1.35);
 float stormOvercastLift = smoothstep(0.31, 0.78, stormSkyElevation);
-vec3 stormOvercastDark = mix(uStormSkyZenithColor * 0.1, uStormHorizonColor * 0.1, stormOvercastLift);
-vec3 stormOvercastLight = stormSkyHighlightColor * 0.32;
+vec3 stormOvercastDark = mix(uStormSkyZenithColor * 0.115, uStormHorizonColor * 0.115, stormOvercastLift);
+vec3 stormOvercastLight = stormSkyHighlightColor * 0.36;
 vec3 stormOvercastReflection = mix(stormOvercastDark, stormOvercastLight, stormOvercastLift);
 stormOvercastReflection *= mix(0.62, 1.18, stormReflectedCloud);
-vec3 stormRayTracedReflection = mix(stormOvercastDark, stormRayColor * (0.76 + uStormAmbientStrength * 0.44), smoothstep(0.08, 0.9, stormSkyElevation));
+float stormRayConfidenceV4 = smoothstep(0.0, 0.72, stormSkyElevation);
+vec3 stormRayTracedReflection = mix(stormOvercastDark, stormRayColor * (0.9 + uStormAmbientStrength * 0.5), stormRayConfidenceV4);
 stormOvercastReflection = mix(stormOvercastReflection, stormRayTracedReflection, ${rayTraceStrength.toFixed(4)});
 vec3 stormSkyLightDirection = stormSunViewDirection();
-float stormHorizonFlash = pow(max(dot(stormReflectedView, stormSkyLightDirection), 0.0), 38.0);
-stormReflection += stormOvercastReflection;
+float stormMacroSlopeV4 = length(vStormWaveGradient);
+float stormMacroReliefV4 = smoothstep(0.025, 0.2, stormMacroSlopeV4);
+vec2 stormMacroGradientDirectionV4 = normalize(vStormWaveGradient + vec2(0.0001));
+vec2 stormSunSurfaceDirectionV4 = normalize(uStormSunDirection.xz + vec2(0.0001));
+float stormMacroSunFacingV4 = -dot(stormMacroGradientDirectionV4, stormSunSurfaceDirectionV4);
+float stormWindwardReliefV4 = smoothstep(0.05, 0.84, stormMacroSunFacingV4) * stormMacroReliefV4;
+float stormLeewardReliefV4 = smoothstep(0.05, 0.84, -stormMacroSunFacingV4) * stormMacroReliefV4;
+float stormCrestReliefV4 = smoothstep(0.08, 0.68, vStormSignedCurvature);
+float stormTroughReliefV4 = smoothstep(0.08, 0.68, -vStormSignedCurvature);
+float stormSunReflectionAlignment = max(dot(stormReflectedView, stormSkyLightDirection), 0.0);
+float stormHorizonFlash = pow(stormSunReflectionAlignment, mix(38.0, 72.0, stormCinematicBacklight));
+float stormWarmReflectionTrailV1 = pow(stormSunReflectionAlignment, mix(12.0, 20.0, stormCinematicBacklight));
+stormWarmReflectionTrailV1 *= smoothstep(0.025, 0.34, stormFresnel) * (1.0 - roughnessFactor * 0.35);
+float stormWarmFacetTrailV2 = pow(stormSunReflectionAlignment, mix(10.0, 16.0, stormCinematicBacklight));
+stormWarmFacetTrailV2 *= smoothstep(
+  0.24,
+  0.82,
+  stormWindRidgeMask * 0.48 + stormCoherentFacetEnergyV10 * 0.34 + stormFacetPatch * 0.18
+);
+stormWarmFacetTrailV2 *= smoothstep(0.035, 0.44, stormFresnel) * (1.0 - roughnessFactor * 0.5);
+float stormCoolFacetFillV2 = smoothstep(0.14, 0.78, stormSkyElevation)
+  * (0.42 + stormFacetPatch * 0.28 + stormCoherentFacetEnergyV10 * 0.16)
+  * (0.72 + stormFresnel * 0.28);
+vec3 stormCoolFillTintV2 = mix(uStormSkyZenithColor, stormSkyHighlightColor, 0.34);
+stormReflection += stormOvercastReflection * uStormReflectionGain
+  * (0.78 + stormCoherentFacetEnergyV10 * 0.17);
+stormReflection += stormCoolFillTintV2 * stormCoolFacetFillV2
+  * (0.021 + uStormAmbientStrength * 0.018);
 stormReflection += mix(uStormSunColor, stormSkySpecularTint, 0.62) * stormHorizonFlash * (0.052 + uStormAmbientStrength * 0.038);
+stormReflection += uStormSunColor * stormWarmReflectionTrailV1 * stormCinematicBacklight
+  * (0.03 + vStormNearness * 0.018);
+stormReflection += mix(uStormSunColor, stormSkySpecularTint, 0.18) * stormWarmFacetTrailV2 * stormCinematicBacklight
+  * (0.024 + vStormNearness * 0.013);
 vec3 stormHalfDirection = normalize(stormSkyLightDirection + stormViewDirection);
 vec3 stormSurfaceNormal = normalize(normal);
 float stormNormalHighlight = max(dot(stormSurfaceNormal, stormHalfDirection), 0.0);
@@ -2055,30 +2334,52 @@ float stormGgxVisibilityL = stormNoL / max(stormNoL * (1.0 - stormGgxK) + stormG
 float stormGgxFresnel = 0.02037 + 0.97963 * pow(1.0 - stormVoH, 5.0);
 float stormSunSpecular = stormGgxDistribution * stormGgxVisibilityV * stormGgxVisibilityL * stormGgxFresnel;
 stormSunSpecular *= stormNoL / max(4.0 * stormNoV * stormNoL, 0.001);
-stormSunSpecular = min(stormSunSpecular * mix(0.62, 1.0, stormWindFacet), 0.072);
-float stormBroadSkyLobe = pow(stormNormalHighlight, 16.0) * (1.0 - roughnessFactor) * 0.024;
-float stormFineSkyGlint = pow(stormNormalHighlight, 76.0) * (1.0 - roughnessFactor) * (0.022 + vStormNearness * 0.032);
+stormSunSpecular = min(stormSunSpecular * mix(0.62, 1.0, stormWindFacet), 0.096);
+float stormBroadSkyLobe = pow(stormNormalHighlight, 18.0) * (1.0 - roughnessFactor) * 0.018;
+float stormFineSkyGlint = pow(stormNormalHighlight, 92.0) * (1.0 - roughnessFactor) * (0.034 + vStormNearness * 0.05);
+float stormResolvedFacetGlintV12 = pow(stormNormalHighlight, 54.0)
+  * smoothstep(0.22, 0.82, stormCoherentFacetEnergyV10 * 0.64 + stormWindRidgeMask * 0.36)
+  * (1.0 - roughnessFactor)
+  * (0.012 + vStormNearness * 0.024);
+float stormMicroFacetGlintV11 = pow(stormNormalHighlight, 128.0)
+  * (1.0 - roughnessFactor)
+  * smoothstep(0.38, 0.88, stormCoherentFacetEnergyV10 * 0.58 + stormWindRidgeMask * 0.42)
+  * stormNearCapillaryFade;
 float stormRandomSparkle = smoothstep(0.72, 0.94, stormRandomCapillary * 0.58 + stormCrossCapillary * 0.26 + stormWindFacet * 0.16);
 float stormCapillarySparkle = stormWindRidgeMask * 0.78 + stormRandomSparkle * stormStochasticFade * 0.22;
 stormCapillarySparkle *= pow(stormNormalHighlight, 72.0) * (0.018 + vStormNearness * 0.034);
-stormDirectSpecularV3 += mix(uStormSunColor, stormSkySpecularTint, 0.58) * stormSunSpecular * (0.2 + uStormAmbientStrength * 0.12);
-stormReflection += stormSkySpecularTint * (stormBroadSkyLobe + stormFineSkyGlint + stormCapillarySparkle) * (0.22 + uStormAmbientStrength * 0.16);
+stormDirectSpecularV3 += mix(uStormSunColor, stormSkySpecularTint, 0.58) * stormSunSpecular
+  * (0.26 + uStormAmbientStrength * 0.14 + stormCinematicBacklight * 0.28);
+stormReflection += stormSkySpecularTint * (stormBroadSkyLobe + stormFineSkyGlint + stormCapillarySparkle) * (0.3 + uStormAmbientStrength * 0.18);
+stormReflection += stormSkySpecularTint * stormResolvedFacetGlintV12 * (0.22 + uStormAmbientStrength * 0.12);
+stormReflection += stormSkySpecularTint * stormMicroFacetGlintV11 * (0.018 + uStormAmbientStrength * 0.012);
 float stormLightningWaterDistance = distance(vStormPoint, uStormLightningTarget);
 float stormLightningWaterMask = 1.0 - smoothstep(18.0, 148.0, stormLightningWaterDistance);
 stormDirectSpecularV3 += vec3(0.19, 0.085, 0.34) * stormLightningWaterMask * uStormLightningFlash
   * (0.055 + stormFresnel * 0.15) * (1.0 - roughnessFactor * 0.22);
-stormReflection *= 0.82 + stormFacetPatch * 0.14 + stormMicroRoughness * 0.04;
+float stormHorizonFacetSheenV10 = pow(1.0 - stormFacing, 2.4)
+  * smoothstep(0.34, 0.9, stormCoherentFacetEnergyV10 + stormWindRidgeMask * 0.46);
+stormReflection += stormSkySpecularTint * stormHorizonFacetSheenV10 * (0.026 + uStormAmbientStrength * 0.03);
+float stormSunGrazingV5 = 1.0 - smoothstep(0.12, 0.62, abs(uStormSunDirection.y));
+float stormWindwardRimV5 = stormWindwardReliefV4
+  * (0.46 + stormCrestReliefV4 * 0.54)
+  * mix(0.68, 1.0, stormSunGrazingV5);
+float stormLeewardShadowV5 = stormLeewardReliefV4 * mix(0.026, 0.058, stormSunGrazingV5);
+stormReflection += mix(stormSkySpecularTint, uStormSunColor, 0.52) * stormWindwardRimV5
+  * (0.012 + stormCinematicBacklight * 0.016);
+stormReflection *= 1.0 - stormLeewardShadowV5 - stormTroughReliefV4 * 0.022;
+stormReflection *= 0.86 + stormFacetPatch * 0.07 + stormCoherentFacetEnergyV10 * 0.04;
 float stormReflectionLuminance = dot(stormReflection, vec3(0.2126, 0.7152, 0.0722));
-float stormReflectionShoulder = 1.0 / (1.0 + max(stormReflectionLuminance - 0.22, 0.0) * 1.85);
+float stormReflectionShoulder = 1.0 / (1.0 + max(stormReflectionLuminance - 0.3, 0.0) * 1.55);
 stormReflection *= stormReflectionShoulder;
 float stormDirectLuminance = dot(stormDirectSpecularV3, vec3(0.2126, 0.7152, 0.0722));
-stormDirectSpecularV3 *= 1.0 / (1.0 + max(stormDirectLuminance - 0.085, 0.0) * 3.2);
+stormDirectSpecularV3 *= 1.0 / (1.0 + max(stormDirectLuminance - 0.13, 0.0) * 2.4);
 
 float stormViewIntoWater = smoothstep(0.18, 0.94, stormFacing);
 float stormImpurityBroad = stormSurfaceFbm(vStormPoint * 0.083 + vec2(uStormTime * 0.004, -uStormTime * 0.006) + 14.7);
 float stormImpurityFine = stormSurfaceNoise(vStormPoint * 0.47 - vec2(uStormTime * 0.011, uStormTime * 0.008) + 31.2);
 float stormSuspendedMatter = smoothstep(0.54, 0.86, stormImpurityBroad * 0.72 + stormImpurityFine * 0.28);
-float stormUnderwaterRayLength = mix(10.5, 3.2, stormViewIntoWater);
+float stormUnderwaterRayLength = mix(7.2, 2.1, stormViewIntoWater);
 vec2 stormColumnDirection = normalize(vec2(0.31, -0.95) + vec2(stormMesoRipple, stormCrossMesoDetail) * 0.16);
 vec3 stormColumnRay = normalize(vec3(stormColumnDirection.x, -max(stormFacing, 0.18), stormColumnDirection.y));
 float stormTracedDensity = stormTraceUnderwaterDensity(vStormPoint, stormColumnRay, stormUnderwaterRayLength);
@@ -2087,22 +2388,25 @@ float stormWaterColumnBroad = stormSurfaceFbm(stormRefractedFoot * 0.061 + vec2(
 float stormWaterColumnDetail = stormSurfaceNoise(stormRefractedFoot * 0.29 + stormWaterColumnBroad * 2.7 - vec2(uStormTime * 0.008, uStormTime * 0.005) + 8.4);
 float stormWaterColumnDepth = stormUnderwaterRayLength * mix(0.62, 1.42, stormWaterColumnBroad * 0.68 + stormWaterColumnDetail * 0.32);
 stormWaterColumnDepth *= mix(0.9, 1.18, stormTracedDensity);
-vec3 stormWaterAbsorption = exp(-vec3(0.082, 0.036, 0.021) * stormWaterColumnDepth);
+vec3 stormWaterAbsorption = exp(-vec3(0.034, 0.032, 0.03) * stormWaterColumnDepth);
 vec2 stormScreenUv = gl_FragCoord.xy / max(uStormSceneResolution, vec2(1.0));
-vec2 stormScreenRefractionOffset = normalize(normal).xy * (0.0016 + vStormNearness * 0.0024) * (0.68 + roughnessFactor * 0.24);
+vec2 stormScreenRefractionOffset = normalize(normal).xy * (0.00125 + vStormNearness * 0.0019) * (0.68 + roughnessFactor * 0.24);
 vec2 stormRefractedUvA = clamp(stormScreenUv + stormScreenRefractionOffset, vec2(0.002), vec2(0.998));
-vec2 stormRefractedUvB = clamp(stormScreenUv + stormScreenRefractionOffset * 1.18, vec2(0.002), vec2(0.998));
-vec3 stormSceneRefraction = texture2D(uStormSceneColor, stormRefractedUvA).rgb * 0.88;
-stormSceneRefraction += texture2D(uStormSceneColor, stormRefractedUvB).rgb * 0.12;
-vec3 stormProceduralIncident = mix(uStormHorizonColor, uStormSkyZenithColor, 0.34) * (0.105 + uStormAmbientStrength * 0.04);
+vec2 stormRefractedUvB = clamp(stormScreenUv + stormScreenRefractionOffset * 1.13, vec2(0.002), vec2(0.998));
+vec3 stormSceneRefraction = texture2D(uStormSceneColor, stormRefractedUvA).rgb * 0.92;
+stormSceneRefraction += texture2D(uStormSceneColor, stormRefractedUvB).rgb * 0.08;
+float stormSceneRefractionLuminance = dot(stormSceneRefraction, vec3(0.2126, 0.7152, 0.0722));
+stormSceneRefraction = mix(vec3(stormSceneRefractionLuminance), stormSceneRefraction, 0.72);
+vec3 stormProceduralIncident = mix(uStormHorizonColor, uStormSkyZenithColor, 0.42) * (0.12 + uStormAmbientStrength * 0.045);
 vec3 stormIncidentWaterLight = mix(stormProceduralIncident, stormSceneRefraction, uStormSceneRefractionReady * 0.99);
 stormIncidentWaterLight = mix(stormIncidentWaterLight, stormSkyHighlightColor * 0.11, stormViewIntoWater * (1.0 - uStormSceneRefractionReady) * 0.14);
-vec3 stormSingleScatterColor = mix(vec3(0.003, 0.012, 0.016), vec3(0.006, 0.023, 0.029), stormSuspendedMatter);
+float stormOpticalClarityV6 = 1.0 - stormSuspendedMatter * 0.12;
+vec3 stormSingleScatterColor = mix(vec3(0.0025, 0.007, 0.009), vec3(0.005, 0.013, 0.016), stormSuspendedMatter);
 vec3 stormSingleScatter = stormSingleScatterColor * (vec3(1.0) - stormWaterAbsorption);
-stormSingleScatter *= (0.24 + stormTracedDensity * 0.17) * ${rayTraceStrength.toFixed(4)};
+stormSingleScatter *= (0.32 + stormTracedDensity * 0.16) * stormOpticalClarityV6 * ${rayTraceStrength.toFixed(4)};
 vec3 stormRefraction = stormIncidentWaterLight * stormWaterAbsorption + stormSingleScatter;
 float stormSubsurfaceWindow = smoothstep(0.28, 0.78, stormWaterColumnDetail * 0.56 + (1.0 - stormTracedDensity) * 0.44);
-stormRefraction *= mix(0.78, 1.12, stormSubsurfaceWindow);
+stormRefraction *= mix(0.82, 1.14, stormSubsurfaceWindow) * stormOpticalClarityV6;
 stormRefraction *= mix(0.96, 1.025, stormWaterMottle);
 stormRefraction += stormTransmissionTint * stormViewIntoWater * (0.002 + stormSubsurfaceWindow * 0.003);
 float stormBacklitCrest = pow(max(dot(-stormSkyLightDirection, stormSurfaceNormal), 0.0), 1.35);
@@ -2111,23 +2415,67 @@ float stormCrestThickness = clamp(stormFacetPatch * 0.46 + stormWaterVariation *
 stormCrestThickness *= 1.0 - clamp(stormFoam * 0.42, 0.0, 0.42);
 float stormCrestThinness = 1.0 - stormCrestThickness;
 vec3 stormCrestTransmissionColor = mix(vec3(0.009, 0.047, 0.055), uStormSkyHighlightColor * vec3(0.08, 0.145, 0.15), 0.18 + stormCrestThinness * 0.24);
-stormRefraction += stormCrestTransmissionColor * stormBacklitCrest * (0.16 + stormCrestThinness * 0.2 + uStormAmbientStrength * 0.11);
+vec3 stormCinematicCrestColor = mix(stormCrestTransmissionColor, uStormSunColor * 0.075, stormCinematicBacklight * 0.42);
+stormRefraction += stormCinematicCrestColor * stormBacklitCrest * (0.16 + stormCrestThinness * 0.2 + uStormAmbientStrength * 0.11);
 stormRefraction += stormCrestTransmissionColor * stormMicroBreakRidge * stormBacklitCrest * 0.025;
 float stormOpticalDepthVariation = smoothstep(0.16, 0.84, stormWaterVariation * 0.42 + vStormCrest * 0.2 + stormFacetPatch * 0.12 + stormSubsurfaceWindow * 0.26);
-stormRefraction *= mix(0.84, 1.1, stormOpticalDepthVariation);
-stormRefraction = max((stormRefraction - vec3(0.01)) * 1.12 + vec3(0.01), vec3(0.0));
-stormRefraction *= mix(1.08, 1.28, stormViewIntoWater);
+stormRefraction *= mix(0.88, 1.08, stormOpticalDepthVariation);
+float stormTransmissionWindowV6 = smoothstep(2.8, 7.4, stormWaterColumnDepth)
+  * smoothstep(0.16, 0.82, 1.0 - stormSubsurfaceWindow)
+  * (1.0 - clamp(stormFoam * 0.72, 0.0, 0.72));
+stormRefraction *= vec3(0.985, 0.995, 1.0);
+stormRefraction += vec3(0.002, 0.0035, 0.0045) * stormTransmissionWindowV6
+  * mix(0.72, 1.0, vStormNearness);
+stormRefraction = max((stormRefraction - vec3(0.003)) * 1.025 + vec3(0.003), vec3(0.0));
+stormRefraction *= mix(0.98, 1.12, stormViewIntoWater);
 
 float stormReflectionWeight = clamp(stormFresnel * (1.0 - roughnessFactor * 0.16), 0.018, 0.965);
 float stormReflectionNormalized = clamp((stormReflectionWeight - 0.018) / 0.947, 0.0, 1.0);
-stormReflectionWeight = 0.018 + pow(stormReflectionNormalized, mix(1.0, 1.72, vStormNearness)) * 0.947;
-stormReflectionWeight = min(stormReflectionWeight, mix(0.115, 0.965, 1.0 - vStormNearness));
+stormReflectionWeight = 0.018 + pow(stormReflectionNormalized, mix(0.96, 1.3, vStormNearness)) * 0.947;
+stormReflectionWeight = min(stormReflectionWeight, mix(0.22, 0.965, 1.0 - vStormNearness));
 vec3 stormWaterLight = mix(stormRefraction, stormReflection, stormReflectionWeight) + stormDirectSpecularV3;
+float stormFacetLightContrastV4 = clamp(
+  (stormFacetPatch - 0.5) * 0.08
+    + (stormWindFacet - 0.5) * 0.055
+    + stormCoherentFacetEnergyV10 * 0.035
+    + stormLayeredMidWaveV3 * 0.022
+    + stormSurfaceDetailV9 * 0.018,
+  -0.072,
+  0.112
+);
+float stormMacroLightBalanceV5 = 1.0
+  + stormWindwardRimV5 * 0.052
+  + stormCrestReliefV4 * 0.016
+  - stormLeewardReliefV4 * mix(0.024, 0.046, stormSunGrazingV5)
+  - stormTroughReliefV4 * 0.021;
+stormWaterLight *= stormMacroLightBalanceV5
+  * (1.0 + stormFacetLightContrastV4 * (0.55 + stormReflectionWeight * 0.45));
+float stormFineOpticalDetailV6 = stormLayeredMidWaveV3 * 0.42
+  + stormMesoRipple * 0.24
+  + stormCrossMesoDetail * 0.18
+  + stormSurfaceDetailV9 * 0.16;
+float stormSilkCapillaryDetailV7 =
+  (stormUltraFineA * 0.3 + stormUltraFineB * 0.22) * stormNearCapillaryFade
+  + (stormNanoFineA * 0.18 + stormNanoFineB * 0.12) * stormNanoCapillaryFade
+  + stormNaturalCapillaryV8 * 0.18;
+stormWaterLight *= 1.0
+  + stormFineOpticalDetailV6 * (0.035 + vStormNearness * 0.025)
+  + stormSilkCapillaryDetailV7 * (0.015 + vStormNearness * 0.015);
+float stormNearShadowFillV5 = vStormNearness
+  * clamp(stormLeewardReliefV4 * 0.62 + stormTroughReliefV4 * 0.38, 0.0, 1.0)
+  * (1.0 - stormReflectionWeight * 0.35);
+stormWaterLight += stormCoolFillTintV2 * stormNearShadowFillV5
+  * (0.003 + uStormAmbientStrength * 0.004);
 float stormFoamBlend = clamp(stormFoam * (0.25 + stormCrestFoam * 0.14 + stormFoamFiligreeV2 * 0.06), 0.0, 0.24);
 vec3 stormOutgoing = mix(stormWaterLight, stormFoamColor, stormFoamBlend);
 float stormNaturalGlintMask = smoothstep(0.5, 0.86, stormWindRidgeMask * 0.5 + (stormUltraFineA * 0.5 + 0.5) * 0.25 + stormFacetPatch * 0.25);
 stormNaturalGlintMask *= stormNearCapillaryFade * (1.0 - clamp(stormFoam * 0.72, 0.0, 0.72));
 stormOutgoing += stormSkySpecularTint * stormNaturalGlintMask * stormFresnel * 0.09;
+float stormSilkGlintV7 = smoothstep(0.62, 0.92, stormSilkCapillaryDetailV7 * 0.5 + 0.5)
+  * pow(stormNormalHighlight, 44.0)
+  * stormNearCapillaryFade
+  * (1.0 - clamp(stormFoam * 0.7, 0.0, 0.7));
+stormOutgoing += stormSkySpecularTint * stormSilkGlintV7 * (0.008 + stormFresnel * 0.022);
 gl_FragColor = vec4(stormOutgoing, diffuseColor.a);`
         );
       material.userData.stormOceanShader = shader;
@@ -2139,6 +2487,16 @@ gl_FragColor = vec4(stormOutgoing, diffuseColor.a);`
 
   function setColorTriplet(color, triplet, scale = 1) {
     color?.setRGB?.(triplet[0] * scale, triplet[1] * scale, triplet[2] * scale);
+  }
+
+  function syncStormRootDataset(runtime, key, value) {
+    if (!runtime || typeof document === 'undefined') return false;
+    const text = String(value);
+    const cache = runtime.rootDatasetCache || (runtime.rootDatasetCache = Object.create(null));
+    if (cache[key] === text) return false;
+    cache[key] = text;
+    document.documentElement.dataset[key] = text;
+    return true;
   }
 
   function thunderstormLighting(lighting, intensity, lightningFlash, config = {}) {
@@ -2161,6 +2519,10 @@ gl_FragColor = vec4(stormOutgoing, diffuseColor.a);`
       ),
       ambient: lighting.ambient * mixNumber(1, 0.72, amount) + flash * 0.18,
       exposure: lighting.exposure * mixNumber(1, exposureMultiplier, amount) * (1 + flash * 0.2),
+      fillIntensity: lighting.fillIntensity * mixNumber(1, 0.55, amount) + flash * 0.4,
+      keyIntensity: lighting.keyIntensity * mixNumber(1, 0.3, amount) + flash * 0.8,
+      backlight: lighting.backlight * mixNumber(1, 0.08, amount),
+      reflectionGain: lighting.reflectionGain * mixNumber(1, 0.82, amount),
       lightningFlash: flash
     };
   }
@@ -2192,13 +2554,17 @@ gl_FragColor = vec4(stormOutgoing, diffuseColor.a);`
       mixTriplet(lighting.zenith, [0.54, 0.48, 0.86], lightningFlash * 0.58)
     );
     setColorTriplet(rig.hemisphere?.groundColor, lighting.horizon, 0.22);
-    if (rig.hemisphere) rig.hemisphere.intensity = 0.2 + lighting.ambient * 0.76 + lightningFlash * 0.45;
+    if (rig.hemisphere) {
+      rig.hemisphere.intensity = (Number(lighting.fillIntensity) || (0.2 + lighting.ambient * 0.76))
+        + lightningFlash * 0.45;
+    }
     setColorTriplet(
       rig.sun?.color,
       mixTriplet(lighting.sun, [0.82, 0.76, 1.0], lightningFlash * 0.82)
     );
     if (rig.sun) {
-      rig.sun.intensity = 0.05 + lighting.ambient * 0.55 + lightningFlash * 1.6;
+      rig.sun.intensity = (Number(lighting.keyIntensity) || (0.05 + lighting.ambient * 0.55))
+        + lightningFlash * 1.6;
       const target = rig.target?.position || { x: 0, y: 0, z: -110 };
       rig.sun.position.set(
         target.x + lighting.sunDirection[0] * 260,
@@ -2223,14 +2589,22 @@ gl_FragColor = vec4(stormOutgoing, diffuseColor.a);`
     setColorTriplet(uniforms.horizonColor.value, lighting.horizon);
     setColorTriplet(uniforms.highlightColor.value, lighting.highlight);
     uniforms.ambient.value = lighting.ambient;
+    uniforms.backlight.value = lighting.backlight;
+    uniforms.reflectionGain.value = lighting.reflectionGain;
     runtime.lightingPhase = lighting.phase;
     runtime.lightingProgress = lighting.progress;
     runtime.currentLighting = lighting;
     updateSceneLightRig(runtime.sceneLightRig, lighting);
-    if (typeof document !== 'undefined') {
-      document.documentElement.dataset.stormLightingPhase = lighting.phase;
-      document.documentElement.dataset.stormLightingProgress = lighting.progress.toFixed(4);
-      document.documentElement.dataset.stormLightingMode = runtime.lightingMode || 'realtime';
+    syncStormRootDataset(runtime, 'stormLightingPhase', lighting.phase);
+    syncStormRootDataset(runtime, 'stormLightingMode', runtime.lightingMode || 'realtime');
+    const currentTime = Number(runtime.currentTime) || 0;
+    if (
+      !Number.isFinite(runtime.rootDatasetProgressAt)
+      || currentTime < runtime.rootDatasetProgressAt
+      || currentTime - runtime.rootDatasetProgressAt >= 0.25
+    ) {
+      runtime.rootDatasetProgressAt = currentTime;
+      syncStormRootDataset(runtime, 'stormLightingProgress', lighting.progress.toFixed(4));
     }
   }
 
@@ -2242,7 +2616,7 @@ gl_FragColor = vec4(stormOutgoing, diffuseColor.a);`
       || lightingForMode(runtime.lightingMode === 'realtime' ? 'day' : runtime.lightingMode, runtime.config);
     runtime.lightingTransitionStartedAt = Number(runtime.currentTime) || 0;
     runtime.lightingMode = normalizedMode;
-    if (typeof document !== 'undefined') document.documentElement.dataset.stormLightingMode = normalizedMode;
+    syncStormRootDataset(runtime, 'stormLightingMode', normalizedMode);
     return normalizedMode;
   }
 
@@ -2257,9 +2631,7 @@ gl_FragColor = vec4(stormOutgoing, diffuseColor.a);`
       runtime.lightningFlash = 0;
       runtime.uniforms.lightningFlash.value = 0;
     }
-    if (typeof document !== 'undefined') {
-      document.documentElement.dataset.stormWeatherMode = normalizedMode;
-    }
+    syncStormRootDataset(runtime, 'stormWeatherMode', normalizedMode);
     return normalizedMode;
   }
 
@@ -2277,14 +2649,20 @@ gl_FragColor = vec4(stormOutgoing, diffuseColor.a);`
     const uniforms = {
       time: { value: 0 },
       bass: { value: 0 },
-      idleHeight: { value: clamp(Math.min(Number(config.idleWaveHeight) || 0.48, 0.55), 0.08, 0.62) },
-      bassHeight: { value: clamp(Number(config.bassWaveHeight) || 2.1, 0.2, 5.5) },
+      idleHeight: {
+        value: clamp((Number(config.idleWaveHeight) || 0.72) * IDLE_WAVE_RESPONSE_GAIN, 0.08, 1.08)
+      },
+      bassHeight: {
+        value: clamp((Number(config.bassWaveHeight) || 2.2) * BASS_WAVE_RESPONSE_GAIN, 0.2, 6.6)
+      },
       sunDirection: { value: new THREE.Vector3(...initialLighting.sunDirection) },
       sunColor: { value: new THREE.Color().setRGB(...initialLighting.sun) },
       zenithColor: { value: new THREE.Color().setRGB(...initialLighting.zenith) },
       horizonColor: { value: new THREE.Color().setRGB(...initialLighting.horizon) },
       highlightColor: { value: new THREE.Color().setRGB(...initialLighting.highlight) },
       ambient: { value: initialLighting.ambient },
+      backlight: { value: initialLighting.backlight },
+      reflectionGain: { value: initialLighting.reflectionGain },
       thunder: { value: 0 },
       thunderFlow: { value: 0 },
       lightningFlash: { value: 0 },
@@ -2308,6 +2686,9 @@ gl_FragColor = vec4(stormOutgoing, diffuseColor.a);`
       underwaterBackdrop: null,
       refractionTarget: null,
       refractionTargetSize: new THREE.Vector2(0, 0),
+      drawingBufferSize: new THREE.Vector2(0, 0),
+      refractionHiddenNodes: [],
+      refractionHiddenVisibility: [],
       refractionCaptureAt: 0,
       refractionCapturing: false,
       fallbackRefractionTexture,
@@ -2338,6 +2719,8 @@ gl_FragColor = vec4(stormOutgoing, diffuseColor.a);`
       seagullPreviewStartedAt: 0,
       sceneLightRig: null,
       waterTextures: waterTextureSet(THREE, config),
+      rootDatasetCache: Object.create(null),
+      rootDatasetProgressAt: Number.NEGATIVE_INFINITY,
       config
     };
     const materialSet = new Set();
@@ -2373,6 +2756,7 @@ gl_FragColor = vec4(stormOutgoing, diffuseColor.a);`
         return;
       }
       if (/^StormOcean_(Surface|Near|Far)/i.test(name)) {
+        configureOceanGeometry(node, THREE, config);
         runtime.oceanNodes.push(node);
         materials.forEach((material) => {
           if (!material || materialSet.has(material)) return;
@@ -2415,6 +2799,12 @@ gl_FragColor = vec4(stormOutgoing, diffuseColor.a);`
         runtime.foamOverlays.push(overlay);
       });
     }
+    runtime.refractionHiddenNodes = [...new Set([
+      ...runtime.oceanNodes,
+      ...runtime.foamNodes,
+      ...runtime.foamOverlays
+    ].filter(Boolean))];
+    runtime.refractionHiddenVisibility = new Array(runtime.refractionHiddenNodes.length).fill(false);
     runtime.skyDome = createStormSkyDome(THREE, uniforms, config);
     root.add(runtime.skyDome);
     runtime.underwaterBackdrop = createStormUnderwaterBackdrop(THREE, uniforms);
@@ -2428,10 +2818,11 @@ gl_FragColor = vec4(stormOutgoing, diffuseColor.a);`
 
   function ensureRefractionTarget(runtime, renderer, THREE) {
     if (!runtime || !renderer || !THREE) return null;
-    const drawSize = renderer.getDrawingBufferSize(new THREE.Vector2());
-    const scale = ANDROID_CLIENT ? (LOW_END_ANDROID ? 0.42 : 0.54) : 0.72;
-    const maximumWidth = ANDROID_CLIENT ? (LOW_END_ANDROID ? 720 : 1024) : 1600;
-    const maximumHeight = ANDROID_CLIENT ? (LOW_END_ANDROID ? 405 : 576) : 900;
+    const drawSize = renderer.getDrawingBufferSize(runtime.drawingBufferSize);
+    const clarityScale = clamp(Number(global.feMonsterRenderClarityScale) || 1, 0.5, 1.25);
+    const scale = (ANDROID_CLIENT ? (LOW_END_ANDROID ? 0.42 : 0.54) : 0.72) * clarityScale;
+    const maximumWidth = Math.round((ANDROID_CLIENT ? (LOW_END_ANDROID ? 720 : 1024) : 1600) * clarityScale);
+    const maximumHeight = Math.round((ANDROID_CLIENT ? (LOW_END_ANDROID ? 405 : 576) : 900) * clarityScale);
     const width = Math.max(240, Math.min(maximumWidth, Math.round(drawSize.x * scale)));
     const height = Math.max(135, Math.min(maximumHeight, Math.round(drawSize.y * scale)));
     if (!runtime.refractionTarget) {
@@ -2459,7 +2850,7 @@ gl_FragColor = vec4(stormOutgoing, diffuseColor.a);`
     const runtime = scene.userData?.stormOceanRuntime;
     if (!runtime || runtime.profile !== PROFILE || runtime.refractionCapturing) return false;
     const timestamp = Math.max(0, Number(now) || 0);
-    const minimumCaptureInterval = ANDROID_CLIENT ? (LOW_END_ANDROID ? 82 : 54) : 38;
+    const minimumCaptureInterval = REDUCED_MOTION ? (ANDROID_CLIENT ? (LOW_END_ANDROID ? 82 : 54) : 38) : 0;
     if (runtime.uniforms.sceneRefractionReady.value > 0.5 && timestamp - runtime.refractionCaptureAt < minimumCaptureInterval) {
       runtime.uniforms.sceneResolution.value.set(
         Math.max(1, renderer.domElement?.width || 1),
@@ -2476,18 +2867,19 @@ gl_FragColor = vec4(stormOutgoing, diffuseColor.a);`
     const previousAutoClear = renderer.autoClear;
     const previousToneMapping = renderer.toneMapping;
     const previousShadowAutoUpdate = renderer.shadowMap?.autoUpdate;
-    const hiddenNodes = [...runtime.oceanNodes, ...runtime.foamNodes, ...runtime.foamOverlays]
-      .filter((node, index, nodes) => node && nodes.indexOf(node) === index)
-      .map((node) => ({ node, visible: node.visible }));
+    const hiddenNodes = runtime.refractionHiddenNodes;
+    const hiddenVisibility = runtime.refractionHiddenVisibility;
     const backdropVisibility = runtime.underwaterBackdrop?.visible === true;
     try {
-      hiddenNodes.forEach(({ node }) => { node.visible = false; });
+      for (let index = 0; index < hiddenNodes.length; index += 1) {
+        hiddenVisibility[index] = hiddenNodes[index].visible;
+        hiddenNodes[index].visible = false;
+      }
       if (runtime.underwaterBackdrop) runtime.underwaterBackdrop.visible = true;
       if (renderer.shadowMap) renderer.shadowMap.autoUpdate = false;
       if (THREE.NoToneMapping !== undefined) renderer.toneMapping = THREE.NoToneMapping;
       renderer.autoClear = true;
       renderer.setRenderTarget(target);
-      renderer.clear(true, true, true);
       renderer.render(scene, camera);
       runtime.uniforms.sceneRefractionReady.value = 1;
       runtime.refractionCaptureAt = timestamp;
@@ -2496,7 +2888,9 @@ gl_FragColor = vec4(stormOutgoing, diffuseColor.a);`
       renderer.autoClear = previousAutoClear;
       renderer.toneMapping = previousToneMapping;
       if (renderer.shadowMap) renderer.shadowMap.autoUpdate = previousShadowAutoUpdate;
-      hiddenNodes.forEach(({ node, visible }) => { node.visible = visible; });
+      for (let index = 0; index < hiddenNodes.length; index += 1) {
+        hiddenNodes[index].visible = hiddenVisibility[index];
+      }
       if (runtime.underwaterBackdrop) runtime.underwaterBackdrop.visible = backdropVisibility;
       runtime.refractionCapturing = false;
     }
@@ -2603,17 +2997,15 @@ gl_FragColor = vec4(stormOutgoing, diffuseColor.a);`
       ? Math.max(0, seconds - runtime.seagullSunsetStartedAt)
       : 0;
     updateSunsetSeagullFlock(runtime, seconds, seagullPhaseSeconds, seagullPhase, dt);
-    if (typeof document !== 'undefined') {
-      document.documentElement.dataset.stormWeatherMode = runtime.thunderstormMode;
-      document.documentElement.dataset.stormThunderstormActive = String(runtime.thunderstormIntensity > 0.04);
-      document.documentElement.dataset.stormThunderstormSource = runtime.thunderstormSource;
-      document.documentElement.dataset.stormLightningActive = String(lightningFlash > 0.02);
-      document.documentElement.dataset.stormLightingCycle = String(targetLighting.cycleIndex || 0);
-    }
+    syncStormRootDataset(runtime, 'stormWeatherMode', runtime.thunderstormMode);
+    syncStormRootDataset(runtime, 'stormThunderstormActive', runtime.thunderstormIntensity > 0.04);
+    syncStormRootDataset(runtime, 'stormThunderstormSource', runtime.thunderstormSource);
+    syncStormRootDataset(runtime, 'stormLightningActive', lightningFlash > 0.02);
+    syncStormRootDataset(runtime, 'stormLightingCycle', targetLighting.cycleIndex || 0);
     if (runtime.waterTextures) {
       const drift = seconds * (0.0022 + smoothBass * 0.0005);
-      const driftX = (-drift * 0.94) % 1;
-      const driftY = (-drift * 0.34) % 1;
+      const driftX = (-drift * 0.22) % 1;
+      const driftY = (-drift * 0.98) % 1;
       runtime.waterTextures.normalMap.offset.set(driftX, driftY);
       runtime.waterTextures.roughnessMap.offset.copy(runtime.waterTextures.normalMap.offset);
     }
@@ -2642,8 +3034,9 @@ gl_FragColor = vec4(stormOutgoing, diffuseColor.a);`
     if (!scene || !renderer || !THREE) return;
     const environment = environmentMap(THREE);
     scene.environment = environment;
+    requestCyclesEnvironment(THREE, scene);
     scene.background = new THREE.Color(0x061019);
-    const requestedFog = Number(config.fogDensity) || 0.001;
+    const requestedFog = Number(config.fogDensity) || 0.0011;
     scene.fog = new THREE.FogExp2(0x07131a, clamp(Math.min(requestedFog, 0.0018), 0.00075, 0.004));
     renderer.shadowMap.enabled = !ANDROID_CLIENT;
     if (!ANDROID_CLIENT && THREE.PCFSoftShadowMap) renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -2679,6 +3072,7 @@ gl_FragColor = vec4(stormOutgoing, diffuseColor.a);`
       if (!runtime || runtime.profile !== PROFILE) return;
       scene.userData.stormOceanRuntime = runtime;
       runtime.sceneLightRig = rig;
+      runtime.cyclesEnvironment = cyclesEnvironmentDiagnostics();
       updateSceneLightRig(rig, runtime.currentLighting || lightingAtMinute(0, config));
     });
   }
@@ -2707,6 +3101,7 @@ gl_FragColor = vec4(stormOutgoing, diffuseColor.a);`
     sunsetSeagullFlightAtSecond,
     sampleSunsetSeagullPose,
     sampleBassSurgeState,
+    cyclesEnvironmentDiagnostics,
     sampleOmnidirectionalBassWaveHeight,
     sampleWaveHeight,
     sampleWaveFrame

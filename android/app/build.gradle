@@ -2,14 +2,6 @@ plugins {
     id "com.android.application"
 }
 
-def configuredServerUrl = providers.gradleProperty("feMonsterServerUrl")
-    .orElse(providers.environmentVariable("FE_MONSTER_ANDROID_SERVER_URL"))
-    .getOrElse("https://frp-boy.com:53981")
-def escapedServerUrl = configuredServerUrl.replace("\\", "\\\\").replace('"', '\\"')
-def configuredPublicAccessKey = providers.gradleProperty("feMonsterPublicAccessKey")
-    .orElse(providers.environmentVariable("FE_MONSTER_PUBLIC_ACCESS_KEY"))
-    .getOrElse("")
-def escapedPublicAccessKey = configuredPublicAccessKey.replace("\\", "\\\\").replace('"', '\\"')
 def bundledWebAssetsDir = layout.buildDirectory.dir("generated/feMonsterWebAssets")
 
 tasks.register("syncFeMonsterWebAssets", Sync) {
@@ -32,8 +24,8 @@ tasks.register("syncFeMonsterWebAssets", Sync) {
         }
         def androidIndex = new File(bundledWebAssetsDir.get().asFile, "fe-monster-web/index.html")
         def mobileMarker = "fe-monster-mobile-runtime.js"
-        def mobileHead = """    <script src=\"fe-monster-mobile-runtime.js?v=20260715-android-native-1\"></script>
-    <link rel=\"stylesheet\" href=\"fe-monster-mobile.css?v=20260715-android-native-1\" />
+        def mobileHead = """    <script src=\"fe-monster-mobile-runtime.js?v=20260716-android-local-1\"></script>
+    <link rel=\"stylesheet\" href=\"fe-monster-mobile.css?v=20260716-android-local-1\" />
 """
         def indexText = androidIndex.getText("UTF-8")
         if (!indexText.contains(mobileMarker)) {
@@ -54,10 +46,8 @@ android {
         applicationId "com.femonster.mobile"
         minSdk 23
         targetSdk 35
-        versionCode 5
-        versionName "1.0.6"
-        buildConfigField "String", "DEFAULT_SERVER_URL", "\"${escapedServerUrl}\""
-        buildConfigField "String", "PUBLIC_ACCESS_KEY", "\"${escapedPublicAccessKey}\""
+        versionCode 6
+        versionName "1.0.7"
     }
 
     sourceSets {

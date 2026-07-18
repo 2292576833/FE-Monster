@@ -16,11 +16,21 @@ public final class SimpleJson {
     }
 
     public static Object parse(String text) {
-        return new Parser(text == null ? "" : text).parse();
+        return new Parser(text == null ? "" : text, false).parse();
+    }
+
+    public static Object parseStrict(String text) {
+        return new Parser(text == null ? "" : text, true).parse();
     }
 
     public static Map<String, Object> parseObject(String text) {
         Object value = parse(text);
+        return asMap(value);
+    }
+
+    public static Map<String, Object> parseObjectStrict(String text) {
+        Object value = parseStrict(text);
+        if (!(value instanceof Map<?, ?>)) throw new IllegalArgumentException("JSON root must be an object");
         return asMap(value);
     }
 
@@ -150,17 +160,26 @@ public final class SimpleJson {
     }
 
     private static final class Parser {
+        private static final int MAX_DEPTH = 64;
         private final String text;
+        private final boolean strict;
         private int index;
+        private int depth;
 
-        Parser(String text) {
+        Parser(String text, boolean strict) {
             this.text = text;
+            this.strict = strict;
         }
 
         Object parse() {
             skipWhitespace();
+            if (index >= text.length()) {
+                if (strict) throw error("empty JSON");
+                return null;
+            }
             Object value = parseValue();
             skipWhitespace();
+            if (strict && index != text.length()) throw error("unexpected trailing content");
             return value;
         }
 
@@ -178,64 +197,96 @@ public final class SimpleJson {
         }
 
         private Map<String, Object> parseObjectValue() {
+            enter();
             Map<String, Object> map = new LinkedHashMap<>();
-            index++;
-            skipWhitespace();
-            if (peek('}')) {
+            try {
                 index++;
-                return map;
-            }
-            while (index < text.length()) {
                 skipWhitespace();
-                String key = parseString();
-                skipWhitespace();
-                if (peek(':')) index++;
-                Object value = parseValue();
-                map.put(key, value);
-                skipWhitespace();
-                if (peek(',')) {
-                    index++;
-                    continue;
-                }
                 if (peek('}')) {
                     index++;
-                    break;
+                    return map;
                 }
+                while (index < text.length()) {
+                    int iterationStart = index;
+                    skipWhitespace();
+                    if (strict && !peek('"')) throw error("object key must be a string");
+                    String key = parseString();
+                    skipWhitespace();
+                    if (peek(':')) index++;
+                    else if (strict) throw error("object key is missing ':'");
+                    Object value = parseValue();
+                    map.put(key, value);
+                    skipWhitespace();
+                    if (peek(',')) {
+                        index++;
+                        continue;
+                    }
+                    if (peek('}')) {
+                        index++;
+                        return map;
+                    }
+                    if (strict) throw error("object is missing ',' or '}'");
+                    if (index <= iterationStart) index++;
+                }
+                if (strict) throw error("unterminated object");
+                return map;
+            } finally {
+                leave();
             }
-            return map;
         }
 
         private List<Object> parseArrayValue() {
+            enter();
             List<Object> list = new ArrayList<>();
-            index++;
-            skipWhitespace();
-            if (peek(']')) {
+            try {
                 index++;
-                return list;
-            }
-            while (index < text.length()) {
-                list.add(parseValue());
                 skipWhitespace();
-                if (peek(',')) {
-                    index++;
-                    continue;
-                }
                 if (peek(']')) {
                     index++;
-                    break;
+                    return list;
                 }
+                while (index < text.length()) {
+                    int iterationStart = index;
+                    list.add(parseValue());
+                    skipWhitespace();
+                    if (peek(',')) {
+                        index++;
+                        continue;
+                    }
+                    if (peek(']')) {
+                        index++;
+                        return list;
+                    }
+                    if (strict) throw error("array is missing ',' or ']'");
+                    if (index <= iterationStart) index++;
+                }
+                if (strict) throw error("unterminated array");
+                return list;
+            } finally {
+                leave();
             }
-            return list;
         }
 
         private String parseString() {
-            if (!peek('"')) return "";
+            if (!peek('"')) {
+                if (strict) throw error("expected string");
+                return "";
+            }
             index++;
             StringBuilder out = new StringBuilder();
+            boolean closed = false;
             while (index < text.length()) {
                 char c = text.charAt(index++);
-                if (c == '"') break;
-                if (c == '\\' && index < text.length()) {
+                if (c == '"') {
+                    closed = true;
+                    break;
+                }
+                if (c < 0x20 && strict) throw error("control character in string");
+                if (c == '\\') {
+                    if (index >= text.length()) {
+                        if (strict) throw error("unterminated escape sequence");
+                        break;
+                    }
                     char e = text.charAt(index++);
                     switch (e) {
                         case '"' -> out.append('"');
@@ -247,22 +298,31 @@ public final class SimpleJson {
                         case 'r' -> out.append('\r');
                         case 't' -> out.append('\t');
                         case 'u' -> out.append(parseUnicode());
-                        default -> out.append(e);
+                        default -> {
+                            if (strict) throw error("invalid escape sequence");
+                            out.append(e);
+                        }
                     }
                 } else {
                     out.append(c);
                 }
             }
+            if (strict && !closed) throw error("unterminated string");
             return out.toString();
         }
 
         private char parseUnicode() {
-            if (index + 4 > text.length()) return '?';
+            if (index + 4 > text.length()) {
+                if (strict) throw error("incomplete unicode escape");
+                index = text.length();
+                return '?';
+            }
             String hex = text.substring(index, index + 4);
             index += 4;
             try {
                 return (char) Integer.parseInt(hex, 16);
             } catch (NumberFormatException ignored) {
+                if (strict) throw error("invalid unicode escape");
                 return '?';
             }
         }
@@ -270,25 +330,44 @@ public final class SimpleJson {
         private Number parseNumber() {
             int start = index;
             if (peek('-')) index++;
-            while (index < text.length() && Character.isDigit(text.charAt(index))) index++;
+            int integerStart = index;
+            if (peek('0')) {
+                index++;
+                if (strict && index < text.length() && Character.isDigit(text.charAt(index))) throw error("leading zero in number");
+            } else {
+                while (index < text.length() && Character.isDigit(text.charAt(index))) index++;
+            }
+            if (index == integerStart) return invalidNumber(start);
             boolean decimal = false;
             if (peek('.')) {
                 decimal = true;
                 index++;
+                int fractionStart = index;
                 while (index < text.length() && Character.isDigit(text.charAt(index))) index++;
+                if (index == fractionStart) return invalidNumber(start);
             }
             if (index < text.length() && (text.charAt(index) == 'e' || text.charAt(index) == 'E')) {
                 decimal = true;
                 index++;
                 if (index < text.length() && (text.charAt(index) == '+' || text.charAt(index) == '-')) index++;
+                int exponentStart = index;
                 while (index < text.length() && Character.isDigit(text.charAt(index))) index++;
+                if (index == exponentStart) return invalidNumber(start);
             }
-            String raw = text.substring(start, Math.max(start, index));
+            String raw = text.substring(start, index);
             try {
-                return decimal ? Double.parseDouble(raw) : Long.parseLong(raw);
+                Number value = decimal ? Double.parseDouble(raw) : Long.parseLong(raw);
+                if (strict && value instanceof Double number && !Double.isFinite(number)) throw error("number is outside the supported range");
+                return value;
             } catch (NumberFormatException ignored) {
-                return 0;
+                return invalidNumber(start);
             }
+        }
+
+        private Number invalidNumber(int start) {
+            if (strict) throw error("invalid JSON value");
+            index = Math.min(text.length(), Math.max(index, start + 1));
+            return 0;
         }
 
         private boolean match(String token) {
@@ -303,6 +382,19 @@ public final class SimpleJson {
 
         private void skipWhitespace() {
             while (index < text.length() && Character.isWhitespace(text.charAt(index))) index++;
+        }
+
+        private void enter() {
+            depth++;
+            if (depth > MAX_DEPTH) throw error("JSON nesting exceeds 64 levels");
+        }
+
+        private void leave() {
+            depth--;
+        }
+
+        private IllegalArgumentException error(String message) {
+            return new IllegalArgumentException(message + " at position " + index);
         }
     }
 }

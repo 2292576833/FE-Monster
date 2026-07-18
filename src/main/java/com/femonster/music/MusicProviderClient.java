@@ -21,6 +21,24 @@ public interface MusicProviderClient {
 
     String loginQrCheckPayload(String key);
 
+    default Map<String, Object> loginPhoneSendPayload(String phone) {
+        return Map.of(
+            "ok", false,
+            "provider", id(),
+            "code", "PHONE_LOGIN_UNSUPPORTED",
+            "error", label() + " does not support phone verification login"
+        );
+    }
+
+    default Map<String, Object> loginPhoneVerifyPayload(String phone, String code) {
+        return Map.of(
+            "ok", false,
+            "provider", id(),
+            "code", "PHONE_LOGIN_UNSUPPORTED",
+            "error", label() + " does not support phone verification login"
+        );
+    }
+
     Map<String, Object> search(String keyword, int page, int limit);
 
     String songUrl(String id, String quality);

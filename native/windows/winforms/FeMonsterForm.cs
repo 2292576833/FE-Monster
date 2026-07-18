@@ -31,6 +31,7 @@ internal sealed class FeMonsterForm : Form
     {
         this.options = options;
         Text = "FE Monster";
+        Icon = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         Width = options.Width;
         Height = options.Height;
         FormBorderStyle = FormBorderStyle.None;
@@ -189,6 +190,27 @@ internal sealed class FeMonsterForm : Form
                 {
                     available = options.GpuAcceleration,
                     backend = "webgl2-fragment-pass"
+                },
+                fsr1 = new
+                {
+                    available = options.GpuAcceleration,
+                    backend = "webgl2-spatial-compatible",
+                    officialVendorImplementation = false
+                },
+                fsr2 = new
+                {
+                    available = false,
+                    reason = "motion-vectors-depth-history-required"
+                },
+                fsr3 = new
+                {
+                    available = false,
+                    reason = "native-temporal-renderer-and-swapchain-required"
+                },
+                fsr4 = new
+                {
+                    available = false,
+                    reason = "d3d12-fsr-sdk-compatible-gpu-required"
                 },
                 fsrNative = new
                 {

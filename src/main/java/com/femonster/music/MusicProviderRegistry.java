@@ -1,24 +1,34 @@
 package com.femonster.music;
 
 import com.femonster.model.Song;
-import com.femonster.netease.NeteaseClient;
-
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 public final class MusicProviderRegistry {
-    private final Map<String, MusicProviderClient> providers = new LinkedHashMap<>();
+    private volatile Map<String, MusicProviderClient> providers = Map.of();
 
-    public MusicProviderRegistry(NeteaseClient netease, MusicProviderClient qq, MusicProviderClient kugou) {
-        register(netease);
-        register(qq);
-        register(kugou);
+    public MusicProviderRegistry(MusicProviderClient... clients) {
+        replace(clients);
     }
 
     public MusicProviderClient get(String provider) {
-        MusicProviderClient client = providers.get(normalize(provider));
-        return client == null ? providers.get("netease") : client;
+        String id = normalize(provider);
+        MusicProviderClient client = providers.get(id);
+        if (client == null) throw new IllegalArgumentException("unknown music provider: " + id);
+        return client;
+    }
+
+    public synchronized void replace(MusicProviderClient... clients) {
+        Map<String, MusicProviderClient> next = new LinkedHashMap<>();
+        if (clients != null) {
+            for (MusicProviderClient client : clients) {
+                if (client != null) next.put(normalize(client.id()), client);
+            }
+        }
+        if (!next.containsKey("netease")) throw new IllegalArgumentException("netease provider is required");
+        providers = Collections.unmodifiableMap(next);
     }
 
     public Map<String, Object> providersPayload() {
@@ -57,6 +67,14 @@ public final class MusicProviderRegistry {
         return get(provider).loginQrCheckPayload(key);
     }
 
+    public Map<String, Object> loginPhoneSendPayload(String provider, String phone) {
+        return get(provider).loginPhoneSendPayload(phone);
+    }
+
+    public Map<String, Object> loginPhoneVerifyPayload(String provider, String phone, String code) {
+        return get(provider).loginPhoneVerifyPayload(phone, code);
+    }
+
     public Map<String, Object> search(String provider, String keyword, int page, int limit) {
         return get(provider).search(keyword, page, limit);
     }
@@ -91,14 +109,11 @@ public final class MusicProviderRegistry {
         if ("163".equals(value) || "wangyiyun".equals(value)) return "netease";
         if ("qqmusic".equals(value) || "tencent".equals(value)) return "qq";
         if ("kg".equals(value) || "kugoumusic".equals(value)) return "kugou";
+        if ("soda".equals(value) || "qishuimusic".equals(value)) return "qishui";
         return value;
     }
 
     public static String providerFromSong(Song song) {
         return song == null ? "netease" : normalize(song.provider);
-    }
-
-    private void register(MusicProviderClient client) {
-        providers.put(normalize(client.id()), client);
     }
 }

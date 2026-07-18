@@ -1,7 +1,6 @@
 package com.femonster.mobile;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.DownloadManager;
@@ -13,27 +12,23 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
-import android.net.http.SslCertificate;
-import android.net.http.SslError;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.util.Base64;
-import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
-import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
+import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.MimeTypeMap;
 import android.webkit.PermissionRequest;
 import android.webkit.RenderProcessGoneDetail;
-import android.webkit.SslErrorHandler;
 import android.webkit.URLUtil;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -43,21 +38,17 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.Button;
-import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.LinearLayout;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -71,14 +62,9 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_WEB_PERMISSIONS = 1002;
     private static final int REQUEST_DOWNLOAD_PERMISSION = 1003;
     private static final String PREFS = "fe_monster_android";
-    private static final String KEY_SERVER_URL = "server_url";
-    private static final String KEY_PACKAGED_SERVER_URL = "packaged_server_url";
     private static final String KEY_INSTALL_ID = "install_id";
-    private static final String SAKURA_FRP_HOST = "frp-boy.com";
-    private static final int SAKURA_FRP_PORT = 53981;
-    private static final String PUBLIC_ACCESS_COOKIE = "fe_public_access";
+    private static final String LOCAL_APP_ORIGIN = "https://fe-monster.local/";
     private static final String BUNDLED_WEB_ROOT = "fe-monster-web/";
-    private static final String SAKURA_FRP_CERT_SHA256 = "9AA22F07CC585686AC23DC763D060E1B189CBFA5732E3DC182AEE35F85B4B758";
 
     private static final String ANDROID_RUNTIME_SCRIPT =
         "(() => {" +
@@ -145,13 +131,9 @@ public final class MainActivity extends Activity {
     private final Map<String, BlobDownload> blobDownloads = new ConcurrentHashMap<>();
     private FrameLayout root;
     private WebView webView;
-    private LinearLayout connectPanel;
-    private EditText serverUrlInput;
-    private TextView statusText;
     private ValueCallback<Uri[]> fileChooserCallback;
     private PermissionRequest pendingPermissionRequest;
     private PendingHttpDownload pendingHttpDownload;
-    private Uri trustedServerUri;
     private boolean backDispatchPending;
     private View customView;
     private WebChromeClient.CustomViewCallback customViewCallback;
@@ -172,33 +154,10 @@ public final class MainActivity extends Activity {
             ViewGroup.LayoutParams.MATCH_PARENT
         ));
 
-        connectPanel = buildConnectPanel();
-        root.addView(connectPanel, new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT
-        ));
-
         setContentView(root);
         applyImmersiveMode();
         configureWebView();
-
-        String defaultUrl = BuildConfig.DEFAULT_SERVER_URL == null ? "" : BuildConfig.DEFAULT_SERVER_URL.trim();
-        SharedPreferences preferences = getPrefs();
-        String savedUrl = preferences.getString(KEY_SERVER_URL, defaultUrl);
-        String previousPackagedUrl = preferences.getString(KEY_PACKAGED_SERVER_URL, "");
-        if (!defaultUrl.isEmpty() && !defaultUrl.equals(previousPackagedUrl)) {
-            savedUrl = defaultUrl;
-            preferences.edit()
-                .putString(KEY_SERVER_URL, defaultUrl)
-                .putString(KEY_PACKAGED_SERVER_URL, defaultUrl)
-                .apply();
-        }
-        serverUrlInput.setText(savedUrl);
-        if (savedUrl == null || savedUrl.trim().isEmpty()) {
-            showConnectPanel("输入电脑或服务器上的 FE Monster 地址");
-        } else {
-            loadServer(savedUrl);
-        }
+        loadBundledClient();
     }
 
     @Override
@@ -239,10 +198,6 @@ public final class MainActivity extends Activity {
     public void onBackPressed() {
         if (customView != null) {
             hideCustomView();
-            return;
-        }
-        if (connectPanel != null && connectPanel.getVisibility() == View.VISIBLE && webView != null && webView.getUrl() != null) {
-            hideConnectPanel();
             return;
         }
         if (webView == null || backDispatchPending) return;
@@ -315,75 +270,6 @@ public final class MainActivity extends Activity {
             }
             dispatchStoragePermissionResult(granted);
         }
-    }
-
-    private LinearLayout buildConnectPanel() {
-        LinearLayout panel = new LinearLayout(this);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setGravity(Gravity.CENTER);
-        panel.setPadding(dp(24), dp(24), dp(24), dp(24));
-        panel.setBackgroundColor(Color.rgb(5, 5, 9));
-
-        TextView title = new TextView(this);
-        title.setText("FE Monster");
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(28);
-        title.setGravity(Gravity.CENTER);
-        panel.addView(title, matchWidthWrapHeight());
-
-        TextView helper = new TextView(this);
-        helper.setText("输入电脑或服务器地址，例如 http://192.168.1.23:3000/");
-        helper.setTextColor(Color.rgb(190, 196, 210));
-        helper.setTextSize(14);
-        helper.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams helperParams = matchWidthWrapHeight();
-        helperParams.setMargins(0, dp(10), 0, dp(18));
-        panel.addView(helper, helperParams);
-
-        serverUrlInput = new EditText(this);
-        serverUrlInput.setSingleLine(true);
-        serverUrlInput.setTextColor(Color.WHITE);
-        serverUrlInput.setHintTextColor(Color.rgb(130, 137, 154));
-        serverUrlInput.setTextSize(16);
-        serverUrlInput.setHint("http://服务器IP:3000/");
-        serverUrlInput.setSelectAllOnFocus(false);
-        serverUrlInput.setPadding(dp(14), 0, dp(14), 0);
-        serverUrlInput.setBackgroundResource(R.drawable.deep_black_gold_field);
-        panel.addView(serverUrlInput, new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            dp(48)
-        ));
-
-        Button connectButton = new Button(this);
-        connectButton.setText("连接");
-        connectButton.setAllCaps(false);
-        connectButton.setTextColor(Color.rgb(231, 205, 146));
-        connectButton.setBackgroundResource(R.drawable.deep_black_gold_button);
-        connectButton.setOnClickListener(view -> loadServer(serverUrlInput.getText().toString()));
-        LinearLayout.LayoutParams buttonParams = matchWidthWrapHeight();
-        buttonParams.setMargins(0, dp(14), 0, 0);
-        panel.addView(connectButton, buttonParams);
-
-        Button reloadButton = new Button(this);
-        reloadButton.setText("重新加载当前地址");
-        reloadButton.setAllCaps(false);
-        reloadButton.setTextColor(Color.rgb(205, 187, 148));
-        reloadButton.setBackgroundResource(R.drawable.deep_black_gold_button);
-        reloadButton.setOnClickListener(view -> {
-            String current = webView == null ? "" : webView.getUrl();
-            loadServer(current == null || current.trim().isEmpty() ? serverUrlInput.getText().toString() : current);
-        });
-        panel.addView(reloadButton, matchWidthWrapHeight());
-
-        statusText = new TextView(this);
-        statusText.setTextColor(Color.rgb(255, 204, 128));
-        statusText.setTextSize(13);
-        statusText.setGravity(Gravity.CENTER);
-        LinearLayout.LayoutParams statusParams = matchWidthWrapHeight();
-        statusParams.setMargins(0, dp(12), 0, 0);
-        panel.addView(statusText, statusParams);
-
-        return panel;
     }
 
     private void configureWebView() {
@@ -464,36 +350,12 @@ public final class MainActivity extends Activity {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Build.VERSION.SDK_INT <= Build.VERSION_CODES.P;
     }
 
-    private void loadServer(String rawUrl) {
-        String url = normalizeServerUrl(rawUrl);
-        if (url.isEmpty()) {
-            showConnectPanel("请输入 FE Monster 服务地址");
-            return;
-        }
-        trustedServerUri = Uri.parse(url);
-        getPrefs().edit().putString(KEY_SERVER_URL, url).apply();
-        serverUrlInput.setText(url);
-        statusText.setText("已设置服务地址 " + url);
-        hideConnectPanel();
-        if (!configurePublicAccessCookie(trustedServerUri, this::loadBundledClient)) {
-            loadBundledClient();
-        }
-    }
-
     private void loadBundledClient() {
-        if (webView == null || trustedServerUri == null) return;
+        if (webView == null) return;
         try {
             String html = readBundledTextAsset(BUNDLED_WEB_ROOT + "index.html");
-            String serverOrigin = new Uri.Builder()
-                .scheme(trustedServerUri.getScheme())
-                .encodedAuthority(trustedServerUri.getEncodedAuthority())
-                .path("/")
-                .build()
-                .toString();
-            webView.loadDataWithBaseURL(serverOrigin, html, "text/html", "UTF-8", serverOrigin);
-            hideConnectPanel();
+            webView.loadDataWithBaseURL(LOCAL_APP_ORIGIN, html, "text/html", "UTF-8", LOCAL_APP_ORIGIN);
         } catch (IOException error) {
-            showConnectPanel("安装包内置客户端损坏，请重新安装 FE Monster");
             Toast.makeText(this, "无法读取内置客户端：" + safeMessage(error), Toast.LENGTH_LONG).show();
         }
     }
@@ -510,37 +372,12 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private boolean configurePublicAccessCookie(Uri serverUri, Runnable onReady) {
-        String accessKey = BuildConfig.PUBLIC_ACCESS_KEY == null ? "" : BuildConfig.PUBLIC_ACCESS_KEY.trim();
-        if (accessKey.isEmpty() || serverUri == null || !"https".equalsIgnoreCase(serverUri.getScheme()) ||
-            !SAKURA_FRP_HOST.equalsIgnoreCase(serverUri.getHost()) || effectivePort(serverUri) != SAKURA_FRP_PORT) {
-            return false;
-        }
-        String cookie = PUBLIC_ACCESS_COOKIE + "=" + Uri.encode(accessKey) +
-            "; Path=/; Secure; HttpOnly; SameSite=Strict";
-        CookieManager manager = CookieManager.getInstance();
-        manager.setCookie(serverUri.toString(), cookie, value -> {
-            manager.flush();
-            onReady.run();
-        });
-        return true;
-    }
-
-    private String normalizeServerUrl(String rawUrl) {
-        String value = rawUrl == null ? "" : rawUrl.trim();
-        if (value.isEmpty()) return "";
-        String lower = value.toLowerCase(Locale.ROOT);
-        if (!lower.startsWith("http://") && !lower.startsWith("https://")) value = "http://" + value;
-        Uri parsed = Uri.parse(value);
-        if (parsed.getHost() == null || parsed.getHost().trim().isEmpty()) return "";
-        return value.endsWith("/") ? value : value + "/";
-    }
-
-    private boolean isTrustedServerUri(Uri uri) {
-        if (uri == null || trustedServerUri == null) return false;
-        return equalsIgnoreCase(uri.getScheme(), trustedServerUri.getScheme())
-            && equalsIgnoreCase(uri.getHost(), trustedServerUri.getHost())
-            && effectivePort(uri) == effectivePort(trustedServerUri);
+    private boolean isLocalAppUri(Uri uri) {
+        Uri localUri = Uri.parse(LOCAL_APP_ORIGIN);
+        if (uri == null) return false;
+        return equalsIgnoreCase(uri.getScheme(), localUri.getScheme())
+            && equalsIgnoreCase(uri.getHost(), localUri.getHost())
+            && effectivePort(uri) == effectivePort(localUri);
     }
 
     private int effectivePort(Uri uri) {
@@ -550,15 +387,6 @@ public final class MainActivity extends Activity {
 
     private boolean equalsIgnoreCase(String left, String right) {
         return left != null && right != null && left.equalsIgnoreCase(right);
-    }
-
-    private void showConnectPanel(String message) {
-        if (connectPanel != null) connectPanel.setVisibility(View.VISIBLE);
-        if (statusText != null) statusText.setText(message == null ? "" : message);
-    }
-
-    private void hideConnectPanel() {
-        if (connectPanel != null) connectPanel.setVisibility(View.GONE);
     }
 
     private SharedPreferences getPrefs() {
@@ -582,13 +410,6 @@ public final class MainActivity extends Activity {
         if (lowRam || memoryClass <= 192 || (memoryClass <= 256 && cores <= 4)) return "low";
         if (memoryClass >= 512 && cores >= 8) return "high";
         return "balanced";
-    }
-
-    private LinearLayout.LayoutParams matchWidthWrapHeight() {
-        return new LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        );
     }
 
     private int dp(int value) {
@@ -666,7 +487,7 @@ public final class MainActivity extends Activity {
             Uri uri = request == null ? null : request.getUrl();
             if (uri == null) return false;
             if (!request.isForMainFrame()) return false;
-            if (isTrustedServerUri(uri)) {
+            if (isLocalAppUri(uri)) {
                 view.post(MainActivity.this::loadBundledClient);
                 return true;
             }
@@ -679,7 +500,7 @@ public final class MainActivity extends Activity {
         public boolean shouldOverrideUrlLoading(WebView view, String url) {
             if (url == null) return false;
             Uri uri = Uri.parse(url);
-            if (isTrustedServerUri(uri)) {
+            if (isLocalAppUri(uri)) {
                 view.post(MainActivity.this::loadBundledClient);
                 return true;
             }
@@ -695,9 +516,8 @@ public final class MainActivity extends Activity {
         @Override
         public void onPageFinished(WebView view, String url) {
             super.onPageFinished(view, url);
-            if (isTrustedServerUri(Uri.parse(url))) {
+            if (isLocalAppUri(Uri.parse(url))) {
                 view.evaluateJavascript(ANDROID_RUNTIME_SCRIPT, null);
-                hideConnectPanel();
             }
         }
 
@@ -706,22 +526,10 @@ public final class MainActivity extends Activity {
             super.onReceivedError(view, request, error);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && request != null && request.isForMainFrame()) {
                 Uri failedUri = request.getUrl();
-                if (isTrustedServerUri(failedUri)) {
-                    statusText.setText("服务器离线：本地播放与预设仍可使用");
+                if (isLocalAppUri(failedUri)) {
                     view.post(MainActivity.this::loadBundledClient);
                 }
             }
-        }
-
-        @Override
-        @SuppressLint("WebViewClientOnReceivedSslError")
-        public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
-            if (handler == null) return;
-            if (isPinnedSakuraCertificate(error)) {
-                handler.proceed();
-                return;
-            }
-            handler.cancel();
         }
 
         @Override
@@ -753,9 +561,11 @@ public final class MainActivity extends Activity {
     }
 
     private WebResourceResponse bundledWebResponse(Uri uri, String method) {
-        if (uri == null || !"GET".equalsIgnoreCase(method) || !isTrustedServerUri(uri)) return null;
+        if (uri == null || !"GET".equalsIgnoreCase(method) || !isLocalAppUri(uri)) return null;
         String path = uri.getPath() == null ? "/" : Uri.decode(uri.getPath());
-        if (path.startsWith("/api/") || "/api".equals(path) || path.startsWith("/health")) return null;
+        if (path.startsWith("/api/") || "/api".equals(path) || path.startsWith("/health")) {
+            return localApiFallbackResponse(path);
+        }
         if (path.contains("..") || path.indexOf('\\') >= 0 || path.indexOf('\0') >= 0) return null;
 
         String relativePath = "/".equals(path) || path.isEmpty() ? "index.html" : path.substring(1);
@@ -775,6 +585,24 @@ public final class MainActivity extends Activity {
         } catch (IOException ignored) {
             return null;
         }
+    }
+
+    private WebResourceResponse localApiFallbackResponse(String path) {
+        boolean health = path != null && path.startsWith("/health");
+        String body = health
+            ? "{\"ok\":true,\"mode\":\"android-local\",\"serverRequired\":false}"
+            : "{\"ok\":false,\"mode\":\"android-local\",\"error\":\"Android local runtime is starting\"}";
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Cache-Control", "no-store, max-age=0");
+        headers.put("X-FE-Runtime", "android-local");
+        return new WebResourceResponse(
+            "application/json",
+            "UTF-8",
+            health ? 200 : 503,
+            health ? "OK" : "Service Unavailable",
+            headers,
+            new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8))
+        );
     }
 
     private String bundledMimeType(String path) {
@@ -801,36 +629,11 @@ public final class MainActivity extends Activity {
             lower.endsWith(".mjs") || lower.endsWith(".json") || lower.endsWith(".svg") ? "UTF-8" : null;
     }
 
-    private boolean isPinnedSakuraCertificate(SslError error) {
-        if (error == null || error.getPrimaryError() != SslError.SSL_UNTRUSTED) return false;
-        Uri uri = Uri.parse(error.getUrl());
-        if (!"https".equalsIgnoreCase(uri.getScheme())
-            || !SAKURA_FRP_HOST.equalsIgnoreCase(uri.getHost())
-            || effectivePort(uri) != SAKURA_FRP_PORT) {
-            return false;
-        }
-        try {
-            Bundle certificateState = SslCertificate.saveState(error.getCertificate());
-            byte[] encoded = certificateState == null ? null : certificateState.getByteArray("x509-certificate");
-            if (encoded == null || encoded.length == 0) return false;
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return SAKURA_FRP_CERT_SHA256.equals(toHex(digest.digest(encoded)));
-        } catch (Exception ignored) {
-            return false;
-        }
-    }
-
-    private String toHex(byte[] value) {
-        StringBuilder output = new StringBuilder(value.length * 2);
-        for (byte item : value) output.append(String.format(Locale.ROOT, "%02X", item & 0xff));
-        return output.toString();
-    }
-
     private final class FeMonsterChromeClient extends WebChromeClient {
         @Override
         public void onPermissionRequest(PermissionRequest request) {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) return;
-            if (!isTrustedServerUri(request.getOrigin())) {
+            if (!isLocalAppUri(request.getOrigin())) {
                 request.deny();
                 return;
             }
@@ -1062,12 +865,29 @@ public final class MainActivity extends Activity {
 
         @JavascriptInterface
         public String getServerUrl() {
-            return trustedServerUri == null ? "" : trustedServerUri.toString();
+            return LOCAL_APP_ORIGIN;
+        }
+
+        @JavascriptInterface
+        public String getRuntimeMode() {
+            return "local";
         }
 
         @JavascriptInterface
         public String getPerformanceTier() {
             return getAndroidPerformanceTier();
+        }
+
+        @JavascriptInterface
+        public boolean openExternal(String uriValue) {
+            if (uriValue == null || uriValue.trim().isEmpty()) return false;
+            try {
+                Uri uri = Uri.parse(uriValue.trim());
+                runOnUiThread(() -> MainActivity.this.openExternal(uri));
+                return true;
+            } catch (Exception ignored) {
+                return false;
+            }
         }
 
         @JavascriptInterface

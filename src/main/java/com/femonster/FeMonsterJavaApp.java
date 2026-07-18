@@ -5,7 +5,6 @@ import com.femonster.core.AppContext;
 import com.femonster.core.ProjectPaths;
 import com.femonster.desktop.LocalClientLauncher;
 import com.femonster.http.StaticFileHandler;
-import com.femonster.music.MusicApiBootstrap;
 import com.sun.net.httpserver.HttpServer;
 
 import java.awt.Desktop;
@@ -31,7 +30,6 @@ public final class FeMonsterJavaApp {
         String bindHost = parseBindHost();
         ProjectPaths paths = ProjectPaths.detect();
         Files.createDirectories(paths.dataDir);
-        MusicApiBootstrap.ensureAvailable(paths);
 
         AppContext context = new AppContext(paths);
         HttpServer server = createServer(preferredPort, bindHost);
@@ -41,6 +39,7 @@ public final class FeMonsterJavaApp {
         server.createContext("/components/", new StaticFileHandler(paths.root));
         server.createContext("/", new StaticFileHandler(paths.webRoot));
         server.start();
+        context.musicApis.startAutostart();
 
         String url = "http://127.0.0.1:" + port + "/";
         String remoteUrl = remoteAccessUrl(bindHost, port);

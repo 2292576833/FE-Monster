@@ -114,6 +114,14 @@ const els = {
   directX11Toggle: $('#directX11Toggle'),
   upscalerStatus: $('#upscalerStatus'),
   upscalerDetail: $('#upscalerDetail'),
+  presetFsrToggle: $('#presetFsrToggle'),
+  presetFsrVersion: $('#presetFsrVersion'),
+  presetFsrMode: $('#presetFsrMode'),
+  presetFsrDetail: $('#presetFsrDetail'),
+  renderClarityRange: $('#renderClarityRange'),
+  renderClarityValue: $('#renderClarityValue'),
+  renderClarityAutoToggle: $('#renderClarityAutoToggle'),
+  renderClarityDetail: $('#renderClarityDetail'),
   xAudio2Toggle: $('#xAudio2Toggle'),
   x3DAudioToggle: $('#x3DAudioToggle'),
   gestureControlToggle: $('#gestureControlToggle'),
@@ -226,6 +234,7 @@ const els = {
   diyScenePresetList: $('#diyScenePresetList'),
   diyCubePreset: $('#diyCubePreset'),
   diyFreeCubePreset: $('#diyFreeCubePreset'),
+  diyVoidPrismPreset: $('#diyVoidPrismPreset'),
   diyTopographyPreset: $('#diyTopographyPreset'),
   diyRainGlassPreset: $('#diyRainGlassPreset'),
   diyCoverParticlesPreset: $('#diyCoverParticlesPreset'),
@@ -257,6 +266,8 @@ const els = {
   wallpaperRefreshButton: $('#wallpaperRefreshButton'),
   wallpaperList: $('#wallpaperList'),
   wallpaperStatus: $('#wallpaperStatus'),
+  voidPrismScene: $('#voidPrismScene'),
+  voidPrismCore: $('#voidPrismCore'),
   freeCubeScene: $('#freeCubeScene'),
   freeCubeCore: $('#freeCubeCore'),
   wallpaperOpacityRange: $('#wallpaperOpacityRange'),
@@ -279,6 +290,10 @@ const els = {
   loginTitle: $('#neteaseLoginTitle'),
   loginSubtitle: $('#loginProviderSubtitle'),
   loginProviderTabs: $('#loginProviderTabs'),
+  musicApiImportPanel: $('#musicApiImportPanel'),
+  musicApiImportButton: $('#musicApiImportButton'),
+  musicApiImportInput: $('#musicApiImportInput'),
+  musicApiImportStatus: $('#musicApiImportStatus'),
   loginClose: $('#neteaseLoginClose'),
   loginRefresh: $('#neteaseQrRefresh'),
   loginCommunityStrip: $('#loginCommunityStrip'),
@@ -288,6 +303,18 @@ const els = {
   qrImage: $('#neteaseQrImage'),
   qrPlaceholder: $('#neteaseQrPlaceholder'),
   qrStatus: $('#neteaseQrStatus'),
+  qrLoginStage: $('#qrLoginStage'),
+  qishuiPhoneLogin: $('#qishuiPhoneLogin'),
+  qishuiPhoneInput: $('#qishuiPhoneInput'),
+  qishuiCodeInput: $('#qishuiCodeInput'),
+  qishuiSendCodeButton: $('#qishuiSendCodeButton'),
+  qishuiLoginButton: $('#qishuiLoginButton'),
+  qishuiGuestButton: $('#qishuiGuestButton'),
+  qishuiPhoneStatus: $('#qishuiPhoneStatus'),
+  androidLoginWorkflow: $('#androidLoginWorkflow'),
+  androidQrHelp: $('#androidQrHelp'),
+  androidQrSaveButton: $('#androidQrSaveButton'),
+  androidMusicAppButton: $('#androidMusicAppButton'),
   playlistOrbit: $('#orbPlaylists'),
   playlistCards: $('#orbPlaylistCards'),
   playlistStatus: $('#orbPlaylistStatus'),
@@ -379,13 +406,13 @@ const DYNAMIC_CUBE_GAP = DYNAMIC_CUBE_SIZE * 1.52;
 const DYNAMIC_CUBE_RADIUS = ((DYNAMIC_CUBE_GRID - 1) * DYNAMIC_CUBE_GAP) / 2;
 const DYNAMIC_CUBE_EXTENT = DYNAMIC_CUBE_RADIUS * 2 + DYNAMIC_CUBE_SIZE;
 const SONIC_TOPOGRAPHY_GRID = RENDER_PROFILE.topographyGrid;
-const SONIC_TOPOGRAPHY_SPACING = 1.05;
-const SONIC_TOPOGRAPHY_SIZE = 0.9;
+const SONIC_TOPOGRAPHY_SPACING = 0.98;
+const SONIC_TOPOGRAPHY_SIZE = 0.91;
 const SONIC_TOPOGRAPHY_HALF = (SONIC_TOPOGRAPHY_GRID * SONIC_TOPOGRAPHY_SPACING) / 2;
 const SONIC_TOPOGRAPHY_RIPPLES = 10;
 const SONIC_TOPOGRAPHY_METEORS = reducedMotion ? Math.min(10, RENDER_PROFILE.topographyMeteors) : RENDER_PROFILE.topographyMeteors;
 const SONIC_TOPOGRAPHY_PARTICLES = reducedMotion ? Math.min(90, RENDER_PROFILE.topographyParticles) : RENDER_PROFILE.topographyParticles;
-const SONIC_TOPOGRAPHY_CAMERA = { x: 35, y: 25, z: 35, fov: 45 };
+const SONIC_TOPOGRAPHY_CAMERA = { x: 32.2, y: 23, z: 32.2, fov: 45 };
 const BOOT_LOGO_TEXT = 'FE moster';
 const MUSIC_PROVIDERS = {
   netease: {
@@ -393,23 +420,41 @@ const MUSIC_PROVIDERS = {
     label: '\u7f51\u6613\u4e91',
     appName: '\u7f51\u6613\u4e91\u97f3\u4e50 App',
     apiUrl: 'http://127.0.0.1:3010',
-    setup: '\u91cd\u65b0\u8fd0\u884c run.cmd\uff0c\u5e94\u7528\u4f1a\u81ea\u52a8\u542f\u52a8\u7f51\u6613\u4e91 API'
+    setup: '\u91cd\u65b0\u8fd0\u884c run.cmd\uff0c\u5e94\u7528\u4f1a\u81ea\u52a8\u542f\u52a8\u7f51\u6613\u4e91 API',
+    loginQr: true
   },
   qq: {
     id: 'qq',
     label: 'QQ\u97f3\u4e50',
     appName: 'QQ\u97f3\u4e50 App',
     apiUrl: 'http://127.0.0.1:3011',
-    setup: '\u9700\u8981\u542f\u52a8\u652f\u6301 /login/qr/key \u7684 QQ\u97f3\u4e50 API \u670d\u52a1\u5230 3011'
+    setup: '\u9700\u8981\u542f\u52a8\u652f\u6301 /login/qr/key \u7684 QQ\u97f3\u4e50 API \u670d\u52a1\u5230 3011',
+    loginQr: true
   },
   kugou: {
     id: 'kugou',
     label: '\u9177\u72d7\u97f3\u4e50',
     appName: '\u9177\u72d7\u97f3\u4e50 App',
     apiUrl: 'http://127.0.0.1:3012',
-    setup: '\u9700\u8981\u542f\u52a8\u652f\u6301 /login/qr/key \u7684 \u9177\u72d7\u97f3\u4e50 API \u670d\u52a1\u5230 3012'
+    setup: '\u9700\u8981\u542f\u52a8\u652f\u6301 /login/qr/key \u7684 \u9177\u72d7\u97f3\u4e50 API \u670d\u52a1\u5230 3012',
+    configured: true,
+    loginQr: true
+  },
+  qishui: {
+    id: 'qishui',
+    label: '\u6c7d\u6c34\u97f3\u4e50',
+    appName: '\u6c7d\u6c34\u97f3\u4e50 App',
+    apiUrl: 'http://127.0.0.1:3013',
+    setup: '\u8bf7\u5728\u767b\u5f55\u9875\u5bfc\u5165\u6c7d\u6c34\u97f3\u4e50 API \u914d\u7f6e\u6216 ZIP \u5305',
+    configured: false,
+    loginQr: false
   }
 };
+const ANDROID_MUSIC_APP_URIS = Object.freeze({
+  netease: 'orpheus://',
+  qq: 'qqmusic://',
+  kugou: 'kugou://'
+});
 const PLAYBACK_QUALITY_OPTIONS = {
   netease: [
     { id: 'standard', label: '标准', short: 'STD', vip: false },
@@ -429,9 +474,78 @@ const PLAYBACK_QUALITY_OPTIONS = {
     { id: '320', label: '高品', short: 'HQ', vip: false },
     { id: 'flac', label: '无损', short: 'SQ', vip: true },
     { id: 'hires', label: 'Hi-Res', short: 'HR', vip: true }
+  ],
+  qishui: [
+    { id: 'standard', label: '\u6807\u51c6', short: 'STD', vip: false },
+    { id: 'higher', label: '\u9ad8\u54c1', short: 'HQ', vip: false },
+    { id: 'lossless', label: '\u65e0\u635f', short: 'SQ', vip: true }
   ]
 };
 const PLAYBACK_QUALITY_PREFS_KEY = 'fe-monster-playback-quality-prefs-v1';
+const RENDER_CLARITY_PREFS_KEY = 'fe-monster-render-clarity-v1';
+const PRESET_FSR_PREFS_KEY = 'fe-monster-preset-fsr-v1';
+const PRESET_FSR_MODES = Object.freeze(['auto', 'ultra-quality', 'quality', 'balanced', 'performance']);
+const PRESET_FSR_VERSIONS = Object.freeze(['1', '2', '3', '4']);
+const RENDER_CLARITY_MIN = 50;
+const RENDER_CLARITY_MAX = 125;
+const RENDER_CLARITY_AUTO_MAX = 100;
+const RENDER_CLARITY_STEP = 5;
+
+function normalizeRenderClarityPercent(value, fallback = 100) {
+  const numeric = Number(value);
+  const safe = Number.isFinite(numeric) ? numeric : fallback;
+  return clamp(
+    Math.round(safe / RENDER_CLARITY_STEP) * RENDER_CLARITY_STEP,
+    RENDER_CLARITY_MIN,
+    RENDER_CLARITY_MAX
+  );
+}
+
+function loadRenderClarityPreferences() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(RENDER_CLARITY_PREFS_KEY) || '{}');
+    return {
+      auto: stored?.auto !== false,
+      manualPercent: normalizeRenderClarityPercent(stored?.manualPercent, 100)
+    };
+  } catch (error) {
+    return { auto: true, manualPercent: 100 };
+  }
+}
+
+function initialAutoRenderClarityPercent() {
+  if (MOBILE_RENDER_TARGET) return RENDER_PROFILE.tier === 'economy' ? 60 : 75;
+  if (RENDER_PROFILE.tier === 'economy') return 65;
+  if (RENDER_PROFILE.tier === 'balanced') return 85;
+  return 100;
+}
+
+const INITIAL_RENDER_CLARITY_PREFERENCES = loadRenderClarityPreferences();
+
+function normalizePresetFsrMode(value) {
+  const mode = safeText(value, 'quality').trim().toLowerCase();
+  return PRESET_FSR_MODES.includes(mode) ? mode : 'quality';
+}
+
+function normalizePresetFsrVersion(value) {
+  const version = safeText(value, '1').trim();
+  return PRESET_FSR_VERSIONS.includes(version) ? version : '1';
+}
+
+function loadPresetFsrPreferences() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(PRESET_FSR_PREFS_KEY) || '{}');
+    return {
+      enabled: stored?.enabled === true,
+      version: normalizePresetFsrVersion(stored?.version),
+      mode: normalizePresetFsrMode(stored?.mode)
+    };
+  } catch (error) {
+    return { enabled: false, version: '1', mode: 'quality' };
+  }
+}
+
+const INITIAL_PRESET_FSR_PREFERENCES = loadPresetFsrPreferences();
 
 function loadPlaybackQualityPreferences() {
   try {
@@ -679,7 +793,7 @@ function detectRenderProfile() {
       playbackDprMax: 1,
       webglDprMax: 1,
       cubeGrid: lowEndAndroid ? 15 : 18,
-      topographyGrid: lowEndAndroid ? 54 : 72,
+      topographyGrid: lowEndAndroid ? 64 : 84,
       topographyMeteors: lowEndAndroid ? 3 : 6,
       topographyParticles: lowEndAndroid ? 28 : 48,
       orbParticles: lowEndAndroid ? 260 : 420,
@@ -705,7 +819,7 @@ function detectRenderProfile() {
       playbackDprMax: 1.85,
       webglDprMax: 1.9,
       cubeGrid: 32,
-      topographyGrid: 160,
+      topographyGrid: 184,
       topographyMeteors: 20,
       topographyParticles: 200,
       orbParticles: 980,
@@ -731,7 +845,7 @@ function detectRenderProfile() {
       playbackDprMax: 1.25,
       webglDprMax: 1.25,
       cubeGrid: 24,
-      topographyGrid: 104,
+      topographyGrid: 124,
       topographyMeteors: 8,
       topographyParticles: 72,
       orbParticles: 620,
@@ -756,7 +870,7 @@ function detectRenderProfile() {
     playbackDprMax: 1.5,
     webglDprMax: 1.6,
     cubeGrid: 28,
-    topographyGrid: 132,
+    topographyGrid: 156,
     topographyMeteors: 14,
     topographyParticles: 130,
     orbParticles: 820,
@@ -932,6 +1046,29 @@ const state = {
   playbackQuality: INITIAL_PLAYBACK_QUALITY_PREFERENCES.netease || 'standard',
   qualityMenuOpen: false,
   qualityLoginRequests: {},
+  renderClarity: {
+    auto: INITIAL_RENDER_CLARITY_PREFERENCES.auto,
+    manualPercent: INITIAL_RENDER_CLARITY_PREFERENCES.manualPercent,
+    autoPercentByScene: Object.create(null),
+    activeSceneKey: '',
+    initialAutoPercent: initialAutoRenderClarityPercent(),
+    refreshHz: 60,
+    targetFrameMs: MOBILE_RENDER_TARGET ? RENDER_PROFILE.targetFrameMs : 1000 / 60,
+    frameSamples: [],
+    warmupFrames: 0,
+    overBudgetFrames: 0,
+    underBudgetFrames: 0,
+    lastFrameAt: 0,
+    lastAdjustmentAt: -Infinity,
+    lastUiUpdateAt: 0,
+    sandboxSignature: ''
+  },
+  presetFsr: {
+    enabled: INITIAL_PRESET_FSR_PREFERENCES.enabled,
+    version: INITIAL_PRESET_FSR_PREFERENCES.version,
+    mode: INITIAL_PRESET_FSR_PREFERENCES.mode,
+    lastDiagnostics: null
+  },
   playerClock: {
     position: 0,
     duration: 0,
@@ -1040,7 +1177,7 @@ const state = {
     playbackPreviewUrl: '',
     playbackKeepBackground: false,
     presetGroupExpanded: false,
-    stormLightingMode: 'realtime',
+    stormLightingMode: 'sunset',
     stormWeatherMode: 'auto',
     tab: 'library',
     sceneName: '我的音乐场景',
@@ -1127,6 +1264,8 @@ const state = {
     coverSignature: '',
     quality: RENDER_PROFILE.playbackQualityMax,
     lastFrameTime: 0,
+    lastMotionAt: 0,
+    frameStep: 1,
     spriteDpr: 0,
     particleSprites: [],
     particles: []
@@ -1134,6 +1273,9 @@ const state = {
   coverParticle: {
     bundlePromise: null,
     engineContainer: null,
+    enginePromise: null,
+    enginePlaying: false,
+    engineVisible: false,
     image: null,
     imageSignature: '',
     sampleSignature: '',
@@ -1152,6 +1294,8 @@ const state = {
     gpuPoints: null,
     gpuSignature: '',
     gpuFailed: false,
+    gpuWidth: 0,
+    gpuHeight: 0,
     backgroundEnabled: false
   },
   bookEffectTransform: {
@@ -1242,6 +1386,13 @@ const state = {
   loginQrKey: '',
   loginQrTimer: 0,
   loginQrLoading: false,
+  musicApiImporting: false,
+  loginQrRequestId: 0,
+  qishuiPhoneSending: false,
+  qishuiPhoneVerifying: false,
+  qishuiPhoneCooldownUntil: 0,
+  qishuiPhoneCooldownTimer: 0,
+  qishuiGuestMode: false,
   community: {
     profile: null,
     friends: [],
@@ -1450,6 +1601,7 @@ const state = {
     phases: null,
     weights: null,
     renderer: null,
+    renderQuality: null,
     scene: null,
     camera: null,
     group: null,
@@ -1461,6 +1613,7 @@ const state = {
     lastHeight: 0,
     lastZoom: 1,
     lastRenderAt: 0,
+    resizeObserver: null,
     push: 0,
     bass: 0,
     energy: 0
@@ -1470,12 +1623,19 @@ const state = {
     mode: 'free',
     backgroundEnabled: true,
     palette: null,
+    frame: {},
+    lastDiagnostics: null
+  },
+  voidPrism: {
+    runtime: null,
+    frame: {},
     lastDiagnostics: null
   },
   sonicTopography: {
     built: false,
     count: 0,
     renderer: null,
+    renderQuality: null,
     scene: null,
     camera: null,
     group: null,
@@ -1499,6 +1659,7 @@ const state = {
     lastHeight: 0,
     lastMotionAt: 0,
     lastRenderAt: 0,
+    resizeObserver: null,
     autoYaw: 0,
     lastBeat: 0,
     lastMeteorAt: 0,
@@ -1510,6 +1671,28 @@ const state = {
     energy: 0,
     audioPulse: 0,
     wasAudioDriving: false,
+    projectilesActive: false,
+    projectilesNeedClear: false,
+    frameAudio: {
+      subBass: 0,
+      bass: 0,
+      lowMid: 0,
+      mid: 0,
+      highMid: 0,
+      presence: 0,
+      brilliance: 0,
+      air: 0,
+      energy: 0,
+      warmth: 0,
+      brightness: 0,
+      sharpness: 0,
+      smoothness: 0.7,
+      density: 0,
+      spectralCentroid: 0,
+      fluxPulse: 0,
+      fluxMeteor: 0,
+      beat: 0
+    },
     idleTone: {
       presence: 0.16,
       brilliance: 0.12,
@@ -1541,7 +1724,9 @@ const state = {
     quality: RENDER_PROFILE.orbQualityMax,
     lastFrameTime: 0,
     lastPaintAt: 0,
+    lastSpectrumAt: 0,
     animationFrame: 0,
+    coveredCanvasKey: '',
     reducedMotion
   }
 };
@@ -1560,7 +1745,11 @@ async function apiJson(path, options = {}) {
     throw new Error(`接口返回不是 JSON: ${path}`);
   }
   if (!response.ok) {
-    throw new Error(json.error || `接口失败: ${response.status}`);
+    const error = new Error(json.error || `接口失败: ${response.status}`);
+    error.status = response.status;
+    error.code = typeof json.code === 'string' ? json.code : '';
+    error.payload = json;
+    throw error;
   }
   return json;
 }
@@ -1582,18 +1771,28 @@ function syncRenderTechnologyStatus(diagnostics = state.clientRuntime.renderCapa
   const rendererText = `${state.clientRuntime.webglVendor || ''} ${state.clientRuntime.webglRenderer || ''}`;
   const isAmd = /amd|radeon/i.test(rendererText);
   const isNvidia = /nvidia|geforce|rtx/i.test(rendererText);
-  const adaptiveActive = diagnostics?.algorithm === 'adaptive-spatial' && diagnostics?.enabled === true;
-  const mode = adaptiveActive ? 'adaptive-spatial' : diagnostics?.mode === 'dlss-native' ? 'dlss-native' : 'native-resolution';
+  const compatibleFsr = diagnostics?.enabled === true && (
+    diagnostics?.family === 'fsr1-compatible-webgl' ||
+    diagnostics?.algorithm === 'fsr1-compatible-webgl' ||
+    diagnostics?.algorithm === 'adaptive-spatial'
+  );
+  const mode = compatibleFsr ? 'fsr1-compatible-webgl' : diagnostics?.mode === 'dlss-native' ? 'dlss-native' : 'native-resolution';
   const scale = Number(diagnostics?.renderScale);
-  let label = mode === 'adaptive-spatial'
-    ? `${isAmd ? 'AMD GPU · ' : isNvidia ? 'NVIDIA GPU · ' : ''}自适应空间重建`
+  let label = mode === 'fsr1-compatible-webgl'
+    ? `${isAmd ? 'AMD GPU · ' : isNvidia ? 'NVIDIA GPU · ' : ''}FSR 1.0 兼容（WebGL）`
     : '原生分辨率';
-  let detail = mode === 'adaptive-spatial'
-    ? `边缘自适应升频 + 锐化${Number.isFinite(scale) ? ` · ${Math.round(scale * 100)}% 内部渲染` : ''}`
+  let detail = mode === 'fsr1-compatible-webgl'
+    ? `仅场景预设 · EASU/RCAS 思路兼容实现${Number.isFinite(scale) ? ` · ${Math.round(scale * 100)}% 内部渲染` : ''} · 非 AMD 官方 SDK`
     : '当前设备使用播放页原生分辨率';
   if (dlss.available === true && diagnostics?.mode === 'dlss-native') {
     label = 'NVIDIA DLSS（原生）';
     detail = 'Streamline 原生渲染链已初始化';
+  } else if (state.presetFsr.enabled && presetFsrSceneActive() && renderClaritySoftwareRenderer()) {
+    label = 'FSR 安全回退';
+    detail = '检测到软件渲染器 · 当前预设保持原生直渲，避免闪退和卡顿';
+  } else if (state.presetFsr.enabled && !presetFsrSceneActive()) {
+    label = 'FSR 1.0 兼容已开启';
+    detail = '仅进入 WebGL 场景预设时生效 · 当前页面保持原生渲染';
   } else if (isNvidia) {
     detail += ' · DLSS 等待原生 D3D12 渲染链';
   } else if (isAmd) {
@@ -1606,6 +1805,582 @@ function syncRenderTechnologyStatus(diagnostics = state.clientRuntime.renderCapa
   document.documentElement.dataset.upscaler = mode;
 }
 
+function presetFsrSceneActive() {
+  if (!state.playbackPage || state.sandbox.open) return false;
+  if (sandboxPlaybackActive()) return true;
+  return ['cube', 'free-cubes', 'void-prism', 'topography'].includes(state.diyPreset);
+}
+
+function savePresetFsrPreferences() {
+  try {
+    window.localStorage.setItem(PRESET_FSR_PREFS_KEY, JSON.stringify({
+      enabled: !!state.presetFsr.enabled,
+      version: normalizePresetFsrVersion(state.presetFsr.version),
+      mode: normalizePresetFsrMode(state.presetFsr.mode)
+    }));
+  } catch (error) {
+    // Rendering remains usable when WebView storage is unavailable.
+  }
+}
+
+function presetFsrEffectiveVersion() {
+  const requested = normalizePresetFsrVersion(state.presetFsr.version);
+  if (requested === '1') return '1';
+  const native = state.clientRuntime.renderCapabilities?.native || {};
+  const capability = native.upscalers?.[`fsr${requested}`] || {};
+  const controllerReady = typeof window.feMonsterNativePresetUpscaler?.configure === 'function';
+  return native.host?.ownsNativeRenderTargets === true && capability.available === true && controllerReady
+    ? requested
+    : '1';
+}
+
+function presetFsrVersionFallbackReason() {
+  const requested = normalizePresetFsrVersion(state.presetFsr.version);
+  if (requested === '1' || presetFsrEffectiveVersion() === requested) return '';
+  if (requested === '2') return 'FSR 2 需要运动矢量、深度与时间历史；当前 WebGL 链回退 FSR 1';
+  if (requested === '3') return 'FSR 3 需要原生时域输入与帧生成交换链；当前 WebGL 链回退 FSR 1';
+  return 'FSR 4 需要 DirectX 12、官方 SDK、兼容显卡与完整时域输入；当前 WebGL 链回退 FSR 1';
+}
+
+function presetFsrModeLabel(mode = state.presetFsr.mode) {
+  return ({
+    auto: '自动',
+    'ultra-quality': '超高质量',
+    quality: '质量',
+    balanced: '均衡',
+    performance: '性能'
+  })[normalizePresetFsrMode(mode)] || '质量';
+}
+
+function presetFsrFallbackLabel(reason) {
+  return ({
+    'webgl2-unavailable': '设备仅支持 WebGL1，已回退原生',
+    'software-renderer': '软件渲染器安全回退原生',
+    'hardware-limits': 'GPU 纹理尺寸不足，已回退原生',
+    'pipeline-unavailable': '升频管线不可用，已回退原生',
+    'pipeline-initialization-failed': '升频初始化失败，已回退原生',
+    'pipeline-render-failed': '升频渲染失败，已回退原生',
+    'mode-direct': '当前使用直接渲染'
+  })[safeText(reason, '')] || '当前场景保持原生渲染';
+}
+
+function presetFsrRequest(active = presetFsrSceneActive()) {
+  const forcedNative = new URLSearchParams(window.location.search).get('render-quality') === 'native';
+  if (!active || !state.presetFsr.enabled || forcedNative || renderClaritySoftwareRenderer()) return 'native';
+  if (presetFsrEffectiveVersion() !== '1') return 'native';
+  const mode = normalizePresetFsrMode(state.presetFsr.mode);
+  if (mode === 'auto') {
+    const scale = clamp(effectiveRenderClarityPercent() / 100, 0.5, 0.77);
+    return {
+      name: 'auto',
+      scale,
+      dynamicResolution: false,
+      sharpness: clamp(0.2 + (0.77 - scale) * 0.34, 0.2, 0.3),
+      targetFrameMs: state.renderClarity.targetFrameMs
+    };
+  }
+  const sharpness = ({
+    'ultra-quality': 0.2,
+    quality: 0.22,
+    balanced: 0.25,
+    performance: 0.28
+  })[mode] || 0.22;
+  return { name: mode, dynamicResolution: false, sharpness, targetFrameMs: state.renderClarity.targetFrameMs };
+}
+
+function createPresetRenderQuality(renderer, sharpness = 0.22) {
+  if (!renderer || !window.FeRenderQuality?.create || !window.THREE) return null;
+  try {
+    return window.FeRenderQuality.create(renderer, {
+      THREE: window.THREE,
+      mode: 'native',
+      initialScale: 1,
+      minScale: 0.5,
+      maxScale: 1,
+      targetFrameMs: state.renderClarity.targetFrameMs,
+      sharpness
+    });
+  } catch (error) {
+    return null;
+  }
+}
+
+function presetFsrOutputPixelRatio(diagnostics) {
+  return diagnostics?.enabled === true ? sandboxRenderPixelRatio() : renderPixelRatio('webgl');
+}
+
+function syncPresetFsrControls(diagnostics = state.presetFsr.lastDiagnostics) {
+  if (els.presetFsrToggle) els.presetFsrToggle.checked = !!state.presetFsr.enabled;
+  if (els.presetFsrVersion) {
+    els.presetFsrVersion.value = normalizePresetFsrVersion(state.presetFsr.version);
+    els.presetFsrVersion.disabled = !state.presetFsr.enabled;
+  }
+  if (els.presetFsrMode) {
+    els.presetFsrMode.value = normalizePresetFsrMode(state.presetFsr.mode);
+    els.presetFsrMode.disabled = !state.presetFsr.enabled;
+  }
+  document.documentElement.dataset.presetFsr = state.presetFsr.enabled
+    ? `fsr${normalizePresetFsrVersion(state.presetFsr.version)}-${normalizePresetFsrMode(state.presetFsr.mode)}`
+    : 'off';
+  if (!els.presetFsrDetail) return;
+  const versionFallback = presetFsrVersionFallbackReason();
+  if (!state.presetFsr.enabled) {
+    els.presetFsrDetail.textContent = '关闭 · 预设使用当前清晰度直接渲染';
+  } else if (versionFallback) {
+    els.presetFsrDetail.textContent = versionFallback;
+  } else if (presetFsrSceneActive() && renderClaritySoftwareRenderer()) {
+    els.presetFsrDetail.textContent = `${presetFsrModeLabel()} · 软件渲染器安全回退原生`;
+  } else if (diagnostics?.enabled) {
+    const scale = Math.round((Number(diagnostics.renderScale) || 1) * 100);
+    els.presetFsrDetail.textContent = `${presetFsrModeLabel()} · ${scale}% 内部渲染 · 仅场景预设`;
+  } else if (!presetFsrSceneActive()) {
+    els.presetFsrDetail.textContent = `${presetFsrModeLabel()} · 等待进入 WebGL 场景预设`;
+  } else {
+    els.presetFsrDetail.textContent = `${presetFsrModeLabel()} · ${presetFsrFallbackLabel(diagnostics?.fallbackReason)}`;
+  }
+}
+
+function renderClaritySceneKey() {
+  if (sandboxPlaybackActive()) return `sandbox:${state.sandbox.playbackPresetId || 'playback'}`;
+  if (state.sandbox.open) return 'sandbox:editor';
+  if (state.playbackPage) return `playback:${state.diyPreset || state.textPreset || 'lyric'}`;
+  return 'home';
+}
+
+function renderClaritySoftwareRenderer() {
+  const renderer = `${state.clientRuntime.webglVendor || ''} ${state.clientRuntime.webglRenderer || ''}`;
+  return /swiftshader|llvmpipe|software|microsoft basic render/i.test(renderer);
+}
+
+function autoRenderClarityCeiling() {
+  return renderClaritySoftwareRenderer() ? 65 : RENDER_CLARITY_AUTO_MAX;
+}
+
+function autoRenderClarityPercent(sceneKey = renderClaritySceneKey()) {
+  const clarity = state.renderClarity;
+  if (!Number.isFinite(clarity.autoPercentByScene[sceneKey])) {
+    clarity.autoPercentByScene[sceneKey] = Math.min(clarity.initialAutoPercent, autoRenderClarityCeiling());
+  }
+  return normalizeRenderClarityPercent(
+    Math.min(clarity.autoPercentByScene[sceneKey], autoRenderClarityCeiling()),
+    clarity.initialAutoPercent
+  );
+}
+
+function effectiveRenderClarityPercent() {
+  return state.renderClarity.auto
+    ? autoRenderClarityPercent()
+    : normalizeRenderClarityPercent(state.renderClarity.manualPercent, 100);
+}
+
+function renderClarityLabel(percent) {
+  if (percent <= 60) return '流畅';
+  if (percent <= 80) return '均衡';
+  if (percent < 100) return '清晰';
+  if (percent === 100) return '标准';
+  return '超清';
+}
+
+function saveRenderClarityPreferences() {
+  try {
+    window.localStorage.setItem(RENDER_CLARITY_PREFS_KEY, JSON.stringify({
+      auto: !!state.renderClarity.auto,
+      manualPercent: normalizeRenderClarityPercent(state.renderClarity.manualPercent, 100)
+    }));
+  } catch (error) {
+    // Rendering remains usable when WebView storage is unavailable.
+  }
+}
+
+function resetRenderClaritySampling(sceneKey = renderClaritySceneKey(), warmupFrames = 60) {
+  const clarity = state.renderClarity;
+  clarity.activeSceneKey = sceneKey;
+  clarity.frameSamples.length = 0;
+  clarity.warmupFrames = warmupFrames;
+  clarity.overBudgetFrames = 0;
+  clarity.underBudgetFrames = 0;
+  clarity.lastFrameAt = 0;
+}
+
+function syncRenderClarityControls(now = performance.now()) {
+  const clarity = state.renderClarity;
+  const effectivePercent = effectiveRenderClarityPercent();
+  if (els.renderClarityAutoToggle) els.renderClarityAutoToggle.checked = !!clarity.auto;
+  if (els.renderClarityRange) {
+    els.renderClarityRange.disabled = !!clarity.auto;
+    els.renderClarityRange.value = String(clarity.auto ? effectivePercent : clarity.manualPercent);
+  }
+  if (els.renderClarityValue) {
+    els.renderClarityValue.textContent = clarity.auto
+      ? `自动 · ${effectivePercent}%`
+      : `${effectivePercent}%`;
+  }
+  if (els.renderClarityDetail) {
+    const samples = clarity.frameSamples;
+    const recentMs = samples.length ? samples[samples.length - 1] : 0;
+    const fps = recentMs > 0 ? Math.round(1000 / recentMs) : 0;
+    const device = renderClaritySoftwareRenderer() ? '软件渲染安全档' : `${Math.round(clarity.refreshHz)}Hz 屏幕`;
+    els.renderClarityDetail.textContent = clarity.auto
+      ? `${device} · 当前${renderClarityLabel(effectivePercent)}${fps ? ` · 约 ${fps} FPS` : ''} · 按场景实时校准`
+      : `手动固定 · ${renderClarityLabel(effectivePercent)} · 不随帧率自动变化`;
+  }
+  clarity.lastUiUpdateAt = now;
+}
+
+function measureDisplayRefreshRate() {
+  const samples = [];
+  const startedAt = performance.now();
+  let lastFrameAt = 0;
+  const sample = (now) => {
+    if (lastFrameAt) {
+      const elapsed = now - lastFrameAt;
+      if (elapsed >= 1.5 && elapsed <= 100) samples.push(elapsed);
+    }
+    lastFrameAt = now;
+    if (samples.length < 32 && now - startedAt < 4000) {
+      window.requestAnimationFrame(sample);
+      return;
+    }
+    const sorted = samples.slice().sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)] || RENDER_PROFILE.targetFrameMs || 1000 / 60;
+    const refreshHz = clamp(Math.round(1000 / median), 15, 500);
+    state.renderClarity.refreshHz = refreshHz;
+    state.renderClarity.targetFrameMs = MOBILE_RENDER_TARGET
+      ? RENDER_PROFILE.targetFrameMs
+      : 1000 / clamp(refreshHz, 60, 120);
+    syncRenderClarityControls();
+  };
+  window.requestAnimationFrame(sample);
+}
+
+function renderClarityPercentile(values, percentile) {
+  if (!values.length) return 0;
+  const sorted = values.slice().sort((a, b) => a - b);
+  return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * percentile) - 1))];
+}
+
+function setAutoRenderClarityPercent(sceneKey, nextPercent, now = performance.now()) {
+  const clarity = state.renderClarity;
+  const current = autoRenderClarityPercent(sceneKey);
+  const next = normalizeRenderClarityPercent(
+    clamp(nextPercent, RENDER_CLARITY_MIN, autoRenderClarityCeiling()),
+    current
+  );
+  if (next === current) return false;
+  clarity.autoPercentByScene[sceneKey] = next;
+  clarity.lastAdjustmentAt = now;
+  resetRenderClaritySampling(sceneKey, 30);
+  applyRenderClarity({ force: true });
+  return true;
+}
+
+function observeRenderClarityFrame(now = performance.now()) {
+  const clarity = state.renderClarity;
+  if (document.hidden) {
+    clarity.lastFrameAt = 0;
+    return;
+  }
+  const sceneKey = renderClaritySceneKey();
+  if (clarity.activeSceneKey !== sceneKey) {
+    resetRenderClaritySampling(sceneKey);
+    applyRenderClarity({ force: true });
+    return;
+  }
+  if (!clarity.lastFrameAt) {
+    clarity.lastFrameAt = now;
+    return;
+  }
+  const frameMs = now - clarity.lastFrameAt;
+  clarity.lastFrameAt = now;
+  if (!Number.isFinite(frameMs) || frameMs < 1.5 || frameMs > 100) return;
+  if (clarity.warmupFrames > 0) {
+    clarity.warmupFrames -= 1;
+    return;
+  }
+  clarity.frameSamples.push(frameMs);
+  if (clarity.frameSamples.length > 60) clarity.frameSamples.shift();
+  if (now - clarity.lastUiUpdateAt >= 500) syncRenderClarityControls(now);
+  if (!clarity.auto || clarity.frameSamples.length < 60) return;
+
+  const p90FrameMs = renderClarityPercentile(clarity.frameSamples, 0.9);
+  const targetFrameMs = sceneKey === 'home'
+    ? Math.max(clarity.targetFrameMs, RENDER_PROFILE.targetFrameMs)
+    : clarity.targetFrameMs;
+  if (reducedMotion) return;
+  if (p90FrameMs > targetFrameMs * 1.08) {
+    clarity.overBudgetFrames += 1;
+    clarity.underBudgetFrames = Math.max(0, clarity.underBudgetFrames - 2);
+  } else if (p90FrameMs < targetFrameMs * 0.72) {
+    clarity.underBudgetFrames += 1;
+    clarity.overBudgetFrames = Math.max(0, clarity.overBudgetFrames - 2);
+  } else {
+    clarity.overBudgetFrames = Math.max(0, clarity.overBudgetFrames - 1);
+    clarity.underBudgetFrames = Math.max(0, clarity.underBudgetFrames - 1);
+  }
+  if (now - clarity.lastAdjustmentAt < 1500) return;
+  const current = autoRenderClarityPercent(sceneKey);
+  if (clarity.overBudgetFrames >= 24) {
+    setAutoRenderClarityPercent(sceneKey, current - RENDER_CLARITY_STEP, now);
+  } else if (clarity.underBudgetFrames >= 180) {
+    setAutoRenderClarityPercent(sceneKey, current + RENDER_CLARITY_STEP, now);
+  }
+}
+
+function sandboxRenderPixelRatio() {
+  const nativeDpr = Math.max(0.5, Number(window.devicePixelRatio) || 1);
+  const scale = Math.max(1, effectiveRenderClarityPercent() / 100);
+  const base = Math.min(nativeDpr, RENDER_PROFILE.webglDprMax);
+  return clamp(base * scale, 0.5, 2.5);
+}
+
+function sandboxRenderQualityRequest() {
+  return presetFsrRequest(sandboxPlaybackActive());
+}
+
+function applySandboxRenderClarity(force = false) {
+  const sandbox = state.sandbox;
+  if (!sandbox.renderer) return;
+  const request = sandboxRenderQualityRequest();
+  const requestedSignature = typeof request === 'string' ? request : JSON.stringify(request);
+  if (!force && sandbox.renderQuality && state.renderClarity.sandboxSignature === requestedSignature) return;
+
+  let diagnostics = null;
+  if (sandbox.renderQuality) {
+    diagnostics = sandbox.renderQuality.setMode(request);
+  }
+  const reconstructionActive = !!diagnostics?.enabled;
+  const pixelRatio = reconstructionActive ? sandboxRenderPixelRatio() : renderPixelRatio('webgl');
+  if (Math.abs((sandbox.renderer.getPixelRatio?.() || 1) - pixelRatio) > 0.001) {
+    sandbox.renderer.setPixelRatio(pixelRatio);
+  }
+  state.renderClarity.sandboxSignature = requestedSignature;
+  sandbox.resizePending = true;
+  resizeSandboxRenderer();
+  state.clientRuntime.renderCapabilities.diagnostics = diagnostics || sandbox.renderQuality?.getDiagnostics?.() || null;
+  if (sandboxPlaybackActive()) state.presetFsr.lastDiagnostics = state.clientRuntime.renderCapabilities.diagnostics;
+  syncRenderTechnologyStatus();
+}
+
+function applyPresetFsrToOwnedRenderer(owner, active, resizeRenderer) {
+  if (!owner?.renderer || !owner.renderQuality) return null;
+  const diagnostics = owner.renderQuality.setMode(presetFsrRequest(active));
+  const pixelRatio = presetFsrOutputPixelRatio(diagnostics);
+  if (Math.abs((owner.renderer.getPixelRatio?.() || 1) - pixelRatio) > 0.001) {
+    owner.renderer.setPixelRatio(pixelRatio);
+    owner.lastWidth = 0;
+    owner.lastHeight = 0;
+  }
+  resizeRenderer?.();
+  return diagnostics;
+}
+
+function runtimeRenderQualityDiagnostics(runtimeApi, runtime, result) {
+  if (result?.renderQuality) return result.renderQuality;
+  if (result?.algorithm || result?.family || result?.backend) return result;
+  const snapshot = runtimeApi?.diagnostics?.(runtime);
+  return snapshot?.renderQuality || snapshot?.upscaler || null;
+}
+
+function applyPresetUpscaler(options = {}) {
+  applySandboxRenderClarity(options.force === true);
+  let activeDiagnostics = sandboxPlaybackActive()
+    ? state.sandbox.renderQuality?.getDiagnostics?.() || null
+    : null;
+
+  const cubeDiagnostics = applyPresetFsrToOwnedRenderer(
+    state.dynamicCube,
+    state.playbackPage && state.diyPreset === 'cube',
+    resizeDynamicCubeRenderer
+  );
+  if (state.playbackPage && state.diyPreset === 'cube') activeDiagnostics = cubeDiagnostics;
+
+  const topoDiagnostics = applyPresetFsrToOwnedRenderer(
+    state.sonicTopography,
+    state.playbackPage && isSonicTopographyPreset(),
+    resizeSonicTopographyRenderer
+  );
+  if (state.playbackPage && isSonicTopographyPreset()) activeDiagnostics = topoDiagnostics;
+
+  if (state.freeCube.runtime && window.FeFreeCubeRuntime?.setRenderQuality) {
+    const result = window.FeFreeCubeRuntime.setRenderQuality(
+      state.freeCube.runtime,
+      presetFsrRequest(state.playbackPage && isFreeCubePreset())
+    );
+    const diagnostics = runtimeRenderQualityDiagnostics(window.FeFreeCubeRuntime, state.freeCube.runtime, result);
+    window.FeFreeCubeRuntime.resize(state.freeCube.runtime, presetFsrOutputPixelRatio(diagnostics));
+    if (state.playbackPage && isFreeCubePreset()) activeDiagnostics = diagnostics;
+  }
+
+  if (state.voidPrism.runtime && window.FeVoidPrismRuntime?.setRenderQuality) {
+    const result = window.FeVoidPrismRuntime.setRenderQuality(
+      state.voidPrism.runtime,
+      presetFsrRequest(state.playbackPage && isVoidPrismPreset())
+    );
+    const diagnostics = runtimeRenderQualityDiagnostics(window.FeVoidPrismRuntime, state.voidPrism.runtime, result);
+    window.FeVoidPrismRuntime.resize(state.voidPrism.runtime, presetFsrOutputPixelRatio(diagnostics));
+    if (state.playbackPage && isVoidPrismPreset()) activeDiagnostics = diagnostics;
+  }
+
+  state.presetFsr.lastDiagnostics = activeDiagnostics;
+  if (activeDiagnostics) state.clientRuntime.renderCapabilities.diagnostics = activeDiagnostics;
+  syncPresetFsrControls(activeDiagnostics);
+  syncRenderTechnologyStatus(activeDiagnostics || state.clientRuntime.renderCapabilities?.diagnostics);
+  requestSandboxRender();
+  return activeDiagnostics;
+}
+
+function setPresetFsrEnabled(enabled, options = {}) {
+  const next = !!enabled;
+  if (state.presetFsr.enabled === next) return;
+  state.presetFsr.enabled = next;
+  if (options.persist !== false) savePresetFsrPreferences();
+  applyPresetUpscaler({ force: true });
+  if (options.announce !== false) toast(next ? `FSR 预设升频已开启：${presetFsrModeLabel()}` : 'FSR 预设升频已关闭');
+}
+
+function setPresetFsrMode(mode, options = {}) {
+  const next = normalizePresetFsrMode(mode);
+  if (state.presetFsr.mode === next) return;
+  state.presetFsr.mode = next;
+  if (options.persist !== false) savePresetFsrPreferences();
+  applyPresetUpscaler({ force: true });
+  if (options.announce !== false && state.presetFsr.enabled) toast(`FSR 档位：${presetFsrModeLabel(next)}`);
+}
+
+function setPresetFsrVersion(version, options = {}) {
+  const next = normalizePresetFsrVersion(version);
+  if (state.presetFsr.version === next) return;
+  state.presetFsr.version = next;
+  if (options.persist !== false) savePresetFsrPreferences();
+  applyPresetUpscaler({ force: true });
+  if (options.announce !== false && state.presetFsr.enabled) {
+    const fallback = presetFsrVersionFallbackReason();
+    toast(fallback || `FSR ${next} 已启用`);
+  }
+}
+
+function applyRenderClarity(options = {}) {
+  const effectivePercent = effectiveRenderClarityPercent();
+  const pixelRatio = renderPixelRatio('webgl');
+  window.feMonsterRenderClarityScale = effectivePercent / 100;
+  document.documentElement.dataset.renderClarity = state.renderClarity.auto ? 'auto' : 'manual';
+  document.documentElement.dataset.renderClarityPercent = String(effectivePercent);
+
+  const cube = state.dynamicCube;
+  if (cube.renderer && Math.abs((cube.renderer.getPixelRatio?.() || 1) - pixelRatio) > 0.001) {
+    cube.renderer.setPixelRatio(pixelRatio);
+    cube.lastWidth = 0;
+    cube.lastHeight = 0;
+    resizeDynamicCubeRenderer();
+  }
+  if (state.freeCube.runtime && window.FeFreeCubeRuntime) {
+    window.FeFreeCubeRuntime.resize(state.freeCube.runtime, pixelRatio);
+  }
+  if (state.voidPrism.runtime && window.FeVoidPrismRuntime) {
+    window.FeVoidPrismRuntime.resize(state.voidPrism.runtime, pixelRatio);
+  }
+  const topo = state.sonicTopography;
+  if (topo.renderer && Math.abs((topo.renderer.getPixelRatio?.() || 1) - pixelRatio) > 0.001) {
+    topo.renderer.setPixelRatio(pixelRatio);
+    topo.lastWidth = 0;
+    topo.lastHeight = 0;
+    resizeSonicTopographyRenderer();
+  }
+  if (state.sandbox.previewRenderer) {
+    const previewRatio = Math.min(pixelRatio, 1.5);
+    if (Math.abs((state.sandbox.previewRenderer.getPixelRatio?.() || 1) - previewRatio) > 0.001) {
+      state.sandbox.previewRenderer.setPixelRatio(previewRatio);
+      resizeSandboxPreview();
+    }
+  }
+  applyPresetUpscaler({ force: options.force === true });
+  state.orb.lastPaintAt = 0;
+  requestOrbFrame();
+  requestSandboxRender();
+  syncRenderClarityControls();
+  if (options.announce) {
+    toast(state.renderClarity.auto
+      ? `清晰度已自动匹配：${effectivePercent}%`
+      : `清晰度已设为 ${effectivePercent}%`);
+  }
+}
+
+function setRenderClarityAuto(enabled, options = {}) {
+  const next = !!enabled;
+  if (state.renderClarity.auto === next) return;
+  if (!next) state.renderClarity.manualPercent = effectiveRenderClarityPercent();
+  state.renderClarity.auto = next;
+  resetRenderClaritySampling(renderClaritySceneKey(), 30);
+  if (options.persist !== false) saveRenderClarityPreferences();
+  applyRenderClarity({ force: true, announce: options.announce !== false });
+}
+
+function setRenderClarityManualPercent(value, options = {}) {
+  const next = normalizeRenderClarityPercent(value, state.renderClarity.manualPercent);
+  if (state.renderClarity.manualPercent === next) return;
+  state.renderClarity.manualPercent = next;
+  if (options.persist !== false) saveRenderClarityPreferences();
+  if (!state.renderClarity.auto) {
+    resetRenderClaritySampling(renderClaritySceneKey(), 20);
+    applyRenderClarity({ force: true, announce: options.announce === true });
+  } else {
+    syncRenderClarityControls();
+  }
+}
+
+function refineAutoRenderClarityForRenderer() {
+  if (!state.renderClarity.auto || !renderClaritySoftwareRenderer()) return;
+  const sceneKey = renderClaritySceneKey();
+  const current = Number(state.renderClarity.autoPercentByScene[sceneKey]) || state.renderClarity.initialAutoPercent;
+  if (current <= autoRenderClarityCeiling()) return;
+  state.renderClarity.autoPercentByScene[sceneKey] = autoRenderClarityCeiling();
+  resetRenderClaritySampling(sceneKey, 30);
+  applyRenderClarity({ force: true });
+}
+
+function initRenderClarity() {
+  const sceneKey = renderClaritySceneKey();
+  autoRenderClarityPercent(sceneKey);
+  resetRenderClaritySampling(sceneKey);
+  applyRenderClarity({ force: true });
+  measureDisplayRefreshRate();
+}
+
+window.feMonsterRenderClarity = Object.freeze({
+  snapshot: () => ({
+    auto: !!state.renderClarity.auto,
+    manualPercent: state.renderClarity.manualPercent,
+    effectivePercent: effectiveRenderClarityPercent(),
+    sceneKey: renderClaritySceneKey(),
+    refreshHz: state.renderClarity.refreshHz,
+    targetFrameMs: state.renderClarity.targetFrameMs,
+    pixelRatio: renderPixelRatio('webgl')
+  }),
+  setAuto: (enabled, options) => setRenderClarityAuto(enabled, options),
+  setPercent: (percent, options) => setRenderClarityManualPercent(percent, options)
+});
+
+window.feMonsterPresetUpscaler = Object.freeze({
+  snapshot: () => ({
+    enabled: !!state.presetFsr.enabled,
+    requestedVersion: normalizePresetFsrVersion(state.presetFsr.version),
+    effectiveVersion: presetFsrEffectiveVersion(),
+    versionFallbackReason: presetFsrVersionFallbackReason(),
+    environmentFallbackReason: state.presetFsr.enabled && presetFsrSceneActive() && renderClaritySoftwareRenderer()
+      ? 'software-renderer'
+      : '',
+    implementation: presetFsrEffectiveVersion() === '1'
+      ? 'fsr1-compatible-webgl'
+      : 'native-fidelityfx-sdk',
+    mode: normalizePresetFsrMode(state.presetFsr.mode),
+    activeScene: presetFsrSceneActive(),
+    diagnostics: state.presetFsr.lastDiagnostics
+  }),
+  setEnabled: (enabled, options) => setPresetFsrEnabled(enabled, options),
+  setVersion: (version, options) => setPresetFsrVersion(version, options),
+  setMode: (mode, options) => setPresetFsrMode(mode, options)
+});
+
 function handleNativeRenderCapabilities(event) {
   let payload = event?.data;
   if (typeof payload === 'string') {
@@ -1615,7 +2390,7 @@ function handleNativeRenderCapabilities(event) {
   const expected = state.clientRuntime.renderCapabilities?.requestId;
   if (expected && payload.requestId && payload.requestId !== expected) return;
   state.clientRuntime.renderCapabilities.native = payload;
-  syncRenderTechnologyStatus();
+  applyPresetUpscaler({ force: true });
 }
 
 function initRenderCapabilityBridge() {
@@ -2327,6 +3102,7 @@ function captureRendererInfo(renderer) {
     state.clientRuntime.webglRenderer = '';
   }
   syncRenderTechnologyStatus();
+  refineAutoRenderClarityForRenderer();
 }
 
 function createDirectX11Renderer(THREE, options = {}) {
@@ -2368,8 +3144,20 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function setStylePropertyIfChanged(element, property, value) {
+  if (!element) return false;
+  const nextValue = String(value);
+  if (element.style.getPropertyValue(property) === nextValue) return false;
+  element.style.setProperty(property, nextValue);
+  return true;
+}
+
 function isSonicTopographyPreset(preset = state.diyPreset) {
   return preset === 'topography';
+}
+
+function playbackPresetsUseNativeRefresh() {
+  return !reducedMotion && state.playbackPage;
 }
 
 function isRainGlassPreset(preset = state.diyPreset) {
@@ -2384,10 +3172,15 @@ function isFreeCubePreset(preset = state.diyPreset) {
   return preset === 'free-cubes';
 }
 
+function isVoidPrismPreset(preset = state.diyPreset) {
+  return preset === 'void-prism';
+}
+
 function normalizeDiyPreset(preset) {
   if (
     preset === 'cube' ||
     preset === 'free-cubes' ||
+    preset === 'void-prism' ||
     preset === 'topography' ||
     preset === 'rain-glass' ||
     preset === 'cover-particles' ||
@@ -2401,13 +3194,14 @@ function normalizeDiyPreset(preset) {
 }
 
 function renderPixelRatio(kind = 'canvas') {
-  const nativeDpr = Math.max(1, Number(window.devicePixelRatio) || 1);
+  const nativeDpr = Math.max(0.5, Number(window.devicePixelRatio) || 1);
   const cap = kind === 'webgl'
     ? RENDER_PROFILE.webglDprMax
     : kind === 'playback'
       ? RENDER_PROFILE.playbackDprMax
       : RENDER_PROFILE.canvasDprMax;
-  return Math.max(1, Math.min(nativeDpr, cap));
+  const scale = effectiveRenderClarityPercent() / 100;
+  return clamp(Math.min(nativeDpr, cap) * scale, 0.5, 2.5);
 }
 
 function smoothstep(edge0, edge1, value) {
@@ -2696,16 +3490,37 @@ function updateAudioSpectrum() {
   const data = analysis.data;
   const scaleBin = data.length / 512;
   const bin = (value) => clamp(Math.floor(value * scaleBin), 0, data.length - 1);
-  const bands = {
-    subBass: { sum: 0, count: 0, start: 0, end: bin(1) },
-    bass: { sum: 0, count: 0, start: bin(2), end: bin(3) },
-    lowMid: { sum: 0, count: 0, start: bin(4), end: bin(7) },
-    mid: { sum: 0, count: 0, start: bin(8), end: bin(18) },
-    highMid: { sum: 0, count: 0, start: bin(19), end: bin(46) },
-    presence: { sum: 0, count: 0, start: bin(47), end: bin(93) },
-    brilliance: { sum: 0, count: 0, start: bin(94), end: bin(186) },
-    air: { sum: 0, count: 0, start: bin(187), end: bin(372) }
-  };
+  const subBassEnd = bin(1);
+  const bassStart = bin(2);
+  const bassEnd = bin(3);
+  const lowMidStart = bin(4);
+  const lowMidEnd = bin(7);
+  const midStart = bin(8);
+  const midEnd = bin(18);
+  const highMidStart = bin(19);
+  const highMidEnd = bin(46);
+  const presenceStart = bin(47);
+  const presenceEnd = bin(93);
+  const brillianceStart = bin(94);
+  const brillianceEnd = bin(186);
+  const airStart = bin(187);
+  const airEnd = bin(372);
+  let subBassSum = 0;
+  let subBassCount = 0;
+  let bassSum = 0;
+  let bassCount = 0;
+  let lowMidSum = 0;
+  let lowMidCount = 0;
+  let midSum = 0;
+  let midCount = 0;
+  let highMidSum = 0;
+  let highMidCount = 0;
+  let presenceSum = 0;
+  let presenceCount = 0;
+  let brillianceSum = 0;
+  let brillianceCount = 0;
+  let airSum = 0;
+  let airCount = 0;
 
   let energySum = 0;
   let centroidNum = 0;
@@ -2732,33 +3547,51 @@ function updateAudioSpectrum() {
     }
     analysis.previousData[index] = value;
 
-    for (const band of Object.values(bands)) {
-      if (index < band.start || index > band.end) continue;
-      band.sum += value;
-      band.count += 1;
-      break;
+    if (index <= subBassEnd) {
+      subBassSum += value;
+      subBassCount += 1;
+    } else if (index >= bassStart && index <= bassEnd) {
+      bassSum += value;
+      bassCount += 1;
+    } else if (index >= lowMidStart && index <= lowMidEnd) {
+      lowMidSum += value;
+      lowMidCount += 1;
+    } else if (index >= midStart && index <= midEnd) {
+      midSum += value;
+      midCount += 1;
+    } else if (index >= highMidStart && index <= highMidEnd) {
+      highMidSum += value;
+      highMidCount += 1;
+    } else if (index >= presenceStart && index <= presenceEnd) {
+      presenceSum += value;
+      presenceCount += 1;
+    } else if (index >= brillianceStart && index <= brillianceEnd) {
+      brillianceSum += value;
+      brillianceCount += 1;
+    } else if (index >= airStart && index <= airEnd) {
+      airSum += value;
+      airCount += 1;
     }
   }
 
-  const averageBand = (band) => band.sum / Math.max(1, band.count);
-  const subBassRaw = averageBand(bands.subBass);
-  const bassOnlyRaw = averageBand(bands.bass);
-  const lowMidRaw = averageBand(bands.lowMid);
-  const midOnlyRaw = averageBand(bands.mid);
-  const highMidRaw = averageBand(bands.highMid);
-  const presenceRaw = averageBand(bands.presence);
-  const brillianceRaw = averageBand(bands.brilliance);
-  const airRaw = averageBand(bands.air);
+  const subBassRaw = subBassSum / Math.max(1, subBassCount);
+  const bassOnlyRaw = bassSum / Math.max(1, bassCount);
+  const lowMidRaw = lowMidSum / Math.max(1, lowMidCount);
+  const midOnlyRaw = midSum / Math.max(1, midCount);
+  const highMidRaw = highMidSum / Math.max(1, highMidCount);
+  const presenceRaw = presenceSum / Math.max(1, presenceCount);
+  const brillianceRaw = brillianceSum / Math.max(1, brillianceCount);
+  const airRaw = airSum / Math.max(1, airCount);
   const lowFrequencyRaw = rmsFrequencyBand(data, analysis.analyser, 20, 150);
   const bassRaw = (subBassRaw + bassOnlyRaw + lowMidRaw) / 3;
   const midRaw = (midOnlyRaw + highMidRaw) / 2;
   const trebleRaw = (presenceRaw + brillianceRaw + airRaw) / 3;
   const energyRaw = energySum / Math.max(1, data.length);
   const warmthRaw = energySum > 0
-    ? (bands.subBass.sum + bands.bass.sum + bands.lowMid.sum + bands.mid.sum) / energySum
+    ? (subBassSum + bassSum + lowMidSum + midSum) / energySum
     : 0;
   const brightnessRaw = energySum > 0
-    ? (bands.presence.sum + bands.brilliance.sum + bands.air.sum) / energySum
+    ? (presenceSum + brillianceSum + airSum) / energySum
     : 0;
   const sharpnessRaw = Math.max(0, brightnessRaw - analysis.previousBrightness) * 10;
   analysis.previousBrightness = brightnessRaw;
@@ -2943,6 +3776,7 @@ function buildDynamicCube() {
   const renderer = createDirectX11Renderer(THREE, { antialias: true });
   renderer.setClearColor(0x000000, 0);
   renderer.setPixelRatio(renderPixelRatio('webgl'));
+  const renderQuality = createPresetRenderQuality(renderer, 0.22);
   renderer.domElement.className = 'dynamic-cube-canvas';
   els.dynamicCubeCore.textContent = '';
   els.dynamicCubeCore.appendChild(renderer.domElement);
@@ -3015,6 +3849,7 @@ function buildDynamicCube() {
   cube.phases = phases;
   cube.weights = weights;
   cube.renderer = renderer;
+  cube.renderQuality = renderQuality;
   cube.scene = scene;
   cube.camera = camera;
   cube.group = group;
@@ -3022,9 +3857,17 @@ function buildDynamicCube() {
   cube.dummy = dummy;
   cube.color = color;
   cube.built = true;
+  observePresetRendererSize(cube, els.dynamicCubeCore, resizeDynamicCubeRenderer);
   applyDynamicCubePalette(cube.palette || fallbackLyricPalette(state.currentSong));
-  resizeDynamicCubeRenderer();
-  renderer.render(scene, camera);
+  applyPresetUpscaler({ force: true });
+  if (renderQuality) renderQuality.render(scene, camera, performance.now());
+  else renderer.render(scene, camera);
+}
+
+function observePresetRendererSize(owner, element, resizeRenderer) {
+  if (!owner || !element || owner.resizeObserver || !('ResizeObserver' in window)) return;
+  owner.resizeObserver = new ResizeObserver(() => resizeRenderer());
+  owner.resizeObserver.observe(element);
 }
 
 function resizeDynamicCubeRenderer() {
@@ -3038,7 +3881,8 @@ function resizeDynamicCubeRenderer() {
   cube.lastWidth = width;
   cube.lastHeight = height;
   cube.lastZoom = zoom;
-  cube.renderer.setSize(width, height, false);
+  if (cube.renderQuality) cube.renderQuality.resize(width, height, cube.renderer.getPixelRatio?.() || renderPixelRatio('webgl'));
+  else cube.renderer.setSize(width, height, false);
   const aspect = width / Math.max(1, height);
   const view = 92 / zoom;
   cube.camera.left = -view * aspect / 2;
@@ -3059,13 +3903,15 @@ function updateDynamicCubeMotion() {
   const cube = state.dynamicCube;
   if (!state.playbackPage || state.diyPreset !== 'cube' || !cube.mesh || !cube.renderer || !cube.scene || !cube.camera) return;
   const nowMs = performance.now();
-  if (RENDER_PROFILE.cubeFrameGapMs && cube.lastRenderAt && nowMs - cube.lastRenderAt < RENDER_PROFILE.cubeFrameGapMs) return;
+  const frameGapMs = playbackPresetsUseNativeRefresh() ? 0 : RENDER_PROFILE.cubeFrameGapMs;
+  if (frameGapMs && cube.lastRenderAt && nowMs - cube.lastRenderAt < frameGapMs) return;
   cube.lastRenderAt = nowMs;
   const bass = Math.max(state.visual.bass, els.audio.paused ? 0.04 : 0.22);
   const energy = Math.max(state.visual.energy, els.audio.paused ? 0.04 : 0.18);
   const beat = Math.max(state.visual.beat, els.audio.paused ? 0 : 0.12);
-  cube.bass += (bass - cube.bass) * 0.32;
-  cube.energy += (energy - cube.energy) * 0.24;
+  const frameStep = state.playbackVisual.frameStep || 1;
+  cube.bass += (bass - cube.bass) * (1 - Math.pow(0.68, frameStep));
+  cube.energy += (energy - cube.energy) * (1 - Math.pow(0.76, frameStep));
 
   const t = nowMs / 1000;
   const heart = Math.pow(Math.max(0, Math.sin(t * Math.PI * (1.15 + state.lyricSpeed * 0.26))), 8);
@@ -3073,12 +3919,12 @@ function updateDynamicCubeMotion() {
   const pushBase = (0.7 + cube.bass * 7.8 + beat * 2.7 + heart * cube.bass * 3.4) * state.cubeIntensity * motionScale;
   const scaleBase = 0.96 + cube.bass * 0.11 + beat * 0.035;
   if (els.dynamicCubeScene) {
-    els.dynamicCubeScene.style.setProperty('--scene-rotate-x', `${state.playbackVisual.pitch}rad`);
-    els.dynamicCubeScene.style.setProperty('--scene-rotate-y', `${state.playbackVisual.yaw}rad`);
-    els.dynamicCubeScene.style.setProperty('--cube-glow-alpha', (0.18 + cube.energy * 0.36 + beat * 0.16).toFixed(3));
+    setStylePropertyIfChanged(els.dynamicCubeScene, '--scene-rotate-x', `${state.playbackVisual.pitch}rad`);
+    setStylePropertyIfChanged(els.dynamicCubeScene, '--scene-rotate-y', `${state.playbackVisual.yaw}rad`);
+    setStylePropertyIfChanged(els.dynamicCubeScene, '--cube-glow-alpha', (0.18 + cube.energy * 0.36 + beat * 0.16).toFixed(3));
   }
 
-  resizeDynamicCubeRenderer();
+  if (!cube.resizeObserver) resizeDynamicCubeRenderer();
   cube.group.rotation.x = state.playbackVisual.pitch;
   cube.group.rotation.y = state.playbackVisual.yaw;
 
@@ -3102,7 +3948,8 @@ function updateDynamicCubeMotion() {
     cube.mesh.setMatrixAt(index, dummy.matrix);
   }
   cube.mesh.instanceMatrix.needsUpdate = true;
-  cube.renderer.render(cube.scene, cube.camera);
+  if (cube.renderQuality) cube.renderQuality.render(cube.scene, cube.camera, nowMs);
+  else cube.renderer.render(cube.scene, cube.camera);
 }
 
 function syncFreeCubeControls() {
@@ -3202,18 +4049,18 @@ function updateFreeCubeMotion() {
   const lowFrequency = playing
     ? Math.max(Number(state.visual.lowFrequencyAmplitude) || 0, Number(state.visual.bass) || 0)
     : 0;
-  window.FeFreeCubeRuntime.update(runtime, {
-    now: performance.now(),
-    bass: lowFrequency,
-    energy: playing ? state.visual.energy : 0,
-    beat: playing ? state.visual.beat : 0,
-    yaw: state.playbackVisual.yaw,
-    pitch: state.playbackVisual.pitch,
-    zoom: state.playbackVisual.zoom,
-    dragging: state.playbackVisual.dragging,
-    reducedMotion,
-    pixelRatio: renderPixelRatio('webgl')
-  });
+  const frame = state.freeCube.frame;
+  frame.now = performance.now();
+  frame.bass = lowFrequency;
+  frame.energy = playing ? state.visual.energy : 0;
+  frame.beat = playing ? state.visual.beat : 0;
+  frame.yaw = state.playbackVisual.yaw;
+  frame.pitch = state.playbackVisual.pitch;
+  frame.zoom = state.playbackVisual.zoom;
+  frame.dragging = state.playbackVisual.dragging;
+  frame.reducedMotion = reducedMotion;
+  frame.pixelRatio = presetFsrOutputPixelRatio(state.presetFsr.lastDiagnostics);
+  window.FeFreeCubeRuntime.update(runtime, frame);
 }
 
 function freeCubeRuntimeSnapshot() {
@@ -3243,6 +4090,77 @@ function previewFreeCubeBass(value) {
 function clearFreeCubeBassPreview() {
   if (!state.freeCube.runtime || !window.FeFreeCubeRuntime) return false;
   return window.FeFreeCubeRuntime.clearBassPreview(state.freeCube.runtime);
+}
+
+function buildVoidPrism() {
+  if (!els.voidPrismCore || state.voidPrism.runtime || !window.FeVoidPrismRuntime || !window.THREE) return;
+  state.voidPrism.runtime = window.FeVoidPrismRuntime.create(els.voidPrismCore, {
+    lyric: state.lyricDisplayText || playbackLyricText(),
+    subtitle: state.lyricSubtitleText || playbackLyricSubtitle(),
+    palette: fallbackLyricPalette(state.currentSong),
+    pixelRatio: renderPixelRatio('webgl'),
+    createRenderer: (options) => createDirectX11Renderer(window.THREE, options)
+  });
+}
+
+function disposeVoidPrism() {
+  const runtime = state.voidPrism.runtime;
+  if (!runtime || !window.FeVoidPrismRuntime) return;
+  const before = window.FeVoidPrismRuntime.diagnostics(runtime);
+  window.FeVoidPrismRuntime.dispose(runtime);
+  state.voidPrism.lastDiagnostics = {
+    ...before,
+    ...window.FeVoidPrismRuntime.diagnostics(runtime)
+  };
+  state.voidPrism.runtime = null;
+}
+
+function resizeVoidPrismRenderer() {
+  if (!state.voidPrism.runtime || !window.FeVoidPrismRuntime) return;
+  window.FeVoidPrismRuntime.resize(state.voidPrism.runtime, renderPixelRatio('webgl'));
+}
+
+function updateVoidPrismVisibility() {
+  const visible = state.playbackPage && isVoidPrismPreset();
+  if (els.voidPrismScene) els.voidPrismScene.hidden = !visible;
+  if (els.appShell) els.appShell.classList.toggle('has-void-prism', visible);
+  if (visible) buildVoidPrism();
+  else disposeVoidPrism();
+}
+
+function updateVoidPrismMotion() {
+  const runtime = state.voidPrism.runtime;
+  if (!state.playbackPage || !isVoidPrismPreset() || !runtime || !window.FeVoidPrismRuntime) return;
+  const playing = !!els.audio && !els.audio.paused;
+  window.FeVoidPrismRuntime.setLyric(
+    runtime,
+    state.lyricDisplayText || playbackLyricText(),
+    state.lyricSubtitleText || playbackLyricSubtitle()
+  );
+  const frame = state.voidPrism.frame;
+  frame.now = performance.now();
+  frame.bass = playing ? Math.max(Number(state.visual.lowFrequencyAmplitude) || 0, Number(state.visual.bass) || 0) : 0;
+  frame.energy = playing ? Number(state.visual.energy) || 0 : 0;
+  frame.yaw = state.playbackVisual.yaw;
+  frame.pitch = state.playbackVisual.pitch;
+  frame.zoom = state.playbackVisual.zoom;
+  frame.pixelRatio = presetFsrOutputPixelRatio(state.presetFsr.lastDiagnostics);
+  window.FeVoidPrismRuntime.update(runtime, frame);
+}
+
+function voidPrismRuntimeSnapshot() {
+  if (state.voidPrism.runtime && window.FeVoidPrismRuntime) {
+    return {
+      ...window.FeVoidPrismRuntime.diagnostics(state.voidPrism.runtime),
+      selected: isVoidPrismPreset()
+    };
+  }
+  return {
+    ...(state.voidPrism.lastDiagnostics || {}),
+    active: false,
+    selected: isVoidPrismPreset(),
+    canvasCount: els.voidPrismCore ? els.voidPrismCore.querySelectorAll('canvas').length : 0
+  };
 }
 
 function threeColorFromRgb(THREE, color) {
@@ -3389,21 +4307,21 @@ function createSonicTopographyMaterial(THREE, theme) {
       vec2 movingPos = pos2D * 0.05 + vec2(uTime * 0.1, uTime * 0.05);
       float baseNoise = (snoise(movingPos) + 1.0) * 0.5;
       float wave = sin(pos2D.x * 0.15 + pos2D.y * 0.1 - uTime * 0.6) * 0.5 + 0.5;
-      float globalFalloff = smoothstep(60.0, 30.0, centerDist);
+      float globalFalloff = smoothstep(70.0, 36.0, centerDist);
       float idleField = (snoise(pos2D * 0.085 + vec2(uTime * 0.032, -uTime * 0.026)) + 1.0) * 0.5;
       float idleCluster = smoothstep(0.5, 0.96, idleField + rnd * 0.18);
       float idlePulse = 0.54 + sin(uTime * 0.72 + rnd * 6.283 + baseNoise * 2.4) * 0.46;
       float idleElevation = uIdleBreath * globalFalloff * (idleCluster * idlePulse * 0.76 + wave * 0.13);
-      float lowDrive = max(uSubBass * 1.25, uBass);
+      float lowDrive = max(uSubBass * 1.35, uBass);
       float lowGate = smoothstep(0.055, 0.22, lowDrive);
       float rhythmGate = lowGate * (0.32 + uAudioPulse * 0.68);
 
-      float subRegion = smoothstep(25.0, 0.0, centerDist);
-      float subLift = uSubBass * rhythmGate * subRegion * 2.75;
+      float subRegion = smoothstep(31.0, 0.0, centerDist);
+      float subLift = uSubBass * rhythmGate * subRegion * 4.15;
 
       float bassNoise = snoise(pos2D * 0.1 - vec2(0.0, uTime * 0.2));
-      float bassRegion = smoothstep(35.0, 5.0, centerDist + bassNoise * 5.0);
-      float bassLift = uBass * rhythmGate * bassRegion * smoothstep(0.0, 1.0, rnd + uDensity * 0.5) * 2.25;
+      float bassRegion = smoothstep(44.0, 6.0, centerDist + bassNoise * 5.0);
+      float bassLift = uBass * rhythmGate * bassRegion * smoothstep(0.0, 1.0, rnd + uDensity * 0.5) * 3.4;
 
       float lowMidNoise = snoise(pos2D * 0.05 + vec2(uTime * 0.1, 0.0));
       float lowMidLift = uLowMid * rhythmGate * (lowMidNoise * 0.5 + 0.5) * 0.95;
@@ -3417,7 +4335,7 @@ function createSonicTopographyMaterial(THREE, theme) {
         highMidLift = uHighMid * rhythmGate * highMidRegion * fract(rnd * 7.7) * 0.8;
       }
 
-      float kickSurface = mix(baseNoise, wave, uSmoothness * 0.5 + 0.2) * lowDrive * rhythmGate * 0.38;
+      float kickSurface = mix(baseNoise, wave, uSmoothness * 0.5 + 0.2) * lowDrive * rhythmGate * 0.56;
       float audioElevation = subLift + bassLift + lowMidLift + midLift + highMidLift + kickSurface;
       if (rnd > 0.99) {
         audioElevation += uEnergy * rhythmGate * 0.72;
@@ -3520,11 +4438,11 @@ function createSonicTopographyMaterial(THREE, theme) {
       vec3 warmCore = uWarmCore;
       vec3 warmEdge = uWarmEdge;
 
-      float warmBlend = smoothstep(0.0, 1.0, uWarmth * 1.5 + (0.5 - centerDist / 80.0));
+      float warmBlend = smoothstep(0.0, 1.0, uWarmth * 1.5 + (0.5 - centerDist / 94.0));
       vec3 zoneCore = mix(coolCore, warmCore, warmBlend);
       vec3 zoneEdge = mix(coolEdge, warmEdge, warmBlend);
       vec3 targetGlow = mix(zoneCore, zoneEdge, fract(rnd * 11.0));
-      float distFade = 1.0 - smoothstep(40.0, 75.0, centerDist);
+      float distFade = 1.0 - smoothstep(46.0, 88.0, centerDist);
       targetGlow = mix(targetGlow, vec3(0.4, 0.8, 1.0), uBrightness * 0.6);
       float visualFloor = clamp(0.035 + uBrightness * 0.05 + uAir * 0.04, 0.035, 0.16);
       vec3 currentGlow = mix(cBase2, targetGlow, max(normElevation, visualFloor)) * uGlowIntensity * distFade;
@@ -3536,7 +4454,7 @@ function createSonicTopographyMaterial(THREE, theme) {
 
       if (isTop) {
         float topIntensity = smoothstep(0.0, 0.4, normElevation);
-        float twinkleDistFalloff = smoothstep(60.0, 30.0, centerDist);
+        float twinkleDistFalloff = smoothstep(72.0, 36.0, centerDist);
         float twinkleMultiplier = mix(twinkleDistFalloff, 1.0, smoothstep(0.01, 0.1, normElevation));
 
         bool isSparkleTarget = fract(rnd * 31.0) > 0.95;
@@ -3604,6 +4522,7 @@ function buildSonicTopography() {
   const renderer = createDirectX11Renderer(THREE, { antialias: false });
   renderer.setClearColor(0x000000, 0);
   renderer.setPixelRatio(renderPixelRatio('webgl'));
+  const renderQuality = createPresetRenderQuality(renderer, 0.2);
   renderer.domElement.className = 'sonic-topography-canvas';
   els.sonicTopographyCore.textContent = '';
   els.sonicTopographyCore.appendChild(renderer.domElement);
@@ -3680,6 +4599,7 @@ function buildSonicTopography() {
 
   topo.count = count;
   topo.renderer = renderer;
+  topo.renderQuality = renderQuality;
   topo.scene = scene;
   topo.camera = camera;
   topo.group = group;
@@ -3691,14 +4611,18 @@ function buildSonicTopography() {
   topo.particleMesh = particleMesh;
   topo.particleMaterial = particleMesh.material;
   topo.dummy = dummy;
+  topo.meteorTargetColor = new THREE.Color();
+  topo.whiteColor = new THREE.Color(0xffffff);
   topo.theme = theme;
   topo.ripples = material.uniforms.uRipples.value;
   topo.meteors = Array.from({ length: SONIC_TOPOGRAPHY_METEORS }, () => ({ active: false, x: 0, y: -1000, z: 0, speed: 0, strength: 0 }));
   topo.particles = Array.from({ length: SONIC_TOPOGRAPHY_PARTICLES }, () => ({ active: false, x: 0, y: -1000, z: 0, vx: 0, vy: 0, vz: 0, life: 0, maxLife: 1, scale: 1 }));
   topo.built = true;
+  observePresetRendererSize(topo, els.sonicTopographyCore, resizeSonicTopographyRenderer);
   applySonicTopographyPalette(topo.palette || fallbackLyricPalette(state.currentSong));
-  resizeSonicTopographyRenderer();
-  renderer.render(scene, camera);
+  applyPresetUpscaler({ force: true });
+  if (renderQuality) renderQuality.render(scene, camera, performance.now());
+  else renderer.render(scene, camera);
 }
 
 function resizeSonicTopographyRenderer() {
@@ -3710,7 +4634,8 @@ function resizeSonicTopographyRenderer() {
   if (width === topo.lastWidth && height === topo.lastHeight) return;
   topo.lastWidth = width;
   topo.lastHeight = height;
-  topo.renderer.setSize(width, height, false);
+  if (topo.renderQuality) topo.renderQuality.resize(width, height, topo.renderer.getPixelRatio?.() || renderPixelRatio('webgl'));
+  else topo.renderer.setSize(width, height, false);
   topo.camera.aspect = width / Math.max(1, height);
   topo.camera.updateProjectionMatrix();
 }
@@ -3969,19 +4894,26 @@ function selectWallpaper(id) {
 }
 
 async function refreshWallpapers(options = {}) {
+  const requestedSource = options.source === 'live' || options.source === 'imported'
+    ? options.source
+    : state.wallpaperSource;
+  state.wallpaperSource = requestedSource;
   if (state.wallpaperLoading) return;
-  if (options.source === 'live' || options.source === 'imported') state.wallpaperSource = options.source;
   state.wallpaperLoading = true;
-  setWallpaperStatus(state.wallpaperSource === 'live' ? '正在识别 Wallpaper Engine 库...' : '正在加载已导入壁纸...');
+  setWallpaperStatus(requestedSource === 'live' ? '正在识别 Wallpaper Engine 库...' : '正在加载已导入壁纸...');
   try {
-    const scan = options.scan ?? state.wallpaperSource === 'live';
+    const scan = options.scan ?? requestedSource === 'live';
     const payload = await apiJson(`/api/wallpapers?${query({ scan })}`);
+    if (state.wallpaperSource !== requestedSource) return;
     state.wallpapers = Array.isArray(payload.wallpapers) ? payload.wallpapers : [];
     renderWallpaperList();
   } catch (error) {
-    setWallpaperStatus(error.message || '壁纸加载失败');
+    if (state.wallpaperSource === requestedSource) setWallpaperStatus(error.message || '壁纸加载失败');
   } finally {
     state.wallpaperLoading = false;
+    if (state.wallpaperSource !== requestedSource) {
+      refreshWallpapers({ source: state.wallpaperSource });
+    }
   }
 }
 
@@ -4026,22 +4958,37 @@ function coverParticlePresetVisible() {
   return state.playbackPage && isCoverParticlePreset();
 }
 
-function pauseCoverParticleEngine() {
-  const container = state.coverParticle.engineContainer;
-  if (container && typeof container.pause === 'function') {
+function playCoverParticleEngine() {
+  const cover = state.coverParticle;
+  const container = cover.engineContainer;
+  if (!cover.engineVisible || !coverParticlePresetVisible() || cover.enginePlaying || typeof container?.play !== 'function') return;
+  try {
+    container.play();
+    cover.enginePlaying = true;
+  } catch (error) {}
+}
+
+function pauseCoverParticleEngine(force = false) {
+  const cover = state.coverParticle;
+  const container = cover.engineContainer;
+  if (!container || (!force && !cover.enginePlaying)) return;
+  if (typeof container.pause === 'function') {
     try { container.pause(); } catch (error) {}
   }
+  cover.enginePlaying = false;
 }
 
 function updateCoverParticleVisibility() {
   const visible = coverParticlePresetVisible();
+  const visibilityChanged = visible !== state.coverParticle.engineVisible;
+  state.coverParticle.engineVisible = visible;
   if (els.coverParticleScene) els.coverParticleScene.hidden = !visible;
   if (els.appShell) els.appShell.classList.toggle('has-cover-particle-scene', visible);
   updateCoverParticleBackgroundMode();
   if (visible) {
     updateCoverParticleImage(state.currentSong);
-    ensureCoverParticleEngine();
-  } else {
+    if (visibilityChanged) ensureCoverParticleEngine().then(playCoverParticleEngine);
+  } else if (visibilityChanged) {
     pauseCoverParticleEngine();
   }
 }
@@ -4109,6 +5056,7 @@ function spawnSonicTopographyParticle(x, y, z, speed) {
   particle.maxLife = 0.5 + Math.random() * 0.5;
   particle.scale = Math.random() * 0.6 + 0.2;
   topo.particleIndex = (index + 1) % topo.particles.length;
+  topo.projectilesActive = true;
 }
 
 function spawnSonicTopographyMeteor(strength = 1) {
@@ -4127,20 +5075,26 @@ function spawnSonicTopographyMeteor(strength = 1) {
   meteor.speed = 1 + Math.random() * 0.5 + strength * 1.5;
   meteor.strength = strength;
   topo.meteorIndex = (index + 1) % topo.meteors.length;
+  topo.projectilesActive = true;
 }
 
 function updateSonicTopographyProjectiles(dt) {
   const topo = state.sonicTopography;
   const dummy = topo.dummy;
-  if (!dummy || !topo.meteorMesh || !topo.particleMesh) return;
+  if (!dummy || !topo.meteorMesh || !topo.particleMesh || !topo.projectilesActive) return;
+  const clearAll = topo.projectilesNeedClear;
+  let activeRemaining = false;
+  let meteorMatricesChanged = false;
   for (let i = 0; i < topo.meteors.length; i += 1) {
     const meteor = topo.meteors[i];
     if (!meteor.active) {
+      if (!clearAll) continue;
       dummy.position.set(0, -1000, 0);
       dummy.rotation.set(0, 0, 0);
       dummy.scale.set(0, 0, 0);
       dummy.updateMatrix();
       topo.meteorMesh.setMatrixAt(i, dummy.matrix);
+      meteorMatricesChanged = true;
       continue;
     }
     meteor.y -= meteor.speed * 60 * dt;
@@ -4151,6 +5105,7 @@ function updateSonicTopographyProjectiles(dt) {
       dummy.position.set(0, -1000, 0);
       dummy.scale.set(0, 0, 0);
     } else {
+      activeRemaining = true;
       if (Math.random() > 0.3) spawnSonicTopographyParticle(meteor.x, meteor.y, meteor.z, meteor.speed * 0.2);
       dummy.position.set(meteor.x, Math.max(0, meteor.y), meteor.z);
       dummy.rotation.set(0, 0, 0);
@@ -4158,17 +5113,21 @@ function updateSonicTopographyProjectiles(dt) {
     }
     dummy.updateMatrix();
     topo.meteorMesh.setMatrixAt(i, dummy.matrix);
+    meteorMatricesChanged = true;
   }
-  topo.meteorMesh.instanceMatrix.needsUpdate = true;
+  if (meteorMatricesChanged) topo.meteorMesh.instanceMatrix.needsUpdate = true;
 
+  let particleMatricesChanged = false;
   for (let i = 0; i < topo.particles.length; i += 1) {
     const particle = topo.particles[i];
     if (!particle.active) {
+      if (!clearAll) continue;
       dummy.position.set(0, -1000, 0);
       dummy.rotation.set(0, 0, 0);
       dummy.scale.set(0, 0, 0);
       dummy.updateMatrix();
       topo.particleMesh.setMatrixAt(i, dummy.matrix);
+      particleMatricesChanged = true;
       continue;
     }
     particle.life += dt;
@@ -4177,6 +5136,7 @@ function updateSonicTopographyProjectiles(dt) {
       dummy.position.set(0, -1000, 0);
       dummy.scale.set(0, 0, 0);
     } else {
+      activeRemaining = true;
       particle.x += particle.vx * dt * 10;
       particle.y += particle.vy * dt * 10;
       particle.z += particle.vz * dt * 10;
@@ -4188,8 +5148,11 @@ function updateSonicTopographyProjectiles(dt) {
     }
     dummy.updateMatrix();
     topo.particleMesh.setMatrixAt(i, dummy.matrix);
+    particleMatricesChanged = true;
   }
-  topo.particleMesh.instanceMatrix.needsUpdate = true;
+  if (particleMatricesChanged) topo.particleMesh.instanceMatrix.needsUpdate = true;
+  topo.projectilesNeedClear = false;
+  topo.projectilesActive = activeRemaining;
 }
 
 function resetSonicTopographyAudioMotion(topo) {
@@ -4210,50 +5173,53 @@ function resetSonicTopographyAudioMotion(topo) {
     particle.active = false;
     particle.y = -1000;
   });
+  topo.projectilesNeedClear = true;
+  topo.projectilesActive = true;
 }
 
 function updateSonicTopographyMotion() {
   const topo = state.sonicTopography;
   if (!state.playbackPage || !isSonicTopographyPreset() || !topo.uniforms || !topo.renderer || !topo.scene || !topo.camera) return;
   const nowMs = performance.now();
-  if (RENDER_PROFILE.topographyFrameGapMs && topo.lastRenderAt && nowMs - topo.lastRenderAt < RENDER_PROFILE.topographyFrameGapMs) return;
+  const frameGapMs = playbackPresetsUseNativeRefresh() ? 0 : RENDER_PROFILE.topographyFrameGapMs;
+  if (frameGapMs && topo.lastRenderAt && nowMs - topo.lastRenderAt < frameGapMs) return;
   topo.lastRenderAt = nowMs;
   const now = nowMs / 1000;
-  const dt = topo.lastMotionAt ? clamp((nowMs - topo.lastMotionAt) / 1000, 0.008, 0.04) : 0.016;
+  const dt = topo.lastMotionAt ? clamp((nowMs - topo.lastMotionAt) / 1000, 1 / 360, 0.04) : 0.016;
+  const simulationStep = playbackPresetsUseNativeRefresh()
+    ? dt * (1000 / RENDER_PROFILE.targetFrameMs)
+    : 1;
   topo.lastMotionAt = nowMs;
 
   const audioDriving = Boolean(els.audio.src && !els.audio.paused && !els.audio.ended);
   const live = audioDriving
     ? (state.audioAnalysis.live ? state.audioAnalysis : state.visual)
     : null;
-  const audio = {
-    subBass: audioDriving ? clamp(live.subBass || 0, 0, 1) : 0,
-    bass: audioDriving ? clamp(live.bass || 0, 0, 1) : 0,
-    lowMid: audioDriving ? clamp(live.lowMid || 0, 0, 1) : 0,
-    mid: audioDriving ? clamp(live.mid || 0, 0, 1) : 0,
-    highMid: audioDriving ? clamp(live.highMid || 0, 0, 1) : 0,
-    presence: audioDriving ? clamp(live.presence || 0, 0, 1) : 0,
-    brilliance: audioDriving ? clamp(live.brilliance || 0, 0, 1) : 0,
-    air: audioDriving ? clamp(live.air || 0, 0, 1) : 0,
-    energy: audioDriving ? clamp(live.energy || 0, 0, 1) : 0,
-    warmth: audioDriving ? clamp(live.warmth || 0, 0, 1) : 0,
-    brightness: audioDriving ? clamp(live.brightness || 0, 0, 1) : 0,
-    sharpness: audioDriving ? clamp(live.sharpness || 0, 0, 1) : 0,
-    smoothness: audioDriving ? clamp(live.smoothness == null ? 0.7 : live.smoothness, 0, 1) : 0.7,
-    density: audioDriving ? clamp(live.density || 0, 0, 1) : 0,
-    spectralCentroid: audioDriving ? Number(live.spectralCentroid) || 0 : 0,
-    fluxPulse: audioDriving ? Number(live.fluxPulse) || 0 : 0,
-    fluxMeteor: audioDriving ? Number(live.fluxMeteor) || 0 : 0,
-    beat: audioDriving ? clamp(state.visual.beat || 0, 0, 1) : 0
-  };
+  const audio = topo.frameAudio;
+  audio.subBass = audioDriving ? clamp(live.subBass || 0, 0, 1) : 0;
+  audio.bass = audioDriving ? clamp(live.bass || 0, 0, 1) : 0;
+  audio.lowMid = audioDriving ? clamp(live.lowMid || 0, 0, 1) : 0;
+  audio.mid = audioDriving ? clamp(live.mid || 0, 0, 1) : 0;
+  audio.highMid = audioDriving ? clamp(live.highMid || 0, 0, 1) : 0;
+  audio.presence = audioDriving ? clamp(live.presence || 0, 0, 1) : 0;
+  audio.brilliance = audioDriving ? clamp(live.brilliance || 0, 0, 1) : 0;
+  audio.air = audioDriving ? clamp(live.air || 0, 0, 1) : 0;
+  audio.energy = audioDriving ? clamp(live.energy || 0, 0, 1) : 0;
+  audio.warmth = audioDriving ? clamp(live.warmth || 0, 0, 1) : 0;
+  audio.brightness = audioDriving ? clamp(live.brightness || 0, 0, 1) : 0;
+  audio.sharpness = audioDriving ? clamp(live.sharpness || 0, 0, 1) : 0;
+  audio.smoothness = audioDriving ? clamp(live.smoothness == null ? 0.7 : live.smoothness, 0, 1) : 0.7;
+  audio.density = audioDriving ? clamp(live.density || 0, 0, 1) : 0;
+  audio.spectralCentroid = audioDriving ? Number(live.spectralCentroid) || 0 : 0;
+  audio.fluxPulse = audioDriving ? Number(live.fluxPulse) || 0 : 0;
+  audio.fluxMeteor = audioDriving ? Number(live.fluxMeteor) || 0 : 0;
+  audio.beat = audioDriving ? clamp(state.visual.beat || 0, 0, 1) : 0;
   if (audioDriving) {
-    topo.idleTone = {
-      presence: audio.presence,
-      brilliance: audio.brilliance,
-      air: audio.air,
-      warmth: audio.warmth,
-      brightness: audio.brightness
-    };
+    topo.idleTone.presence = audio.presence;
+    topo.idleTone.brilliance = audio.brilliance;
+    topo.idleTone.air = audio.air;
+    topo.idleTone.warmth = audio.warmth;
+    topo.idleTone.brightness = audio.brightness;
   } else {
     const idleTone = topo.idleTone || {};
     audio.presence = clamp(idleTone.presence ?? 0.16, 0.08, 0.42);
@@ -4300,7 +5266,8 @@ function updateSonicTopographyMotion() {
     topo.scene.fog.color.lerp(theme.uBaseColor1, lerpSpeed);
   }
   if (topo.meteorMaterial && topo.meteorMaterial.color) {
-    topo.meteorMaterial.color.lerp(theme.uWarmCore.clone().lerp(new window.THREE.Color(0xffffff), 0.7), lerpSpeed);
+    topo.meteorTargetColor.copy(theme.uWarmCore).lerp(topo.whiteColor, 0.7);
+    topo.meteorMaterial.color.lerp(topo.meteorTargetColor, lerpSpeed);
   }
   if (topo.particleMaterial && topo.particleMaterial.color && topo.meteorMaterial && topo.meteorMaterial.color) {
     topo.particleMaterial.color.copy(topo.meteorMaterial.color);
@@ -4313,11 +5280,12 @@ function updateSonicTopographyMotion() {
     topo.audioPulse += (0 - topo.audioPulse) * clamp(dt * 5.2, 0, 1);
   } else {
     topo.wasAudioDriving = true;
-    if (topo.pulseCooldown > 0) topo.pulseCooldown -= 1;
-    if (topo.meteorCooldown > 0) topo.meteorCooldown -= 1;
+    if (topo.pulseCooldown > 0) topo.pulseCooldown = Math.max(0, topo.pulseCooldown - simulationStep);
+    if (topo.meteorCooldown > 0) topo.meteorCooldown = Math.max(0, topo.meteorCooldown - simulationStep);
     const lowBassTransient = Math.max(0, lowBassDrive - topo.lastBeat);
     const pulseStrength = clamp(Math.max(audio.fluxPulse * 1.45, lowBassTransient * 2.2, audio.beat * lowBassDrive * 0.72), 0, 1);
-    const pulseRate = pulseStrength > topo.audioPulse ? 0.34 : 0.075;
+    const pulseRateBase = pulseStrength > topo.audioPulse ? 0.34 : 0.075;
+    const pulseRate = 1 - Math.pow(1 - pulseRateBase, simulationStep);
     topo.audioPulse += (pulseStrength - topo.audioPulse) * pulseRate;
     if (topo.pulseCooldown <= 0 && lowBassDrive > 0.075 && pulseStrength > 0.13) {
       const angle = Math.random() * Math.PI * 2;
@@ -4330,16 +5298,12 @@ function updateSonicTopographyMotion() {
       spawnSonicTopographyMeteor(clamp(meteorStrength * 1.25, 0.2, 1.45));
       topo.meteorCooldown = 260;
     }
-    topo.lastBeat += (lowBassDrive - topo.lastBeat) * 0.24;
+    const beatRate = 1 - Math.pow(0.76, simulationStep);
+    topo.lastBeat += (lowBassDrive - topo.lastBeat) * beatRate;
   }
   uniforms.uAudioPulse.value = clamp(topo.audioPulse || 0, 0, 1);
 
-  resizeSonicTopographyRenderer();
-  if (els.sonicTopographyScene) {
-    els.sonicTopographyScene.style.setProperty('--scene-rotate-x', `${state.playbackVisual.pitch}rad`);
-    els.sonicTopographyScene.style.setProperty('--scene-rotate-y', `${state.playbackVisual.yaw}rad`);
-    els.sonicTopographyScene.style.setProperty('--topography-glow-alpha', (0.1 + audio.energy * 0.18 + lowBassDrive * 0.52).toFixed(3));
-  }
+  if (!topo.resizeObserver) resizeSonicTopographyRenderer();
 
   if (!state.playbackVisual.dragging && !reducedMotion) topo.autoYaw += dt * 0.05;
   const baseRadius = Math.hypot(SONIC_TOPOGRAPHY_CAMERA.x, SONIC_TOPOGRAPHY_CAMERA.y, SONIC_TOPOGRAPHY_CAMERA.z);
@@ -4357,7 +5321,8 @@ function updateSonicTopographyMotion() {
   topo.camera.lookAt(0, 0, 0);
 
   updateSonicTopographyProjectiles(dt);
-  topo.renderer.render(topo.scene, topo.camera);
+  if (topo.renderQuality) topo.renderQuality.render(topo.scene, topo.camera, nowMs);
+  else topo.renderer.render(topo.scene, topo.camera);
 }
 
 function hslToRgb(h, s, l) {
@@ -4908,14 +5873,14 @@ function bookGlyphEase(value) {
   return x * x * (3 - 2 * x);
 }
 
-const BOOK_LYRIC_VISUAL_LEAD_SECONDS = 0;
-const BOOK_LYRIC_GLYPH_VISUAL_LEAD_SECONDS = 0.025;
+const BOOK_LYRIC_VISUAL_LEAD_SECONDS = 0.34;
+const BOOK_LYRIC_GLYPH_VISUAL_LEAD_SECONDS = 0.045;
 const BOOK_LYRIC_MIN_GLYPH_VISUAL_SECONDS = 0.08;
 const BOOK_LYRIC_GLYPH_SAMPLE_SECONDS = 0;
 const BOOK_LYRIC_ROLL_WINDOW_GLYPHS = 1.2;
-const LYRIC_FRAME_SAMPLE_SECONDS = 1 / 90;
 const LYRIC_TIMESTAMP_COMPENSATION_SECONDS = 0.22;
 const BOOK_LYRIC_SCROLL_SNAP_PX = 0.65;
+const BOOK_LYRIC_SCROLL_MIN_STEP_SECONDS = 1 / 240;
 const BOOK_LYRIC_SCROLL_MAX_STEP_SECONDS = 0.08;
 
 function resetLyricFrameSync() {
@@ -4964,7 +5929,11 @@ function syncBookLyricScroll(line) {
   }
 
   const lastAt = Number(state.lyricBookScrollFrameAt) || now;
-  const dt = clamp((now - lastAt) / 1000, 0.016, BOOK_LYRIC_SCROLL_MAX_STEP_SECONDS);
+  const dt = clamp(
+    (now - lastAt) / 1000,
+    BOOK_LYRIC_SCROLL_MIN_STEP_SECONDS,
+    BOOK_LYRIC_SCROLL_MAX_STEP_SECONDS
+  );
   state.lyricBookScrollFrameAt = now;
 
   if (state.orb.reducedMotion || !isPlaybackClockRunning() || Math.abs(delta) > list.clientHeight * 1.4) {
@@ -5421,7 +6390,7 @@ function updateFavoriteControls(song = state.currentSong) {
 }
 
 function favoriteProviderIds() {
-  return Object.keys(MUSIC_PROVIDERS);
+  return Object.keys(MUSIC_PROVIDERS).filter((provider) => providerConfigured(provider));
 }
 
 function favoriteCount(provider) {
@@ -8409,6 +9378,8 @@ function closeLoginDialog() {
   clearLoginQrTimer();
   state.loginQrKey = '';
   state.loginQrLoading = false;
+  if (els.qishuiPhoneInput) els.qishuiPhoneInput.value = '';
+  if (els.qishuiCodeInput) els.qishuiCodeInput.value = '';
   els.loginDialog.hidden = true;
   els.loginButton.setAttribute('aria-expanded', 'false');
   els.loginRefresh.disabled = false;
@@ -8419,8 +9390,324 @@ function providerInfo(provider = state.activeProvider) {
   return state.providers[id] || MUSIC_PROVIDERS[id] || MUSIC_PROVIDERS.netease;
 }
 
+function providerConfigured(provider = state.activeProvider) {
+  const info = providerInfo(provider);
+  return info.enabled !== false && info.configured !== false;
+}
+
+function setMusicApiImportStatus(message) {
+  if (els.musicApiImportStatus) els.musicApiImportStatus.textContent = safeText(message, '可导入 JSON 配置或受信任的 ZIP API 包');
+}
+
+function setQishuiPhoneStatus(message) {
+  if (els.qishuiPhoneStatus) els.qishuiPhoneStatus.textContent = safeText(message, '请输入手机号获取验证码');
+}
+
+function clearQishuiPhoneCooldownTimer() {
+  window.clearInterval(state.qishuiPhoneCooldownTimer);
+  state.qishuiPhoneCooldownTimer = 0;
+}
+
+function syncQishuiPhoneControls() {
+  const remaining = Math.max(0, Math.ceil((state.qishuiPhoneCooldownUntil - Date.now()) / 1000));
+  const busy = state.qishuiPhoneSending || state.qishuiPhoneVerifying;
+  if (els.qishuiPhoneInput) els.qishuiPhoneInput.disabled = busy;
+  if (els.qishuiCodeInput) els.qishuiCodeInput.disabled = busy;
+  if (els.qishuiSendCodeButton) {
+    els.qishuiSendCodeButton.disabled = state.qishuiPhoneSending || remaining > 0;
+    els.qishuiSendCodeButton.textContent = state.qishuiPhoneSending
+      ? '发送中'
+      : remaining > 0
+        ? `${remaining} 秒后重发`
+        : '获取验证码';
+  }
+  if (els.qishuiLoginButton) {
+    els.qishuiLoginButton.disabled = busy;
+    els.qishuiLoginButton.textContent = state.qishuiPhoneVerifying ? '登录中…' : '登录汽水音乐';
+  }
+  if (els.qishuiGuestButton) els.qishuiGuestButton.disabled = busy;
+  if (!remaining && state.qishuiPhoneCooldownTimer) clearQishuiPhoneCooldownTimer();
+}
+
+function startQishuiPhoneCooldown(seconds = 60) {
+  state.qishuiPhoneCooldownUntil = Date.now() + clamp(Number(seconds) || 60, 1, 300) * 1000;
+  clearQishuiPhoneCooldownTimer();
+  syncQishuiPhoneControls();
+  state.qishuiPhoneCooldownTimer = window.setInterval(syncQishuiPhoneControls, 500);
+}
+
+function syncLoginMethod(provider = state.activeProvider) {
+  const phoneLogin = providerInfo(provider).id === 'qishui';
+  if (els.qishuiPhoneLogin) els.qishuiPhoneLogin.hidden = !phoneLogin;
+  if (els.qrLoginStage) els.qrLoginStage.hidden = phoneLogin;
+  if (phoneLogin) syncQishuiPhoneControls();
+}
+
+function qishuiPhoneValue() {
+  return safeText(els.qishuiPhoneInput?.value, '').replace(/\D/g, '').slice(0, 11);
+}
+
+function qishuiCodeValue() {
+  return safeText(els.qishuiCodeInput?.value, '').replace(/\D/g, '').slice(0, 6);
+}
+
+function enterQishuiGuestMode() {
+  if (!setActiveProvider('qishui')) return;
+  state.qishuiGuestMode = true;
+  state.loginLoggedIn = false;
+  state.playlistsLoggedIn = false;
+  state.userPlaylists = [];
+  renderLoginStatus({ provider: 'qishui', loggedIn: false, account: null });
+  renderCommunityState({ provider: 'qishui', loggedIn: false, account: null });
+  renderPlaylistOrbit(playbackPlaylists());
+  closeLoginDialog();
+  toast('已进入汽水音乐访客模式：可搜索播放公开免费歌曲，账号歌单、社区和会员歌曲不可用');
+  window.requestAnimationFrame(() => els.searchInput?.focus());
+}
+
+async function sendQishuiPhoneCode() {
+  if (state.qishuiPhoneSending || state.qishuiPhoneVerifying) return;
+  if (state.qishuiPhoneCooldownUntil > Date.now()) {
+    syncQishuiPhoneControls();
+    return;
+  }
+  const phone = qishuiPhoneValue();
+  if (!/^1[3-9]\d{9}$/.test(phone)) {
+    setQishuiPhoneStatus('请输入有效的中国大陆 11 位手机号');
+    els.qishuiPhoneInput?.focus();
+    return;
+  }
+  state.qishuiPhoneSending = true;
+  syncQishuiPhoneControls();
+  setQishuiPhoneStatus('正在请求汽水音乐发送验证码…');
+  try {
+    const payload = await apiJson('/api/qishui/login/phone/send', {
+      method: 'POST',
+      body: JSON.stringify({ phone })
+    });
+    if (payload?.ok !== true || payload?.sent !== true) {
+      throw new Error(payload?.error || '汽水音乐未确认验证码已发送，请稍后重试');
+    }
+    const retryAfter = Number(payload.cooldownSeconds ?? payload.retryAfterSeconds ?? payload.retryAfter ?? payload.data?.retryAfter ?? 60);
+    startQishuiPhoneCooldown(retryAfter);
+    setQishuiPhoneStatus(payload.message || '验证码已发送，请查看短信');
+    els.qishuiCodeInput?.focus();
+  } catch (error) {
+    const payload = error?.payload && typeof error.payload === 'object' ? error.payload : {};
+    const rateLimited = error?.status === 429
+      || error?.code === 'UPSTREAM_RATE_LIMITED'
+      || error?.code === 'SEND_COOLDOWN';
+    if (rateLimited) {
+      const retryAfter = Number(
+        payload.retryAfterSeconds
+        ?? payload.cooldownSeconds
+        ?? payload.retryAfter
+        ?? payload.data?.retryAfter
+        ?? 60
+      );
+      startQishuiPhoneCooldown(retryAfter);
+    }
+    setQishuiPhoneStatus(error.message || '验证码发送失败，请稍后重试');
+  } finally {
+    state.qishuiPhoneSending = false;
+    syncQishuiPhoneControls();
+  }
+}
+
+async function verifyQishuiPhoneLogin(event) {
+  event?.preventDefault?.();
+  if (state.qishuiPhoneSending || state.qishuiPhoneVerifying) return;
+  const phone = qishuiPhoneValue();
+  const code = qishuiCodeValue();
+  if (!/^1[3-9]\d{9}$/.test(phone)) {
+    setQishuiPhoneStatus('请输入有效的中国大陆 11 位手机号');
+    els.qishuiPhoneInput?.focus();
+    return;
+  }
+  if (!/^\d{6}$/.test(code)) {
+    setQishuiPhoneStatus('请输入短信中的 6 位验证码');
+    els.qishuiCodeInput?.focus();
+    return;
+  }
+  state.qishuiPhoneVerifying = true;
+  syncQishuiPhoneControls();
+  setQishuiPhoneStatus('正在验证并建立本机会话…');
+  try {
+    const payload = await apiJson('/api/qishui/login/phone/verify', {
+      method: 'POST',
+      body: JSON.stringify({ phone, code })
+    });
+    if (els.qishuiCodeInput) els.qishuiCodeInput.value = '';
+    const account = await refreshLoginStatus('qishui');
+    const loggedIn = account.loggedIn === true || payload.loggedIn === true || payload.success === true;
+    if (loggedIn && !account.loggedIn) {
+      renderLoginStatus({ ...payload, provider: 'qishui', loggedIn: true, account: payload.account || {} });
+    }
+    if (!loggedIn) throw new Error(payload.message || '验证码已通过，但汽水音乐未返回有效会话');
+    setQishuiPhoneStatus(payload.message || '登录成功，正在同步账号');
+    await refreshUserPlaylists().catch(() => {});
+    window.setTimeout(closeLoginDialog, 500);
+  } catch (error) {
+    setQishuiPhoneStatus(error.message || '登录失败，请检查验证码后重试');
+  } finally {
+    state.qishuiPhoneVerifying = false;
+    syncQishuiPhoneControls();
+  }
+}
+
+function syncMusicApiProviderTabs() {
+  if (!els.loginProviderTabs) return;
+  els.loginProviderTabs.querySelectorAll('[data-login-provider]').forEach((tab) => {
+    const configured = providerConfigured(tab.dataset.loginProvider);
+    tab.classList.toggle('is-unconfigured', !configured);
+    tab.removeAttribute('aria-disabled');
+  });
+}
+
+function mergeMusicApiProviders(payload = {}) {
+  const providers = Array.isArray(payload.providers) ? payload.providers : [];
+  providers.forEach((item) => {
+    const id = safeText(item && item.id, '');
+    if (!id || !MUSIC_PROVIDERS[id]) return;
+    state.providers[id] = {
+      ...state.providers[id],
+      label: safeText(item.label, state.providers[id].label),
+      appName: safeText(item.appName, state.providers[id].appName),
+      apiUrl: safeText(item.baseUrl, state.providers[id].apiUrl),
+      enabled: item.enabled !== false,
+      configured: item.configured !== false,
+      loginQr: item.loginQr === undefined ? state.providers[id].loginQr !== false : item.loginQr !== false,
+      apiStatus: safeText(item.status, '')
+    };
+  });
+  syncMusicApiProviderTabs();
+  if (!providerConfigured(state.activeProvider)) {
+    clearLoginQrTimer();
+    state.loginQrRequestId += 1;
+    state.loginQrLoading = false;
+    const fallback = Object.keys(MUSIC_PROVIDERS).find((provider) => providerConfigured(provider));
+    if (fallback) setActiveProvider(fallback, { reloadQr: !els.loginDialog.hidden });
+  }
+  return providers;
+}
+
+async function refreshMusicApiProviders(options = {}) {
+  try {
+    const payload = await apiJson('/api/music-apis');
+    mergeMusicApiProviders(payload);
+    return payload;
+  } catch (error) {
+    if (!options.silent) setMusicApiImportStatus(error.message || '音乐 API 配置读取失败');
+    return { ok: false, providers: [] };
+  }
+}
+
+async function importMusicApiFile(file) {
+  if (!file || state.musicApiImporting) return;
+  const isZip = /\.zip$/i.test(file.name || '') || /zip/i.test(file.type || '');
+  const maximum = isZip ? 25 * 1024 * 1024 : 64 * 1024;
+  if (file.size > maximum) {
+    setMusicApiImportStatus(isZip ? 'ZIP 包不能超过 25 MB' : 'API 配置不能超过 64 KB');
+    return;
+  }
+  if (isZip && !window.confirm('ZIP API 包会在本机运行其中的服务代码。仅导入你信任的来源，是否继续？')) {
+    setMusicApiImportStatus('已取消导入未确认的 ZIP 包');
+    return;
+  }
+
+  state.musicApiImporting = true;
+  if (els.musicApiImportButton) els.musicApiImportButton.disabled = true;
+  setMusicApiImportStatus(`正在解析 ${safeText(file.name, 'API 文件')}`);
+  try {
+    const payload = await apiJson(`/api/music-apis/import?${query({
+      name: file.name || (isZip ? 'music-api.zip' : 'music-api.json'),
+      trusted: String(isZip)
+    })}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': file.type || 'application/octet-stream',
+        'X-FE-Monster-Import': '1'
+      },
+      body: file
+    });
+    if (payload?.ok === false) throw new Error(payload.error || '音乐 API 导入失败');
+    mergeMusicApiProviders(payload);
+    const imported = Array.isArray(payload.importedProviders) ? payload.importedProviders : [];
+    const importedId = safeText(imported[0]?.id || imported[0], '');
+    setMusicApiImportStatus(imported.length
+      ? `已识别并启用：${imported.map((item) => safeText(item?.label || item?.id || item, '')).filter(Boolean).join('、')}`
+      : 'API 配置已导入');
+    await refreshMusicApiProviders({ silent: true });
+    if (importedId && providerConfigured(importedId)) {
+      setActiveProvider(importedId, { reloadQr: true });
+    }
+    toast('音乐 API 已导入并应用');
+  } catch (error) {
+    setMusicApiImportStatus(error.message || '音乐 API 导入失败');
+  } finally {
+    state.musicApiImporting = false;
+    if (els.musicApiImportButton) els.musicApiImportButton.disabled = false;
+    if (els.musicApiImportInput) els.musicApiImportInput.value = '';
+  }
+}
+
 function providerPath(path, provider = state.activeProvider) {
   return `/api/${providerInfo(provider).id}${path}`;
+}
+
+function syncAndroidLoginWorkflow(provider = state.activeProvider) {
+  if (!ANDROID_CLIENT || !els.androidLoginWorkflow) return;
+  const info = providerInfo(provider);
+  els.androidLoginWorkflow.hidden = false;
+  if (els.androidQrHelp) {
+    els.androidQrHelp.textContent = `保存二维码后，打开${info.appName}，进入扫一扫并从相册选择该二维码。`;
+  }
+  if (els.androidMusicAppButton) {
+    const canOpenApp = !!ANDROID_MUSIC_APP_URIS[info.id];
+    els.androidMusicAppButton.textContent = canOpenApp ? `打开${info.label}` : `请手动打开${info.label}`;
+    els.androidMusicAppButton.disabled = !canOpenApp;
+  }
+}
+
+async function saveAndroidLoginQr() {
+  if (!ANDROID_CLIENT || !els.qrImage || !els.androidQrSaveButton) return;
+  const source = els.qrImage.currentSrc || els.qrImage.getAttribute('src') || '';
+  if (!source) {
+    setQrStatus('二维码尚未生成，请稍后重试');
+    return;
+  }
+  els.androidQrSaveButton.disabled = true;
+  try {
+    if (typeof window.feMonsterAndroidSaveBlob !== 'function') throw new Error('Android 保存能力不可用');
+    const response = await fetch(source, { credentials: 'same-origin' });
+    if (!response.ok) throw new Error(`二维码读取失败 (${response.status})`);
+    const blob = await response.blob();
+    const provider = providerInfo().id;
+    await window.feMonsterAndroidSaveBlob(blob, `fe-monster-${provider}-login-qr.png`);
+    setQrStatus('二维码已保存；请在音乐 App 的扫一扫中从相册选择');
+    toast('登录二维码已保存到手机');
+  } catch (error) {
+    setQrStatus(error.message || '二维码保存失败，请重试');
+  } finally {
+    els.androidQrSaveButton.disabled = !els.qrImage.getAttribute('src');
+  }
+}
+
+function openAndroidMusicApp() {
+  if (!ANDROID_CLIENT) return;
+  const provider = providerInfo().id;
+  const uri = ANDROID_MUSIC_APP_URIS[provider];
+  if (!uri) return;
+  try {
+    if (typeof window.FeMonsterAndroid?.openExternal === 'function') {
+      window.FeMonsterAndroid.openExternal(uri);
+    } else {
+      window.location.href = uri;
+    }
+    setQrStatus(`已尝试打开${providerInfo(provider).appName}；请选择扫一扫 → 相册`);
+  } catch (error) {
+    setQrStatus(`无法打开${providerInfo(provider).appName}，请手动打开后从相册扫码`);
+  }
 }
 
 function playbackQualityProvider(song = state.currentSong) {
@@ -8489,6 +9776,10 @@ function providerHasPlaybackVip(provider = playbackQualityProvider()) {
 }
 
 function playbackQualityOptions(provider = playbackQualityProvider()) {
+  const id = providerInfo(provider).id;
+  if (id === 'qishui' && state.qishuiGuestMode) {
+    return qualityDefinitions(id).filter((option) => option.id === 'standard');
+  }
   const hasVip = providerHasPlaybackVip(provider);
   return qualityDefinitions(provider).filter((option) => !option.vip || hasVip);
 }
@@ -8603,13 +9894,32 @@ async function selectPlaybackQuality(quality) {
 }
 
 function setActiveProvider(provider, options = {}) {
-  const nextProvider = providerInfo(provider).id;
+  const requestedProvider = safeText(provider, 'netease');
+  if (!MUSIC_PROVIDERS[requestedProvider] || !providerConfigured(requestedProvider)) {
+    clearLoginQrTimer();
+    resetQrImage('请先导入 API');
+    setQrStatus(`${safeText(MUSIC_PROVIDERS[requestedProvider]?.label, '该平台')} API 尚未配置，请在上方导入配置或 ZIP 包`);
+    setMusicApiImportStatus(`等待导入${safeText(MUSIC_PROVIDERS[requestedProvider]?.label, '音乐')} API`);
+    els.musicApiImportButton?.focus();
+    return false;
+  }
+  const nextProvider = providerInfo(requestedProvider).id;
   const changed = state.activeProvider !== nextProvider;
   state.activeProvider = nextProvider;
   const info = providerInfo(nextProvider);
+  syncAndroidLoginWorkflow(nextProvider);
+  syncLoginMethod(nextProvider);
 
-  if (els.loginTitle) els.loginTitle.textContent = `${info.label}\u4e8c\u7ef4\u7801\u767b\u5f55`;
-  if (els.loginSubtitle) els.loginSubtitle.textContent = `\u4f7f\u7528${info.appName}\u626b\u7801\u786e\u8ba4`;
+  if (els.loginTitle) els.loginTitle.textContent = nextProvider === 'qishui'
+    ? '汽水音乐'
+    : info.loginQr === false
+      ? `${info.label} API`
+      : `${info.label}\u4e8c\u7ef4\u7801\u767b\u5f55`;
+  if (els.loginSubtitle) els.loginSubtitle.textContent = nextProvider === 'qishui'
+    ? '免登录可播放公开免费歌曲；手机号登录用于同步账号功能'
+    : info.loginQr === false
+      ? '\u5df2\u542f\u7528\u641c\u7d22\u4e0e\u64ad\u653e\uff0c\u5f53\u524d API \u5305\u672a\u58f0\u660e\u626b\u7801\u767b\u5f55'
+      : `\u4f7f\u7528${info.appName}\u626b\u7801\u786e\u8ba4`;
   if (els.loginProviderTabs) {
     els.loginProviderTabs.querySelectorAll('[data-login-provider]').forEach((tab) => {
       const active = tab.dataset.loginProvider === nextProvider;
@@ -8617,10 +9927,14 @@ function setActiveProvider(provider, options = {}) {
       tab.setAttribute('aria-pressed', String(active));
     });
   }
+  syncMusicApiProviderTabs();
 
   if (changed) {
+    state.loginQrRequestId += 1;
+    state.loginQrLoading = false;
     state.playbackQuality = preferredPlaybackQuality(nextProvider);
     state.loginQrKey = '';
+    if (els.qishuiCodeInput) els.qishuiCodeInput.value = '';
     state.userPlaylists = [];
     state.playlistsLoggedIn = false;
     state.searchSuggestions.songs = [];
@@ -8640,21 +9954,33 @@ function setActiveProvider(provider, options = {}) {
   if (options.reloadQr && !els.loginDialog.hidden) loadLoginQr();
   refreshLoginStatus(nextProvider);
   if (changed) scheduleUserPlaylistsRefresh(180);
+  return true;
 }
 
 function renderLoginStatus(payload = {}) {
   const loggedIn = !!payload.loggedIn;
   const provider = providerInfo(payload.provider || state.activeProvider);
+  if (provider.id === 'qishui' && loggedIn) state.qishuiGuestMode = false;
+  const guest = provider.id === 'qishui' && !loggedIn && state.qishuiGuestMode;
   const vip = loggedIn && accountHasVip(payload);
   state.loginStatusByProvider[provider.id] = payload;
+  if (provider.id !== state.activeProvider) return;
   state.loginLoggedIn = loggedIn;
   els.loginButton.classList.toggle('is-logged-in', loggedIn);
   els.loginButton.classList.toggle('has-vip', vip);
-  els.loginLabel.textContent = loggedIn ? accountName(payload) || `${provider.label}\u5df2\u767b\u5f55` : `${provider.label}\u767b\u5f55`;
+  els.loginLabel.textContent = loggedIn
+    ? accountName(payload) || `${provider.label}\u5df2\u767b\u5f55`
+    : guest
+      ? `${provider.label} · 访客`
+      : `${provider.label}\u767b\u5f55`;
   if (els.loginVipBadge) els.loginVipBadge.hidden = !vip;
   els.loginButton.setAttribute('aria-label', loggedIn
     ? `${provider.label}\u5df2\u767b\u5f55\uff1a${els.loginLabel.textContent}${vip ? '\uff0cVIP\u4f1a\u5458' : ''}`
-    : `\u6253\u5f00${provider.label}\u4e8c\u7ef4\u7801\u767b\u5f55`);
+    : provider.id === 'qishui'
+      ? guest
+        ? '汽水音乐访客模式，打开账号登录'
+        : '打开汽水音乐访客或手机号登录'
+      : `\u6253\u5f00${provider.label}\u4e8c\u7ef4\u7801\u767b\u5f55`);
   if (provider.id === playbackQualityProvider()) {
     state.playbackQuality = normalizePlaybackQuality(provider.id, preferredPlaybackQuality(provider.id, state.playbackQuality));
   }
@@ -8666,12 +9992,15 @@ async function refreshLoginStatus(provider = state.activeProvider) {
   try {
     const payload = await apiJson(`/api/login/status?${query({ provider })}`);
     renderLoginStatus(payload);
+    if (providerInfo(provider).id !== state.activeProvider) return payload;
     if (payload.loggedIn) scheduleCommunityRefresh(120);
     else renderCommunityState({ provider, loggedIn: false, account: payload.account || {} });
     return payload;
   } catch (error) {
     renderLoginStatus({ provider, loggedIn: false });
-    renderCommunityState({ provider, loggedIn: false });
+    if (providerInfo(provider).id === state.activeProvider) {
+      renderCommunityState({ provider, loggedIn: false });
+    }
     return { provider, loggedIn: false };
   }
 }
@@ -8680,6 +10009,7 @@ function resetQrImage(message = '\u751f\u6210\u4e8c\u7ef4\u7801') {
   els.qrImage.removeAttribute('src');
   els.qrShell.classList.remove('has-qr');
   els.qrPlaceholder.textContent = message;
+  if (els.androidQrSaveButton) els.androidQrSaveButton.disabled = true;
 }
 
 function showLoginDialog() {
@@ -8687,6 +10017,7 @@ function showLoginDialog() {
   els.loginButton.setAttribute('aria-expanded', 'true');
   setActiveProvider(state.activeProvider);
   loadLoginQr();
+  refreshMusicApiProviders({ silent: true });
 }
 
 function qrCodeMessage(code, message, provider = state.activeProvider) {
@@ -8805,9 +10136,35 @@ async function checkLoginQr() {
 }
 
 async function loadLoginQr() {
-  if (state.loginQrLoading) return;
+  const requestId = ++state.loginQrRequestId;
   const provider = state.activeProvider;
   const info = providerInfo(provider);
+  if (!providerConfigured(provider)) {
+    clearLoginQrTimer();
+    resetQrImage('请先导入 API');
+    setQrStatus(`${info.label} API 尚未配置，请在上方导入配置或 ZIP 包`);
+    return;
+  }
+  if (provider === 'qishui') {
+    clearLoginQrTimer();
+    state.loginQrKey = '';
+    syncLoginMethod(provider);
+    setQishuiPhoneStatus(state.loginStatusByProvider.qishui?.loggedIn
+      ? '汽水音乐已登录，可重新验证以切换账号'
+      : state.qishuiGuestMode
+        ? '当前为访客模式；需要同步账号时可使用手机号登录'
+        : '可免登录进入访客模式，或输入手机号获取验证码');
+    syncQishuiPhoneControls();
+    return;
+  }
+  if (info.loginQr === false) {
+    clearLoginQrTimer();
+    state.loginQrKey = '';
+    resetQrImage('API 已启用');
+    setQrStatus(`${info.label} API 已启用，可搜索播放；当前 API 包未声明扫码登录能力`);
+    els.loginRefresh.disabled = false;
+    return;
+  }
   state.loginQrLoading = true;
   clearLoginQrTimer();
   state.loginQrKey = '';
@@ -8817,7 +10174,7 @@ async function loadLoginQr() {
 
   try {
     const keyPayload = await apiJson(providerPath('/login/qr/key', provider));
-    if (provider !== state.activeProvider) return;
+    if (requestId !== state.loginQrRequestId || provider !== state.activeProvider) return;
     const key = loginQrKeyValue(keyPayload);
     if (!key) throw new Error(keyPayload.error || `\u672a\u83b7\u53d6\u5230${info.label}\u4e8c\u7ef4\u7801 key`);
 
@@ -8825,22 +10182,26 @@ async function loadLoginQr() {
     let qrImage = loginQrImage(keyPayload);
     if (!qrImage) {
       const qrPayload = await apiJson(`${providerPath('/login/qr/create', provider)}?${query({ key, qrimg: 'true' })}`);
-      if (provider !== state.activeProvider) return;
+      if (requestId !== state.loginQrRequestId || provider !== state.activeProvider) return;
       qrImage = loginQrImage(qrPayload);
       if (!qrImage) throw new Error(qrPayload.error || `\u672a\u83b7\u53d6\u5230${info.label}\u4e8c\u7ef4\u7801\u56fe\u7247`);
     }
 
     els.qrImage.src = qrImage;
     els.qrShell.classList.add('has-qr');
+    if (els.androidQrSaveButton) els.androidQrSaveButton.disabled = false;
     setQrStatus(`\u7b49\u5f85${info.appName}\u626b\u7801`);
     state.loginQrTimer = window.setInterval(checkLoginQr, 1800);
     checkLoginQr();
   } catch (error) {
+    if (requestId !== state.loginQrRequestId || provider !== state.activeProvider) return;
     resetQrImage('\u670d\u52a1\u672a\u5c31\u7eea');
     setQrStatus(loginQrFailureMessage(error, provider));
   } finally {
-    state.loginQrLoading = false;
-    els.loginRefresh.disabled = false;
+    if (requestId === state.loginQrRequestId) {
+      state.loginQrLoading = false;
+      els.loginRefresh.disabled = false;
+    }
   }
 }
 
@@ -9010,6 +10371,12 @@ function renderPlaylistOrbit(playlists) {
 async function refreshUserPlaylists() {
   if (document.hidden || state.playlistsLoading) return;
   const provider = state.activeProvider;
+  if (provider === 'qishui' && state.qishuiGuestMode) {
+    state.playlistsLoggedIn = false;
+    state.userPlaylists = [];
+    renderPlaylistOrbit(playbackPlaylists());
+    return;
+  }
   state.playlistsLoading = true;
   try {
     const data = await apiJson(providerPath('/user/playlists', provider));
@@ -9050,9 +10417,12 @@ function isShelfBackFacing(rotateY) {
 function setShelfRotation(x, y) {
   state.shelfRotateX = clamp(x, -58, 58);
   state.shelfRotateY = y;
-  els.playlistShelfStage.style.setProperty('--shelf-rotate-x', `${state.shelfRotateX}deg`);
-  els.playlistShelfStage.style.setProperty('--shelf-rotate-y', `${state.shelfRotateY}deg`);
-  els.playlistShelf.classList.toggle('is-back-facing', isShelfBackFacing(state.shelfRotateY));
+  setStylePropertyIfChanged(els.playlistShelfStage, '--shelf-rotate-x', `${state.shelfRotateX}deg`);
+  setStylePropertyIfChanged(els.playlistShelfStage, '--shelf-rotate-y', `${state.shelfRotateY}deg`);
+  const backFacing = isShelfBackFacing(state.shelfRotateY);
+  if (els.playlistShelf.classList.contains('is-back-facing') !== backFacing) {
+    els.playlistShelf.classList.toggle('is-back-facing', backFacing);
+  }
 }
 
 function syncShelfRotationToPlaybackView(options = {}) {
@@ -9151,11 +10521,13 @@ function syncPlaybackChromeClasses() {
 }
 
 function setPlaybackChromeVisibility(next = {}) {
-  if (typeof next.searchVisible === 'boolean') state.playbackChrome.searchVisible = next.searchVisible;
-  if (typeof next.dockVisible === 'boolean') state.playbackChrome.dockVisible = next.dockVisible;
-  if (typeof next.communityVisible === 'boolean') state.playbackChrome.communityVisible = next.communityVisible;
-  if (typeof next.controlsHidden === 'boolean') state.playbackChrome.controlsHidden = next.controlsHidden;
-  syncPlaybackChromeClasses();
+  let changed = false;
+  for (const key of ['searchVisible', 'dockVisible', 'communityVisible', 'controlsHidden']) {
+    if (typeof next[key] !== 'boolean' || state.playbackChrome[key] === next[key]) continue;
+    state.playbackChrome[key] = next[key];
+    changed = true;
+  }
+  if (changed) syncPlaybackChromeClasses();
 }
 
 function resetPlaybackChromeForMode() {
@@ -9202,6 +10574,31 @@ function updatePlaybackChromeFromPointer(event) {
   });
 }
 
+let uiPointerFrame = 0;
+let latestUiPointer = null;
+
+function scheduleUiPointerUpdates(event) {
+  latestUiPointer = {
+    clientX: event.clientX,
+    clientY: event.clientY,
+    target: event.target
+  };
+  if (uiPointerFrame) return;
+  uiPointerFrame = window.requestAnimationFrame(() => {
+    uiPointerFrame = 0;
+    const pointer = latestUiPointer;
+    latestUiPointer = null;
+    updatePlaybackChromeFromPointer(pointer);
+    updateDiySidebarFromPointer(pointer);
+  });
+}
+
+function cancelUiPointerUpdates() {
+  if (uiPointerFrame) window.cancelAnimationFrame(uiPointerFrame);
+  uiPointerFrame = 0;
+  latestUiPointer = null;
+}
+
 function updatePlaybackPageClass() {
   els.appShell.classList.toggle('is-playback-page', state.playbackPage);
   els.appShell.classList.toggle('has-playlist-song-page', state.playlistSongPageOpen);
@@ -9210,10 +10607,12 @@ function updatePlaybackPageClass() {
   setPlaybackLyricVisible(state.playbackPage);
   updateDynamicCubeVisibility();
   updateFreeCubeVisibility();
+  updateVoidPrismVisibility();
   updateSonicTopographyVisibility();
   updateCoverParticleVisibility();
   updateWallpaperVisibility();
   syncSandboxPlaybackSurface();
+  applyPresetUpscaler({ force: true });
   resetPlaybackChromeForMode();
 }
 
@@ -10371,19 +11770,18 @@ function syncPlaybackLyricToCurrentTime() {
 function syncPlaybackLyricAnimationFrame() {
   if (!state.lyricLines.length || !isPlaybackClockRunning()) return;
   const time = currentPlaybackLyricTime();
-  const sampledTime = Math.round(time / LYRIC_FRAME_SAMPLE_SECONDS) * LYRIC_FRAME_SAMPLE_SECONDS;
   const signature = `${state.lyricSignature}|${state.textPreset}`;
   if (
     state.lyricFrameSignature === signature &&
     state.lyricFramePreset === state.textPreset &&
-    Math.abs(sampledTime - state.lyricFrameTime) < 0.0005
+    Math.abs(time - state.lyricFrameTime) < 0.0005
   ) {
     return;
   }
-  state.lyricFrameTime = sampledTime;
+  state.lyricFrameTime = time;
   state.lyricFramePreset = state.textPreset;
   state.lyricFrameSignature = signature;
-  syncPlaybackLyricAtTime(sampledTime);
+  syncPlaybackLyricAtTime(time);
 }
 
 function lyricProgressForLineAtTime(line, displayTime, endTime, options = {}) {
@@ -10587,13 +11985,13 @@ function setPlaybackLyricVisible(visible) {
 
 function updatePlaybackSceneTransform() {
   if (!els.playbackLyricScene) return;
-  els.playbackLyricScene.style.setProperty('--scene-rotate-x', `${state.playbackVisual.pitch}rad`);
-  els.playbackLyricScene.style.setProperty('--scene-rotate-y', `${state.playbackVisual.yaw}rad`);
-  els.playbackLyricScene.style.setProperty('--playback-zoom', (state.playbackVisual.zoom || 1).toFixed(3));
-  if (els.coverParticleScene) {
-    els.coverParticleScene.style.setProperty('--scene-rotate-x', `${state.playbackVisual.pitch}rad`);
-    els.coverParticleScene.style.setProperty('--scene-rotate-y', `${state.playbackVisual.yaw}rad`);
-    els.coverParticleScene.style.setProperty('--playback-zoom', (state.playbackVisual.zoom || 1).toFixed(3));
+  setStylePropertyIfChanged(els.playbackLyricScene, '--scene-rotate-x', `${state.playbackVisual.pitch}rad`);
+  setStylePropertyIfChanged(els.playbackLyricScene, '--scene-rotate-y', `${state.playbackVisual.yaw}rad`);
+  setStylePropertyIfChanged(els.playbackLyricScene, '--playback-zoom', (state.playbackVisual.zoom || 1).toFixed(3));
+  if (coverParticlePresetVisible()) {
+    setStylePropertyIfChanged(els.coverParticleScene, '--scene-rotate-x', `${state.playbackVisual.pitch}rad`);
+    setStylePropertyIfChanged(els.coverParticleScene, '--scene-rotate-y', `${state.playbackVisual.yaw}rad`);
+    setStylePropertyIfChanged(els.coverParticleScene, '--playback-zoom', (state.playbackVisual.zoom || 1).toFixed(3));
   }
   syncShelfRotationToPlaybackView();
 }
@@ -10781,6 +12179,7 @@ function resetPlaybackView() {
   updatePlaybackSceneTransform();
   resizeDynamicCubeRenderer();
   resizeFreeCubeRenderer();
+  resizeVoidPrismRenderer();
 }
 
 function updateLyricDiyVars() {
@@ -10903,7 +12302,11 @@ const DIY_PRESET_CONFIG_LABELS = Object.freeze({
   freeCubeStyle: '方块样式',
   freeCubeBackground: '柔光背景',
   cubeCount: '方块数量',
-  particleCount: '星河粒子'
+  particleCount: '星河粒子',
+  mirrorCount: '镜面数量',
+  seamCount: '纵深接缝',
+  reflectionMode: '反射方式',
+  reflectionResolution: '反射分辨率'
 });
 
 function diyPresetConfigLabel(key) {
@@ -10916,6 +12319,7 @@ function builtinDiyPresetConfiguration() {
     lyric: '无场景',
     cube: '动感魔方',
     'free-cubes': '自由方块',
+    'void-prism': '虚空棱镜',
     topography: 'Sonic Terrain',
     'rain-glass': '雨天玻璃',
     'cover-particles': '粒子封面',
@@ -10931,6 +12335,12 @@ function builtinDiyPresetConfiguration() {
     runtimeControls.freeCubeBackground = !!state.freeCube.backgroundEnabled;
     runtimeControls.cubeCount = diagnostics.cubeCount || (MOBILE_RENDER_TARGET ? 1100 : 1800);
     runtimeControls.particleCount = diagnostics.particleCount || (MOBILE_RENDER_TARGET ? 760 : 1400);
+  } else if (preset === 'void-prism') {
+    const diagnostics = voidPrismRuntimeSnapshot();
+    runtimeControls.mirrorCount = diagnostics.mirrorCount || 4;
+    runtimeControls.seamCount = diagnostics.seamCount || 4;
+    runtimeControls.reflectionMode = 'Metal012 镜面精抛 · 高清反射 · 8K源材质';
+    runtimeControls.reflectionResolution = diagnostics.reflectionResolution || [];
   } else if (preset === 'cover-particles') {
     runtimeControls.coverBackground = !!state.coverParticle.backgroundEnabled;
   } else if (['lyric', 'rain-glass', 'book'].includes(preset)) {
@@ -11173,7 +12583,7 @@ function enterDiyScenePresetPlayback(id) {
   state.sandbox.playbackAssetFailed = false;
   const playbackAsset = preset.sceneItems[0]?.component?.asset || {};
   if (window.FeStormOceanRuntime?.isProfile?.(playbackAsset.reactivity)) {
-    state.sandbox.stormLightingMode = 'realtime';
+    state.sandbox.stormLightingMode = 'sunset';
     state.sandbox.stormWeatherMode = 'auto';
   }
   const playbackView = playbackAsset.playbackView || {};
@@ -11198,6 +12608,7 @@ function setDiyPreset(preset) {
   if (els.diySceneNonePreset) els.diySceneNonePreset.classList.toggle('is-active', state.diyPreset === 'lyric');
   if (els.diyCubePreset) els.diyCubePreset.classList.toggle('is-active', state.diyPreset === 'cube');
   if (els.diyFreeCubePreset) els.diyFreeCubePreset.classList.toggle('is-active', isFreeCubePreset());
+  if (els.diyVoidPrismPreset) els.diyVoidPrismPreset.classList.toggle('is-active', isVoidPrismPreset());
   if (els.diyTopographyPreset) els.diyTopographyPreset.classList.toggle('is-active', state.diyPreset === 'topography');
   if (els.diyRainGlassPreset) els.diyRainGlassPreset.classList.toggle('is-active', isRainGlassPreset());
   if (els.diyCoverParticlesPreset) els.diyCoverParticlesPreset.classList.toggle('is-active', isCoverParticlePreset());
@@ -11208,6 +12619,7 @@ function setDiyPreset(preset) {
   if (!isRainGlassPreset()) clearRainGlassOverlay();
   updateDynamicCubeVisibility();
   updateFreeCubeVisibility();
+  updateVoidPrismVisibility();
   updateSonicTopographyVisibility();
   updateCoverParticleVisibility();
   updateWallpaperVisibility();
@@ -11222,6 +12634,7 @@ function setDiyPreset(preset) {
   updateWallpaperDiyVars();
   syncDiyPresetAdjustmentVisibility();
   renderDiySelectedPresetConfig();
+  applyPresetUpscaler({ force: true });
 }
 
 function setTextPreset(preset) {
@@ -11399,10 +12812,25 @@ function mergeSandboxComponents(components = []) {
 }
 
 async function loadBundledSceneLibrary() {
+  let payload = null;
+  for (const url of ['/data/android-bundled-library.json', '/data/storm-ocean-preset.json']) {
+    try {
+      const response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok || !String(response.headers.get('content-type') || '').includes('application/json')) continue;
+      const candidate = await response.json();
+      if (Array.isArray(candidate.components) || Array.isArray(candidate.presets)) {
+        payload = candidate;
+        break;
+      }
+    } catch (error) {
+      // Try the smaller built-in preset fallback when the generated library is unavailable.
+    }
+  }
+  if (!payload) {
+    document.documentElement.dataset.bundledLibrary = 'unavailable';
+    return null;
+  }
   try {
-    const response = await fetch('/data/android-bundled-library.json', { cache: 'no-store' });
-    if (!response.ok) return null;
-    const payload = await response.json();
     const bundledComponents = Array.isArray(payload.components) ? payload.components : [];
     const localComponents = state.sandbox.components.filter((component) => component.source !== 'built-in');
     mergeSandboxComponents([...bundledComponents, ...localComponents]);
@@ -11549,6 +12977,8 @@ function sandboxPresetForLocalCache(preset = {}) {
 async function refreshSandboxPresets(options = {}) {
   try {
     let response = await apiJson('/api/sandbox/presets');
+    if (response?.ok === false) throw new Error(response.error || '预设服务不可用');
+    const bundledPresets = state.sandbox.presets.filter((preset) => preset.libraryPlacement === 'desktop-scene');
     const serverIds = new Set(Array.isArray(response.presets) ? response.presets.map((preset) => preset.id) : []);
     const legacyPresets = options.migrateLocal === false ? [] : state.sandbox.presets.filter((preset) => (
       preset.presetType === 'scene'
@@ -11561,10 +12991,14 @@ async function refreshSandboxPresets(options = {}) {
         method: 'POST',
         body: JSON.stringify({ preset: legacyPreset })
       });
+      if (response?.ok === false) throw new Error(response.error || '预设服务不可用');
     }
-    const presets = Array.isArray(response.presets)
-      ? response.presets.map(normalizeSandboxPreset).filter((preset) => !REMOVED_SANDBOX_PRESET_IDS.has(preset.id))
-      : [];
+    const presetById = new Map(bundledPresets.map((preset) => [preset.id, normalizeSandboxPreset(preset)]));
+    (Array.isArray(response.presets) ? response.presets : [])
+      .map(normalizeSandboxPreset)
+      .filter((preset) => !REMOVED_SANDBOX_PRESET_IDS.has(preset.id))
+      .forEach((preset) => presetById.set(preset.id, preset));
+    const presets = Array.from(presetById.values());
     state.sandbox.presets = presets;
     state.sandbox.presetFolder = safeText(response.folder, '');
     saveSandboxPresets();
@@ -11989,7 +13423,12 @@ function disposeSandboxMesh(mesh) {
 function sandboxAssetUrl(value) {
   try {
     const resolved = new URL(safeText(value, ''), window.location.origin);
-    if (resolved.origin !== window.location.origin || resolved.pathname !== '/api/sandbox/assets') return '';
+    if (resolved.origin !== window.location.origin) return '';
+    const pathname = resolved.pathname;
+    const bundledAsset = pathname.startsWith('/bundled-assets/');
+    const stormAsset = pathname.startsWith('/assets/storm-ocean/');
+    const sandboxApiAsset = pathname === '/api/sandbox/assets';
+    if ((!bundledAsset && !stormAsset && !sandboxApiAsset) || /%2f|%5c/i.test(pathname)) return '';
     return `${resolved.pathname}${resolved.search}`;
   } catch (error) {
     return '';
@@ -12188,7 +13627,7 @@ function loadSandboxGltf(item, group) {
     group.add(root);
     group.userData.assetRoot = root;
     group.userData.assetReactiveNodes = reactiveNodes;
-    if (Array.isArray(gltf.animations) && gltf.animations.length && THREE.AnimationMixer) {
+    if (!stormAsset && Array.isArray(gltf.animations) && gltf.animations.length && THREE.AnimationMixer) {
       const mixer = new THREE.AnimationMixer(root);
       gltf.animations.forEach((clip) => mixer.clipAction(clip).play());
       group.userData.assetMixer = mixer;
@@ -12423,6 +13862,7 @@ function syncSandboxRendererBackground() {
   const renderer = state.sandbox.renderer;
   const scene3d = state.sandbox.scene3d;
   if (!renderer || !scene3d || !window.THREE) return;
+  applySandboxRenderClarity();
   const stormOceanItem = activeStormOceanSceneItem();
   const playbackAsset = sandboxPlaybackActive()
     ? (stormOceanItem?.component?.asset || state.sandbox.sceneItems[0]?.component?.asset)
@@ -12431,10 +13871,6 @@ function syncSandboxRendererBackground() {
   const stormOcean = !!stormOceanItem;
   const transparentPlayback = sandboxPlaybackActive() && state.sandbox.playbackKeepBackground && !stormOcean;
   if (stormOcean) {
-    const stormRenderMode = MOBILE_RENDER_TARGET ? 'auto' : 'native';
-    if (state.sandbox.renderQuality?.getDiagnostics?.().mode !== stormRenderMode) {
-      state.sandbox.renderQuality?.setMode?.(stormRenderMode);
-    }
     renderer.setClearColor(0x020609, transparentPlayback ? 0 : 1);
     scene3d.background = transparentPlayback ? null : new window.THREE.Color(0x050b10);
     window.FeStormOceanRuntime.configureScene(scene3d, renderer, window.THREE, reactivity);
@@ -12453,9 +13889,6 @@ function syncSandboxRendererBackground() {
       if (child.name === 'SandboxRustRim') child.intensity = 0;
     });
     return;
-  }
-  if (state.sandbox.renderQuality?.getDiagnostics?.().mode === 'native') {
-    state.sandbox.renderQuality?.setMode?.('auto');
   }
   renderer.setClearColor(0x030708, transparentPlayback ? 0 : 1);
   const playback = sandboxPlaybackActive();
@@ -12551,23 +13984,20 @@ function initSandboxRenderer() {
     alpha: true
   });
   renderer.setClearColor(0x030708, 1);
-  renderer.setPixelRatio(Math.min(Number(window.devicePixelRatio) || 1, RENDER_PROFILE.webglDprMax));
+  renderer.setPixelRatio(sandboxRenderPixelRatio());
   renderer.shadowMap.enabled = !MOBILE_RENDER_TARGET;
   renderer.shadowMap.type = THREE.BasicShadowMap;
   if ('outputEncoding' in renderer && THREE.sRGBEncoding) renderer.outputEncoding = THREE.sRGBEncoding;
   if ('toneMapping' in renderer && THREE.ACESFilmicToneMapping) renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1;
-  const renderQualityMode = new URLSearchParams(window.location.search).get('render-quality') === 'native'
-    ? 'native'
-    : 'auto';
   const renderQuality = window.FeRenderQuality?.create?.(renderer, {
     THREE,
-    mode: renderQualityMode,
-    initialScale: MOBILE_RENDER_TARGET ? (RENDER_PROFILE.tier === 'economy' ? 0.5 : 0.59) : RENDER_PROFILE.tier === 'high' ? 0.77 : 0.67,
-    minScale: MOBILE_RENDER_TARGET ? 0.44 : RENDER_PROFILE.tier === 'economy' ? 0.5 : 0.59,
-    maxScale: MOBILE_RENDER_TARGET ? (RENDER_PROFILE.tier === 'economy' ? 0.64 : 0.74) : RENDER_PROFILE.tier === 'high' ? 1 : 0.84,
-    targetFrameMs: MOBILE_RENDER_TARGET ? RENDER_PROFILE.targetFrameMs : RENDER_PROFILE.tier === 'economy' ? 30 : 21,
-    sharpness: MOBILE_RENDER_TARGET ? 0.28 : 0.34
+    mode: 'native',
+    initialScale: 1,
+    minScale: 0.5,
+    maxScale: 1,
+    targetFrameMs: state.renderClarity.targetFrameMs,
+    sharpness: 0.28
   }) || null;
 
   const scene3d = new THREE.Scene();
@@ -12616,6 +14046,7 @@ function initSandboxRenderer() {
 
   state.sandbox.renderer = renderer;
   state.sandbox.renderQuality = renderQuality;
+  applySandboxRenderClarity(true);
   state.clientRuntime.renderCapabilities.diagnostics = renderQuality?.getDiagnostics?.() || null;
   syncRenderTechnologyStatus();
   state.sandbox.scene3d = scene3d;
@@ -12937,6 +14368,7 @@ function sandboxSceneItemRuntimeSnapshot(itemId) {
     waveFollowerActive: Boolean(mesh?.userData?.stormWaveFollower),
     stormOcean: stormRuntime ? {
       runtimeVersion: window.FeStormOceanRuntime?.runtimeVersion || '',
+      cyclesEnvironment: window.FeStormOceanRuntime?.cyclesEnvironmentDiagnostics?.() || {},
       materialCount: stormRuntime.oceanMaterials?.length || 0,
       compiledMaterialCount: stormRuntime.oceanMaterials?.filter((material) => material.userData?.stormOceanShader).length || 0,
       waterTextureResolution: Number(stormRuntime.waterTextures?.textureState?.resolution) || 0,
@@ -13060,6 +14492,7 @@ window.FeSandboxDiagnostics = Object.freeze({
   triggerStormLightning: triggerSandboxStormLightning,
   previewSunsetSeagulls: previewSandboxSunsetSeagulls,
   freeCube: freeCubeRuntimeSnapshot,
+  voidPrism: voidPrismRuntimeSnapshot,
   previewFreeCubeBass,
   clearFreeCubeBassPreview
 });
@@ -13169,14 +14602,8 @@ function animateSandboxMesh(item, mesh, now) {
 }
 
 function sandboxFrameInterval() {
-  const particleCount = state.sandbox.sceneItems
-    .filter((item) => item.component.category === 'particle')
-    .reduce((total, item) => total + sandboxParticleCountForItem(item), 0);
   if (reducedMotion) return 1000 / 20;
-  if (MOBILE_RENDER_TARGET) return RENDER_PROFILE.tier === 'economy' ? 1000 / 24 : 1000 / 30;
-  if (particleCount > 1200 || state.sandbox.sceneItems.length > 12) return 1000 / 30;
-  if (particleCount > 600 || state.sandbox.sceneItems.length > 6) return 1000 / 40;
-  return 1000 / 50;
+  return 0;
 }
 
 function sandboxHasContinuousMotion(previewComponent = null) {
@@ -13200,6 +14627,7 @@ function renderSandboxFrame(now = performance.now()) {
 
   const previewActive = sandbox.open && sandbox.tab === 'generator' && !!sandbox.previewMesh;
   const elapsed = now - sandbox.lastFrameAt;
+  const frameStep = sandbox.lastFrameAt ? clamp(elapsed / 20, 0.05, 2.5) : 1;
   const previewComponent = previewActive ? readSandboxComponentForm() : null;
   const continuous = sandboxHasContinuousMotion(previewComponent);
   if (!sandbox.renderRequested && elapsed < sandboxFrameInterval()) {
@@ -13217,7 +14645,7 @@ function renderSandboxFrame(now = performance.now()) {
     if (mesh) animateSandboxMesh(item, mesh, now);
   });
   if (previewActive && previewComponent) {
-    if (!reducedMotion && previewComponent.rotation360) sandbox.previewMesh.rotation.y += 0.008 * previewComponent.speed;
+    if (!reducedMotion && previewComponent.rotation360) sandbox.previewMesh.rotation.y += 0.008 * previewComponent.speed * frameStep;
     const pulse = previewComponent.motion === 'music' && !reducedMotion
       ? 1 + sandboxAudioSignal(previewComponent, now) * previewComponent.amplitude / 480
       : 1;
@@ -13242,6 +14670,7 @@ function renderSandboxFrame(now = performance.now()) {
   if (previewActive && sandbox.previewRenderer && sandbox.previewScene && sandbox.previewCamera) {
     sandbox.previewRenderer.render(sandbox.previewScene, sandbox.previewCamera);
   }
+  observeRenderClarityFrame(now);
   sandbox.lastFrameAt = now;
   sandbox.renderRequested = false;
   if (continuous) sandbox.animationFrame = window.requestAnimationFrame(renderSandboxFrame);
@@ -13909,6 +15338,7 @@ function setSandboxOpen(open) {
     els.sandboxModeButton.setAttribute('aria-label', state.sandbox.open ? '退出沙盒模式' : '进入沙盒模式');
   }
   syncSandboxPlaybackSurface();
+  applyPresetUpscaler({ force: true });
   if (state.sandbox.open) {
     if (state.diyOpen) setDiyOpen(false);
     renderSandboxLibrary();
@@ -15372,6 +16802,7 @@ function bindEvents() {
   if (els.diySceneNonePreset) els.diySceneNonePreset.addEventListener('click', () => enterPresetPlaybackPage('lyric'));
   if (els.diyCubePreset) els.diyCubePreset.addEventListener('click', () => enterPresetPlaybackPage('cube'));
   if (els.diyFreeCubePreset) els.diyFreeCubePreset.addEventListener('click', () => enterPresetPlaybackPage('free-cubes'));
+  if (els.diyVoidPrismPreset) els.diyVoidPrismPreset.addEventListener('click', () => enterPresetPlaybackPage('void-prism'));
   if (els.diyTopographyPreset) els.diyTopographyPreset.addEventListener('click', () => enterPresetPlaybackPage('topography'));
   if (els.diyRainGlassPreset) els.diyRainGlassPreset.addEventListener('click', () => enterPresetPlaybackPage('rain-glass'));
   if (els.diyCoverParticlesPreset) els.diyCoverParticlesPreset.addEventListener('click', () => enterPresetPlaybackPage('cover-particles'));
@@ -15455,6 +16886,28 @@ function bindEvents() {
       saveWallpaperPrefs();
     });
   }
+  if (els.renderClarityAutoToggle) {
+    els.renderClarityAutoToggle.addEventListener('change', () => {
+      setRenderClarityAuto(els.renderClarityAutoToggle.checked);
+    });
+  }
+  if (els.renderClarityRange) {
+    els.renderClarityRange.addEventListener('input', () => {
+      setRenderClarityManualPercent(els.renderClarityRange.value);
+    });
+    els.renderClarityRange.addEventListener('change', () => {
+      if (!state.renderClarity.auto) toast(`清晰度已设为 ${state.renderClarity.manualPercent}%`);
+    });
+  }
+  if (els.presetFsrToggle) {
+    els.presetFsrToggle.addEventListener('change', () => setPresetFsrEnabled(els.presetFsrToggle.checked));
+  }
+  if (els.presetFsrVersion) {
+    els.presetFsrVersion.addEventListener('change', () => setPresetFsrVersion(els.presetFsrVersion.value));
+  }
+  if (els.presetFsrMode) {
+    els.presetFsrMode.addEventListener('change', () => setPresetFsrMode(els.presetFsrMode.value));
+  }
   for (const input of [els.gpuAccelerationToggle, els.directX11Toggle, els.xAudio2Toggle, els.x3DAudioToggle, els.gestureControlToggle]) {
     if (input) input.addEventListener('change', saveRuntimeSettings);
   }
@@ -15467,6 +16920,25 @@ function bindEvents() {
   els.loginButton.addEventListener('click', showLoginDialog);
   els.loginClose.addEventListener('click', closeLoginDialog);
   els.loginRefresh.addEventListener('click', loadLoginQr);
+  if (els.qishuiPhoneInput) {
+    els.qishuiPhoneInput.addEventListener('input', () => {
+      els.qishuiPhoneInput.value = qishuiPhoneValue();
+    });
+  }
+  if (els.qishuiCodeInput) {
+    els.qishuiCodeInput.addEventListener('input', () => {
+      els.qishuiCodeInput.value = qishuiCodeValue();
+    });
+  }
+  if (els.qishuiSendCodeButton) els.qishuiSendCodeButton.addEventListener('click', sendQishuiPhoneCode);
+  if (els.qishuiGuestButton) els.qishuiGuestButton.addEventListener('click', enterQishuiGuestMode);
+  if (els.qishuiPhoneLogin) els.qishuiPhoneLogin.addEventListener('submit', verifyQishuiPhoneLogin);
+  if (els.musicApiImportButton && els.musicApiImportInput) {
+    els.musicApiImportButton.addEventListener('click', () => els.musicApiImportInput.click());
+    els.musicApiImportInput.addEventListener('change', () => importMusicApiFile(els.musicApiImportInput.files?.[0]));
+  }
+  if (els.androidQrSaveButton) els.androidQrSaveButton.addEventListener('click', saveAndroidLoginQr);
+  if (els.androidMusicAppButton) els.androidMusicAppButton.addEventListener('click', openAndroidMusicApp);
   if (els.loginProviderTabs) {
     els.loginProviderTabs.addEventListener('click', (event) => {
       const tab = event.target.closest('[data-login-provider]');
@@ -15638,9 +17110,9 @@ function bindEvents() {
     });
   }
   window.addEventListener('fe-blur-lyrics-ready', () => syncBlurLyricComponent());
-  window.addEventListener('pointermove', updatePlaybackChromeFromPointer, { passive: true });
-  window.addEventListener('pointermove', updateDiySidebarFromPointer, { passive: true });
+  window.addEventListener('pointermove', scheduleUiPointerUpdates, { passive: true });
   window.addEventListener('pointerleave', () => {
+    cancelUiPointerUpdates();
     setPlaybackChromeVisibility({
       searchVisible: state.playbackPage ? false : state.playbackChrome.searchVisible,
       dockVisible: state.playbackChrome.dockPinned
@@ -15674,9 +17146,11 @@ function bindEvents() {
   }, { passive: true });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
+      state.renderClarity.lastFrameAt = 0;
       stopCommunityEventStream(false);
       return;
     }
+    resetRenderClaritySampling(renderClaritySceneKey(), 30);
     refreshPlayerState().catch(() => {});
     refreshVisualBridge();
     refreshNativeAudioSample();
@@ -16062,7 +17536,7 @@ function coverParticleEngineOptions() {
   const palette = state.coverParticle.palette || fallbackLyricPalette(state.currentSong);
   return {
     fullScreen: { enable: false },
-    fpsLimit: reducedMotion ? 36 : 60,
+    fpsLimit: reducedMotion ? 36 : 1000,
     detectRetina: true,
     background: { color: 'transparent' },
     particles: {
@@ -16101,16 +17575,13 @@ function coverParticleEngineOptions() {
 
 function ensureCoverParticleEngine() {
   if (!els.coverParticleEngine || !coverParticlePresetVisible()) return Promise.resolve(null);
-  if (state.coverParticle.engineContainer) {
-    if (typeof state.coverParticle.engineContainer.play === 'function') {
-      try { state.coverParticle.engineContainer.play(); } catch (error) {}
-    }
-    return Promise.resolve(state.coverParticle.engineContainer);
-  }
-  return ensureTsParticlesBundle()
+  const cover = state.coverParticle;
+  if (cover.engineContainer) return Promise.resolve(cover.engineContainer);
+  if (cover.enginePromise) return cover.enginePromise;
+  const pending = ensureTsParticlesBundle()
     .then((engine) => {
-      if (!coverParticlePresetVisible() || state.coverParticle.engineContainer || !engine || typeof engine.load !== 'function') {
-        return state.coverParticle.engineContainer;
+      if (!coverParticlePresetVisible() || cover.engineContainer || !engine || typeof engine.load !== 'function') {
+        return cover.engineContainer;
       }
       return engine.load({
         id: 'coverParticleEngine',
@@ -16118,10 +17589,19 @@ function ensureCoverParticleEngine() {
       });
     })
     .then((container) => {
-      if (container) state.coverParticle.engineContainer = container;
+      if (container && container !== cover.engineContainer) {
+        cover.engineContainer = container;
+        cover.enginePlaying = false;
+      }
+      if (container && (!cover.engineVisible || !coverParticlePresetVisible())) pauseCoverParticleEngine(true);
       return container;
     })
     .catch(() => null);
+  cover.enginePromise = pending;
+  pending.finally(() => {
+    if (cover.enginePromise === pending) cover.enginePromise = null;
+  });
+  return pending;
 }
 
 function coverParticleFallbackColor(index, radius) {
@@ -16367,6 +17847,8 @@ function ensureCoverParticleGpu(frame) {
       renderer.setPixelRatio(1);
       renderer.autoClear = true;
       cover.gpuRenderer = renderer;
+      cover.gpuWidth = 0;
+      cover.gpuHeight = 0;
       cover.gpuScene = new THREE.Scene();
       cover.gpuCamera = new THREE.Camera();
       cover.gpuMaterial = coverParticleGpuMaterial(THREE);
@@ -16444,7 +17926,11 @@ function drawCoverParticleSceneGpu(frame, width, height, dpr, now, t, audioActiv
   const renderer = cover.gpuRenderer;
   const material = cover.gpuMaterial;
   const uniforms = material.uniforms;
-  renderer.setSize(width, height, false);
+  if (cover.gpuWidth !== width || cover.gpuHeight !== height) {
+    renderer.setSize(width, height, false);
+    cover.gpuWidth = width;
+    cover.gpuHeight = height;
+  }
 
   const zoom = clamp(state.playbackVisual.zoom || 1, 0.58, 2.35);
   const coverSize = Math.min(width, height) * 0.76 * zoom;
@@ -16480,7 +17966,6 @@ function drawCoverParticleScene(width, height, dpr) {
   if (!frame) return;
   width = frame.width;
   height = frame.height;
-  ensureCoverParticleEngine();
   buildCoverParticleSamples(width, height, dpr);
   updatePlaybackQuality(state.playbackVisual);
 
@@ -16499,8 +17984,11 @@ function drawCoverParticleScene(width, height, dpr) {
   const audioEnergy = audioActive
     ? Math.max(state.visual.energy || 0, 0.38)
     : 0;
-  cover.bass += (audioBass - cover.bass) * (audioActive ? 0.24 : 0.36);
-  cover.energy += (audioEnergy - cover.energy) * (audioActive ? 0.18 : 0.28);
+  const frameStep = state.playbackVisual.frameStep || 1;
+  const bassRate = 1 - Math.pow(1 - (audioActive ? 0.24 : 0.36), frameStep);
+  const energyRate = 1 - Math.pow(1 - (audioActive ? 0.18 : 0.28), frameStep);
+  cover.bass += (audioBass - cover.bass) * bassRate;
+  cover.energy += (audioEnergy - cover.energy) * energyRate;
 
   if (drawCoverParticleSceneGpu(frame, width, height, dpr, now, t, audioActive)) return;
 
@@ -16652,12 +18140,18 @@ function updateOrbMotion() {
 
 function updatePlaybackSceneMotion() {
   const visual = state.playbackVisual;
+  const now = performance.now();
+  const simulationStep = playbackPresetsUseNativeRefresh() && visual.lastMotionAt
+    ? clamp((now - visual.lastMotionAt) / RENDER_PROFILE.targetFrameMs, 0.05, 2)
+    : 1;
+  visual.lastMotionAt = now;
+  visual.frameStep = simulationStep;
   if (state.lyricLines.length && state.textPreset !== 'book') syncPlaybackLyricAnimationFrame();
   if (!visual.dragging && !state.orb.reducedMotion) {
-    visual.yaw += visual.velocityYaw;
-    visual.pitch += visual.velocityPitch;
-    visual.velocityYaw *= 0.91;
-    visual.velocityPitch *= 0.91;
+    visual.yaw += visual.velocityYaw * simulationStep;
+    visual.pitch += visual.velocityPitch * simulationStep;
+    visual.velocityYaw *= Math.pow(0.91, simulationStep);
+    visual.velocityPitch *= Math.pow(0.91, simulationStep);
   }
   visual.yaw = wrapRadians(visual.yaw);
   visual.pitch = wrapRadians(visual.pitch);
@@ -16668,9 +18162,10 @@ function updatePlaybackSceneMotion() {
   const lowFrequency = Math.max(Number(state.visual.lowFrequencyAmplitude) || 0, bass);
   const beat = Math.max(state.visual.beat, els.audio.paused ? 0.04 : 0.32);
   const targetPulse = els.audio.paused ? 0.08 : clamp(energy * 0.42 + bass * 0.28 + beat * 0.48, 0.08, 1.18);
-  const response = clamp(0.08 * state.lyricSpeed, 0.045, 0.24);
+  const responseBase = clamp(0.08 * state.lyricSpeed, 0.045, 0.24);
+  const response = 1 - Math.pow(1 - responseBase, simulationStep);
   visual.lyricPulse += (targetPulse - visual.lyricPulse) * response;
-  const t = performance.now() / 1000;
+  const t = now / 1000;
   const bassJump = els.audio.paused ? 0 : clamp(lowFrequency * 0.95 + beat * 0.58 + visual.lyricPulse * 0.18, 0, 1.45);
   const bounce = els.audio.paused
     ? 0
@@ -16679,15 +18174,20 @@ function updatePlaybackSceneMotion() {
   const scale = (1 + visual.lyricPulse * 0.026 + bassJump * 0.05) * zoom;
   const glowSize = Math.round(1 + bassJump * 8);
   const glowAlpha = clamp(bassJump * 0.42, 0, 0.48);
-  els.playbackLyricScene.style.setProperty('--lyric-pulse', visual.lyricPulse.toFixed(3));
-  els.playbackLyricScene.style.setProperty('--lyric-bounce', `${bounce.toFixed(2)}px`);
-  els.playbackLyricScene.style.setProperty('--lyric-scale', scale.toFixed(3));
-  els.playbackLyricScene.style.setProperty('--lyric-heart', bassJump.toFixed(3));
-  els.playbackLyricScene.style.setProperty('--lyric-jump-glow-size', `${glowSize}px`);
-  els.playbackLyricScene.style.setProperty('--lyric-jump-glow-alpha', glowAlpha.toFixed(3));
-  els.playbackLyricScene.style.setProperty('--lyric-glow-size', `${Math.round(4 + visual.lyricPulse * 4 + bassJump * 7)}px`);
+  setStylePropertyIfChanged(els.playbackLyricScene, '--lyric-pulse', visual.lyricPulse.toFixed(3));
+  setStylePropertyIfChanged(els.playbackLyricScene, '--lyric-bounce', `${bounce.toFixed(2)}px`);
+  setStylePropertyIfChanged(els.playbackLyricScene, '--lyric-scale', scale.toFixed(3));
+  setStylePropertyIfChanged(els.playbackLyricScene, '--lyric-heart', bassJump.toFixed(3));
+  setStylePropertyIfChanged(els.playbackLyricScene, '--lyric-jump-glow-size', `${glowSize}px`);
+  setStylePropertyIfChanged(els.playbackLyricScene, '--lyric-jump-glow-alpha', glowAlpha.toFixed(3));
+  setStylePropertyIfChanged(
+    els.playbackLyricScene,
+    '--lyric-glow-size',
+    `${Math.round(4 + visual.lyricPulse * 4 + bassJump * 7)}px`
+  );
   updateDynamicCubeMotion();
   updateFreeCubeMotion();
+  updateVoidPrismMotion();
   updateSonicTopographyMotion();
 }
 
@@ -17012,9 +18512,13 @@ function drawRainGlassScene(context, width, height, dpr) {
 }
 
 function drawPlaybackParticles(context, rect, dpr, width, height) {
-  context.fillStyle = '#000';
-  context.fillRect(0, 0, width, height);
+  const sandboxSceneOwnsFrame = sandboxPlaybackActive();
+  if (!sandboxSceneOwnsFrame) {
+    context.fillStyle = '#000';
+    context.fillRect(0, 0, width, height);
+  }
   updatePlaybackSceneMotion();
+  if (sandboxSceneOwnsFrame || isFreeCubePreset()) return;
   if (state.textPreset === 'book') return;
   if (isSonicTopographyPreset()) return;
   if (isCoverParticlePreset()) {
@@ -17029,6 +18533,7 @@ function drawPlaybackParticles(context, rect, dpr, width, height) {
   const visual = state.playbackVisual;
   updatePlaybackQuality(visual);
   const t = performance.now() / 1000;
+  const frameStep = visual.frameStep || 1;
   const speed = state.lyricSpeed;
   const energy = Math.max(state.visual.energy, els.audio.paused ? 0.12 : 0.55);
   const bass = Math.max(state.visual.bass, els.audio.paused ? 0.08 : 0.42);
@@ -17047,9 +18552,9 @@ function drawPlaybackParticles(context, rect, dpr, width, height) {
   context.shadowBlur = 0;
   for (let index = 0; index < particleLimit; index += 1) {
     const particle = visual.particles[index];
-    particle.y -= (0.00055 + particle.speed * 0.00082) * speed * (1 + energy * 0.55) * (height / 720);
-    particle.x += Math.sin(t * 0.62 + particle.phase) * 0.00065 * speed;
-    particle.z += Math.cos(t * 0.42 + particle.drift) * 0.0005 * speed;
+    particle.y -= (0.00055 + particle.speed * 0.00082) * speed * (1 + energy * 0.55) * (height / 720) * frameStep;
+    particle.x += Math.sin(t * 0.62 + particle.phase) * 0.00065 * speed * frameStep;
+    particle.z += Math.cos(t * 0.42 + particle.drift) * 0.0005 * speed * frameStep;
     if (particle.y < -1.24) recyclePlaybackParticle(particle, -1);
     if (particle.x > 1.32 || particle.x < -1.32 || particle.z > 1.24 || particle.z < -1.24) {
       particle.x = Math.random() * 2 - 1;
@@ -17159,18 +18664,62 @@ function requestOrbFrame() {
   state.orb.animationFrame = window.requestAnimationFrame(drawOrb);
 }
 
+function coveredPlaybackCanvasKey() {
+  if (!state.playbackPage) return '';
+  if (state.diyPreset === 'wallpaper') return 'wallpaper';
+  if (sandboxPlaybackActive()) return 'sandbox';
+  if (isFreeCubePreset()) return 'free-cubes';
+  if (isVoidPrismPreset()) return 'void-prism';
+  if (isSonicTopographyPreset()) return 'topography';
+  if (state.textPreset === 'book') return 'book';
+  return '';
+}
+
+function clearCoveredPlaybackCanvas(canvas, key) {
+  if (!canvas || state.orb.coveredCanvasKey === key) return;
+  state.orb.coveredCanvasKey = key;
+  const context = canvas.getContext('2d');
+  const rect = canvas.getBoundingClientRect();
+  const dpr = renderPixelRatio('playback');
+  const width = Math.max(1, Math.floor(rect.width * dpr));
+  const height = Math.max(1, Math.floor(rect.height * dpr));
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+  context.clearRect(0, 0, width, height);
+}
+
 function drawOrb(now = performance.now()) {
   state.orb.animationFrame = 0;
   if (document.hidden || state.sandbox.open) return;
-  const frameInterval = state.orb.dragging ? 16 : RENDER_PROFILE.targetFrameMs;
+  syncBookLyricFrame();
+  const frameInterval = playbackPresetsUseNativeRefresh()
+    ? 0
+    : state.orb.dragging ? 16 : RENDER_PROFILE.targetFrameMs;
   if (state.orb.lastPaintAt && now - state.orb.lastPaintAt < frameInterval) {
     requestOrbFrame();
     return;
   }
   state.orb.lastPaintAt = now;
-  updateAudioSpectrum();
-  syncBookLyricFrame();
+  observeRenderClarityFrame(now);
+  const sampleSpectrum = !playbackPresetsUseNativeRefresh()
+    || !state.orb.lastSpectrumAt
+    || now - state.orb.lastSpectrumAt >= RENDER_PROFILE.targetFrameMs;
+  if (sampleSpectrum) {
+    state.orb.lastSpectrumAt = now;
+    updateAudioSpectrum();
+  }
   const canvas = els.canvas;
+  const coveredCanvasKey = coveredPlaybackCanvasKey();
+  if (coveredCanvasKey) {
+    updatePlaybackSceneMotion();
+    clearCoveredPlaybackCanvas(canvas, coveredCanvasKey);
+    state.orb.lastFrameTime = 0;
+    requestOrbFrame();
+    return;
+  }
+  state.orb.coveredCanvasKey = '';
   const context = canvas.getContext('2d');
   const rect = canvas.getBoundingClientRect();
   const dpr = state.playbackPage ? renderPixelRatio('playback') : renderPixelRatio('canvas');
@@ -17371,6 +18920,7 @@ async function init() {
   bindOrbEvents();
   initParticles();
   initPlaybackParticles();
+  initRenderClarity();
   setDiyPreset('lyric');
   setTextPreset('depth');
   updateLyricDiyVars();
@@ -17386,7 +18936,7 @@ async function init() {
   setCommunityCardCollapsed(state.community.cardCollapsed);
   renderCommunityBroadcastButton();
   els.audio.volume = Number(els.volumeRange.value) / 100;
-  await Promise.allSettled([refreshClientRuntime(), refreshPlayerState(), refreshVisualBridge(), refreshNativeAudioSample(), refreshLoginStatus(), refreshUserPlaylists(), refreshSandboxPresets({ silent: true })]);
+  await Promise.allSettled([refreshClientRuntime(), refreshMusicApiProviders({ silent: true }), refreshPlayerState(), refreshVisualBridge(), refreshNativeAudioSample(), refreshLoginStatus(), refreshUserPlaylists(), refreshSandboxPresets({ silent: true })]);
   window.setInterval(refreshNativeAudioSample, MOBILE_RENDER_TARGET ? 120 : 50);
   window.setInterval(refreshVisualBridge, 1000);
   window.setInterval(() => refreshPlayerState().catch(() => {}), 5000);

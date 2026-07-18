@@ -176,48 +176,7 @@ try {
     exit 1
   }
 
-  $apiProcesses = @()
-  foreach ($apiScript in @('start-ncm-api.ps1', 'start-qq-api.ps1', 'start-kugou-api.ps1')) {
-    $path = Join-Path $rootPath "scripts\$apiScript"
-    if (Test-Path $path) {
-      $port = if ($apiScript -eq 'start-ncm-api.ps1') { 3010 } elseif ($apiScript -eq 'start-qq-api.ps1') { 3011 } else { 3012 }
-      $logPrefix = $apiScript -replace '\.ps1$', ''
-      $apiOutLog = Join-Path $outDir "$logPrefix-$launchRunId.launch.out.log"
-      $apiErrLog = Join-Path $outDir "$logPrefix-$launchRunId.launch.err.log"
-      $argumentLine = @(
-        '-NoProfile',
-        '-WindowStyle',
-        'Hidden',
-        '-File',
-        (Quote-Arg $path),
-        '-Root',
-        (Quote-Arg $rootPath),
-        '-Port',
-        [string]$port
-      ) -join ' '
-      $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $argumentLine -WorkingDirectory $rootPath -WindowStyle Hidden -RedirectStandardOutput $apiOutLog -RedirectStandardError $apiErrLog -PassThru
-      $apiProcesses += [pscustomobject]@{
-        Script = $apiScript
-        Port = $port
-        Process = $process
-        OutLog = $apiOutLog
-        ErrLog = $apiErrLog
-      }
-    }
-  }
-
-  foreach ($api in $apiProcesses) {
-    if (!$api.Process.WaitForExit(45000)) {
-      try { $api.Process.Kill() } catch {}
-      Write-Log "$($api.Script) startup timed out on port $($api.Port). See $($api.ErrLog)"
-      continue
-    }
-    if ($api.Process.ExitCode -eq 0) {
-      Write-Log "$($api.Script) is ready on port $($api.Port)."
-    } else {
-      Write-Log "$($api.Script) did not become ready on port $($api.Port). See $($api.ErrLog)"
-    }
-  }
+  Write-Log 'Music APIs will be probed and started in the background after the local client server is ready.'
 
   if (Get-Command Find-JavaRuntime -ErrorAction SilentlyContinue) {
     $javaExe = Find-JavaRuntime -Root $rootPath -MinimumMajor 26 -PreferWindowless

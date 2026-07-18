@@ -12,6 +12,7 @@ const profile = path.resolve(tmpdir(), `fe-monster-free-cubes-${process.pid}`);
 const artifactDir = path.resolve("artifacts");
 const screenshots = {
   free: path.join(artifactDir, `free-cubes-free-${width}x${height}.png`),
+  freeBass: path.join(artifactDir, `free-cubes-bass-depth-${width}x${height}.png`),
   heart: path.join(artifactDir, `free-cubes-heart-${width}x${height}.png`),
   galaxy: path.join(artifactDir, `free-cubes-galaxy-${width}x${height}.png`),
 };
@@ -163,6 +164,33 @@ try {
     const before = window.FeSandboxDiagnostics.freeCube();
     await wait(520);
     const after = window.FeSandboxDiagnostics.freeCube();
+    const runtime = state.freeCube.runtime;
+    const previousHostStyle = runtime.host.getAttribute('style');
+    runtime.host.style.cssText = 'position:absolute;left:0;top:0;width:32px;height:32px;';
+    window.FeFreeCubeRuntime.resize(runtime, 2.5);
+    const maxDpr = window.FeSandboxDiagnostics.freeCube();
+    if (previousHostStyle === null) runtime.host.removeAttribute('style');
+    else runtime.host.setAttribute('style', previousHostStyle);
+    window.FeFreeCubeRuntime.resize(runtime, renderPixelRatio('webgl'));
+    const fsrAccepted = window.FeFreeCubeRuntime.setRenderQuality(runtime, {
+      name: 'quality',
+      scale: 0.67,
+      dynamicResolution: false,
+      sharpness: 0.24
+    });
+    await wait(180);
+    const fsr = window.FeSandboxDiagnostics.freeCube();
+    const nativeAccepted = window.FeFreeCubeRuntime.setRenderQuality(runtime, 'native');
+    const restored = window.FeSandboxDiagnostics.freeCube();
+    const qualityProbe = {
+      native: after.renderQuality,
+      maxDpr: maxDpr.pixelRatio,
+      restoredDpr: restored.pixelRatio,
+      fsrAccepted,
+      fsr: fsr.renderQuality,
+      nativeAccepted,
+      restored: restored.renderQuality
+    };
 
     document.querySelector('#diyButton')?.click();
     await wait(180);
@@ -185,11 +213,39 @@ try {
       backgroundPressed,
       before,
       after,
+      qualityProbe,
       stageRect: stageRect ? { left: stageRect.left, top: stageRect.top, width: stageRect.width, height: stageRect.height } : null
     };
   })()`);
 
   await capture(screenshots.free);
+
+  const freeBassAttack = await evaluate(`(async () => {
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    window.FeSandboxDiagnostics.previewFreeCubeBass(0);
+    await wait(900);
+    const quiet = window.FeSandboxDiagnostics.freeCube();
+    window.FeSandboxDiagnostics.previewFreeCubeBass(1);
+    await wait(35);
+    const early = window.FeSandboxDiagnostics.freeCube();
+    await wait(45);
+    const onset = window.FeSandboxDiagnostics.freeCube();
+    await wait(570);
+    const loud = window.FeSandboxDiagnostics.freeCube();
+    return { quiet, early, onset, loud };
+  })()`);
+  await capture(screenshots.freeBass);
+
+  const freeBassRelease = await evaluate(`(async () => {
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    window.FeSandboxDiagnostics.clearFreeCubeBassPreview();
+    await wait(340);
+    const releaseTau = window.FeSandboxDiagnostics.freeCube();
+    await wait(1060);
+    const released = window.FeSandboxDiagnostics.freeCube();
+    return { releaseTau, released };
+  })()`);
+  const freeBass = { ...freeBassAttack, ...freeBassRelease };
 
   const heart = await evaluate(`(async () => {
     const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -287,13 +343,89 @@ try {
     softBackground: heart.backgroundEnabled === true && heart.particleVisible === false,
     galaxyMode: galaxy.backgroundEnabled === false && galaxy.particleVisible === true && galaxy.particleCount >= 1000,
     galaxyQuality: galaxy.pointSize <= 2.5 && galaxy.blending === "additive",
-    glassMaterial: heart.material.type === "MeshPhysicalMaterial" && heart.material.roughness <= 0.28 && heart.material.transmission >= 0.25 && heart.material.clearcoat >= 0.5,
-    bassResponse: bass.loud.pulseDisplacement - bass.quiet.pulseDisplacement >= 1.2,
+    glassMaterial: heart.material.type === "MeshPhysicalMaterial"
+      && heart.material.roughness >= 0.19
+      && heart.material.roughness <= 0.21
+      && heart.material.transmission >= 0.25
+      && heart.material.clearcoat >= 0.7
+      && heart.material.clearcoat <= 0.74
+      && heart.material.clearcoatRoughness >= 0.13
+      && heart.material.clearcoatRoughness <= 0.15,
+    opaqueInstanceMaterial: heart.material.transparent === false
+      && heart.material.opacity === 1
+      && heart.material.depthWrite === true,
+    cubemapQuality: heart.environment.faceSize === 64
+      && heart.environment.mipmapped === true
+      && heart.normalBlend >= 0.16
+      && heart.normalBlend <= 0.2,
+    controlledExposure: initial.after.toneMappingExposure >= 0.92
+      && initial.after.toneMappingExposure <= 0.98,
+    realisticReflection: Math.abs(initial.after.material.envMapIntensity - 0.78) <= 0.001
+      && freeBass.loud.material.envMapIntensity >= 0.85
+      && freeBass.loud.material.envMapIntensity <= 0.875,
+    nativeRenderQuality: initial.qualityProbe.native.available === true
+      && initial.qualityProbe.native.mode === "native"
+      && initial.qualityProbe.native.enabled === false
+      && initial.qualityProbe.native.backend === "direct",
+    fsrRequestApi: initial.qualityProbe.fsrAccepted === true
+      && initial.qualityProbe.fsr.request === "quality"
+      && initial.qualityProbe.fsr.mode === "quality"
+      && initial.qualityProbe.fsr.frameCount > initial.qualityProbe.native.frameCount
+      && (
+        initial.qualityProbe.fsr.enabled === true
+          ? Math.abs(initial.qualityProbe.fsr.renderScale - 0.67) <= 0.001
+          : initial.qualityProbe.fsr.backend === "direct" && Boolean(initial.qualityProbe.fsr.fallbackReason)
+      )
+      && initial.qualityProbe.nativeAccepted === true
+      && initial.qualityProbe.restored.mode === "native"
+      && initial.qualityProbe.restored.enabled === false
+      && initial.qualityProbe.restored.backend === "direct",
+    dprUpperBound: initial.qualityProbe.maxDpr === 2.5
+      && initial.qualityProbe.restoredDpr >= 0.5
+      && initial.qualityProbe.restoredDpr <= 2.5,
+    layeredDepthImpact: freeBass.loud.freeDepthProfile === "three-layer-staggered-impact"
+      && freeBass.loud.freeDepthLayerCounts.length === 3
+      && freeBass.loud.freeDepthLayerCounts.reduce((sum, value) => sum + value, 0) === freeBass.loud.cubeCount
+      && JSON.stringify(freeBass.loud.freeDepthLayerDisplacements) === JSON.stringify([6, 3.5, -2])
+      && JSON.stringify(freeBass.loud.freeDepthStaggerMs) === JSON.stringify([0, 40, 70])
+      && freeBass.loud.freeDepthAttackMs === 70
+      && freeBass.loud.freeDepthReleaseMs === 340
+      && freeBass.loud.freeDepthHistorySize === 64,
+    staggeredDepthResponse: freeBass.early.freeDepthLayerBass[0] > 0.05
+      && freeBass.early.freeDepthLayerBass[1] <= 0.02
+      && freeBass.early.freeDepthLayerBass[2] <= 0.02
+      && freeBass.onset.freeDepthLayerBass[0] > freeBass.onset.freeDepthLayerBass[1] + 0.05
+      && freeBass.onset.freeDepthLayerBass[1] > freeBass.onset.freeDepthLayerBass[2] + 0.04,
+    freeBassResponse: freeBass.quiet.mode === "free"
+      && freeBass.loud.mode === "free"
+      && freeBass.loud.freeBassAxis === "depth-z"
+      && freeBass.loud.freeDepthDisplacement - freeBass.quiet.freeDepthDisplacement >= 5.5
+      && freeBass.loud.bounds.depth - freeBass.quiet.bounds.depth >= 6.5
+      && freeBass.releaseTau.freeDepthDisplacement >= 1.6
+      && freeBass.releaseTau.freeDepthDisplacement <= 2.8
+      && freeBass.released.freeDepthDisplacement <= 0.15,
+    freeBassAccents: freeBass.loud.freeScalePulse >= 0.07
+      && freeBass.loud.freeScalePulse <= 0.0801
+      && freeBass.loud.freeReflectionBoost >= 0.1
+      && freeBass.loud.freeReflectionBoost <= 0.1201
+      && freeBass.loud.freeTiltDegrees >= 2.6
+      && freeBass.loud.freeTiltDegrees <= 3.01
+      && freeBass.loud.material.envMapIntensity >= 0.85
+      && freeBass.loud.material.envMapIntensity <= 0.875,
+    bassResponse: bass.loud.pulseDisplacement - bass.quiet.pulseDisplacement >= 1.2
+      && bass.loud.freeDepthDisplacement === 0
+      && bass.loud.freeScalePulse === 0
+      && bass.loud.freeReflectionBoost === 0
+      && bass.loud.freeTiltDegrees === 0
+      && Math.abs(bass.loud.material.envMapIntensity - 0.78) <= 0.001,
     rotation: Math.hypot(
       rotated.rotation.yaw - galaxy.rotation.yaw,
       rotated.rotation.pitch - galaxy.rotation.pitch
     ) >= 0.15,
-    drawCalls: heart.drawCalls <= 4 && galaxy.drawCalls <= 4,
+    drawCalls: freeBass.loud.drawCalls === freeBass.quiet.drawCalls
+      && freeBass.loud.drawCalls <= 4
+      && heart.drawCalls <= 4
+      && galaxy.drawCalls <= 4,
     disposal: cleanup.left.active === false && cleanup.left.canvasCount === 0 && cleanup.left.disposeCount >= 1,
     singleCanvasOnReturn: cleanup.returned.active === true && cleanup.returned.canvasCount === 1,
     shaderErrors: shaderErrors.length === 0,
@@ -302,7 +434,7 @@ try {
     pass: Object.values(checks).every(Boolean),
     viewport: `${width}x${height}`,
     checks,
-    diagnostics: { free: initial.after, heart, galaxy, bass, rotated, cleanup, paletteDistances },
+    diagnostics: { free: initial.after, qualityProbe: initial.qualityProbe, freeBass, heart, galaxy, bass, rotated, cleanup, paletteDistances },
     browserErrors,
     screenshots,
   };

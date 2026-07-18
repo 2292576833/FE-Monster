@@ -164,6 +164,9 @@ try {
   await command("Page.enable");
   await command("Runtime.enable");
   await command("Performance.enable");
+  await command("Emulation.setEmulatedMedia", {
+    features: [{ name: "prefers-reduced-motion", value: "no-preference" }]
+  });
   await command("Emulation.setDeviceMetricsOverride", {
     width: 1440,
     height: 900,
@@ -300,20 +303,33 @@ try {
   const activeSample = await evaluate(`new Promise((resolve) => {
     const startedAt = performance.now();
     const before = window.FeSandboxDiagnostics.freeCube();
+    const orbContext = document.querySelector('#orbCanvas')?.getContext('2d');
+    const originalDrawImage = orbContext?.drawImage;
+    let hiddenOrbDrawImageCalls = 0;
+    if (orbContext && typeof originalDrawImage === 'function') {
+      orbContext.drawImage = function countedHiddenOrbDrawImage(...args) {
+        hiddenOrbDrawImageCalls += 1;
+        return originalDrawImage.apply(this, args);
+      };
+    }
     let rafFrames = 0;
     const finish = () => {
       const after = window.FeSandboxDiagnostics.freeCube();
       const elapsed = performance.now() - startedAt;
       const tasks = (window.__fePerfLongTasks || []).filter((task) => task.startTime >= startedAt);
+      if (orbContext && typeof originalDrawImage === 'function') orbContext.drawImage = originalDrawImage;
       resolve({
         elapsed,
         rafFrames,
+        nativeRefresh: playbackPresetsUseNativeRefresh(),
         runtimeFrames: after.frameCount - before.frameCount,
         rafFps: elapsed > 0 ? (rafFrames - 1) * 1000 / elapsed : 0,
         presetFps: elapsed > 0 ? (after.frameCount - before.frameCount) * 1000 / elapsed : 0,
+        renderToRafRatio: (after.frameCount - before.frameCount) / Math.max(1, rafFrames - 1),
         longTaskCount: tasks.length,
         longTaskMs: tasks.reduce((total, task) => total + task.duration, 0),
-        maxLongTaskMs: tasks.reduce((maximum, task) => Math.max(maximum, task.duration), 0)
+        maxLongTaskMs: tasks.reduce((maximum, task) => Math.max(maximum, task.duration), 0),
+        hiddenOrbDrawImageCalls
       });
     };
     const frame = (timestamp) => {
@@ -324,6 +340,43 @@ try {
     requestAnimationFrame(frame);
   })`);
   const metricsAfter = metricMap(await command("Performance.getMetrics"));
+
+  const uiPointerSample = await evaluate(`(async () => {
+    const waitForFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+    const sidebar = els.diySidebar;
+    const shellClassList = els.appShell?.classList;
+    if (!sidebar || !shellClassList) return { available: false };
+    const previousDiyCardOpen = state.diyCardOpen;
+    const originalBounds = sidebar.getBoundingClientRect.bind(sidebar);
+    const originalToggle = shellClassList.toggle.bind(shellClassList);
+    let layoutReads = 0;
+    let classWrites = 0;
+    sidebar.getBoundingClientRect = (...args) => {
+      layoutReads += 1;
+      return originalBounds(...args);
+    };
+    shellClassList.toggle = (...args) => {
+      classWrites += 1;
+      return originalToggle(...args);
+    };
+    state.diyCardOpen = true;
+    try {
+      for (let index = 0; index < 120; index += 1) {
+        window.dispatchEvent(new PointerEvent('pointermove', {
+          clientX: 240 + index,
+          clientY: 180 + (index % 30),
+          bubbles: true
+        }));
+      }
+      await waitForFrame();
+      await waitForFrame();
+      return { available: true, layoutReads, classWrites };
+    } finally {
+      state.diyCardOpen = previousDiyCardOpen;
+      sidebar.getBoundingClientRect = originalBounds;
+      shellClassList.toggle = originalToggle;
+    }
+  })()`);
 
   const lifecycle = await evaluate(`(async () => {
     const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -433,11 +486,669 @@ try {
     };
   })()`);
 
+  const dynamicCubeRefresh = await evaluate(`(async () => {
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    enterPresetPlaybackPage('cube');
+    requestOrbFrame();
+    const startedWaitingAt = performance.now();
+    while (!state.dynamicCube?.renderer && performance.now() - startedWaitingAt < 8000) {
+      await wait(80);
+    }
+    const cube = state.dynamicCube;
+    if (!cube?.renderer) throw new Error('Dynamic cube renderer did not start');
+    const originalRender = cube.renderer.render.bind(cube.renderer);
+    const originalGetBoundingClientRect = els.dynamicCubeCore.getBoundingClientRect.bind(els.dynamicCubeCore);
+    let renderFrames = 0;
+    let rafFrames = 0;
+    let layoutReads = 0;
+    let probing = true;
+    cube.renderer.render = (...args) => {
+      renderFrames += 1;
+      return originalRender(...args);
+    };
+    els.dynamicCubeCore.getBoundingClientRect = (...args) => {
+      layoutReads += 1;
+      return originalGetBoundingClientRect(...args);
+    };
+    const probe = () => {
+      rafFrames += 1;
+      if (probing) requestAnimationFrame(probe);
+    };
+    requestAnimationFrame(probe);
+    const startedAt = performance.now();
+    await wait(900);
+    const elapsed = performance.now() - startedAt;
+    probing = false;
+    cube.renderer.render = originalRender;
+    els.dynamicCubeCore.getBoundingClientRect = originalGetBoundingClientRect;
+    setDiyPreset('lyric');
+    return {
+      renderFps: renderFrames * 1000 / elapsed,
+      rafFps: Math.max(0, rafFrames - 1) * 1000 / elapsed,
+      renderToRafRatio: renderFrames / Math.max(1, rafFrames - 1),
+      layoutReads
+    };
+  })()`);
+
+  const voidCanvasBypass = await evaluate(`(async () => {
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const canvas = els.canvas;
+    const context = canvas.getContext('2d');
+    const originalDrawImage = context.drawImage;
+    const originalGetBoundingClientRect = canvas.getBoundingClientRect;
+    let drawImageCalls = 0;
+    let layoutReads = 0;
+    context.drawImage = function (...args) {
+      drawImageCalls += 1;
+      return originalDrawImage.apply(this, args);
+    };
+    canvas.getBoundingClientRect = function (...args) {
+      layoutReads += 1;
+      return originalGetBoundingClientRect.apply(this, args);
+    };
+    enterPresetPlaybackPage('void-prism');
+    requestOrbFrame();
+    const startedWaitingAt = performance.now();
+    while (!state.voidPrism?.runtime && performance.now() - startedWaitingAt < 8000) {
+      await wait(80);
+    }
+    if (!state.voidPrism?.runtime) throw new Error('Void prism runtime did not start');
+    await wait(180);
+    drawImageCalls = 0;
+    layoutReads = 0;
+    const before = window.FeSandboxDiagnostics.voidPrism();
+    await wait(600);
+    const after = window.FeSandboxDiagnostics.voidPrism();
+    context.drawImage = originalDrawImage;
+    canvas.getBoundingClientRect = originalGetBoundingClientRect;
+    setDiyPreset('lyric');
+    return {
+      drawImageCalls,
+      layoutReads,
+      runtimeFrameDelta: (after.frameCount || 0) - (before.frameCount || 0)
+    };
+  })()`);
+
+  const wallpaperCanvasBypass = await evaluate(`(async () => {
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const canvas = els.canvas;
+    const context = canvas.getContext('2d');
+    const originalDrawImage = context.drawImage;
+    const originalGetBoundingClientRect = canvas.getBoundingClientRect;
+    const originalUpdatePlaybackSceneMotion = updatePlaybackSceneMotion;
+    let drawImageCalls = 0;
+    let layoutReads = 0;
+    let motionUpdates = 0;
+    context.drawImage = function (...args) {
+      drawImageCalls += 1;
+      return originalDrawImage.apply(this, args);
+    };
+    canvas.getBoundingClientRect = function (...args) {
+      layoutReads += 1;
+      return originalGetBoundingClientRect.apply(this, args);
+    };
+    updatePlaybackSceneMotion = function (...args) {
+      motionUpdates += 1;
+      return originalUpdatePlaybackSceneMotion(...args);
+    };
+    enterPresetPlaybackPage('wallpaper');
+    requestOrbFrame();
+    await wait(180);
+    drawImageCalls = 0;
+    layoutReads = 0;
+    motionUpdates = 0;
+    await wait(500);
+    const canvasOpacity = getComputedStyle(canvas).opacity;
+    context.drawImage = originalDrawImage;
+    canvas.getBoundingClientRect = originalGetBoundingClientRect;
+    updatePlaybackSceneMotion = originalUpdatePlaybackSceneMotion;
+    setDiyPreset('lyric');
+    return { drawImageCalls, layoutReads, motionUpdates, canvasOpacity };
+  })()`);
+
+  const sonicRefresh = await evaluate(`(async () => {
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    enterPresetPlaybackPage('topography');
+    requestOrbFrame();
+    const startedWaitingAt = performance.now();
+    while (!state.sonicTopography?.renderer && performance.now() - startedWaitingAt < 8000) {
+      await wait(80);
+    }
+    const topo = state.sonicTopography;
+    if (!topo?.renderer) throw new Error('Sonic renderer did not start');
+    const originalRender = topo.renderer.render.bind(topo.renderer);
+    const originalSetRenderTarget = topo.renderer.setRenderTarget.bind(topo.renderer);
+    const originalGetBoundingClientRect = els.sonicTopographyCore.getBoundingClientRect.bind(els.sonicTopographyCore);
+    const originalSceneStyleSetProperty = els.sonicTopographyScene.style.setProperty.bind(els.sonicTopographyScene.style);
+    const playbackStyles = [els.playbackLyricScene?.style, els.coverParticleScene?.style].filter(Boolean);
+    const originalPlaybackStyleSetProperties = playbackStyles.map((style) => style.setProperty);
+    const originalUpdateAudioSpectrum = updateAudioSpectrum;
+    let renderFrames = 0;
+    let rafFrames = 0;
+    let spectrumSamples = 0;
+    let renderTargetSwitches = 0;
+    let layoutReads = 0;
+    let sceneStyleWrites = 0;
+    let playbackStyleWrites = 0;
+    let probing = true;
+    topo.renderer.render = (...args) => {
+      renderFrames += 1;
+      return originalRender(...args);
+    };
+    topo.renderer.setRenderTarget = (...args) => {
+      renderTargetSwitches += 1;
+      return originalSetRenderTarget(...args);
+    };
+    els.sonicTopographyCore.getBoundingClientRect = (...args) => {
+      layoutReads += 1;
+      return originalGetBoundingClientRect(...args);
+    };
+    els.sonicTopographyScene.style.setProperty = (...args) => {
+      sceneStyleWrites += 1;
+      return originalSceneStyleSetProperty(...args);
+    };
+    playbackStyles.forEach((style, index) => {
+      style.setProperty = function (...args) {
+        playbackStyleWrites += 1;
+        return originalPlaybackStyleSetProperties[index].apply(this, args);
+      };
+    });
+    updateAudioSpectrum = (...args) => {
+      spectrumSamples += 1;
+      return originalUpdateAudioSpectrum(...args);
+    };
+    const meteorMatrixVersionBefore = topo.meteorMesh.instanceMatrix.version;
+    const particleMatrixVersionBefore = topo.particleMesh.instanceMatrix.version;
+    const probe = () => {
+      rafFrames += 1;
+      if (probing) requestAnimationFrame(probe);
+    };
+    requestAnimationFrame(probe);
+    const startedAt = performance.now();
+    await wait(600);
+    playbackStyleWrites = 0;
+    await wait(1000);
+    const elapsed = performance.now() - startedAt;
+    probing = false;
+    const idleMeteorMatrixUploadDelta = topo.meteorMesh.instanceMatrix.version - meteorMatrixVersionBefore;
+    const idleParticleMatrixUploadDelta = topo.particleMesh.instanceMatrix.version - particleMatrixVersionBefore;
+    const activeMeteorVersionBefore = topo.meteorMesh.instanceMatrix.version;
+    const activeParticleVersionBefore = topo.particleMesh.instanceMatrix.version;
+    spawnSonicTopographyMeteor(0.9);
+    spawnSonicTopographyParticle(1, 1, 1, 0.5);
+    const activeMeteor = topo.meteors.find((meteor) => meteor.active);
+    const activeParticle = topo.particles.find((particle) => particle.active);
+    const meteorYBefore = activeMeteor?.y;
+    const particleYBefore = activeParticle?.y;
+    updateSonicTopographyProjectiles(1 / 60);
+    const activeProjectilesAdvance = topo.meteorMesh.instanceMatrix.version > activeMeteorVersionBefore
+      && topo.particleMesh.instanceMatrix.version > activeParticleVersionBefore
+      && activeMeteor?.y < meteorYBefore
+      && activeParticle?.y > particleYBefore;
+    resetSonicTopographyAudioMotion(topo);
+    updateSonicTopographyProjectiles(1 / 60);
+    const clearedMeteorVersion = topo.meteorMesh.instanceMatrix.version;
+    const clearedParticleVersion = topo.particleMesh.instanceMatrix.version;
+    updateSonicTopographyProjectiles(1 / 60);
+    const inactiveProjectilesStayFrozen = topo.projectilesActive === false
+      && topo.meteorMesh.instanceMatrix.version === clearedMeteorVersion
+      && topo.particleMesh.instanceMatrix.version === clearedParticleVersion;
+    topo.renderer.render = originalRender;
+    topo.renderer.setRenderTarget = originalSetRenderTarget;
+    els.sonicTopographyCore.getBoundingClientRect = originalGetBoundingClientRect;
+    els.sonicTopographyScene.style.setProperty = originalSceneStyleSetProperty;
+    playbackStyles.forEach((style, index) => {
+      style.setProperty = originalPlaybackStyleSetProperties[index];
+    });
+    updateAudioSpectrum = originalUpdateAudioSpectrum;
+    const nativeRefresh = playbackPresetsUseNativeRefresh();
+    setDiyPreset('lyric');
+    const lyricNativeRefresh = playbackPresetsUseNativeRefresh();
+    const sandboxInterval = sandboxFrameInterval();
+    const coverParticleFpsLimit = coverParticleEngineOptions().fpsLimit;
+    returnHomePage();
+    return {
+      nativeRefresh,
+      lyricNativeRefresh,
+      homeNativeRefresh: playbackPresetsUseNativeRefresh(),
+      sandboxInterval,
+      coverParticleFpsLimit,
+      renderTier: RENDER_PROFILE.tier,
+      grid: RENDER_PROFILE.topographyGrid,
+      instanceCount: topo.count,
+      renderFps: renderFrames * 1000 / elapsed,
+      rafFps: Math.max(0, rafFrames - 1) * 1000 / elapsed,
+      spectrumFps: spectrumSamples * 1000 / elapsed,
+      renderToRafRatio: renderFrames / Math.max(1, rafFrames - 1),
+      renderTargetSwitches,
+      layoutReads,
+      sceneStyleWrites,
+      playbackStyleWrites,
+      meteorMatrixUploadDelta: idleMeteorMatrixUploadDelta,
+      particleMatrixUploadDelta: idleParticleMatrixUploadDelta,
+      activeProjectilesAdvance,
+      inactiveProjectilesStayFrozen,
+      contextLost: topo.renderer.getContext().isContextLost()
+    };
+  })()`);
+
+  const clarity = await evaluate(`(() => {
+    const api = window.feMonsterRenderClarity;
+    const range = document.querySelector('#renderClarityRange');
+    const autoToggle = document.querySelector('#renderClarityAutoToggle');
+    const value = document.querySelector('#renderClarityValue');
+    if (!api || !range || !autoToggle || !value) return { available: false };
+    const initial = api.snapshot();
+    api.setAuto(false, { persist: false, announce: false });
+    api.setPercent(50, { persist: false, announce: false });
+    const low = api.snapshot();
+    const lowUi = { disabled: range.disabled, value: range.value, output: value.textContent };
+    api.setPercent(125, { persist: false, announce: false });
+    const high = api.snapshot();
+    api.setPercent(initial.manualPercent, { persist: false, announce: false });
+    api.setAuto(initial.auto, { persist: false, announce: false });
+    const restored = api.snapshot();
+    return {
+      available: true,
+      range: { min: range.min, max: range.max, step: range.step },
+      initial,
+      low,
+      lowUi,
+      high,
+      restored
+    };
+  })()`);
+
+  const presetFsr = await evaluate(`(async () => {
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const api = window.feMonsterPresetUpscaler;
+    const toggle = document.querySelector('#presetFsrToggle');
+    const versionSelect = document.querySelector('#presetFsrVersion');
+    const modeSelect = document.querySelector('#presetFsrMode');
+    const detail = document.querySelector('#presetFsrDetail');
+    if (!api || !toggle || !versionSelect || !modeSelect || !detail) return { available: false };
+
+    const initial = api.snapshot();
+    const options = { persist: false, announce: false };
+    const ui = () => ({
+      toggleChecked: toggle.checked,
+      version: versionSelect.value,
+      versionDisabled: versionSelect.disabled,
+      mode: modeSelect.value,
+      modeDisabled: modeSelect.disabled,
+      detail: detail.textContent,
+      dataset: document.documentElement.dataset.presetFsr
+    });
+    let result;
+    try {
+      api.setEnabled(false, options);
+      await wait(30);
+      const disabled = {
+        snapshot: api.snapshot(),
+        ui: ui(),
+        request: presetFsrRequest(true)
+      };
+
+      api.setEnabled(true, options);
+      api.setVersion('1', options);
+      api.setMode('quality', options);
+      enterPresetPlaybackPage('cube');
+      requestOrbFrame();
+      const startedWaitingAt = performance.now();
+      while (!state.dynamicCube?.renderer && performance.now() - startedWaitingAt < 8000) {
+        await wait(80);
+      }
+      applyPresetUpscaler({ force: true });
+      await wait(80);
+      const activePreset = {
+        rendererReady: !!state.dynamicCube?.renderer,
+        snapshot: api.snapshot(),
+        ui: ui()
+      };
+
+      const modes = [];
+      for (const requestedMode of ['auto', 'ultra-quality', 'quality', 'balanced', 'performance']) {
+        api.setMode(requestedMode, options);
+        await wait(20);
+        const request = presetFsrRequest(true);
+        modes.push({
+          requestedMode,
+          snapshotMode: api.snapshot().mode,
+          selectedMode: modeSelect.value,
+          requestMode: typeof request === 'object' ? request.name : request,
+          dataset: document.documentElement.dataset.presetFsr
+        });
+      }
+
+      api.setMode('quality', options);
+      const versions = [];
+      for (const requestedVersion of ['1', '2', '3', '4']) {
+        api.setVersion(requestedVersion, options);
+        await wait(30);
+        const snapshot = api.snapshot();
+        const request = presetFsrRequest(true);
+        versions.push({
+          requestedVersion,
+          snapshotRequestedVersion: snapshot.requestedVersion,
+          effectiveVersion: snapshot.effectiveVersion,
+          selectedVersion: versionSelect.value,
+          requestMode: typeof request === 'object' ? request.name : request,
+          family: snapshot.diagnostics?.family || '',
+          fallback: presetFsrVersionFallbackReason(),
+          detail: detail.textContent
+        });
+      }
+
+      api.setVersion('1', options);
+      setDiyPreset('lyric');
+      applyPresetUpscaler({ force: true });
+      await wait(40);
+      const nonPreset = {
+        snapshot: api.snapshot(),
+        request: presetFsrRequest(false),
+        ui: ui()
+      };
+
+      result = {
+        available: true,
+        softwareRenderer: renderClaritySoftwareRenderer(),
+        nativeTargetsOwned: state.clientRuntime.renderCapabilities?.native?.host?.ownsNativeRenderTargets === true,
+        disabled,
+        activePreset,
+        modes,
+        versions,
+        nonPreset
+      };
+    } finally {
+      setDiyPreset('lyric');
+      returnHomePage();
+      api.setMode(initial.mode, options);
+      api.setVersion(initial.requestedVersion, options);
+      api.setEnabled(initial.enabled, options);
+      applyPresetUpscaler({ force: true });
+    }
+    return result;
+  })()`);
+
+  const renderQualityLifecycle = await evaluate(`(() => {
+    if (!window.FeRenderQuality?.create) return { available: false };
+    const counters = {
+      targetsCreated: 0,
+      targetsDisposed: 0,
+      timerExtensionRequests: 0,
+      queriesCreated: 0,
+      queriesDeleted: 0
+    };
+    const timerExtension = {
+      TIME_ELAPSED_EXT: 0x88bf,
+      GPU_DISJOINT_EXT: 0x8fbb
+    };
+    const gl = {
+      VENDOR: 0x1f00,
+      RENDERER: 0x1f01,
+      MAX_TEXTURE_SIZE: 0x0d33,
+      MAX_RENDERBUFFER_SIZE: 0x84e8,
+      QUERY_RESULT_AVAILABLE: 0x8867,
+      QUERY_RESULT: 0x8866,
+      getExtension(name) {
+        if (name === 'WEBGL_debug_renderer_info') {
+          return { UNMASKED_VENDOR_WEBGL: 0x9245, UNMASKED_RENDERER_WEBGL: 0x9246 };
+        }
+        if (name === 'EXT_disjoint_timer_query_webgl2') {
+          counters.timerExtensionRequests += 1;
+          return timerExtension;
+        }
+        return null;
+      },
+      getParameter(parameter) {
+        if (parameter === 0x9245) return 'Regression Test Vendor';
+        if (parameter === 0x9246) return 'Regression Test GPU';
+        if (parameter === this.MAX_TEXTURE_SIZE || parameter === this.MAX_RENDERBUFFER_SIZE) return 8192;
+        if (parameter === timerExtension.GPU_DISJOINT_EXT) return false;
+        return '';
+      },
+      createQuery() {
+        counters.queriesCreated += 1;
+        return { id: counters.queriesCreated };
+      },
+      beginQuery() {},
+      endQuery() {},
+      deleteQuery() {
+        counters.queriesDeleted += 1;
+      },
+      getQueryParameter(query, parameter) {
+        return parameter === this.QUERY_RESULT_AVAILABLE ? true : 1000000;
+      }
+    };
+    class FakeRenderTarget {
+      constructor(width, height) {
+        counters.targetsCreated += 1;
+        this.width = width;
+        this.height = height;
+        this.texture = {};
+        this.disposed = false;
+      }
+      setSize(width, height) {
+        this.width = width;
+        this.height = height;
+      }
+      dispose() {
+        if (this.disposed) return;
+        this.disposed = true;
+        counters.targetsDisposed += 1;
+      }
+    }
+    class FakeShaderMaterial {
+      constructor(options) {
+        Object.assign(this, options);
+        this.uniforms = options.uniforms;
+        this.extensions = {};
+      }
+      dispose() {}
+    }
+    class FakeVector2 {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+      }
+      set(x, y) {
+        this.x = x;
+        this.y = y;
+      }
+    }
+    class FakeScene {
+      add() {}
+    }
+    class FakeCamera {
+      constructor() {
+        this.position = {};
+      }
+    }
+    class FakeMesh {
+      constructor(geometry, material) {
+        this.geometry = geometry;
+        this.material = material;
+      }
+    }
+    class FakeGeometry {
+      dispose() {}
+    }
+    const THREE = {
+      WebGLRenderTarget: FakeRenderTarget,
+      ShaderMaterial: FakeShaderMaterial,
+      Vector2: FakeVector2,
+      Scene: FakeScene,
+      OrthographicCamera: FakeCamera,
+      Mesh: FakeMesh,
+      PlaneBufferGeometry: FakeGeometry,
+      LinearFilter: 1,
+      RGBAFormat: 2,
+      UnsignedByteType: 3,
+      NoBlending: 4
+    };
+    let pixelRatio = 1;
+    let renderTarget = null;
+    let scissorTest = false;
+    const canvas = {
+      width: 640,
+      height: 360,
+      clientWidth: 640,
+      clientHeight: 360,
+      addEventListener() {},
+      removeEventListener() {}
+    };
+    const renderer = {
+      domElement: canvas,
+      capabilities: { isWebGL2: true },
+      autoClear: true,
+      xr: { enabled: false },
+      getContext: () => gl,
+      getPixelRatio: () => pixelRatio,
+      setPixelRatio(value) {
+        pixelRatio = value;
+      },
+      setSize(width, height) {
+        canvas.width = Math.round(width * pixelRatio);
+        canvas.height = Math.round(height * pixelRatio);
+      },
+      getRenderTarget: () => renderTarget,
+      setRenderTarget(value) {
+        renderTarget = value;
+      },
+      getScissorTest: () => scissorTest,
+      setScissorTest(value) {
+        scissorTest = value;
+      },
+      render() {}
+    };
+    const quality = window.FeRenderQuality.create(renderer, {
+      THREE,
+      mode: 'native',
+      minScale: 0.5,
+      maxScale: 1
+    });
+    quality.resize(640, 360, 1);
+    const nativeInitial = quality.getDiagnostics();
+    const nativeInitialTargetCount = counters.targetsCreated;
+
+    const staticDiagnostics = quality.setMode({ name: 'quality', dynamicResolution: false });
+    quality.render({}, {}, performance.now());
+    const staticCounters = { ...counters };
+
+    const nativeAfterStatic = quality.setMode('native');
+    const nativeAfterStaticCounters = { ...counters };
+
+    quality.setMode({ name: 'auto', dynamicResolution: true });
+    quality.render({}, {}, performance.now());
+    const dynamicDiagnostics = quality.getDiagnostics();
+    const dynamicCounters = { ...counters };
+    quality.setMode('native');
+    quality.dispose();
+
+    return {
+      available: true,
+      nativeInitial,
+      nativeInitialTargetCount,
+      staticDiagnostics,
+      staticCounters,
+      nativeAfterStatic,
+      nativeAfterStaticCounters,
+      dynamicDiagnostics,
+      dynamicCounters
+    };
+  })()`);
+
+  const coverParticleLifecycle = await evaluate(`(async () => {
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const cover = state.coverParticle;
+    const original = {
+      engineContainer: cover.engineContainer,
+      enginePromise: cover.enginePromise,
+      enginePlaying: cover.enginePlaying,
+      engineVisible: cover.engineVisible
+    };
+    let playCalls = 0;
+    let pauseCalls = 0;
+    let gpuSetSizeCalls = 0;
+    let originalGpuSetSize = null;
+    let result = { available: false };
+    try {
+      setDiyPreset('lyric');
+      cover.engineContainer = {
+        play() { playCalls += 1; },
+        pause() { pauseCalls += 1; }
+      };
+      cover.enginePromise = null;
+      cover.enginePlaying = false;
+      cover.engineVisible = false;
+
+      enterPresetPlaybackPage('cover-particles');
+      requestOrbFrame();
+      const gpuStartedAt = performance.now();
+      while (!cover.gpuRenderer && !cover.gpuFailed && performance.now() - gpuStartedAt < 5000) {
+        await wait(50);
+      }
+      await wait(160);
+      const playAfterEntry = playCalls;
+
+      updateCoverParticleVisibility();
+      updateCoverParticleVisibility();
+      await wait(120);
+      const playAfterRepeatedVisible = playCalls;
+
+      if (cover.gpuRenderer) {
+        originalGpuSetSize = cover.gpuRenderer.setSize;
+        cover.gpuRenderer.setSize = function (...args) {
+          gpuSetSizeCalls += 1;
+          return originalGpuSetSize.apply(this, args);
+        };
+        await wait(360);
+        cover.gpuRenderer.setSize = originalGpuSetSize;
+        originalGpuSetSize = null;
+      }
+
+      setDiyPreset('lyric');
+      await wait(80);
+      const pauseAfterExit = pauseCalls;
+      updateCoverParticleVisibility();
+      updateCoverParticleVisibility();
+      const pauseAfterRepeatedHidden = pauseCalls;
+
+      enterPresetPlaybackPage('cover-particles');
+      await wait(80);
+      result = {
+        available: true,
+        gpuAvailable: !!cover.gpuRenderer,
+        playAfterEntry,
+        playAfterRepeatedVisible,
+        pauseAfterExit,
+        pauseAfterRepeatedHidden,
+        playAfterReentry: playCalls,
+        gpuSetSizeCalls
+      };
+    } finally {
+      if (originalGpuSetSize && cover.gpuRenderer) cover.gpuRenderer.setSize = originalGpuSetSize;
+      setDiyPreset('lyric');
+      returnHomePage();
+      cover.engineContainer = original.engineContainer;
+      cover.enginePromise = original.enginePromise;
+      cover.enginePlaying = original.enginePlaying;
+      cover.engineVisible = original.engineVisible;
+    }
+    return result;
+  })()`);
+
   const taskDurationMs = Math.max(0, ((metricsAfter.TaskDuration || 0) - (metricsBefore.TaskDuration || 0)) * 1000);
   const scriptDurationMs = Math.max(0, ((metricsAfter.ScriptDuration || 0) - (metricsBefore.ScriptDuration || 0)) * 1000);
+  const sonicGridMinimum = ({ high: 184, balanced: 156, economy: 124, mobile: 84 })[sonicRefresh.renderTier] || 64;
   const checks = {
     presetStarted: setup.active === true && setup.canvasCount === 1,
-    interactiveFrameRate: activeSample.presetFps >= 24,
+    playbackPresetsTrackNativeRefresh: activeSample.nativeRefresh === true
+      && activeSample.renderToRafRatio >= 0.9,
+    freeCubeSkipsCovered2dScene: activeSample.hiddenOrbDrawImageCalls === 0,
+    uiPointerWorkCoalesced: uiPointerSample.available === true
+      && uiPointerSample.layoutReads <= 2
+      && uiPointerSample.classWrites <= 12,
     stableModeFastPath: kernelComparison?.ratio < 0.9,
     boundedLongTasks: activeSample.maxLongTaskMs < 120 && activeSample.longTaskMs < 260,
     hiddenPresetPaused: lifecycle.hiddenFrameDelta <= 1,
@@ -445,7 +1156,103 @@ try {
     hiddenEventStreamPaused: lifecycle.hiddenEventSourceCount === 0,
     foregroundPresetResumed: lifecycle.resumedFrameDelta >= 5,
     foregroundEventStreamResumed: lifecycle.resumedEventSourceCount >= 1,
-    inactivePresetDisposed: lifecycle.inactive.active === false && lifecycle.inactive.canvasCount === 0
+    inactivePresetDisposed: lifecycle.inactive.active === false && lifecycle.inactive.canvasCount === 0,
+    dynamicCubeTracksNativeRefresh: dynamicCubeRefresh.renderToRafRatio >= 0.9,
+    dynamicCubeAvoidsPerFrameLayoutReads: dynamicCubeRefresh.layoutReads <= 3,
+    coveredVoidSkips2dCanvas: voidCanvasBypass.runtimeFrameDelta > 0
+      && voidCanvasBypass.drawImageCalls === 0
+      && voidCanvasBypass.layoutReads <= 2,
+    hiddenWallpaperSkips2dCanvas: wallpaperCanvasBypass.canvasOpacity === '0'
+      && wallpaperCanvasBypass.motionUpdates > 0
+      && wallpaperCanvasBypass.drawImageCalls === 0
+      && wallpaperCanvasBypass.layoutReads <= 2,
+    renderClarityControl: clarity.available === true
+      && clarity.range.min === '50'
+      && clarity.range.max === '125'
+      && clarity.range.step === '5'
+      && clarity.low.auto === false
+      && clarity.low.effectivePercent === 50
+      && clarity.lowUi.disabled === false
+      && clarity.lowUi.value === '50'
+      && clarity.high.effectivePercent === 125
+      && clarity.high.pixelRatio > clarity.low.pixelRatio
+      && clarity.restored.auto === clarity.initial.auto
+      && clarity.restored.manualPercent === clarity.initial.manualPercent,
+    presetFsrControls: presetFsr.available === true
+      && presetFsr.disabled.snapshot.enabled === false
+      && presetFsr.disabled.ui.toggleChecked === false
+      && presetFsr.disabled.ui.versionDisabled === true
+      && presetFsr.disabled.ui.modeDisabled === true
+      && presetFsr.disabled.ui.dataset === 'off'
+      && presetFsr.disabled.request === 'native'
+      && presetFsr.disabled.ui.detail.includes('关闭')
+      && presetFsr.activePreset.rendererReady === true
+      && presetFsr.activePreset.snapshot.enabled === true
+      && presetFsr.activePreset.snapshot.activeScene === true
+      && presetFsr.activePreset.ui.toggleChecked === true
+      && presetFsr.activePreset.ui.versionDisabled === false
+      && presetFsr.activePreset.ui.modeDisabled === false,
+    presetFsrModes: presetFsr.modes?.length === 5
+      && presetFsr.modes.every((entry) => entry.snapshotMode === entry.requestedMode
+        && entry.selectedMode === entry.requestedMode
+        && entry.dataset === `fsr1-${entry.requestedMode}`
+        && (presetFsr.softwareRenderer ? entry.requestMode === 'native' : entry.requestMode === entry.requestedMode)),
+    presetFsrVersionsFallback: presetFsr.nativeTargetsOwned === false
+      && presetFsr.versions?.length === 4
+      && presetFsr.versions.every((entry) => entry.snapshotRequestedVersion === entry.requestedVersion
+        && entry.selectedVersion === entry.requestedVersion)
+      && presetFsr.versions.filter((entry) => entry.requestedVersion !== '1').every((entry) => entry.effectiveVersion === '1'
+        && entry.family === 'fsr1-compatible-webgl'
+        && entry.fallback.includes(`FSR ${entry.requestedVersion}`)
+        && entry.fallback.includes('当前 WebGL 链回退 FSR 1')
+        && entry.detail === entry.fallback
+        && (presetFsr.softwareRenderer ? entry.requestMode === 'native' : entry.requestMode === 'quality')),
+    presetFsrOnlyForPresets: presetFsr.nonPreset.snapshot.activeScene === false
+      && presetFsr.nonPreset.request === 'native'
+      && presetFsr.nonPreset.ui.detail.includes('等待进入 WebGL 场景预设'),
+    nativeFsrTargetsLazyAndReleased: renderQualityLifecycle.available === true
+      && renderQualityLifecycle.nativeInitialTargetCount === 0
+      && renderQualityLifecycle.nativeInitial.pipelineAllocated === false
+      && renderQualityLifecycle.staticCounters.targetsCreated === 2
+      && renderQualityLifecycle.staticDiagnostics.pipelineAllocated === true
+      && renderQualityLifecycle.nativeAfterStatic.pipelineAllocated === false
+      && renderQualityLifecycle.nativeAfterStaticCounters.targetsDisposed === 2,
+    staticFsrSkipsGpuTimerQueries: renderQualityLifecycle.staticDiagnostics.dynamicResolution === false
+      && renderQualityLifecycle.staticDiagnostics.gpuTimerQueriesEnabled === false
+      && renderQualityLifecycle.staticDiagnostics.pendingGpuQueries === 0
+      && renderQualityLifecycle.staticCounters.timerExtensionRequests === 0
+      && renderQualityLifecycle.staticCounters.queriesCreated === 0,
+    dynamicFsrTimerQueriesPreserved: renderQualityLifecycle.dynamicDiagnostics.dynamicResolution === true
+      && renderQualityLifecycle.dynamicDiagnostics.gpuTimerQueriesEnabled === true
+      && renderQualityLifecycle.dynamicCounters.timerExtensionRequests === 1
+      && renderQualityLifecycle.dynamicCounters.queriesCreated === 1,
+    coverParticleEngineUsesVisibilityEdges: coverParticleLifecycle.available === true
+      && coverParticleLifecycle.playAfterEntry === 1
+      && coverParticleLifecycle.playAfterRepeatedVisible === 1
+      && coverParticleLifecycle.pauseAfterExit === 1
+      && coverParticleLifecycle.pauseAfterRepeatedHidden === 1
+      && coverParticleLifecycle.playAfterReentry === 2,
+    coverParticleSkipsStableGpuResize: coverParticleLifecycle.gpuAvailable === true
+      && coverParticleLifecycle.gpuSetSizeCalls === 0,
+    sonicTracksNativeRefresh: sonicRefresh.nativeRefresh === true
+      && sonicRefresh.lyricNativeRefresh === true
+      && sonicRefresh.homeNativeRefresh === false
+      && sonicRefresh.sandboxInterval === 0
+      && sonicRefresh.coverParticleFpsLimit >= 1000
+      && sonicRefresh.grid >= sonicGridMinimum
+      && sonicRefresh.instanceCount === sonicRefresh.grid * sonicRefresh.grid
+      && sonicRefresh.spectrumFps >= 24
+      && sonicRefresh.spectrumFps <= 50
+      && sonicRefresh.renderToRafRatio >= 0.9
+      && sonicRefresh.contextLost === false
+      && sonicRefresh.layoutReads <= 3,
+    nativePresetRenderAvoidsRedundantTargets: sonicRefresh.renderTargetSwitches === 0,
+    sonicAvoidsUnusedSceneStyleWrites: sonicRefresh.sceneStyleWrites === 0,
+    playbackSceneAvoidsRedundantStyleWrites: sonicRefresh.playbackStyleWrites === 0,
+    sonicSkipsIdleProjectileUploads: sonicRefresh.meteorMatrixUploadDelta === 0
+      && sonicRefresh.particleMatrixUploadDelta === 0,
+    sonicActiveProjectileMotionPreserved: sonicRefresh.activeProjectilesAdvance === true
+      && sonicRefresh.inactiveProjectilesStayFrozen === true
   };
   const result = {
     pass: Object.values(checks).every(Boolean),
@@ -453,6 +1260,7 @@ try {
     metrics: {
       presetFps: Number(activeSample.presetFps.toFixed(1)),
       rafFps: Number(activeSample.rafFps.toFixed(1)),
+      renderToRafRatio: Number(activeSample.renderToRafRatio.toFixed(3)),
       runtimeFrames: activeSample.runtimeFrames,
       rafFrames: activeSample.rafFrames,
       sampleMs: Number(activeSample.elapsed.toFixed(1)),
@@ -461,6 +1269,7 @@ try {
       longTaskCount: activeSample.longTaskCount,
       longTaskMs: Number(activeSample.longTaskMs.toFixed(1)),
       maxLongTaskMs: Number(activeSample.maxLongTaskMs.toFixed(1)),
+      hiddenOrbDrawImageCalls: activeSample.hiddenOrbDrawImageCalls,
       hiddenFrameDelta: lifecycle.hiddenFrameDelta,
       hiddenRequestCount: lifecycle.hiddenNetworkRequests.length,
       hiddenEventSourceCount: lifecycle.hiddenEventSourceCount,
@@ -472,8 +1281,28 @@ try {
       optimizedMs: Number(kernelComparison.optimizedMs.toFixed(1)),
       ratio: Number(kernelComparison.ratio.toFixed(3))
     } : null,
+    uiPointerSample,
     hiddenRequests: lifecycle.hiddenNetworkRequests,
     inactive: lifecycle.inactive,
+    clarity,
+    presetFsr,
+    renderQualityLifecycle,
+    coverParticleLifecycle,
+    dynamicCubeRefresh: {
+      ...dynamicCubeRefresh,
+      renderFps: Number(dynamicCubeRefresh.renderFps.toFixed(1)),
+      rafFps: Number(dynamicCubeRefresh.rafFps.toFixed(1)),
+      renderToRafRatio: Number(dynamicCubeRefresh.renderToRafRatio.toFixed(3))
+    },
+    voidCanvasBypass,
+    wallpaperCanvasBypass,
+    sonicRefresh: {
+      ...sonicRefresh,
+      renderFps: Number(sonicRefresh.renderFps.toFixed(1)),
+      rafFps: Number(sonicRefresh.rafFps.toFixed(1)),
+      spectrumFps: Number(sonicRefresh.spectrumFps.toFixed(1)),
+      renderToRafRatio: Number(sonicRefresh.renderToRafRatio.toFixed(3))
+    },
     browserErrors
   };
   console.log(JSON.stringify(result, null, 2));

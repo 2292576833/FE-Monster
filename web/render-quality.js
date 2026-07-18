@@ -9,7 +9,8 @@
  * - This file is an original, simplified WebGL fragment-shader implementation.
  *   It is not a line-by-line port of AMD source and is not an official AMD
  *   FidelityFX implementation. Its public name and diagnostics are therefore
- *   deliberately "adaptive-spatial", never FSR or DLSS.
+ *   explicitly identifies itself as an FSR 1-compatible WebGL path rather
+ *   than an official AMD FidelityFX implementation.
  */
 (function attachRenderQuality(root, factory) {
   const api = factory(root);
@@ -19,7 +20,9 @@
   'use strict';
 
   const ALGORITHM = 'adaptive-spatial';
-  const VERSION = '1.0.1';
+  const FAMILY = 'fsr1-compatible-webgl';
+  const LABEL = 'FSR 1.0 兼容（WebGL）';
+  const VERSION = '1.1.0';
   const MODE_PRESETS = Object.freeze({
     auto: Object.freeze({ enabled: true, dynamic: true, scale: 0.77 }),
     'ultra-quality': Object.freeze({ enabled: true, dynamic: false, scale: 0.77 }),
@@ -198,6 +201,37 @@
     return root?.performance?.now ? root.performance.now() : Date.now();
   }
 
+  function nativeKillSwitchActive() {
+    try {
+      return new URLSearchParams(root?.location?.search || '').get('render-quality') === 'native';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function inspectRendererCapabilities(gl) {
+    let vendor = '';
+    let renderer = '';
+    let maxTextureSize = 0;
+    let maxRenderbufferSize = 0;
+    try {
+      const debugInfo = gl?.getExtension?.('WEBGL_debug_renderer_info');
+      vendor = String(gl?.getParameter?.(debugInfo?.UNMASKED_VENDOR_WEBGL || gl.VENDOR) || '');
+      renderer = String(gl?.getParameter?.(debugInfo?.UNMASKED_RENDERER_WEBGL || gl.RENDERER) || '');
+      maxTextureSize = Math.max(0, Number(gl?.getParameter?.(gl.MAX_TEXTURE_SIZE)) || 0);
+      maxRenderbufferSize = Math.max(0, Number(gl?.getParameter?.(gl.MAX_RENDERBUFFER_SIZE)) || 0);
+    } catch (error) {
+      // Missing debug information must not prevent the direct-render fallback.
+    }
+    return {
+      vendor,
+      renderer,
+      maxTextureSize,
+      maxRenderbufferSize,
+      softwareRenderer: /swiftshader|llvmpipe|lavapipe|software|microsoft basic render/i.test(`${vendor} ${renderer}`)
+    };
+  }
+
   function normalizedModeName(value) {
     const name = String(value || 'auto').trim().toLowerCase();
     if (name === 'adaptive') return 'auto';
@@ -216,14 +250,22 @@
     const THREE = options.THREE || root?.THREE;
     const gl = renderer.getContext();
     const webgl2 = renderer.capabilities?.isWebGL2 === true;
+    const rendererCapabilities = inspectRendererCapabilities(gl);
     const minimumScale = clamp(finiteNumber(options.minScale, 0.5), 0.25, 1);
     const maximumScale = clamp(finiteNumber(options.maxScale, 1), minimumScale, 1);
     const state = {
       disposed: false,
       contextLost: false,
       pipelineFailed: false,
+      sizeUnsafe: false,
       fallbackReason: '',
       webgl2,
+      killSwitchActive: nativeKillSwitchActive(),
+      softwareRenderer: rendererCapabilities.softwareRenderer,
+      rendererVendor: rendererCapabilities.vendor,
+      rendererName: rendererCapabilities.renderer,
+      maxTextureSize: rendererCapabilities.maxTextureSize,
+      maxRenderbufferSize: rendererCapabilities.maxRenderbufferSize,
       mode: 'auto',
       modeEnabled: true,
       dynamicResolution: true,
@@ -270,17 +312,25 @@
       activeQuery: null
     };
 
-    function supportsPipeline() {
-      return !!(
-        state.webgl2
-        && THREE
+    function pipelineCapabilityReason() {
+      if (state.killSwitchActive) return 'query-native-kill-switch';
+      if (state.softwareRenderer) return 'software-renderer';
+      if (!state.webgl2) return 'webgl2-unavailable';
+      if (state.maxTextureSize < 1 || state.maxRenderbufferSize < 1) return 'render-target-limits-unavailable';
+      if (!(
+        THREE
         && THREE.WebGLRenderTarget
         && THREE.ShaderMaterial
         && THREE.Scene
         && THREE.OrthographicCamera
         && THREE.Mesh
         && (THREE.PlaneBufferGeometry || THREE.PlaneGeometry)
-      );
+      )) return 'three-postprocess-unavailable';
+      return '';
+    }
+
+    function supportsPipeline() {
+      return pipelineCapabilityReason() === '';
     }
 
     function pipelineActive() {
@@ -288,6 +338,7 @@
         state.modeEnabled
         && supportsPipeline()
         && !state.pipelineFailed
+        && !state.sizeUnsafe
         && !state.contextLost
         && !state.disposed
         && state.sceneTarget
@@ -334,8 +385,9 @@
     }
 
     function buildPipeline() {
-      if (!supportsPipeline()) {
-        state.fallbackReason = state.webgl2 ? 'three-postprocess-unavailable' : 'webgl2-unavailable';
+      const unsupportedReason = pipelineCapabilityReason();
+      if (unsupportedReason) {
+        state.fallbackReason = unsupportedReason;
         return;
       }
       try {
@@ -367,7 +419,7 @@
         state.postCamera.position.z = 1;
         state.pipelineFailed = false;
         state.fallbackReason = state.modeEnabled ? '' : 'mode-direct';
-        initializeTimerQueries();
+        if (state.dynamicResolution) initializeTimerQueries();
         resizeTargets(true);
       } catch (error) {
         state.pipelineFailed = true;
@@ -382,16 +434,33 @@
       const scale = clamp(state.renderScale, state.minimumScale, state.maximumScale);
       const internalWidth = Math.max(1, Math.round(state.outputWidth * scale));
       const internalHeight = Math.max(1, Math.round(state.outputHeight * scale));
-      if (force || internalWidth !== state.internalWidth || internalHeight !== state.internalHeight) {
-        state.sceneTarget.setSize(internalWidth, internalHeight);
-        state.internalWidth = internalWidth;
-        state.internalHeight = internalHeight;
-        state.edgeMaterial.uniforms.uInputSize.value.set(internalWidth, internalHeight);
-        state.edgeMaterial.uniforms.uInvInputSize.value.set(1 / internalWidth, 1 / internalHeight);
+      const exceedsTextureLimit = Math.max(internalWidth, state.outputWidth) > state.maxTextureSize
+        || Math.max(internalHeight, state.outputHeight) > state.maxTextureSize;
+      const exceedsRenderbufferLimit = internalWidth > state.maxRenderbufferSize
+        || internalHeight > state.maxRenderbufferSize;
+      if (exceedsTextureLimit || exceedsRenderbufferLimit) {
+        state.sizeUnsafe = true;
+        state.fallbackReason = 'render-target-size-exceeded';
+        return;
       }
-      if (force || state.upscaleTarget.width !== state.outputWidth || state.upscaleTarget.height !== state.outputHeight) {
-        state.upscaleTarget.setSize(state.outputWidth, state.outputHeight);
-        state.sharpenMaterial.uniforms.uInvOutputSize.value.set(1 / state.outputWidth, 1 / state.outputHeight);
+      try {
+        if (force || internalWidth !== state.internalWidth || internalHeight !== state.internalHeight) {
+          state.sceneTarget.setSize(internalWidth, internalHeight);
+          state.internalWidth = internalWidth;
+          state.internalHeight = internalHeight;
+          state.edgeMaterial.uniforms.uInputSize.value.set(internalWidth, internalHeight);
+          state.edgeMaterial.uniforms.uInvInputSize.value.set(1 / internalWidth, 1 / internalHeight);
+        }
+        if (force || state.upscaleTarget.width !== state.outputWidth || state.upscaleTarget.height !== state.outputHeight) {
+          state.upscaleTarget.setSize(state.outputWidth, state.outputHeight);
+          state.sharpenMaterial.uniforms.uInvOutputSize.value.set(1 / state.outputWidth, 1 / state.outputHeight);
+        }
+        state.sizeUnsafe = false;
+        if (state.modeEnabled && !state.pipelineFailed) state.fallbackReason = '';
+      } catch (error) {
+        state.sizeUnsafe = true;
+        state.fallbackReason = 'render-target-resize-failed';
+        state.lastError = String(error?.message || error || 'render target resize failed');
       }
     }
 
@@ -522,7 +591,7 @@
 
     function beginTimerQuery(sampleTime) {
       const extension = state.timerExtension;
-      if (!extension || state.pendingQueries.length >= 6 || state.activeQuery || state.contextLost) return false;
+      if (!state.dynamicResolution || !extension || state.pendingQueries.length >= 6 || state.activeQuery || state.contextLost) return false;
       let query = null;
       try {
         query = gl.createQuery();
@@ -563,9 +632,9 @@
 
     function renderDirect(scene, camera) {
       const previousTarget = renderer.getRenderTarget?.() || null;
-      renderer.setRenderTarget(null);
+      if (previousTarget) renderer.setRenderTarget(null);
       renderer.render(scene, camera);
-      renderer.setRenderTarget(previousTarget);
+      if (previousTarget) renderer.setRenderTarget(previousTarget);
     }
 
     function renderPipeline(scene, camera, sampleTime) {
@@ -573,7 +642,7 @@
       const previousAutoClear = renderer.autoClear;
       const previousScissorTest = renderer.getScissorTest?.() || false;
       const previousXrEnabled = renderer.xr?.enabled;
-      const timerStarted = beginTimerQuery(sampleTime);
+      const timerStarted = state.dynamicResolution && beginTimerQuery(sampleTime);
       try {
         if (renderer.xr) renderer.xr.enabled = false;
         if (typeof renderer.setScissorTest === 'function') renderer.setScissorTest(false);
@@ -609,7 +678,7 @@
       const sampleTime = finiteNumber(objectForm ? sceneOrOptions.now : suppliedNow, nowMs());
       if (!scene || !camera || state.contextLost) return false;
       ensureSize();
-      pollTimerQueries(sampleTime);
+      if (state.dynamicResolution) pollTimerQueries(sampleTime);
 
       const startedAt = nowMs();
       if (pipelineActive()) {
@@ -629,7 +698,7 @@
       state.lastCpuSubmitMs = cpuSubmitMs;
       state.frameCount += 1;
 
-      if (pipelineActive() && !state.timerExtension) {
+      if (pipelineActive() && state.dynamicResolution && !state.timerExtension) {
         const frameDelta = state.lastFrameAt > 0 ? sampleTime - state.lastFrameAt : 0;
         const fallbackSample = frameDelta > 0
           ? Math.max(cpuSubmitMs, Math.min(frameDelta, state.targetFrameMs * 2.5))
@@ -642,7 +711,11 @@
 
     function setMode(mode) {
       if (state.disposed) return getDiagnostics();
-      const modeName = normalizedModeName(typeof mode === 'object' ? mode.name : mode);
+      const wasDynamicResolution = state.dynamicResolution;
+      state.killSwitchActive = nativeKillSwitchActive();
+      const modeName = state.killSwitchActive
+        ? 'native'
+        : normalizedModeName(typeof mode === 'object' ? mode.name : mode);
       const preset = MODE_PRESETS[modeName];
       state.mode = modeName;
       state.modeEnabled = preset.enabled;
@@ -659,16 +732,29 @@
       state.overBudgetSamples = 0;
       state.underBudgetSamples = 0;
       state.emaFrameMs = 0;
+      let pipelineBuilt = false;
+      if (!state.modeEnabled) {
+        discardTimerQueries();
+        state.timerExtension = null;
+        disposePipelineResources();
+      } else {
+        if (!state.sceneTarget && !state.pipelineFailed && supportsPipeline()) {
+          buildPipeline();
+          pipelineBuilt = !!state.sceneTarget;
+        }
+        if (!state.dynamicResolution) {
+          discardTimerQueries();
+          state.timerExtension = null;
+        } else if (!wasDynamicResolution && !pipelineBuilt && state.sceneTarget) {
+          initializeTimerQueries();
+        }
+      }
       state.fallbackReason = state.modeEnabled
-        ? (!state.webgl2
-            ? 'webgl2-unavailable'
-            : !supportsPipeline()
-              ? 'three-postprocess-unavailable'
-              : state.pipelineFailed || !state.sceneTarget
-                ? 'pipeline-unavailable'
-                : '')
-        : 'mode-direct';
-      resizeTargets(true);
+        ? pipelineCapabilityReason()
+          || (state.sizeUnsafe ? 'render-target-size-exceeded' : '')
+          || (state.pipelineFailed || !state.sceneTarget ? 'pipeline-unavailable' : '')
+        : state.killSwitchActive ? 'query-native-kill-switch' : 'mode-direct';
+      if (state.modeEnabled) resizeTargets(true);
       return getDiagnostics();
     }
 
@@ -676,8 +762,9 @@
       const active = pipelineActive();
       return {
         algorithm: ALGORITHM,
+        family: FAMILY,
         version: VERSION,
-        label: 'Adaptive Spatial',
+        label: LABEL,
         officialVendorImplementation: false,
         backend: active ? 'webgl2-two-pass' : 'direct',
         webgl2: state.webgl2,
@@ -701,6 +788,16 @@
         scaleChanges: state.scaleChanges,
         frameCount: state.frameCount,
         contextLost: state.contextLost,
+        killSwitchActive: state.killSwitchActive,
+        softwareRenderer: state.softwareRenderer,
+        rendererVendor: state.rendererVendor,
+        rendererName: state.rendererName,
+        maxTextureSize: state.maxTextureSize,
+        maxRenderbufferSize: state.maxRenderbufferSize,
+        renderTargetSizeSafe: !state.sizeUnsafe,
+        pipelineAllocated: !!(state.sceneTarget || state.upscaleTarget),
+        gpuTimerQueriesEnabled: !!state.timerExtension,
+        pendingGpuQueries: state.pendingQueries.length + (state.activeQuery ? 1 : 0),
         lastError: state.lastError
       };
     }
@@ -723,18 +820,26 @@
       state.internalHeight = 0;
     }
 
-    function handleContextLost() {
+    function handleContextLost(event) {
+      event?.preventDefault?.();
       state.contextLost = true;
       state.fallbackReason = 'context-lost';
       discardTimerQueries();
+      state.timerExtension = null;
     }
 
     function handleContextRestored() {
       if (state.disposed) return;
       state.contextLost = false;
       state.pipelineFailed = false;
+      const restoredCapabilities = inspectRendererCapabilities(gl);
+      state.softwareRenderer = restoredCapabilities.softwareRenderer;
+      state.rendererVendor = restoredCapabilities.vendor;
+      state.rendererName = restoredCapabilities.renderer;
+      state.maxTextureSize = restoredCapabilities.maxTextureSize;
+      state.maxRenderbufferSize = restoredCapabilities.maxRenderbufferSize;
       disposePipelineResources();
-      buildPipeline();
+      if (state.modeEnabled) buildPipeline();
     }
 
     function dispose() {
@@ -743,13 +848,13 @@
       renderer.domElement?.removeEventListener?.('webglcontextlost', handleContextLost);
       renderer.domElement?.removeEventListener?.('webglcontextrestored', handleContextRestored);
       discardTimerQueries();
+      state.timerExtension = null;
       disposePipelineResources();
       state.fallbackReason = 'disposed';
     }
 
     renderer.domElement?.addEventListener?.('webglcontextlost', handleContextLost);
     renderer.domElement?.addEventListener?.('webglcontextrestored', handleContextRestored);
-    buildPipeline();
     const initialMode = normalizedModeName(options.mode || 'auto');
     setMode(initialMode === 'auto' && options.initialScale !== undefined
       ? { name: initialMode, scale: options.initialScale }

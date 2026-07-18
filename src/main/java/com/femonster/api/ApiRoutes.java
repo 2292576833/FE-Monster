@@ -58,6 +58,8 @@ public final class ApiRoutes {
             }
 
             HttpUtil.sendJson(exchange, 405, HttpUtil.error("method not allowed"));
+        } catch (IllegalArgumentException e) {
+            HttpUtil.sendJson(exchange, 400, HttpUtil.error(e.getMessage() == null ? "invalid request" : e.getMessage()));
         } catch (Exception e) {
             Map<String, Object> body = HttpUtil.error(e.getMessage() == null ? "internal error" : e.getMessage());
             HttpUtil.sendJson(exchange, 500, body);
@@ -93,24 +95,28 @@ public final class ApiRoutes {
             case "/api/wallpapers" -> HttpUtil.sendJson(exchange, context.wallpapers.payload(Boolean.parseBoolean(HttpUtil.param(query, "scan", "true"))));
             case "/api/wallpapers/file" -> handleWallpaperFile(exchange, query);
             case "/api/providers" -> HttpUtil.sendJson(exchange, context.music.providersPayload());
+            case "/api/music-apis" -> HttpUtil.sendJson(exchange, context.musicApis.redactedPayload());
+            case "/api/music-apis/status" -> HttpUtil.sendJson(exchange, context.musicApis.refreshStatus(
+                HttpUtil.param(query, "provider", "netease")
+            ));
             case "/api/community/state" -> handleCommunityState(exchange, query);
             case "/api/community/messages" -> handleCommunityMessages(exchange, query);
             case "/api/community/nearby" -> handleCommunityNearby(exchange, query);
             case "/api/community/listen/state" -> handleCommunityListenState(exchange, query);
             case "/api/community/call/signals" -> handleCommunityCallSignals(exchange, query);
             case "/api/community/events" -> handleCommunityEvents(exchange, query);
-            case "/api/search", "/api/netease/search", "/api/qq/search", "/api/kugou/search" -> HttpUtil.sendJson(exchange, context.music.search(
+            case "/api/search", "/api/netease/search", "/api/qq/search", "/api/kugou/search", "/api/qishui/search" -> HttpUtil.sendJson(exchange, context.music.search(
                 providerFrom(path, query),
                 HttpUtil.param(query, "keyword", HttpUtil.param(query, "q", "")),
                 HttpUtil.intParam(query, "page", 1, 1, 10000),
                 HttpUtil.intParam(query, "limit", 20, 1, 50)
             ));
-            case "/api/song/url", "/api/netease/song/url", "/api/qq/song/url", "/api/kugou/song/url" -> HttpUtil.sendJson(exchange, context.music.songUrlPayload(
+            case "/api/song/url", "/api/netease/song/url", "/api/qq/song/url", "/api/kugou/song/url", "/api/qishui/song/url" -> HttpUtil.sendJson(exchange, context.music.songUrlPayload(
                 providerFrom(path, query),
                 HttpUtil.param(query, "id", ""),
                 HttpUtil.param(query, "quality", HttpUtil.param(query, "level", "standard"))
             ));
-            case "/api/song/comments", "/api/netease/song/comments", "/api/qq/song/comments", "/api/kugou/song/comments" -> HttpUtil.sendJson(exchange, context.music.commentsPayload(
+            case "/api/song/comments", "/api/netease/song/comments", "/api/qq/song/comments", "/api/kugou/song/comments", "/api/qishui/song/comments" -> HttpUtil.sendJson(exchange, context.music.commentsPayload(
                 providerFrom(path, query),
                 songCommentId(query),
                 HttpUtil.intParam(query, "limit", 20, 1, 80)
@@ -121,22 +127,22 @@ public final class ApiRoutes {
             ));
             case "/api/cover" -> handleCover(exchange, query);
             case "/api/login/status" -> HttpUtil.sendJson(exchange, context.music.accountPayload(providerFrom(path, query)));
-            case "/api/login/qr/key", "/api/netease/login/qr/key", "/api/qq/login/qr/key", "/api/kugou/login/qr/key" -> HttpUtil.sendRawJson(exchange, 200, context.music.loginQrKeyPayload(providerFrom(path, query)));
-            case "/api/netease/service/status", "/api/qq/service/status", "/api/kugou/service/status" -> HttpUtil.sendJson(exchange, context.music.serviceStatus(providerFrom(path, query)));
+            case "/api/login/qr/key", "/api/netease/login/qr/key", "/api/qq/login/qr/key", "/api/kugou/login/qr/key", "/api/qishui/login/qr/key" -> HttpUtil.sendRawJson(exchange, 200, context.music.loginQrKeyPayload(providerFrom(path, query)));
+            case "/api/netease/service/status", "/api/qq/service/status", "/api/kugou/service/status", "/api/qishui/service/status" -> HttpUtil.sendJson(exchange, context.music.serviceStatus(providerFrom(path, query)));
             case "/api/netease/login/status" -> HttpUtil.sendRawJson(exchange, 200, context.netease.rawGet("/login/status"));
-            case "/api/qq/login/status", "/api/kugou/login/status" -> HttpUtil.sendJson(exchange, context.music.accountPayload(providerFrom(path, query)));
-            case "/api/netease/login/qr/create", "/api/qq/login/qr/create", "/api/kugou/login/qr/create" -> HttpUtil.sendRawJson(exchange, 200, context.music.loginQrCreatePayload(
+            case "/api/qq/login/status", "/api/kugou/login/status", "/api/qishui/login/status" -> HttpUtil.sendJson(exchange, context.music.accountPayload(providerFrom(path, query)));
+            case "/api/netease/login/qr/create", "/api/qq/login/qr/create", "/api/kugou/login/qr/create", "/api/qishui/login/qr/create" -> HttpUtil.sendRawJson(exchange, 200, context.music.loginQrCreatePayload(
                 providerFrom(path, query),
                 HttpUtil.param(query, "key", ""),
                 Boolean.parseBoolean(HttpUtil.param(query, "qrimg", "true"))
             ));
-            case "/api/netease/login/qr/check", "/api/qq/login/qr/check", "/api/kugou/login/qr/check" -> HttpUtil.sendRawJson(exchange, 200, context.music.loginQrCheckPayload(
+            case "/api/netease/login/qr/check", "/api/qq/login/qr/check", "/api/kugou/login/qr/check", "/api/qishui/login/qr/check" -> HttpUtil.sendRawJson(exchange, 200, context.music.loginQrCheckPayload(
                 providerFrom(path, query),
                 HttpUtil.param(query, "key", "")
             ));
-            case "/api/netease/user/playlists", "/api/qq/user/playlists", "/api/kugou/user/playlists" -> HttpUtil.sendJson(exchange, context.music.userPlaylistsPayload(providerFrom(path, query)));
+            case "/api/netease/user/playlists", "/api/qq/user/playlists", "/api/kugou/user/playlists", "/api/qishui/user/playlists" -> HttpUtil.sendJson(exchange, context.music.userPlaylistsPayload(providerFrom(path, query)));
             case "/api/user/playlists" -> HttpUtil.sendJson(exchange, SimpleJson.asList(context.music.userPlaylistsPayload(providerFrom(path, query)).get("playlists")));
-            case "/api/playlist/tracks", "/api/netease/playlist/tracks", "/api/qq/playlist/tracks", "/api/kugou/playlist/tracks" -> HttpUtil.sendJson(exchange, context.music.playlistTracksPayload(
+            case "/api/playlist/tracks", "/api/netease/playlist/tracks", "/api/qq/playlist/tracks", "/api/kugou/playlist/tracks", "/api/qishui/playlist/tracks" -> HttpUtil.sendJson(exchange, context.music.playlistTracksPayload(
                 providerFrom(path, query),
                 HttpUtil.param(query, "id", ""),
                 HttpUtil.intParam(query, "limit", 0, 0, Integer.MAX_VALUE)
@@ -182,6 +188,7 @@ public final class ApiRoutes {
                 }
                 cleanupBackgroundServices();
                 context.gestureControl.stop();
+                context.musicApis.close();
                 System.exit(0);
             }, "fe-monster-shutdown");
             shutdown.setDaemon(false);
@@ -222,6 +229,14 @@ public final class ApiRoutes {
     }
 
     private void handlePost(HttpExchange exchange, String path, Map<String, String> query) throws IOException {
+        if ("/api/music-apis/import".equals(path)) {
+            handleMusicApiImport(exchange, query);
+            return;
+        }
+        if ("/api/qishui/login/phone/send".equals(path) || "/api/qishui/login/phone/verify".equals(path)) {
+            handleQishuiPhoneLogin(exchange, path);
+            return;
+        }
         if ("/api/wallpapers/import".equals(path)) {
             HttpUtil.sendJson(exchange, context.wallpapers.importFile(HttpUtil.param(query, "name", "wallpaper"), exchange.getRequestBody()));
             return;
@@ -248,7 +263,7 @@ public final class ApiRoutes {
                 "/api/preset-market/upload", "/api/preset-market/download",
                 "/api/component-market/upload", "/api/component-market/download" ->
                 HttpUtil.sendJson(exchange, context.community.sandboxPost(path, root));
-            case "/api/playlist/add", "/api/netease/playlist/add", "/api/qq/playlist/add", "/api/kugou/playlist/add" -> handlePlaylistAdd(exchange, path, query, root);
+            case "/api/playlist/add", "/api/netease/playlist/add", "/api/qq/playlist/add", "/api/kugou/playlist/add", "/api/qishui/playlist/add" -> handlePlaylistAdd(exchange, path, query, root);
             case "/api/community/friends/add" -> handleCommunityAddFriend(exchange, query, root);
             case "/api/community/profile" -> handleCommunityProfile(exchange, query, root);
             case "/api/community/listening" -> handleCommunityListening(exchange, query, root);
@@ -269,6 +284,108 @@ public final class ApiRoutes {
                 SimpleJson.asString(root.get("mode"), "append")
             ));
             default -> HttpUtil.notFound(exchange);
+        }
+    }
+
+    private void handleQishuiPhoneLogin(HttpExchange exchange, String path) throws IOException {
+        String contentType = exchange.getRequestHeaders().getFirst("Content-Type");
+        if (contentType == null || !contentType.toLowerCase().contains("application/json")) {
+            throw new IllegalArgumentException("qishui phone login requires application/json");
+        }
+        byte[] bytes = exchange.getRequestBody().readNBytes(2049);
+        if (bytes.length > 2048) throw new IllegalArgumentException("qishui phone login request is too large");
+        Map<String, Object> body = SimpleJson.parseObject(new String(bytes, StandardCharsets.UTF_8));
+        Object rawPhone = body.get("phone");
+        String phone = rawPhone instanceof String value ? value : "";
+        if (!phone.matches("^1[3-9]\\d{9}$")) {
+            throw new IllegalArgumentException("phone must be an 11-digit mainland China mobile number");
+        }
+        if (path.endsWith("/send")) {
+            Map<String, Object> payload = context.music.loginPhoneSendPayload("qishui", phone);
+            HttpUtil.sendJson(exchange, qishuiPhoneLoginStatus(payload), payload);
+            return;
+        }
+        Object rawCode = body.get("code");
+        String code = rawCode instanceof String value ? value : "";
+        if (!code.matches("^\\d{6}$")) throw new IllegalArgumentException("verification code must be exactly 6 digits");
+        Map<String, Object> payload = context.music.loginPhoneVerifyPayload("qishui", phone, code);
+        HttpUtil.sendJson(exchange, qishuiPhoneLoginStatus(payload), payload);
+    }
+
+    private static int qishuiPhoneLoginStatus(Map<String, Object> payload) {
+        if (SimpleJson.asBoolean(payload.get("ok"), false)) return 200;
+        String code = SimpleJson.asString(payload.get("code"), "");
+        if ("SEND_COOLDOWN".equals(code) || "UPSTREAM_RATE_LIMITED".equals(code)) return 429;
+        if ("CAPTCHA_REQUIRED".equals(code) || "OFFICIAL_CLIENT_REQUIRED".equals(code)
+            || "ADDITIONAL_VERIFICATION_REQUIRED".equals(code) || "VERIFY_REJECTED".equals(code)
+            || "SEND_REJECTED".equals(code)) return 409;
+        if ("INVALID_PHONE".equals(code) || "INVALID_CODE".equals(code)) return 400;
+        return 502;
+    }
+
+    private void handleMusicApiImport(HttpExchange exchange, Map<String, String> query) throws IOException {
+        requireLocalMusicApiImport(exchange);
+        long contentLength = parseContentLength(exchange);
+        if (contentLength > 25L * 1024 * 1024) {
+            throw new IllegalArgumentException("music API import exceeds 25 MB");
+        }
+
+        String name = HttpUtil.param(query, "name", "music-api.json").trim();
+        if (name.length() > 160) throw new IllegalArgumentException("music API import filename is too long");
+        String lowerName = name.toLowerCase();
+        String contentType = exchange.getRequestHeaders().getFirst("Content-Type");
+        String normalizedType = contentType == null ? "" : contentType.toLowerCase();
+        boolean zip = lowerName.endsWith(".zip") || normalizedType.contains("zip");
+        boolean json = lowerName.endsWith(".json") || lowerName.endsWith(".feapi") || normalizedType.contains("json");
+        if (!zip && !json) throw new IllegalArgumentException("music API import must be a JSON/FEAPI config or ZIP package");
+
+        boolean trusted = Boolean.parseBoolean(HttpUtil.param(query, "trusted", "false"));
+        var result = zip
+            ? context.musicApis.importTrustedZip(exchange.getRequestBody(), trusted)
+            : context.musicApis.importJson(exchange.getRequestBody());
+        context.reloadMusicProviders();
+        for (var provider : result.providers()) context.musicApis.ensureStarted(provider.id());
+
+        Map<String, Object> payload = new LinkedHashMap<>(context.musicApis.redactedPayload());
+        payload.put("importedProviders", result.payloadProviders());
+        payload.put("packageImport", result.packageImport());
+        HttpUtil.sendJson(exchange, payload);
+    }
+
+    private static void requireLocalMusicApiImport(HttpExchange exchange) {
+        if (!"1".equals(exchange.getRequestHeaders().getFirst("X-FE-Monster-Import"))) {
+            throw new IllegalArgumentException("music API import must be confirmed by the local application");
+        }
+        var remote = exchange.getRemoteAddress();
+        if (remote == null || remote.getAddress() == null || !remote.getAddress().isLoopbackAddress()) {
+            throw new IllegalArgumentException("music API import is only available from this device");
+        }
+
+        String origin = exchange.getRequestHeaders().getFirst("Origin");
+        if (origin == null || origin.isBlank()) return;
+        try {
+            URI uri = URI.create(origin);
+            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase();
+            String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase();
+            int originPort = uri.getPort() >= 0 ? uri.getPort() : ("https".equals(scheme) ? 443 : 80);
+            int servicePort = exchange.getLocalAddress().getPort();
+            if (!("http".equals(scheme) || "https".equals(scheme))
+                || !("127.0.0.1".equals(host) || "localhost".equals(host) || "::1".equals(host))
+                || originPort != servicePort) {
+                throw new IllegalArgumentException("music API import requires a local application origin");
+            }
+        } catch (IllegalArgumentException error) {
+            throw new IllegalArgumentException("music API import requires a local application origin");
+        }
+    }
+
+    private static long parseContentLength(HttpExchange exchange) {
+        String value = exchange.getRequestHeaders().getFirst("Content-Length");
+        if (value == null || value.isBlank()) return -1;
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException error) {
+            throw new IllegalArgumentException("invalid music API import length");
         }
     }
 
@@ -668,6 +785,7 @@ public final class ApiRoutes {
     private static String providerFrom(String path, Map<String, String> query) {
         if (path.contains("/qq/")) return "qq";
         if (path.contains("/kugou/")) return "kugou";
+        if (path.contains("/qishui/")) return "qishui";
         if (path.contains("/netease/")) return "netease";
         return MusicProviderRegistry.normalize(HttpUtil.param(query, "provider", "netease"));
     }
@@ -685,6 +803,7 @@ public final class ApiRoutes {
         return switch (MusicProviderRegistry.normalize(provider)) {
             case "qq" -> "QQ音乐";
             case "kugou" -> "酷狗音乐";
+            case "qishui" -> "汽水音乐";
             default -> "网易云";
         };
     }

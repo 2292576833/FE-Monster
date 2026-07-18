@@ -1,9 +1,6 @@
 param(
   [ValidateSet('Debug', 'Release')]
-  [string]$Configuration = 'Debug',
-  [string]$ServerUrl = $Env:FE_MONSTER_ANDROID_SERVER_URL,
-  [string]$PublicAccessKey = $Env:FE_MONSTER_PUBLIC_ACCESS_KEY,
-  [string]$AccessKeyFile = (Join-Path $Env:LOCALAPPDATA 'FE Monster\public-access.key')
+  [string]$Configuration = 'Debug'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -77,29 +74,9 @@ if (Test-Path -LiteralPath $apkSource -PathType Leaf) {
   Remove-Item -LiteralPath $apkSource -Force
 }
 
-if ([string]::IsNullOrWhiteSpace($PublicAccessKey) -and (Test-Path $AccessKeyFile)) {
-  $PublicAccessKey = (Get-Content -Raw $AccessKeyFile).Trim()
-}
-if ([string]::IsNullOrWhiteSpace($PublicAccessKey)) {
-  $keyDirectory = Split-Path -Parent $AccessKeyFile
-  if (!(Test-Path $keyDirectory)) { New-Item -ItemType Directory -Path $keyDirectory -Force | Out-Null }
-  $keyBytes = [byte[]]::new(32)
-  $generator = [Security.Cryptography.RandomNumberGenerator]::Create()
-  try { $generator.GetBytes($keyBytes) } finally { $generator.Dispose() }
-  $PublicAccessKey = ([BitConverter]::ToString($keyBytes) -replace '-', '').ToLowerInvariant()
-  Set-Content -LiteralPath $AccessKeyFile -Value $PublicAccessKey -Encoding ASCII -NoNewline
-}
-
 Push-Location $androidRoot
 try {
-  $arguments = @($task)
-  if (![string]::IsNullOrWhiteSpace($ServerUrl)) {
-    $arguments += "-PfeMonsterServerUrl=$ServerUrl"
-  }
-  if (![string]::IsNullOrWhiteSpace($PublicAccessKey)) {
-    $arguments += "-PfeMonsterPublicAccessKey=$PublicAccessKey"
-  }
-  & $gradle @arguments
+  & $gradle $task
   if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
   }
@@ -109,11 +86,11 @@ try {
 
 if ($Configuration -eq 'Debug') {
   $distDirectory = Join-Path $rootPath 'dist'
-  $apkDestination = Join-Path $distDirectory 'FE-Monster-Android-1.0.6-complete-debug.apk'
+  $apkDestination = Join-Path $distDirectory 'FE-Monster-Android-1.0.7-local-debug.apk'
   if (!(Test-Path $apkSource)) {
     throw "Android build succeeded but the APK was not found: $apkSource"
   }
   if (!(Test-Path $distDirectory)) { New-Item -ItemType Directory -Path $distDirectory -Force | Out-Null }
   Copy-Item -LiteralPath $apkSource -Destination $apkDestination -Force
-  Write-Host "Complete Android APK: $apkDestination"
+  Write-Host "Local Android APK: $apkDestination"
 }

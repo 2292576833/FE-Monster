@@ -4,6 +4,16 @@
   const TAU = Math.PI * 2;
   const DEFAULT_CUBE_COUNT = 1800;
   const DEFAULT_PARTICLE_COUNT = 1400;
+  const ENVIRONMENT_FACE_SIZE = 64;
+  const MAX_PIXEL_RATIO = 2.5;
+  const CUBE_NORMAL_BLEND = 0.18;
+  const FREE_DEPTH_DEAD_ZONE = 0.04;
+  const FREE_DEPTH_LAYER_LIMIT = 3.8;
+  const FREE_DEPTH_LAYER_DISPLACEMENTS = [6, 3.5, -2];
+  const FREE_DEPTH_STAGGER_MS = [0, 40, 70];
+  const FREE_DEPTH_ATTACK_RATE = 14.2857;
+  const FREE_DEPTH_RELEASE_RATE = 2.9412;
+  const FREE_DEPTH_HISTORY_SIZE = 64;
   let disposeCount = 0;
 
   function clamp(value, min, max) {
@@ -24,6 +34,30 @@
   function smoothstep(value) {
     const next = clamp(value, 0, 1);
     return next * next * (3 - 2 * next);
+  }
+
+  function delayedDepthSample(runtime, now, delayMs) {
+    if (delayMs <= 0 || runtime.freeDepthHistoryCount <= 1) return runtime.freeDepthEnvelope;
+    const targetTime = now - delayMs;
+    const size = runtime.freeDepthHistoryValues.length;
+    let newerIndex = (runtime.freeDepthHistoryCursor - 1 + size) % size;
+    let newerTime = runtime.freeDepthHistoryTimes[newerIndex];
+    let newerValue = runtime.freeDepthHistoryValues[newerIndex];
+    if (targetTime >= newerTime) return newerValue;
+
+    for (let step = 1; step < runtime.freeDepthHistoryCount; step += 1) {
+      const olderIndex = (newerIndex - 1 + size) % size;
+      const olderTime = runtime.freeDepthHistoryTimes[olderIndex];
+      const olderValue = runtime.freeDepthHistoryValues[olderIndex];
+      if (olderTime <= targetTime) {
+        const amount = clamp((targetTime - olderTime) / Math.max(0.001, newerTime - olderTime), 0, 1);
+        return olderValue + (newerValue - olderValue) * amount;
+      }
+      newerIndex = olderIndex;
+      newerTime = olderTime;
+      newerValue = olderValue;
+    }
+    return newerValue;
   }
 
   function normalizeRgb(color, fallback) {
@@ -240,21 +274,132 @@
       ['#160b20', '#94e9ff', '#03050b']
     ].map((colors, index) => {
       const canvas = document.createElement('canvas');
-      canvas.width = 48;
-      canvas.height = 48;
+      canvas.width = ENVIRONMENT_FACE_SIZE;
+      canvas.height = ENVIRONMENT_FACE_SIZE;
       const context = canvas.getContext('2d');
-      const gradient = context.createLinearGradient(index % 2 ? 48 : 0, 0, index % 2 ? 0 : 48, 48);
+      const gradient = context.createLinearGradient(
+        index % 2 ? ENVIRONMENT_FACE_SIZE : 0,
+        0,
+        index % 2 ? 0 : ENVIRONMENT_FACE_SIZE,
+        ENVIRONMENT_FACE_SIZE
+      );
       gradient.addColorStop(0, colors[0]);
       gradient.addColorStop(0.46, colors[1]);
       gradient.addColorStop(1, colors[2]);
       context.fillStyle = gradient;
-      context.fillRect(0, 0, 48, 48);
+      context.fillRect(0, 0, ENVIRONMENT_FACE_SIZE, ENVIRONMENT_FACE_SIZE);
       return canvas;
     });
     const texture = new THREE.CubeTexture(faces);
     if ('encoding' in texture && THREE.sRGBEncoding !== undefined) texture.encoding = THREE.sRGBEncoding;
+    texture.generateMipmaps = true;
+    if (THREE.LinearMipmapLinearFilter !== undefined) texture.minFilter = THREE.LinearMipmapLinearFilter;
+    if (THREE.LinearFilter !== undefined) texture.magFilter = THREE.LinearFilter;
     texture.needsUpdate = true;
     return texture;
+  }
+
+  function softenBoxNormals(geometry, amount = CUBE_NORMAL_BLEND) {
+    const positions = geometry && geometry.getAttribute && geometry.getAttribute('position');
+    const normals = geometry && geometry.getAttribute && geometry.getAttribute('normal');
+    if (!positions || !normals || positions.count !== normals.count) return 0;
+    const blend = clamp(amount, 0, 1);
+    for (let index = 0; index < positions.count; index += 1) {
+      const px = positions.getX(index);
+      const py = positions.getY(index);
+      const pz = positions.getZ(index);
+      const positionLength = Math.max(0.0001, Math.hypot(px, py, pz));
+      const nx = normals.getX(index) * (1 - blend) + px / positionLength * blend;
+      const ny = normals.getY(index) * (1 - blend) + py / positionLength * blend;
+      const nz = normals.getZ(index) * (1 - blend) + pz / positionLength * blend;
+      const normalLength = Math.max(0.0001, Math.hypot(nx, ny, nz));
+      normals.setXYZ(index, nx / normalLength, ny / normalLength, nz / normalLength);
+    }
+    normals.needsUpdate = true;
+    return blend;
+  }
+
+  function createRenderQuality(renderer, THREE, config) {
+    if (!global.FeRenderQuality || typeof global.FeRenderQuality.create !== 'function') {
+      return { controller: null, error: 'render-quality-unavailable' };
+    }
+    try {
+      const requestedTargetFrameMs = Number(config && config.targetFrameMs);
+      const requestedSharpness = Number(config && config.sharpness);
+      return {
+        controller: global.FeRenderQuality.create(renderer, {
+          THREE,
+          mode: 'native',
+          initialScale: 1,
+          minScale: 0.5,
+          maxScale: 1,
+          targetFrameMs: clamp(Number.isFinite(requestedTargetFrameMs) ? requestedTargetFrameMs : 24, 8, 100),
+          sharpness: clamp(Number.isFinite(requestedSharpness) ? requestedSharpness : 0.24, 0, 1)
+        }),
+        error: ''
+      };
+    } catch (error) {
+      return { controller: null, error: String(error && error.message || error || 'render-quality-create-failed') };
+    }
+  }
+
+  function disableRenderQuality(runtime, error, reason) {
+    if (!runtime) return;
+    try {
+      runtime.renderQuality?.dispose?.();
+    } catch (disposeError) {
+      // Direct rendering remains available even if post-process cleanup fails.
+    }
+    runtime.renderQuality = null;
+    runtime.renderQualityFallbackReason = reason || 'render-quality-failed';
+    runtime.renderQualityLastError = String(error && error.message || error || runtime.renderQualityFallbackReason);
+  }
+
+  function setRenderQuality(runtime, request) {
+    if (!runtime || runtime.disposed || !runtime.renderQuality) return false;
+    try {
+      const diagnostics = runtime.renderQuality.setMode(request || 'native');
+      runtime.renderQualityRequest = typeof request === 'object' && request
+        ? String(request.name || 'auto')
+        : String(request || 'native');
+      runtime.renderQualityFallbackReason = diagnostics && diagnostics.fallbackReason || '';
+      runtime.renderQualityLastError = diagnostics && diagnostics.lastError || '';
+      return true;
+    } catch (error) {
+      disableRenderQuality(runtime, error, 'render-quality-set-mode-failed');
+      return false;
+    }
+  }
+
+  function renderQualityDiagnostics(runtime) {
+    if (runtime && runtime.renderQuality && typeof runtime.renderQuality.getDiagnostics === 'function') {
+      try {
+        return {
+          available: true,
+          request: runtime.renderQualityRequest || 'native',
+          ...runtime.renderQuality.getDiagnostics()
+        };
+      } catch (error) {
+        return {
+          available: false,
+          request: runtime.renderQualityRequest || 'native',
+          mode: 'native',
+          enabled: false,
+          backend: 'direct',
+          fallbackReason: 'render-quality-diagnostics-failed',
+          lastError: String(error && error.message || error)
+        };
+      }
+    }
+    return {
+      available: false,
+      request: runtime && runtime.renderQualityRequest || 'native',
+      mode: 'native',
+      enabled: false,
+      backend: 'direct',
+      fallbackReason: runtime && runtime.renderQualityFallbackReason || 'render-quality-unavailable',
+      lastError: runtime && runtime.renderQualityLastError || ''
+    };
   }
 
   function applyPalette(runtime, palette) {
@@ -305,13 +450,24 @@
     const rect = runtime.host.getBoundingClientRect();
     const width = Math.max(1, Math.floor(rect.width));
     const height = Math.max(1, Math.floor(rect.height));
-    const ratio = clamp(pixelRatio || global.devicePixelRatio || 1, 1, 1.75);
+    const ratio = clamp(pixelRatio || global.devicePixelRatio || 1, 0.5, MAX_PIXEL_RATIO);
     if (width === runtime.width && height === runtime.height && Math.abs(ratio - runtime.pixelRatio) < 0.01) return;
     runtime.width = width;
     runtime.height = height;
     runtime.pixelRatio = ratio;
-    runtime.renderer.setPixelRatio(ratio);
-    runtime.renderer.setSize(width, height, false);
+    let resizedByRenderQuality = false;
+    if (runtime.renderQuality) {
+      try {
+        runtime.renderQuality.resize({ width, height, dpr: ratio });
+        resizedByRenderQuality = true;
+      } catch (error) {
+        disableRenderQuality(runtime, error, 'render-quality-resize-failed');
+      }
+    }
+    if (!resizedByRenderQuality) {
+      runtime.renderer.setPixelRatio(ratio);
+      runtime.renderer.setSize(width, height, false);
+    }
     runtime.camera.aspect = width / Math.max(1, height);
     runtime.camera.updateProjectionMatrix();
   }
@@ -332,21 +488,22 @@
   }
 
   function projectedCoverage(runtime) {
-    if (!runtime || runtime.disposed || !runtime.currentPositions) return { width: 0, height: 0 };
+    if (!runtime || runtime.disposed || !runtime.mesh?.instanceMatrix?.array) return { width: 0, height: 0 };
     runtime.group.updateMatrixWorld(true);
     runtime.camera.updateMatrixWorld(true);
     const point = runtime.projectPoint;
+    const matrices = runtime.mesh.instanceMatrix.array;
     let minX = 1;
     let maxX = -1;
     let minY = 1;
     let maxY = -1;
     const stride = runtime.count > 1200 ? 3 : 1;
     for (let index = 0; index < runtime.count; index += stride) {
-      const offset = index * 3;
+      const offset = index * 16 + 12;
       point.set(
-        runtime.currentPositions[offset],
-        runtime.currentPositions[offset + 1],
-        runtime.currentPositions[offset + 2]
+        matrices[offset],
+        matrices[offset + 1],
+        matrices[offset + 2]
       );
       point.applyMatrix4(runtime.group.matrixWorld).project(runtime.camera);
       if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) continue;
@@ -361,11 +518,43 @@
     };
   }
 
+  function refreshMotionDiagnostics(runtime) {
+    const matrices = runtime?.mesh?.instanceMatrix?.array;
+    if (!matrices) return;
+    let checksum = 0;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (let index = 0; index < runtime.count; index += 1) {
+      const offset = index * 16 + 12;
+      const x = matrices[offset];
+      const y = matrices[offset + 1];
+      const z = matrices[offset + 2];
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+      minZ = Math.min(minZ, z);
+      maxZ = Math.max(maxZ, z);
+      if (index % 97 === 0) checksum += x * 0.37 + y * 0.23 + z * 0.11;
+    }
+    runtime.bounds.minX = minX;
+    runtime.bounds.maxX = maxX;
+    runtime.bounds.minY = minY;
+    runtime.bounds.maxY = maxY;
+    runtime.bounds.minZ = minZ;
+    runtime.bounds.maxZ = maxZ;
+    runtime.motionChecksum = checksum;
+  }
+
   function update(runtime, frame) {
     if (!runtime || runtime.disposed) return false;
     const updateStartedAt = performance.now();
     const now = Number(frame && frame.now) || performance.now();
-    const requestedPixelRatio = clamp((frame && frame.pixelRatio) || global.devicePixelRatio || 1, 1, 1.75);
+    const requestedPixelRatio = clamp((frame && frame.pixelRatio) || global.devicePixelRatio || 1, 0.5, MAX_PIXEL_RATIO);
     if (
       !runtime.lastResizeCheckAt
       || now - runtime.lastResizeCheckAt >= 250
@@ -373,7 +562,7 @@
     ) {
       resize(runtime, requestedPixelRatio);
     }
-    const dt = runtime.lastNow ? clamp((now - runtime.lastNow) / 1000, 1 / 240, 0.08) : 1 / 60;
+    const dt = runtime.lastNow ? clamp((now - runtime.lastNow) / 1000, 1 / 360, 0.08) : 1 / 60;
     runtime.lastNow = now;
     runtime.frameCount += 1;
 
@@ -382,6 +571,21 @@
       : runtime.bassPreview;
     const attack = sourceBass > runtime.smoothedBass ? 1 - Math.exp(-dt * 12) : 1 - Math.exp(-dt * 4.6);
     runtime.smoothedBass += (sourceBass - runtime.smoothedBass) * attack;
+    const depthSource = sourceBass <= FREE_DEPTH_DEAD_ZONE
+      ? 0
+      : Math.pow(clamp((sourceBass - FREE_DEPTH_DEAD_ZONE) / (1 - FREE_DEPTH_DEAD_ZONE), 0, 1), 0.65);
+    const depthRate = depthSource > runtime.freeDepthEnvelope
+      ? FREE_DEPTH_ATTACK_RATE
+      : FREE_DEPTH_RELEASE_RATE;
+    runtime.freeDepthEnvelope += (depthSource - runtime.freeDepthEnvelope) * (1 - Math.exp(-dt * depthRate));
+    const historyIndex = runtime.freeDepthHistoryCursor;
+    runtime.freeDepthHistoryTimes[historyIndex] = now;
+    runtime.freeDepthHistoryValues[historyIndex] = runtime.freeDepthEnvelope;
+    runtime.freeDepthHistoryCursor = (historyIndex + 1) % runtime.freeDepthHistoryValues.length;
+    runtime.freeDepthHistoryCount = Math.min(runtime.freeDepthHistoryCount + 1, runtime.freeDepthHistoryValues.length);
+    for (let layer = 0; layer < runtime.freeDepthLayerBass.length; layer += 1) {
+      runtime.freeDepthLayerBass[layer] = delayedDepthSample(runtime, now, FREE_DEPTH_STAGGER_MS[layer]);
+    }
     runtime.smoothedEnergy += (clamp(frame && frame.energy, 0, 1.25) - runtime.smoothedEnergy) * (1 - Math.exp(-dt * 4));
     runtime.modeProgress += (runtime.targetModeProgress - runtime.modeProgress) * (1 - Math.exp(-dt * 4.8));
     if (Math.abs(runtime.targetModeProgress - runtime.modeProgress) < 0.0005) runtime.modeProgress = runtime.targetModeProgress;
@@ -393,15 +597,14 @@
     const time = now / 1000;
     const motion = frame && frame.reducedMotion ? 0.22 : 1;
     const outward = blend * runtime.smoothedBass * 2.45 * motion;
+    const freeDepthBlend = (1 - blend) * motion;
+    const foregroundDepth = runtime.freeDepthLayerBass[0] * FREE_DEPTH_LAYER_DISPLACEMENTS[0] * freeDepthBlend;
     runtime.pulseDisplacement = outward;
+    runtime.freeDepthDisplacement = foregroundDepth;
+    runtime.freeScalePulse = runtime.freeDepthLayerBass[0] * 0.08 * freeDepthBlend;
+    runtime.freeReflectionBoost = runtime.freeDepthLayerBass[0] * 0.12 * freeDepthBlend;
+    runtime.freeTiltDegrees = runtime.freeDepthLayerBass[0] * 3 * freeDepthBlend;
     const dummy = runtime.dummy;
-    let checksum = 0;
-    let minX = Infinity;
-    let maxX = -Infinity;
-    let minY = Infinity;
-    let maxY = -Infinity;
-    let minZ = Infinity;
-    let maxZ = -Infinity;
 
     for (let index = 0; index < runtime.count; index += 1) {
       const offset = index * 3;
@@ -411,12 +614,17 @@
       let freeY = 0;
       let freeZ = 0;
       if (!stableHeart) {
+        const depthLayer = runtime.freeDepthLayers[index];
+        const depthPulse = runtime.freeDepthLayerBass[depthLayer]
+          * FREE_DEPTH_LAYER_DISPLACEMENTS[depthLayer]
+          * freeDepthBlend;
+        const localDepthPulse = depthPulse * (0.86 + runtime.pulseWeights[index] * 0.14);
         const driftX = Math.sin(time * speed + phase) * (0.9 + runtime.drift[index] * 1.6) * motion;
         const driftY = Math.cos(time * speed * 0.73 + phase * 1.37) * (0.62 + runtime.drift[index]) * motion;
         const driftZ = Math.sin(time * speed * 0.41 + phase * 0.83) * (0.5 + runtime.drift[index] * 0.8) * motion;
         freeX = runtime.freePositions[offset] + driftX;
         freeY = runtime.freePositions[offset + 1] + driftY;
-        freeZ = runtime.freePositions[offset + 2] + driftZ;
+        freeZ = runtime.freePositions[offset + 2] + driftZ + localDepthPulse;
       }
 
       let targetX = 0;
@@ -432,52 +640,58 @@
       const x = stableFree ? freeX : stableHeart ? targetX : freeX + (targetX - freeX) * blend;
       const y = stableFree ? freeY : stableHeart ? targetY : freeY + (targetY - freeY) * blend;
       const z = stableFree ? freeZ : stableHeart ? targetZ : freeZ + (targetZ - freeZ) * blend;
-      runtime.currentPositions[offset] = x;
-      runtime.currentPositions[offset + 1] = y;
-      runtime.currentPositions[offset + 2] = z;
 
       dummy.position.set(x, y, z);
       const freeTilt = (1 - blend) * motion;
       const heartTilt = blend;
+      const freeBass = runtime.freeDepthLayerBass[runtime.freeDepthLayers[index]] * freeDepthBlend;
+      const freeBassTilt = freeBass * (0.035 + runtime.pulseWeights[index] * 0.017);
       dummy.rotation.set(
-        runtime.tiltWaveX[index] * (0.16 * freeTilt + 0.06 * heartTilt),
-        runtime.tiltWaveY[index] * (0.2 * freeTilt + 0.07 * heartTilt),
-        runtime.tiltWaveZ[index] * (0.12 * freeTilt + 0.05 * heartTilt)
+        runtime.tiltWaveX[index] * (0.16 * freeTilt + 0.06 * heartTilt + freeBassTilt),
+        runtime.tiltWaveY[index] * (0.2 * freeTilt + 0.07 * heartTilt + freeBassTilt),
+        runtime.tiltWaveZ[index] * (0.12 * freeTilt + 0.05 * heartTilt + freeBassTilt)
       );
-      const scale = 0.68 + blend * 0.28 + runtime.smoothedBass * blend * (0.05 + runtime.pulseWeights[index] * 0.04);
+      const baseScale = 0.68 + blend * 0.28;
+      const freeBassScale = freeBass * (0.04 + runtime.pulseWeights[index] * 0.04);
+      const scale = baseScale * (1 + freeBassScale)
+        + runtime.smoothedBass * blend * (0.05 + runtime.pulseWeights[index] * 0.04);
       dummy.scale.setScalar(scale);
       dummy.updateMatrix();
       runtime.mesh.setMatrixAt(index, dummy.matrix);
-
-      minX = Math.min(minX, x);
-      maxX = Math.max(maxX, x);
-      minY = Math.min(minY, y);
-      maxY = Math.max(maxY, y);
-      minZ = Math.min(minZ, z);
-      maxZ = Math.max(maxZ, z);
-      if (index % 97 === 0) checksum += x * 0.37 + y * 0.23 + z * 0.11;
     }
     runtime.mesh.instanceMatrix.needsUpdate = true;
-    runtime.bounds = { minX, maxX, minY, maxY, minZ, maxZ };
-    runtime.motionChecksum = checksum;
 
     const yaw = Number(frame && frame.yaw) || 0;
     const pitch = Number(frame && frame.pitch) || 0;
     runtime.group.rotation.set(pitch, yaw, 0);
-    runtime.particleGroup.rotation.set(
-      -0.16 + Math.sin(time * 0.09) * 0.08,
-      -yaw * 0.2 + time * 0.055 * motion,
-      0.18 + Math.sin(time * 0.12) * 0.09
-    );
-    runtime.particleGroup.scale.setScalar(0.98 + Math.sin(time * 0.7) * 0.015 + runtime.smoothedBass * 0.025);
-    runtime.particleMaterial.opacity = 0.66 + Math.sin(time * 1.35) * 0.08 + runtime.smoothedEnergy * 0.1;
-    runtime.particleChecksum = runtime.particleGroup.rotation.y + runtime.particleGroup.scale.x;
+    if (runtime.particles.visible) {
+      runtime.particleGroup.rotation.set(
+        -0.16 + Math.sin(time * 0.09) * 0.08,
+        -yaw * 0.2 + time * 0.055 * motion,
+        0.18 + Math.sin(time * 0.12) * 0.09
+      );
+      runtime.particleGroup.scale.setScalar(0.98 + Math.sin(time * 0.7) * 0.015 + runtime.smoothedBass * 0.025);
+      runtime.particleMaterial.opacity = 0.66 + Math.sin(time * 1.35) * 0.08 + runtime.smoothedEnergy * 0.1;
+      runtime.particleChecksum = runtime.particleGroup.rotation.y + runtime.particleGroup.scale.x;
+    }
 
     const zoom = clamp(frame && frame.zoom, 0.58, 2.35);
     runtime.camera.position.z = 64 / zoom;
     runtime.camera.lookAt(0, 0, 0);
+    runtime.material.envMapIntensity = 0.78 * (1 + runtime.freeReflectionBoost);
     runtime.material.emissiveIntensity = 0.045 + runtime.smoothedEnergy * 0.08 + runtime.smoothedBass * 0.06;
-    runtime.renderer.render(runtime.scene, runtime.camera);
+    let renderedByRenderQuality = false;
+    if (runtime.renderQuality) {
+      try {
+        renderedByRenderQuality = runtime.renderQuality.render(runtime.scene, runtime.camera, now) === true;
+        if (!renderedByRenderQuality) {
+          disableRenderQuality(runtime, 'render-quality-render-returned-false', 'render-quality-render-failed');
+        }
+      } catch (error) {
+        disableRenderQuality(runtime, error, 'render-quality-render-failed');
+      }
+    }
+    if (!renderedByRenderQuality) runtime.renderer.render(runtime.scene, runtime.camera);
     runtime.drawCalls = Number(runtime.renderer.info && runtime.renderer.info.render && runtime.renderer.info.render.calls) || 0;
     runtime.lastUpdateMs = performance.now() - updateStartedAt;
     runtime.averageUpdateMs = runtime.averageUpdateMs
@@ -499,9 +713,11 @@
     renderer.setClearColor(0x000000, 0);
     if ('outputEncoding' in renderer && THREE.sRGBEncoding !== undefined) renderer.outputEncoding = THREE.sRGBEncoding;
     if ('toneMapping' in renderer && THREE.ACESFilmicToneMapping !== undefined) renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.18;
+    renderer.toneMappingExposure = 0.95;
     renderer.domElement.className = 'free-cube-canvas';
     renderer.domElement.setAttribute('aria-hidden', 'true');
+
+    const renderQualityState = createRenderQuality(renderer, THREE, config.renderQualityOptions);
 
     host.replaceChildren(renderer.domElement);
     const scene = new THREE.Scene();
@@ -526,18 +742,19 @@
     scene.add(glow);
 
     const geometry = new THREE.BoxGeometry(0.78, 0.78, 0.78, 1, 1, 1);
+    const normalBlend = softenBoxNormals(geometry);
     const material = new THREE.MeshPhysicalMaterial({
       color: 0xffffff,
       vertexColors: true,
-      roughness: 0.18,
+      roughness: 0.2,
       metalness: 0.04,
       transmission: 0.42,
       thickness: 0.72,
-      clearcoat: 1,
-      clearcoatRoughness: 0.11,
-      envMapIntensity: 1.18,
-      transparent: true,
-      opacity: 0.9,
+      clearcoat: 0.72,
+      clearcoatRoughness: 0.14,
+      envMapIntensity: 0.78,
+      transparent: false,
+      opacity: 1,
       emissive: 0x173542,
       emissiveIntensity: 0.055,
       depthWrite: true
@@ -569,6 +786,10 @@
       THREE,
       host,
       renderer,
+      renderQuality: renderQualityState.controller,
+      renderQualityRequest: 'native',
+      renderQualityFallbackReason: renderQualityState.controller ? '' : renderQualityState.error,
+      renderQualityLastError: renderQualityState.controller ? '' : renderQualityState.error,
       scene,
       camera,
       group,
@@ -580,11 +801,21 @@
       particleGeometry: particleData.geometry,
       particleMaterial,
       environment,
+      environmentFaceSize: ENVIRONMENT_FACE_SIZE,
+      normalBlend,
       particlePhases: particleData.phases,
       particleRadii: particleData.radii,
       count,
       particleCount,
       freePositions: buildFreePositions(count, random),
+      freeDepthLayers: new Uint8Array(count),
+      freeDepthLayerCounts: [0, 0, 0],
+      freeDepthLayerBass: new Float32Array(3),
+      freeDepthEnvelope: 0,
+      freeDepthHistoryTimes: new Float64Array(FREE_DEPTH_HISTORY_SIZE),
+      freeDepthHistoryValues: new Float32Array(FREE_DEPTH_HISTORY_SIZE),
+      freeDepthHistoryCursor: 0,
+      freeDepthHistoryCount: 0,
       heartPositions: heartLayout.positions,
       heartDirections: new Float32Array(count * 3),
       heartGridSpacing: heartLayout.gridSpacing,
@@ -593,7 +824,6 @@
       heartSurfaceCounts: heartLayout.surfaceCounts,
       heartProfile: heartLayout.profile,
       heartJitter: heartLayout.jitter,
-      currentPositions: new Float32Array(count * 3),
       phases: new Float32Array(count),
       speeds: new Float32Array(count),
       drift: new Float32Array(count),
@@ -614,9 +844,13 @@
       smoothedBass: 0,
       smoothedEnergy: 0,
       pulseDisplacement: 0,
+      freeDepthDisplacement: 0,
+      freeScalePulse: 0,
+      freeReflectionBoost: 0,
+      freeTiltDegrees: 0,
       motionChecksum: 0,
       particleChecksum: 0,
-      bounds: null,
+      bounds: { minX: 0, maxX: 0, minY: 0, maxY: 0, minZ: 0, maxZ: 0 },
       width: 0,
       height: 0,
       pixelRatio: 0,
@@ -630,6 +864,9 @@
       averageUpdateMs: 0,
       disposed: false
     };
+    if (config.renderQuality && config.renderQuality !== 'native') {
+      setRenderQuality(runtime, config.renderQuality);
+    }
     for (let index = 0; index < count; index += 1) {
       const offset = index * 3;
       const phase = random() * TAU;
@@ -641,6 +878,10 @@
       runtime.tiltWaveX[index] = Math.sin(phase * 1.73);
       runtime.tiltWaveY[index] = Math.cos(phase * 1.31);
       runtime.tiltWaveZ[index] = Math.sin(phase * 0.91);
+      const freeZ = runtime.freePositions[offset + 2];
+      const depthLayer = freeZ >= FREE_DEPTH_LAYER_LIMIT ? 0 : freeZ <= -FREE_DEPTH_LAYER_LIMIT ? 2 : 1;
+      runtime.freeDepthLayers[index] = depthLayer;
+      runtime.freeDepthLayerCounts[depthLayer] += 1;
       const heartX = runtime.heartPositions[offset];
       const heartY = runtime.heartPositions[offset + 1];
       const heartZ = runtime.heartPositions[offset + 2];
@@ -665,6 +906,7 @@
         canvasCount: runtime && runtime.host ? runtime.host.querySelectorAll('canvas').length : 0
       };
     }
+    refreshMotionDiagnostics(runtime);
     const coverage = projectedCoverage(runtime);
     const bounds = runtime.bounds || { minX: 0, maxX: 0, minY: 0, maxY: 0, minZ: 0, maxZ: 0 };
     return {
@@ -676,15 +918,27 @@
       transition: Number(runtime.modeProgress.toFixed(4)),
       cubeCount: runtime.count,
       particleCount: runtime.particleCount,
+      pixelRatio: Number(runtime.pixelRatio.toFixed(3)),
+      toneMappingExposure: Number(runtime.renderer.toneMappingExposure.toFixed(3)),
       particleVisible: runtime.particles.visible,
       backgroundEnabled: runtime.backgroundEnabled,
       palette: runtime.paletteHex.slice(),
+      environment: {
+        faceSize: runtime.environmentFaceSize,
+        mipmapped: runtime.environment.generateMipmaps === true
+      },
+      normalBlend: runtime.normalBlend,
+      renderQuality: renderQualityDiagnostics(runtime),
       material: {
         type: runtime.material.type,
         roughness: runtime.material.roughness,
         transmission: runtime.material.transmission,
         clearcoat: runtime.material.clearcoat,
-        opacity: runtime.material.opacity
+        clearcoatRoughness: runtime.material.clearcoatRoughness,
+        envMapIntensity: Number(runtime.material.envMapIntensity.toFixed(4)),
+        opacity: runtime.material.opacity,
+        transparent: runtime.material.transparent,
+        depthWrite: runtime.material.depthWrite
       },
       bounds: {
         width: Number((bounds.maxX - bounds.minX).toFixed(3)),
@@ -709,6 +963,19 @@
       heartProfile: runtime.heartProfile,
       heartJitter: runtime.heartJitter,
       bass: Number(runtime.smoothedBass.toFixed(4)),
+      freeBassAxis: 'depth-z',
+      freeDepthProfile: 'three-layer-staggered-impact',
+      freeDepthLayerCounts: runtime.freeDepthLayerCounts.slice(),
+      freeDepthLayerDisplacements: FREE_DEPTH_LAYER_DISPLACEMENTS.slice(),
+      freeDepthLayerBass: Array.from(runtime.freeDepthLayerBass, (value) => Number(value.toFixed(4))),
+      freeDepthStaggerMs: FREE_DEPTH_STAGGER_MS.slice(),
+      freeDepthAttackMs: Math.round(1000 / FREE_DEPTH_ATTACK_RATE),
+      freeDepthReleaseMs: Math.round(1000 / FREE_DEPTH_RELEASE_RATE),
+      freeDepthHistorySize: FREE_DEPTH_HISTORY_SIZE,
+      freeDepthDisplacement: Number(runtime.freeDepthDisplacement.toFixed(4)),
+      freeScalePulse: Number(runtime.freeScalePulse.toFixed(4)),
+      freeReflectionBoost: Number(runtime.freeReflectionBoost.toFixed(4)),
+      freeTiltDegrees: Number(runtime.freeTiltDegrees.toFixed(3)),
       pulseDisplacement: Number(runtime.pulseDisplacement.toFixed(4)),
       motionChecksum: Number(runtime.motionChecksum.toFixed(5)),
       particleChecksum: Number(runtime.particleChecksum.toFixed(5)),
@@ -738,6 +1005,12 @@
   function dispose(runtime) {
     if (!runtime || runtime.disposed) return false;
     runtime.disposed = true;
+    try {
+      runtime.renderQuality?.dispose?.();
+    } catch (error) {
+      // Continue releasing the renderer and scene resources.
+    }
+    runtime.renderQuality = null;
     runtime.geometry.dispose();
     runtime.material.dispose();
     runtime.particleGeometry.dispose();
@@ -757,6 +1030,7 @@
     create,
     update,
     resize,
+    setRenderQuality,
     setMode,
     setBackgroundEnabled,
     setPalette: applyPalette,

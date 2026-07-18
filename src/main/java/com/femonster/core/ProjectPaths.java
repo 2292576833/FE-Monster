@@ -19,7 +19,10 @@ public final class ProjectPaths {
         Path webRoot = webOverride == null || webOverride.isBlank()
             ? root.resolve("web")
             : Path.of(webOverride).toAbsolutePath().normalize();
-        Path dataDir = root.resolve("data");
+        String dataOverride = System.getenv("FE_MONSTER_DATA_DIR");
+        Path dataDir = dataOverride == null || dataOverride.isBlank()
+            ? root.resolve("data")
+            : Path.of(dataOverride).toAbsolutePath().normalize();
         return new ProjectPaths(root, webRoot, dataDir);
     }
 }

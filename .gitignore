@@ -8,6 +8,8 @@ build/sources.txt
 # Runtime and local data
 runtime/
 data/
+!web/data/
+!web/data/storm-ocean-preset.json
 .venv-gesture/
 node_modules/
 __pycache__/
@@ -53,4 +55,12 @@ android/local.properties
 
 # Local QA, render and release evidence (never ship as source)
 artifacts/
+.tmp/
 *.blend1
+
+# Local credential/network probe kept outside the fully local Android release
+scripts/check-android-live-music.mjs
+
+# Redundant authoring exports; runtime GLBs embed their textures
+web/bundled-assets/1dec0986-a81d-4847-af22-93d1976b5f2d/blender-output/textures/
+web/assets/void-prism/metal012/Metal012_8K-PNG.mtlx
