@@ -1,0 +1,29 @@
+{
+  "schema": "fe-monster.cycles-render/v1",
+  "preset": "storm-ocean",
+  "renderer": {
+    "engine": "CYCLES",
+    "blenderVersion": "5.1.2",
+    "deviceBackend": "HIP",
+    "deviceName": "AMD Radeon RX 5700 XT",
+    "samples": 64,
+    "panorama": "equirectangular",
+    "resolution": [
+      2048,
+      1024
+    ],
+    "colorSpace": "sRGB"
+  },
+  "sourceBlend": "cycles-source/storm-ocean/storm-ocean-cycles-environment.blend",
+  "output": {
+    "file": "storm-ocean-cycles-environment.png",
+    "role": "realtime-reflection-environment",
+    "sha256": "aef7a5e6645f95710f3f69903fb8b14deab31f9a56fd281d970e08b3bccda0ba"
+  },
+  "runtime": {
+    "renderer": "three-webgl",
+    "usesCyclesOutput": true,
+    "usesCyclesAuthoringReference": true,
+    "keepsAudioReactiveInteraction": true
+  }
+}

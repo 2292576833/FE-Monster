@@ -1,0 +1,29 @@
+{
+  "schema": "fe-monster.cycles-render/v1",
+  "preset": "void-prism",
+  "renderer": {
+    "engine": "CYCLES",
+    "blenderVersion": "5.1.2",
+    "deviceBackend": "HIP",
+    "deviceName": "AMD Radeon RX 5700 XT",
+    "samples": 64,
+    "panorama": "equirectangular",
+    "resolution": [
+      2048,
+      1024
+    ],
+    "colorSpace": "sRGB"
+  },
+  "sourceBlend": "cycles-source/void-prism/void-prism-cycles-environment.blend",
+  "output": {
+    "file": "void-prism-cycles-environment.png",
+    "role": "authoring-reference-environment",
+    "sha256": "6e21f30089a706138a221c6cff30e2a46fdc28b09c6200c310c2771ef9f82551"
+  },
+  "runtime": {
+    "renderer": "three-webgl",
+    "usesCyclesOutput": false,
+    "usesCyclesAuthoringReference": true,
+    "keepsAudioReactiveInteraction": true
+  }
+}

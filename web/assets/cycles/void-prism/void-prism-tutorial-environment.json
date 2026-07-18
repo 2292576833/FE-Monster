@@ -1,0 +1,65 @@
+{
+  "schema": "fe-monster.cycles-tutorial-environment/v1",
+  "preset": "void-prism",
+  "role": "tutorial-style-reflection-environment",
+  "createdAt": "2026-07-17T12:05:17.222590+00:00",
+  "renderer": {
+    "engine": "CYCLES",
+    "blenderVersion": "5.1.2",
+    "blenderBuildHash": "ec6e62d40fa9",
+    "deviceBackend": "HIP",
+    "deviceNames": [
+      "AMD Radeon RX 5700 XT"
+    ],
+    "samples": 64,
+    "denoiser": "OPENIMAGEDENOISE",
+    "adaptiveThreshold": 0.014999999664723873
+  },
+  "image": {
+    "projection": "equirectangular",
+    "resolution": [
+      2048,
+      1024
+    ],
+    "format": "PNG",
+    "colorDepth": 16,
+    "file": "web/assets/cycles/void-prism/void-prism-tutorial-environment.png",
+    "bytes": 7569265,
+    "sha256": "55ac98e4070461bfd781b41fa298467963daf2fcae23137ba2495eba7d8a564b"
+  },
+  "colorManagement": {
+    "viewTransform": "AgX",
+    "look": "AgX - Medium High Contrast",
+    "exposure": -0.05000000074505806,
+    "gamma": 1.0
+  },
+  "source": {
+    "blend": "cycles-source/void-prism/void-prism-tutorial-environment.blend",
+    "script": "scripts/render-void-prism-tutorial-environment.py"
+  },
+  "design": {
+    "palette": "neutral-silver-gray-with-subtle-warmth",
+    "reflectionAnchors": [
+      "broad bright window and sky",
+      "lifted charcoal interior wall",
+      "rounded furniture",
+      "rounded practical lamp",
+      "broad sculpture silhouettes"
+    ],
+    "excluded": [
+      "thin strip lights",
+      "black bars",
+      "text",
+      "procedural dirt",
+      "visible grain",
+      "large near-black regions"
+    ]
+  },
+  "statistics": {
+    "renderSeconds": 14.75,
+    "objects": 35,
+    "meshObjects": 30,
+    "lights": 4,
+    "basePolygons": 15557
+  }
+}
