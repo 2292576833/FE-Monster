@@ -202,7 +202,7 @@ public final class NeteaseClient implements MusicProviderClient {
         Map<String, String> params = new LinkedHashMap<>();
         params.put("id", id);
         if (quality != null && !quality.isBlank()) params.put("level", quality);
-        Object root = jsonGet("/song/url", params);
+        Object root = jsonGet("/song/url/v1", params);
         List<Object> data = SimpleJson.asList(SimpleJson.asMap(root).get("data"));
         if (data.isEmpty()) return "";
         return SimpleJson.asString(SimpleJson.asMap(data.get(0)).get("url"), "");

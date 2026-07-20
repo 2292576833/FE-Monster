@@ -54,7 +54,7 @@ function Get-CommunityUrl {
 }
 
 function Get-InstalledVersion {
-  return '1.0.6-java26'
+  return '1.1.0'
 }
 
 function Invoke-AutoInstall {

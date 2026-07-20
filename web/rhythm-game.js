@@ -1,7 +1,7 @@
 (function attachRhythmGame(global) {
   'use strict';
 
-  const VERSION = '2026.07.16-rhythm-game-manual-step-4';
+  const VERSION = '2026.07.18-rhythm-game-orbit-lock-1';
   const TAU = Math.PI * 2;
   const $ = (selector) => document.querySelector(selector);
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -30,6 +30,7 @@
     setup: $('#rhythmGameSetup'),
     result: $('#rhythmGameResult'),
     resultRank: $('#rhythmGameResultRank'),
+    resultTitle: $('#rhythmGameResultTitle'),
     resultScore: $('#rhythmGameResultScore'),
     resultMeta: $('#rhythmGameResultMeta'),
     restart: $('#rhythmGameRestartButton'),
@@ -67,9 +68,9 @@
     judgements: [],
     pathGrades: [],
     pathStep: 0,
-    lastAdvanceBeat: -1,
+    resultStatus: '',
+    lastInputAt: Number.NEGATIVE_INFINITY,
     stats: null,
-    missCursor: 0,
     frame: 0,
     feedbackTimer: 0,
     analysisToken: 0,
@@ -116,9 +117,11 @@
     game.judgements = new Array(game.chart?.beats.length || 0).fill(null);
     game.pathGrades = new Array(Math.max(0, (game.chart?.points.length || 1) - 1)).fill(null);
     game.pathStep = 0;
-    game.lastAdvanceBeat = -1;
-    game.missCursor = 0;
+    game.resultStatus = '';
+    game.lastInputAt = Number.NEGATIVE_INFINITY;
     game.pulses.length = 0;
+    els.scene.removeAttribute('data-result');
+    els.resultTitle.textContent = '关卡完成';
     updateHud(0);
   }
 
@@ -130,10 +133,12 @@
   function updateHud(time = els.audio.currentTime || 0) {
     const stats = game.stats || { score: 0, combo: 0 };
     const duration = Math.max(0.001, Number(els.audio.duration) || game.audioBuffer?.duration || 1);
+    const beatCount = game.chart?.beats.length || 0;
+    const progress = beatCount ? game.pathStep / beatCount : time / duration;
     els.score.textContent = String(Math.round(stats.score || 0)).padStart(7, '0');
     els.accuracy.textContent = `${accuracyPercent().toFixed(2)}%`;
     els.combo.textContent = `${stats.combo || 0}x`;
-    els.progress.style.transform = `scaleX(${clamp(time / duration, 0, 1).toFixed(4)})`;
+    els.progress.style.transform = `scaleX(${clamp(progress, 0, 1).toFixed(4)})`;
   }
 
   function quantile(values, position) {
@@ -486,18 +491,6 @@
     game.feedbackTimer = global.setTimeout(() => els.feedback.classList.remove('is-visible'), grade === 'miss' ? 230 : 320);
   }
 
-  function lowerBoundBeat(time) {
-    const beats = game.chart?.beats || [];
-    let low = 0;
-    let high = beats.length;
-    while (low < high) {
-      const middle = (low + high) >> 1;
-      if (beats[middle].time < time) low = middle + 1;
-      else high = middle;
-    }
-    return low;
-  }
-
   function recordJudgement(index, grade, weight, baseScore) {
     if (!game.stats || game.judgements[index]) return;
     game.judgements[index] = grade;
@@ -506,6 +499,7 @@
     game.stats[grade] += 1;
     if (grade === 'miss') {
       game.stats.combo = 0;
+      game.pathGrades[Math.min(game.pathStep, game.pathGrades.length - 1)] = 'miss';
     } else {
       game.stats.combo += 1;
       game.stats.maxCombo = Math.max(game.stats.maxCombo, game.stats.combo);
@@ -513,7 +507,6 @@
       game.stats.score += Math.round(baseScore * comboMultiplier);
       game.pathStep = Math.min(game.pathStep + 1, Math.max(0, game.chart.points.length - 1));
       game.pathGrades[game.pathStep - 1] = grade;
-      game.lastAdvanceBeat = index;
     }
     const pulseStep = grade === 'miss'
       ? Math.min(game.pathStep + 1, game.chart.points.length - 1)
@@ -525,25 +518,21 @@
 
   function judgeHit() {
     if (game.mode !== 'playing' || !game.chart) return;
+    const inputAt = performance.now();
+    if (inputAt - game.lastInputAt < 45) return;
+    game.lastInputAt = inputAt;
     const time = els.audio.currentTime;
     const windowSize = game.chart.hitWindow;
-    const insertion = lowerBoundBeat(time);
-    let candidate = -1;
-    let difference = Number.POSITIVE_INFINITY;
-    for (let index = Math.max(0, insertion - 2); index <= Math.min(game.chart.beats.length - 1, insertion + 1); index += 1) {
-      if (game.judgements[index]) continue;
-      const nextDifference = Math.abs(game.chart.beats[index].time - time);
-      if (nextDifference < difference) {
-        difference = nextDifference;
-        candidate = index;
-      }
-    }
+    const candidate = game.pathStep;
+    const beat = game.chart.beats[candidate];
+    if (!beat) return;
+    const timingError = time - beat.time;
+    const difference = Math.abs(timingError);
     els.hit.classList.add('is-pressed');
     global.setTimeout(() => els.hit.classList.remove('is-pressed'), 80);
-    if (candidate < 0 || difference > windowSize) {
-      showFeedback(insertion < game.chart.beats.length && game.chart.beats[insertion].time > time ? 'EARLY' : 'LATE', 'miss');
-      if (game.stats) game.stats.combo = 0;
-      updateHud();
+    if (difference > windowSize) {
+      showFeedback(timingError < 0 ? 'EARLY' : 'MISS', 'miss');
+      finishRun(false, timingError < 0 ? '抢拍' : '漏拍');
       return;
     }
     if (difference <= 0.065) {
@@ -556,19 +545,15 @@
       recordJudgement(candidate, 'good', 0.55, 420);
       showFeedback('GOOD', 'good');
     }
+    if (game.pathStep >= game.chart.beats.length) finishRun(true);
   }
 
   function markMisses(time) {
-    if (!game.chart || !game.stats) return;
-    let missed = false;
-    while (game.missCursor < game.chart.beats.length && game.chart.beats[game.missCursor].time < time - game.chart.hitWindow) {
-      if (!game.judgements[game.missCursor]) {
-        recordJudgement(game.missCursor, 'miss', 0, 0);
-        missed = true;
-      }
-      game.missCursor += 1;
-    }
-    if (missed) showFeedback('MISS', 'miss');
+    if (!game.chart || !game.stats || game.mode !== 'playing') return;
+    const beat = game.chart.beats[game.pathStep];
+    if (!beat || beat.time >= time - game.chart.hitWindow) return;
+    showFeedback('MISS', 'miss');
+    finishRun(false, '漏拍');
   }
 
   function finalRank(accuracy, misses) {
@@ -579,18 +564,28 @@
     return 'D';
   }
 
-  function endGame() {
+  function finishRun(completed, reason = '') {
     if (!game.chart || game.mode === 'result') return;
-    game.chart.beats.forEach((beat, index) => {
-      if (!game.judgements[index]) recordJudgement(index, 'miss', 0, 0);
-    });
+    if (!completed) {
+      const missedIndex = Math.min(game.pathStep, game.chart.beats.length - 1);
+      if (missedIndex >= 0 && !game.judgements[missedIndex]) recordJudgement(missedIndex, 'miss', 0, 0);
+    }
     els.audio.pause();
     const accuracy = accuracyPercent();
-    els.resultRank.textContent = finalRank(accuracy, game.stats.miss);
+    game.resultStatus = completed ? 'completed' : 'failed';
+    els.scene.dataset.result = game.resultStatus;
+    els.resultRank.textContent = completed ? finalRank(accuracy, game.stats.miss) : '×';
+    els.resultTitle.textContent = completed ? '关卡完成' : '脱离节拍';
     els.resultScore.textContent = String(Math.round(game.stats.score)).padStart(7, '0');
-    els.resultMeta.textContent = `${accuracy.toFixed(2)}% 准确率 · ${game.stats.maxCombo}x 最大连击 · ${game.stats.miss} 次失误`;
+    els.resultMeta.textContent = completed
+      ? `${accuracy.toFixed(2)}% 准确率 · ${game.stats.maxCombo}x 最大连击 · ${game.stats.miss} 次失误`
+      : `${reason || '节拍中断'} · 已完成 ${game.pathStep}/${game.chart.beats.length} · ${accuracy.toFixed(2)}% 准确率`;
     els.countdown.hidden = true;
     setMode('result');
+  }
+
+  function endGame() {
+    finishRun(game.pathStep >= (game.chart?.beats.length || 0), '音乐已结束');
   }
 
   function resizeCanvas() {
@@ -655,8 +650,8 @@
 
     const beats = game.chart.beats;
     const points = game.chart.points;
-    const timingIndex = clamp(Math.max(lowerBoundBeat(time), game.lastAdvanceBeat + 1), 0, beats.length - 1);
     const pathStep = clamp(game.pathStep, 0, points.length - 1);
+    const timingIndex = clamp(pathStep, 0, beats.length - 1);
     const current = points[pathStep];
     const next = points[pathStep + 1] || current;
     const previous = pathStep > 0
@@ -714,9 +709,7 @@
     const endAngle = Math.atan2(next.y - current.y, next.x - current.x);
     let angleDistance = (endAngle - startAngle + TAU) % TAU;
     if (angleDistance < 0.12) angleDistance = TAU;
-    const movingAngle = timingIndex === game.lastAdvanceBeat + 1
-      ? startAngle + angleDistance * progress
-      : endAngle - TAU * (1 - progress);
+    const movingAngle = startAngle + angleDistance * progress;
     const orbitRadius = Math.hypot(next.x - current.x, next.y - current.y) * scale;
     const movingX = currentScreen.x + Math.cos(movingAngle) * orbitRadius;
     const movingY = currentScreen.y + Math.sin(movingAngle) * orbitRadius;
@@ -750,17 +743,19 @@
     const time = Number(els.audio.currentTime) || 0;
     if (game.mode === 'playing') {
       markMisses(time);
-      updateHud(time);
-      const firstBeat = game.chart?.beats[0]?.time || 0;
-      const remaining = firstBeat - time;
-      if (remaining > 0.15) {
-        els.countdown.hidden = false;
-        els.countdown.textContent = remaining > 1 ? String(Math.ceil(remaining)) : 'GO';
-      } else {
-        els.countdown.hidden = true;
+      if (game.mode === 'playing') {
+        updateHud(time);
+        const firstBeat = game.chart?.beats[0]?.time || 0;
+        const remaining = firstBeat - time;
+        if (remaining > 0.15) {
+          els.countdown.hidden = false;
+          els.countdown.textContent = remaining > 1 ? String(Math.ceil(remaining)) : 'GO';
+        } else {
+          els.countdown.hidden = true;
+        }
+        const lastBeat = game.chart?.beats[game.chart.beats.length - 1]?.time || 0;
+        if (time > lastBeat + game.chart.hitWindow || els.audio.ended) endGame();
       }
-      const lastBeat = game.chart?.beats[game.chart.beats.length - 1]?.time || 0;
-      if (time > lastBeat + 0.65 || els.audio.ended) endGame();
     }
     drawGame(time, frameTime);
     game.frame = global.requestAnimationFrame(renderFrame);
@@ -863,6 +858,7 @@
 
   function onKeyDown(event) {
     if (!game.active) return;
+    if (event.repeat) return;
     if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
@@ -933,6 +929,8 @@
       bpm: game.chart?.bpm || 0,
       beatCount: game.chart?.beats.length || 0,
       pathStep: game.pathStep,
+      nextBeatTime: game.chart?.beats[game.pathStep]?.time ?? null,
+      resultStatus: game.resultStatus,
       score: game.stats?.score || 0,
       combo: game.stats?.combo || 0
     })

@@ -1,43 +1,37 @@
-# FE Monster 1.0.6-java26
+# FE Monster 1.1.0
 
-Release date: 2026-07-15
+Release date: 2026-07-20
 
 ## 更新内容
 
-- 修复社区服务器关闭后客户端短时间仍显示在线的问题：成功状态不再使用宽限缓存，服务器停止后会立即切换为离线并禁用联网操作。
-- 优化程序与场景预设运行性能：非活动页面、后台页面和未启用场景会停止无效渲染与轮询；实测隐藏页请求从 6 次降为 0，1800 方块同轮计算耗时降低约 75%。
-- 完成 Android 本地客户端：界面、组件、预设、预览、纹理与可播放场景打入 APK，本地音乐导入、播放、内置预设和本地设置不依赖局域网或 FE Monster 服务端。
-- Android 的社区与沙盒模式会真实检测服务器状态；离线时明确提示并阻止联网操作，服务器恢复后自动重新启用。
-- Android 使用独立手机布局和性能样式，覆盖 320×568、360×800 竖屏与 800×360 横屏，触控目标不小于 44dp，避免顶部、播放栏、DIY、社区和沙盒控件重叠。
-- Android 低性能档关闭高成本玻璃滤镜和实时阴影，降低粒子、反射缓冲与环境贴图预算；移动包不再携带不会被选择的 8K 纹理副本。
-- Windows 桌面端现有按键布局、尺寸和位置保持不变；Android 适配仅注入 APK 专用 CSS/JS。
+- 新增三色半透明悬浮播放页：自动提取歌曲封面颜色，同时透出后方壁纸或场景。
+- 播放页统一支持网易云、QQ 音乐、酷狗、汽水音乐与本地歌曲的平台身份、歌单、歌曲切换、可拖动进度和音质选择。
+- 播放页歌词复用完整书页滚动逻辑，支持多行平滑滚动、到位高亮、宋体显示和独立颜色调节。
+- 增强“焦点回声”文字预设的暗影层次，并为各文字预设保留独立调色盘。
+- 修复壁纸模式的导入列表、实时壁纸与默认壁纸显示链路，主页面默认进入纯净壁纸模式。
+- 完善音游模式的按键判定、节拍驱动与自定义音乐分析流程。
+- 优化风暴海域、自由方块、Sonic 等预设的纹理、反射和低频响应，并加入自适应清晰度、刷新率与可选 FSR 档位。
+- 优化低配电脑与小窗口下的渲染、歌词和播放页性能，保持桌面客户端既有主布局不变。
+- Android 客户端继续使用独立本地资源和移动端布局，与 Windows 桌面端互不干扰。
 
 ## 安装包
 
-- Windows x64 单文件安装包：`FE-Monster-Setup.exe`。
-- Android 可直接侧载安装包：`FE-Monster-Android-1.0.6-complete-debug.apk`。
-- Windows 安装包内嵌完整载荷，安装时会检查 Node、WebView2、.NET、Java 26 与本地手势运行时。
-- Android APK 使用调试签名，适合当前直接安装测试；正式商店发布仍需用户自有的长期发布密钥。
-- 当前 Windows 安装包未做 Authenticode 代码签名，Windows SmartScreen 或杀毒软件可能显示未知发布者提示。
-
-## Android 离线边界
-
-- 无 FE Monster 服务端：可打开客户端、导入并播放本地音乐、使用内置场景/预设、保存本地设置。
-- 需要 FE Monster 服务端：社区、组件/预设市场、沙盒、Codex 对话与 Blender 生成。
-- 音乐平台账号登录与在线搜索需要互联网和可访问的音乐 API 网关；本地音乐播放不受影响。
+- Windows x64 单文件安装包：`FE-Monster-Setup-1.1.0.exe`。
+- 安装包内嵌完整载荷，安装时会检查 Node、WebView2、.NET、Java 与本地手势运行时。
+- 本次 GitHub Release 发布 Windows 安装包；Android APK 仍通过独立构建流程生成。
+- 当前安装包未做 Authenticode 代码签名，Windows SmartScreen 或杀毒软件可能显示未知发布者提示。
 
 ## 验证记录
 
 ```powershell
 cmd /c build.cmd
 node --check web/app.js
-node scripts/check-community-offline.mjs
-node scripts/check-client-polish.mjs
-node scripts/check-free-cubes.mjs
-node scripts/check-preset-performance.mjs
-node scripts/check-android-client.mjs
-powershell -NoProfile -File scripts\check-storm-ocean-material.ps1
-powershell -NoProfile -File scripts\build-android.ps1
+node scripts/check-text-preset-palette.mjs
+node scripts/check-playback-lyric-palette.mjs
+node scripts/check-qishui-phone-login-ui.mjs
+node scripts/check-playback-card-performance.mjs
+node scripts/check-playback-runtime-cache.mjs
+node scripts/check-playback-cover-palette.mjs
 powershell -NoProfile -File scripts\build-winforms-client.ps1 -Root .
-powershell -NoProfile -File scripts\build-installer.ps1 -SkipBuild -EmbedPayload -AllowEmbeddedPayload
+powershell -NoProfile -File scripts\build-installer.ps1 -EmbedPayload -AllowEmbeddedPayload
 ```

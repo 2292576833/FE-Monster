@@ -262,6 +262,9 @@ try {
       const result = {
         blackSearchGlass: searchGlass.blackSurface,
         blackDockGlass: dockGlass.blackSurface,
+        oldDockRemoved: dock.hidden
+          && dock.getAttribute('aria-hidden') === 'true'
+          && dockStyle.display === 'none',
         searchGlassMode: searchGlass.mode,
         dockGlassMode: dockGlass.mode,
         searchGlassRefraction: searchGlass.filterActive && searchGlass.oneFilter && searchGlass.oneContent,
@@ -293,9 +296,8 @@ try {
         liveVisible,
       };
       result.ok = result.blackSearchGlass
-        && result.blackDockGlass
+        && result.oldDockRemoved
         && result.searchGlassRefraction
-        && result.dockGlassRefraction
         && result.hiddenScrollbar
         && result.pageStillScrolls
         && result.vipVisible

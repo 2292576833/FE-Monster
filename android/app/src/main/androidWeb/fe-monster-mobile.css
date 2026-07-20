@@ -24,6 +24,13 @@ html[data-fe-platform="android"] textarea {
   touch-action: manipulation;
 }
 
+html[data-fe-platform="android"] .app-shell.is-playback-page .top-search {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+  transform: none !important;
+}
+
 html[data-fe-platform="android"] .runtime-topbar .window-control-button--fullscreen,
 html[data-fe-platform="android"] .runtime-topbar .window-control-button--minimize,
 html[data-fe-platform="android"] .runtime-topbar .window-control-button--close {
@@ -601,6 +608,11 @@ html[data-fe-platform="android"][data-android-performance="low"] .diy-sidebar::a
 }
 
 @media (max-width: 767px) and (orientation: portrait) {
+  html[data-fe-platform="android"] .qishui-playback-card {
+    top: calc(var(--android-search-top) + var(--android-control) + 8px) !important;
+    bottom: calc(var(--safe-area-bottom) + 12px) !important;
+  }
+
   html[data-fe-platform="android"] .sandbox-workspace {
     height: calc(100% - 64px - var(--safe-area-top)) !important;
     grid-template-columns: 1fr !important;

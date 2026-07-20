@@ -227,9 +227,22 @@ const els = {
   diyTextPage: $('#diyTextPage'),
   diyWallpaperModeButton: $('#diyWallpaperModeButton'),
   diyWallpaperPage: $('#diyWallpaperPage'),
+  diyRhythmGameButton: $('#diyRhythmGameButton'),
+  diyNoTextPreset: $('#diyNoTextPreset'),
   diyLyricPreset: $('#diyLyricPreset'),
   diyFlowTextPreset: $('#diyFlowTextPreset'),
   diyBookEffectTextPreset: $('#diyBookEffectTextPreset'),
+  diyFocusEchoTextPreset: $('#diyFocusEchoTextPreset'),
+  textPaletteControl: $('#textPaletteControl'),
+  textPaletteStatus: $('#textPaletteStatus'),
+  textPaletteAutoButton: $('#textPaletteAutoButton'),
+  textPaletteCustomInput: $('#textPaletteCustomInput'),
+  textPaletteResetButton: $('#textPaletteResetButton'),
+  playbackLyricPaletteControl: $('#playbackLyricPaletteControl'),
+  playbackLyricPaletteStatus: $('#playbackLyricPaletteStatus'),
+  playbackLyricPaletteAutoButton: $('#playbackLyricPaletteAutoButton'),
+  playbackLyricPaletteCustomInput: $('#playbackLyricPaletteCustomInput'),
+  playbackLyricPaletteResetButton: $('#playbackLyricPaletteResetButton'),
   diySceneNonePreset: $('#diySceneNonePreset'),
   diyScenePresetList: $('#diyScenePresetList'),
   diyCubePreset: $('#diyCubePreset'),
@@ -365,6 +378,36 @@ const els = {
   playbackLyricText: $('#playbackLyricText'),
   playbackLyricBack: $('#playbackLyricBack'),
   playbackLyricSubtitle: $('#playbackLyricSubtitle'),
+  qishuiPlaybackCard: $('#qishuiPlaybackCard'),
+  qishuiPlaybackPhone: $('#qishuiPlaybackPhone'),
+  qishuiPlaybackVisibilityToggle: $('#qishuiPlaybackVisibilityToggle'),
+  qishuiPlaybackScaleToggle: $('#qishuiPlaybackScaleToggle'),
+  qishuiPlaybackTools: $('#qishuiPlaybackTools'),
+  qishuiPlaybackBackdrop: $('#qishuiPlaybackBackdrop'),
+  qishuiPlaybackCoverFrame: $('#qishuiPlaybackCoverFrame'),
+  qishuiPlaybackCover: $('#qishuiPlaybackCover'),
+  qishuiPlaybackCoverFallback: $('#qishuiPlaybackCoverFallback'),
+  qishuiPlaybackAccount: $('#qishuiPlaybackAccount'),
+  qishuiPlaybackAccountAvatar: $('#qishuiPlaybackAccountAvatar'),
+  qishuiPlaybackAccountAvatarImage: $('#qishuiPlaybackAccountAvatarImage'),
+  qishuiPlaybackAccountAvatarFallback: $('#qishuiPlaybackAccountAvatarFallback'),
+  qishuiPlaybackAccountName: $('#qishuiPlaybackAccountName'),
+  qishuiPlaybackAccountStatus: $('#qishuiPlaybackAccountStatus'),
+  qishuiPlaybackVipBadge: $('#qishuiPlaybackVipBadge'),
+  qishuiPlaybackQueue: $('#qishuiPlaybackQueue'),
+  qishuiPlaybackLyrics: $('#qishuiPlaybackLyrics'),
+  qishuiPlaybackLyricPage: $('#qishuiPlaybackLyricPage'),
+  qishuiPlaybackTitle: $('#qishuiPlaybackTitle'),
+  qishuiPlaybackArtist: $('#qishuiPlaybackArtist'),
+  qishuiPlaybackQuality: $('#qishuiPlaybackQuality'),
+  qishuiPlaybackQualityMenu: $('#qishuiPlaybackQualityMenu'),
+  qishuiPlaybackProgressRange: $('#qishuiPlaybackProgressRange'),
+  qishuiPlaybackCurrentTime: $('#qishuiPlaybackCurrentTime'),
+  qishuiPlaybackTotalTime: $('#qishuiPlaybackTotalTime'),
+  qishuiPlaybackPreviousButton: $('#qishuiPlaybackPreviousButton'),
+  qishuiPlaybackPlayButton: $('#qishuiPlaybackPlayButton'),
+  qishuiPlaybackNextButton: $('#qishuiPlaybackNextButton'),
+  qishuiPlaybackWheelHint: $('#qishuiPlaybackWheelHint'),
   progressRange: $('#progressRange'),
   currentTime: $('#currentTime'),
   totalTime: $('#totalTime'),
@@ -466,24 +509,24 @@ const PLAYBACK_QUALITY_OPTIONS = {
   qq: [
     { id: '128', label: '标准', short: 'STD', vip: false },
     { id: '320', label: '高品', short: 'HQ', vip: false },
-    { id: 'flac', label: '无损', short: 'SQ', vip: true },
-    { id: 'hires', label: 'Hi-Res', short: 'HR', vip: true }
+    { id: 'flac', label: '无损', short: 'SQ', vip: true }
   ],
   kugou: [
     { id: '128', label: '标准', short: 'STD', vip: false },
     { id: '320', label: '高品', short: 'HQ', vip: false },
-    { id: 'flac', label: '无损', short: 'SQ', vip: true },
-    { id: 'hires', label: 'Hi-Res', short: 'HR', vip: true }
+    { id: 'flac', label: '无损', short: 'SQ', vip: true }
   ],
   qishui: [
-    { id: 'standard', label: '\u6807\u51c6', short: 'STD', vip: false },
-    { id: 'higher', label: '\u9ad8\u54c1', short: 'HQ', vip: false },
-    { id: 'lossless', label: '\u65e0\u635f', short: 'SQ', vip: true }
+    { id: 'standard', label: '\u6807\u51c6', short: 'STD', vip: false }
   ]
 };
 const PLAYBACK_QUALITY_PREFS_KEY = 'fe-monster-playback-quality-prefs-v1';
 const RENDER_CLARITY_PREFS_KEY = 'fe-monster-render-clarity-v1';
 const PRESET_FSR_PREFS_KEY = 'fe-monster-preset-fsr-v1';
+const TEXT_PALETTE_PREFS_KEY = 'fe-monster-text-preset-palettes-v1';
+const PLAYBACK_LYRIC_PALETTE_PREFS_KEY = 'fe-monster-playback-lyric-palette-v1';
+const TEXT_PALETTE_PRESET_IDS = Object.freeze(['depth', 'flow', 'book-effect', 'focus-echo', 'book']);
+const TEXT_PALETTE_DEFAULT_COLOR = '#eafbff';
 const PRESET_FSR_MODES = Object.freeze(['auto', 'ultra-quality', 'quality', 'balanced', 'performance']);
 const PRESET_FSR_VERSIONS = Object.freeze(['1', '2', '3', '4']);
 const RENDER_CLARITY_MIN = 50;
@@ -562,6 +605,45 @@ function loadPlaybackQualityPreferences() {
 }
 
 const INITIAL_PLAYBACK_QUALITY_PREFERENCES = loadPlaybackQualityPreferences();
+
+function normalizeTextPaletteColor(value, fallback = TEXT_PALETTE_DEFAULT_COLOR) {
+  const color = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return /^#[0-9a-f]{6}$/.test(color) ? color : fallback;
+}
+
+function normalizeTextPalettePreference(source = {}) {
+  return {
+    mode: source?.mode === 'manual' ? 'manual' : 'auto',
+    color: normalizeTextPaletteColor(source?.color)
+  };
+}
+
+function loadTextPalettePreferences() {
+  let source = {};
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(TEXT_PALETTE_PREFS_KEY) || '{}');
+    source = stored?.palettes && typeof stored.palettes === 'object' ? stored.palettes : stored;
+  } catch (error) {
+    source = {};
+  }
+  return TEXT_PALETTE_PRESET_IDS.reduce((preferences, preset) => {
+    preferences[preset] = normalizeTextPalettePreference(source?.[preset]);
+    return preferences;
+  }, {});
+}
+
+const INITIAL_TEXT_PALETTE_PREFERENCES = loadTextPalettePreferences();
+
+function loadPlaybackLyricPalettePreference() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(PLAYBACK_LYRIC_PALETTE_PREFS_KEY) || '{}');
+    return normalizeTextPalettePreference(stored?.palette || stored);
+  } catch (error) {
+    return normalizeTextPalettePreference();
+  }
+}
+
+const INITIAL_PLAYBACK_LYRIC_PALETTE_PREFERENCE = loadPlaybackLyricPalettePreference();
 const FAVORITE_SONGS_KEY = 'fe-monster-favorite-songs-v1';
 const SEARCH_SUGGESTION_CACHE_MS = 60 * 1000;
 const PLAYLIST_FAVORITE_CACHE_MS = 60 * 1000;
@@ -1028,6 +1110,7 @@ function hydrateGlassSurface(element, index) {
 
 function initGlassSurfaces() {
   document.querySelectorAll('[data-glass-surface]').forEach((element, index) => {
+    if (element.hidden) return;
     if (MOBILE_RENDER_TARGET) {
       element.classList.remove('glass-surface--svg');
       element.classList.add('glass-surface--fallback', 'glass-surface--mobile-lite');
@@ -1114,6 +1197,8 @@ const state = {
   songWheelFrame: 0,
   songButtonCache: [],
   playlistSongPageOpen: false,
+  playbackPlaylistPickerOpen: false,
+  playlistLoadRequestId: 0,
   activePlaylist: null,
   activePlaylistSongs: [],
   shelfLoadingPlaylistId: '',
@@ -1132,7 +1217,7 @@ const state = {
   shelfRotateY: -14,
   shelfHiddenByUser: false,
   shelfLastRightClickAt: 0,
-  playbackPage: false,
+  playbackPage: true,
   playbackChrome: {
     searchVisible: false,
     dockVisible: false,
@@ -1148,11 +1233,13 @@ const state = {
   diyCardPitch: 2,
   diyCardDrag: null,
   diyPageTransitionTimer: 0,
-  diyPage: 'preset',
-  diyPreset: 'lyric',
+  diyPage: 'wallpaper',
+  diyPreset: 'wallpaper',
   scenePreset: 'lyric',
-  textPreset: 'depth',
-  lastSelectableTextPreset: 'depth',
+  textPreset: 'none',
+  lastSelectableTextPreset: 'none',
+  textPalettePreferences: INITIAL_TEXT_PALETTE_PREFERENCES,
+  playbackLyricPalettePreference: INITIAL_PLAYBACK_LYRIC_PALETTE_PREFERENCE,
   lyricBrightness: 1.12,
   lyricSpeed: 1,
   cubeIntensity: 1.1,
@@ -1242,6 +1329,7 @@ const state = {
   lyricFrameTime: -1,
   lyricFramePreset: '',
   lyricFrameSignature: '',
+  focusEchoAnimationFrame: 0,
   lyricBookScrollTarget: Number.NaN,
   lyricBookScrollFrameAt: 0,
   lyricBookLayoutVersion: 0,
@@ -1262,6 +1350,7 @@ const state = {
     mouseY: 0.5,
     lyricPulse: 0,
     coverSignature: '',
+    palette: null,
     quality: RENDER_PROFILE.playbackQualityMax,
     lastFrameTime: 0,
     lastMotionAt: 0,
@@ -1393,6 +1482,28 @@ const state = {
   qishuiPhoneCooldownUntil: 0,
   qishuiPhoneCooldownTimer: 0,
   qishuiGuestMode: false,
+  qishuiPlaybackCard: {
+    wheelDelta: 0,
+    switching: false,
+    switchTimer: 0,
+    switchId: 0,
+    expanded: false,
+    hiddenByUser: false,
+    lastLyricIndex: -1,
+    lyricSignature: '',
+    lyricBookIndex: -2,
+    lyricBookCurrentLine: null,
+    lyricBookArrivedIndex: -2,
+    lyricBookScrollTarget: Number.NaN,
+    lyricBookScrollFrameAt: 0,
+    lyricBookLayoutVersion: 0,
+    lyricBookLayoutFrame: 0,
+    progressDragging: false,
+    seekRequestId: 0,
+    seekPending: false,
+    pendingSeekTarget: null,
+    pendingAudioSeekTarget: null
+  },
   community: {
     profile: null,
     friends: [],
@@ -5364,6 +5475,15 @@ function rgbCss(color, alpha = 1) {
   return `rgba(${color.r}, ${color.g}, ${color.b}, ${alpha})`;
 }
 
+function rgbFromHex(value) {
+  const color = normalizeTextPaletteColor(value);
+  return {
+    r: Number.parseInt(color.slice(1, 3), 16),
+    g: Number.parseInt(color.slice(3, 5), 16),
+    b: Number.parseInt(color.slice(5, 7), 16)
+  };
+}
+
 function relativeLuminance(color) {
   return (0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b) / 255;
 }
@@ -5398,8 +5518,52 @@ function proxiedImageUrl(url) {
 }
 
 function coverUrl(song) {
-  if (!song || !song.cover) return '';
-  return proxiedImageUrl(song.cover);
+  const source = songCoverSource(song || {});
+  return proxiedImageUrl(source);
+}
+
+function textPalettePresetId(preset = state.textPreset) {
+  if (TEXT_PALETTE_PRESET_IDS.includes(preset)) return preset;
+  if (TEXT_PALETTE_PRESET_IDS.includes(state.lastSelectableTextPreset)) return state.lastSelectableTextPreset;
+  return 'depth';
+}
+
+function textPalettePreference(preset = state.textPreset) {
+  const id = textPalettePresetId(preset);
+  const preference = normalizeTextPalettePreference(state.textPalettePreferences?.[id]);
+  state.textPalettePreferences[id] = preference;
+  return preference;
+}
+
+function manualTextLyricPalette(color) {
+  const base = rgbFromHex(color);
+  const white = { r: 255, g: 255, b: 255 };
+  const black = { r: 0, g: 0, b: 0 };
+  return lyricPaletteFromBase(base, [
+    base,
+    mixRgb(base, white, 0.32),
+    mixRgb(base, black, 0.46)
+  ]);
+}
+
+function resolvedTextLyricPalette(coverPalette) {
+  const preference = textPalettePreference();
+  return preference.mode === 'manual'
+    ? manualTextLyricPalette(preference.color)
+    : coverPalette;
+}
+
+function playbackLyricPalettePreference() {
+  const preference = normalizeTextPalettePreference(state.playbackLyricPalettePreference);
+  state.playbackLyricPalettePreference = preference;
+  return preference;
+}
+
+function resolvedPlaybackLyricPalette(coverPalette) {
+  const preference = playbackLyricPalettePreference();
+  return preference.mode === 'manual'
+    ? manualTextLyricPalette(preference.color)
+    : coverPalette;
 }
 
 function setImage(img, song) {
@@ -5675,56 +5839,141 @@ function applyCoverParticlePalette(palette) {
   els.coverParticleScene.style.setProperty('--cover-particle-c', rgbCss(source.depth, 0.82));
 }
 
+function playbackGlowColor(color, index = 0) {
+  const white = { r: 255, g: 255, b: 255 };
+  const minimumLift = [0.1, 0.08, 0.06][index] ?? 0.08;
+  const lift = clamp(
+    minimumLift + Math.max(0, 0.48 - relativeLuminance(color)) * 0.72,
+    minimumLift,
+    0.42
+  );
+  return mixRgb(color, white, lift);
+}
+
+function applyQishuiPlaybackPalette(palette) {
+  if (!els.qishuiPlaybackPhone || !palette) return;
+  const fallback = [palette.primary, palette.glow, palette.depth];
+  const colors = [0, 1, 2].map((index) => palette.coverColors?.[index] || fallback[index]);
+  const black = { r: 0, g: 0, b: 0 };
+  const softA = playbackGlowColor(colors[0], 0);
+  const softB = playbackGlowColor(colors[1], 1);
+  const softC = playbackGlowColor(colors[2], 2);
+  const blended = mixRgb(mixRgb(softA, softB, 0.38), softC, 0.24);
+  const surface = mixRgb(blended, black, 0.58);
+  [els.qishuiPlaybackPhone, els.appShell].forEach((target) => {
+    if (!target) return;
+    target.style.setProperty('--playback-cover-a', rgbCss(softA, 0.62));
+    target.style.setProperty('--playback-cover-b', rgbCss(softB, 0.58));
+    target.style.setProperty('--playback-cover-c', rgbCss(softC, 0.6));
+    target.style.setProperty('--playback-cover-surface', rgbCss(surface, 0.12));
+  });
+  applyQishuiPlaybackLyricPalette(palette);
+}
+
+function applyQishuiPlaybackLyricPalette(coverPalette) {
+  if (!els.qishuiPlaybackPhone || !coverPalette) return;
+  const lyricPalette = resolvedPlaybackLyricPalette(coverPalette);
+  const white = { r: 255, g: 255, b: 255 };
+  const black = { r: 0, g: 0, b: 0 };
+  const base = readableLyricColor(
+    mixRgb(lyricPalette.primary, lyricPalette.glow, 0.22),
+    0.22
+  );
+  const current = readableLyricColor(
+    mixRgb(lyricPalette.highlight, lyricPalette.primary, 0.16),
+    0.18
+  );
+  const muted = readableLyricColor(mixRgb(base, lyricPalette.depth, 0.06), 0.08);
+  const shadow = mixRgb(lyricPalette.depth, black, 0.48);
+  const highlightEdge = mixRgb(current, white, 0.1);
+  [els.qishuiPlaybackPhone, els.appShell].filter(Boolean).forEach((target) => {
+    target.style.setProperty('--playback-lyric-base', rgbCss(base, 0.94));
+    target.style.setProperty('--playback-lyric-base-rgb', rgbTriplet(base));
+    target.style.setProperty('--playback-lyric-muted', rgbCss(muted, 0.9));
+    target.style.setProperty('--playback-lyric-current', rgbCss(highlightEdge, 0.99));
+    target.style.setProperty('--playback-lyric-current-rgb', rgbTriplet(highlightEdge));
+    target.style.setProperty('--playback-lyric-shadow', rgbCss(shadow, 0.96));
+    target.style.setProperty('--playback-lyric-shadow-rgb', rgbTriplet(shadow));
+  });
+  els.qishuiPlaybackPhone.style.setProperty('--book-hot', rgbCss(highlightEdge));
+  els.qishuiPlaybackPhone.style.setProperty('--book-hot-rgb', rgbTriplet(highlightEdge));
+  els.qishuiPlaybackPhone.style.setProperty('--book-depth', rgbCss(shadow));
+  els.qishuiPlaybackPhone.style.setProperty('--book-depth-rgb', rgbTriplet(shadow));
+  if (els.playbackLyricPaletteControl) {
+    els.playbackLyricPaletteControl.style.setProperty(
+      '--text-palette-auto-color',
+      rgbCss(coverPalette.primary)
+    );
+  }
+}
+
 function applyLyricPalette(palette) {
   if (!palette) return;
+  state.playbackVisual.palette = palette;
+  applyQishuiPlaybackPalette(palette);
+  const lyricPalette = resolvedTextLyricPalette(palette);
   const target = els.playbackLyricScene;
   if (target) {
     const white = { r: 255, g: 255, b: 255 };
-    const gradientStart = mixRgb(palette.highlight, white, 0.12);
-    const gradientMid = mixRgb(palette.glow, white, 0.04);
-    const gradientEnd = mixRgb(palette.primary, palette.depth, 0.14);
-    const gradientTail = mixRgb(palette.depth, palette.primary, 0.22);
-    const lyricCoverSoftA = mixRgb(palette.primary, palette.glow, 0.36);
-    const lyricCoverSoftB = mixRgb(palette.highlight, palette.glow, 0.34);
-    const lyricCoverSoftC = mixRgb(palette.depth, palette.primary, 0.3);
-    const lyricFontBase = readableLyricColor(mixRgb(palette.primary, palette.glow, 0.18), 0.16);
-    const lyricFontHot = readableLyricColor(mixRgb(palette.highlight, palette.primary, 0.16), 0.2);
-    const lyricFontSoft = mixRgb(lyricFontBase, palette.depth, 0.12);
-    const bookSoftA = mixRgb(palette.primary, palette.glow, 0.34);
-    const bookSoftB = mixRgb(palette.highlight, palette.glow, 0.42);
-    const bookSoftBase = mixRgb(palette.depth, palette.primary, 0.2);
-    target.style.setProperty('--lyric-primary', rgbCss(palette.primary));
-    target.style.setProperty('--lyric-glow', rgbCss(white));
-    target.style.setProperty('--lyric-highlight', rgbCss(palette.highlight));
-    target.style.setProperty('--lyric-depth', rgbCss(palette.depth));
-    target.style.setProperty('--lyric-glow-soft', rgbCss(white, 0.22));
-    target.style.setProperty('--lyric-glow-hot', rgbCss(white, 0.36));
+    const gradientStart = mixRgb(lyricPalette.highlight, white, 0.12);
+    const gradientMid = mixRgb(lyricPalette.glow, white, 0.04);
+    const gradientEnd = mixRgb(lyricPalette.primary, lyricPalette.depth, 0.14);
+    const gradientTail = mixRgb(lyricPalette.depth, lyricPalette.primary, 0.22);
+    const lyricCoverSoftA = mixRgb(lyricPalette.primary, lyricPalette.glow, 0.36);
+    const lyricCoverSoftB = mixRgb(lyricPalette.highlight, lyricPalette.glow, 0.34);
+    const lyricCoverSoftC = mixRgb(lyricPalette.depth, lyricPalette.primary, 0.3);
+    const lyricFontBase = readableLyricColor(mixRgb(lyricPalette.primary, lyricPalette.glow, 0.18), 0.16);
+    const lyricFontHot = readableLyricColor(mixRgb(lyricPalette.highlight, lyricPalette.primary, 0.16), 0.2);
+    const lyricFontSoft = mixRgb(lyricFontBase, lyricPalette.depth, 0.12);
+    const bookSoftA = mixRgb(lyricPalette.primary, lyricPalette.glow, 0.34);
+    const bookSoftB = mixRgb(lyricPalette.highlight, lyricPalette.glow, 0.42);
+    const bookSoftBase = mixRgb(lyricPalette.depth, lyricPalette.primary, 0.2);
+    target.style.setProperty('--lyric-primary', rgbCss(lyricPalette.primary));
+    target.style.setProperty('--lyric-glow', rgbCss(lyricPalette.glow));
+    target.style.setProperty('--lyric-highlight', rgbCss(lyricPalette.highlight));
+    target.style.setProperty('--lyric-depth', rgbCss(lyricPalette.depth));
+    target.style.setProperty('--lyric-primary-rgb', rgbTriplet(lyricPalette.primary));
+    target.style.setProperty('--lyric-highlight-rgb', rgbTriplet(lyricPalette.highlight));
+    target.style.setProperty('--lyric-depth-rgb', rgbTriplet(lyricPalette.depth));
+    target.style.setProperty('--lyric-glow-soft', rgbCss(lyricPalette.glow, 0.22));
+    target.style.setProperty('--lyric-glow-hot', rgbCss(lyricPalette.glow, 0.36));
     target.style.setProperty('--lyric-gradient-start', rgbCss(gradientStart));
     target.style.setProperty('--lyric-gradient-mid', rgbCss(gradientMid));
     target.style.setProperty('--lyric-gradient-end', rgbCss(gradientEnd));
     target.style.setProperty('--lyric-gradient-tail', rgbCss(gradientTail, 0.34));
-    target.style.setProperty('--lyric-gradient-shadow', rgbCss(palette.depth, 0.88));
+    target.style.setProperty('--lyric-gradient-shadow', rgbCss(lyricPalette.depth, 0.88));
     target.style.setProperty('--lyric-cover-soft-a', rgbCss(lyricCoverSoftA, 0.62));
     target.style.setProperty('--lyric-cover-soft-b', rgbCss(lyricCoverSoftB, 0.5));
     target.style.setProperty('--lyric-cover-soft-c', rgbCss(lyricCoverSoftC, 0.58));
     target.style.setProperty('--lyric-font-base', rgbCss(lyricFontBase));
     target.style.setProperty('--lyric-font-hot', rgbCss(lyricFontHot));
     target.style.setProperty('--lyric-font-soft', rgbCss(lyricFontSoft));
+    target.style.setProperty('--lyric-font-base-rgb', rgbTriplet(lyricFontBase));
+    target.style.setProperty('--lyric-font-hot-rgb', rgbTriplet(lyricFontHot));
+    target.style.setProperty('--lyric-font-soft-rgb', rgbTriplet(lyricFontSoft));
     [target, els.appShell].filter(Boolean).forEach((bookTarget) => {
-      bookTarget.style.setProperty('--book-glow', rgbCss(palette.glow));
-      bookTarget.style.setProperty('--book-glow-soft', rgbCss(palette.glow, 0.26));
-      bookTarget.style.setProperty('--book-hot', rgbCss(palette.highlight));
-      bookTarget.style.setProperty('--book-depth', rgbCss(palette.depth));
-      bookTarget.style.setProperty('--book-page', rgbCss(mixRgb(palette.depth, palette.primary, 0.18), 0.58));
+      bookTarget.style.setProperty('--book-glow', rgbCss(lyricPalette.glow));
+      bookTarget.style.setProperty('--book-glow-rgb', rgbTriplet(lyricPalette.glow));
+      bookTarget.style.setProperty('--book-glow-soft', rgbCss(lyricPalette.glow, 0.26));
+      bookTarget.style.setProperty('--book-hot', rgbCss(lyricPalette.highlight));
+      bookTarget.style.setProperty('--book-hot-rgb', rgbTriplet(lyricPalette.highlight));
+      bookTarget.style.setProperty('--book-depth', rgbCss(lyricPalette.depth));
+      bookTarget.style.setProperty('--book-depth-rgb', rgbTriplet(lyricPalette.depth));
+      bookTarget.style.setProperty('--book-page', rgbCss(mixRgb(lyricPalette.depth, lyricPalette.primary, 0.18), 0.58));
       bookTarget.style.setProperty('--book-soft-a', rgbCss(bookSoftA, 0.72));
       bookTarget.style.setProperty('--book-soft-b', rgbCss(bookSoftB, 0.62));
       bookTarget.style.setProperty('--book-soft-base', rgbCss(bookSoftBase, 0.94));
     });
   }
+  if (els.textPaletteControl) {
+    els.textPaletteControl.style.setProperty('--text-palette-auto-color', rgbCss(palette.primary));
+  }
   applyDynamicCubePalette(palette);
   applyFreeCubePalette(palette);
   applySonicTopographyPalette(palette);
   applyCoverParticlePalette(palette);
+  syncTextPaletteControls();
+  syncPlaybackLyricPaletteControls();
 }
 
 function applyCoverSample(img, signature) {
@@ -5889,60 +6138,84 @@ function resetLyricFrameSync() {
   state.lyricFrameSignature = '';
 }
 
-function resetBookLyricScrollState() {
-  state.lyricBookScrollTarget = Number.NaN;
-  state.lyricBookScrollFrameAt = 0;
-  state.lyricBookLayoutVersion = (Number(state.lyricBookLayoutVersion) || 0) + 1;
+function resetBookLyricScrollState(options = {}) {
+  const store = options.store || state;
+  const targetKey = options.targetKey || 'lyricBookScrollTarget';
+  const frameAtKey = options.frameAtKey || 'lyricBookScrollFrameAt';
+  const layoutVersionKey = options.layoutVersionKey || 'lyricBookLayoutVersion';
+  store[targetKey] = Number.NaN;
+  store[frameAtKey] = 0;
+  store[layoutVersionKey] = (Number(store[layoutVersionKey]) || 0) + 1;
 }
 
-function bookLyricTargetScrollTop(line) {
-  const list = els.bookLyricList;
+function bookLyricTargetScrollTop(line, options = {}) {
+  const list = options.list || els.bookLyricList;
+  const store = options.store || state;
+  const layoutVersionKey = options.layoutVersionKey || 'lyricBookLayoutVersion';
+  const layoutVersion = Number(store[layoutVersionKey]) || 0;
   if (!list || !line) return Number.NaN;
-  if (line.__bookScrollVersion === state.lyricBookLayoutVersion && Number.isFinite(line.__bookScrollTarget)) {
+  const clientHeight = Number(list.clientHeight) || 0;
+  const scrollHeight = Number(list.scrollHeight) || 0;
+  if (clientHeight <= 0 || scrollHeight <= 0) return Number.NaN;
+  if (
+    line.__bookScrollVersion === layoutVersion
+    && line.__bookScrollClientHeight === clientHeight
+    && line.__bookScrollHeight === scrollHeight
+    && Number.isFinite(line.__bookScrollTarget)
+  ) {
     return line.__bookScrollTarget;
   }
-  const maxScroll = Math.max(0, list.scrollHeight - list.clientHeight);
-  const target = line.offsetTop - Math.max(0, (list.clientHeight - line.offsetHeight) / 2);
+  const maxScroll = Math.max(0, scrollHeight - clientHeight);
+  const target = line.offsetTop - Math.max(0, (clientHeight - line.offsetHeight) / 2);
   const scrollTop = clamp(target, 0, maxScroll);
-  line.__bookScrollVersion = state.lyricBookLayoutVersion;
+  line.__bookScrollVersion = layoutVersion;
+  line.__bookScrollClientHeight = clientHeight;
+  line.__bookScrollHeight = scrollHeight;
   line.__bookScrollTarget = scrollTop;
   return scrollTop;
 }
 
-function syncBookLyricScroll(line) {
-  const list = els.bookLyricList;
-  if (!list || !line) return;
-  const target = bookLyricTargetScrollTop(line);
-  if (!Number.isFinite(target)) return;
+function syncBookLyricScroll(line, options = {}) {
+  const list = options.list || els.bookLyricList;
+  const store = options.store || state;
+  const targetKey = options.targetKey || 'lyricBookScrollTarget';
+  const frameAtKey = options.frameAtKey || 'lyricBookScrollFrameAt';
+  const lines = Array.isArray(options.lines) ? options.lines : state.lyricLines;
+  const activeIndex = Number.isInteger(options.activeIndex) ? options.activeIndex : state.lyricIndex;
+  if (!list || !line) return false;
+  const target = bookLyricTargetScrollTop(line, options);
+  if (!Number.isFinite(target)) return false;
 
   const now = performance.now();
-  const previousTarget = Number(state.lyricBookScrollTarget);
+  const previousTarget = Number(store[targetKey]);
   const targetChanged = !Number.isFinite(previousTarget) || Math.abs(previousTarget - target) > BOOK_LYRIC_SCROLL_SNAP_PX;
-  state.lyricBookScrollTarget = target;
+  store[targetKey] = target;
 
   const current = Number(list.scrollTop) || 0;
   const delta = target - current;
   if (Math.abs(delta) <= BOOK_LYRIC_SCROLL_SNAP_PX) {
     list.scrollTop = target;
-    state.lyricBookScrollFrameAt = now;
-    return;
+    store[frameAtKey] = now;
+    return true;
   }
 
-  const lastAt = Number(state.lyricBookScrollFrameAt) || now;
+  const lastAt = Number(store[frameAtKey]) || now;
   const dt = clamp(
     (now - lastAt) / 1000,
     BOOK_LYRIC_SCROLL_MIN_STEP_SECONDS,
     BOOK_LYRIC_SCROLL_MAX_STEP_SECONDS
   );
-  state.lyricBookScrollFrameAt = now;
+  store[frameAtKey] = now;
 
-  if (state.orb.reducedMotion || !isPlaybackClockRunning() || Math.abs(delta) > list.clientHeight * 1.4) {
+  const reducedMotionEnabled = options.reducedMotion ?? state.orb.reducedMotion;
+  const playbackRunning = options.playbackRunning ?? isPlaybackClockRunning();
+  if (reducedMotionEnabled || !playbackRunning || Math.abs(delta) > list.clientHeight * 1.4) {
     list.scrollTop = target;
-    return;
+    return true;
   }
 
-  const activeLine = state.lyricLines[state.lyricIndex] || {};
-  const nextLine = state.lyricLines[state.lyricIndex + 1] || {};
+  const activeLine = lines[activeIndex] || {};
+  const nextLine = lines[activeIndex + 1] || {};
   const lineStart = Number(activeLine.time);
   const nextStart = Number(nextLine.time);
   const lineGap = Number.isFinite(lineStart) && Number.isFinite(nextStart) && nextStart > lineStart
@@ -5950,7 +6223,21 @@ function syncBookLyricScroll(line) {
     : 2.4;
   const responseSeconds = clamp(lineGap * 0.12, targetChanged ? 0.09 : 0.12, 0.26);
   const step = clamp(dt / responseSeconds, targetChanged ? 0.28 : 0.08, 0.82);
-  list.scrollTop = current + delta * bookGlyphEase(step);
+  const easedDelta = delta * bookGlyphEase(step);
+  list.scrollTop = current + easedDelta;
+  const observed = Number(list.scrollTop) || 0;
+  // Chromium can quantize a sub-pixel scroll write back to the same CSS pixel.
+  if (
+    Math.abs(observed - current) < 0.01
+    && Math.abs(delta) > BOOK_LYRIC_SCROLL_SNAP_PX
+  ) {
+    list.scrollTop = current + Math.sign(delta) * Math.min(1, Math.abs(delta));
+  }
+  if (Math.abs(target - list.scrollTop) <= BOOK_LYRIC_SCROLL_SNAP_PX) {
+    list.scrollTop = target;
+    return true;
+  }
+  return false;
 }
 
 function cachedBookLyricGlyphs(line) {
@@ -6075,6 +6362,45 @@ function scheduleBookLyricFit() {
   });
 }
 
+function createBookLyricLine(line, index, options = {}) {
+  const button = document.createElement('button');
+  button.className = ['book-lyric-line', options.lineClass].filter(Boolean).join(' ');
+  button.type = 'button';
+  button.dataset.bookLyricIndex = String(index);
+  button.dataset.bookLyricTime = String(Number(line.time) || 0);
+  button.dataset.text = safeText(line.text, playbackLyricText());
+  button.setAttribute('aria-label', `${formatTime(Number(line.time) || 0)} ${safeText(line.text, '')}`);
+
+  const text = document.createElement('span');
+  text.className = 'book-lyric-line-text';
+  const lyricText = safeText(line.text, playbackLyricText()).replace(/\s*\r?\n+\s*/g, ' ').trim();
+  const base = document.createElement('span');
+  base.className = 'book-lyric-copy book-lyric-copy--base';
+  const highlight = document.createElement('span');
+  highlight.className = 'book-lyric-copy book-lyric-copy--hot';
+  const detailedGlyphs = options.lazyGlyphs !== true;
+  if (detailedGlyphs) {
+    appendBookLyricGlyphs(base, lyricText, [], { progress: false });
+    appendBookLyricGlyphs(highlight, lyricText, line.glyphTimings);
+  } else {
+    base.textContent = lyricText;
+    highlight.textContent = lyricText;
+  }
+  highlight.setAttribute('aria-hidden', 'true');
+  text.appendChild(base);
+  text.appendChild(highlight);
+  button.appendChild(text);
+  return button;
+}
+
+function renderBookLyricList(list, lines, options = {}) {
+  if (!list) return;
+  clearElement(list);
+  lines.forEach((line, index) => {
+    list.appendChild(createBookLyricLine(line, index, options));
+  });
+}
+
 function renderBookLyricLines(force = false) {
   if (!els.bookLyricList) return;
   const lines = bookLyricDisplayLines();
@@ -6084,32 +6410,7 @@ function renderBookLyricLines(force = false) {
   state.lyricBookIndex = -2;
   state.lyricBookCurrentLine = null;
   resetBookLyricScrollState();
-  clearElement(els.bookLyricList);
-
-  lines.forEach((line, index) => {
-    const button = document.createElement('button');
-    button.className = 'book-lyric-line';
-    button.type = 'button';
-    button.dataset.bookLyricIndex = String(index);
-    button.dataset.bookLyricTime = String(Number(line.time) || 0);
-    button.dataset.text = safeText(line.text, playbackLyricText());
-    button.setAttribute('aria-label', `${formatTime(Number(line.time) || 0)} ${safeText(line.text, '')}`);
-
-    const text = document.createElement('span');
-    text.className = 'book-lyric-line-text';
-    const lyricText = safeText(line.text, playbackLyricText()).replace(/\s*\r?\n+\s*/g, ' ').trim();
-    const base = document.createElement('span');
-    base.className = 'book-lyric-copy book-lyric-copy--base';
-    appendBookLyricGlyphs(base, lyricText, [], { progress: false });
-    const highlight = document.createElement('span');
-    highlight.className = 'book-lyric-copy book-lyric-copy--hot';
-    appendBookLyricGlyphs(highlight, lyricText, line.glyphTimings);
-    highlight.setAttribute('aria-hidden', 'true');
-    text.appendChild(base);
-    text.appendChild(highlight);
-    button.appendChild(text);
-    els.bookLyricList.appendChild(button);
-  });
+  renderBookLyricList(els.bookLyricList, lines);
   fitBookLyricLinesToPage();
   scheduleBookLyricFit();
 }
@@ -7073,6 +7374,7 @@ function openLocalPlaylist() {
   updateActivePlaylistCard();
   if (!state.playbackPage) enterPlaybackPage();
   if (!state.localPlaylistSongs.length) {
+    renderPlaylistShelf(localPlaylistDescriptor(), [], { preserveScroll: false });
     els.localPlaylistInput?.click();
     return;
   }
@@ -7246,12 +7548,45 @@ async function pollClientUpdateProgress() {
 
 function accountName(payload) {
   const account = payload && payload.account ? payload.account : {};
-  return safeText(account.nickname || account.userId, '');
+  const profile = payload && payload.profile ? payload.profile : {};
+  const nestedProfile = account && account.profile ? account.profile : {};
+  return safeText(
+    account.nickname
+      || account.nick
+      || account.username
+      || account.userName
+      || account.name
+      || profile.nickname
+      || profile.username
+      || nestedProfile.nickname
+      || nestedProfile.username
+      || account.userId,
+    ''
+  );
 }
 
 function accountAvatar(payload) {
   const account = payload && payload.account ? payload.account : {};
-  const raw = safeText(account.avatarUrl || account.avatar || account.headimg || account.pic, '');
+  const profile = payload && payload.profile ? payload.profile : {};
+  const nestedProfile = account && account.profile ? account.profile : {};
+  let raw = safeText(
+    account.avatarUrl
+      || account.avatar
+      || account.headimg
+      || account.pic
+      || account.headPic
+      || profile.avatarUrl
+      || profile.avatar
+      || profile.headimg
+      || profile.pic
+      || nestedProfile.avatarUrl
+      || nestedProfile.avatar,
+    ''
+  );
+  const qqUserId = safeText(account.userId || account.uin || account.qq, '');
+  if (!raw && payload && payload.provider === 'qq' && /^[1-9]\d{4,}$/.test(qqUserId)) {
+    raw = `https://q.qlogo.cn/headimg_dl?dst_uin=${encodeURIComponent(qqUserId)}&spec=140`;
+  }
   if (!raw) return '';
   if (/^(data:|blob:)/i.test(raw)) return raw;
   if (/^https?:\/\//i.test(raw)) return proxiedImageUrl(raw);
@@ -9769,6 +10104,29 @@ function accountHasVip(payload = {}) {
   return roots.some((root) => keys.some((key) => valueLooksVip(root[key])));
 }
 
+function accountVipLabel(payload = {}) {
+  if (!accountHasVip(payload)) return '';
+  const account = payload.account || {};
+  const roots = [payload, account, payload.profile, account.profile].filter(Boolean);
+  const superKeys = ['svip', 'superVip', 'isSvip', 'isSVip'];
+  if (roots.some((root) => superKeys.some((key) => valueLooksVip(root[key])))) return 'SVIP';
+  const labelKeys = ['vipLabel', 'vipName', 'membershipName', 'memberName'];
+  for (const root of roots) {
+    for (const key of labelKeys) {
+      const label = safeText(root[key], '');
+      if (label) return label.slice(0, 12);
+    }
+  }
+  const levelKeys = ['vipLevel', 'vip_level', 'level'];
+  for (const root of roots) {
+    for (const key of levelKeys) {
+      const level = Number(root[key]);
+      if (Number.isFinite(level) && level > 0 && level <= 10) return `VIP ${Math.round(level)}`;
+    }
+  }
+  return 'VIP';
+}
+
 function providerHasPlaybackVip(provider = playbackQualityProvider()) {
   const id = providerInfo(provider).id;
   const payload = state.loginStatusByProvider[id];
@@ -9798,14 +10156,18 @@ function playbackQualityOption(provider = playbackQualityProvider(), quality = s
 }
 
 function updateQualityButton(song = state.currentSong) {
-  if (!els.dockQualityButton) return;
+  const controls = [els.dockQualityButton, els.qishuiPlaybackQuality].filter(Boolean);
+  if (!controls.length) return;
   if (isLocalSong(song)) {
-    els.dockQualityButton.disabled = true;
-    els.dockQualityButton.title = '本地文件原始音质';
-    els.dockQualityButton.setAttribute('aria-label', els.dockQualityButton.title);
-    els.dockQualityButton.setAttribute('aria-expanded', 'false');
-    els.dockQualityButton.classList.remove('is-open');
-    els.dockQualityButton.dataset.quality = 'LOCAL';
+    controls.forEach((control) => {
+      control.disabled = true;
+      control.title = '本地文件原始音质';
+      control.setAttribute('aria-label', control.title);
+      control.setAttribute('aria-expanded', 'false');
+      control.classList.remove('is-open');
+      control.dataset.quality = 'LOCAL';
+      if (control === els.qishuiPlaybackQuality) control.textContent = 'LOCAL';
+    });
     return;
   }
   const provider = playbackQualityProvider(song);
@@ -9813,38 +10175,56 @@ function updateQualityButton(song = state.currentSong) {
   const quality = normalizePlaybackQuality(provider);
   const option = playbackQualityOption(provider, quality);
   const title = hasSong ? `音质：${option.label}` : '音质';
-  els.dockQualityButton.disabled = !hasSong;
-  els.dockQualityButton.title = title;
-  els.dockQualityButton.setAttribute('aria-label', title);
-  els.dockQualityButton.setAttribute('aria-expanded', String(state.qualityMenuOpen));
-  els.dockQualityButton.classList.toggle('is-open', state.qualityMenuOpen);
-  els.dockQualityButton.dataset.quality = option.short || option.label || quality;
+  controls.forEach((control) => {
+    control.disabled = !hasSong;
+    control.title = title;
+    control.setAttribute('aria-label', title);
+    control.setAttribute('aria-expanded', String(state.qualityMenuOpen));
+    control.classList.toggle('is-open', state.qualityMenuOpen);
+    control.dataset.quality = option.short || option.label || quality;
+    if (control === els.qishuiPlaybackQuality) {
+      control.textContent = safeText(option.short || option.label, 'HQ');
+    }
+  });
 }
 
 function renderDockQualityMenu() {
-  if (!els.dockQualityMenu) return;
+  const menus = [els.dockQualityMenu, els.qishuiPlaybackQualityMenu].filter(Boolean);
+  if (!menus.length) return;
   const provider = playbackQualityProvider();
   const options = playbackQualityOptions(provider);
   const activeQuality = normalizePlaybackQuality(provider);
-  clearElement(els.dockQualityMenu);
-  options.forEach((option) => {
-    const button = document.createElement('button');
-    button.className = `dock-quality-option${option.id === activeQuality ? ' is-active' : ''}`;
-    button.type = 'button';
-    button.setAttribute('role', 'menuitemradio');
-    button.dataset.quality = option.id;
-    button.setAttribute('aria-checked', String(option.id === activeQuality));
-    button.textContent = option.label;
-    els.dockQualityMenu.appendChild(button);
+  menus.forEach((menu) => {
+    clearElement(menu);
+    if (menu === els.qishuiPlaybackQualityMenu) {
+      const heading = document.createElement('span');
+      heading.className = 'qishui-playback-quality-heading';
+      heading.textContent = `音质调节 · ${providerInfo(provider).label}`;
+      menu.appendChild(heading);
+    }
+    options.forEach((option) => {
+      const button = document.createElement('button');
+      button.className = `dock-quality-option${option.id === activeQuality ? ' is-active' : ''}`;
+      button.type = 'button';
+      button.setAttribute('role', 'menuitemradio');
+      button.dataset.quality = option.id;
+      button.setAttribute('aria-checked', String(option.id === activeQuality));
+      button.dataset.short = safeText(option.short, '');
+      button.textContent = option.label;
+      menu.appendChild(button);
+    });
   });
   updateQualityButton();
 }
 
 function setDockQualityMenuOpen(open) {
-  if (!els.dockQualityMenu || !els.dockQualityButton) return;
+  const menus = [els.dockQualityMenu, els.qishuiPlaybackQualityMenu].filter(Boolean);
+  if (!menus.length) return;
   if (isLocalSong(state.currentSong)) open = false;
   state.qualityMenuOpen = !!open;
-  els.dockQualityMenu.hidden = !state.qualityMenuOpen;
+  menus.forEach((menu) => {
+    menu.hidden = !state.qualityMenuOpen;
+  });
   updateQualityButton();
   if (!state.qualityMenuOpen) return;
   renderDockQualityMenu();
@@ -9877,6 +10257,7 @@ async function ensureQualityLoginStatus(provider = playbackQualityProvider()) {
 async function selectPlaybackQuality(quality) {
   if (isLocalSong(state.currentSong)) return;
   const provider = playbackQualityProvider();
+  const previousQuality = normalizePlaybackQuality(provider, state.playbackQuality);
   const normalized = normalizePlaybackQuality(provider, quality);
   savePlaybackQualityPreference(provider, normalized);
   state.playbackQuality = normalized;
@@ -9886,11 +10267,21 @@ async function selectPlaybackQuality(quality) {
   if (!song || !song.id || !els.audio || !els.audio.src) return;
   const wasPlaying = !els.audio.paused && !els.audio.ended;
   const position = currentPlaybackLyricTime(els.audio.currentTime || 0);
-  await loadSong({ ...song, provider }, {
+  const loaded = await loadSong({ ...song, provider }, {
     quality: normalized,
     position,
     autoplay: wasPlaying
   });
+  if (!loaded && previousQuality !== normalized) {
+    state.playbackQuality = previousQuality;
+    savePlaybackQualityPreference(provider, previousQuality);
+    renderDockQualityMenu();
+    await loadSong({ ...song, provider }, {
+      quality: previousQuality,
+      position,
+      autoplay: wasPlaying
+    });
+  }
 }
 
 function setActiveProvider(provider, options = {}) {
@@ -9937,6 +10328,8 @@ function setActiveProvider(provider, options = {}) {
     if (els.qishuiCodeInput) els.qishuiCodeInput.value = '';
     state.userPlaylists = [];
     state.playlistsLoggedIn = false;
+    state.playbackPlaylistPickerOpen = false;
+    closePlaylistShelf({ resetActive: true, reopenPicker: false });
     state.searchSuggestions.songs = [];
     state.searchSuggestions.query = '';
     state.searchSuggestions.requestId += 1;
@@ -9954,6 +10347,7 @@ function setActiveProvider(provider, options = {}) {
   if (options.reloadQr && !els.loginDialog.hidden) loadLoginQr();
   refreshLoginStatus(nextProvider);
   if (changed) scheduleUserPlaylistsRefresh(180);
+  syncQishuiPlaybackCard();
   return true;
 }
 
@@ -9964,6 +10358,9 @@ function renderLoginStatus(payload = {}) {
   const guest = provider.id === 'qishui' && !loggedIn && state.qishuiGuestMode;
   const vip = loggedIn && accountHasVip(payload);
   state.loginStatusByProvider[provider.id] = payload;
+  if (playbackCardVisible() && playbackCardProvider(playbackCardSong()).id === provider.id) {
+    renderQishuiPlaybackIdentity(provider);
+  }
   if (provider.id !== state.activeProvider) return;
   state.loginLoggedIn = loggedIn;
   els.loginButton.classList.toggle('is-logged-in', loggedIn);
@@ -10210,7 +10607,7 @@ function hidePlaylistOrbit() {
   clearElement(els.playlistCards);
   els.playlistStatus.textContent = `${providerInfo().label}\u6b4c\u5355`;
   state.playlistSignature = '';
-  closePlaylistShelf({ resetActive: true });
+  closePlaylistShelf({ resetActive: true, reopenPicker: false });
 }
 
 function playlistSubtitle(playlist) {
@@ -10599,12 +10996,784 @@ function cancelUiPointerUpdates() {
   latestUiPointer = null;
 }
 
+const PLAYBACK_CARD_PROVIDER_ACCENTS = Object.freeze({
+  netease: '#e5484d',
+  qq: '#2fc77a',
+  kugou: '#2d9ff0',
+  qishui: '#ff8a4c',
+  local: '#7dd3fc'
+});
+
+function playbackCardSong(song = state.currentSong) {
+  return song || null;
+}
+
+function playbackCardVisible() {
+  return !!(els.qishuiPlaybackCard && state.playbackPage);
+}
+
+function playbackCardLyricsVisible() {
+  return playbackCardVisible() && !state.qishuiPlaybackCard.hiddenByUser;
+}
+
+function syncQishuiPlaybackExpansion() {
+  if (!els.qishuiPlaybackCard || !els.qishuiPlaybackPhone) return;
+  const expanded = !!state.qishuiPlaybackCard.expanded;
+  els.qishuiPlaybackCard.classList.toggle('is-expanded', expanded);
+  els.qishuiPlaybackCard.classList.toggle('is-compact', !expanded);
+  els.qishuiPlaybackPhone.setAttribute('aria-expanded', String(expanded));
+  els.qishuiPlaybackPhone.dataset.displayMode = expanded ? 'expanded' : 'compact';
+  if (els.qishuiPlaybackScaleToggle) {
+    const label = expanded ? '还原播放页' : '放大播放页';
+    els.qishuiPlaybackScaleToggle.classList.toggle('is-expanded', expanded);
+    els.qishuiPlaybackScaleToggle.setAttribute('aria-pressed', String(expanded));
+    els.qishuiPlaybackScaleToggle.setAttribute('aria-label', label);
+    els.qishuiPlaybackScaleToggle.title = label;
+  }
+}
+
+function setQishuiPlaybackExpanded(expanded) {
+  state.qishuiPlaybackCard.expanded = !!expanded;
+  syncQishuiPlaybackExpansion();
+  scheduleQishuiPlaybackLyricLayout();
+}
+
+function toggleQishuiPlaybackExpanded() {
+  if (state.qishuiPlaybackCard.hiddenByUser) return;
+  setQishuiPlaybackExpanded(!state.qishuiPlaybackCard.expanded);
+}
+
+function syncQishuiPlaybackHiddenState() {
+  if (!els.qishuiPlaybackCard || !els.qishuiPlaybackPhone) return;
+  const hiddenByUser = !!state.qishuiPlaybackCard.hiddenByUser;
+  els.qishuiPlaybackCard.classList.toggle('is-user-hidden', hiddenByUser);
+  els.qishuiPlaybackCard.setAttribute(
+    'aria-label',
+    hiddenByUser ? '音乐播放页已隐藏' : '音乐悬浮播放页'
+  );
+  if (els.qishuiPlaybackScaleToggle) {
+    els.qishuiPlaybackScaleToggle.disabled = hiddenByUser;
+  }
+  if (els.qishuiPlaybackVisibilityToggle) {
+    const label = hiddenByUser ? '显示播放页' : '隐藏播放页';
+    els.qishuiPlaybackVisibilityToggle.classList.toggle('is-hidden', hiddenByUser);
+    els.qishuiPlaybackVisibilityToggle.setAttribute('aria-pressed', String(hiddenByUser));
+    els.qishuiPlaybackVisibilityToggle.setAttribute('aria-label', label);
+    els.qishuiPlaybackVisibilityToggle.title = label;
+  }
+}
+
+function setQishuiPlaybackHidden(hidden) {
+  const nextHidden = !!hidden;
+  if (nextHidden) {
+    state.playbackPlaylistPickerOpen = false;
+    if (state.playlistSongPageOpen) closePlaylistShelf({ reopenPicker: false });
+    if (state.diyOpen) setDiyOpen(false);
+  }
+  state.qishuiPlaybackCard.hiddenByUser = nextHidden;
+  syncQishuiPlaybackHiddenState();
+  syncPlaybackCardPanelState();
+  if (!nextHidden) {
+    updateQishuiPlaybackLyrics(state.lyricDisplayText, state.lyricSubtitleText);
+    requestOrbFrame();
+  }
+}
+
+function toggleQishuiPlaybackHidden() {
+  setQishuiPlaybackHidden(!state.qishuiPlaybackCard.hiddenByUser);
+}
+
+function playbackCardProvider(song = state.currentSong) {
+  if (isLocalSong(song)) return { id: 'local', label: '本地音乐' };
+  return providerInfo(state.activeProvider || (song && song.provider));
+}
+
+function playbackCardProviderFallback(provider) {
+  if (provider.id === 'netease') return '网易';
+  if (provider.id === 'qq') return 'QQ';
+  if (provider.id === 'kugou') return '酷狗';
+  if (provider.id === 'qishui') return '汽水';
+  if (provider.id === 'local') return '本地';
+  return 'FE';
+}
+
+function playbackCardAccountFallback(provider) {
+  if (provider.id === 'netease') return '云';
+  if (provider.id === 'qq') return 'Q';
+  if (provider.id === 'kugou') return '狗';
+  if (provider.id === 'qishui') return '汽';
+  if (provider.id === 'local') return '本';
+  return 'FE';
+}
+
+function renderQishuiPlaybackIdentity(provider = playbackCardProvider()) {
+  if (!els.qishuiPlaybackAccount) return;
+  const local = provider.id === 'local';
+  const payload = local ? null : state.loginStatusByProvider[provider.id];
+  const loading = !local && !payload;
+  const loggedIn = !!(payload && payload.loggedIn);
+  const guest = provider.id === 'qishui' && !loggedIn && state.qishuiGuestMode;
+  const avatarUrl = loggedIn ? accountAvatar(payload) : '';
+  const vipLabel = loggedIn ? accountVipLabel(payload) : '';
+  const accountLabel = local
+    ? '本地音乐'
+    : loggedIn
+      ? accountName(payload) || `${provider.label}用户`
+      : guest
+        ? '汽水访客'
+        : loading
+          ? '读取账号中'
+          : `${provider.label}未登录`;
+  const statusLabel = local
+    ? '本地播放'
+    : loggedIn
+      ? '已登录'
+      : guest
+        ? '访客模式'
+        : loading
+          ? '连接中'
+          : '未登录';
+
+  els.qishuiPlaybackAccount.dataset.provider = provider.id;
+  els.qishuiPlaybackAccount.classList.toggle('is-logged-in', loggedIn);
+  els.qishuiPlaybackAccount.classList.toggle('has-vip', !!vipLabel);
+  els.qishuiPlaybackAccount.setAttribute(
+    'aria-label',
+    `${provider.label}，${accountLabel}，${vipLabel || statusLabel}`
+  );
+  if (els.qishuiPlaybackAccountName) {
+    els.qishuiPlaybackAccountName.textContent = accountLabel;
+    els.qishuiPlaybackAccountName.title = accountLabel;
+  }
+  if (els.qishuiPlaybackAccountStatus) {
+    els.qishuiPlaybackAccountStatus.textContent = statusLabel;
+  }
+  if (els.qishuiPlaybackVipBadge) {
+    els.qishuiPlaybackVipBadge.hidden = !vipLabel;
+    els.qishuiPlaybackVipBadge.textContent = vipLabel || 'VIP';
+  }
+  if (els.qishuiPlaybackAccountAvatarFallback) {
+    els.qishuiPlaybackAccountAvatarFallback.textContent = playbackCardAccountFallback(provider);
+  }
+  if (els.qishuiPlaybackAccountAvatar) {
+    els.qishuiPlaybackAccountAvatar.classList.toggle('has-avatar', !!avatarUrl);
+  }
+  if (els.qishuiPlaybackAccountAvatarImage) {
+    if (avatarUrl) {
+      if (els.qishuiPlaybackAccountAvatarImage.getAttribute('src') !== avatarUrl) {
+        els.qishuiPlaybackAccountAvatarImage.src = avatarUrl;
+      }
+    } else {
+      els.qishuiPlaybackAccountAvatarImage.removeAttribute('src');
+    }
+  }
+}
+
+function ensureQishuiPlaybackIdentity(provider = playbackCardProvider()) {
+  if (provider.id === 'local' || state.loginStatusByProvider[provider.id]) return;
+  ensureQualityLoginStatus(provider.id).then(() => {
+    if (playbackCardProvider(playbackCardSong()).id === provider.id) {
+      renderQishuiPlaybackIdentity(provider);
+    }
+  });
+}
+
+function setQishuiPlaybackImage(image, url) {
+  if (!image) return;
+  if (!url) {
+    image.removeAttribute('src');
+    return;
+  }
+  if (image.getAttribute('src') !== url) image.src = url;
+}
+
+function handleQishuiPlaybackImageError(event) {
+  const image = event.currentTarget;
+  image.removeAttribute('src');
+  if (image === els.qishuiPlaybackCover) {
+    els.qishuiPlaybackCoverFrame?.classList.remove('has-cover');
+  }
+}
+
+function handleQishuiPlaybackAccountAvatarError() {
+  if (els.qishuiPlaybackAccountAvatarImage) {
+    els.qishuiPlaybackAccountAvatarImage.removeAttribute('src');
+  }
+  els.qishuiPlaybackAccountAvatar?.classList.remove('has-avatar');
+}
+
+function qishuiPlaybackBookLines(text = '', subtitle = '') {
+  const song = playbackCardSong();
+  const syncedLines = Array.isArray(state.lyricLines) ? state.lyricLines : [];
+  if (song && syncedLines.length) return syncedLines;
+  const currentText = song
+    ? safeText(text, playbackLyricText(song))
+    : '选择一首歌曲';
+  const secondaryText = song
+    ? safeText(subtitle, playbackLyricSubtitle(song))
+    : '滚轮向上上一首，向下下一首';
+  return [
+    { time: 0, text: currentText, fallback: true },
+    { time: 4, text: secondaryText, fallback: true }
+  ];
+}
+
+function qishuiPlaybackBookFrame(lines, playbackTime = Number.NaN) {
+  if (!state.lyricLines.length) {
+    return { activeIndex: 0, currentTime: Number.NaN, progressPercent: 0 };
+  }
+  const currentTime = Number.isFinite(Number(playbackTime))
+    ? Math.max(0, Number(playbackTime))
+    : currentPlaybackLyricTime();
+  const activeIndex = findLyricIndexAtTime(
+    lines,
+    currentTime,
+    BOOK_LYRIC_VISUAL_LEAD_SECONDS
+  );
+  const displayTime = lyricTimelineTime(currentTime, BOOK_LYRIC_VISUAL_LEAD_SECONDS);
+  const line = lines[activeIndex] || {};
+  const nextLine = lines[activeIndex + 1];
+  const timedEnd = Number(line.endTime);
+  const fallbackDuration = playbackDurationForLyricSpeed();
+  const fallbackEnd = nextLine
+    ? nextLine.time
+    : Math.max((Number(line.time) || 0) + 4, fallbackDuration || (Number(line.time) || 0) + 4);
+  const endTime = Number.isFinite(timedEnd) && timedEnd > Number(line.time)
+    ? (nextLine ? Math.min(timedEnd, nextLine.time) : timedEnd)
+    : fallbackEnd;
+  const progressEndTime = bookLyricProgressEndTime(line, endTime);
+  const progressPercent = lyricProgressForLineAtTime(
+    line,
+    displayTime,
+    progressEndTime,
+    { linear: true }
+  ) * 100;
+  return { activeIndex, currentTime: displayTime, progressPercent };
+}
+
+function scheduleQishuiPlaybackLyricLayout() {
+  window.cancelAnimationFrame(state.qishuiPlaybackCard.lyricBookLayoutFrame);
+  state.qishuiPlaybackCard.lyricBookLayoutFrame = window.requestAnimationFrame(() => {
+    state.qishuiPlaybackCard.lyricBookLayoutFrame = 0;
+    resetBookLyricScrollState({ store: state.qishuiPlaybackCard });
+    updateQishuiPlaybackLyrics(state.lyricDisplayText, state.lyricSubtitleText);
+  });
+}
+
+function updateQishuiPlaybackLyrics(
+  text = '',
+  subtitle = '',
+  playbackTime = Number.NaN,
+  scrollOptions = {}
+) {
+  if (!els.qishuiPlaybackLyrics || !els.qishuiPlaybackLyricPage) return;
+  const list = els.qishuiPlaybackLyricPage;
+  const cardState = state.qishuiPlaybackCard;
+  const lines = qishuiPlaybackBookLines(text, subtitle);
+  const songId = safeText(playbackCardSong()?.id, 'empty');
+  const signature = `${songId}|${bookLyricSignature(lines)}`;
+  if (signature !== cardState.lyricSignature) {
+    cardState.lyricSignature = signature;
+    cardState.lastLyricIndex = -1;
+    cardState.lyricBookIndex = -2;
+    cardState.lyricBookCurrentLine = null;
+    cardState.lyricBookArrivedIndex = -2;
+    resetBookLyricScrollState({ store: cardState });
+    renderBookLyricList(list, lines, {
+      lineClass: 'qishui-playback-lyric-line',
+      lazyGlyphs: true
+    });
+  }
+
+  const { activeIndex, currentTime, progressPercent } = qishuiPlaybackBookFrame(lines, playbackTime);
+  const previousIndex = cardState.lastLyricIndex;
+  const direction = previousIndex < 0
+    ? 'none'
+    : activeIndex === previousIndex
+      ? safeText(list.dataset.scrollDirection, 'none')
+      : activeIndex > previousIndex
+        ? 'forward'
+        : 'backward';
+  cardState.lastLyricIndex = activeIndex;
+
+  if (cardState.lyricBookIndex !== activeIndex) {
+    cardState.lyricBookIndex = activeIndex;
+    cardState.lyricBookCurrentLine = null;
+    cardState.lyricBookArrivedIndex = -2;
+    list.querySelectorAll('.qishui-playback-lyric-line').forEach((line) => {
+      const index = Number(line.dataset.bookLyricIndex) || 0;
+      const distance = Math.min(6, Math.abs(index - activeIndex));
+      const isTarget = index === activeIndex;
+      line.classList.remove('is-current', 'is-ended', 'is-scroll-arrived');
+      line.classList.toggle('is-arriving', isTarget);
+      line.classList.toggle('is-past', index < activeIndex);
+      line.classList.toggle('is-future', index > activeIndex);
+      line.style.setProperty('--book-line-distance', distance.toFixed(0));
+      line.style.setProperty('--book-line-progress', '0%');
+      setBookLyricGlyphProgress(line, 0, Number.NaN);
+      line.removeAttribute('aria-current');
+      line.removeAttribute('id');
+      if (isTarget) {
+        line.id = 'qishuiPlaybackLyric';
+        cardState.lyricBookCurrentLine = line;
+      } else if (index === activeIndex + 1) {
+        line.id = 'qishuiPlaybackLyricNext';
+      }
+    });
+    resetBookLyricScrollState({ store: cardState });
+  }
+
+  let current = cardState.lyricBookCurrentLine;
+  if (!current || Number(current.dataset.bookLyricIndex) !== activeIndex) {
+    current = list.querySelector(
+      `.qishui-playback-lyric-line[data-book-lyric-index="${activeIndex}"]`
+    );
+    cardState.lyricBookCurrentLine = current;
+  }
+
+  const scrollArrived = current
+    ? syncBookLyricScroll(current, {
+        list,
+        store: cardState,
+        lines,
+        activeIndex,
+        reducedMotion: reducedMotion,
+        playbackRunning: scrollOptions.playbackRunning
+      })
+    : false;
+  // Once the line reaches the reading position, keep its highlight latched
+  // until the active lyric changes. The larger current-line typography changes
+  // layout by a pixel or two; treating that reflow as "not arrived" makes the
+  // line expand and collapse every other frame on tall fullscreen layouts.
+  const arrived = cardState.lyricBookArrivedIndex === activeIndex || scrollArrived;
+  cardState.lyricBookArrivedIndex = arrived ? activeIndex : -2;
+  list.classList.toggle('is-highlight-pending', !arrived);
+  list.dataset.activeIndex = String(activeIndex);
+  list.dataset.arrivedIndex = arrived ? String(activeIndex) : '';
+  list.dataset.scrollDirection = direction;
+
+  if (!current) return;
+  const visibleProgress = arrived ? clamp(Number(progressPercent) || 0, 0, 100) : 0;
+  current.classList.toggle('is-arriving', !arrived);
+  current.classList.toggle('is-current', arrived);
+  current.classList.toggle('is-scroll-arrived', arrived);
+  current.classList.toggle('is-ended', arrived && visibleProgress >= 99.6);
+  current.style.setProperty('--book-line-progress', `${visibleProgress.toFixed(2)}%`);
+  setBookLyricGlyphProgress(
+    current,
+    visibleProgress,
+    arrived ? currentTime : Number.NaN
+  );
+  if (arrived) current.setAttribute('aria-current', 'true');
+  else current.removeAttribute('aria-current');
+}
+
+function qishuiPlaybackSeekDuration() {
+  const audioDuration = Number(els.audio && els.audio.duration);
+  if (Number.isFinite(audioDuration) && audioDuration > 0) return audioDuration;
+  return Math.max(0, Number(playbackCardSong()?.duration) || 0);
+}
+
+function qishuiPlaybackSeekTarget() {
+  if (!els.qishuiPlaybackProgressRange) return 0;
+  const duration = qishuiPlaybackSeekDuration();
+  const ratio = clamp(Number(els.qishuiPlaybackProgressRange.value) / 1000, 0, 1);
+  return duration * ratio;
+}
+
+function updateQishuiPlaybackProgress(
+  current = Number.NaN,
+  duration = Number.NaN,
+  { forceRange = false } = {}
+) {
+  if (!els.qishuiPlaybackProgressRange) return;
+  const song = playbackCardSong();
+  if (!song) {
+    els.qishuiPlaybackProgressRange.value = '0';
+    els.qishuiPlaybackProgressRange.disabled = true;
+    els.qishuiPlaybackProgressRange.style.setProperty('--playback-progress', '0%');
+    if (els.qishuiPlaybackCurrentTime) els.qishuiPlaybackCurrentTime.textContent = '00:00';
+    if (els.qishuiPlaybackTotalTime) els.qishuiPlaybackTotalTime.textContent = '00:00';
+    return;
+  }
+  const hasLiveAudio = !!(els.audio && els.audio.src);
+  const audioCurrent = Number.isFinite(current)
+    ? current
+    : hasLiveAudio
+      ? Number(els.audio.currentTime)
+      : Number.NaN;
+  const audioDuration = Number.isFinite(duration) && duration > 0
+    ? duration
+    : hasLiveAudio
+      ? Number(els.audio.duration)
+      : Number.NaN;
+  const fallbackCurrent = song ? estimatedPlayerClockTime(Number(song.position) || 0) : 0;
+  const fallbackDuration = song ? Number(song.duration) || 0 : 0;
+  const safeCurrent = Math.max(0, Number.isFinite(audioCurrent) ? audioCurrent : fallbackCurrent);
+  const safeDuration = Math.max(0, Number.isFinite(audioDuration) && audioDuration > 0 ? audioDuration : fallbackDuration);
+  const progress = safeDuration > 0 ? clamp(safeCurrent / safeDuration, 0, 1) : 0;
+  els.qishuiPlaybackProgressRange.disabled = safeDuration <= 0;
+  if (!state.qishuiPlaybackCard.progressDragging || forceRange) {
+    els.qishuiPlaybackProgressRange.value = String(Math.round(progress * 1000));
+    els.qishuiPlaybackProgressRange.style.setProperty(
+      '--playback-progress',
+      `${(progress * 100).toFixed(3)}%`
+    );
+  }
+  els.qishuiPlaybackProgressRange.setAttribute(
+    'aria-valuetext',
+    `${formatTime(safeCurrent)} / ${formatTime(safeDuration)}`
+  );
+  if (els.qishuiPlaybackCurrentTime) els.qishuiPlaybackCurrentTime.textContent = formatTime(safeCurrent);
+  if (els.qishuiPlaybackTotalTime) els.qishuiPlaybackTotalTime.textContent = formatTime(safeDuration);
+}
+
+function previewQishuiPlaybackSeek() {
+  const duration = qishuiPlaybackSeekDuration();
+  if (!duration || !els.qishuiPlaybackProgressRange) return false;
+  if (state.qishuiPlaybackCard.seekPending) {
+    state.qishuiPlaybackCard.seekRequestId += 1;
+    state.qishuiPlaybackCard.seekPending = false;
+  }
+  state.qishuiPlaybackCard.progressDragging = true;
+  const target = qishuiPlaybackSeekTarget();
+  state.qishuiPlaybackCard.pendingSeekTarget = target;
+  const audioDuration = Number(els.audio && els.audio.duration);
+  if (Number.isFinite(audioDuration) && audioDuration > 0) {
+    els.audio.currentTime = target;
+    state.qishuiPlaybackCard.pendingAudioSeekTarget = null;
+  } else if (els.progressRange) {
+    els.progressRange.value = els.qishuiPlaybackProgressRange.value;
+    if (els.audio?.src) state.qishuiPlaybackCard.pendingAudioSeekTarget = target;
+  }
+  updateQishuiPlaybackProgress(target, duration, { forceRange: true });
+  syncPlaybackLyricAtTime(target);
+  return true;
+}
+
+async function commitQishuiPlaybackSeek() {
+  if (!state.qishuiPlaybackCard.progressDragging) return false;
+  const duration = qishuiPlaybackSeekDuration();
+  const target = qishuiPlaybackSeekTarget();
+  state.qishuiPlaybackCard.progressDragging = false;
+  if (!duration) {
+    updateQishuiPlaybackProgress();
+    return false;
+  }
+  const audioDuration = Number(els.audio && els.audio.duration);
+  if (Number.isFinite(audioDuration) && audioDuration > 0) {
+    els.audio.currentTime = target;
+    state.qishuiPlaybackCard.pendingAudioSeekTarget = null;
+  } else if (els.audio?.src) {
+    state.qishuiPlaybackCard.pendingAudioSeekTarget = target;
+  }
+  state.qishuiPlaybackCard.pendingSeekTarget = target;
+  if (state.currentSong) state.currentSong = { ...state.currentSong, position: target };
+  updatePlayerClock(target, duration, isPlaybackClockRunning());
+  updateQishuiPlaybackProgress(target, duration, { forceRange: true });
+  if (!state.localQueueActive) {
+    const requestId = state.qishuiPlaybackCard.seekRequestId + 1;
+    state.qishuiPlaybackCard.seekRequestId = requestId;
+    state.qishuiPlaybackCard.seekPending = true;
+    try {
+      await apiJson(`/api/player/seek?${query({ position: Math.round(target) })}`);
+    } catch (error) {
+      if (requestId === state.qishuiPlaybackCard.seekRequestId) {
+        toast(`进度调整失败：${safeText(error && error.message, '请稍后重试')}`);
+        refreshPlayerState().catch(() => {});
+      }
+    } finally {
+      if (requestId === state.qishuiPlaybackCard.seekRequestId) {
+        state.qishuiPlaybackCard.seekPending = false;
+        state.qishuiPlaybackCard.pendingSeekTarget = null;
+      }
+    }
+  } else {
+    state.qishuiPlaybackCard.pendingSeekTarget = null;
+  }
+  if (state.community.activeSession) reportCommunityListening(true).catch(() => {});
+  return true;
+}
+
+function updateQishuiPlaybackPlayState(playing = !els.audio.paused && !!els.audio.src) {
+  if (!els.qishuiPlaybackPlayButton) return;
+  const enabled = !!playbackCardSong();
+  if (els.qishuiPlaybackPreviousButton) els.qishuiPlaybackPreviousButton.disabled = !enabled;
+  if (els.qishuiPlaybackNextButton) els.qishuiPlaybackNextButton.disabled = !enabled;
+  els.qishuiPlaybackPlayButton.disabled = !enabled;
+  els.qishuiPlaybackPlayButton.classList.toggle('is-playing', enabled && playing);
+  els.qishuiPlaybackPlayButton.title = enabled ? (playing ? '暂停' : '播放') : '请先选择一首歌曲';
+  els.qishuiPlaybackPlayButton.setAttribute('aria-label', els.qishuiPlaybackPlayButton.title);
+}
+
+function renderQishuiPlaybackCard(song = state.currentSong) {
+  if (!els.qishuiPlaybackCard) return;
+  const active = playbackCardSong(song);
+  const provider = playbackCardProvider(active);
+  const title = safeText(active && active.title, '等待播放');
+  const artist = safeText(active && (active.artist || active.album), provider.label);
+  const imageUrl = coverUrl(active);
+  if (active && state.playbackVisual.palette) {
+    applyQishuiPlaybackPalette(state.playbackVisual.palette);
+  }
+  setQishuiPlaybackImage(els.qishuiPlaybackCover, imageUrl);
+  setQishuiPlaybackImage(els.qishuiPlaybackBackdrop, imageUrl);
+  if (els.qishuiPlaybackCoverFrame) els.qishuiPlaybackCoverFrame.classList.toggle('has-cover', !!imageUrl);
+  if (els.qishuiPlaybackCover) els.qishuiPlaybackCover.alt = imageUrl ? `${title} 封面` : '';
+  renderQishuiPlaybackIdentity(provider);
+  ensureQishuiPlaybackIdentity(provider);
+  if (els.qishuiPlaybackCoverFallback) {
+    els.qishuiPlaybackCoverFallback.textContent = playbackCardProviderFallback(provider);
+  }
+  els.qishuiPlaybackCard.dataset.provider = provider.id;
+  els.qishuiPlaybackCard.style.setProperty(
+    '--playback-provider-accent',
+    PLAYBACK_CARD_PROVIDER_ACCENTS[provider.id] || PLAYBACK_CARD_PROVIDER_ACCENTS.local
+  );
+  if (els.qishuiPlaybackTitle) {
+    els.qishuiPlaybackTitle.textContent = title;
+    els.qishuiPlaybackTitle.title = title;
+  }
+  if (els.qishuiPlaybackArtist) {
+    els.qishuiPlaybackArtist.textContent = artist;
+    els.qishuiPlaybackArtist.title = artist;
+  }
+  if (els.qishuiPlaybackQueue) {
+    const hasQueuePosition = active && state.queue.length && state.queueIndex >= 0;
+    els.qishuiPlaybackQueue.textContent = hasQueuePosition
+      ? `${state.queueIndex + 1} / ${state.queue.length}`
+      : '移动播放页';
+  }
+  updateQualityButton(song);
+  els.qishuiPlaybackCard.classList.toggle('is-empty', !active);
+  updateQishuiPlaybackLyrics(
+    active ? safeText(state.lyricDisplayText, title) : '',
+    active ? safeText(state.lyricSubtitleText, artist) : ''
+  );
+  updateQishuiPlaybackProgress();
+  updateQishuiPlaybackPlayState();
+}
+
+function syncPlaybackCardPanelState() {
+  const visible = playbackCardVisible();
+  const diyPanelOpen = visible && state.diyOpen && state.diyCardOpen;
+  const playlistPickerOpen = visible && state.playbackPlaylistPickerOpen && !state.playlistSongPageOpen;
+  const songPanelOpen = visible && state.playlistSongPageOpen;
+  const sidePanelOpen = diyPanelOpen || playlistPickerOpen || songPanelOpen;
+  els.appShell.classList.toggle('has-playback-side-panel', sidePanelOpen);
+  els.appShell.classList.toggle('is-playback-diy-panel-open', diyPanelOpen);
+  els.appShell.classList.toggle('is-playback-playlist-picker-open', playlistPickerOpen);
+  els.appShell.classList.toggle('is-playback-song-panel-open', songPanelOpen);
+  if (els.qishuiPlaybackPhone) {
+    els.qishuiPlaybackPhone.classList.toggle('is-panel-open', sidePanelOpen);
+    els.qishuiPlaybackPhone.inert = sidePanelOpen
+      && window.matchMedia('(max-width: 767px)').matches;
+  }
+  if (!els.qishuiPlaybackTools) return;
+  els.qishuiPlaybackTools.querySelectorAll('[data-playback-tool]').forEach((button) => {
+    const tool = button.dataset.playbackTool;
+    const active = tool === 'playlists'
+      ? playlistPickerOpen || songPanelOpen
+      : tool === 'preset' || tool === 'text' || tool === 'wallpaper'
+        ? diyPanelOpen && state.diyPage === tool
+        : false;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+}
+
+function syncQishuiPlaybackCard() {
+  if (!els.qishuiPlaybackCard) return;
+  const visible = playbackCardVisible();
+  els.qishuiPlaybackCard.hidden = !visible;
+  els.appShell.classList.toggle('has-qishui-playback-card', visible);
+  if (visible) {
+    syncQishuiPlaybackExpansion();
+    syncQishuiPlaybackHiddenState();
+    renderQishuiPlaybackCard();
+    syncPlaybackCardPanelState();
+    return;
+  }
+  state.playbackPlaylistPickerOpen = false;
+  state.qishuiPlaybackCard.expanded = false;
+  state.qishuiPlaybackCard.wheelDelta = 0;
+  state.qishuiPlaybackCard.switching = false;
+  state.qishuiPlaybackCard.progressDragging = false;
+  state.qishuiPlaybackCard.seekPending = false;
+  state.qishuiPlaybackCard.pendingSeekTarget = null;
+  state.qishuiPlaybackCard.pendingAudioSeekTarget = null;
+  state.qishuiPlaybackCard.seekRequestId += 1;
+  state.qishuiPlaybackCard.switchId += 1;
+  state.qishuiPlaybackCard.lyricSignature = '';
+  state.qishuiPlaybackCard.lastLyricIndex = -1;
+  state.qishuiPlaybackCard.lyricBookIndex = -2;
+  state.qishuiPlaybackCard.lyricBookCurrentLine = null;
+  state.qishuiPlaybackCard.lyricBookArrivedIndex = -2;
+  window.cancelAnimationFrame(state.qishuiPlaybackCard.lyricBookLayoutFrame);
+  state.qishuiPlaybackCard.lyricBookLayoutFrame = 0;
+  resetBookLyricScrollState({ store: state.qishuiPlaybackCard });
+  window.clearTimeout(state.qishuiPlaybackCard.switchTimer);
+  state.qishuiPlaybackCard.switchTimer = 0;
+  syncQishuiPlaybackExpansion();
+  syncQishuiPlaybackHiddenState();
+  clearQishuiPlaybackSwitchClasses();
+  syncPlaybackCardPanelState();
+}
+
+function setPlaybackPlaylistPickerOpen(open) {
+  const nextOpen = playbackCardVisible() && !!open;
+  if (nextOpen) {
+    if (state.diyOpen) setDiyOpen(false);
+    if (state.playlistSongPageOpen) closePlaylistShelf({ reopenPicker: false });
+    state.playbackPlaylistPickerOpen = true;
+    renderPlaylistOrbit(playbackPlaylists());
+  } else {
+    state.playbackPlaylistPickerOpen = false;
+    if (state.playlistSongPageOpen) closePlaylistShelf({ reopenPicker: false });
+  }
+  syncPlaybackCardPanelState();
+}
+
+function openPlaybackDiyPanel(page) {
+  const nextPage = page === 'wallpaper' ? 'wallpaper' : page === 'text' ? 'text' : 'preset';
+  const alreadyOpen = state.diyOpen && state.diyCardOpen && state.diyPage === nextPage;
+  state.playbackPlaylistPickerOpen = false;
+  if (state.playlistSongPageOpen) closePlaylistShelf({ reopenPicker: false });
+  if (alreadyOpen) {
+    setDiyOpen(false);
+  } else {
+    if (!state.diyOpen) setDiyOpen(true);
+    setDiyPage(nextPage);
+    if (nextPage !== 'wallpaper') enterPlaybackPage();
+  }
+  syncPlaybackCardPanelState();
+}
+
+function openPlaybackRhythmGame() {
+  state.playbackPlaylistPickerOpen = false;
+  if (state.playlistSongPageOpen) closePlaylistShelf({ reopenPicker: false });
+  if (state.diyOpen) setDiyOpen(false);
+  syncPlaybackCardPanelState();
+  els.diyRhythmGameButton?.click();
+}
+
+function handlePlaybackCardTool(event) {
+  const button = event.target.closest('[data-playback-tool]');
+  if (!button || !els.qishuiPlaybackTools?.contains(button)) return;
+  const tool = button.dataset.playbackTool;
+  if (tool === 'playlists') {
+    setPlaybackPlaylistPickerOpen(!(state.playbackPlaylistPickerOpen || state.playlistSongPageOpen));
+  } else if (tool === 'rhythm') {
+    openPlaybackRhythmGame();
+  } else {
+    openPlaybackDiyPanel(tool);
+  }
+}
+
+const QISHUI_PLAYBACK_SWITCH_CLASSES = Object.freeze([
+  'is-switching-previous',
+  'is-switching-next',
+  'is-switching-enter-previous',
+  'is-switching-enter-next',
+  'is-switching-preparing'
+]);
+
+function clearQishuiPlaybackSwitchClasses() {
+  els.qishuiPlaybackPhone?.classList.remove(...QISHUI_PLAYBACK_SWITCH_CLASSES);
+}
+
+function finishQishuiPlaybackSwitch(switchId) {
+  if (switchId !== state.qishuiPlaybackCard.switchId) return;
+  window.clearTimeout(state.qishuiPlaybackCard.switchTimer);
+  state.qishuiPlaybackCard.switchTimer = 0;
+  state.qishuiPlaybackCard.switching = false;
+  clearQishuiPlaybackSwitchClasses();
+  if (els.qishuiPlaybackWheelHint) {
+    els.qishuiPlaybackWheelHint.textContent = '滚轮向上上一首 · 向下下一首';
+  }
+}
+
+function switchQishuiPlaybackTrack(direction) {
+  const song = playbackCardSong();
+  if (!song || state.qishuiPlaybackCard.switching) return;
+  const previous = direction < 0;
+  const switchId = state.qishuiPlaybackCard.switchId + 1;
+  const exitClass = previous ? 'is-switching-previous' : 'is-switching-next';
+  const enterClass = previous ? 'is-switching-enter-previous' : 'is-switching-enter-next';
+  state.qishuiPlaybackCard.switchId = switchId;
+  state.qishuiPlaybackCard.switching = true;
+  state.qishuiPlaybackCard.progressDragging = false;
+  state.qishuiPlaybackCard.seekPending = false;
+  state.qishuiPlaybackCard.pendingSeekTarget = null;
+  state.qishuiPlaybackCard.pendingAudioSeekTarget = null;
+  state.qishuiPlaybackCard.seekRequestId += 1;
+  if (els.qishuiPlaybackPhone) {
+    clearQishuiPlaybackSwitchClasses();
+    els.qishuiPlaybackPhone.classList.add(exitClass);
+  }
+  if (els.qishuiPlaybackWheelHint) {
+    els.qishuiPlaybackWheelHint.textContent = previous ? '正在切换上一首' : '正在切换下一首';
+  }
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const minimumExit = reducedMotion
+    ? Promise.resolve()
+    : new Promise((resolve) => window.setTimeout(resolve, 110));
+  let watchdogTimer = 0;
+  const transportReady = Promise.race([
+    Promise.resolve(transport(previous ? '/api/player/previous' : '/api/player/next')).catch(() => {}),
+    new Promise((resolve) => {
+      watchdogTimer = window.setTimeout(resolve, 6000);
+    })
+  ]).finally(() => window.clearTimeout(watchdogTimer));
+  Promise.all([
+    transportReady,
+    minimumExit
+  ]).finally(() => {
+    if (switchId !== state.qishuiPlaybackCard.switchId) return;
+    const phone = els.qishuiPlaybackPhone;
+    if (reducedMotion || !phone) {
+      finishQishuiPlaybackSwitch(switchId);
+      return;
+    }
+    phone.classList.add('is-switching-preparing', enterClass);
+    phone.classList.remove(exitClass);
+    window.requestAnimationFrame(() => {
+      if (switchId !== state.qishuiPlaybackCard.switchId) return;
+      window.requestAnimationFrame(() => {
+        if (switchId !== state.qishuiPlaybackCard.switchId) return;
+        phone.classList.remove('is-switching-preparing', enterClass);
+        window.clearTimeout(state.qishuiPlaybackCard.switchTimer);
+        state.qishuiPlaybackCard.switchTimer = window.setTimeout(
+          () => finishQishuiPlaybackSwitch(switchId),
+          250
+        );
+      });
+    });
+  });
+}
+
+function handleQishuiPlaybackWheel(event) {
+  if (!playbackCardVisible() || state.qishuiPlaybackCard.hiddenByUser) return false;
+  const target = event.target instanceof Element ? event.target : null;
+  if (!target?.closest('#qishuiPlaybackCard')) return false;
+  if (target.closest('input, button, select, textarea, [role="slider"]')) return false;
+  event.preventDefault();
+  event.stopPropagation();
+  const unit = event.deltaMode === 1 ? 32 : event.deltaMode === 2 ? window.innerHeight : 1;
+  state.qishuiPlaybackCard.wheelDelta += event.deltaY * unit;
+  if (Math.abs(state.qishuiPlaybackCard.wheelDelta) < 52) return true;
+  const direction = state.qishuiPlaybackCard.wheelDelta < 0 ? -1 : 1;
+  state.qishuiPlaybackCard.wheelDelta = 0;
+  switchQishuiPlaybackTrack(direction);
+  return true;
+}
+
 function updatePlaybackPageClass() {
   els.appShell.classList.toggle('is-playback-page', state.playbackPage);
   els.appShell.classList.toggle('has-playlist-song-page', state.playlistSongPageOpen);
   els.stage.classList.toggle('is-playback-page', state.playbackPage);
   els.playlistShelf.classList.toggle('is-song-page-open', state.playlistSongPageOpen);
-  setPlaybackLyricVisible(state.playbackPage);
+  syncPlaybackLyricVisibility();
   updateDynamicCubeVisibility();
   updateFreeCubeVisibility();
   updateVoidPrismVisibility();
@@ -10613,6 +11782,7 @@ function updatePlaybackPageClass() {
   updateWallpaperVisibility();
   syncSandboxPlaybackSurface();
   applyPresetUpscaler({ force: true });
+  syncQishuiPlaybackCard();
   resetPlaybackChromeForMode();
 }
 
@@ -10620,6 +11790,7 @@ function enterPlaybackPage() {
   state.playbackPage = true;
   updatePlaybackPageClass();
   renderPlaylistOrbit(playbackPlaylists());
+  requestOrbFrame();
 }
 
 function enterPresetPlaybackPage(preset) {
@@ -10633,9 +11804,24 @@ function enterPresetPlaybackPage(preset) {
 
 function returnHomePage() {
   state.playbackPage = false;
-  closePlaylistShelf();
+  state.playbackPlaylistPickerOpen = false;
+  closePlaylistShelf({ reopenPicker: false });
+  if (state.diyOpen) setDiyOpen(false);
   resetPlaybackView();
   updatePlaybackPageClass();
+}
+
+function enterWallpaperHome() {
+  state.playbackPlaylistPickerOpen = false;
+  closePlaylistShelf({ reopenPicker: false });
+  if (state.diyOpen) setDiyOpen(false);
+  state.sandbox.playbackPresetId = '';
+  state.sandbox.playbackKeepBackground = false;
+  state.sandbox.playbackPreviewUrl = '';
+  setTextPreset('none');
+  commitDiyPage('wallpaper');
+  resetPlaybackView();
+  requestOrbFrame();
 }
 
 function showActivePlaylistShelf(options = {}) {
@@ -10648,7 +11834,7 @@ function showActivePlaylistShelf(options = {}) {
 
 function hidePlaylistShelf() {
   state.shelfHiddenByUser = true;
-  closePlaylistShelf();
+  closePlaylistShelf({ reopenPicker: false });
 }
 
 function setShelfCover(playlist = {}) {
@@ -10810,6 +11996,7 @@ function renderPlaylistShelf(playlist, songs, options = {}) {
   state.activePlaylist = playlist;
   state.activePlaylistSongs = songs;
   state.playlistSongPageOpen = true;
+  state.playbackPlaylistPickerOpen = false;
   const local = playlist.local || playlist.provider === 'local';
   if (els.selectedPlaylistAlbum) els.selectedPlaylistAlbum.classList.toggle('is-local-playlist', local);
   if (els.playlistLocalAddButton) els.playlistLocalAddButton.hidden = !local;
@@ -10842,6 +12029,7 @@ function renderShelfLoading(playlist) {
   state.songFocusIndex = 0;
   state.songButtonCache = [];
   state.playlistSongPageOpen = true;
+  state.playbackPlaylistPickerOpen = false;
   if (els.selectedPlaylistAlbum) els.selectedPlaylistAlbum.classList.remove('is-local-playlist');
   if (els.playlistLocalAddButton) els.playlistLocalAddButton.hidden = true;
   els.playlistShelfTitle.textContent = safeText(playlist.name, '网易云歌单');
@@ -10864,12 +12052,15 @@ function renderShelfLoading(playlist) {
   updateActivePlaylistCard();
 }
 
-function closePlaylistShelf({ resetActive = false } = {}) {
+function closePlaylistShelf({ resetActive = false, reopenPicker = true } = {}) {
   clearShelfPressTimer();
+  state.playlistLoadRequestId += 1;
+  state.shelfLoadingPlaylistId = '';
   els.playlistShelf.classList.remove('is-open', 'is-loading', 'is-playback-mode', 'is-pressing', 'is-dragging', 'is-position-dragging', 'is-back-facing');
   els.playlistShelf.hidden = true;
   els.playlistShelf.removeAttribute('aria-busy');
   state.playlistSongPageOpen = false;
+  state.playbackPlaylistPickerOpen = !!(reopenPicker && state.playbackPage);
   state.shelfDragging = false;
   state.shelfPointerId = null;
   state.shelfInteraction = '';
@@ -10893,8 +12084,9 @@ async function loadPlaylistFromCard(card) {
   if (!playlistId) return;
   if (Number.isFinite(playlistIndex) && playlistIndex !== state.playlistFocusIndex) {
     setPlaylistFocus(playlistIndex);
-    return;
   }
+  state.playbackPlaylistPickerOpen = false;
+  syncPlaybackCardPanelState();
   if (String(playlistId) === LOCAL_PLAYLIST_ID) {
     openLocalPlaylist();
     return;
@@ -10918,13 +12110,21 @@ async function loadPlaylistFromCard(card) {
   }
   if (state.shelfLoadingPlaylistId === String(playlistId)) return;
 
+  const requestId = state.playlistLoadRequestId + 1;
+  state.playlistLoadRequestId = requestId;
   state.shelfLoadingPlaylistId = String(playlistId);
   card.classList.add('is-loading');
   card.disabled = true;
   card.setAttribute('aria-busy', 'true');
   renderShelfLoading(playlist);
+  const requestStillActive = () => requestId === state.playlistLoadRequestId
+    && state.playbackPage
+    && state.playlistSongPageOpen
+    && state.activeProvider === info.id
+    && String(state.activePlaylistId) === String(playlistId);
   try {
     const data = await apiJson(`${providerPath('/playlist/tracks', provider)}?${query({ id: playlistId })}`);
+    if (!requestStillActive()) return;
     const songs = Array.isArray(data.songs) ? data.songs : [];
     if (!songs.length) {
       renderPlaylistShelf(playlist, []);
@@ -10933,9 +12133,12 @@ async function loadPlaylistFromCard(card) {
     }
     renderPlaylistShelf(playlist, songs);
   } catch (error) {
-    toast(error.message);
+    if (requestStillActive()) {
+      renderPlaylistShelf(playlist, []);
+      toast(error.message);
+    }
   } finally {
-    state.shelfLoadingPlaylistId = '';
+    if (requestId === state.playlistLoadRequestId) state.shelfLoadingPlaylistId = '';
     card.classList.remove('is-loading');
     card.disabled = false;
     card.removeAttribute('aria-busy');
@@ -10948,7 +12151,6 @@ async function playShelfSong(button) {
   if (!song) return;
   if (index !== state.songFocusIndex) {
     setSongFocus(index);
-    return;
   }
 
   button.classList.add('is-loading');
@@ -10962,6 +12164,7 @@ async function playShelfSong(button) {
       if (loaded) {
         updateShelfCurrentSong();
         setSongFocus(index);
+        closePlaylistShelf({ reopenPicker: false });
         toast(`正在播放：${safeText(song.title, '本地歌曲')}`);
       }
       return;
@@ -10977,6 +12180,7 @@ async function playShelfSong(button) {
       await refreshPlayerState();
       updateShelfCurrentSong();
       setSongFocus(index);
+      closePlaylistShelf({ reopenPicker: false });
       toast(`正在播放：${safeText(song.title, '歌曲')}`);
     }
   } catch (error) {
@@ -11661,18 +12865,36 @@ function updatePlaybackLyricGlyphProgress(progressPercent) {
   });
 }
 
+function triggerFocusEchoTransition() {
+  if (!els.playbackLyricScene) return;
+  if (state.focusEchoAnimationFrame) {
+    window.cancelAnimationFrame(state.focusEchoAnimationFrame);
+    state.focusEchoAnimationFrame = 0;
+  }
+  els.playbackLyricScene.classList.remove('is-focus-echo-entering');
+  if (state.textPreset !== 'focus-echo' || reducedMotion) return;
+  state.focusEchoAnimationFrame = window.requestAnimationFrame(() => {
+    state.focusEchoAnimationFrame = 0;
+    if (state.textPreset === 'focus-echo') {
+      els.playbackLyricScene.classList.add('is-focus-echo-entering');
+    }
+  });
+}
+
 function setPlaybackLyricLine(text, subtitle, progress = 0, currentTime = Number.NaN) {
   const line = safeText(text, playbackLyricText());
   const nextSubtitle = safeText(subtitle, playbackLyricSubtitle());
   const progressPercent = clamp(progress, 0, 1) * 100;
   const glyphRenderMode = playbackGlyphRenderMode();
+  const lineChanged = line !== state.lyricDisplayText || glyphRenderMode !== state.lyricGlyphRenderMode;
 
-  if (line !== state.lyricDisplayText || glyphRenderMode !== state.lyricGlyphRenderMode) {
+  if (lineChanged) {
     els.playbackLyricScene.querySelectorAll('.playback-lyric-layer').forEach((layer) => {
       setPlaybackLayerText(layer, line, glyphRenderMode && layer === els.playbackLyricText, glyphRenderMode);
     });
     state.lyricDisplayText = line;
     state.lyricGlyphRenderMode = glyphRenderMode;
+    if (state.textPreset === 'focus-echo') triggerFocusEchoTransition();
   }
 
   if (nextSubtitle !== state.lyricSubtitleText) {
@@ -11689,6 +12911,9 @@ function setPlaybackLyricLine(text, subtitle, progress = 0, currentTime = Number
 
   if (state.textPreset === 'flow') syncBlurLyricComponent(line);
   if (state.textPreset === 'book') updateBookLyricLines(progressPercent, currentTime);
+  if (playbackCardLyricsVisible()) {
+    updateQishuiPlaybackLyrics(line, nextSubtitle, currentTime);
+  }
 }
 
 function lyricTimelineTime(currentTime, visualLead = 0) {
@@ -11983,6 +13208,22 @@ function setPlaybackLyricVisible(visible) {
   els.playbackLyricScene.hidden = !visible;
 }
 
+function textLyricsEnabled(preset = state.textPreset) {
+  return preset !== 'none';
+}
+
+function syncPlaybackLyricVisibility() {
+  const enabled = textLyricsEnabled();
+  setPlaybackLyricVisible(state.playbackPage && enabled);
+  if (els.qishuiPlaybackLyrics) els.qishuiPlaybackLyrics.hidden = false;
+  if (els.qishuiPlaybackPhone) {
+    els.qishuiPlaybackPhone.classList.remove('is-lyrics-hidden');
+  }
+  [els.lyricBrightnessRange, els.lyricSpeedRange].forEach((control) => {
+    if (control) control.disabled = !enabled;
+  });
+}
+
 function updatePlaybackSceneTransform() {
   if (!els.playbackLyricScene) return;
   setStylePropertyIfChanged(els.playbackLyricScene, '--scene-rotate-x', `${state.playbackVisual.pitch}rad`);
@@ -11997,7 +13238,7 @@ function updatePlaybackSceneTransform() {
 }
 
 function selectableTextPreset(preset) {
-  return preset === 'flow' || preset === 'book-effect' ? preset : 'depth';
+  return ['none', 'depth', 'flow', 'book-effect', 'focus-echo'].includes(preset) ? preset : 'depth';
 }
 
 function textPresetButtons() {
@@ -12021,6 +13262,116 @@ function syncTextPresetButtons() {
 
 function updateTextPresetAvailability() {
   syncTextPresetButtons();
+}
+
+function saveTextPalettePreferences() {
+  try {
+    window.localStorage.setItem(TEXT_PALETTE_PREFS_KEY, JSON.stringify({
+      version: 1,
+      palettes: state.textPalettePreferences
+    }));
+  } catch (error) {
+  }
+}
+
+function syncTextPaletteControls() {
+  if (!els.textPaletteControl) return;
+  const enabled = textLyricsEnabled();
+  const preference = textPalettePreference();
+  const manual = preference.mode === 'manual';
+  els.textPaletteControl.classList.toggle('is-disabled', !enabled);
+  els.textPaletteControl.dataset.paletteMode = preference.mode;
+  if (els.textPaletteStatus) {
+    els.textPaletteStatus.textContent = enabled
+      ? (manual ? preference.color.toUpperCase() : '封面自动')
+      : '选择文字预设';
+  }
+  if (els.textPaletteAutoButton) {
+    els.textPaletteAutoButton.disabled = !enabled;
+    els.textPaletteAutoButton.classList.toggle('is-active', enabled && !manual);
+    els.textPaletteAutoButton.setAttribute('aria-pressed', String(enabled && !manual));
+  }
+  if (els.textPaletteCustomInput) {
+    els.textPaletteCustomInput.disabled = !enabled;
+    if (els.textPaletteCustomInput.value.toLowerCase() !== preference.color) {
+      els.textPaletteCustomInput.value = preference.color;
+    }
+  }
+  if (els.textPaletteResetButton) els.textPaletteResetButton.disabled = !enabled;
+  els.textPaletteControl.querySelectorAll('[data-text-palette-color]').forEach((button) => {
+    const color = normalizeTextPaletteColor(button.dataset.textPaletteColor);
+    const active = enabled && manual && color === preference.color;
+    button.disabled = !enabled;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+}
+
+function setTextPalettePreference(mode, color) {
+  if (!textLyricsEnabled()) {
+    syncTextPaletteControls();
+    return;
+  }
+  const preset = textPalettePresetId();
+  const previous = textPalettePreference(preset);
+  state.textPalettePreferences[preset] = {
+    mode: mode === 'manual' ? 'manual' : 'auto',
+    color: normalizeTextPaletteColor(color, previous.color)
+  };
+  saveTextPalettePreferences();
+  applyLyricPalette(state.playbackVisual.palette || fallbackLyricPalette());
+  syncTextPaletteControls();
+  requestOrbFrame();
+}
+
+function savePlaybackLyricPalettePreference() {
+  try {
+    window.localStorage.setItem(PLAYBACK_LYRIC_PALETTE_PREFS_KEY, JSON.stringify({
+      version: 1,
+      palette: state.playbackLyricPalettePreference
+    }));
+  } catch (error) {
+  }
+}
+
+function syncPlaybackLyricPaletteControls() {
+  if (!els.playbackLyricPaletteControl) return;
+  const preference = playbackLyricPalettePreference();
+  const manual = preference.mode === 'manual';
+  els.playbackLyricPaletteControl.dataset.paletteMode = preference.mode;
+  if (els.playbackLyricPaletteStatus) {
+    els.playbackLyricPaletteStatus.textContent = manual
+      ? preference.color.toUpperCase()
+      : '封面自动';
+  }
+  if (els.playbackLyricPaletteAutoButton) {
+    els.playbackLyricPaletteAutoButton.classList.toggle('is-active', !manual);
+    els.playbackLyricPaletteAutoButton.setAttribute('aria-pressed', String(!manual));
+  }
+  if (els.playbackLyricPaletteCustomInput
+    && els.playbackLyricPaletteCustomInput.value.toLowerCase() !== preference.color) {
+    els.playbackLyricPaletteCustomInput.value = preference.color;
+  }
+  els.playbackLyricPaletteControl
+    .querySelectorAll('[data-playback-lyric-palette-color]')
+    .forEach((button) => {
+      const color = normalizeTextPaletteColor(button.dataset.playbackLyricPaletteColor);
+      const active = manual && color === preference.color;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+}
+
+function setPlaybackLyricPalettePreference(mode, color) {
+  const previous = playbackLyricPalettePreference();
+  state.playbackLyricPalettePreference = {
+    mode: mode === 'manual' ? 'manual' : 'auto',
+    color: normalizeTextPaletteColor(color, previous.color)
+  };
+  savePlaybackLyricPalettePreference();
+  applyQishuiPlaybackLyricPalette(state.playbackVisual.palette || fallbackLyricPalette());
+  syncPlaybackLyricPaletteControls();
+  requestOrbFrame();
 }
 
 function updateBookEffectTextTransform() {
@@ -12236,15 +13587,15 @@ function commitDiyPage(page) {
     setDiyPreset('wallpaper');
     enterPlaybackPage();
     setWallpaperSource(state.wallpaperSource);
-  } else if (presetPage && state.diyPreset === 'wallpaper') {
-    setDiyPreset(state.scenePreset);
   }
+  syncPlaybackCardPanelState();
 }
 
 function setDiyCardOpen(open) {
   state.diyCardOpen = state.diyOpen && !!open;
   els.appShell.classList.toggle('has-diy-card', state.diyCardOpen);
   if (els.diySidebar) els.diySidebar.setAttribute('aria-hidden', String(!state.diyCardOpen));
+  syncPlaybackCardPanelState();
 }
 
 function setDiyPage(page) {
@@ -12653,16 +14004,20 @@ function setTextPreset(preset) {
     els.playbackLyricScene.classList.toggle('is-depth-single-text', state.textPreset === 'depth' && !isRainGlassPreset());
     els.playbackLyricScene.classList.toggle('is-flow-text', state.textPreset === 'flow');
     els.playbackLyricScene.classList.toggle('is-book-effect-text', state.textPreset === 'book-effect');
+    els.playbackLyricScene.classList.toggle('is-focus-echo-text', state.textPreset === 'focus-echo');
     els.playbackLyricScene.classList.toggle('is-book-text', state.textPreset === 'book');
     els.playbackLyricScene.classList.toggle('is-rain-glass-text', isRainGlassPreset() && state.textPreset === 'depth');
     els.playbackLyricScene.dataset.textPreset = state.textPreset;
   }
   if (els.appShell) els.appShell.classList.toggle('has-book-lyric-text', state.textPreset === 'book');
   if (els.appShell) els.appShell.classList.toggle('has-rain-glass-scene', isRainGlassPreset());
+  applyLyricPalette(state.playbackVisual.palette || fallbackLyricPalette());
+  syncPlaybackLyricVisibility();
   if (els.bookLyricStage) {
     els.bookLyricStage.setAttribute('aria-hidden', state.textPreset === 'book' ? 'false' : 'true');
   }
   resetLyricFrameSync();
+  triggerFocusEchoTransition();
   updateTextPresetAvailability();
   updateBookEffectTextTransform();
   syncBlurLyricComponent();
@@ -12675,6 +14030,7 @@ function setTextPreset(preset) {
     resetBookLyricScrollState();
   }
   renderDiySelectedPresetConfig();
+  requestOrbFrame();
 }
 
 function syncBlurLyricComponent(text = state.lyricDisplayText) {
@@ -12728,6 +14084,7 @@ function setDiyOpen(open) {
     setDiyCardOpen(false);
     setDiyPeek(false);
   }
+  syncPlaybackCardPanelState();
 }
 
 function sandboxId(prefix = 'sandbox') {
@@ -15711,6 +17068,7 @@ async function requestAppWindowAction(action) {
 
 function syncWindowFullscreenState() {
   els.appShell.classList.toggle('is-window-fullscreen', state.appWindowFullscreen);
+  scheduleQishuiPlaybackLyricLayout();
   if (els.windowExitFullscreenButton) {
     els.windowExitFullscreenButton.title = state.appWindowFullscreen ? 'Exit fullscreen' : 'Enter fullscreen';
     els.windowExitFullscreenButton.setAttribute('aria-label', els.windowExitFullscreenButton.title);
@@ -15783,6 +17141,7 @@ function renderCurrent(song = state.currentSong) {
   updateShelfCurrentSong();
   updateFavoriteControls(song);
   updateQualityButton(song);
+  renderQishuiPlaybackCard(song);
 }
 
 function updatePlayState() {
@@ -15793,6 +17152,7 @@ function updatePlayState() {
   els.dockStatus.textContent = playing ? 'PLAYING' : 'READY';
   els.dockStatus.classList.toggle('playing', playing);
   if (els.playbackLyricScene) els.playbackLyricScene.classList.toggle('is-playing', playing);
+  updateQishuiPlaybackPlayState(playing);
 }
 
 async function refreshPlayerState() {
@@ -15805,28 +17165,44 @@ async function refreshPlayerState() {
     renderCurrent(state.currentSong);
     return;
   }
+  const seekRevision = state.qishuiPlaybackCard.seekRequestId;
   const data = await apiJson('/api/player/state');
+  const sameSong = !data.song?.id
+    || !state.currentSong?.id
+    || String(data.song.id) === String(state.currentSong.id);
+  const preserveSeek = sameSong && (
+    state.qishuiPlaybackCard.progressDragging
+    || state.qishuiPlaybackCard.seekPending
+    || seekRevision !== state.qishuiPlaybackCard.seekRequestId
+  );
   state.localQueueActive = false;
   state.queue = Array.isArray(data.queue) ? data.queue : [];
   state.queueIndex = Number.isInteger(data.queueIndex) ? data.queueIndex : -1;
   const playerPosition = Number(data.position);
   const playerDuration = Number(data.duration);
   const playerPlaying = data.playing === true && data.paused !== true;
-  if (Number.isFinite(playerPosition)) {
+  const pendingSeekTarget = state.qishuiPlaybackCard.pendingSeekTarget;
+  const pendingTarget = pendingSeekTarget == null ? Number.NaN : Number(pendingSeekTarget);
+  const preservedPosition = Number.isFinite(pendingTarget)
+    ? pendingTarget
+    : estimatedPlayerClockTime(Number(state.currentSong?.position) || 0);
+  const effectivePosition = preserveSeek ? preservedPosition : playerPosition;
+  if (!preserveSeek && Number.isFinite(playerPosition)) {
     updatePlayerClock(playerPosition, Number.isFinite(playerDuration) ? playerDuration : 0, playerPlaying);
   }
+  if (playerPlaying) requestOrbFrame();
   if (data.song && data.song.id) {
     state.currentSong = {
       ...data.song,
       playing: playerPlaying,
-      ...(Number.isFinite(playerPosition) ? { position: Math.max(0, playerPosition) } : {}),
+      ...(Number.isFinite(effectivePosition) ? { position: Math.max(0, effectivePosition) } : {}),
       ...(Number.isFinite(playerDuration) && playerDuration > 0 ? { duration: Math.max(0, playerDuration) } : {})
     };
-  } else if (state.currentSong && Number.isFinite(playerPosition)) {
+  } else if (state.currentSong && Number.isFinite(effectivePosition)) {
     state.currentSong = {
       ...state.currentSong,
       playing: playerPlaying,
-      position: Math.max(0, playerPosition),
+      position: Math.max(0, effectivePosition),
       ...(Number.isFinite(playerDuration) && playerDuration > 0 ? { duration: Math.max(0, playerDuration) } : {})
     };
   }
@@ -15837,12 +17213,12 @@ async function refreshPlayerState() {
   }
   els.volumeRange.value = Math.round((Number(data.volume) || 0.8) * 100);
   els.volumeLabel.textContent = `${els.volumeRange.value}%`;
-  if (Number.isFinite(playerPosition)) {
+  if (Number.isFinite(effectivePosition)) {
     if (els.audio && els.audio.src) {
-      setAudioPlaybackPosition(playerPosition);
+      if (!preserveSeek) setAudioPlaybackPosition(effectivePosition);
       syncPlaybackLyricToCurrentTime();
     } else {
-      renderManualProgress(playerPosition, Number.isFinite(playerDuration) ? playerDuration : 0);
+      renderManualProgress(effectivePosition, Number.isFinite(playerDuration) ? playerDuration : 0);
     }
   }
   renderCurrent();
@@ -15901,6 +17277,7 @@ function renderManualProgress(position = 0, duration = 0) {
   els.progressRange.value = safeDuration > 0 ? Math.round((safePosition / safeDuration) * 1000) : 0;
   els.currentTime.textContent = formatTime(safePosition);
   els.totalTime.textContent = formatTime(safeDuration || (state.currentSong && state.currentSong.duration) || 0);
+  updateQishuiPlaybackProgress(safePosition, safeDuration);
   syncPlaybackLyricAtTime(safePosition);
 }
 
@@ -16011,6 +17388,7 @@ async function loadSong(song, options = {}) {
     els.audio.volume = Number(els.volumeRange.value) / 100;
     const targetPosition = Number(options.position ?? song.position) || 0;
     if (targetPosition > 0) {
+      await apiJson(`/api/player/seek?${query({ position: Math.round(targetPosition) })}`).catch(() => {});
       const applyPosition = () => setAudioPlaybackPosition(targetPosition, 0.25);
       if (els.audio.readyState >= 1) applyPosition();
       else els.audio.addEventListener('loadedmetadata', applyPosition, { once: true });
@@ -16172,6 +17550,7 @@ function updateProgress() {
   els.currentTime.textContent = formatTime(current);
   els.totalTime.textContent = formatTime(duration || (state.currentSong && state.currentSong.duration) || 0);
   syncPlaybackLyricAtTime(current);
+  updateQishuiPlaybackProgress(current, duration);
 }
 
 function clearShelfPressTimer() {
@@ -16316,7 +17695,11 @@ function playbackBack() {
     closePlaylistShelf();
     return;
   }
-  if (state.playbackPage) returnHomePage();
+  if (state.playbackPlaylistPickerOpen) {
+    setPlaybackPlaylistPickerOpen(false);
+    return;
+  }
+  if (state.playbackPage) enterWallpaperHome();
 }
 
 function clearWindowDragTimer() {
@@ -16707,7 +18090,7 @@ function bindEvents() {
   if (els.windowFullscreenButton) els.windowFullscreenButton.addEventListener('click', toggleAppFullscreen);
   if (els.windowMinimizeButton) els.windowMinimizeButton.addEventListener('click', minimizeAppWindow);
   if (els.windowCloseButton) els.windowCloseButton.addEventListener('click', quitAppWindow);
-  els.homeButton.addEventListener('click', returnHomePage);
+  els.homeButton.addEventListener('click', enterWallpaperHome);
   els.diyButton.addEventListener('click', () => setDiyOpen(!state.diyOpen));
   els.diyCloseButton.addEventListener('click', () => setDiyCardOpen(false));
   if (els.diySandboxPresetToggle) {
@@ -16771,6 +18154,53 @@ function bindEvents() {
       setTextPreset(button.dataset.textPreset);
     });
   }
+  if (els.textPaletteAutoButton) {
+    els.textPaletteAutoButton.addEventListener('click', () => setTextPalettePreference('auto'));
+  }
+  if (els.textPaletteResetButton) {
+    els.textPaletteResetButton.addEventListener('click', () => setTextPalettePreference('auto'));
+  }
+  if (els.textPaletteControl) {
+    els.textPaletteControl.querySelectorAll('[data-text-palette-color]').forEach((button) => {
+      button.addEventListener('click', () => {
+        setTextPalettePreference('manual', button.dataset.textPaletteColor);
+      });
+    });
+  }
+  if (els.textPaletteCustomInput) {
+    els.textPaletteCustomInput.addEventListener('input', () => {
+      setTextPalettePreference('manual', els.textPaletteCustomInput.value);
+    });
+  }
+  if (els.playbackLyricPaletteAutoButton) {
+    els.playbackLyricPaletteAutoButton.addEventListener(
+      'click',
+      () => setPlaybackLyricPalettePreference('auto')
+    );
+  }
+  if (els.playbackLyricPaletteResetButton) {
+    els.playbackLyricPaletteResetButton.addEventListener(
+      'click',
+      () => setPlaybackLyricPalettePreference('auto')
+    );
+  }
+  if (els.playbackLyricPaletteControl) {
+    els.playbackLyricPaletteControl
+      .querySelectorAll('[data-playback-lyric-palette-color]')
+      .forEach((button) => {
+        button.addEventListener('click', () => {
+          setPlaybackLyricPalettePreference(
+            'manual',
+            button.dataset.playbackLyricPaletteColor
+          );
+        });
+      });
+  }
+  if (els.playbackLyricPaletteCustomInput) {
+    els.playbackLyricPaletteCustomInput.addEventListener('input', () => {
+      setPlaybackLyricPalettePreference('manual', els.playbackLyricPaletteCustomInput.value);
+    });
+  }
   window.addEventListener('pointerup', endDiyCardRotation);
   window.addEventListener('pointercancel', endDiyCardRotation);
   updateDiyCardRotation();
@@ -16786,6 +18216,16 @@ function bindEvents() {
       }
       const line = event.target && event.target.closest ? event.target.closest('.book-lyric-line') : null;
       if (!line || !els.bookLyricList.contains(line)) return;
+      seekToBookLyric(line.dataset.bookLyricTime);
+    });
+  }
+  if (els.qishuiPlaybackLyricPage) {
+    els.qishuiPlaybackLyricPage.addEventListener('pointerdown', (event) => event.stopPropagation());
+    els.qishuiPlaybackLyricPage.addEventListener('click', (event) => {
+      const line = event.target && event.target.closest
+        ? event.target.closest('.qishui-playback-lyric-line')
+        : null;
+      if (!line || !els.qishuiPlaybackLyricPage.contains(line)) return;
       seekToBookLyric(line.dataset.bookLyricTime);
     });
   }
@@ -16982,7 +18422,7 @@ function bindEvents() {
   });
   document.addEventListener('pointerdown', (event) => {
     const target = event.target instanceof Element ? event.target : null;
-    if (!target || target.closest('.dock-quality-button, .dock-quality-menu')) return;
+    if (!target || target.closest('.dock-quality-button, .dock-quality-menu, .qishui-playback-quality, .qishui-playback-quality-menu')) return;
     setDockQualityMenuOpen(false);
   });
   document.addEventListener('pointerdown', (event) => {
@@ -17079,6 +18519,47 @@ function bindEvents() {
     }
   });
   els.playButton.addEventListener('click', togglePlay);
+  if (els.qishuiPlaybackPreviousButton) {
+    els.qishuiPlaybackPreviousButton.addEventListener('click', () => switchQishuiPlaybackTrack(-1));
+  }
+  if (els.qishuiPlaybackPlayButton) els.qishuiPlaybackPlayButton.addEventListener('click', togglePlay);
+  if (els.qishuiPlaybackNextButton) {
+    els.qishuiPlaybackNextButton.addEventListener('click', () => switchQishuiPlaybackTrack(1));
+  }
+  if (els.qishuiPlaybackScaleToggle) {
+    els.qishuiPlaybackScaleToggle.addEventListener('click', toggleQishuiPlaybackExpanded);
+  }
+  if (els.qishuiPlaybackVisibilityToggle) {
+    els.qishuiPlaybackVisibilityToggle.addEventListener('click', toggleQishuiPlaybackHidden);
+  }
+  if (els.qishuiPlaybackTools) els.qishuiPlaybackTools.addEventListener('click', handlePlaybackCardTool);
+  if (els.qishuiPlaybackCard) {
+    els.qishuiPlaybackCard.addEventListener('wheel', handleQishuiPlaybackWheel, { passive: false });
+  }
+  if (els.qishuiPlaybackProgressRange) {
+    els.qishuiPlaybackProgressRange.addEventListener('pointerdown', () => {
+      if (!els.qishuiPlaybackProgressRange.disabled) {
+        state.qishuiPlaybackCard.progressDragging = true;
+      }
+    });
+    els.qishuiPlaybackProgressRange.addEventListener('input', previewQishuiPlaybackSeek);
+    els.qishuiPlaybackProgressRange.addEventListener('change', commitQishuiPlaybackSeek);
+    els.qishuiPlaybackProgressRange.addEventListener('pointerup', commitQishuiPlaybackSeek);
+    els.qishuiPlaybackProgressRange.addEventListener('pointercancel', commitQishuiPlaybackSeek);
+    els.qishuiPlaybackProgressRange.addEventListener('blur', commitQishuiPlaybackSeek);
+  }
+  if (els.qishuiPlaybackCover) {
+    els.qishuiPlaybackCover.addEventListener('error', handleQishuiPlaybackImageError);
+  }
+  if (els.qishuiPlaybackBackdrop) {
+    els.qishuiPlaybackBackdrop.addEventListener('error', handleQishuiPlaybackImageError);
+  }
+  if (els.qishuiPlaybackAccountAvatarImage) {
+    els.qishuiPlaybackAccountAvatarImage.addEventListener('error', handleQishuiPlaybackAccountAvatarError);
+  }
+  if (els.qishuiPlaybackPhone) {
+    els.qishuiPlaybackPhone.addEventListener('pointerdown', (event) => event.stopPropagation());
+  }
   els.prevButton.addEventListener('click', () => transport('/api/player/previous'));
   els.nextButton.addEventListener('click', () => transport('/api/player/next'));
   if (els.dockQualityButton) {
@@ -17090,6 +18571,20 @@ function bindEvents() {
   if (els.dockQualityMenu) {
     els.dockQualityMenu.addEventListener('pointerdown', (event) => event.stopPropagation());
     els.dockQualityMenu.addEventListener('click', (event) => {
+      const button = event.target.closest('.dock-quality-option');
+      if (!button) return;
+      selectPlaybackQuality(button.dataset.quality);
+    });
+  }
+  if (els.qishuiPlaybackQuality) {
+    els.qishuiPlaybackQuality.addEventListener('click', (event) => {
+      setDockQualityMenuOpen(!state.qualityMenuOpen);
+      event.stopPropagation();
+    });
+  }
+  if (els.qishuiPlaybackQualityMenu) {
+    els.qishuiPlaybackQualityMenu.addEventListener('pointerdown', (event) => event.stopPropagation());
+    els.qishuiPlaybackQualityMenu.addEventListener('click', (event) => {
       const button = event.target.closest('.dock-quality-option');
       if (!button) return;
       selectPlaybackQuality(button.dataset.quality);
@@ -17133,9 +18628,11 @@ function bindEvents() {
   window.addEventListener('beforeunload', revokeLocalObjectUrls, { once: true });
   window.addEventListener('pageshow', () => scheduleUserPlaylistsRefresh(160), { passive: true });
   window.addEventListener('resize', () => {
+    syncPlaybackCardPanelState();
     scheduleWallpaperAutoSize();
     resetBookLyricScrollState();
     scheduleBookLyricFit();
+    scheduleQishuiPlaybackLyricLayout();
     setListenMiniPosition();
     setCommunityFloatingPanelPosition('message');
     setCommunityFloatingPanelPosition('profile');
@@ -17192,6 +18689,11 @@ function bindEvents() {
   els.audio.addEventListener('seeking', updateProgress);
   els.audio.addEventListener('seeked', updateProgress);
   els.audio.addEventListener('loadedmetadata', () => {
+    const pendingAudioSeekTarget = state.qishuiPlaybackCard.pendingAudioSeekTarget;
+    if (pendingAudioSeekTarget != null && Number.isFinite(Number(pendingAudioSeekTarget))) {
+      setAudioPlaybackPosition(Number(pendingAudioSeekTarget), 0.05);
+      state.qishuiPlaybackCard.pendingAudioSeekTarget = null;
+    }
     if (state.localQueueActive && isLocalSong(state.currentSong) && Number.isFinite(els.audio.duration)) {
       const duration = Math.max(0, els.audio.duration);
       state.currentSong.duration = duration;
@@ -17210,6 +18712,7 @@ function bindEvents() {
     ensureAudioAnalysis();
     state.community.lastListenReportAt = performance.now();
     updatePlayState();
+    requestOrbFrame();
   });
   els.audio.addEventListener('pause', () => {
     reportCommunityListening(true).catch(() => {});
@@ -17396,46 +18899,6 @@ function bindOrbEvents() {
     updateStageZoom(event.deltaY);
     event.preventDefault();
   }, { passive: false });
-}
-
-function initParticles() {
-  const count = state.orb.reducedMotion ? Math.min(480, RENDER_PROFILE.orbParticles) : RENDER_PROFILE.orbParticles;
-  const tau = Math.PI * 2;
-  state.particles = Array.from({ length: count }, () => {
-    const clustered = Math.random() < 0.52;
-    const cell = clustered ? Math.floor(Math.random() * 18) : 0;
-    const theta = clustered
-      ? (cell / 18) * tau + (Math.random() - 0.5) * (0.24 + Math.random() * 0.36)
-      : Math.random() * tau;
-    const z = clamp(
-      (Math.random() * 2 - 1) + (clustered ? Math.sin(theta * 2.6) * 0.08 : 0),
-      -0.96,
-      0.96
-    );
-    const r = Math.sqrt(Math.max(0, 1 - z * z));
-    const shell = 0.86 + Math.random() * 0.34 + (clustered ? Math.random() * 0.12 : 0);
-    const rough = 1
-      + Math.sin(theta * 5.0 + z * 4.2) * 0.045
-      + Math.cos(theta * 9.0 - z * 5.7) * 0.034
-      + (Math.random() - 0.5) * 0.12;
-    const kindRoll = Math.random();
-    return {
-      x: Math.cos(theta) * r * shell * rough,
-      y: Math.sin(theta) * r * shell * rough * (0.9 + Math.random() * 0.16),
-      z: z * shell * (0.94 + Math.random() * 0.14),
-      size: 0.36 + Math.random() * (clustered ? 1.55 : 1.05),
-      opacity: 0.34 + Math.random() * (clustered ? 0.62 : 0.44),
-      phase: Math.random() * Math.PI * 2,
-      seed: Math.random(),
-      speed: 0.22 + Math.random() * 0.9,
-      drift: (Math.random() - 0.5) * 0.036,
-      twist: (Math.random() - 0.5) * 0.018,
-      kind: kindRoll > 0.84 ? 'shard' : kindRoll > 0.78 ? 'dust' : 'dot',
-      shardLength: 4 + Math.random() * (clustered ? 15 : 9),
-      shardAngle: Math.random() * Math.PI,
-      clustered
-    };
-  });
 }
 
 function initPlaybackParticles() {
@@ -18146,7 +19609,11 @@ function updatePlaybackSceneMotion() {
     : 1;
   visual.lastMotionAt = now;
   visual.frameStep = simulationStep;
-  if (state.lyricLines.length && state.textPreset !== 'book') syncPlaybackLyricAnimationFrame();
+  const centralLyricsNeedFrame = textLyricsEnabled() && state.textPreset !== 'book';
+  const cardLyricsNeedFrame = playbackCardLyricsVisible();
+  if ((centralLyricsNeedFrame || cardLyricsNeedFrame) && state.lyricLines.length) {
+    syncPlaybackLyricAnimationFrame();
+  }
   if (!visual.dragging && !state.orb.reducedMotion) {
     visual.yaw += visual.velocityYaw * simulationStep;
     visual.pitch += visual.velocityPitch * simulationStep;
@@ -18713,10 +20180,13 @@ function drawOrb(now = performance.now()) {
   const canvas = els.canvas;
   const coveredCanvasKey = coveredPlaybackCanvasKey();
   if (coveredCanvasKey) {
-    updatePlaybackSceneMotion();
+    const needsContinuousPlaybackMotion = coveredCanvasKey !== 'wallpaper'
+      || textLyricsEnabled()
+      || (playbackCardLyricsVisible() && state.lyricLines.length && isPlaybackClockRunning());
+    if (needsContinuousPlaybackMotion) updatePlaybackSceneMotion();
     clearCoveredPlaybackCanvas(canvas, coveredCanvasKey);
     state.orb.lastFrameTime = 0;
-    requestOrbFrame();
+    if (needsContinuousPlaybackMotion) requestOrbFrame();
     return;
   }
   state.orb.coveredCanvasKey = '';
@@ -18734,6 +20204,13 @@ function drawOrb(now = performance.now()) {
   if (state.playbackPage) {
     drawPlaybackParticles(context, rect, dpr, width, height);
     requestOrbFrame();
+    return;
+  }
+
+  if (!state.particles.length) {
+    context.fillStyle = '#000';
+    context.fillRect(0, 0, width, height);
+    state.orb.lastFrameTime = 0;
     return;
   }
 
@@ -18918,12 +20395,12 @@ async function init() {
   bindEvents();
   bindSandboxEvents();
   bindOrbEvents();
-  initParticles();
   initPlaybackParticles();
   initRenderClarity();
-  setDiyPreset('lyric');
-  setTextPreset('depth');
+  enterWallpaperHome();
   updateLyricDiyVars();
+  syncTextPaletteControls();
+  syncPlaybackLyricPaletteControls();
   updateWallpaperDiyVars();
   updateBookLyricTransform();
   updateBookLyricArtist();

@@ -7,6 +7,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>FE-Monster-Setup</AssemblyName>
     <RootNamespace>FeMonster.Setup</RootNamespace>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
+    <InformationalVersion>1.1.0</InformationalVersion>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>

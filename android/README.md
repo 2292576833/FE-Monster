@@ -20,7 +20,7 @@ Debug outputs:
 
 ```text
 android/app/build/outputs/apk/debug/app-debug.apk
-dist/FE-Monster-Android-1.0.7-local-debug.apk
+dist/FE-Monster-Android-1.1.0-local-debug.apk
 ```
 
 No server URL or access-key build argument is required.

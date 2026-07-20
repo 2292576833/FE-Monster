@@ -71,6 +71,8 @@ public final class StaticFileHandler implements HttpHandler {
         if (type.startsWith("text/html")) {
             exchange.getResponseHeaders().set("Cache-Control", "no-store, max-age=0");
             exchange.getResponseHeaders().set("Pragma", "no-cache");
+        } else if (isReloadableAppAsset(type)) {
+            exchange.getResponseHeaders().set("Cache-Control", "no-cache, max-age=0, must-revalidate");
         } else if (hasVersionToken(exchange)) {
             exchange.getResponseHeaders().set("Cache-Control", "public, max-age=31536000, immutable");
         } else {
@@ -106,6 +108,12 @@ public final class StaticFileHandler implements HttpHandler {
     private static boolean hasVersionToken(HttpExchange exchange) {
         String query = exchange.getRequestURI().getRawQuery();
         return query != null && query.matches("(?:^|.*&)v=[^&]+(?:&.*|$)");
+    }
+
+    private static boolean isReloadableAppAsset(String contentType) {
+        return contentType.startsWith("text/css")
+            || contentType.startsWith("text/javascript")
+            || contentType.startsWith("application/json");
     }
 
     private static boolean acceptsGzip(HttpExchange exchange) {

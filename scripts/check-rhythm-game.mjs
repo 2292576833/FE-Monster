@@ -154,19 +154,17 @@ try {
   await waitFor(`document.getElementById('bootScreen').hidden === true`);
 
   const entry = await evaluate(`(() => {
-    const button = document.getElementById('diyRhythmGameButton');
+    const button = document.querySelector('#qishuiPlaybackTools [data-playback-tool="rhythm"]');
     return { exists: !!button, label: button?.textContent?.trim(), controls: button?.getAttribute('aria-controls') };
   })()`);
-  await clickSelector('#diyButton');
-  await waitFor(`document.getElementById('diyButton').getAttribute('aria-expanded') === 'true'`);
   await waitFor(`(() => {
-    const button = document.getElementById('diyRhythmGameButton');
+    const button = document.querySelector('#qishuiPlaybackTools [data-playback-tool="rhythm"]');
     if (!button) return false;
     const rect = button.getBoundingClientRect();
     const target = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
     return target === button || button.contains(target);
   })()`);
-  await clickSelector('#diyRhythmGameButton');
+  await clickSelector('#qishuiPlaybackTools [data-playback-tool="rhythm"]');
   await waitFor(`window.FeRhythmGame.getState().active === true && !document.getElementById('rhythmGameScene').hidden`);
   await command('Page.setInterceptFileChooserDialog', { enabled: true });
   await clickSelector('#rhythmGameChooseButton');
@@ -193,13 +191,39 @@ try {
 
   await clickSelector('#rhythmGameStartButton');
   await waitFor(`window.FeRhythmGame.getState().mode === 'playing' && document.getElementById('rhythmGameAudio').currentTime > 0.2`, 3000);
-  await waitFor(`document.getElementById('rhythmGameAudio').currentTime >= 1.72`, 6000);
-  const unassistedPathStep = await evaluate(`window.FeRhythmGame.getState().pathStep`);
-  await waitFor(`document.getElementById('rhythmGameAudio').currentTime >= 1.97`, 3000);
+  await waitFor(`window.FeRhythmGame.getState().mode === 'result' && window.FeRhythmGame.getState().resultStatus === 'failed'`, 6000);
+  const noInputFailure = await evaluate(`(() => ({
+    ...window.FeRhythmGame.getState(),
+    audioPaused: document.getElementById('rhythmGameAudio').paused,
+    resultTitle: document.getElementById('rhythmGameResultTitle').textContent
+  }))()`);
+
+  await clickSelector('#rhythmGameRestartButton');
+  await waitFor(`window.FeRhythmGame.getState().mode === 'playing' && document.getElementById('rhythmGameAudio').currentTime > 0.1`, 3000);
+  await clickSelector('#rhythmGameHitButton');
+  await waitFor(`window.FeRhythmGame.getState().mode === 'result' && window.FeRhythmGame.getState().resultStatus === 'failed'`, 2000);
+  const earlyFailure = await evaluate(`(() => ({
+    ...window.FeRhythmGame.getState(),
+    audioPaused: document.getElementById('rhythmGameAudio').paused,
+    resultTitle: document.getElementById('rhythmGameResultTitle').textContent
+  }))()`);
+
+  await clickSelector('#rhythmGameRestartButton');
+  await waitFor(`window.FeRhythmGame.getState().mode === 'playing' && document.getElementById('rhythmGameAudio').currentTime > 0.1`, 3000);
+  await evaluate(`(() => {
+    const state = window.FeRhythmGame.getState();
+    document.getElementById('rhythmGameAudio').currentTime = state.nextBeatTime;
+  })()`);
   await clickSelector('#rhythmGameHitButton');
   await delay(120);
-  const pointerScoreText = await evaluate(`document.getElementById('rhythmGameScore').textContent`);
-  await waitFor(`document.getElementById('rhythmGameAudio').currentTime >= 2.47`, 3000);
+  const pointerState = await evaluate(`(() => ({
+    ...window.FeRhythmGame.getState(),
+    scoreText: document.getElementById('rhythmGameScore').textContent
+  }))()`);
+  await evaluate(`(() => {
+    const state = window.FeRhythmGame.getState();
+    document.getElementById('rhythmGameAudio').currentTime = state.nextBeatTime;
+  })()`);
   await command('Input.dispatchKeyEvent', { type: 'keyDown', code: 'Space', key: ' ', windowsVirtualKeyCode: 32 });
   await command('Input.dispatchKeyEvent', { type: 'keyUp', code: 'Space', key: ' ', windowsVirtualKeyCode: 32 });
   await delay(140);
@@ -211,6 +235,23 @@ try {
     feedback: document.getElementById('rhythmGameFeedback').textContent
   }))()`);
   await screenshot(playingScreenshot);
+
+  for (let beatIndex = playingState.pathStep; beatIndex < readyState.beatCount; beatIndex += 1) {
+    await evaluate(`(() => {
+      const state = window.FeRhythmGame.getState();
+      document.getElementById('rhythmGameAudio').currentTime = state.nextBeatTime;
+    })()`);
+    await command('Input.dispatchKeyEvent', { type: 'keyDown', code: 'KeyF', key: 'f', windowsVirtualKeyCode: 70 });
+    await command('Input.dispatchKeyEvent', { type: 'keyUp', code: 'KeyF', key: 'f', windowsVirtualKeyCode: 70 });
+    await delay(70);
+  }
+  await waitFor(`window.FeRhythmGame.getState().mode === 'result' && window.FeRhythmGame.getState().resultStatus === 'completed'`, 3000);
+  const completedState = await evaluate(`(() => ({
+    ...window.FeRhythmGame.getState(),
+    audioPaused: document.getElementById('rhythmGameAudio').paused,
+    resultTitle: document.getElementById('rhythmGameResultTitle').textContent,
+    resultRank: document.getElementById('rhythmGameResultRank').textContent
+  }))()`);
 
   await evaluate('window.FeRhythmGame.close()');
   const closedState = await evaluate(`(() => ({
@@ -224,25 +265,47 @@ try {
     entry,
     fileChooserOpened: fileChooserEvents > 0,
     readyState,
+    noInputFailure,
+    pointerState,
     playingState,
-    unassistedPathStep,
-    pointerScoreText,
+    earlyFailure,
+    completedState,
     closedState,
     screenshots: [setupScreenshot, playingScreenshot],
     browserErrors,
     passed: entry.exists
       && entry.label === '音游'
+      && entry.controls === 'rhythmGameScene'
       && fileChooserEvents > 0
       && readyState.startEnabled
       && readyState.beatCount >= 8
       && readyState.bpm >= 60
       && readyState.bpm <= 200
+      && noInputFailure.mode === 'result'
+      && noInputFailure.resultStatus === 'failed'
+      && noInputFailure.pathStep === 0
+      && noInputFailure.score === 0
+      && noInputFailure.audioPaused
+      && noInputFailure.resultTitle === '脱离节拍'
+      && pointerState.mode === 'playing'
+      && pointerState.pathStep === 1
+      && Number.parseInt(pointerState.scoreText, 10) > 0
       && playingState.mode === 'playing'
-      && unassistedPathStep === 0
       && playingState.pathStep === 2
-      && Number.parseInt(pointerScoreText, 10) > 0
       && Number.parseInt(playingState.scoreText, 10) > 0
-      && Number.parseInt(playingState.scoreText, 10) > Number.parseInt(pointerScoreText, 10)
+      && Number.parseInt(playingState.scoreText, 10) > Number.parseInt(pointerState.scoreText, 10)
+      && earlyFailure.mode === 'result'
+      && earlyFailure.resultStatus === 'failed'
+      && earlyFailure.pathStep === 0
+      && earlyFailure.score === 0
+      && earlyFailure.audioPaused
+      && completedState.mode === 'result'
+      && completedState.resultStatus === 'completed'
+      && completedState.pathStep === readyState.beatCount
+      && completedState.score > playingState.score
+      && completedState.audioPaused
+      && completedState.resultTitle === '关卡完成'
+      && completedState.resultRank === 'S'
       && closedState.sceneHidden
       && closedState.shellClassRemoved
       && browserErrors.length === 0

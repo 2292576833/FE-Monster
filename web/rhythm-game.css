@@ -457,6 +457,11 @@
   font-weight: 900;
 }
 
+.rhythm-game[data-result="failed"] .rhythm-game-result > span {
+  color: #2a0808;
+  background: #ff9f9f;
+}
+
 .rhythm-game-result > strong {
   margin-top: 12px;
   font-size: 30px;

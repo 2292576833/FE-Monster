@@ -13,6 +13,7 @@ $payloadZip = Join-Path $setupRoot 'FE-Monster-Payload.zip'
 $installPath = [System.IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($InstallDir))
 $outDir = Join-Path $installPath 'out'
 $installLog = Join-Path $outDir 'install.log'
+$appVersion = '1.1.0'
 
 function Write-Log {
   param([string]$Message)
@@ -284,6 +285,7 @@ function Register-Uninstaller {
 
   New-Item -Path $keyPath -Force | Out-Null
   Set-ItemProperty -Path $keyPath -Name 'DisplayName' -Value 'FE Monster'
+  Set-ItemProperty -Path $keyPath -Name 'DisplayVersion' -Value $appVersion
   Set-ItemProperty -Path $keyPath -Name 'Publisher' -Value 'FE Monster'
   Set-ItemProperty -Path $keyPath -Name 'DisplayIcon' -Value $icon
   Set-ItemProperty -Path $keyPath -Name 'InstallLocation' -Value $installPath

@@ -764,7 +764,7 @@ public final class ApiRoutes {
     private static Map<String, Object> appVersion() {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("name", "FE Monster Java");
-        body.put("version", "1.0.6-java26");
+        body.put("version", "1.1.0");
         body.put("runtime", System.getProperty("java.version"));
         body.put("ok", true);
         return body;
@@ -853,9 +853,9 @@ public final class ApiRoutes {
 
     private static Map<String, Object> updatePayload() {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("version", "1.0.6-java26");
+        body.put("version", "1.1.0");
         body.put("downloadUrl", "");
-        body.put("releaseNotes", "Android local client, accurate community health, and adaptive preset performance.");
+        body.put("releaseNotes", "New translucent playback page, clearer lyrics, independent lyric colors, rhythm mode, and adaptive preset performance.");
         body.put("fileSize", 0);
         return body;
     }

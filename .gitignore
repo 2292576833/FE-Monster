@@ -56,6 +56,9 @@ android/local.properties
 # Local QA, render and release evidence (never ship as source)
 artifacts/
 .tmp/
+.media-home/
+.npm-cache/
+.tmp-hyperframes/
 *.blend1
 
 # Local credential/network probe kept outside the fully local Android release

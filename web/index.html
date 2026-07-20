@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/components/GlassSurface.css?v=20260706-black-glass-scroll" />
     <link rel="stylesheet" href="/components/BorderGlow.css?v=20260705-button-border-glow-fix" />
     <link rel="stylesheet" href="border-glow-buttons.css?v=20260705-button-border-glow-fix" />
-  <link rel="stylesheet" href="styles.css?v=20260718-preset-fsr-qishui-phone-1" />
+  <link rel="stylesheet" href="styles.css?v=20260720-playback-lyric-color-14" />
   <link rel="stylesheet" href="rhythm-game.css?v=20260716-rhythm-game-2" />
     <link rel="stylesheet" href="black-gold-buttons.css?v=20260714-black-react-bits-glass-16" />
   </head>
@@ -199,7 +199,7 @@
         class="home-button glass-surface glass-surface--fallback"
         id="homeButton"
         type="button"
-        aria-label="回到粒子球主页面"
+        aria-label="回到壁纸主页面"
         data-glass-surface
         data-glass-radius="23"
         data-glass-brightness="66"
@@ -714,7 +714,7 @@
               <span class="rhythm-game-mark" aria-hidden="true"><i></i><i></i></span>
               <div>
                 <h2 id="rhythmGameTitle">节奏双星</h2>
-                <p>选择音乐后自动分析节拍并生成关卡</p>
+                <p>单键控制双星交替落点：每一拍按一次，抢拍或漏拍都会结束本局</p>
               </div>
             </div>
             <div class="rhythm-game-track" id="rhythmGameTrack">
@@ -748,7 +748,7 @@
 
           <footer class="rhythm-game-input-guide">
             <button id="rhythmGameHitButton" type="button" aria-label="触发节拍">节拍</button>
-            <span><kbd>SPACE</kbd><kbd>F</kbd><kbd>J</kbd> 或点击画面</span>
+            <span>每拍按一次 · <kbd>SPACE</kbd><kbd>F</kbd><kbd>J</kbd> 或点击画面</span>
           </footer>
           <input id="rhythmGameAudioInput" type="file" accept="audio/*,.mp3,.flac,.wav,.wave,.m4a,.aac,.ogg,.oga,.opus,.webm,.mp4,.wma,.ape,.alac,.aif,.aiff" hidden />
           <audio id="rhythmGameAudio" preload="auto"></audio>
@@ -812,6 +812,131 @@
             <div class="playback-lyric-subtitle" id="playbackLyricSubtitle"></div>
           </div>
         </section>
+        <section class="qishui-playback-card" id="qishuiPlaybackCard" aria-label="音乐悬浮播放页" hidden>
+          <article class="qishui-playback-phone" id="qishuiPlaybackPhone" aria-expanded="false">
+            <div class="qishui-playback-ambient" aria-hidden="true">
+              <img id="qishuiPlaybackBackdrop" alt="" />
+            </div>
+            <div class="qishui-playback-content">
+              <div class="qishui-playback-view-controls" aria-label="播放页显示控制">
+                <button
+                  class="qishui-playback-view-button qishui-playback-visibility-toggle"
+                  id="qishuiPlaybackVisibilityToggle"
+                  type="button"
+                  aria-label="隐藏播放页"
+                  aria-pressed="false"
+                  title="隐藏播放页"
+                ><span aria-hidden="true"></span></button>
+                <button
+                  class="qishui-playback-view-button qishui-playback-scale-toggle"
+                  id="qishuiPlaybackScaleToggle"
+                  type="button"
+                  aria-label="放大播放页"
+                  aria-pressed="false"
+                  title="放大播放页"
+                ><span aria-hidden="true"></span></button>
+              </div>
+              <nav class="qishui-playback-tools" id="qishuiPlaybackTools" aria-label="播放页功能">
+                <button type="button" data-playback-tool="playlists" aria-pressed="false" aria-controls="orbPlaylists playlistShelf">歌单</button>
+                <button type="button" data-playback-tool="preset" aria-pressed="false" aria-controls="diyPresetPage">场景</button>
+                <button type="button" data-playback-tool="text" aria-pressed="false" aria-controls="diyTextPage">文字</button>
+                <button type="button" data-playback-tool="wallpaper" aria-pressed="false" aria-controls="diyWallpaperPage">壁纸</button>
+                <button type="button" data-playback-tool="rhythm" aria-pressed="false" aria-controls="rhythmGameScene">音游</button>
+              </nav>
+
+              <header class="qishui-playback-header">
+                <span class="qishui-playback-account" id="qishuiPlaybackAccount" role="group" aria-label="平台账号">
+                  <span class="qishui-playback-account-avatar" id="qishuiPlaybackAccountAvatar" aria-hidden="true">
+                    <img id="qishuiPlaybackAccountAvatarImage" alt="" />
+                    <b id="qishuiPlaybackAccountAvatarFallback">FE</b>
+                  </span>
+                  <span class="qishui-playback-account-copy">
+                    <strong id="qishuiPlaybackAccountName">平台账号</strong>
+                    <span class="qishui-playback-account-meta">
+                      <em class="qishui-playback-vip" id="qishuiPlaybackVipBadge" hidden>VIP</em>
+                      <span id="qishuiPlaybackAccountStatus">未登录</span>
+                      <span aria-hidden="true">·</span>
+                      <span class="qishui-playback-queue" id="qishuiPlaybackQueue">移动播放页</span>
+                    </span>
+                  </span>
+                </span>
+              </header>
+
+              <figure class="qishui-playback-cover" id="qishuiPlaybackCoverFrame">
+                <img id="qishuiPlaybackCover" alt="" />
+                <span id="qishuiPlaybackCoverFallback" aria-hidden="true">FE</span>
+              </figure>
+
+              <div class="qishui-playback-lyrics" id="qishuiPlaybackLyrics">
+                <div
+                  class="book-lyric-list qishui-playback-lyric-page"
+                  id="qishuiPlaybackLyricPage"
+                  aria-label="书页歌词"
+                  aria-live="polite"
+                ></div>
+              </div>
+
+              <div class="qishui-playback-track">
+                <span class="qishui-playback-track-copy" aria-live="polite">
+                  <strong id="qishuiPlaybackTitle">等待播放</strong>
+                  <small id="qishuiPlaybackArtist">音乐播放</small>
+                </span>
+                <span class="qishui-playback-quality-control">
+                  <button
+                    class="qishui-playback-quality"
+                    id="qishuiPlaybackQuality"
+                    type="button"
+                    title="音质调节"
+                    aria-label="音质调节"
+                    aria-expanded="false"
+                    aria-controls="qishuiPlaybackQualityMenu"
+                    disabled
+                  >HQ</button>
+                  <span
+                    class="qishui-playback-quality-menu"
+                    id="qishuiPlaybackQualityMenu"
+                    role="menu"
+                    aria-label="音质调节"
+                    hidden
+                  ></span>
+                </span>
+              </div>
+
+              <div class="qishui-playback-progress">
+                <input
+                  class="qishui-playback-progress-range"
+                  id="qishuiPlaybackProgressRange"
+                  type="range"
+                  min="0"
+                  max="1000"
+                  step="1"
+                  value="0"
+                  aria-label="歌曲播放进度"
+                  disabled
+                />
+                <span class="qishui-playback-times">
+                  <time id="qishuiPlaybackCurrentTime">00:00</time>
+                  <time id="qishuiPlaybackTotalTime">00:00</time>
+                </span>
+              </div>
+
+              <footer class="qishui-playback-controls">
+                <button class="qishui-playback-direction qishui-playback-direction--previous" id="qishuiPlaybackPreviousButton" type="button" aria-label="上一首" disabled>
+                  <i></i>
+                  <small>上一首</small>
+                </button>
+                <button class="qishui-playback-play" id="qishuiPlaybackPlayButton" type="button" aria-label="播放" disabled>
+                  <span aria-hidden="true"></span>
+                </button>
+                <button class="qishui-playback-direction qishui-playback-direction--next" id="qishuiPlaybackNextButton" type="button" aria-label="下一首" disabled>
+                  <i></i>
+                  <small>下一首</small>
+                </button>
+              </footer>
+            </div>
+          </article>
+          <p class="qishui-playback-wheel-hint" id="qishuiPlaybackWheelHint">滚轮向上上一首 · 向下下一首</p>
+        </section>
         <canvas class="rain-glass-overlay-canvas" id="rainGlassCanvas" aria-hidden="true"></canvas>
         <section class="orb-playlists playlist-album-orbit" id="orbPlaylists" aria-label="User playlist albums" hidden>
           <div class="orb-playlist-status" id="orbPlaylistStatus">Playlists</div>
@@ -850,6 +975,9 @@
 
       <footer
         class="player-dock glass-surface glass-surface--react-bits glass-surface--fallback"
+        hidden
+        inert
+        aria-hidden="true"
         aria-label="播放控制栏"
         data-glass-surface
         data-glass-radius="20"
@@ -971,7 +1099,11 @@
           <div class="diy-preset-group diy-preset-group--inline-text" data-inline-text-presets>
             <span class="diy-preset-group-label">&#25991;&#23383;&#39044;&#35774;</span>
             <div class="diy-preset-options diy-preset-options--text">
-              <button class="diy-preset-card is-active" type="button" data-text-preset="depth">
+              <button class="diy-preset-card is-active" type="button" data-text-preset="none">
+                <strong>关闭歌词</strong>
+                <small>纯净画面</small>
+              </button>
+              <button class="diy-preset-card" type="button" data-text-preset="depth">
                 <strong>3D&#27468;&#35789;</strong>
                 <small>&#23553;&#38754;&#21462;&#33394;</small>
               </button>
@@ -982,6 +1114,10 @@
               <button class="diy-preset-card" type="button" data-text-preset="book-effect">
                 <strong>&#20070;&#39029;&#25928;&#26524;</strong>
                 <small>&#29420;&#31435;&#23383;&#20809;&#26248;</small>
+              </button>
+              <button class="diy-preset-card" type="button" data-text-preset="focus-echo">
+                <strong>&#28966;&#28857;&#22238;&#22768;</strong>
+                <small>&#26263;&#24433;&#25910;&#26463;&#23435;&#20307;</small>
               </button>
             </div>
           </div>
@@ -1033,7 +1169,11 @@
           <div class="diy-preset-group diy-preset-group--text">
             <span class="diy-preset-group-label">文字预设</span>
             <div class="diy-preset-options diy-preset-options--text">
-              <button class="diy-preset-card is-active" id="diyLyricPreset" type="button" data-text-preset="depth">
+              <button class="diy-preset-card is-active" id="diyNoTextPreset" type="button" data-text-preset="none">
+                <strong>关闭歌词</strong>
+                <small>纯净画面</small>
+              </button>
+              <button class="diy-preset-card" id="diyLyricPreset" type="button" data-text-preset="depth">
                 <strong>3D歌词</strong>
                 <small>封面取色</small>
               </button>
@@ -1045,8 +1185,84 @@
                 <strong>&#20070;&#39029;&#25928;&#26524;</strong>
                 <small>&#29420;&#31435;&#23383;&#20809;&#26248;</small>
               </button>
+              <button class="diy-preset-card" id="diyFocusEchoTextPreset" type="button" data-text-preset="focus-echo">
+                <strong>&#28966;&#28857;&#22238;&#22768;</strong>
+                <small>&#26263;&#24433;&#25910;&#26463;&#23435;&#20307;</small>
+              </button>
             </div>
           </div>
+          <section class="diy-text-palette" id="textPaletteControl" aria-labelledby="textPaletteTitle">
+            <header class="diy-text-palette-head">
+              <strong id="textPaletteTitle">&#25991;&#23383;&#35843;&#33394;</strong>
+              <output id="textPaletteStatus">&#23553;&#38754;&#33258;&#21160;</output>
+            </header>
+            <button class="diy-text-palette-auto is-active" id="textPaletteAutoButton" type="button" aria-pressed="true">
+              <i aria-hidden="true"></i>
+              <span>&#23553;&#38754;&#33258;&#21160;</span>
+            </button>
+            <div class="diy-text-palette-actions">
+              <div class="diy-text-palette-swatches" role="group" aria-label="&#24120;&#29992;&#25991;&#23383;&#39068;&#33394;">
+                <button type="button" data-text-palette-color="#eafbff" style="--text-swatch: #eafbff" aria-label="&#20912;&#30333;"></button>
+                <button type="button" data-text-palette-color="#a8dde8" style="--text-swatch: #a8dde8" aria-label="&#38654;&#34013;"></button>
+                <button type="button" data-text-palette-color="#56d9f2" style="--text-swatch: #56d9f2" aria-label="&#20809;&#38738;"></button>
+                <button type="button" data-text-palette-color="#64e7c3" style="--text-swatch: #64e7c3" aria-label="&#34028;&#33655;"></button>
+                <button type="button" data-text-palette-color="#bfadff" style="--text-swatch: #bfadff" aria-label="&#38654;&#32043;"></button>
+                <button type="button" data-text-palette-color="#ffadc9" style="--text-swatch: #ffadc9" aria-label="&#26580;&#31881;"></button>
+                <button type="button" data-text-palette-color="#ffbc72" style="--text-swatch: #ffbc72" aria-label="&#26262;&#27225;"></button>
+                <button type="button" data-text-palette-color="#ffe16b" style="--text-swatch: #ffe16b" aria-label="&#26376;&#40644;"></button>
+              </div>
+              <label class="diy-text-palette-custom" for="textPaletteCustomInput">
+                <input id="textPaletteCustomInput" type="color" value="#eafbff" aria-label="&#33258;&#23450;&#20041;&#25991;&#23383;&#39068;&#33394;" />
+                <span>&#33258;&#23450;&#20041;</span>
+              </label>
+              <button class="diy-text-palette-reset" id="textPaletteResetButton" type="button">&#24674;&#22797;&#33258;&#21160;</button>
+            </div>
+          </section>
+          <section
+            class="diy-text-palette diy-text-palette--playback"
+            id="playbackLyricPaletteControl"
+            aria-labelledby="playbackLyricPaletteTitle"
+          >
+            <header class="diy-text-palette-head">
+              <strong id="playbackLyricPaletteTitle">新播放栏歌词</strong>
+              <output id="playbackLyricPaletteStatus">封面自动</output>
+            </header>
+            <button
+              class="diy-text-palette-auto is-active"
+              id="playbackLyricPaletteAutoButton"
+              type="button"
+              aria-pressed="true"
+            >
+              <i aria-hidden="true"></i>
+              <span>封面自动</span>
+            </button>
+            <div class="diy-text-palette-actions">
+              <div class="diy-text-palette-swatches" role="group" aria-label="新播放栏歌词常用颜色">
+                <button type="button" data-playback-lyric-palette-color="#eafbff" style="--text-swatch: #eafbff" aria-label="冰白"></button>
+                <button type="button" data-playback-lyric-palette-color="#a8dde8" style="--text-swatch: #a8dde8" aria-label="雾蓝"></button>
+                <button type="button" data-playback-lyric-palette-color="#56d9f2" style="--text-swatch: #56d9f2" aria-label="光青"></button>
+                <button type="button" data-playback-lyric-palette-color="#64e7c3" style="--text-swatch: #64e7c3" aria-label="薄荷"></button>
+                <button type="button" data-playback-lyric-palette-color="#bfadff" style="--text-swatch: #bfadff" aria-label="雾紫"></button>
+                <button type="button" data-playback-lyric-palette-color="#ffadc9" style="--text-swatch: #ffadc9" aria-label="柔粉"></button>
+                <button type="button" data-playback-lyric-palette-color="#ffbc72" style="--text-swatch: #ffbc72" aria-label="暖橙"></button>
+                <button type="button" data-playback-lyric-palette-color="#ffe16b" style="--text-swatch: #ffe16b" aria-label="月黄"></button>
+              </div>
+              <label class="diy-text-palette-custom" for="playbackLyricPaletteCustomInput">
+                <input
+                  id="playbackLyricPaletteCustomInput"
+                  type="color"
+                  value="#eafbff"
+                  aria-label="自定义新播放栏歌词颜色"
+                />
+                <span>自定义</span>
+              </label>
+              <button
+                class="diy-text-palette-reset"
+                id="playbackLyricPaletteResetButton"
+                type="button"
+              >恢复自动</button>
+            </div>
+          </section>
           <div class="diy-control">
             <label for="lyricBrightnessRange">歌词亮度</label>
             <input id="lyricBrightnessRange" type="range" min="60" max="180" value="112" />
@@ -1100,7 +1316,11 @@
           <div class="diy-preset-group diy-preset-group--inline-text diy-preset-group--wallpaper-text" data-inline-text-presets>
             <span class="diy-preset-group-label">&#25991;&#23383;&#39044;&#35774;</span>
             <div class="diy-preset-options diy-preset-options--text">
-              <button class="diy-preset-card is-active" type="button" data-text-preset="depth">
+              <button class="diy-preset-card is-active" type="button" data-text-preset="none">
+                <strong>关闭歌词</strong>
+                <small>纯净画面</small>
+              </button>
+              <button class="diy-preset-card" type="button" data-text-preset="depth">
                 <strong>3D&#27468;&#35789;</strong>
                 <small>&#23553;&#38754;&#21462;&#33394;</small>
               </button>
@@ -1111,6 +1331,10 @@
               <button class="diy-preset-card" type="button" data-text-preset="book-effect">
                 <strong>&#20070;&#39029;&#25928;&#26524;</strong>
                 <small>&#29420;&#31435;&#23383;&#20809;&#26248;</small>
+              </button>
+              <button class="diy-preset-card" type="button" data-text-preset="focus-echo">
+                <strong>&#28966;&#28857;&#22238;&#22768;</strong>
+                <small>&#26263;&#24433;&#25910;&#26463;&#23435;&#20307;</small>
               </button>
             </div>
           </div>
@@ -1301,7 +1525,7 @@
     <script src="storm-ocean-runtime.js?v=20260718-fine-waves-120"></script>
     <script src="free-cube-runtime.js?v=20260718-material-clarity-2"></script>
     <script src="void-prism-runtime.js?v=20260718-preset-fsr-1"></script>
-    <script src="app.js?v=20260718-preset-fsr-qishui-phone-1"></script>
-    <script src="rhythm-game.js?v=20260716-rhythm-game-manual-step-4"></script>
+    <script src="app.js?v=20260720-playback-lyric-color-14"></script>
+    <script src="rhythm-game.js?v=20260718-rhythm-game-orbit-lock-1"></script>
   </body>
 </html>
