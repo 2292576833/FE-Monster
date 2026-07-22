@@ -906,7 +906,7 @@ try {
         && new Set(playbackPaletteValues).size === 3
         && playbackPaletteValues.every((value) => {
           const alpha = Number(value.slice(value.lastIndexOf(',') + 1, -1).trim());
-          return Number.isFinite(alpha) && alpha > 0.3 && alpha < 0.75;
+          return Number.isFinite(alpha) && alpha >= 0.18 && alpha <= 0.28;
         })
         && getComputedStyle(document.querySelector('.qishui-playback-ambient'), '::before')
           .backgroundImage.includes('radial-gradient');
@@ -917,9 +917,10 @@ try {
       );
       const playbackSceneShowsThrough = getComputedStyle(playbackPhone).backgroundColor === 'rgba(0, 0, 0, 0)'
         && Number.isFinite(playbackAmbientAlpha)
-        && playbackAmbientAlpha > 0.1
-        && playbackAmbientAlpha < 0.5
-        && playbackAmbientStyle.backdropFilter !== 'none';
+        && playbackAmbientAlpha >= 0
+        && playbackAmbientAlpha <= 0.06
+        && playbackAmbientStyle.backdropFilter.includes('url(')
+        && playbackAmbientStyle.backdropFilter.includes('blur(2.5px)');
 
       playbackProgress.value = '500';
       playbackProgress.dispatchEvent(new Event('input', { bubbles: true }));

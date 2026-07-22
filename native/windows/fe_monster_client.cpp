@@ -83,8 +83,8 @@ int APIENTRY wWinMain(HINSTANCE instance, HINSTANCE, LPWSTR, int show_command) {
     if (argv) {
         g_url = arg_value(argc, argv, L"--url", g_url.c_str());
     }
-    int width = argv ? arg_int(argc, argv, L"--width", 1280) : 1280;
-    int height = argv ? arg_int(argc, argv, L"--height", 720) : 720;
+    int width = argv ? arg_int(argc, argv, L"--width", 1600) : 1600;
+    int height = argv ? arg_int(argc, argv, L"--height", 900) : 900;
     if (argv) LocalFree(argv);
 
     HRESULT coinit = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);

@@ -25,6 +25,26 @@ function Resolve-JavaHome {
   return $null
 }
 
+function Assert-AndroidNativeRuntime {
+  param([Parameter(Mandatory = $true)][string]$ApkPath)
+
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+  $archive = [System.IO.Compression.ZipFile]::OpenRead($ApkPath)
+  try {
+    $entries = @($archive.Entries | ForEach-Object { $_.FullName })
+    foreach ($abi in @('arm64-v8a', 'armeabi-v7a')) {
+      foreach ($library in @('libnode.so', 'libfe_node_mobile.so', 'libc++_shared.so')) {
+        $expected = "lib/$abi/$library"
+        if ($entries -notcontains $expected) {
+          throw "Android native runtime dependency is missing from APK: $expected"
+        }
+      }
+    }
+  } finally {
+    $archive.Dispose()
+  }
+}
+
 $sdkRoot = $Env:ANDROID_HOME
 if ([string]::IsNullOrWhiteSpace($sdkRoot)) {
   $sdkRoot = $Env:ANDROID_SDK_ROOT
@@ -90,6 +110,7 @@ if ($Configuration -eq 'Debug') {
   if (!(Test-Path $apkSource)) {
     throw "Android build succeeded but the APK was not found: $apkSource"
   }
+  Assert-AndroidNativeRuntime -ApkPath $apkSource
   if (!(Test-Path $distDirectory)) { New-Item -ItemType Directory -Path $distDirectory -Force | Out-Null }
   Copy-Item -LiteralPath $apkSource -Destination $apkDestination -Force
   Write-Host "Local Android APK: $apkDestination"

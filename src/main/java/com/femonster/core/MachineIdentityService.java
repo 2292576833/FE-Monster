@@ -92,7 +92,7 @@ public final class MachineIdentityService {
     }
 
     public String appVersion() {
-        return "1.1.0";
+        return "1.1.5";
     }
 
     private String readCachedId() {

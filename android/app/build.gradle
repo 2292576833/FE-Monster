@@ -3,10 +3,15 @@ plugins {
 }
 
 def bundledWebAssetsDir = layout.buildDirectory.dir("generated/feMonsterWebAssets")
+def nodeGatewayAssetsDir = layout.buildDirectory.dir("generated/feMonsterNodeGatewayAssets")
+def nodeMobileDir = layout.buildDirectory.dir("generated/nodejs-mobile")
+def nodeMobileVersion = "18.20.4"
+def nodeMobileSha256 = "bd7321eaa1a7602fbe0bb87302df2d79d87835cf4363fbdd17c350dbb485c2af"
 
 tasks.register("syncFeMonsterWebAssets", Sync) {
     from(rootProject.file("../web")) {
         into "fe-monster-web"
+        exclude "**/*.blend1"
     }
     from(rootProject.file("../components")) {
         into "fe-monster-web/components"
@@ -34,6 +39,85 @@ tasks.register("syncFeMonsterWebAssets", Sync) {
     }
 }
 
+tasks.register("prepareAndroidNodeGateway") {
+    def sourceDir = file("src/main/nodeGateway")
+    def qishuiAdapter = file("src/main/nodeGateway/providers/qishui.cjs")
+    inputs.files(
+        new File(sourceDir, "main.cjs"),
+        new File(sourceDir, "package.json"),
+        new File(sourceDir, "package-lock.json"),
+        qishuiAdapter
+    )
+    outputs.dir(nodeGatewayAssetsDir)
+
+    doLast {
+        def outputRoot = nodeGatewayAssetsDir.get().asFile
+        def projectDir = new File(outputRoot, "nodejs-project")
+        delete(outputRoot)
+        projectDir.mkdirs()
+        copy {
+            from(sourceDir)
+            include "main.cjs", "package.json", "package-lock.json"
+            into projectDir
+        }
+        copy {
+            from(qishuiAdapter)
+            into new File(projectDir, "providers")
+            rename { "qishui.cjs" }
+        }
+        exec {
+            workingDir projectDir
+            commandLine "npm.cmd", "ci", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund"
+        }
+    }
+}
+
+tasks.register("prepareNodeJsMobile") {
+    def outputRoot = nodeMobileDir.get().asFile
+    def arm64Library = new File(outputRoot, "bin/arm64-v8a/libnode.so")
+    def armv7Library = new File(outputRoot, "bin/armeabi-v7a/libnode.so")
+    def nodeHeader = new File(outputRoot, "include/node/node.h")
+    inputs.property("nodeMobileVersion", nodeMobileVersion)
+    inputs.property("nodeMobileSha256", nodeMobileSha256)
+    outputs.files(arm64Library, armv7Library, nodeHeader)
+
+    doLast {
+        def cacheDir = rootProject.file(".gradle/nodejs-mobile")
+        def archive = new File(cacheDir, "nodejs-mobile-v${nodeMobileVersion}-android.zip")
+        def localSeed = rootProject.file("../.tmp/nodejs-mobile-v${nodeMobileVersion}-android.zip")
+        cacheDir.mkdirs()
+        if (!archive.isFile()) {
+            if (localSeed.isFile()) {
+                copy { from localSeed; into cacheDir }
+            } else {
+                new URL("https://github.com/nodejs-mobile/nodejs-mobile/releases/download/v${nodeMobileVersion}/nodejs-mobile-v${nodeMobileVersion}-android.zip")
+                    .withInputStream { input -> archive.withOutputStream { output -> output << input } }
+            }
+        }
+
+        def digest = java.security.MessageDigest.getInstance("SHA-256")
+        archive.withInputStream { input ->
+            byte[] buffer = new byte[1024 * 1024]
+            int read
+            while ((read = input.read(buffer)) > 0) digest.update(buffer, 0, read)
+        }
+        def actualSha256 = digest.digest().collect { String.format("%02x", it) }.join()
+        if (actualSha256 != nodeMobileSha256) {
+            archive.delete()
+            throw new GradleException("nodejs-mobile archive checksum mismatch: ${actualSha256}")
+        }
+
+        delete(outputRoot)
+        copy {
+            from zipTree(archive)
+            include "bin/arm64-v8a/libnode.so"
+            include "bin/armeabi-v7a/libnode.so"
+            include "include/**"
+            into outputRoot
+        }
+    }
+}
+
 android {
     namespace "com.femonster.mobile"
     compileSdk 35
@@ -48,13 +132,38 @@ android {
         targetSdk 35
         versionCode 7
         versionName "1.1.0"
+        externalNativeBuild {
+            cmake {
+                arguments "-DANDROID_STL=c++_shared"
+                cppFlags "-std=c++17"
+            }
+        }
+        ndk {
+            abiFilters "arm64-v8a", "armeabi-v7a"
+        }
     }
 
     sourceSets {
-        main.assets.srcDir bundledWebAssetsDir
+        main.assets.srcDirs bundledWebAssetsDir, nodeGatewayAssetsDir
+        main.jniLibs.srcDir nodeMobileDir.map { new File(it.asFile, "bin") }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path file("CMakeLists.txt")
+            version "3.22.1"
+        }
     }
 }
 
 tasks.named("preBuild").configure {
     dependsOn tasks.named("syncFeMonsterWebAssets")
+    dependsOn tasks.named("prepareAndroidNodeGateway")
+    dependsOn tasks.named("prepareNodeJsMobile")
+}
+
+tasks.configureEach { task ->
+    if (task.name.startsWith("configureCMake") || task.name.startsWith("buildCMake")) {
+        task.dependsOn tasks.named("prepareNodeJsMobile")
+    }
 }

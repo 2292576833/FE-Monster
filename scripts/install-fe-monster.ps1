@@ -13,7 +13,7 @@ $payloadZip = Join-Path $setupRoot 'FE-Monster-Payload.zip'
 $installPath = [System.IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($InstallDir))
 $outDir = Join-Path $installPath 'out'
 $installLog = Join-Path $outDir 'install.log'
-$appVersion = '1.1.0'
+$appVersion = '1.1.5'
 
 function Write-Log {
   param([string]$Message)

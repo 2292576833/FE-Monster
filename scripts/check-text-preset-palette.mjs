@@ -7,6 +7,22 @@ import path from 'node:path';
 const edge = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const webRoot = path.resolve('web');
 const storageKey = 'fe-monster-text-preset-palettes-v1';
+const fontStorageKey = 'fe-monster-text-preset-fonts-v1';
+const expectedFontLabels = Object.freeze([
+  '南廱明體', '光华标题黑', '无界黑', '汉仪英雄体', '知新体', '少年南波万', '俊林简', '挥墨体',
+  '锐智体', '新青年体', '追光体', '文雅体', '黑糖体', '咏楷体', '汇文明朝体', 'Caveat-Regular',
+  'ZY Hope', '渔阳细体', 'FACON', '字语云黑宋', '系统字体', '得意黑', '江湖体', '风雅宋',
+  '抖音体', '思源粗宋', '三极榜楷简体', '招牌体', '苍耳状元楷', '活力黑体', '俪金黑', '综艺体',
+  '俊雅体', '江户招牌', '字由列黑', '圆体', '金陵体', '研宋体', '后现代体', '烟波宋',
+  '字由奇巧', '优设标题黑', '三极古拙楷书'
+]);
+const expectedFontIds = Object.freeze({
+  depth: 'source-han-heavy',
+  flow: 'facon',
+  'book-effect': 'caveat-regular',
+  'focus-echo': 'smiley-sans',
+  book: 'yanbo-serif'
+});
 const debugPort = 23000 + (process.pid % 7000);
 const profile = path.resolve(tmpdir(), `fe-monster-text-palette-${process.pid}`);
 const focusEchoScreenshotPath = path.resolve('artifacts', 'text-preset-focus-echo-live.png');
@@ -159,7 +175,7 @@ try {
     && typeof setDiyPreset === 'function'
     && state.playbackVisual.particles.length > 0
     && document.getElementById('playbackLyricScene')`);
-  await evaluate(`localStorage.removeItem(${JSON.stringify(storageKey)})`);
+  await evaluate(`localStorage.removeItem(${JSON.stringify(storageKey)}); localStorage.removeItem(${JSON.stringify(fontStorageKey)})`);
   const resetReloadTimeOrigin = await evaluate('performance.timeOrigin');
   await command('Page.reload', { ignoreCache: true });
   await waitFor(`performance.timeOrigin !== ${JSON.stringify(resetReloadTimeOrigin)}
@@ -253,6 +269,8 @@ try {
 
   const firstPass = await evaluate(`(async () => {
     const expectedColors = ${JSON.stringify(expectedColors)};
+    const expectedFontLabels = ${JSON.stringify(expectedFontLabels)};
+    const expectedFontIds = ${JSON.stringify(expectedFontIds)};
     const normalPresets = ['depth', 'flow', 'book-effect', 'focus-echo'];
     const allSelectablePresets = ['none', ...normalPresets];
     const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
@@ -345,6 +363,10 @@ try {
       autoButton: document.getElementById('textPaletteAutoButton'),
       customInput: document.getElementById('textPaletteCustomInput'),
       resetButton: document.getElementById('textPaletteResetButton'),
+      fontRoot: document.getElementById('textFontControl'),
+      fontSelect: document.getElementById('textFontSelect'),
+      fontPreview: document.getElementById('textFontPreview'),
+      fontAvailability: document.getElementById('textFontAvailability'),
       scene: document.getElementById('playbackLyricScene')
     };
     const missing = Object.entries(required)
@@ -353,13 +375,14 @@ try {
     const swatches = Array.from(
       document.querySelectorAll('[data-text-palette-color]')
     );
-    if (missing.length || !swatches.length || !state.textPalettePreferences) {
+    if (missing.length || !swatches.length || !state.textPalettePreferences || !state.textFontPreferences) {
       return {
         ready: false,
         pass: false,
         missing,
         swatchCount: swatches.length,
-        statePreferencesPresent: !!state.textPalettePreferences
+        statePreferencesPresent: !!state.textPalettePreferences,
+        fontPreferencesPresent: !!state.textFontPreferences
       };
     }
 
@@ -392,6 +415,16 @@ try {
     const registryPass = Object.values(registryCounts).every((count) => count === 3);
     const controlContractPass = required.customInput.type === 'color'
       && swatches.every((swatch) => normalizeHex(swatch.dataset.textPaletteColor));
+    const fontRegistryLabels = TEXT_FONT_OPTIONS.map((option) => option.label);
+    const fontRegistryPass = fontRegistryLabels.length === expectedFontLabels.length
+      && expectedFontLabels.every((label, index) => fontRegistryLabels[index] === label)
+      && required.fontSelect.options.length === expectedFontLabels.length;
+    const fontControlContractPass = Array.from(required.fontSelect.options).every((option) => (
+      option.value && ['true', 'false'].includes(option.dataset.fontAvailable)
+    )) && !!required.fontPreview.textContent.trim()
+      && !!required.fontAvailability.textContent.trim();
+    const presetDefaultTypographyPreserved = document.documentElement.style
+      .getPropertyValue('--text-preset-font-family').trim() === '';
 
     await selectViaButton('focus-echo');
     const focusEchoSelection = {
@@ -488,19 +521,74 @@ try {
     await settle();
     const bookExitRestoresSelectable = state.textPreset === 'focus-echo';
 
+    const setFont = async (fontId) => {
+      required.fontSelect.value = fontId;
+      required.fontSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      await settle();
+    };
+    const fontResults = {};
+    for (const preset of normalPresets) {
+      await selectViaButton(preset);
+      await setFont(expectedFontIds[preset]);
+      const option = textFontOption(expectedFontIds[preset]);
+      const rootStack = document.documentElement.style.getPropertyValue('--text-preset-font-family');
+      fontResults[preset] = {
+        preference: state.textFontPreferences[preset],
+        selected: required.fontSelect.value,
+        dataset: document.documentElement.dataset.textFont,
+        rootStack,
+        sceneFamily: getComputedStyle(required.scene).fontFamily,
+        playbackFamily: getComputedStyle(document.getElementById('qishuiPlaybackLyricPage')).fontFamily,
+        containsRequestedFamily: option.families.length
+          ? rootStack.includes(option.families[0])
+          : rootStack.includes('system-ui')
+      };
+    }
+    setDiyPreset('book');
+    await settle();
+    await setFont(expectedFontIds.book);
+    const bookFontStack = document.documentElement.style.getPropertyValue('--text-preset-font-family');
+    fontResults.book = {
+      preference: state.textFontPreferences.book,
+      selected: required.fontSelect.value,
+      dataset: document.documentElement.dataset.textFont,
+      rootStack: bookFontStack,
+      containsRequestedFamily: bookFontStack.includes(textFontOption(expectedFontIds.book).families[0])
+    };
+    const independentFontsPass = Object.entries(expectedFontIds).every(([preset, fontId]) => {
+      const result = fontResults[preset];
+      return result?.preference === fontId
+        && result.selected === fontId
+        && result.dataset === fontId
+        && result.containsRequestedFamily;
+    });
+    setDiyPreset('lyric');
+    await settle();
+
     setTextPreset('none');
     await settle();
     const nonePreservesPalettes = required.scene.hidden
       && [...normalPresets, 'book'].every((preset) => (
         preferenceMatches(preset, expectedColors[preset])
       ));
+    const nonePreservesFonts = required.fontSelect.disabled
+      && Object.entries(expectedFontIds).every(([preset, fontId]) => (
+        state.textFontPreferences[preset] === fontId
+      ));
     const savedRaw = localStorage.getItem(${JSON.stringify(storageKey)}) || '';
+    const savedFontsRaw = localStorage.getItem(${JSON.stringify(fontStorageKey)}) || '';
     const storageContainsAllColors = [...normalPresets, 'book'].every((preset) => (
       savedRaw.toLowerCase().includes(expectedColors[preset])
+    ));
+    const storageContainsAllFonts = Object.values(expectedFontIds).every((fontId) => (
+      savedFontsRaw.includes(fontId)
     ));
     const checks = {
       registryPass,
       controlContractPass,
+      fontRegistryPass,
+      fontControlContractPass,
+      presetDefaultTypographyPreserved,
       focusEchoPass,
       swatchInteractionPass,
       autoInteractionPass,
@@ -509,8 +597,11 @@ try {
       independentPalettesPass,
       bookPass,
       bookExitRestoresSelectable,
+      independentFontsPass,
       nonePreservesPalettes,
-      storageContainsAllColors
+      nonePreservesFonts,
+      storageContainsAllColors,
+      storageContainsAllFonts
     };
     return {
       ready: true,
@@ -518,11 +609,14 @@ try {
       checks,
       registryCounts,
       swatchCount: swatches.length,
+      fontRegistryLabels,
       focusEchoSelection,
       presetResults,
       paletteRoundTrip,
       bookResult,
-      savedRaw
+      fontResults,
+      savedRaw,
+      savedFontsRaw
     };
   })()`, true);
 
@@ -540,9 +634,12 @@ try {
       && typeof setDiyPreset === 'function'
       && state.playbackVisual.particles.length > 0
       && state.textPalettePreferences
-      && document.getElementById('textPaletteCustomInput')`);
+      && state.textFontPreferences
+      && document.getElementById('textPaletteCustomInput')
+      && document.getElementById('textFontSelect')?.options.length === ${expectedFontLabels.length}`);
     reloadPass = await evaluate(`(async () => {
       const expectedColors = ${JSON.stringify(expectedColors)};
+      const expectedFontIds = ${JSON.stringify(expectedFontIds)};
       const normalPresets = ['depth', 'flow', 'book-effect', 'focus-echo'];
       const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
       const settle = async () => {
@@ -590,13 +687,17 @@ try {
       const defaultPreset = state.textPreset;
       const root = document.getElementById('textPaletteControl');
       const input = document.getElementById('textPaletteCustomInput');
+      const fontSelect = document.getElementById('textFontSelect');
       const restored = {};
       for (const preset of normalPresets) {
         const button = await selectViaButton(preset);
         restored[preset] = {
           buttonPresent: !!button,
           preference: state.textPalettePreferences?.[preset] || null,
-          inputColor: normalizeHex(input?.value)
+          inputColor: normalizeHex(input?.value),
+          fontPreference: state.textFontPreferences?.[preset] || '',
+          selectedFont: fontSelect?.value || '',
+          appliedFont: document.documentElement.dataset.textFont || ''
         };
       }
       setTextPreset('focus-echo');
@@ -607,11 +708,19 @@ try {
           && document.getElementById('playbackLyricScene')?.classList.contains('is-book-text'),
         preference: state.textPalettePreferences?.book || null,
         inputColor: normalizeHex(input?.value),
+        fontPreference: state.textFontPreferences?.book || '',
+        selectedFont: fontSelect?.value || '',
+        appliedFont: document.documentElement.dataset.textFont || '',
         paletteVisible: !!root
           && !root.hidden
           && getComputedStyle(root).display !== 'none'
       };
       const preferencesRestored = [...normalPresets, 'book'].every(preferenceMatches);
+      const fontsRestored = Object.entries(expectedFontIds).every(([preset, fontId]) => (
+        state.textFontPreferences?.[preset] === fontId
+        && restored[preset]?.selectedFont === fontId
+        && restored[preset]?.appliedFont === fontId
+      ));
       const controlsRestored = normalPresets.every((preset) => (
         restored[preset].buttonPresent
         && restored[preset].inputColor === expectedColors[preset]
@@ -619,21 +728,30 @@ try {
         && restored.book.paletteVisible
         && restored.book.inputColor === expectedColors.book;
       const savedRaw = localStorage.getItem(${JSON.stringify(storageKey)}) || '';
+      const savedFontsRaw = localStorage.getItem(${JSON.stringify(fontStorageKey)}) || '';
       const storageStillContainsAllColors = [...normalPresets, 'book'].every((preset) => (
         savedRaw.toLowerCase().includes(expectedColors[preset])
+      ));
+      const storageStillContainsAllFonts = Object.values(expectedFontIds).every((fontId) => (
+        savedFontsRaw.includes(fontId)
       ));
       return {
         skipped: false,
         pass: defaultPreset === 'none'
           && preferencesRestored
+          && fontsRestored
           && controlsRestored
-          && storageStillContainsAllColors,
+          && storageStillContainsAllColors
+          && storageStillContainsAllFonts,
         defaultPreset,
         preferencesRestored,
+        fontsRestored,
         controlsRestored,
         storageStillContainsAllColors,
+        storageStillContainsAllFonts,
         restored,
-        savedRaw
+        savedRaw,
+        savedFontsRaw
       };
     })()`, true);
   }
@@ -659,6 +777,8 @@ try {
       await nextFrame();
       await nextFrame();
       const root = document.getElementById('textPaletteControl');
+      const fontRoot = document.getElementById('textFontControl');
+      const fontSelect = document.getElementById('textFontSelect');
       const swatches = Array.from(
         root?.querySelectorAll('[data-text-palette-color]') || []
       );
@@ -673,7 +793,12 @@ try {
         };
       });
       const noHorizontalOverflow = !!root
-        && root.scrollWidth <= root.clientWidth + 1;
+        && root.scrollWidth <= root.clientWidth + 1
+        && !!fontRoot
+        && fontRoot.scrollWidth <= fontRoot.clientWidth + 1;
+      const fontControlUsable = !!fontSelect
+        && fontSelect.options.length === ${expectedFontLabels.length}
+        && fontSelect.getBoundingClientRect().width >= 180;
       const swatchesUsable = swatches.length === 8
         && swatchRects.every((rect) => (
           rect.width >= 20
@@ -683,11 +808,12 @@ try {
         ));
       return {
         skipped: false,
-        pass: noHorizontalOverflow && swatchesUsable,
+        pass: noHorizontalOverflow && swatchesUsable && fontControlUsable,
         viewport: [innerWidth, innerHeight],
         clientWidth: root?.clientWidth || 0,
         scrollWidth: root?.scrollWidth || 0,
         noHorizontalOverflow,
+        fontControlUsable,
         swatchCount: swatches.length,
         swatchesUsable,
         swatchRects

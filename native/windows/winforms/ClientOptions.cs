@@ -23,8 +23,8 @@ internal sealed record ClientOptions(
 
         return new ClientOptions(
             Get(values, "--url", "http://127.0.0.1:3000/?client=embedded&render=directx11&audio=xaudio2"),
-            GetInt(values, "--width", 1280),
-            GetInt(values, "--height", 720),
+            GetInt(values, "--width", 1600),
+            GetInt(values, "--height", 900),
             GetBool(values, "--gpu", true),
             GetBool(values, "--dx11", true),
             GetBool(values, "--xaudio2", true),

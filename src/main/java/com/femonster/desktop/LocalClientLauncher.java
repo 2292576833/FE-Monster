@@ -23,8 +23,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public final class LocalClientLauncher {
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
-    private static final int DEFAULT_WINDOW_WIDTH = 1280;
-    private static final int DEFAULT_WINDOW_HEIGHT = 720;
+    private static final int DEFAULT_WINDOW_WIDTH = 1600;
+    private static final int DEFAULT_WINDOW_HEIGHT = 900;
     private static volatile ClientSession currentSession;
 
     private LocalClientLauncher() {

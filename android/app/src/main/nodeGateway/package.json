@@ -1,0 +1,11 @@
+{
+  "name": "fe-monster-android-music-gateway",
+  "private": true,
+  "version": "1.1.0",
+  "license": "MIT",
+  "dependencies": {
+    "@sansenjian/qq-music-api": "2.1.0",
+    "NeteaseCloudMusicApi": "4.32.0",
+    "kugoumusicapi": "https://codeload.github.com/MakcRe/KuGouMusicApi/tar.gz/283f1e97b110726b208a64b486a657c0fc0a6126"
+  }
+}

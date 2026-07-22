@@ -185,6 +185,8 @@ try {
       if (storm) selectDiyScenePreset(storm.id);
       const cubeControl = document.querySelector('#diyCubeIntensityControl');
       const coverControl = document.querySelector('#diyCoverParticleControl');
+      const coverMotionRange = document.querySelector('#diyCoverParticleMotionRange');
+      const coverMotionValue = document.querySelector('#diyCoverParticleMotionValue');
       const stormQuickControls = document.querySelector('#stormPresetLightingQuickControls');
       const stormStageControls = document.querySelector('#stormLightingControls');
       const previewKeepsUnrelatedControlsHidden = Boolean(
@@ -214,6 +216,24 @@ try {
         && !coverControl?.hidden
         && stormQuickControls?.hidden
       );
+      if (coverMotionRange) {
+        coverMotionRange.value = '135';
+        coverMotionRange.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      const coverMotionControlWorks = Boolean(
+        coverMotionRange
+        && coverMotionRange.min === '0'
+        && coverMotionRange.max === '200'
+        && coverMotionRange.step === '1'
+        && Math.abs(state.coverParticle.motionAmplitude - 1.35) < 1e-7
+        && coverMotionValue?.textContent === '135%'
+        && coverMotionRange.getAttribute('aria-valuetext') === '135%'
+        && builtinDiyPresetConfiguration().runtimeControls?.coverMotionAmplitude === '135%'
+      );
+      if (coverMotionRange) {
+        coverMotionRange.value = '80';
+        coverMotionRange.dispatchEvent(new Event('input', { bubbles: true }));
+      }
       enterPresetPlaybackPage('lyric');
 
       await refreshWallpapers({ source: 'imported', scan: false });
@@ -291,6 +311,7 @@ try {
           && stormShowsOnlyStormControls
           && cubeShowsOnlyCubeControl
           && coverShowsOnlyCoverControl,
+        coverMotionControlWorks,
         presetConfigDumpHidden: Boolean(els.diySelectedPresetConfig?.hidden),
         importedVisible,
         liveVisible,
@@ -308,6 +329,7 @@ try {
         && result.localPlaylistImportReady
         && result.localPlaylistPlaybackReady
         && result.presetControlsScoped
+        && result.coverMotionControlWorks
         && result.presetConfigDumpHidden
         && result.importedVisible
         && result.liveVisible;

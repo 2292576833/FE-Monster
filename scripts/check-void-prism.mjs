@@ -226,7 +226,15 @@ try {
       projectionMatrixUpdates += 1;
       return originalProjectionUpdate.apply(this, args);
     };
-    const first = window.FeSandboxDiagnostics.voidPrism();
+    const fontBefore = window.FeSandboxDiagnostics.voidPrism();
+    setTextPreset('depth');
+    setTextFontPreference('source-han-heavy');
+    requestOrbFrame();
+    await wait(260);
+    const fontAfter = window.FeSandboxDiagnostics.voidPrism();
+    reflectionClearCalls = 0;
+    projectionMatrixUpdates = 0;
+    const first = fontAfter;
     state.playbackVisual.yaw = 0.34;
     state.playbackVisual.pitch = -0.22;
     state.playbackVisual.zoom = 1.06;
@@ -237,9 +245,13 @@ try {
     const second = window.FeSandboxDiagnostics.voidPrism();
     runtime.renderer.clear = originalRendererClear;
     runtime.camera.updateProjectionMatrix = originalProjectionUpdate;
+    const lyricGlyph = document.querySelector('.playback-lyric-glyph')
+      || document.querySelector('.lyric-depth-0');
     return {
       first,
       second,
+      fontBefore,
+      fontAfter,
       cardInSceneList,
       cardLabel: card?.querySelector('strong')?.textContent.trim() || '',
       sceneVisible: document.querySelector('#voidPrismScene')?.hidden === false,
@@ -247,7 +259,11 @@ try {
       canvasCount: document.querySelectorAll('#voidPrismCore canvas').length,
       lyricPrimary: getComputedStyle(els.playbackLyricScene).getPropertyValue('--lyric-primary').trim(),
       lyricComputedColor: getComputedStyle(document.querySelector('.lyric-depth-0')).color,
-      lyricGlyphColor: getComputedStyle(document.querySelector('.playback-lyric-glyph')).color,
+      lyricGlyphColor: lyricGlyph ? getComputedStyle(lyricGlyph).color : '',
+      selectedTextFont: document.documentElement.dataset.textFont || '',
+      selectedTextFontStack: document.documentElement.style.getPropertyValue('--text-preset-font-family'),
+      fontStackCachedInFrameLoop: /activeTextFontFamilyStack/.test(updateVoidPrismMotion.toString())
+        && !/\btextFontFamilyStack\(\)/.test(updateVoidPrismMotion.toString()),
       lyricSceneClasses: els.playbackLyricScene.className,
       performanceSample: {
         reflectionClearCalls,
@@ -400,6 +416,12 @@ try {
       && Math.abs(scene.second.lyricScale - 1.06) < 0.02,
     controlledExposure: scene.second.toneMappingExposure >= 0.84
       && scene.second.toneMappingExposure <= 0.92,
+    textFontPropagation: scene.selectedTextFont === 'source-han-heavy'
+      && scene.selectedTextFontStack.includes('思源粗宋')
+      && scene.fontAfter.lyricFontFamily.includes('思源粗宋')
+      && scene.fontAfter.lyricFontFamily !== scene.fontBefore.lyricFontFamily
+      && scene.fontAfter.lyricUpdates > scene.fontBefore.lyricUpdates,
+    textFontFrameEfficiency: scene.fontStackCachedInFrameLoop === true,
     lyricReflection: scene.second.lyricText === '镜中的歌词随时间继续延伸'
       && scene.second.lyricUpdates > scene.first.lyricUpdates
       && scene.lyricPrimary === 'rgba(92, 99, 103, 1)'

@@ -233,6 +233,11 @@ const els = {
   diyFlowTextPreset: $('#diyFlowTextPreset'),
   diyBookEffectTextPreset: $('#diyBookEffectTextPreset'),
   diyFocusEchoTextPreset: $('#diyFocusEchoTextPreset'),
+  textFontControl: $('#textFontControl'),
+  textFontSelect: $('#textFontSelect'),
+  textFontStatus: $('#textFontStatus'),
+  textFontPreview: $('#textFontPreview'),
+  textFontAvailability: $('#textFontAvailability'),
   textPaletteControl: $('#textPaletteControl'),
   textPaletteStatus: $('#textPaletteStatus'),
   textPaletteAutoButton: $('#textPaletteAutoButton'),
@@ -249,16 +254,22 @@ const els = {
   diyFreeCubePreset: $('#diyFreeCubePreset'),
   diyVoidPrismPreset: $('#diyVoidPrismPreset'),
   diyTopographyPreset: $('#diyTopographyPreset'),
+  diyChladniPreset: $('#diyChladniPreset'),
   diyRainGlassPreset: $('#diyRainGlassPreset'),
   diyCoverParticlesPreset: $('#diyCoverParticlesPreset'),
   diyCoverParticleControl: $('#diyCoverParticleControl'),
   diyCoverParticleBackgroundToggle: $('#diyCoverParticleBackgroundToggle'),
   diyCoverParticleBackgroundValue: $('#diyCoverParticleBackgroundValue'),
+  diyCoverParticleMotionRange: $('#diyCoverParticleMotionRange'),
+  diyCoverParticleMotionValue: $('#diyCoverParticleMotionValue'),
   diyBookLyricPreset: $('#diyBookLyricPreset'),
   diyCubeIntensityControl: $('#diyCubeIntensityControl'),
   freeCubePresetControls: $('#freeCubePresetControls'),
   freeCubeHeartButton: $('#freeCubeHeartButton'),
   freeCubeBackgroundButton: $('#freeCubeBackgroundButton'),
+  chladniPresetControls: $('#chladniPresetControls'),
+  chladniPlaneButton: $('#chladniPlaneButton'),
+  chladniCubeButton: $('#chladniCubeButton'),
   stormPresetLightingQuickControls: $('#stormPresetLightingQuickControls'),
   diySelectedPresetConfig: $('#diySelectedPresetConfig'),
   diySelectedPresetConfigTitle: $('#diySelectedPresetConfigTitle'),
@@ -356,6 +367,8 @@ const els = {
   sonicTopographyScene: $('#sonicTopographyScene'),
   sonicTopographyRig: $('#sonicTopographyRig'),
   sonicTopographyCore: $('#sonicTopographyCore'),
+  chladniScene: $('#chladniScene'),
+  chladniCore: $('#chladniCore'),
   coverParticleScene: $('#coverParticleScene'),
   coverParticleRig: $('#coverParticleRig'),
   coverParticleEngine: $('#coverParticleEngine'),
@@ -524,9 +537,124 @@ const PLAYBACK_QUALITY_PREFS_KEY = 'fe-monster-playback-quality-prefs-v1';
 const RENDER_CLARITY_PREFS_KEY = 'fe-monster-render-clarity-v1';
 const PRESET_FSR_PREFS_KEY = 'fe-monster-preset-fsr-v1';
 const TEXT_PALETTE_PREFS_KEY = 'fe-monster-text-preset-palettes-v1';
+const TEXT_FONT_PREFS_KEY = 'fe-monster-text-preset-fonts-v1';
 const PLAYBACK_LYRIC_PALETTE_PREFS_KEY = 'fe-monster-playback-lyric-palette-v1';
 const TEXT_PALETTE_PRESET_IDS = Object.freeze(['depth', 'flow', 'book-effect', 'focus-echo', 'book']);
 const TEXT_PALETTE_DEFAULT_COLOR = '#eafbff';
+const TEXT_FONT_DEFAULT_ID = 'system';
+const TEXT_FONT_FALLBACKS = Object.freeze({
+  system: Object.freeze({
+    label: '系统字体',
+    families: Object.freeze(['system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', '"Microsoft YaHei UI"', '"Microsoft YaHei"', 'sans-serif'])
+  }),
+  sans: Object.freeze({
+    label: '现代黑体',
+    families: Object.freeze(['"Noto Sans SC"', '"Noto Sans CJK SC"', '"Microsoft YaHei UI"', '"Microsoft YaHei"', '"SimHei"', 'sans-serif'])
+  }),
+  serif: Object.freeze({
+    label: '宋体',
+    families: Object.freeze(['"Noto Serif SC"', '"Source Han Serif SC"', '"Noto Serif CJK SC"', '"SimSun"', '"宋体"', 'serif'])
+  }),
+  brush: Object.freeze({
+    label: '楷体',
+    families: Object.freeze(['"KaiTi"', '"STKaiti"', '"FangSong"', '"STFangsong"', 'cursive'])
+  }),
+  thin: Object.freeze({
+    label: '细黑体',
+    families: Object.freeze(['"DengXian Light"', '"DengXian"', '"Noto Sans SC"', '"Microsoft YaHei Light"', 'sans-serif'])
+  }),
+  handwritten: Object.freeze({
+    label: '手写体',
+    families: Object.freeze(['"Segoe Print"', '"Segoe Script"', 'cursive'])
+  }),
+  display: Object.freeze({
+    label: '展示体',
+    families: Object.freeze(['"Impact"', '"Arial Black"', '"Noto Sans SC"', 'sans-serif'])
+  })
+});
+const TEXT_FONT_OPTIONS = Object.freeze([
+  { id: 'nanyong-ming', label: '南廱明體', category: 'serif', families: ['南廱明體', '南廱明体'] },
+  { id: 'guanghua-title-black', label: '光华标题黑', category: 'sans', families: ['光华标题黑', '华光标题黑'] },
+  { id: 'unbounded-sans', label: '无界黑', category: 'sans', embeddedFamily: 'FE Wujiehei', embeddedLicense: 'SIL OFL 1.1', families: ['FE Wujiehei', '无界黑', '标小智无界黑'] },
+  { id: 'hanyi-hero', label: '汉仪英雄体', category: 'brush', families: ['汉仪英雄体', '汉仪英雄体简'] },
+  { id: 'zhixin', label: '知新体', category: 'sans', families: ['知新体', '仓耳知新体'] },
+  { id: 'nanbowan', label: '少年南波万', category: 'brush', families: ['少年南波万', '少年永远南波万'] },
+  { id: 'junlin-jian', label: '俊林简', category: 'sans', families: ['俊林简', '励字俊林简'] },
+  { id: 'huimo', label: '挥墨体', category: 'brush', families: ['挥墨体'] },
+  { id: 'ruizhi', label: '锐智体', category: 'sans', families: ['锐智体', 'Aa锐智体'] },
+  { id: 'new-youth', label: '新青年体', category: 'sans', families: ['新青年体', '文悦新青年体'] },
+  { id: 'zhuiguang', label: '追光体', category: 'sans', families: ['追光体', '斗鱼追光体'] },
+  { id: 'wenya', label: '文雅体', category: 'sans', families: ['文雅体', '造字工房文雅体'] },
+  { id: 'heitang', label: '黑糖体', category: 'sans', families: ['黑糖体'] },
+  { id: 'yongkai', label: '咏楷体', category: 'brush', families: ['咏楷体', '字语咏楷体'] },
+  { id: 'huiwen-mincho', label: '汇文明朝体', category: 'serif', families: ['汇文明朝体', '汇文明朝體'] },
+  { id: 'caveat-regular', label: 'Caveat-Regular', category: 'handwritten', coverage: 'latin', embeddedFamily: 'FE Caveat', embeddedLicense: 'SIL OFL 1.1', families: ['FE Caveat', 'Caveat-Regular', 'Caveat'] },
+  { id: 'zy-hope', label: 'ZY Hope', category: 'handwritten', coverage: 'latin', families: ['ZY Hope', 'ZYHope'] },
+  { id: 'yuyang-thin', label: '渔阳细体', category: 'thin', families: ['渔阳细体', '仓耳渔阳体 W05', '仓耳渔阳体'] },
+  { id: 'facon', label: 'FACON', category: 'display', coverage: 'latin', families: ['FACON', 'Facon'] },
+  { id: 'ziyu-cloud-serif', label: '字语云黑宋', category: 'serif', families: ['字语云黑宋'] },
+  { id: 'system', label: '系统字体', category: 'system', families: [] },
+  { id: 'smiley-sans', label: '得意黑', category: 'sans', embeddedFamily: 'FE Smiley Sans', embeddedLicense: 'SIL OFL 1.1', families: ['FE Smiley Sans', '得意黑', 'Smiley Sans'] },
+  { id: 'jianghu', label: '江湖体', category: 'brush', families: ['江湖体', '点字江湖体'] },
+  { id: 'fengya-serif', label: '风雅宋', category: 'serif', families: ['风雅宋', '方正风雅宋'] },
+  { id: 'douyin', label: '抖音体', category: 'sans', families: ['抖音体'] },
+  { id: 'source-han-heavy', label: '思源粗宋', category: 'serif', embeddedFamily: 'FE Noto Serif SC', embeddedLicense: 'SIL OFL 1.1 · Noto Serif SC 兼容字库', families: ['FE Noto Serif SC', '思源粗宋', 'Source Han Serif SC Heavy', 'Source Han Serif Heavy'] },
+  { id: 'sanjibangkai', label: '三极榜楷简体', category: 'brush', families: ['三极榜楷简体', '三極榜楷簡體'] },
+  { id: 'signboard', label: '招牌体', category: 'brush', families: ['招牌体'] },
+  { id: 'tsanger-zhuangyuan', label: '苍耳状元楷', category: 'brush', families: ['苍耳状元楷', '仓耳状元楷'] },
+  { id: 'vitality-black', label: '活力黑体', category: 'sans', families: ['活力黑体', '三极活力黑'] },
+  { id: 'lijin-black', label: '俪金黑', category: 'sans', families: ['俪金黑', '华康俪金黑'] },
+  { id: 'variety', label: '综艺体', category: 'sans', families: ['综艺体'] },
+  { id: 'junya', label: '俊雅体', category: 'serif', families: ['俊雅体', '造字工房俊雅体'] },
+  { id: 'edo-signboard', label: '江户招牌', category: 'brush', families: ['江户招牌', '点字江户招牌黑'] },
+  { id: 'hellofont-liehei', label: '字由列黑', category: 'sans', families: ['字由列黑'] },
+  { id: 'rounded', label: '圆体', category: 'sans', families: ['圆体', '幼圆', 'YouYuan', 'Yuanti SC'] },
+  { id: 'jinling', label: '金陵体', category: 'serif', families: ['金陵体', '方正金陵体'] },
+  { id: 'yansong', label: '研宋体', category: 'serif', families: ['研宋体', 'Aa研宋'] },
+  { id: 'postmodern', label: '后现代体', category: 'sans', families: ['后现代体', '文悦后现代体'] },
+  { id: 'yanbo-serif', label: '烟波宋', category: 'serif', embeddedFamily: 'FE Yanbo Serif', embeddedLicense: 'SIL OFL 1.1', families: ['FE Yanbo Serif', '烟波宋', '猫啃网烟波宋'] },
+  { id: 'hellofont-qiqiao', label: '字由奇巧', category: 'sans', families: ['字由奇巧', '点字奇巧'] },
+  { id: 'uisdc-title-black', label: '优设标题黑', category: 'sans', families: ['优设标题黑'] },
+  { id: 'sanji-guzhuo-kai', label: '三极古拙楷书', category: 'brush', families: ['三极古拙楷书', '三極古拙楷書'] }
+].map((option) => Object.freeze({
+  ...option,
+  families: Object.freeze(option.families)
+})));
+const TEXT_FONT_LICENSE_REQUIRED_IDS = new Set([
+  'hanyi-hero',
+  'zhixin',
+  'nanbowan',
+  'junlin-jian',
+  'huimo',
+  'ruizhi',
+  'new-youth',
+  'zhuiguang',
+  'wenya',
+  'heitang',
+  'yongkai',
+  'zy-hope',
+  'yuyang-thin',
+  'facon',
+  'ziyu-cloud-serif',
+  'jianghu',
+  'fengya-serif',
+  'douyin',
+  'sanjibangkai',
+  'tsanger-zhuangyuan',
+  'vitality-black',
+  'lijin-black',
+  'variety',
+  'junya',
+  'edo-signboard',
+  'hellofont-liehei',
+  'jinling',
+  'yansong',
+  'postmodern',
+  'hellofont-qiqiao',
+  'uisdc-title-black',
+  'sanji-guzhuo-kai'
+]);
+const TEXT_FONT_LICENSE_VERIFIED_NOT_BUNDLED_IDS = new Set(['huiwen-mincho']);
 const PRESET_FSR_MODES = Object.freeze(['auto', 'ultra-quality', 'quality', 'balanced', 'performance']);
 const PRESET_FSR_VERSIONS = Object.freeze(['1', '2', '3', '4']);
 const RENDER_CLARITY_MIN = 50;
@@ -633,6 +761,27 @@ function loadTextPalettePreferences() {
 }
 
 const INITIAL_TEXT_PALETTE_PREFERENCES = loadTextPalettePreferences();
+
+function normalizeTextFontId(value) {
+  const id = typeof value === 'string' ? value.trim() : '';
+  return TEXT_FONT_OPTIONS.some((option) => option.id === id) ? id : TEXT_FONT_DEFAULT_ID;
+}
+
+function loadTextFontPreferences() {
+  let source = {};
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(TEXT_FONT_PREFS_KEY) || '{}');
+    source = stored?.fonts && typeof stored.fonts === 'object' ? stored.fonts : stored;
+  } catch (error) {
+    source = {};
+  }
+  return TEXT_PALETTE_PRESET_IDS.reduce((preferences, preset) => {
+    preferences[preset] = normalizeTextFontId(source?.[preset]);
+    return preferences;
+  }, {});
+}
+
+const INITIAL_TEXT_FONT_PREFERENCES = loadTextFontPreferences();
 
 function loadPlaybackLyricPalettePreference() {
   try {
@@ -1239,6 +1388,9 @@ const state = {
   textPreset: 'none',
   lastSelectableTextPreset: 'none',
   textPalettePreferences: INITIAL_TEXT_PALETTE_PREFERENCES,
+  textFontPreferences: INITIAL_TEXT_FONT_PREFERENCES,
+  textFontAvailability: {},
+  textFontStack: '',
   playbackLyricPalettePreference: INITIAL_PLAYBACK_LYRIC_PALETTE_PREFERENCE,
   lyricBrightness: 1.12,
   lyricSpeed: 1,
@@ -1372,6 +1524,7 @@ const state = {
     particles: [],
     bass: 0,
     energy: 0,
+    beat: 0,
     lastWidth: 0,
     lastHeight: 0,
     lastDpr: 0,
@@ -1385,7 +1538,8 @@ const state = {
     gpuFailed: false,
     gpuWidth: 0,
     gpuHeight: 0,
-    backgroundEnabled: false
+    backgroundEnabled: true,
+    motionAmplitude: 0.8
   },
   bookEffectTransform: {
     x: 0,
@@ -1417,6 +1571,23 @@ const state = {
     startOffsetY: 0,
     startRotate: 0,
     suppressClick: false
+  },
+  chladniTextTransform: {
+    x: 0,
+    y: 0,
+    rotate: 0,
+    rotateX: 0,
+    rotateY: 0,
+    scale: 1,
+    dragging: false,
+    mode: 'move',
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    startOffsetX: 0,
+    startOffsetY: 0,
+    startRotateX: 0,
+    startRotateY: 0
   },
   rainGlassScene: {
     drops: [],
@@ -1472,6 +1643,8 @@ const state = {
   activeProvider: 'netease',
   providers: MUSIC_PROVIDERS,
   loginStatusByProvider: {},
+  loginStatusRetryTimers: {},
+  loginStatusRetryAttempts: {},
   loginQrKey: '',
   loginQrTimer: 0,
   loginQrLoading: false,
@@ -1489,6 +1662,8 @@ const state = {
     switchId: 0,
     expanded: false,
     hiddenByUser: false,
+    visibilityTransitionTimer: 0,
+    visibilityTransitionFrame: 0,
     lastLyricIndex: -1,
     lyricSignature: '',
     lyricBookIndex: -2,
@@ -1742,6 +1917,13 @@ const state = {
     frame: {},
     lastDiagnostics: null
   },
+  chladni: {
+    runtime: null,
+    mode: 'cube',
+    palette: null,
+    frame: {},
+    lastDiagnostics: null
+  },
   sonicTopography: {
     built: false,
     count: 0,
@@ -1919,7 +2101,7 @@ function syncRenderTechnologyStatus(diagnostics = state.clientRuntime.renderCapa
 function presetFsrSceneActive() {
   if (!state.playbackPage || state.sandbox.open) return false;
   if (sandboxPlaybackActive()) return true;
-  return ['cube', 'free-cubes', 'void-prism', 'topography'].includes(state.diyPreset);
+  return ['cube', 'free-cubes', 'void-prism', 'topography', 'chladni'].includes(state.diyPreset);
 }
 
 function savePresetFsrPreferences() {
@@ -2120,6 +2302,7 @@ function syncRenderClarityControls(now = performance.now()) {
   if (els.renderClarityRange) {
     els.renderClarityRange.disabled = !!clarity.auto;
     els.renderClarityRange.value = String(clarity.auto ? effectivePercent : clarity.manualPercent);
+    syncElasticRangeVisual(els.renderClarityRange);
   }
   if (els.renderClarityValue) {
     els.renderClarityValue.textContent = clarity.auto
@@ -2332,6 +2515,16 @@ function applyPresetUpscaler(options = {}) {
     if (state.playbackPage && isVoidPrismPreset()) activeDiagnostics = diagnostics;
   }
 
+  if (state.chladni.runtime && window.FeChladniRuntime?.setRenderQuality) {
+    const result = window.FeChladniRuntime.setRenderQuality(
+      state.chladni.runtime,
+      presetFsrRequest(state.playbackPage && isChladniPreset())
+    );
+    const diagnostics = runtimeRenderQualityDiagnostics(window.FeChladniRuntime, state.chladni.runtime, result);
+    window.FeChladniRuntime.resize(state.chladni.runtime, presetFsrOutputPixelRatio(diagnostics));
+    if (state.playbackPage && isChladniPreset()) activeDiagnostics = diagnostics;
+  }
+
   state.presetFsr.lastDiagnostics = activeDiagnostics;
   if (activeDiagnostics) state.clientRuntime.renderCapabilities.diagnostics = activeDiagnostics;
   syncPresetFsrControls(activeDiagnostics);
@@ -2389,6 +2582,9 @@ function applyRenderClarity(options = {}) {
   }
   if (state.voidPrism.runtime && window.FeVoidPrismRuntime) {
     window.FeVoidPrismRuntime.resize(state.voidPrism.runtime, pixelRatio);
+  }
+  if (state.chladni.runtime && window.FeChladniRuntime) {
+    window.FeChladniRuntime.resize(state.chladni.runtime, pixelRatio);
   }
   const topo = state.sonicTopography;
   if (topo.renderer && Math.abs((topo.renderer.getPixelRatio?.() || 1) - pixelRatio) > 0.001) {
@@ -3267,8 +3463,12 @@ function isSonicTopographyPreset(preset = state.diyPreset) {
   return preset === 'topography';
 }
 
+function isChladniPreset(preset = state.diyPreset) {
+  return preset === 'chladni';
+}
+
 function playbackPresetsUseNativeRefresh() {
-  return !reducedMotion && state.playbackPage;
+  return !document.hidden;
 }
 
 function isRainGlassPreset(preset = state.diyPreset) {
@@ -3293,6 +3493,7 @@ function normalizeDiyPreset(preset) {
     preset === 'free-cubes' ||
     preset === 'void-prism' ||
     preset === 'topography' ||
+    preset === 'chladni' ||
     preset === 'rain-glass' ||
     preset === 'cover-particles' ||
     preset === 'sandbox-scene' ||
@@ -3995,11 +4196,17 @@ function resizeDynamicCubeRenderer() {
   if (cube.renderQuality) cube.renderQuality.resize(width, height, cube.renderer.getPixelRatio?.() || renderPixelRatio('webgl'));
   else cube.renderer.setSize(width, height, false);
   const aspect = width / Math.max(1, height);
-  const view = 92 / zoom;
+  // The old 460px rig kept the model compact but clipped expanding voxels at its edges.
+  // Preserve that apparent scale while letting the renderer cover the complete stage.
+  const legacyRigHeight = Math.max(1, Math.min((window.innerHeight || height) * 0.6, 460));
+  const legacyDepthScale = 1200 / (1200 + 72);
+  const legacyMotionScale = reducedMotion ? 0.88 : 1;
+  const view = (92 / zoom) * (height / (legacyRigHeight * legacyDepthScale * legacyMotionScale));
+  const verticalOffset = view * 0.03;
   cube.camera.left = -view * aspect / 2;
   cube.camera.right = view * aspect / 2;
-  cube.camera.top = view / 2;
-  cube.camera.bottom = -view / 2;
+  cube.camera.top = view / 2 - verticalOffset;
+  cube.camera.bottom = -view / 2 - verticalOffset;
   cube.camera.updateProjectionMatrix();
 }
 
@@ -4209,6 +4416,7 @@ function buildVoidPrism() {
     lyric: state.lyricDisplayText || playbackLyricText(),
     subtitle: state.lyricSubtitleText || playbackLyricSubtitle(),
     palette: fallbackLyricPalette(state.currentSong),
+    fontFamily: activeTextFontFamilyStack(),
     pixelRatio: renderPixelRatio('webgl'),
     createRenderer: (options) => createDirectX11Renderer(window.THREE, options)
   });
@@ -4246,7 +4454,9 @@ function updateVoidPrismMotion() {
   window.FeVoidPrismRuntime.setLyric(
     runtime,
     state.lyricDisplayText || playbackLyricText(),
-    state.lyricSubtitleText || playbackLyricSubtitle()
+    state.lyricSubtitleText || playbackLyricSubtitle(),
+    undefined,
+    activeTextFontFamilyStack()
   );
   const frame = state.voidPrism.frame;
   frame.now = performance.now();
@@ -4271,6 +4481,135 @@ function voidPrismRuntimeSnapshot() {
     active: false,
     selected: isVoidPrismPreset(),
     canvasCount: els.voidPrismCore ? els.voidPrismCore.querySelectorAll('canvas').length : 0
+  };
+}
+
+function applyChladniPalette(palette) {
+  const source = palette || fallbackLyricPalette(state.currentSong);
+  state.chladni.palette = source;
+  if (els.chladniScene) {
+    const fallback = [source.glow, source.primary, source.highlight];
+    const coverColors = [0, 1, 2].map((index) => source.coverColors?.[index] || fallback[index]);
+    const softColors = coverColors.map((color, index) => playbackGlowColor(color, index));
+    els.chladniScene.style.setProperty('--chladni-a', rgbTriplet(softColors[0]));
+    els.chladniScene.style.setProperty('--chladni-b', rgbTriplet(softColors[1]));
+    els.chladniScene.style.setProperty('--chladni-hot', rgbTriplet(softColors[2]));
+    els.chladniScene.style.setProperty('--chladni-depth', rgbTriplet(source.depth));
+  }
+  if (state.chladni.runtime && window.FeChladniRuntime) {
+    window.FeChladniRuntime.setPalette(state.chladni.runtime, source);
+  }
+}
+
+function syncChladniModeControls() {
+  const planeActive = state.chladni.mode === 'plane';
+  if (els.chladniPlaneButton) {
+    els.chladniPlaneButton.classList.toggle('is-active', planeActive);
+    els.chladniPlaneButton.setAttribute('aria-pressed', String(planeActive));
+  }
+  if (els.chladniCubeButton) {
+    els.chladniCubeButton.classList.toggle('is-active', !planeActive);
+    els.chladniCubeButton.setAttribute('aria-pressed', String(!planeActive));
+  }
+}
+
+function setChladniMode(mode) {
+  state.chladni.mode = mode === 'plane' ? 'plane' : 'cube';
+  if (state.chladni.runtime && window.FeChladniRuntime) {
+    window.FeChladniRuntime.setMode(state.chladni.runtime, state.chladni.mode);
+  }
+  syncChladniModeControls();
+  renderDiySelectedPresetConfig();
+  requestOrbFrame();
+}
+
+function buildChladni() {
+  if (!els.chladniCore || state.chladni.runtime || !window.FeChladniRuntime || !window.THREE) return;
+  const lowEndAndroid = ANDROID_CLIENT && RENDER_PROFILE.tier === 'economy';
+  const particleCount = lowEndAndroid
+    ? 72000
+    : MOBILE_RENDER_TARGET
+      ? 120000
+      : 500000;
+  const planeParticleCount = lowEndAndroid
+    ? 72000
+    : MOBILE_RENDER_TARGET
+      ? 100000
+      : 600000;
+  state.chladni.runtime = window.FeChladniRuntime.create(els.chladniCore, {
+    particleCount,
+    planeParticleCount,
+    mode: state.chladni.mode,
+    palette: state.chladni.palette || fallbackLyricPalette(state.currentSong),
+    pixelRatio: renderPixelRatio('webgl'),
+    createRenderer: (options) => createDirectX11Renderer(window.THREE, options)
+  });
+  syncChladniModeControls();
+}
+
+function disposeChladni() {
+  const runtime = state.chladni.runtime;
+  if (!runtime || !window.FeChladniRuntime) return;
+  const before = window.FeChladniRuntime.diagnostics(runtime);
+  window.FeChladniRuntime.dispose(runtime);
+  state.chladni.lastDiagnostics = {
+    ...before,
+    ...window.FeChladniRuntime.diagnostics(runtime)
+  };
+  state.chladni.runtime = null;
+}
+
+function resizeChladniRenderer() {
+  if (!state.chladni.runtime || !window.FeChladniRuntime) return;
+  window.FeChladniRuntime.resize(state.chladni.runtime, renderPixelRatio('webgl'));
+}
+
+function updateChladniVisibility() {
+  const visible = state.playbackPage && isChladniPreset();
+  if (els.chladniScene) els.chladniScene.hidden = !visible;
+  if (els.appShell) els.appShell.classList.toggle('has-chladni', visible);
+  if (visible) buildChladni();
+  else disposeChladni();
+  syncChladniModeControls();
+}
+
+function updateChladniMotion() {
+  const runtime = state.chladni.runtime;
+  if (!state.playbackPage || !isChladniPreset() || !runtime || !window.FeChladniRuntime) return;
+  const playing = !!els.audio && !els.audio.paused && !els.audio.ended;
+  const live = state.audioAnalysis.live ? state.audioAnalysis : state.visual;
+  const frame = state.chladni.frame;
+  frame.now = performance.now();
+  frame.playing = playing;
+  frame.bass = playing
+    ? Math.max(Number(live.lowFrequencyAmplitude) || 0, Number(live.bass) || 0, Number(live.subBass) || 0)
+    : 0;
+  frame.energy = playing ? Number(live.energy) || 0 : 0;
+  frame.mid = playing ? Math.max(Number(live.mid) || 0, Number(live.highMid) || 0) : 0;
+  frame.treble = playing ? Math.max(Number(live.treble) || 0, Number(live.brilliance) || 0) : 0;
+  frame.beat = playing ? Number(live.beat) || 0 : 0;
+  frame.yaw = state.playbackVisual.yaw;
+  frame.pitch = state.playbackVisual.pitch;
+  frame.zoom = state.playbackVisual.zoom;
+  frame.reducedMotion = reducedMotion;
+  frame.pixelRatio = presetFsrOutputPixelRatio(state.presetFsr.lastDiagnostics);
+  window.FeChladniRuntime.update(runtime, frame);
+}
+
+function chladniRuntimeSnapshot() {
+  if (state.chladni.runtime && window.FeChladniRuntime) {
+    return {
+      ...window.FeChladniRuntime.diagnostics(state.chladni.runtime),
+      selected: isChladniPreset(),
+      controlsVisible: !!els.chladniPresetControls && !els.chladniPresetControls.hidden
+    };
+  }
+  return {
+    ...(state.chladni.lastDiagnostics || {}),
+    active: false,
+    selected: isChladniPreset(),
+    displayMode: state.chladni.mode,
+    canvasCount: els.chladniCore ? els.chladniCore.querySelectorAll('canvas').length : 0
   };
 }
 
@@ -4791,6 +5130,12 @@ function updateWallpaperDiyVars() {
   if (els.wallpaperBlurValue) els.wallpaperBlurValue.textContent = `${Math.round(state.wallpaperBlur)}px`;
   if (els.wallpaperScaleRange) els.wallpaperScaleRange.value = String(Math.round(state.wallpaperScale * 100));
   if (els.wallpaperScaleValue) els.wallpaperScaleValue.textContent = `${Math.round(state.wallpaperScale * 100)}%`;
+  [
+    els.wallpaperOpacityRange,
+    els.wallpaperBrightnessRange,
+    els.wallpaperBlurRange,
+    els.wallpaperScaleRange
+  ].forEach(syncElasticRangeVisual);
 }
 
 function currentWallpaperIntrinsicSize() {
@@ -5072,7 +5417,7 @@ function coverParticlePresetVisible() {
 function playCoverParticleEngine() {
   const cover = state.coverParticle;
   const container = cover.engineContainer;
-  if (!cover.engineVisible || !coverParticlePresetVisible() || cover.enginePlaying || typeof container?.play !== 'function') return;
+  if (!cover.engineVisible || !coverParticlePresetVisible() || !isPlaybackClockRunning() || cover.enginePlaying || typeof container?.play !== 'function') return;
   try {
     container.play();
     cover.enginePlaying = true;
@@ -5114,6 +5459,23 @@ function updateCoverParticleBackgroundMode() {
   if (els.diyCoverParticleBackgroundValue) {
     els.diyCoverParticleBackgroundValue.textContent = state.coverParticle.backgroundEnabled ? 'ON' : 'OFF';
   }
+  const motionPercent = coverParticleMotionPercent();
+  if (els.diyCoverParticleMotionRange) {
+    els.diyCoverParticleMotionRange.value = String(motionPercent);
+    els.diyCoverParticleMotionRange.setAttribute('aria-valuetext', `${motionPercent}%`);
+    syncElasticRangeVisual(els.diyCoverParticleMotionRange);
+  }
+  if (els.diyCoverParticleMotionValue) {
+    els.diyCoverParticleMotionValue.textContent = `${motionPercent}%`;
+  }
+}
+
+function coverParticleMotionPercent() {
+  return Math.round(clamp(Number(state.coverParticle.motionAmplitude) || 0, 0, 2) * 100);
+}
+
+function coverParticleMotionScale() {
+  return clamp(Number(state.coverParticle.motionAmplitude) || 0, 0, 2) * (reducedMotion ? 0.35 : 1);
 }
 
 function addSonicTopographyRipple(x, z, strength = 1, white = false) {
@@ -5834,9 +6196,12 @@ function applyCoverParticlePalette(palette) {
   const source = palette || fallbackLyricPalette(state.currentSong);
   state.coverParticle.palette = source;
   if (!els.coverParticleScene || !source) return;
-  els.coverParticleScene.style.setProperty('--cover-particle-a', rgbCss(source.primary, 0.58));
-  els.coverParticleScene.style.setProperty('--cover-particle-b', rgbCss(source.glow, 0.46));
-  els.coverParticleScene.style.setProperty('--cover-particle-c', rgbCss(source.depth, 0.82));
+  const fallback = [source.primary, source.glow, source.highlight];
+  const coverColors = [0, 1, 2].map((index) => source.coverColors?.[index] || fallback[index]);
+  const softColors = coverColors.map((color, index) => playbackGlowColor(color, index));
+  els.coverParticleScene.style.setProperty('--cover-particle-a', rgbCss(softColors[0], 0.66));
+  els.coverParticleScene.style.setProperty('--cover-particle-b', rgbCss(softColors[1], 0.58));
+  els.coverParticleScene.style.setProperty('--cover-particle-c', rgbCss(softColors[2], 0.62));
 }
 
 function playbackGlowColor(color, index = 0) {
@@ -5862,10 +6227,10 @@ function applyQishuiPlaybackPalette(palette) {
   const surface = mixRgb(blended, black, 0.58);
   [els.qishuiPlaybackPhone, els.appShell].forEach((target) => {
     if (!target) return;
-    target.style.setProperty('--playback-cover-a', rgbCss(softA, 0.62));
-    target.style.setProperty('--playback-cover-b', rgbCss(softB, 0.58));
-    target.style.setProperty('--playback-cover-c', rgbCss(softC, 0.6));
-    target.style.setProperty('--playback-cover-surface', rgbCss(surface, 0.12));
+    target.style.setProperty('--playback-cover-a', rgbCss(softA, 0.24));
+    target.style.setProperty('--playback-cover-b', rgbCss(softB, 0.22));
+    target.style.setProperty('--playback-cover-c', rgbCss(softC, 0.23));
+    target.style.setProperty('--playback-cover-surface', rgbCss(surface, 0.045));
   });
   applyQishuiPlaybackLyricPalette(palette);
 }
@@ -5970,6 +6335,7 @@ function applyLyricPalette(palette) {
   }
   applyDynamicCubePalette(palette);
   applyFreeCubePalette(palette);
+  applyChladniPalette(palette);
   applySonicTopographyPalette(palette);
   applyCoverParticlePalette(palette);
   syncTextPaletteControls();
@@ -10385,20 +10751,55 @@ function renderLoginStatus(payload = {}) {
   renderDockQualityMenu();
 }
 
+const LOGIN_STATUS_RETRY_DELAYS = Object.freeze([320, 700, 1400, 2600]);
+
+function loginStatusNeedsRetry(payload = {}) {
+  const code = safeText(payload.code, '').toUpperCase();
+  const gatewayState = safeText(payload.gatewayState || payload.status, '').toLowerCase();
+  return payload.retryable === true
+    || gatewayState === 'starting'
+    || code.includes('STARTING');
+}
+
+function clearLoginStatusRetry(provider = state.activeProvider) {
+  const id = providerInfo(provider).id;
+  window.clearTimeout(state.loginStatusRetryTimers[id]);
+  delete state.loginStatusRetryTimers[id];
+  delete state.loginStatusRetryAttempts[id];
+}
+
+function scheduleLoginStatusRetry(provider = state.activeProvider) {
+  const id = providerInfo(provider).id;
+  if (state.loginStatusRetryTimers[id]) return;
+  const attempt = Math.max(0, Number(state.loginStatusRetryAttempts[id]) || 0);
+  if (attempt >= LOGIN_STATUS_RETRY_DELAYS.length) return;
+  state.loginStatusRetryAttempts[id] = attempt + 1;
+  state.loginStatusRetryTimers[id] = window.setTimeout(() => {
+    delete state.loginStatusRetryTimers[id];
+    refreshLoginStatus(id);
+  }, LOGIN_STATUS_RETRY_DELAYS[attempt]);
+}
+
 async function refreshLoginStatus(provider = state.activeProvider) {
+  const id = providerInfo(provider).id;
   try {
-    const payload = await apiJson(`/api/login/status?${query({ provider })}`);
+    const payload = await apiJson(`/api/login/status?${query({ provider: id })}`);
+    const retryable = loginStatusNeedsRetry(payload);
     renderLoginStatus(payload);
-    if (providerInfo(provider).id !== state.activeProvider) return payload;
+    if (payload.loggedIn || !retryable) clearLoginStatusRetry(id);
+    else scheduleLoginStatusRetry(id);
+    if (id !== state.activeProvider) return payload;
     if (payload.loggedIn) scheduleCommunityRefresh(120);
-    else renderCommunityState({ provider, loggedIn: false, account: payload.account || {} });
+    else renderCommunityState({ provider: id, loggedIn: false, account: payload.account || {} });
     return payload;
   } catch (error) {
-    renderLoginStatus({ provider, loggedIn: false });
-    if (providerInfo(provider).id === state.activeProvider) {
-      renderCommunityState({ provider, loggedIn: false });
+    const previous = state.loginStatusByProvider[id];
+    if (!previous?.loggedIn) renderLoginStatus({ provider: id, loggedIn: false });
+    scheduleLoginStatusRetry(id);
+    if (id === state.activeProvider && !previous?.loggedIn) {
+      renderCommunityState({ provider: id, loggedIn: false });
     }
-    return { provider, loggedIn: false };
+    return previous?.loggedIn ? previous : { provider: id, loggedIn: false };
   }
 }
 
@@ -10960,13 +11361,28 @@ function toggleCommunityPageFromPlayback() {
   if (visible) setCommunityCardCollapsed(false);
 }
 
+function isPointerNearSearchBar(event) {
+  if (!els.searchForm || !Number.isFinite(event?.clientX) || !Number.isFinite(event?.clientY)) return false;
+  const rect = els.searchForm.getBoundingClientRect();
+  const width = els.searchForm.offsetWidth || rect.width;
+  const height = els.searchForm.offsetHeight || rect.height;
+  const left = rect.left - Math.max(0, width - rect.width) / 2;
+  const top = els.searchForm.offsetTop;
+  const paddingX = 24;
+  const paddingY = 16;
+  return event.clientX >= left - paddingX
+    && event.clientX <= left + width + paddingX
+    && event.clientY >= top - paddingY
+    && event.clientY <= top + height + paddingY;
+}
+
 function updatePlaybackChromeFromPointer(event) {
   if (!event) return;
   const target = event.target instanceof Element ? event.target : null;
-  const overSearchChrome = !!target && !!target.closest('.top-search, .search-suggestions, .favorite-library, .runtime-topbar, .runtime-settings-panel, .window-controls, .netease-login-button, .home-button, .diy-button, .diy-sidebar, .netease-login-dialog');
+  const overSearchChrome = !!target && !!target.closest('.top-search, .search-suggestions, .favorite-library, .playlist-favorite-popover');
   const overDock = !!target && !!target.closest('.player-dock');
   setPlaybackChromeVisibility({
-    searchVisible: state.playbackPage && (overSearchChrome || event.clientY <= 96),
+    searchVisible: state.playbackPage && (overSearchChrome || isPointerNearSearchBar(event)),
     dockVisible: state.playbackChrome.dockPinned || overDock || event.clientY >= window.innerHeight - 128
   });
 }
@@ -11003,6 +11419,7 @@ const PLAYBACK_CARD_PROVIDER_ACCENTS = Object.freeze({
   qishui: '#ff8a4c',
   local: '#7dd3fc'
 });
+const PLAYBACK_CARD_VISIBILITY_TRANSITION_MS = 240;
 
 function playbackCardSong(song = state.currentSong) {
   return song || null;
@@ -11063,13 +11480,18 @@ function syncQishuiPlaybackHiddenState() {
   }
 }
 
-function setQishuiPlaybackHidden(hidden) {
+function clearQishuiPlaybackVisibilityTransition() {
+  window.clearTimeout(state.qishuiPlaybackCard.visibilityTransitionTimer);
+  window.cancelAnimationFrame(state.qishuiPlaybackCard.visibilityTransitionFrame);
+  state.qishuiPlaybackCard.visibilityTransitionTimer = 0;
+  state.qishuiPlaybackCard.visibilityTransitionFrame = 0;
+  if (!els.qishuiPlaybackCard) return;
+  els.qishuiPlaybackCard.classList.remove('is-visibility-sliding-right', 'is-visibility-snap');
+  els.qishuiPlaybackCard.removeAttribute('aria-busy');
+}
+
+function commitQishuiPlaybackHiddenState(hidden) {
   const nextHidden = !!hidden;
-  if (nextHidden) {
-    state.playbackPlaylistPickerOpen = false;
-    if (state.playlistSongPageOpen) closePlaylistShelf({ reopenPicker: false });
-    if (state.diyOpen) setDiyOpen(false);
-  }
   state.qishuiPlaybackCard.hiddenByUser = nextHidden;
   syncQishuiPlaybackHiddenState();
   syncPlaybackCardPanelState();
@@ -11077,6 +11499,46 @@ function setQishuiPlaybackHidden(hidden) {
     updateQishuiPlaybackLyrics(state.lyricDisplayText, state.lyricSubtitleText);
     requestOrbFrame();
   }
+}
+
+function setQishuiPlaybackHidden(hidden) {
+  const nextHidden = !!hidden;
+  if (nextHidden) {
+    state.playbackPlaylistPickerOpen = false;
+    if (state.playlistSongPageOpen) closePlaylistShelf({ reopenPicker: false });
+    if (state.diyOpen) setDiyOpen(false);
+  }
+  const card = els.qishuiPlaybackCard;
+  clearQishuiPlaybackVisibilityTransition();
+  if (!card || reducedMotion) {
+    commitQishuiPlaybackHiddenState(nextHidden);
+    return;
+  }
+
+  card.setAttribute('aria-busy', 'true');
+  if (nextHidden) {
+    card.classList.add('is-visibility-sliding-right');
+    state.qishuiPlaybackCard.visibilityTransitionTimer = window.setTimeout(() => {
+      state.qishuiPlaybackCard.visibilityTransitionTimer = 0;
+      card.classList.add('is-visibility-snap');
+      commitQishuiPlaybackHiddenState(true);
+      card.classList.remove('is-visibility-sliding-right');
+      void card.offsetWidth;
+      card.classList.remove('is-visibility-snap');
+      card.removeAttribute('aria-busy');
+    }, PLAYBACK_CARD_VISIBILITY_TRANSITION_MS);
+    return;
+  }
+
+  card.classList.add('is-visibility-snap', 'is-visibility-sliding-right');
+  commitQishuiPlaybackHiddenState(false);
+  void card.offsetWidth;
+  card.classList.remove('is-visibility-snap');
+  state.qishuiPlaybackCard.visibilityTransitionFrame = window.requestAnimationFrame(() => {
+    state.qishuiPlaybackCard.visibilityTransitionFrame = 0;
+    card.classList.remove('is-visibility-sliding-right');
+    card.removeAttribute('aria-busy');
+  });
 }
 
 function toggleQishuiPlaybackHidden() {
@@ -11283,6 +11745,7 @@ function updateQishuiPlaybackLyrics(
       lineClass: 'qishui-playback-lyric-line',
       lazyGlyphs: true
     });
+    list.__qishuiPlaybackLyricLines = Array.from(list.children);
   }
 
   const { activeIndex, currentTime, progressPercent } = qishuiPlaybackBookFrame(lines, playbackTime);
@@ -11297,10 +11760,30 @@ function updateQishuiPlaybackLyrics(
   cardState.lastLyricIndex = activeIndex;
 
   if (cardState.lyricBookIndex !== activeIndex) {
+    const previousBookIndex = cardState.lyricBookIndex;
     cardState.lyricBookIndex = activeIndex;
     cardState.lyricBookCurrentLine = null;
     cardState.lyricBookArrivedIndex = -2;
-    list.querySelectorAll('.qishui-playback-lyric-line').forEach((line) => {
+    let lyricLineElements = list.__qishuiPlaybackLyricLines;
+    if (!Array.isArray(lyricLineElements) || lyricLineElements.length !== lines.length) {
+      lyricLineElements = Array.from(list.querySelectorAll('.qishui-playback-lyric-line'));
+      list.__qishuiPlaybackLyricLines = lyricLineElements;
+    }
+    const previousIndexIsValid = Number.isInteger(previousBookIndex)
+      && previousBookIndex >= 0
+      && previousBookIndex < lyricLineElements.length;
+    // Only lines between the old/new focus plus the six-line visual falloff can
+    // change. Keeping the remaining DOM untouched removes an O(n) style pass
+    // whenever a lyric advances, which is important on 120/144/165 Hz panels.
+    const updateStart = previousIndexIsValid
+      ? Math.max(0, Math.min(previousBookIndex, activeIndex) - 6)
+      : 0;
+    const updateEnd = previousIndexIsValid
+      ? Math.min(lyricLineElements.length - 1, Math.max(previousBookIndex, activeIndex) + 6)
+      : lyricLineElements.length - 1;
+    for (let elementIndex = updateStart; elementIndex <= updateEnd; elementIndex += 1) {
+      const line = lyricLineElements[elementIndex];
+      if (!line) continue;
       const index = Number(line.dataset.bookLyricIndex) || 0;
       const distance = Math.min(6, Math.abs(index - activeIndex));
       const isTarget = index === activeIndex;
@@ -11319,7 +11802,7 @@ function updateQishuiPlaybackLyrics(
       } else if (index === activeIndex + 1) {
         line.id = 'qishuiPlaybackLyricNext';
       }
-    });
+    }
     resetBookLyricScrollState({ store: cardState });
   }
 
@@ -11420,12 +11903,18 @@ function updateQishuiPlaybackProgress(
       `${(progress * 100).toFixed(3)}%`
     );
   }
-  els.qishuiPlaybackProgressRange.setAttribute(
-    'aria-valuetext',
-    `${formatTime(safeCurrent)} / ${formatTime(safeDuration)}`
-  );
-  if (els.qishuiPlaybackCurrentTime) els.qishuiPlaybackCurrentTime.textContent = formatTime(safeCurrent);
-  if (els.qishuiPlaybackTotalTime) els.qishuiPlaybackTotalTime.textContent = formatTime(safeDuration);
+  const currentTimeLabel = formatTime(safeCurrent);
+  const totalTimeLabel = formatTime(safeDuration);
+  const progressAriaLabel = `${currentTimeLabel} / ${totalTimeLabel}`;
+  if (els.qishuiPlaybackProgressRange.getAttribute('aria-valuetext') !== progressAriaLabel) {
+    els.qishuiPlaybackProgressRange.setAttribute('aria-valuetext', progressAriaLabel);
+  }
+  if (els.qishuiPlaybackCurrentTime && els.qishuiPlaybackCurrentTime.textContent !== currentTimeLabel) {
+    els.qishuiPlaybackCurrentTime.textContent = currentTimeLabel;
+  }
+  if (els.qishuiPlaybackTotalTime && els.qishuiPlaybackTotalTime.textContent !== totalTimeLabel) {
+    els.qishuiPlaybackTotalTime.textContent = totalTimeLabel;
+  }
 }
 
 function previewQishuiPlaybackSeek() {
@@ -11444,6 +11933,7 @@ function previewQishuiPlaybackSeek() {
     state.qishuiPlaybackCard.pendingAudioSeekTarget = null;
   } else if (els.progressRange) {
     els.progressRange.value = els.qishuiPlaybackProgressRange.value;
+    syncElasticRangeVisual(els.progressRange);
     if (els.audio?.src) state.qishuiPlaybackCard.pendingAudioSeekTarget = target;
   }
   updateQishuiPlaybackProgress(target, duration, { forceRange: true });
@@ -11609,6 +12099,7 @@ function syncQishuiPlaybackCard() {
   state.qishuiPlaybackCard.lyricBookIndex = -2;
   state.qishuiPlaybackCard.lyricBookCurrentLine = null;
   state.qishuiPlaybackCard.lyricBookArrivedIndex = -2;
+  clearQishuiPlaybackVisibilityTransition();
   window.cancelAnimationFrame(state.qishuiPlaybackCard.lyricBookLayoutFrame);
   state.qishuiPlaybackCard.lyricBookLayoutFrame = 0;
   resetBookLyricScrollState({ store: state.qishuiPlaybackCard });
@@ -11777,6 +12268,8 @@ function updatePlaybackPageClass() {
   updateDynamicCubeVisibility();
   updateFreeCubeVisibility();
   updateVoidPrismVisibility();
+  updateChladniVisibility();
+  updateChladniTextTransform();
   updateSonicTopographyVisibility();
   updateCoverParticleVisibility();
   updateWallpaperVisibility();
@@ -13264,6 +13757,251 @@ function updateTextPresetAvailability() {
   syncTextPresetButtons();
 }
 
+function textFontPresetId(preset = state.textPreset) {
+  if (TEXT_PALETTE_PRESET_IDS.includes(preset)) return preset;
+  if (TEXT_PALETTE_PRESET_IDS.includes(state.lastSelectableTextPreset)) return state.lastSelectableTextPreset;
+  return 'depth';
+}
+
+function textFontOption(fontId = TEXT_FONT_DEFAULT_ID) {
+  const id = normalizeTextFontId(fontId);
+  return TEXT_FONT_OPTIONS.find((option) => option.id === id)
+    || TEXT_FONT_OPTIONS.find((option) => option.id === TEXT_FONT_DEFAULT_ID);
+}
+
+function textFontLicenseAvailability(option) {
+  if (!option || option.id === TEXT_FONT_DEFAULT_ID) return 'system';
+  if (option.embeddedFamily) return 'bundled';
+  if (TEXT_FONT_LICENSE_REQUIRED_IDS.has(option.id)) return 'authorization-required';
+  if (TEXT_FONT_LICENSE_VERIFIED_NOT_BUNDLED_IDS.has(option.id)) return 'verified-not-bundled';
+  return 'unverified';
+}
+
+function textFontPreference(preset = state.textPreset) {
+  const presetId = textFontPresetId(preset);
+  const fontId = normalizeTextFontId(state.textFontPreferences?.[presetId]);
+  state.textFontPreferences[presetId] = fontId;
+  return textFontOption(fontId);
+}
+
+function quoteTextFontFamily(family) {
+  return `"${String(family || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+function textFontFamilyStack(option = textFontPreference()) {
+  const fallback = TEXT_FONT_FALLBACKS[option?.category] || TEXT_FONT_FALLBACKS.system;
+  const exactFamilies = Array.isArray(option?.families)
+    ? option.families.map(quoteTextFontFamily)
+    : [];
+  return [...new Set([...exactFamilies, ...fallback.families])].join(', ');
+}
+
+function activeTextFontFamilyStack() {
+  return state.textFontStack || textFontFamilyStack();
+}
+
+function textFontMetrics(context, family, fallback, sample) {
+  context.font = `72px ${quoteTextFontFamily(family)}, ${fallback}`;
+  const metrics = context.measureText(sample);
+  return [
+    metrics.width,
+    metrics.actualBoundingBoxLeft || 0,
+    metrics.actualBoundingBoxRight || 0,
+    metrics.actualBoundingBoxAscent || 0,
+    metrics.actualBoundingBoxDescent || 0
+  ];
+}
+
+function localTextFontAvailable(family, coverage = 'cjk') {
+  if (!family || typeof document === 'undefined') return false;
+  const canvas = localTextFontAvailable.canvas
+    || (localTextFontAvailable.canvas = document.createElement('canvas'));
+  const context = canvas.getContext('2d');
+  if (!context) return false;
+  const sample = coverage === 'latin'
+    ? 'FE Monster Hope Facon 0123456789'
+    : '字体预设歌词光影测试';
+  return ['monospace', 'serif', 'sans-serif'].some((fallback) => {
+    context.font = `72px ${fallback}`;
+    const base = context.measureText(sample);
+    const baseMetrics = [
+      base.width,
+      base.actualBoundingBoxLeft || 0,
+      base.actualBoundingBoxRight || 0,
+      base.actualBoundingBoxAscent || 0,
+      base.actualBoundingBoxDescent || 0
+    ];
+    const candidateMetrics = textFontMetrics(context, family, fallback, sample);
+    return candidateMetrics.some((value, index) => Math.abs(value - baseMetrics[index]) > 0.1);
+  });
+}
+
+function detectedTextFontFamily(option) {
+  if (!option || option.id === TEXT_FONT_DEFAULT_ID) return 'system-ui';
+  if (option.embeddedFamily) return option.embeddedFamily;
+  return option.families.find((family) => localTextFontAvailable(family, option.coverage)) || '';
+}
+
+function textFontPreviewSample(option) {
+  return option?.coverage === 'latin'
+    ? `FE Monster · ${option.label}`
+    : '此刻，听见光的回声';
+}
+
+function saveTextFontPreferences() {
+  try {
+    window.localStorage.setItem(TEXT_FONT_PREFS_KEY, JSON.stringify({
+      version: 1,
+      fonts: state.textFontPreferences
+    }));
+  } catch (error) {
+  }
+}
+
+function initializeTextFontOptions() {
+  if (!els.textFontSelect) return;
+  if (els.textFontSelect.options.length !== TEXT_FONT_OPTIONS.length) {
+    const fragment = document.createDocumentFragment();
+    TEXT_FONT_OPTIONS.forEach((option) => {
+      const item = document.createElement('option');
+      item.value = option.id;
+      item.textContent = option.label;
+      item.style.fontFamily = textFontFamilyStack(option);
+      fragment.appendChild(item);
+    });
+    els.textFontSelect.replaceChildren(fragment);
+  }
+  refreshTextFontAvailability();
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(() => refreshTextFontAvailability()).catch(() => {});
+  }
+}
+
+function refreshTextFontAvailability() {
+  if (!els.textFontSelect) return;
+  TEXT_FONT_OPTIONS.forEach((option) => {
+    const detectedFamily = detectedTextFontFamily(option);
+    state.textFontAvailability[option.id] = detectedFamily;
+    const item = Array.from(els.textFontSelect.options).find((candidate) => candidate.value === option.id);
+    if (!item) return;
+    const fallback = TEXT_FONT_FALLBACKS[option.category] || TEXT_FONT_FALLBACKS.system;
+    const exact = option.id === TEXT_FONT_DEFAULT_ID || !!detectedFamily;
+    const licenseStatus = textFontLicenseAvailability(option);
+    item.dataset.fontAvailable = String(exact);
+    item.dataset.fontCoverage = option.coverage || 'cjk';
+    if (licenseStatus === 'system') {
+      item.textContent = option.label;
+      item.title = '跟随当前设备';
+    } else if (licenseStatus === 'bundled') {
+      item.textContent = `${option.label} · 已内置${option.coverage === 'latin' ? '（仅英文）' : ''}`;
+      item.title = `已内置：${option.embeddedFamily}；${option.embeddedLicense}${option.coverage === 'latin' ? '；仅用于英文字符' : '；缺失字符自动回退'}`;
+    } else if (exact) {
+      item.textContent = `${option.label} · ${option.coverage === 'latin' ? '本机可用（仅英文）' : '本机可用'}`;
+      item.title = `本机已检测：${detectedFamily}；字体文件未随程序分发${licenseStatus === 'authorization-required' ? '，内置仍需取得软件嵌入授权' : ''}`;
+    } else if (licenseStatus === 'authorization-required') {
+      item.textContent = `${option.label} · 需嵌入授权`;
+      item.title = `未内置；需要版权方的软件或 APP 嵌入授权，当前使用${fallback.label}`;
+    } else if (licenseStatus === 'verified-not-bundled') {
+      item.textContent = `${option.label} · 授权已核 · 未内置`;
+      item.title = `已确认允许软件嵌入，但当前未取得可随包保留的完整原始许可包，暂用${fallback.label}`;
+    } else {
+      item.textContent = `${option.label} · 授权待核实`;
+      item.title = `未找到可核验的软件嵌入与再分发许可，未内置；当前使用${fallback.label}`;
+    }
+  });
+  syncTextFontControls();
+}
+
+function syncTextFontControls() {
+  if (!els.textFontControl || !els.textFontSelect) return;
+  const enabled = textLyricsEnabled();
+  const option = textFontPreference();
+  const fallback = TEXT_FONT_FALLBACKS[option.category] || TEXT_FONT_FALLBACKS.system;
+  const detectedFamily = state.textFontAvailability[option.id] || '';
+  const exact = option.id === TEXT_FONT_DEFAULT_ID || !!detectedFamily;
+  const licenseStatus = textFontLicenseAvailability(option);
+  const stack = textFontFamilyStack(option);
+  els.textFontControl.classList.toggle('is-disabled', !enabled);
+  els.textFontControl.dataset.fontAvailable = String(exact);
+  els.textFontSelect.disabled = !enabled;
+  els.textFontSelect.value = option.id;
+  els.textFontSelect.style.fontFamily = stack;
+  if (els.textFontPreview) {
+    els.textFontPreview.style.fontFamily = stack;
+    els.textFontPreview.textContent = textFontPreviewSample(option);
+  }
+  if (els.textFontStatus) {
+    els.textFontStatus.textContent = enabled ? option.label : '选择文字预设';
+  }
+  if (els.textFontAvailability) {
+    if (!enabled) {
+      els.textFontAvailability.textContent = '选择文字预设后可设置独立字体';
+    } else if (licenseStatus === 'system') {
+      els.textFontAvailability.textContent = '跟随当前设备的系统字体';
+    } else if (licenseStatus === 'bundled') {
+      els.textFontAvailability.textContent = `已内置：${option.label} · ${option.embeddedLicense}${option.coverage === 'latin' ? '；仅用于英文字符' : '；缺失字符自动回退'}`;
+    } else if (exact) {
+      els.textFontAvailability.textContent = `本机已检测：${detectedFamily}；字体文件未随程序分发${licenseStatus === 'authorization-required' ? '，内置仍需单独授权' : ''}`;
+    } else if (licenseStatus === 'authorization-required') {
+      els.textFontAvailability.textContent = `未内置：需要软件或 APP 嵌入授权；当前使用${fallback.label}`;
+    } else if (licenseStatus === 'verified-not-bundled') {
+      els.textFontAvailability.textContent = `授权允许嵌入，但原始许可包尚未内置；当前使用${fallback.label}`;
+    } else {
+      els.textFontAvailability.textContent = `软件嵌入与再分发授权待核实，未内置；当前使用${fallback.label}`;
+    }
+  }
+}
+
+function refreshTextFontDependentLayout() {
+  if (state.textPreset === 'book') {
+    resetBookLyricScrollState();
+    renderBookLyricLines(true);
+    syncPlaybackLyricToCurrentTime();
+  }
+  scheduleQishuiPlaybackLyricLayout();
+  if (state.voidPrism.runtime && window.FeVoidPrismRuntime) {
+    window.FeVoidPrismRuntime.setLyric(
+      state.voidPrism.runtime,
+      state.lyricDisplayText || playbackLyricText(),
+      state.lyricSubtitleText || playbackLyricSubtitle(),
+      undefined,
+      activeTextFontFamilyStack()
+    );
+  }
+}
+
+function applyTextFontPreference({ refreshLayout = false } = {}) {
+  const option = textFontPreference();
+  const stack = textFontFamilyStack(option);
+  state.textFontStack = stack;
+  if (option.id === TEXT_FONT_DEFAULT_ID) {
+    document.documentElement.style.removeProperty('--text-preset-font-family');
+  } else {
+    document.documentElement.style.setProperty('--text-preset-font-family', stack);
+  }
+  document.documentElement.dataset.textFont = option.id;
+  syncTextFontControls();
+  if (!refreshLayout) return;
+  refreshTextFontDependentLayout();
+  if (document.fonts?.load) {
+    document.fonts.load(`900 48px ${stack}`, '歌词字体测试').then(() => {
+      refreshTextFontAvailability();
+      refreshTextFontDependentLayout();
+    }).catch(() => {});
+  }
+}
+
+function setTextFontPreference(fontId) {
+  if (!textLyricsEnabled()) {
+    syncTextFontControls();
+    return;
+  }
+  state.textFontPreferences[textFontPresetId()] = normalizeTextFontId(fontId);
+  saveTextFontPreferences();
+  applyTextFontPreference({ refreshLayout: true });
+  requestOrbFrame();
+}
+
 function saveTextPalettePreferences() {
   try {
     window.localStorage.setItem(TEXT_PALETTE_PREFS_KEY, JSON.stringify({
@@ -13521,6 +14259,114 @@ function endBookLyricGesture(event) {
   return false;
 }
 
+function updateChladniTextTransform() {
+  if (!els.playbackLyricScene) return;
+  const transform = state.chladniTextTransform;
+  els.playbackLyricScene.style.setProperty('--chladni-text-x', `${transform.x.toFixed(1)}px`);
+  els.playbackLyricScene.style.setProperty('--chladni-text-y', `${transform.y.toFixed(1)}px`);
+  els.playbackLyricScene.style.setProperty('--chladni-text-rotate', `${transform.rotate.toFixed(2)}deg`);
+  els.playbackLyricScene.style.setProperty('--chladni-text-rotate-x', `${transform.rotateX.toFixed(2)}deg`);
+  els.playbackLyricScene.style.setProperty('--chladni-text-rotate-y', `${transform.rotateY.toFixed(2)}deg`);
+  els.playbackLyricScene.style.setProperty('--chladni-text-scale', transform.scale.toFixed(3));
+  els.playbackLyricScene.classList.toggle('is-chladni-text-dragging', !!transform.dragging);
+}
+
+function chladniTextDragTarget() {
+  if (!state.playbackPage || !isChladniPreset() || state.textPreset === 'none') return null;
+  return state.textPreset === 'book' ? els.bookLyricStage : els.playbackLyricCore;
+}
+
+function chladniTextPointInside(event, target = chladniTextDragTarget(), padding = 34) {
+  if (!target) return false;
+  const rect = target.getBoundingClientRect();
+  if (!rect.width || !rect.height) return false;
+  const transformScale = Math.max(0.1, Number(state.chladniTextTransform?.scale) || 1);
+  const stableWidth = Math.max(1, target.offsetWidth * transformScale || rect.width);
+  const stableHeight = Math.max(1, target.offsetHeight * transformScale || rect.height);
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  return event.clientX >= centerX - stableWidth / 2 - padding
+    && event.clientX <= centerX + stableWidth / 2 + padding
+    && event.clientY >= centerY - stableHeight / 2 - padding
+    && event.clientY <= centerY + stableHeight / 2 + padding;
+}
+
+function chladniTextGestureMode(event, target) {
+  if (!target || !chladniTextPointInside(event, target, 104)) return '';
+  const insideText = chladniTextPointInside(event, target, 0);
+  if (insideText) return 'move';
+  return 'rotate-3d';
+}
+
+function beginChladniTextGesture(event) {
+  const source = event.target instanceof Element ? event.target : null;
+  if (source?.closest('button, input, select, textarea, a, [role="button"], [role="slider"], #qishuiPlaybackCard')) return false;
+  const target = chladniTextDragTarget();
+  const mode = chladniTextGestureMode(event, target);
+  if (!mode) return false;
+  const transform = state.chladniTextTransform;
+  transform.dragging = true;
+  transform.mode = mode;
+  transform.pointerId = event.pointerId;
+  transform.startX = event.clientX;
+  transform.startY = event.clientY;
+  transform.startOffsetX = transform.x;
+  transform.startOffsetY = transform.y;
+  transform.startRotateX = transform.rotateX;
+  transform.startRotateY = transform.rotateY;
+  updateChladniTextTransform();
+  return true;
+}
+
+function moveChladniTextGesture(event) {
+  const transform = state.chladniTextTransform;
+  if (!transform.dragging || transform.pointerId !== event.pointerId) return false;
+  const stageRect = els.stage.getBoundingClientRect();
+  const maxX = Math.max(80, stageRect.width * 0.44);
+  const maxY = Math.max(60, stageRect.height * 0.42);
+  if (transform.mode === 'rotate-3d') {
+    transform.rotateX = transform.startRotateX - (event.clientY - transform.startY) * 0.48;
+    transform.rotateY = transform.startRotateY + (event.clientX - transform.startX) * 0.48;
+  } else {
+    transform.x = clamp(transform.startOffsetX + event.clientX - transform.startX, -maxX, maxX);
+    transform.y = clamp(transform.startOffsetY + event.clientY - transform.startY, -maxY, maxY);
+  }
+  updateChladniTextTransform();
+  return true;
+}
+
+function endChladniTextGesture(event) {
+  const transform = state.chladniTextTransform;
+  if (!transform.dragging || transform.pointerId !== event.pointerId) return false;
+  transform.dragging = false;
+  transform.mode = 'move';
+  transform.pointerId = null;
+  updateChladniTextTransform();
+  return true;
+}
+
+function scaleChladniTextFromWheel(event) {
+  const target = chladniTextDragTarget();
+  if (!chladniTextPointInside(event, target, 28)) return false;
+  const transform = state.chladniTextTransform;
+  const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+  transform.scale = clamp(transform.scale * factor, 0.5, 2.5);
+  updateChladniTextTransform();
+  return true;
+}
+
+function captureStagePointer(pointerId) {
+  try {
+    els.stage.setPointerCapture(pointerId);
+  } catch (error) {}
+}
+
+function releaseStagePointer(pointerId) {
+  try {
+    if (els.stage.hasPointerCapture(pointerId)) els.stage.releasePointerCapture(pointerId);
+  } catch (error) {}
+}
+
 function resetPlaybackView() {
   state.playbackVisual.yaw = PLAYBACK_REST_YAW;
   state.playbackVisual.pitch = PLAYBACK_REST_PITCH;
@@ -13531,6 +14377,7 @@ function resetPlaybackView() {
   resizeDynamicCubeRenderer();
   resizeFreeCubeRenderer();
   resizeVoidPrismRenderer();
+  resizeChladniRenderer();
 }
 
 function updateLyricDiyVars() {
@@ -13654,13 +14501,20 @@ const DIY_PRESET_CONFIG_LABELS = Object.freeze({
   freeCubeBackground: '柔光背景',
   cubeCount: '方块数量',
   particleCount: '星河粒子',
+  planeParticleCount: '平面粒子',
+  cubeParticleCount: '3D六面粒子',
   mirrorCount: '镜面数量',
   seamCount: '纵深接缝',
   reflectionMode: '反射方式',
-  reflectionResolution: '反射分辨率'
+  reflectionResolution: '反射分辨率',
+  nodalMode: '节点模态',
+  chladniDisplayMode: '克拉尼形态',
+  faceCount: '3D面数',
+  autoRotation: '自动旋转'
 });
 
 function diyPresetConfigLabel(key) {
+  if (key === 'coverMotionAmplitude') return '粒子律动';
   return DIY_PRESET_CONFIG_LABELS[key] || key;
 }
 
@@ -13672,6 +14526,7 @@ function builtinDiyPresetConfiguration() {
     'free-cubes': '自由方块',
     'void-prism': '虚空棱镜',
     topography: 'Sonic Terrain',
+    chladni: '克拉尼',
     'rain-glass': '雨天玻璃',
     'cover-particles': '粒子封面',
     book: '书页歌词',
@@ -13692,8 +14547,20 @@ function builtinDiyPresetConfiguration() {
     runtimeControls.seamCount = diagnostics.seamCount || 4;
     runtimeControls.reflectionMode = 'Metal012 镜面精抛 · 高清反射 · 8K源材质';
     runtimeControls.reflectionResolution = diagnostics.reflectionResolution || [];
+  } else if (preset === 'chladni') {
+    const diagnostics = chladniRuntimeSnapshot();
+    runtimeControls.chladniDisplayMode = state.chladni.mode === 'plane' ? '平面' : '3D六面';
+    runtimeControls.faceCount = state.chladni.mode === 'plane' ? 1 : 6;
+    runtimeControls.planeParticleCount = diagnostics.planeParticleCount || (MOBILE_RENDER_TARGET ? 100000 : 500000);
+    runtimeControls.cubeParticleCount = diagnostics.cubeParticleCount || (MOBILE_RENDER_TARGET ? 120000 : 300000);
+    runtimeControls.nodalMode = `${diagnostics.modeFrom?.join(' × ') || '2 × 3'} → ${diagnostics.modeTo?.join(' × ') || '3 × 5'}`;
+    runtimeControls.autoRotation = diagnostics.autoRotation !== false;
   } else if (preset === 'cover-particles') {
     runtimeControls.coverBackground = !!state.coverParticle.backgroundEnabled;
+    runtimeControls.coverMotionAmplitude = `${coverParticleMotionPercent()}%`;
+    runtimeControls.particleCount = state.coverParticle.particles.length || (
+      reducedMotion ? 192 * 192 : MOBILE_RENDER_TARGET ? 224 * 224 : 256 * 256
+    );
   } else if (['lyric', 'rain-glass', 'book'].includes(preset)) {
     runtimeControls.textPreset = state.textPreset;
     runtimeControls.lyricBrightness = state.lyricBrightness;
@@ -13735,6 +14602,9 @@ function syncDiyPresetAdjustmentVisibility() {
   }
   if (els.freeCubePresetControls) {
     els.freeCubePresetControls.hidden = !isFreeCubePreset();
+  }
+  if (els.chladniPresetControls) {
+    els.chladniPresetControls.hidden = !isChladniPreset();
   }
   if (els.stormPresetLightingQuickControls) {
     els.stormPresetLightingQuickControls.hidden = !stormOcean;
@@ -13961,6 +14831,7 @@ function setDiyPreset(preset) {
   if (els.diyFreeCubePreset) els.diyFreeCubePreset.classList.toggle('is-active', isFreeCubePreset());
   if (els.diyVoidPrismPreset) els.diyVoidPrismPreset.classList.toggle('is-active', isVoidPrismPreset());
   if (els.diyTopographyPreset) els.diyTopographyPreset.classList.toggle('is-active', state.diyPreset === 'topography');
+  if (els.diyChladniPreset) els.diyChladniPreset.classList.toggle('is-active', isChladniPreset());
   if (els.diyRainGlassPreset) els.diyRainGlassPreset.classList.toggle('is-active', isRainGlassPreset());
   if (els.diyCoverParticlesPreset) els.diyCoverParticlesPreset.classList.toggle('is-active', isCoverParticlePreset());
   if (els.diyBookLyricPreset) els.diyBookLyricPreset.classList.toggle('is-active', state.diyPreset === 'book');
@@ -13971,6 +14842,8 @@ function setDiyPreset(preset) {
   updateDynamicCubeVisibility();
   updateFreeCubeVisibility();
   updateVoidPrismVisibility();
+  updateChladniVisibility();
+  updateChladniTextTransform();
   updateSonicTopographyVisibility();
   updateCoverParticleVisibility();
   updateWallpaperVisibility();
@@ -13995,7 +14868,9 @@ function setTextPreset(preset) {
     return;
   }
   state.textPreset = nextPreset;
-  if (state.textPreset !== 'book') state.lastSelectableTextPreset = state.textPreset;
+  if (state.textPreset !== 'book' && state.textPreset !== 'none') {
+    state.lastSelectableTextPreset = state.textPreset;
+  }
   syncTextPresetButtons();
   if (els.diyBookLyricPreset) els.diyBookLyricPreset.classList.toggle('is-active', state.diyPreset === 'book');
   if (els.diyPresetPage) els.diyPresetPage.dataset.activeTextPreset = state.textPreset;
@@ -14011,6 +14886,7 @@ function setTextPreset(preset) {
   }
   if (els.appShell) els.appShell.classList.toggle('has-book-lyric-text', state.textPreset === 'book');
   if (els.appShell) els.appShell.classList.toggle('has-rain-glass-scene', isRainGlassPreset());
+  applyTextFontPreference();
   applyLyricPalette(state.playbackVisual.palette || fallbackLyricPalette());
   syncPlaybackLyricVisibility();
   if (els.bookLyricStage) {
@@ -14020,6 +14896,7 @@ function setTextPreset(preset) {
   triggerFocusEchoTransition();
   updateTextPresetAvailability();
   updateBookEffectTextTransform();
+  updateChladniTextTransform();
   syncBlurLyricComponent();
   if (state.textPreset === 'book') {
     resetBookLyricScrollState();
@@ -15565,6 +16442,12 @@ function writeSandboxComponentForm(component, item = null) {
   if (els.sandboxSpeed) els.sandboxSpeed.value = String(Math.round(normalized.speed * 100));
   if (els.sandboxParticleCount) els.sandboxParticleCount.value = String(normalized.particleCount);
   if (els.sandboxOpacity) els.sandboxOpacity.value = String(Math.round(normalized.opacity * 100));
+  [
+    els.sandboxAmplitude,
+    els.sandboxSpeed,
+    els.sandboxParticleCount,
+    els.sandboxOpacity
+  ].forEach(syncElasticRangeVisual);
   writeSandboxTransformForm(item);
   syncSandboxFormPresentation();
   if (state.sandbox.tab === 'generator') rebuildSandboxPreview();
@@ -15850,6 +16733,7 @@ window.FeSandboxDiagnostics = Object.freeze({
   previewSunsetSeagulls: previewSandboxSunsetSeagulls,
   freeCube: freeCubeRuntimeSnapshot,
   voidPrism: voidPrismRuntimeSnapshot,
+  chladni: chladniRuntimeSnapshot,
   previewFreeCubeBass,
   clearFreeCubeBassPreview
 });
@@ -15959,7 +16843,6 @@ function animateSandboxMesh(item, mesh, now) {
 }
 
 function sandboxFrameInterval() {
-  if (reducedMotion) return 1000 / 20;
   return 0;
 }
 
@@ -17142,6 +18025,7 @@ function renderCurrent(song = state.currentSong) {
   updateFavoriteControls(song);
   updateQualityButton(song);
   renderQishuiPlaybackCard(song);
+  syncElasticRangeVisuals();
 }
 
 function updatePlayState() {
@@ -17153,6 +18037,8 @@ function updatePlayState() {
   els.dockStatus.classList.toggle('playing', playing);
   if (els.playbackLyricScene) els.playbackLyricScene.classList.toggle('is-playing', playing);
   updateQishuiPlaybackPlayState(playing);
+  if (isPlaybackClockRunning()) playCoverParticleEngine();
+  else pauseCoverParticleEngine();
 }
 
 async function refreshPlayerState() {
@@ -17212,6 +18098,7 @@ async function refreshPlayerState() {
     state.playbackQuality = preferredPlaybackQuality(provider, safeText(data.quality, state.playbackQuality));
   }
   els.volumeRange.value = Math.round((Number(data.volume) || 0.8) * 100);
+  syncElasticRangeVisual(els.volumeRange);
   els.volumeLabel.textContent = `${els.volumeRange.value}%`;
   if (Number.isFinite(effectivePosition)) {
     if (els.audio && els.audio.src) {
@@ -17275,8 +18162,11 @@ function renderManualProgress(position = 0, duration = 0) {
   const safeDuration = Math.max(0, Number(duration) || 0);
   const safePosition = Math.max(0, Math.min(Number(position) || 0, safeDuration || Number(position) || 0));
   els.progressRange.value = safeDuration > 0 ? Math.round((safePosition / safeDuration) * 1000) : 0;
-  els.currentTime.textContent = formatTime(safePosition);
-  els.totalTime.textContent = formatTime(safeDuration || (state.currentSong && state.currentSong.duration) || 0);
+  syncElasticRangeVisual(els.progressRange);
+  const currentTimeLabel = formatTime(safePosition);
+  const totalTimeLabel = formatTime(safeDuration || (state.currentSong && state.currentSong.duration) || 0);
+  if (els.currentTime.textContent !== currentTimeLabel) els.currentTime.textContent = currentTimeLabel;
+  if (els.totalTime.textContent !== totalTimeLabel) els.totalTime.textContent = totalTimeLabel;
   updateQishuiPlaybackProgress(safePosition, safeDuration);
   syncPlaybackLyricAtTime(safePosition);
 }
@@ -17547,6 +18437,7 @@ function updateProgress() {
   const duration = Number.isFinite(els.audio.duration) ? els.audio.duration : 0;
   const current = Number.isFinite(els.audio.currentTime) ? els.audio.currentTime : 0;
   els.progressRange.value = duration > 0 ? Math.round((current / duration) * 1000) : 0;
+  syncElasticRangeVisual(els.progressRange);
   els.currentTime.textContent = formatTime(current);
   els.totalTime.textContent = formatTime(duration || (state.currentSong && state.currentSong.duration) || 0);
   syncPlaybackLyricAtTime(current);
@@ -18157,6 +19048,9 @@ function bindEvents() {
   if (els.textPaletteAutoButton) {
     els.textPaletteAutoButton.addEventListener('click', () => setTextPalettePreference('auto'));
   }
+  if (els.textFontSelect) {
+    els.textFontSelect.addEventListener('change', () => setTextFontPreference(els.textFontSelect.value));
+  }
   if (els.textPaletteResetButton) {
     els.textPaletteResetButton.addEventListener('click', () => setTextPalettePreference('auto'));
   }
@@ -18244,6 +19138,7 @@ function bindEvents() {
   if (els.diyFreeCubePreset) els.diyFreeCubePreset.addEventListener('click', () => enterPresetPlaybackPage('free-cubes'));
   if (els.diyVoidPrismPreset) els.diyVoidPrismPreset.addEventListener('click', () => enterPresetPlaybackPage('void-prism'));
   if (els.diyTopographyPreset) els.diyTopographyPreset.addEventListener('click', () => enterPresetPlaybackPage('topography'));
+  if (els.diyChladniPreset) els.diyChladniPreset.addEventListener('click', () => enterPresetPlaybackPage('chladni'));
   if (els.diyRainGlassPreset) els.diyRainGlassPreset.addEventListener('click', () => enterPresetPlaybackPage('rain-glass'));
   if (els.diyCoverParticlesPreset) els.diyCoverParticlesPreset.addEventListener('click', () => enterPresetPlaybackPage('cover-particles'));
   if (els.wallpaperImportedModeButton) els.wallpaperImportedModeButton.addEventListener('click', () => setWallpaperSource('imported'));
@@ -18290,9 +19185,22 @@ function bindEvents() {
       setFreeCubeBackground(!state.freeCube.backgroundEnabled);
     });
   }
+  if (els.chladniPlaneButton) {
+    els.chladniPlaneButton.addEventListener('click', () => setChladniMode('plane'));
+  }
+  if (els.chladniCubeButton) {
+    els.chladniCubeButton.addEventListener('click', () => setChladniMode('cube'));
+  }
   if (els.diyCoverParticleBackgroundToggle) {
     els.diyCoverParticleBackgroundToggle.addEventListener('change', () => {
       state.coverParticle.backgroundEnabled = !!els.diyCoverParticleBackgroundToggle.checked;
+      updateCoverParticleBackgroundMode();
+      renderDiySelectedPresetConfig();
+    });
+  }
+  if (els.diyCoverParticleMotionRange) {
+    els.diyCoverParticleMotionRange.addEventListener('input', () => {
+      state.coverParticle.motionAmplitude = clamp(Number(els.diyCoverParticleMotionRange.value) / 100, 0, 2);
       updateCoverParticleBackgroundMode();
       renderDiySelectedPresetConfig();
     });
@@ -18759,13 +19667,22 @@ function updateStageZoom(deltaY) {
 function bindOrbEvents() {
   els.stage.addEventListener('pointerdown', (event) => {
     if (event.button !== 0) return;
+    if (state.playbackPage && beginChladniTextGesture(event)) {
+      captureStagePointer(event.pointerId);
+      event.preventDefault();
+      return;
+    }
     if (state.playbackPage && beginBookEffectTextGesture(event)) {
-      els.stage.setPointerCapture(event.pointerId);
+      captureStagePointer(event.pointerId);
       event.preventDefault();
       return;
     }
     if (state.playbackPage && beginBookLyricGesture(event)) {
-      els.stage.setPointerCapture(event.pointerId);
+      captureStagePointer(event.pointerId);
+      event.preventDefault();
+      return;
+    }
+    if (state.playbackPage && isChladniPreset()) {
       event.preventDefault();
       return;
     }
@@ -18788,7 +19705,7 @@ function bindOrbEvents() {
       state.orb.velocityPitch = 0;
     }
     els.stage.classList.add('is-dragging');
-    els.stage.setPointerCapture(event.pointerId);
+    captureStagePointer(event.pointerId);
     event.preventDefault();
   });
 
@@ -18800,6 +19717,10 @@ function bindOrbEvents() {
     state.orb.mouseY = state.playbackVisual.mouseY;
     state.orb.mouseActive = true;
     state.orb.lastMouseAt = performance.now();
+    if (moveChladniTextGesture(event)) {
+      event.preventDefault();
+      return;
+    }
     if (moveBookEffectTextGesture(event)) {
       event.preventDefault();
       return;
@@ -18836,12 +19757,16 @@ function bindOrbEvents() {
   });
 
   const endDrag = (event) => {
+    if (endChladniTextGesture(event)) {
+      releaseStagePointer(event.pointerId);
+      return;
+    }
     if (endBookEffectTextGesture(event)) {
-      if (els.stage.hasPointerCapture(event.pointerId)) els.stage.releasePointerCapture(event.pointerId);
+      releaseStagePointer(event.pointerId);
       return;
     }
     if (endBookLyricGesture(event)) {
-      if (els.stage.hasPointerCapture(event.pointerId)) els.stage.releasePointerCapture(event.pointerId);
+      releaseStagePointer(event.pointerId);
       return;
     }
     if (state.playbackVisual.dragging && event.pointerId === state.playbackVisual.pointerId) {
@@ -18856,14 +19781,14 @@ function bindOrbEvents() {
       state.playbackVisual.dragging = false;
       state.playbackVisual.pointerId = null;
       els.stage.classList.remove('is-dragging');
-      if (els.stage.hasPointerCapture(event.pointerId)) els.stage.releasePointerCapture(event.pointerId);
+      releaseStagePointer(event.pointerId);
       return;
     }
     if (!state.orb.dragging || event.pointerId !== state.orb.pointerId) return;
     state.orb.dragging = false;
     state.orb.pointerId = null;
     els.stage.classList.remove('is-dragging');
-    if (els.stage.hasPointerCapture(event.pointerId)) els.stage.releasePointerCapture(event.pointerId);
+    releaseStagePointer(event.pointerId);
   };
 
   els.stage.addEventListener('pointerup', endDrag);
@@ -18896,6 +19821,10 @@ function bindOrbEvents() {
   });
   els.stage.addEventListener('wheel', (event) => {
     if (event.target.closest('.playlist-song-page, .playlist-shelf, .orb-playlists, button, input, textarea, select')) return;
+    if (scaleChladniTextFromWheel(event)) {
+      event.preventDefault();
+      return;
+    }
     updateStageZoom(event.deltaY);
     event.preventDefault();
   }, { passive: false });
@@ -18999,12 +19928,12 @@ function coverParticleEngineOptions() {
   const palette = state.coverParticle.palette || fallbackLyricPalette(state.currentSong);
   return {
     fullScreen: { enable: false },
-    fpsLimit: reducedMotion ? 36 : 1000,
+    fpsLimit: 1000,
     detectRetina: true,
     background: { color: 'transparent' },
     particles: {
       number: {
-        value: reducedMotion ? 44 : 96,
+        value: reducedMotion ? 32 : 64,
         density: { enable: true, width: 960, height: 640 }
       },
       color: {
@@ -19014,12 +19943,12 @@ function coverParticleEngineOptions() {
           rgbHexValue(palette.highlight)
         ]
       },
-      opacity: { value: { min: 0.12, max: 0.36 } },
-      size: { value: { min: 1.1, max: 3.2 } },
+      opacity: { value: { min: 0.08, max: 0.24 } },
+      size: { value: { min: 0.45, max: 1.35 } },
       links: { enable: false },
       move: {
         enable: true,
-        speed: { min: 0.18, max: 0.72 },
+        speed: { min: 0.08, max: 0.28 },
         direction: 'none',
         outModes: { default: 'bounce' }
       }
@@ -19079,11 +20008,22 @@ function coverParticleFallbackColor(index, radius) {
   };
 }
 
+function coverParticleDisplayChannel(value) {
+  const normalized = clamp(Number(value) / 255, 0, 1);
+  const lifted = Math.pow(normalized, 0.92);
+  return Math.round(clamp((lifted - 0.5) * 1.18 + 0.5, 0, 1) * 255);
+}
+
+function coverParticleNoise(x, y, salt = 0) {
+  const value = Math.sin(x * 12.9898 + y * 78.233 + salt * 37.719) * 43758.5453;
+  return value - Math.floor(value);
+}
+
 function buildCoverParticleSamples(width, height, dpr) {
   const image = state.coverParticle.image;
-  const sampleSize = reducedMotion ? 208 : 448;
+  const sampleSize = reducedMotion ? 192 : MOBILE_RENDER_TARGET ? 224 : 256;
   const step = 1;
-  const signature = `${state.coverParticle.imageSignature}|${sampleSize}|${step}|${Math.round(width)}|${Math.round(height)}|${Math.round(dpr * 100)}`;
+  const signature = `${state.coverParticle.imageSignature}|${sampleSize}|${step}`;
   if (signature === state.coverParticle.sampleSignature && state.coverParticle.particles.length) return;
 
   let data = null;
@@ -19111,6 +20051,19 @@ function buildCoverParticleSamples(width, height, dpr) {
   }
 
   const particles = [];
+  const luminanceAt = data
+    ? (sampleX, sampleY) => {
+        const clampedX = Math.max(0, Math.min(sampleSize - 1, sampleX));
+        const clampedY = Math.max(0, Math.min(sampleSize - 1, sampleY));
+        const offset = (clampedY * sampleSize + clampedX) * 4;
+        const alpha = data[offset + 3] / 255;
+        return (
+          data[offset] * 0.2126
+          + data[offset + 1] * 0.7152
+          + data[offset + 2] * 0.0722
+        ) / 255 * alpha;
+      }
+    : null;
   let index = 0;
   for (let y = 0; y < sampleSize; y += step) {
     for (let x = 0; x < sampleSize; x += step) {
@@ -19121,28 +20074,59 @@ function buildCoverParticleSamples(width, height, dpr) {
       const py = ny * 0.64;
       let color = coverParticleFallbackColor(index, radius);
       let alpha = 0.9;
+      let depth = (coverParticleNoise(x, y, 1) - 0.5) * 0.046;
       if (data) {
         const offset = (y * sampleSize + x) * 4;
         alpha = data[offset + 3] / 255;
         if (alpha <= 0.05) continue;
         color = { r: data[offset], g: data[offset + 1], b: data[offset + 2] };
+        const centerLuma = luminanceAt(x, y);
+        const crossLuma = (
+          luminanceAt(x - 1, y)
+          + luminanceAt(x + 1, y)
+          + luminanceAt(x, y - 1)
+          + luminanceAt(x, y + 1)
+        ) * 0.1;
+        const diagonalLuma = (
+          luminanceAt(x - 1, y - 1)
+          + luminanceAt(x + 1, y - 1)
+          + luminanceAt(x - 1, y + 1)
+          + luminanceAt(x + 1, y + 1)
+        ) * 0.05;
+        const smoothLuma = centerLuma * 0.4 + crossLuma + diagonalLuma;
+        const reliefLuma = clamp(smoothLuma * 0.68 + centerLuma * 0.32, 0, 1);
+        depth = Math.pow(reliefLuma, 1.42) * 0.14 - 0.04;
       }
-      const sheetPhase = px * 8.4 + py * 5.2 + Math.sin((px - py) * 3.6) * 0.55 + Math.random() * 0.22;
-      const bumpAngle = Math.atan2(py || 0.001, px || 0.001) + (Math.random() - 0.5) * 0.42;
+      const relief = clamp((depth + 0.04) / 0.14, 0, 1);
+      const gradientX = data ? luminanceAt(x + 1, y) - luminanceAt(x - 1, y) : 0;
+      const gradientY = data ? luminanceAt(x, y + 1) - luminanceAt(x, y - 1) : 0;
+      const gradientLength = Math.hypot(gradientX, gradientY) || 1;
+      const radialLength = Math.hypot(px, py) || 1;
+      const noiseAngle = coverParticleNoise(x, y, 2) * Math.PI * 2;
+      let driftX = gradientX / gradientLength * 0.58 + px / radialLength * 0.28 + Math.cos(noiseAngle) * 0.14;
+      let driftY = gradientY / gradientLength * 0.58 + py / radialLength * 0.28 + Math.sin(noiseAngle) * 0.14;
+      const driftLength = Math.hypot(driftX, driftY) || 1;
+      driftX /= driftLength;
+      driftY /= driftLength;
+      const driftMagnitude = 0.009 + relief * 0.005 + coverParticleNoise(x, y, 3) * 0.004;
+      const sheetPhase = px * 7.6
+        + py * 5.1
+        + Math.sin((px - py) * 3.8) * 0.58
+        + (coverParticleNoise(x, y, 4) - 0.5) * 0.18;
       particles.push({
         x: px,
         y: py,
-        z: (Math.random() - 0.5) * 0.08,
-        rgb: `${color.r}, ${color.g}, ${color.b}`,
+        z: depth,
+        rgb: `${coverParticleDisplayChannel(color.r)}, ${coverParticleDisplayChannel(color.g)}, ${coverParticleDisplayChannel(color.b)}`,
         r: color.r / 255,
         g: color.g / 255,
         b: color.b / 255,
         alpha,
-        size: 0.68 + Math.random() * 0.12,
+        size: 0.82 + coverParticleNoise(x, y, 5) * 0.12,
         wavePhase: sheetPhase,
-        waveStrength: 0.78 + Math.random() * 0.38,
-        bumpDriftX: Math.cos(bumpAngle) * 0.03,
-        bumpDriftY: Math.sin(bumpAngle) * 0.03
+        waveStrength: 0.54 + relief * 0.66 + coverParticleNoise(x, y, 6) * 0.12,
+        bumpDriftX: driftX * driftMagnitude,
+        bumpDriftY: driftY * driftMagnitude
       });
       index += 1;
     }
@@ -19183,6 +20167,7 @@ function coverParticleGpuMaterial(THREE) {
       uBass: { value: 0 },
       uEnergy: { value: 0 },
       uBeat: { value: 0 },
+      uAudioActive: { value: 0 },
       uYawCos: { value: 1 },
       uYawSin: { value: 0 },
       uPitchCos: { value: 1 },
@@ -19190,7 +20175,6 @@ function coverParticleGpuMaterial(THREE) {
       uCoverSize: { value: 1 },
       uCoverPixelSize: { value: 1 },
       uMotionScale: { value: 1 },
-      uLyricSpeed: { value: 1 },
       uMouseActive: { value: 0 },
       uMouseLimit: { value: 1 },
       uMousePullBase: { value: 0 },
@@ -19210,6 +20194,7 @@ function coverParticleGpuMaterial(THREE) {
       uniform float uBass;
       uniform float uEnergy;
       uniform float uBeat;
+      uniform float uAudioActive;
       uniform float uYawCos;
       uniform float uYawSin;
       uniform float uPitchCos;
@@ -19217,7 +20202,6 @@ function coverParticleGpuMaterial(THREE) {
       uniform float uCoverSize;
       uniform float uCoverPixelSize;
       uniform float uMotionScale;
-      uniform float uLyricSpeed;
       uniform float uMouseActive;
       uniform float uMouseLimit;
       uniform float uMousePullBase;
@@ -19226,28 +20210,29 @@ function coverParticleGpuMaterial(THREE) {
       varying float vAlpha;
       varying float vBump;
       varying float vInteraction;
+      varying float vRelief;
 
       void main() {
-        float sheetTime = uTime * (2.15 + uBass * 1.25 + uLyricSpeed * 0.25);
-        float waveA = (sin(sheetTime + aWavePhase) + 1.0) * 0.5;
-        float waveB = (sin(sheetTime * 1.23 + aWavePhase * 1.37 + position.x * 5.8) + 1.0) * 0.5;
-        float waveC = (sin(sheetTime * 0.82 - aWavePhase * 0.92 + position.y * 7.2) + 1.0) * 0.5;
-        float peakA = smoothstep(0.32, 0.96, waveA);
-        float peakB = smoothstep(0.46, 1.0, waveB);
-        float peakC = smoothstep(0.5, 1.0, waveC);
-        float radial = length(position.xy);
-        float sonicRing = sin(radial * 24.0 - uTime * (4.8 + uBass * 2.4));
-        float sonicPeak = smoothstep(0.42, 1.0, sonicRing * 0.5 + 0.5);
-        float sonicCenter = smoothstep(0.84, 0.08, radial);
-        float sonicLift = (sonicPeak * (0.18 + sonicCenter * 0.48) + uBeat * sonicCenter * 0.32) * (uBass * 0.38 + uBeat * 0.42);
-        float bump = ((peakA * 0.46 + peakB * 0.28 + peakC * 0.22) * aWaveStrength * uBass + sonicLift) * uMotionScale;
-        vec3 source = position + vec3(aDrift * bump, bump * 0.28);
+        float relief = clamp((position.z + 0.04) / 0.14, 0.0, 1.0);
+        float sheetTime = uTime * (0.68 + uBass * 0.54 + uBeat * 0.12);
+        float waveA = sin(sheetTime + aWavePhase);
+        float waveB = sin(sheetTime * 0.73 + aWavePhase * 1.31 + position.x * 5.2);
+        float waveC = sin(sheetTime * 1.17 - aWavePhase * 0.89 + position.y * 6.6);
+        float radialWave = sin(length(position.xy) * 14.0 - sheetTime * 1.28 + aWavePhase * 0.18);
+        float naturalWave = waveA * 0.42 + waveB * 0.28 + waveC * 0.20 + radialWave * 0.10;
+        float lowDrive = clamp(uBass * 0.82 + uEnergy * 0.22, 0.0, 1.25);
+        float beatDrive = clamp(uBeat, 0.0, 1.4);
+        float waveDepth = uAudioActive * naturalWave * (0.010 + lowDrive * 0.014 + beatDrive * 0.004) * aWaveStrength * uMotionScale;
+        float motionAmount = abs(waveDepth) * 8.0;
+        float lateralWave = uAudioActive * naturalWave * (0.12 + lowDrive * 0.08) * uMotionScale;
+        vec3 source = vec3(position.xy, position.z * uAudioActive)
+          + vec3(aDrift * lateralWave, waveDepth);
 
         float rotatedX = source.x * uYawCos + source.z * uYawSin;
         float rotatedZ = -source.x * uYawSin + source.z * uYawCos;
         float rotatedY = source.y * uPitchCos - rotatedZ * uPitchSin;
         float pointZ = source.y * uPitchSin + rotatedZ * uPitchCos;
-        float perspective = 1.22 / (1.22 - pointZ * 0.46);
+        float perspective = 1.24 / (1.24 - pointZ * 0.54);
         vec2 point = uCenter + vec2(rotatedX, rotatedY) * uCoverSize * perspective;
 
         float interaction = 0.0;
@@ -19264,15 +20249,17 @@ function coverParticleGpuMaterial(THREE) {
         float depth = clamp((pointZ + 0.9) / 1.8, 0.0, 1.0);
         gl_PointSize = max(
           uMinPointSize,
-          uCoverPixelSize * aSize * (1.0 + bump * 0.1 + interaction * 0.1 + uBass * 0.018) * perspective
+          uCoverPixelSize * aSize * (1.0 + motionAmount * 0.08 + interaction * 0.08 + uBass * 0.012) * perspective
         );
         vec2 clip = vec2(point.x / uResolution.x * 2.0 - 1.0, 1.0 - point.y / uResolution.y * 2.0);
-        gl_Position = vec4(clip, 0.0, 1.0);
+        float clipDepth = clamp(-pointZ * 0.72, -0.94, 0.94);
+        gl_Position = vec4(clip, clipDepth, 1.0);
 
         vColor = aColor;
-        vAlpha = clamp((0.85 + depth * 0.09 + bump * 0.026 + interaction * 0.1 + uEnergy * 0.03) * aAlpha, 0.52, 1.0);
-        vBump = bump;
+        vAlpha = clamp((0.86 + depth * 0.12 + motionAmount * 0.03 + interaction * 0.08 + uEnergy * 0.035) * aAlpha, 0.52, 1.0);
+        vBump = motionAmount;
         vInteraction = interaction;
+        vRelief = relief;
       }
     `,
     fragmentShader: `
@@ -19281,18 +20268,27 @@ function coverParticleGpuMaterial(THREE) {
       varying float vAlpha;
       varying float vBump;
       varying float vInteraction;
+      varying float vRelief;
 
       void main() {
         vec2 p = gl_PointCoord - vec2(0.5);
         float dist = dot(p, p);
-        float mask = smoothstep(0.25, 0.06, dist);
-        vec3 color = vColor * (1.0 + vBump * 0.08 + vInteraction * 0.06);
+        float core = 1.0 - smoothstep(0.12, 0.22, dist);
+        float halo = 1.0 - smoothstep(0.20, 0.25, dist);
+        float mask = clamp(core + halo * 0.14, 0.0, 1.0);
+        if (mask < 0.02) discard;
+        float reliefLight = mix(0.94, 1.16, vRelief);
+        vec3 liftedColor = pow(max(vColor, vec3(0.002)), vec3(0.92));
+        float colorLuma = dot(liftedColor, vec3(0.2126, 0.7152, 0.0722));
+        vec3 vividColor = max(mix(vec3(colorLuma), liftedColor, 1.12), vec3(0.014));
+        vec3 displayColor = clamp((vividColor - vec3(0.5)) * 1.18 + vec3(0.5), 0.0, 1.0);
+        vec3 color = displayColor * (reliefLight + halo * 0.1 + vBump * 0.08 + vInteraction * 0.08);
         gl_FragColor = vec4(color, vAlpha * mask);
       }
     `,
     transparent: true,
-    depthTest: false,
-    depthWrite: false
+    depthTest: true,
+    depthWrite: true
   });
 }
 
@@ -19383,7 +20379,11 @@ function rebuildCoverParticleGpuGeometry() {
   return true;
 }
 
-function drawCoverParticleSceneGpu(frame, width, height, dpr, now, t, audioActive) {
+function coverParticlePointSize(coverSize, particleCount) {
+  return coverSize / Math.max(1, Math.sqrt(Math.max(1, particleCount)));
+}
+
+function drawCoverParticleSceneGpu(frame, width, height, dpr, now, t, audioActive, wholePulse) {
   if (!ensureCoverParticleGpu(frame) || !rebuildCoverParticleGpuGeometry()) return false;
   const cover = state.coverParticle;
   const renderer = cover.gpuRenderer;
@@ -19396,25 +20396,28 @@ function drawCoverParticleSceneGpu(frame, width, height, dpr, now, t, audioActiv
   }
 
   const zoom = clamp(state.playbackVisual.zoom || 1, 0.58, 2.35);
-  const coverSize = Math.min(width, height) * 0.76 * zoom;
-  const coverPixelSize = coverSize * 1.3 / Math.max(1, Math.round(Math.sqrt(Math.max(1, cover.particles.length))));
+  const wholeScale = 1 + wholePulse * 0.04;
+  const coverSize = Math.min(width, height) * 0.76 * zoom * wholeScale;
+  const coverPixelSize = coverParticlePointSize(coverSize, cover.particles.length);
   const mouseActive = state.orb.mouseActive && now - state.orb.lastMouseAt < 1600;
+  const coverYaw = state.playbackVisual.yaw - PLAYBACK_REST_YAW;
+  const coverPitch = state.playbackVisual.pitch - PLAYBACK_REST_PITCH;
 
   uniforms.uResolution.value.set(width, height);
-  uniforms.uCenter.value.set(width * 0.5, height * 0.48);
+  uniforms.uCenter.value.set(width * 0.5, height * (0.48 - wholePulse * 0.008));
   uniforms.uMouse.value.set(state.playbackVisual.mouseX * width, state.playbackVisual.mouseY * height);
   uniforms.uTime.value = t;
   uniforms.uBass.value = audioActive ? cover.bass : 0;
   uniforms.uEnergy.value = audioActive ? cover.energy : 0;
-  uniforms.uBeat.value = audioActive ? clamp(Number(state.visual.beat) || 0, 0, 1.4) : 0;
-  uniforms.uYawCos.value = Math.cos(state.playbackVisual.yaw);
-  uniforms.uYawSin.value = Math.sin(state.playbackVisual.yaw);
-  uniforms.uPitchCos.value = Math.cos(state.playbackVisual.pitch);
-  uniforms.uPitchSin.value = Math.sin(state.playbackVisual.pitch);
+  uniforms.uBeat.value = audioActive ? cover.beat : 0;
+  uniforms.uAudioActive.value = audioActive ? 1 : 0;
+  uniforms.uYawCos.value = Math.cos(coverYaw);
+  uniforms.uYawSin.value = Math.sin(coverYaw);
+  uniforms.uPitchCos.value = Math.cos(coverPitch);
+  uniforms.uPitchSin.value = Math.sin(coverPitch);
   uniforms.uCoverSize.value = coverSize;
   uniforms.uCoverPixelSize.value = coverPixelSize;
-  uniforms.uMotionScale.value = reducedMotion ? 0.35 : 1;
-  uniforms.uLyricSpeed.value = state.lyricSpeed;
+  uniforms.uMotionScale.value = coverParticleMotionScale();
   uniforms.uMouseActive.value = mouseActive ? 1 : 0;
   uniforms.uMouseLimit.value = 132 * dpr;
   uniforms.uMousePullBase.value = (16 + cover.energy * 28) * dpr;
@@ -19440,47 +20443,59 @@ function drawCoverParticleScene(width, height, dpr) {
   );
   const now = performance.now();
   const t = now / 1000;
-  const audioActive = !!(els.audio && !els.audio.paused && els.audio.src);
+  const audioActive = isPlaybackClockRunning();
   const audioBass = audioActive
-    ? Math.max(Number(state.visual.lowFrequencyAmplitude) || 0, state.visual.bass || 0, 0.22)
+    ? clamp(Math.max(Number(state.visual.lowFrequencyAmplitude) || 0, state.visual.bass || 0), 0, 1.25)
     : 0;
   const audioEnergy = audioActive
-    ? Math.max(state.visual.energy || 0, 0.38)
+    ? clamp(Number(state.visual.energy) || 0, 0, 1)
     : 0;
+  const audioBeat = audioActive ? clamp(Number(state.visual.beat) || 0, 0, 1.4) : 0;
   const frameStep = state.playbackVisual.frameStep || 1;
-  const bassRate = 1 - Math.pow(1 - (audioActive ? 0.24 : 0.36), frameStep);
-  const energyRate = 1 - Math.pow(1 - (audioActive ? 0.18 : 0.28), frameStep);
+  const envelopeStepMs = Math.max(1, frameStep * RENDER_PROFILE.targetFrameMs);
+  const bassRate = 1 - Math.exp(-envelopeStepMs / (audioBass > cover.bass ? 60 : 340));
+  const energyRate = 1 - Math.exp(-envelopeStepMs / (audioEnergy > cover.energy ? 85 : 380));
+  const beatRate = 1 - Math.exp(-envelopeStepMs / (audioBeat > cover.beat ? 50 : 320));
   cover.bass += (audioBass - cover.bass) * bassRate;
   cover.energy += (audioEnergy - cover.energy) * energyRate;
+  cover.beat += (audioBeat - cover.beat) * beatRate;
+  const wholePulse = audioActive
+    ? clamp(Math.pow(cover.bass, 1.1) * 0.88 + cover.beat * 0.12, 0, 1.15)
+    : 0;
 
-  if (drawCoverParticleSceneGpu(frame, width, height, dpr, now, t, audioActive)) return;
+  if (drawCoverParticleSceneGpu(frame, width, height, dpr, now, t, audioActive, wholePulse)) return;
 
   const context = frame.canvas.getContext('2d');
   if (!context) return;
   context.clearRect(0, 0, width, height);
   const cx = width * 0.5;
-  const cy = height * 0.48;
+  const cy = height * (0.48 - wholePulse * 0.008);
   const zoom = clamp(state.playbackVisual.zoom || 1, 0.58, 2.35);
-  const coverSize = Math.min(width, height) * 0.76 * zoom;
-  const coverPixelSize = coverSize * 1.48 / Math.max(1, Math.round(Math.sqrt(Math.max(1, particles.length))));
+  const coverSize = Math.min(width, height) * 0.76 * zoom * (1 + wholePulse * 0.04);
+  const coverPixelSize = coverParticlePointSize(coverSize, particles.length);
   const mouseX = state.playbackVisual.mouseX * width;
   const mouseY = state.playbackVisual.mouseY * height;
   const mouseActive = state.orb.mouseActive && now - state.orb.lastMouseAt < 1600;
-  const yawCos = Math.cos(state.playbackVisual.yaw);
-  const yawSin = Math.sin(state.playbackVisual.yaw);
-  const pitchCos = Math.cos(state.playbackVisual.pitch);
-  const pitchSin = Math.sin(state.playbackVisual.pitch);
-  const motionScale = reducedMotion ? 0.35 : 1;
+  const coverYaw = state.playbackVisual.yaw - PLAYBACK_REST_YAW;
+  const coverPitch = state.playbackVisual.pitch - PLAYBACK_REST_PITCH;
+  const yawCos = Math.cos(coverYaw);
+  const yawSin = Math.sin(coverYaw);
+  const pitchCos = Math.cos(coverPitch);
+  const pitchSin = Math.sin(coverPitch);
+  const motionScale = coverParticleMotionScale();
+  const bass = audioActive ? cover.bass : 0;
+  const energy = audioActive ? cover.energy : 0;
+  const beat = audioActive ? cover.beat : 0;
   const mouseLimit = 132 * dpr;
   const mouseLimitSq = mouseLimit * mouseLimit;
   const mousePullBase = (16 + cover.energy * 28) * dpr;
-  const sheetTime = t * (2.15 + cover.bass * 1.25 + state.lyricSpeed * 0.25);
+  const sheetTime = t * (0.68 + bass * 0.54 + beat * 0.12);
   const drawAllParticles = particleLimit >= particles.length;
   const sampleScale = drawAllParticles ? 1 : particles.length / particleLimit;
 
   const glow = context.createRadialGradient(cx, cy, coverSize * 0.08, cx, cy, coverSize * 0.82);
-  glow.addColorStop(0, `rgba(255, 255, 255, ${0.06 + cover.bass * 0.04})`);
-  glow.addColorStop(0.42, `rgba(131, 228, 255, ${0.035 + cover.energy * 0.03})`);
+  glow.addColorStop(0, `rgba(255, 255, 255, ${0.04 + bass * 0.035})`);
+  glow.addColorStop(0.42, `rgba(177, 237, 255, ${0.026 + energy * 0.028})`);
   glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
   context.fillStyle = glow;
   context.fillRect(0, 0, width, height);
@@ -19495,33 +20510,25 @@ function drawCoverParticleScene(width, height, dpr) {
       ? drawIndex
       : Math.floor(drawIndex * sampleScale);
     const particle = particles[sampleIndex];
-    let bump = 0;
-    if (audioActive) {
-      const waveA = (Math.sin(sheetTime + particle.wavePhase) + 1) * 0.5;
-      const waveB = (Math.sin(sheetTime * 1.23 + particle.wavePhase * 1.37 + particle.x * 5.8) + 1) * 0.5;
-      const waveC = (Math.sin(sheetTime * 0.82 - particle.wavePhase * 0.92 + particle.y * 7.2) + 1) * 0.5;
-      let peakA = waveA > 0.32 ? (waveA - 0.32) / 0.68 : 0;
-      let peakB = waveB > 0.46 ? (waveB - 0.46) / 0.54 : 0;
-      let peakC = waveC > 0.5 ? (waveC - 0.5) / 0.5 : 0;
-      peakA = peakA * peakA * (3 - 2 * peakA);
-      peakB = peakB * peakB * (3 - 2 * peakB);
-      peakC = peakC * peakC * (3 - 2 * peakC);
-      const radial = Math.hypot(particle.x, particle.y);
-      const sonicRing = Math.sin(radial * 24 - t * (4.8 + cover.bass * 2.4));
-      const sonicPeak = sonicRing > -0.16 ? (sonicRing + 0.16) / 1.16 : 0;
-      const sonicCenter = clamp((0.84 - radial) / 0.76, 0, 1);
-      const beat = clamp(Number(state.visual.beat) || 0, 0, 1.4);
-      const sonicLift = (sonicPeak * sonicPeak * (0.18 + sonicCenter * 0.48) + beat * sonicCenter * 0.32) * (cover.bass * 0.38 + beat * 0.42);
-      bump = ((peakA * 0.46 + peakB * 0.28 + peakC * 0.22) * particle.waveStrength * cover.bass + sonicLift) * motionScale;
-    }
-    const sourceX = particle.x + particle.bumpDriftX * bump;
-    const sourceY = particle.y + particle.bumpDriftY * bump;
-    const sourceZ = particle.z + bump * 0.28;
+    const waveA = Math.sin(sheetTime + particle.wavePhase);
+    const waveB = Math.sin(sheetTime * 0.73 + particle.wavePhase * 1.31 + particle.x * 5.2);
+    const waveC = Math.sin(sheetTime * 1.17 - particle.wavePhase * 0.89 + particle.y * 6.6);
+    const radialWave = Math.sin(Math.hypot(particle.x, particle.y) * 14 - sheetTime * 1.28 + particle.wavePhase * 0.18);
+    const naturalWave = waveA * 0.42 + waveB * 0.28 + waveC * 0.2 + radialWave * 0.1;
+    const lowDrive = clamp(bass * 0.82 + energy * 0.22, 0, 1.25);
+    const audioGate = audioActive ? 1 : 0;
+    const waveDepth = audioGate * naturalWave * (0.01 + lowDrive * 0.014 + beat * 0.004) * particle.waveStrength * motionScale;
+    const motionAmount = Math.abs(waveDepth) * 8;
+    const lateralWave = audioGate * naturalWave * (0.12 + lowDrive * 0.08) * motionScale;
+    const sourceX = particle.x + particle.bumpDriftX * lateralWave;
+    const sourceY = particle.y + particle.bumpDriftY * lateralWave;
+    const sourceZ = particle.z * (audioActive ? 1 : 0)
+      + waveDepth;
     const rotatedX = sourceX * yawCos + sourceZ * yawSin;
     const rotatedZ = -sourceX * yawSin + sourceZ * yawCos;
     const rotatedY = sourceY * pitchCos - rotatedZ * pitchSin;
     const pointZ = sourceY * pitchSin + rotatedZ * pitchCos;
-    const perspective = 1.22 / (1.22 - pointZ * 0.46);
+    const perspective = 1.24 / (1.24 - pointZ * 0.54);
     let x = cx + rotatedX * coverSize * perspective;
     let y = cy + rotatedY * coverSize * perspective;
     let interaction = 0;
@@ -19541,10 +20548,10 @@ function drawCoverParticleScene(width, height, dpr) {
     let depth = (pointZ + 0.9) / 1.8;
     if (depth < 0) depth = 0;
     else if (depth > 1) depth = 1;
-    let size = coverPixelSize * particle.size * (1 + bump * 0.1 + interaction * 0.1 + cover.bass * 0.018) * perspective;
+    let size = coverPixelSize * particle.size * (1 + motionAmount * 0.08 + interaction * 0.08 + bass * 0.012) * perspective;
     const minSize = 0.42 * dpr;
     if (size < minSize) size = minSize;
-    let alpha = (0.85 + depth * 0.09 + bump * 0.026 + interaction * 0.1 + cover.energy * 0.03) * particle.alpha;
+    let alpha = (0.86 + depth * 0.12 + motionAmount * 0.03 + interaction * 0.08 + energy * 0.035) * particle.alpha;
     if (alpha < 0.52) alpha = 0.52;
     else if (alpha > 1) alpha = 1;
     if (mouseActive) {
@@ -19655,6 +20662,7 @@ function updatePlaybackSceneMotion() {
   updateDynamicCubeMotion();
   updateFreeCubeMotion();
   updateVoidPrismMotion();
+  updateChladniMotion();
   updateSonicTopographyMotion();
 }
 
@@ -20137,6 +21145,7 @@ function coveredPlaybackCanvasKey() {
   if (sandboxPlaybackActive()) return 'sandbox';
   if (isFreeCubePreset()) return 'free-cubes';
   if (isVoidPrismPreset()) return 'void-prism';
+  if (isChladniPreset()) return 'chladni';
   if (isSonicTopographyPreset()) return 'topography';
   if (state.textPreset === 'book') return 'book';
   return '';
@@ -20383,6 +21392,27 @@ function drawOrb(now = performance.now()) {
   requestOrbFrame();
 }
 
+function syncElasticRangeVisual(input) {
+  if (!input || !input.matches?.('input[type="range"]')) return;
+  const min = Number(input.min);
+  const max = Number(input.max);
+  const value = Number(input.value);
+  const range = Number.isFinite(max - min) && max > min ? max - min : 1;
+  const progress = clamp(((value - min) / range) * 100, 0, 100);
+  input.style.setProperty('--elastic-range-progress', `${progress}%`);
+}
+
+function syncElasticRangeVisuals(root = document) {
+  root.querySelectorAll?.('input[type="range"]').forEach(syncElasticRangeVisual);
+}
+
+function initElasticRangeVisuals() {
+  syncElasticRangeVisuals();
+  document.addEventListener('input', (event) => {
+    syncElasticRangeVisual(event.target);
+  }, { passive: true });
+}
+
 async function init() {
   initBootScreen();
   initGlassSurfaces();
@@ -20395,10 +21425,13 @@ async function init() {
   bindEvents();
   bindSandboxEvents();
   bindOrbEvents();
+  initElasticRangeVisuals();
   initPlaybackParticles();
   initRenderClarity();
   enterWallpaperHome();
   updateLyricDiyVars();
+  initializeTextFontOptions();
+  applyTextFontPreference();
   syncTextPaletteControls();
   syncPlaybackLyricPaletteControls();
   updateWallpaperDiyVars();

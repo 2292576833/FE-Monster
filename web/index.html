@@ -8,7 +8,8 @@
     <link rel="stylesheet" href="/components/GlassSurface.css?v=20260706-black-glass-scroll" />
     <link rel="stylesheet" href="/components/BorderGlow.css?v=20260705-button-border-glow-fix" />
     <link rel="stylesheet" href="border-glow-buttons.css?v=20260705-button-border-glow-fix" />
-  <link rel="stylesheet" href="styles.css?v=20260720-playback-lyric-color-14" />
+  <link rel="stylesheet" href="text-fonts.css?v=20260721-licensed-fonts-1" />
+  <link rel="stylesheet" href="styles.css?v=20260722-cover-particle-wave-1" />
   <link rel="stylesheet" href="rhythm-game.css?v=20260716-rhythm-game-2" />
     <link rel="stylesheet" href="black-gold-buttons.css?v=20260714-black-react-bits-glass-16" />
   </head>
@@ -770,6 +771,9 @@
             <div class="sonic-topography-core" id="sonicTopographyCore"></div>
           </div>
         </section>
+        <section class="chladni-scene" id="chladniScene" aria-label="克拉尼 3D 粒子图形" hidden>
+          <div class="chladni-core" id="chladniCore" aria-hidden="true"></div>
+        </section>
         <section class="cover-particle-scene" id="coverParticleScene" aria-label="&#31890;&#23376;&#23553;&#38754;" hidden>
           <div class="cover-particle-rig" id="coverParticleRig" aria-hidden="true">
             <div class="cover-particle-engine" id="coverParticleEngine"></div>
@@ -814,7 +818,22 @@
         </section>
         <section class="qishui-playback-card" id="qishuiPlaybackCard" aria-label="音乐悬浮播放页" hidden>
           <article class="qishui-playback-phone" id="qishuiPlaybackPhone" aria-expanded="false">
-            <div class="qishui-playback-ambient" aria-hidden="true">
+            <div
+              class="qishui-playback-ambient glass-surface glass-surface--fallback"
+              aria-hidden="true"
+              data-glass-surface
+              data-glass-radius="16"
+              data-glass-brightness="50"
+              data-glass-opacity="0.9"
+              data-glass-blur="7"
+              data-glass-displace="0.16"
+              data-glass-background-opacity="0.035"
+              data-glass-saturation="1.14"
+              data-glass-distortion-scale="-96"
+              data-glass-red-offset="-2"
+              data-glass-green-offset="4"
+              data-glass-blue-offset="10"
+            >
               <img id="qishuiPlaybackBackdrop" alt="" />
             </div>
             <div class="qishui-playback-content">
@@ -1078,6 +1097,10 @@
                 <strong>Sonic</strong>
                 <small>Terrain</small>
               </button>
+              <button class="diy-preset-card" id="diyChladniPreset" type="button" data-preset="chladni">
+                <strong>克拉尼</strong>
+                <small>平面 · 3D六面</small>
+              </button>
               <button class="diy-preset-card" id="diyRainGlassPreset" type="button" data-preset="rain-glass">
                 <strong>&#38632;&#22825;&#29627;&#29827;</strong>
                 <small>&#27700;&#28404;&#28369;&#33853;</small>
@@ -1131,9 +1154,12 @@
           <div class="diy-control diy-control--cover-particle-background" id="diyCoverParticleControl" data-diy-preset-control="cover-particles" hidden>
             <label class="diy-toggle" for="diyCoverParticleBackgroundToggle">
               <span>&#32972;&#26223;</span>
-              <input id="diyCoverParticleBackgroundToggle" type="checkbox" aria-label="&#32972;&#26223;" />
+              <input id="diyCoverParticleBackgroundToggle" type="checkbox" aria-label="&#32972;&#26223;" checked />
             </label>
-            <span id="diyCoverParticleBackgroundValue">OFF</span>
+            <span id="diyCoverParticleBackgroundValue">ON</span>
+            <label for="diyCoverParticleMotionRange">&#31890;&#23376;&#24459;&#21160;</label>
+            <span id="diyCoverParticleMotionValue">80%</span>
+            <input id="diyCoverParticleMotionRange" type="range" min="0" max="200" step="1" value="80" aria-label="&#31890;&#23376;&#24459;&#21160;&#24133;&#24230;" aria-valuetext="80%" />
           </div>
           <div class="diy-control" id="diyCubeIntensityControl" data-diy-preset-control="cube" hidden>
             <label for="cubeIntensityRange">魔方强度</label>
@@ -1145,6 +1171,13 @@
             <div>
               <button id="freeCubeHeartButton" type="button" aria-pressed="false">心动</button>
               <button class="is-active" id="freeCubeBackgroundButton" type="button" aria-pressed="true">背景</button>
+            </div>
+          </div>
+          <div class="free-cube-preset-controls chladni-preset-controls" id="chladniPresetControls" role="group" aria-label="克拉尼平面与3D六面切换" hidden>
+            <span>克拉尼形态</span>
+            <div>
+              <button id="chladniPlaneButton" type="button" aria-pressed="false">平面</button>
+              <button class="is-active" id="chladniCubeButton" type="button" aria-pressed="true">3D六面</button>
             </div>
           </div>
           <div class="storm-preset-lighting-quick" id="stormPresetLightingQuickControls" role="group" aria-label="风暴海域光照与天气切换" hidden>
@@ -1191,6 +1224,18 @@
               </button>
             </div>
           </div>
+          <section class="diy-text-font" id="textFontControl" aria-labelledby="textFontTitle">
+            <header class="diy-text-font-head">
+              <strong id="textFontTitle">字体选择</strong>
+              <output id="textFontStatus">系统字体</output>
+            </header>
+            <label class="diy-text-font-field" for="textFontSelect">
+              <span class="sr-only">选择歌词字体</span>
+              <select id="textFontSelect" aria-describedby="textFontAvailability"></select>
+            </label>
+            <output class="diy-text-font-preview" id="textFontPreview" aria-hidden="true">此刻，听见光的回声</output>
+            <small id="textFontAvailability">跟随当前设备的系统字体</small>
+          </section>
           <section class="diy-text-palette" id="textPaletteControl" aria-labelledby="textPaletteTitle">
             <header class="diy-text-palette-head">
               <strong id="textPaletteTitle">&#25991;&#23383;&#35843;&#33394;</strong>
@@ -1524,8 +1569,9 @@
     <script src="render-quality.js?v=20260718-preset-fsr-versions-1"></script>
     <script src="storm-ocean-runtime.js?v=20260718-fine-waves-120"></script>
     <script src="free-cube-runtime.js?v=20260718-material-clarity-2"></script>
-    <script src="void-prism-runtime.js?v=20260718-preset-fsr-1"></script>
-    <script src="app.js?v=20260720-playback-lyric-color-14"></script>
+    <script src="void-prism-runtime.js?v=20260721-text-fonts-1"></script>
+    <script src="chladni-runtime.js?v=20260721-chladni-particles-1"></script>
+    <script src="app.js?v=20260722-cover-particle-wave-1"></script>
     <script src="rhythm-game.js?v=20260718-rhythm-game-orbit-lock-1"></script>
   </body>
 </html>

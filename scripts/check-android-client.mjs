@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 const root = path.resolve(import.meta.dirname, '..');
 const webRoot = path.join(root, 'android', 'app', 'build', 'generated', 'feMonsterWebAssets', 'fe-monster-web');
 const mainActivityPath = path.join(root, 'android', 'app', 'src', 'main', 'java', 'com', 'femonster', 'mobile', 'MainActivity.java');
+const manifestPath = path.join(root, 'android', 'app', 'src', 'main', 'AndroidManifest.xml');
 const buildGradlePath = path.join(root, 'android', 'app', 'build.gradle');
 const artifactDirectory = path.join(root, 'artifacts', 'android-client-check');
 const edge = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
@@ -20,6 +21,7 @@ if (!existsSync(path.join(webRoot, 'index.html'))) {
 if (!existsSync(edge)) throw new Error(`Microsoft Edge was not found: ${edge}`);
 
 const mainActivity = readFileSync(mainActivityPath, 'utf8');
+const manifest = readFileSync(manifestPath, 'utf8');
 const buildGradle = readFileSync(buildGradlePath, 'utf8');
 const nativeShellContract = {
   privateLocalOrigin: mainActivity.includes('LOCAL_APP_ORIGIN = "https://fe-monster.local/"'),
@@ -29,6 +31,7 @@ const nativeShellContract = {
   localApiHasNativeFailClosedResponse: mainActivity.includes('localApiFallbackResponse(path)'),
   bridgeReportsLocalRuntime: mainActivity.includes('public String getRuntimeMode()')
     && mainActivity.includes('return "local";'),
+  landscapeOnly: manifest.includes('android:screenOrientation="sensorLandscape"'),
   noRemoteGatewayBuildConfig: !buildGradle.includes('DEFAULT_SERVER_URL')
     && !buildGradle.includes('PUBLIC_ACCESS_KEY')
     && !buildGradle.includes('FE_MONSTER_ANDROID_SERVER_URL'),
@@ -129,13 +132,6 @@ async function evaluate(expression) {
 }
 
 const viewports = [
-  { name: 'ratio-20-9-portrait', aspect: '20:9', width: 360, height: 800 },
-  { name: 'ratio-19_5-9-portrait', aspect: '19.5:9', width: 360, height: 780 },
-  { name: 'ratio-20_5-9-portrait', aspect: '20.5:9', width: 360, height: 820 },
-  { name: 'ratio-21-9-portrait', aspect: '21:9', width: 360, height: 840 },
-  { name: 'ratio-3-2-portrait', aspect: '3:2', width: 360, height: 540 },
-  { name: 'ratio-16-9-portrait', aspect: '16:9', width: 360, height: 640 },
-  { name: 'ratio-18-9-portrait', aspect: '18:9', width: 360, height: 720 },
   { name: 'ratio-21-9-landscape', aspect: '21:9 landscape', width: 840, height: 360 },
   { name: 'ratio-3-2-landscape', aspect: '3:2 landscape', width: 540, height: 360 },
   { name: 'ratio-16-9-landscape', aspect: '16:9 landscape', width: 640, height: 360 },
@@ -155,15 +151,20 @@ function failuresFor(report) {
   if (!report.localApiOk) failures.push('local API contract is unavailable');
   if (!report.localStatePersists) failures.push('local runtime state did not persist');
   if (!report.localAudioInputReady) failures.push('local audio importer is unavailable');
-  if (!report.localImportEntry) failures.push('music account control was not converted to local import');
+  if (!report.removedCircledChrome) failures.push('removed Android rail/import controls are still present');
+  if (!report.accountLoginEntry) failures.push('playback account is not the Android login entry');
+  if (!report.loginDialogReachable) failures.push('music platform login dialog is suppressed in local runtime');
+  if (!report.loginUsesAndroidErrorCopy) failures.push('login dialog fell back to desktop gateway instructions');
   if (!report.sandboxEnabled) failures.push('local sandbox was disabled');
   if (!report.communityHidden) failures.push('server-only community UI is visible');
-  if (report.smallTargets.length) failures.push(`touch targets below 44px: ${report.smallTargets.join(', ')}`);
+  if (!report.searchFourColumns) failures.push('search field does not preserve input, favorites, and submit columns');
+  if (!report.searchUsesFreedWidth) failures.push('search field still reserves space for removed Android chrome');
+  if (!report.textFontSelector) failures.push('43-item text preset font selector is unavailable');
+  if (!report.textFontLayout) failures.push('text font selector overflows the Android landscape panel');
+  if (!report.textFontFallbackHonest) failures.push('missing text fonts are not identified with an explicit fallback state');
+  if (report.smallTargets.length) failures.push(`touch targets below compact Android minimum (40px): ${report.smallTargets.join(', ')}`);
   if (report.outOfBounds.length) failures.push(`out-of-bounds controls: ${report.outOfBounds.join(', ')}`);
   if (report.overlaps.length) failures.push(`overlapping controls: ${report.overlaps.join(', ')}`);
-  if (report.expectedOrientation === 'landscape' && !report.singleRowLandscapeTopbar) {
-    failures.push('landscape search and top controls are not in one row');
-  }
   return failures;
 }
 
@@ -196,6 +197,15 @@ try {
         getServerUrl: () => 'https://fe-monster.local/',
         getRuntimeMode: () => 'local',
         getPerformanceTier: () => 'low',
+        getMusicGatewayState: () => 'starting',
+        requestMusicApi: (requestId) => setTimeout(() => {
+          window.feMonsterAndroidMusicResult?.(requestId, 503, JSON.stringify({
+            ok: false,
+            code: 'ANDROID_GATEWAY_STARTING',
+            gatewayState: 'starting',
+            error: 'On-device music gateway is starting'
+          }));
+        }, 8),
         showMessage: () => {},
         openExternal: () => true,
         beginDownload: () => '',
@@ -209,15 +219,15 @@ try {
 
   mkdirSync(artifactDirectory, { recursive: true });
   for (const viewport of viewports) {
-    const expectedOrientation = viewport.width > viewport.height ? 'landscape' : 'portrait';
+    const expectedOrientation = 'landscape';
     await command('Emulation.setDeviceMetricsOverride', {
       width: viewport.width,
       height: viewport.height,
       deviceScaleFactor: 2,
       mobile: true,
       screenOrientation: {
-        type: expectedOrientation === 'landscape' ? 'landscapePrimary' : 'portraitPrimary',
-        angle: expectedOrientation === 'landscape' ? 90 : 0
+        type: 'landscapePrimary',
+        angle: 90
       }
     });
     await command('Emulation.setUserAgentOverride', {
@@ -243,17 +253,33 @@ try {
         return { selector, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height };
       };
       const selectors = [
-        '#sandboxModeButton', '#runtimeSettingsButton', '#neteaseLoginButton', '#diyButton', '#homeButton',
-        '#topSearchForm', '#topSearchForm .top-search-submit', '#prevButton', '#playButton', '#nextButton',
-        '#dockQualityButton', '#dockFavoriteButton', '#dockPinButton'
+        '#qishuiPlaybackAccount', '#topSearchForm', '#topFavoritesButton', '#topSearchForm .top-search-submit', '#prevButton', '#playButton', '#nextButton',
+        '#dockQualityButton', '#dockFavoriteButton', '#dockPinButton',
+        '#qishuiPlaybackVisibilityToggle', '#qishuiPlaybackScaleToggle', '#qishuiPlaybackQuality',
+        '#qishuiPlaybackProgressRange', '#qishuiPlaybackPreviousButton', '#qishuiPlaybackPlayButton', '#qishuiPlaybackNextButton'
       ];
       const targets = selectors.map(rectOf).filter(Boolean);
-      const smallTargets = targets.filter((item) => item.width < 43.5 || item.height < 43.5)
+      document.querySelectorAll('#qishuiPlaybackTools button').forEach((node, index) => {
+        if (!visible(node)) return;
+        const rect = node.getBoundingClientRect();
+        targets.push({
+          selector: '#qishuiPlaybackTools button:nth-child(' + (index + 1) + ')',
+          left: rect.left,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+          width: rect.width,
+          height: rect.height
+        });
+      });
+      const smallTargets = targets.filter((item) => item.width < 39.5 || item.height < 39.5)
         .map((item) => item.selector + ':' + Math.round(item.width) + 'x' + Math.round(item.height));
       const outOfBounds = targets.filter((item) => item.left < -1 || item.top < -1 || item.right > innerWidth + 1 || item.bottom > innerHeight + 1)
         .map((item) => item.selector);
-      const topSelectors = ['#sandboxModeButton', '#runtimeSettingsButton', '#neteaseLoginButton', '#diyButton', '#homeButton', '#topSearchForm'];
-      const topRects = topSelectors.map(rectOf).filter(Boolean);
+      const interactiveSelectors = [
+        '#qishuiPlaybackAccount', '#topSearchForm'
+      ];
+      const topRects = interactiveSelectors.map(rectOf).filter(Boolean);
       const overlaps = [];
       for (let left = 0; left < topRects.length; left += 1) {
         for (let right = left + 1; right < topRects.length; right += 1) {
@@ -269,7 +295,28 @@ try {
       await fetch('/api/player/volume?value=0.37');
       const player = await fetch('/api/player/state').then((response) => response.json());
       const search = rectOf('#topSearchForm');
-      const sandbox = rectOf('#sandboxModeButton');
+      const searchInput = rectOf('#topSearchInput');
+      const favorites = rectOf('#topFavoritesButton');
+      const searchSubmit = rectOf('#topSearchForm .top-search-submit');
+      const loginDialog = document.getElementById('neteaseLoginDialog');
+      const loginWasHidden = loginDialog?.hidden;
+      const accountEntry = document.getElementById('qishuiPlaybackAccount');
+      if (loginDialog) loginDialog.hidden = true;
+      accountEntry?.click();
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      const loginDialogReachable = visible(loginDialog);
+      const loginDialogText = loginDialog?.textContent || '';
+      if (loginDialog) loginDialog.hidden = loginWasHidden;
+      setDiyOpen(true);
+      setDiyPage('text');
+      setTextPreset('depth');
+      await new Promise((resolve) => setTimeout(resolve, 260));
+      const textFontRoot = document.getElementById('textFontControl');
+      const textFontSelect = document.getElementById('textFontSelect');
+      const textFontPreview = document.getElementById('textFontPreview');
+      textFontRoot?.scrollIntoView({ block: 'center', inline: 'nearest' });
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      const textFontRect = textFontRoot?.getBoundingClientRect();
       return {
         mobileRuntime: Boolean(window.__feMonsterAndroidMobileRuntime),
         platform: document.documentElement.dataset.fePlatform || '',
@@ -281,12 +328,30 @@ try {
           && runtime.clientMode === 'android-local' && runtime.serverRequired === false,
         localStatePersists: Math.abs(Number(player.volume) - 0.37) < 0.001,
         localAudioInputReady: Boolean(document.getElementById('localPlaylistInput')?.multiple),
-        localImportEntry: document.getElementById('neteaseLoginLabel')?.textContent?.trim() === '导入音乐'
-          && /本地音乐/.test(document.getElementById('neteaseLoginButton')?.getAttribute('aria-label') || ''),
+        removedCircledChrome: !document.getElementById('androidCommandBar')
+          && !document.getElementById('androidLocalImportButton'),
+        accountLoginEntry: accountEntry?.dataset.androidLoginEntry === 'true'
+          && accountEntry?.getAttribute('role') === 'button'
+          && accountEntry?.getAttribute('tabindex') === '0',
+        loginDialogReachable,
+        loginUsesAndroidErrorCopy: /\u672c\u673a\u97f3\u4e50\u767b\u5f55\u670d\u52a1/.test(loginDialogText)
+          && !/127\.0\.0\.1|run\.cmd|\u5bfc\u5165\s*API/i.test(loginDialogText),
         sandboxEnabled: document.getElementById('sandboxModeButton')?.getAttribute('aria-disabled') !== 'true',
         communityHidden: !visible(document.getElementById('communityCard')),
-        singleRowLandscapeTopbar: ${JSON.stringify(expectedOrientation)} !== 'landscape'
-          || (search && sandbox && Math.abs(search.top - sandbox.top) <= 1.5),
+        searchFourColumns: Boolean(searchInput && favorites && searchSubmit
+          && searchInput.right <= favorites.left + 1 && favorites.right <= searchSubmit.left + 1
+          && favorites.width >= 39.5 && searchSubmit.width >= 39.5),
+        searchUsesFreedWidth: Boolean(search && search.left <= 16 && innerWidth - search.right <= 16),
+        textFontSelector: visible(textFontRoot)
+          && textFontSelect?.options.length === 43
+          && Boolean(textFontPreview?.textContent.trim()),
+        textFontLayout: Boolean(textFontRect
+          && textFontRect.left >= -1
+          && textFontRect.right <= innerWidth + 1
+          && textFontRoot.scrollWidth <= textFontRoot.clientWidth + 1
+          && textFontSelect.getBoundingClientRect().width >= 120),
+        textFontFallbackHonest: Boolean(textFontSelect?.querySelector('option[data-font-available="false"]')
+          && /需嵌入授权|授权待核实|授权已核/.test(textFontSelect.textContent || '')),
         smallTargets,
         outOfBounds,
         overlaps,

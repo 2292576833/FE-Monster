@@ -5,6 +5,7 @@ import path from 'node:path';
 
 const edge = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const webRoot = path.resolve('web');
+const componentsRoot = path.resolve('components');
 const debugPort = 0;
 const profile = path.resolve('artifacts', `.tmp-playback-performance-${process.pid}`);
 const mimeTypes = new Map([
@@ -28,8 +29,13 @@ const server = createServer((request, response) => {
   }
 
   const requestedPath = url.pathname === '/' ? '/index.html' : url.pathname;
-  const filePath = path.resolve(webRoot, `.${decodeURIComponent(requestedPath)}`);
-  if (!filePath.startsWith(`${webRoot}${path.sep}`) || !existsSync(filePath)) {
+  const isComponentAsset = requestedPath.startsWith('/components/');
+  const staticRoot = isComponentAsset ? componentsRoot : webRoot;
+  const relativePath = isComponentAsset
+    ? requestedPath.slice('/components/'.length)
+    : requestedPath.slice(1);
+  const filePath = path.resolve(staticRoot, decodeURIComponent(relativePath));
+  if (!filePath.startsWith(`${staticRoot}${path.sep}`) || !existsSync(filePath)) {
     response.writeHead(404);
     response.end('Not found');
     return;
@@ -296,6 +302,10 @@ try {
   await delay(250);
   const artifactRoot = `${path.resolve('artifacts')}${path.sep}`;
   if (profile.startsWith(artifactRoot) && existsSync(profile)) {
-    rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 150 });
+    try {
+      rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    } catch {
+      // Edge may keep transient profile locks for a moment after taskkill on Windows.
+    }
   }
 }

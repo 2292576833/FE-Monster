@@ -147,33 +147,41 @@
     return `rgb(${red}, ${green}, ${blue})`;
   }
 
-  function fitLyricFont(context, text, maximumWidth) {
+  const DEFAULT_LYRIC_FONT_FAMILY = '"Microsoft YaHei", "Noto Sans CJK SC", sans-serif';
+
+  function safeLyricFontFamily(value, fallback = DEFAULT_LYRIC_FONT_FAMILY) {
+    const family = String(value || '').replace(/[\r\n;]/g, ' ').trim();
+    return family || fallback;
+  }
+
+  function fitLyricFont(context, text, maximumWidth, fontFamily) {
     let size = 284;
     while (size > 108) {
-      context.font = `900 ${size}px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif`;
+      context.font = `900 ${size}px ${fontFamily}`;
       if (context.measureText(text).width <= maximumWidth) break;
       size -= 8;
     }
     return size;
   }
 
-  function setLyric(runtime, text, subtitle, palette) {
+  function setLyric(runtime, text, subtitle, palette, fontFamily) {
     if (!runtime || runtime.disposed) return false;
     const line = String(text || 'FE MONSTER').replace(/\s*\r?\n+\s*/g, ' ').trim() || 'FE MONSTER';
     const detail = String(subtitle || '').replace(/\s*\r?\n+\s*/g, ' ').trim();
     const primary = '#3f474c';
     const glow = 'transparent';
-    const signature = `${line}|${detail}|${primary}|${glow}`;
+    const resolvedFontFamily = safeLyricFontFamily(fontFamily, runtime.lyricFontFamily);
+    const signature = `${line}|${detail}|${primary}|${glow}|${resolvedFontFamily}`;
     if (signature === runtime.lyricSignature) return false;
 
     const context = runtime.lyricCanvas.getContext('2d');
     const width = runtime.lyricCanvas.width;
     const height = runtime.lyricCanvas.height;
     context.clearRect(0, 0, width, height);
-    const fontSize = fitLyricFont(context, line, width * 0.84);
+    const fontSize = fitLyricFont(context, line, width * 0.84, resolvedFontFamily);
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    context.font = `900 ${fontSize}px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif`;
+    context.font = `900 ${fontSize}px ${resolvedFontFamily}`;
     context.shadowColor = glow;
     context.shadowBlur = 0;
     context.fillStyle = primary;
@@ -181,12 +189,13 @@
 
     if (detail) {
       context.shadowBlur = 0;
-      context.font = '700 84px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif';
+      context.font = `700 84px ${resolvedFontFamily}`;
       context.fillStyle = 'rgba(63, 71, 76, 0.72)';
       context.fillText(detail, width / 2, height * 0.73);
     }
 
     runtime.lyricTexture.needsUpdate = true;
+    runtime.lyricFontFamily = resolvedFontFamily;
     runtime.lyricSignature = signature;
     runtime.lyricText = line;
     runtime.lyricUpdates += 1;
@@ -619,6 +628,7 @@
       lyricTexture: lyricData.texture,
       lyricSignature: '',
       lyricText: '',
+      lyricFontFamily: DEFAULT_LYRIC_FONT_FAMILY,
       lyricUpdates: 0,
       reflectionPasses: 0,
       reflectionDirty: true,
@@ -641,7 +651,7 @@
       runtime.reflectionDirty = true;
     };
     renderer.domElement.addEventListener('webglcontextrestored', runtime.handleContextRestored);
-    setLyric(runtime, config.lyric, config.subtitle, config.palette);
+    setLyric(runtime, config.lyric, config.subtitle, config.palette, config.fontFamily);
     resize(runtime, config.pixelRatio);
     update(runtime, { now: performance.now(), yaw: 0, pitch: 0, zoom: 1, energy: 0, bass: 0, pixelRatio: config.pixelRatio });
     return runtime;
@@ -827,6 +837,7 @@
         targetAspect: '16:9'
       },
       lyricText: runtime.lyricText,
+      lyricFontFamily: runtime.lyricFontFamily,
       lyricSignature: runtime.lyricSignature,
       lyricUpdates: runtime.lyricUpdates,
       frameCount: runtime.frameCount,

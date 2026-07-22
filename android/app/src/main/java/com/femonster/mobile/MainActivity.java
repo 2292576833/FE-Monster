@@ -9,7 +9,9 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.res.AssetManager;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -41,6 +43,8 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 
+import org.json.JSONObject;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.ByteArrayInputStream;
@@ -48,14 +52,20 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public final class MainActivity extends Activity {
     private static final int REQUEST_FILE_CHOOSER = 1001;
@@ -65,6 +75,24 @@ public final class MainActivity extends Activity {
     private static final String KEY_INSTALL_ID = "install_id";
     private static final String LOCAL_APP_ORIGIN = "https://fe-monster.local/";
     private static final String BUNDLED_WEB_ROOT = "fe-monster-web/";
+    private static final String NODE_GATEWAY_ASSET_ROOT = "nodejs-project";
+    private static final int MAX_GATEWAY_RESPONSE_BYTES = 2 * 1024 * 1024;
+    private static final long MUSIC_GATEWAY_STARTUP_WAIT_MS = 20_000L;
+    private static final long MUSIC_GATEWAY_RETRY_DELAY_MS = 180L;
+    private static final String KEY_NODE_GATEWAY_APK_TIME = "node_gateway_apk_time";
+    private static final boolean NODE_MOBILE_AVAILABLE;
+
+    static {
+        boolean available = false;
+        try {
+            System.loadLibrary("node");
+            System.loadLibrary("fe_node_mobile");
+            available = true;
+        } catch (UnsatisfiedLinkError error) {
+            android.util.Log.e("FE-MUSIC-NODE", "Embedded Node runtime is unavailable", error);
+        }
+        NODE_MOBILE_AVAILABLE = available;
+    }
 
     private static final String ANDROID_RUNTIME_SCRIPT =
         "(() => {" +
@@ -129,6 +157,12 @@ public final class MainActivity extends Activity {
         "})();";
 
     private final Map<String, BlobDownload> blobDownloads = new ConcurrentHashMap<>();
+    private final Map<String, Object> musicSessionLocks = new ConcurrentHashMap<>();
+    private final ExecutorService musicGatewayRequests = Executors.newFixedThreadPool(4);
+    private final String musicGatewayToken = createGatewayToken();
+    private final int musicGatewayPort = createGatewayPort();
+    private volatile String musicGatewayState = NODE_MOBILE_AVAILABLE ? "starting" : "unavailable";
+    private volatile String musicGatewayFailure = NODE_MOBILE_AVAILABLE ? "" : "Embedded Node runtime is unavailable";
     private FrameLayout root;
     private WebView webView;
     private ValueCallback<Uri[]> fileChooserCallback;
@@ -137,6 +171,8 @@ public final class MainActivity extends Activity {
     private boolean backDispatchPending;
     private View customView;
     private WebChromeClient.CustomViewCallback customViewCallback;
+
+    private native int startNodeWithArguments(String[] arguments);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -156,6 +192,7 @@ public final class MainActivity extends Activity {
 
         setContentView(root);
         applyImmersiveMode();
+        startOnDeviceMusicGateway();
         configureWebView();
         loadBundledClient();
     }
@@ -186,6 +223,7 @@ public final class MainActivity extends Activity {
             fileChooserCallback = null;
         }
         for (String id : new ArrayList<>(blobDownloads.keySet())) cancelBlobDownload(id);
+        musicGatewayRequests.shutdownNow();
         if (webView != null) {
             webView.stopLoading();
             webView.removeJavascriptInterface("FeMonsterAndroid");
@@ -587,6 +625,317 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private static String createGatewayToken() {
+        byte[] bytes = new byte[32];
+        new SecureRandom().nextBytes(bytes);
+        return Base64.encodeToString(bytes, Base64.NO_WRAP | Base64.NO_PADDING | Base64.URL_SAFE);
+    }
+
+    private static int createGatewayPort() {
+        return 49152 + new SecureRandom().nextInt(12000);
+    }
+
+    private void startOnDeviceMusicGateway() {
+        if (!NODE_MOBILE_AVAILABLE) {
+            musicGatewayState = "unavailable";
+            return;
+        }
+        musicGatewayState = "starting";
+        new Thread(() -> {
+            try {
+                File nodeProject = prepareNodeGatewayProject();
+                File sessionDirectory = new File(getFilesDir(), "music-sessions");
+                if (!sessionDirectory.exists() && !sessionDirectory.mkdirs()) {
+                    throw new IOException("Unable to create the music session directory");
+                }
+                int qishuiPort = createGatewayPort();
+                while (qishuiPort == musicGatewayPort) qishuiPort = createGatewayPort();
+                int exitCode = startNodeWithArguments(new String[] {
+                    "node",
+                    new File(nodeProject, "main.cjs").getAbsolutePath(),
+                    "--data-dir",
+                    sessionDirectory.getAbsolutePath(),
+                    "--token",
+                    musicGatewayToken,
+                    "--port",
+                    String.valueOf(musicGatewayPort),
+                    "--qishui-port",
+                    String.valueOf(qishuiPort)
+                });
+                musicGatewayState = "failed";
+                musicGatewayFailure = "On-device gateway stopped with code " + exitCode;
+                android.util.Log.e("FE-MUSIC-NODE", "On-device gateway stopped with code " + exitCode);
+            } catch (Throwable error) {
+                musicGatewayState = "failed";
+                musicGatewayFailure = safeMessage(error);
+                android.util.Log.e("FE-MUSIC-NODE", "Unable to start on-device gateway", error);
+            }
+        }, "fe-music-node").start();
+    }
+
+    private File prepareNodeGatewayProject() throws IOException, PackageManager.NameNotFoundException {
+        File projectDirectory = new File(getFilesDir(), NODE_GATEWAY_ASSET_ROOT);
+        PackageInfo packageInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+        long installedApkTime = packageInfo.lastUpdateTime;
+        SharedPreferences preferences = getPrefs();
+        boolean current = preferences.getLong(KEY_NODE_GATEWAY_APK_TIME, 0L) == installedApkTime
+            && new File(projectDirectory, "main.cjs").isFile();
+        if (current) return projectDirectory;
+
+        deleteRecursively(projectDirectory);
+        if (!copyAssetTree(getAssets(), NODE_GATEWAY_ASSET_ROOT, projectDirectory)) {
+            deleteRecursively(projectDirectory);
+            throw new IOException("Unable to extract the on-device music gateway");
+        }
+        preferences.edit().putLong(KEY_NODE_GATEWAY_APK_TIME, installedApkTime).apply();
+        return projectDirectory;
+    }
+
+    private boolean copyAssetTree(AssetManager assets, String assetPath, File destination) {
+        try {
+            String[] children = assets.list(assetPath);
+            if (children == null || children.length == 0) {
+                File parent = destination.getParentFile();
+                if (parent != null && !parent.exists() && !parent.mkdirs()) return false;
+                try (InputStream input = assets.open(assetPath); OutputStream output = new FileOutputStream(destination)) {
+                    copyStream(input, output);
+                }
+                return true;
+            }
+            if (!destination.exists() && !destination.mkdirs()) return false;
+            for (String child : children) {
+                if (!copyAssetTree(assets, assetPath + "/" + child, new File(destination, child))) return false;
+            }
+            return true;
+        } catch (IOException error) {
+            android.util.Log.e("FE-MUSIC-NODE", "Asset extraction failed: " + assetPath, error);
+            return false;
+        }
+    }
+
+    private static void copyStream(InputStream input, OutputStream output) throws IOException {
+        byte[] buffer = new byte[64 * 1024];
+        int read;
+        while ((read = input.read(buffer)) >= 0) {
+            if (read > 0) output.write(buffer, 0, read);
+        }
+    }
+
+    private static void deleteRecursively(File file) {
+        if (file == null || !file.exists()) return;
+        File[] children = file.listFiles();
+        if (children != null) {
+            for (File child : children) deleteRecursively(child);
+        }
+        if (!file.delete()) android.util.Log.w("FE-MUSIC-NODE", "Unable to delete " + file);
+    }
+
+    private void requestMusicApiAsync(String requestId, String method, String pathAndQuery, String bodyJson) {
+        String safeRequestId = requestId == null ? "" : requestId.trim();
+        musicGatewayRequests.execute(() -> {
+            GatewayResponse result;
+            if (!NODE_MOBILE_AVAILABLE) {
+                result = musicGatewayUnavailableResponse("ANDROID_GATEWAY_UNAVAILABLE", "unavailable");
+            } else {
+                try {
+                    result = requestMusicApi(method, pathAndQuery, bodyJson);
+                } catch (Exception error) {
+                    String state = musicGatewayState;
+                    boolean failed = "failed".equals(state) || "unavailable".equals(state);
+                    result = musicGatewayUnavailableResponse(
+                        failed ? "ANDROID_GATEWAY_UNAVAILABLE" : "ANDROID_GATEWAY_STARTING",
+                        failed ? "failed" : "starting"
+                    );
+                }
+            }
+            dispatchMusicApiResult(safeRequestId, result);
+        });
+    }
+
+    private GatewayResponse musicGatewayUnavailableResponse(String code, String state) {
+        String message = "failed".equals(state) || "unavailable".equals(state)
+            ? "On-device music gateway could not start"
+            : "On-device music gateway is starting";
+        return new GatewayResponse(
+            503,
+            "{\"ok\":false,\"code\":" + JSONObject.quote(code)
+                + ",\"gatewayState\":" + JSONObject.quote(state)
+                + ",\"error\":" + JSONObject.quote(message) + "}"
+        );
+    }
+
+    private GatewayResponse requestMusicApi(String method, String pathAndQuery, String bodyJson) throws IOException {
+        String normalizedMethod = method == null ? "GET" : method.trim().toUpperCase(Locale.ROOT);
+        if (!"GET".equals(normalizedMethod) && !"POST".equals(normalizedMethod)) {
+            return new GatewayResponse(405, "{\"ok\":false,\"error\":\"method not allowed\"}");
+        }
+        String path = pathAndQuery == null ? "" : pathAndQuery.trim();
+        if (path.length() > 2048 || !isAllowedMusicApiPath(path)) {
+            return new GatewayResponse(403, "{\"ok\":false,\"error\":\"endpoint not allowed\"}");
+        }
+        String requestBody = bodyJson == null || bodyJson.isBlank() ? "{}" : bodyJson;
+        if (requestBody.getBytes(StandardCharsets.UTF_8).length > 64 * 1024) {
+            return new GatewayResponse(413, "{\"ok\":false,\"error\":\"request body too large\"}");
+        }
+        String provider = providerFromMusicPath(path);
+        Object sessionLock = musicSessionLocks.computeIfAbsent(provider, ignored -> new Object());
+        synchronized (sessionLock) {
+            long deadline = System.currentTimeMillis() + MUSIC_GATEWAY_STARTUP_WAIT_MS;
+            while (true) {
+                try {
+                    GatewayResponse response = requestMusicApiOnce(normalizedMethod, path, requestBody, provider);
+                    musicGatewayState = "ready";
+                    musicGatewayFailure = "";
+                    return response;
+                } catch (java.net.ConnectException error) {
+                    if ("failed".equals(musicGatewayState) || System.currentTimeMillis() >= deadline) {
+                        throw new IOException(
+                            musicGatewayFailure.isBlank() ? "On-device music gateway did not start" : musicGatewayFailure,
+                            error
+                        );
+                    }
+                    try {
+                        Thread.sleep(MUSIC_GATEWAY_RETRY_DELAY_MS);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        throw new IOException("On-device music gateway startup was interrupted", interrupted);
+                    }
+                }
+            }
+        }
+    }
+
+    private GatewayResponse requestMusicApiOnce(
+        String normalizedMethod,
+        String path,
+        String requestBody,
+        String provider
+    ) throws IOException {
+        HttpURLConnection connection = (HttpURLConnection) new URL(
+            "http://127.0.0.1:" + musicGatewayPort + path
+        ).openConnection();
+        try {
+            connection.setConnectTimeout(1500);
+            connection.setReadTimeout(22000);
+            connection.setUseCaches(false);
+            connection.setRequestMethod(normalizedMethod);
+            connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("X-FE-Android-Gateway-Token", musicGatewayToken);
+            String sessionCookie = getPrefs().getString(musicSessionKey(provider), "");
+            if (sessionCookie != null && !sessionCookie.isBlank()) {
+                connection.setRequestProperty("Cookie", sessionCookie);
+            }
+            if ("POST".equals(normalizedMethod)) {
+                byte[] payload = requestBody.getBytes(StandardCharsets.UTF_8);
+                connection.setDoOutput(true);
+                connection.setFixedLengthStreamingMode(payload.length);
+                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                try (OutputStream output = connection.getOutputStream()) {
+                    output.write(payload);
+                }
+            }
+            int status = connection.getResponseCode();
+            storeMusicSession(provider, sessionCookie, connection.getHeaderFields());
+            InputStream stream = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
+            String body = readBoundedUtf8(stream, MAX_GATEWAY_RESPONSE_BYTES);
+            if (body.isBlank()) body = "{\"ok\":false,\"error\":\"empty gateway response\"}";
+            return new GatewayResponse(status, body);
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private boolean isAllowedMusicApiPath(String path) {
+        if ("/health".equals(path)) return true;
+        int query = path.indexOf('?');
+        String pathname = query >= 0 ? path.substring(0, query) : path;
+        if ("/api/providers".equals(pathname) || "/api/music-apis".equals(pathname)) return query < 0;
+        if ("/api/login/status".equals(pathname)) {
+            return path.matches("^/api/login/status\\?provider=(netease|qq|kugou|qishui)$");
+        }
+        return pathname.matches("^/api/(netease|qq|kugou|qishui)/(login/(qr/(key|create|check)|status|phone/(send|verify))|user/playlists)$");
+    }
+
+    private String providerFromMusicPath(String path) {
+        if (path.startsWith("/api/login/status?")) {
+            java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("(?:^|[?&])provider=(netease|qq|kugou|qishui)(?:&|$)").matcher(path);
+            return matcher.find() ? matcher.group(1) : "gateway";
+        }
+        String prefix = "/api/";
+        if (!path.startsWith(prefix)) return "gateway";
+        int slash = path.indexOf('/', prefix.length());
+        return slash > prefix.length() ? path.substring(prefix.length(), slash) : "gateway";
+    }
+
+    private String musicSessionKey(String provider) {
+        return "music_session_" + provider;
+    }
+
+    private void storeMusicSession(String provider, String existing, Map<String, List<String>> headers) {
+        Map<String, String> cookies = new LinkedHashMap<>();
+        mergeCookieHeader(cookies, existing);
+        for (Map.Entry<String, List<String>> header : headers.entrySet()) {
+            if (header.getKey() == null || !"set-cookie".equalsIgnoreCase(header.getKey())) continue;
+            for (String value : header.getValue()) mergeSetCookie(cookies, value);
+        }
+        StringBuilder joined = new StringBuilder();
+        for (Map.Entry<String, String> cookie : cookies.entrySet()) {
+            if (joined.length() > 0) joined.append("; ");
+            joined.append(cookie.getKey()).append('=').append(cookie.getValue());
+        }
+        getPrefs().edit().putString(musicSessionKey(provider), joined.toString()).apply();
+    }
+
+    private void mergeCookieHeader(Map<String, String> cookies, String header) {
+        if (header == null) return;
+        for (String pair : header.split(";")) {
+            int equals = pair.indexOf('=');
+            if (equals <= 0) continue;
+            String name = pair.substring(0, equals).trim();
+            String value = pair.substring(equals + 1).trim();
+            if (name.matches("[!#$%&'*+.^_`|~0-9A-Za-z-]+")) cookies.put(name, value);
+        }
+    }
+
+    private void mergeSetCookie(Map<String, String> cookies, String header) {
+        if (header == null || header.isBlank()) return;
+        String pair = header.split(";", 2)[0].trim();
+        int equals = pair.indexOf('=');
+        if (equals <= 0) return;
+        String name = pair.substring(0, equals).trim();
+        String value = pair.substring(equals + 1).trim();
+        if (!name.matches("[!#$%&'*+.^_`|~0-9A-Za-z-]+")) return;
+        if (value.isEmpty() || header.toLowerCase(Locale.ROOT).contains("max-age=0")) cookies.remove(name);
+        else cookies.put(name, value);
+    }
+
+    private String readBoundedUtf8(InputStream input, int maximumBytes) throws IOException {
+        if (input == null) return "";
+        try (InputStream stream = input; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[16 * 1024];
+            int total = 0;
+            int read;
+            while ((read = stream.read(buffer)) >= 0) {
+                if (read == 0) continue;
+                total += read;
+                if (total > maximumBytes) throw new IOException("gateway response too large");
+                output.write(buffer, 0, read);
+            }
+            return output.toString(StandardCharsets.UTF_8.name());
+        }
+    }
+
+    private void dispatchMusicApiResult(String requestId, GatewayResponse result) {
+        String body = result.body == null || result.body.isBlank()
+            ? "{\"ok\":false,\"error\":\"empty gateway response\"}"
+            : result.body;
+        String script = "window.feMonsterAndroidMusicResult&&window.feMonsterAndroidMusicResult("
+            + JSONObject.quote(requestId) + "," + result.status + "," + JSONObject.quote(body) + ");";
+        runOnUiThread(() -> {
+            if (webView != null) webView.evaluateJavascript(script, null);
+        });
+    }
+
     private WebResourceResponse localApiFallbackResponse(String path) {
         boolean health = path != null && path.startsWith("/health");
         String body = health
@@ -879,6 +1228,25 @@ public final class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public String getMusicGatewayState() {
+            return musicGatewayState;
+        }
+
+        @JavascriptInterface
+        public void requestMusicApi(String requestId, String method, String pathAndQuery, String bodyJson) {
+            if (requestId == null || requestId.isBlank() || requestId.length() > 128) return;
+            requestMusicApiAsync(requestId, method, pathAndQuery, bodyJson);
+        }
+
+        @JavascriptInterface
+        public boolean clearMusicApiSession(String provider) {
+            String normalized = provider == null ? "" : provider.trim().toLowerCase(Locale.ROOT);
+            if (!normalized.matches("netease|qq|kugou|qishui")) return false;
+            getPrefs().edit().remove(musicSessionKey(normalized)).apply();
+            return true;
+        }
+
+        @JavascriptInterface
         public boolean openExternal(String uriValue) {
             if (uriValue == null || uriValue.trim().isEmpty()) return false;
             try {
@@ -913,6 +1281,16 @@ public final class MainActivity extends Activity {
         @JavascriptInterface
         public void showMessage(String message) {
             runOnUiThread(() -> Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show());
+        }
+    }
+
+    private static final class GatewayResponse {
+        final int status;
+        final String body;
+
+        GatewayResponse(int status, String body) {
+            this.status = status;
+            this.body = body;
         }
     }
 

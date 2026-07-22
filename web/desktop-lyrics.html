@@ -1026,8 +1026,7 @@
       return 120;
     }
     function frameIntervalMs() {
-      var fps = normalizeFrameRate(state.frameRate);
-      return fps > 0 ? 1000 / fps : 0;
+      return 0;
     }
     function pointInRect(evt, rect, padX, padY) {
       return evt.clientX >= rect.left - padX && evt.clientX <= rect.right + padX && evt.clientY >= rect.top - padY && evt.clientY <= rect.bottom + padY;

@@ -6,6 +6,7 @@ import path from 'node:path';
 
 const edge = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const webRoot = path.resolve('web');
+const componentsRoot = path.resolve('components');
 const debugPort = 24000 + (process.pid % 6000);
 const profile = path.resolve(tmpdir(), `fe-monster-playback-lyric-palette-${process.pid}`);
 const storageKey = 'fe-monster-playback-lyric-palette-v1';
@@ -29,8 +30,13 @@ const server = createServer((request, response) => {
     return;
   }
   const requestedPath = url.pathname === '/' ? '/index.html' : url.pathname;
-  const filePath = path.resolve(webRoot, `.${decodeURIComponent(requestedPath)}`);
-  if (!filePath.startsWith(`${webRoot}${path.sep}`) || !existsSync(filePath)) {
+  const isComponentAsset = requestedPath.startsWith('/components/');
+  const staticRoot = isComponentAsset ? componentsRoot : webRoot;
+  const relativePath = isComponentAsset
+    ? requestedPath.slice('/components/'.length)
+    : requestedPath.slice(1);
+  const filePath = path.resolve(staticRoot, decodeURIComponent(relativePath));
+  if (!filePath.startsWith(`${staticRoot}${path.sep}`) || !existsSync(filePath)) {
     response.writeHead(404);
     response.end('Not found');
     return;

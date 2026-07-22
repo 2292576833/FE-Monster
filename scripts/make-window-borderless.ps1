@@ -1,8 +1,8 @@
 param(
   [Parameter(Mandatory = $true)]
   [long]$TargetProcessId,
-  [int]$Width = 1120,
-  [int]$Height = 720,
+  [int]$Width = 1600,
+  [int]$Height = 900,
   [int]$X = 120,
   [int]$Y = 80
 )

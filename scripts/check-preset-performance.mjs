@@ -1065,7 +1065,9 @@ try {
       engineContainer: cover.engineContainer,
       enginePromise: cover.enginePromise,
       enginePlaying: cover.enginePlaying,
-      engineVisible: cover.engineVisible
+      engineVisible: cover.engineVisible,
+      motionAmplitude: cover.motionAmplitude,
+      playerClock: { ...state.playerClock }
     };
     let playCalls = 0;
     let pauseCalls = 0;
@@ -1089,12 +1091,48 @@ try {
         await wait(50);
       }
       await wait(160);
-      const playAfterEntry = playCalls;
+      const playWhilePaused = playCalls;
+
+      state.playerClock.playing = true;
+      state.playerClock.updatedAt = performance.now();
+      updatePlayState();
+      await wait(80);
+      const playAfterPlaybackStart = playCalls;
 
       updateCoverParticleVisibility();
       updateCoverParticleVisibility();
       await wait(120);
       const playAfterRepeatedVisible = playCalls;
+
+      const motionRange = document.querySelector('#diyCoverParticleMotionRange');
+      const particlesBeforeMotionInput = cover.particles;
+      const geometryBeforeMotionInput = cover.gpuGeometry;
+      const motionUniforms = [];
+      for (const percent of [0, 100, 200]) {
+        if (motionRange) {
+          motionRange.value = String(percent);
+          motionRange.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        requestOrbFrame();
+        await wait(80);
+        motionUniforms.push(Number(cover.gpuMaterial?.uniforms?.uMotionScale?.value));
+      }
+      const motionControl = {
+        available: !!motionRange,
+        min: motionRange?.min,
+        max: motionRange?.max,
+        step: motionRange?.step,
+        stateAmplitude: cover.motionAmplitude,
+        output: document.querySelector('#diyCoverParticleMotionValue')?.textContent,
+        runtimeValue: builtinDiyPresetConfiguration().runtimeControls?.coverMotionAmplitude,
+        motionUniforms,
+        particlesStable: cover.particles === particlesBeforeMotionInput,
+        geometryStable: cover.gpuGeometry === geometryBeforeMotionInput
+      };
+      if (motionRange) {
+        motionRange.value = String(Math.round(original.motionAmplitude * 100));
+        motionRange.dispatchEvent(new Event('input', { bubbles: true }));
+      }
 
       if (cover.gpuRenderer) {
         originalGpuSetSize = cover.gpuRenderer.setSize;
@@ -1107,6 +1145,12 @@ try {
         originalGpuSetSize = null;
       }
 
+      state.playerClock.playing = false;
+      state.playerClock.updatedAt = performance.now();
+      updatePlayState();
+      await wait(80);
+      const pauseAfterPlaybackPause = pauseCalls;
+
       setDiyPreset('lyric');
       await wait(80);
       const pauseAfterExit = pauseCalls;
@@ -1116,15 +1160,24 @@ try {
 
       enterPresetPlaybackPage('cover-particles');
       await wait(80);
+      const playAfterPausedReentry = playCalls;
+      state.playerClock.playing = true;
+      state.playerClock.updatedAt = performance.now();
+      updatePlayState();
+      await wait(80);
       result = {
         available: true,
         gpuAvailable: !!cover.gpuRenderer,
-        playAfterEntry,
+        playWhilePaused,
+        playAfterPlaybackStart,
         playAfterRepeatedVisible,
+        pauseAfterPlaybackPause,
         pauseAfterExit,
         pauseAfterRepeatedHidden,
-        playAfterReentry: playCalls,
-        gpuSetSizeCalls
+        playAfterPausedReentry,
+        playAfterReentryPlaybackStart: playCalls,
+        gpuSetSizeCalls,
+        motionControl
       };
     } finally {
       if (originalGpuSetSize && cover.gpuRenderer) cover.gpuRenderer.setSize = originalGpuSetSize;
@@ -1134,8 +1187,281 @@ try {
       cover.enginePromise = original.enginePromise;
       cover.enginePlaying = original.enginePlaying;
       cover.engineVisible = original.engineVisible;
+      cover.motionAmplitude = original.motionAmplitude;
+      Object.assign(state.playerClock, original.playerClock);
+      updateCoverParticleBackgroundMode();
     }
     return result;
+  })()`);
+
+  const coverParticleDepthMapping = await evaluate(`(async () => {
+    const fixture = document.createElement('canvas');
+    fixture.width = 96;
+    fixture.height = 96;
+    const fixtureContext = fixture.getContext('2d');
+    fixtureContext.fillStyle = 'rgb(16,16,16)';
+    fixtureContext.fillRect(0, 0, 32, 96);
+    fixtureContext.fillStyle = 'rgb(128,128,128)';
+    fixtureContext.fillRect(32, 0, 32, 96);
+    fixtureContext.fillStyle = 'rgb(240,240,240)';
+    fixtureContext.fillRect(64, 0, 32, 96);
+
+    const image = new Image();
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = reject;
+      image.src = fixture.toDataURL('image/png');
+    });
+
+    const cover = state.coverParticle;
+    const originalCover = {
+      image: cover.image,
+      imageSignature: cover.imageSignature,
+      sampleSignature: cover.sampleSignature,
+      particles: cover.particles,
+      gpuSignature: cover.gpuSignature
+    };
+    const originalRandom = Math.random;
+    const chladniRefs = {
+      root: state.chladni,
+      runtime: state.chladni.runtime,
+      palette: state.chladni.palette,
+      frame: state.chladni.frame,
+      lastDiagnostics: state.chladni.lastDiagnostics
+    };
+
+    const summarize = (particles) => {
+      let count = 0;
+      let sumL = 0;
+      let sumZ = 0;
+      let sumLL = 0;
+      let sumZZ = 0;
+      let sumLZ = 0;
+      let minZ = Infinity;
+      let maxZ = -Infinity;
+      let minSize = Infinity;
+      let maxSize = -Infinity;
+      const bands = {
+        dark: { count: 0, sumZ: 0 },
+        mid: { count: 0, sumZ: 0 },
+        bright: { count: 0, sumZ: 0 }
+      };
+      for (const particle of particles) {
+        const luminance = 0.2126 * particle.r + 0.7152 * particle.g + 0.0722 * particle.b;
+        const z = Number(particle.z);
+        count += 1;
+        sumL += luminance;
+        sumZ += z;
+        sumLL += luminance * luminance;
+        sumZZ += z * z;
+        sumLZ += luminance * z;
+        minZ = Math.min(minZ, z);
+        maxZ = Math.max(maxZ, z);
+        minSize = Math.min(minSize, Number(particle.size));
+        maxSize = Math.max(maxSize, Number(particle.size));
+        const band = luminance < 0.2
+          ? bands.dark
+          : luminance > 0.82
+            ? bands.bright
+            : luminance > 0.44 && luminance < 0.58
+              ? bands.mid
+              : null;
+        if (band) {
+          band.count += 1;
+          band.sumZ += z;
+        }
+      }
+      const denominator = Math.sqrt(
+        Math.max(0, count * sumLL - sumL * sumL)
+          * Math.max(0, count * sumZZ - sumZ * sumZ)
+      );
+      return {
+        count,
+        correlation: denominator > 0 ? (count * sumLZ - sumL * sumZ) / denominator : 0,
+        depthSpan: maxZ - minZ,
+        minSize,
+        maxSize,
+        bands: Object.fromEntries(Object.entries(bands).map(([key, band]) => [key, {
+          count: band.count,
+          meanZ: band.count ? band.sumZ / band.count : 0
+        }]))
+      };
+    };
+
+    let result;
+    try {
+      cover.image = image;
+      cover.imageSignature = 'qa-cover-depth-fixture';
+      Math.random = () => 0.1;
+      resetCoverParticleSamples();
+      buildCoverParticleSamples(900, 900, 1);
+      const firstDepths = Float32Array.from(cover.particles, (particle) => particle.z);
+      const first = summarize(cover.particles);
+
+      Math.random = () => 0.9;
+      resetCoverParticleSamples();
+      buildCoverParticleSamples(900, 900, 1);
+      const second = summarize(cover.particles);
+      const particlesBeforeResize = cover.particles;
+      buildCoverParticleSamples(1200, 680, 2);
+      const resizeKeepsAnchors = cover.particles === particlesBeforeResize;
+      let maxDepthDelta = firstDepths.length === cover.particles.length ? 0 : Number.MAX_SAFE_INTEGER;
+      if (firstDepths.length === cover.particles.length) {
+        for (let index = 0; index < firstDepths.length; index += 1) {
+          maxDepthDelta = Math.max(maxDepthDelta, Math.abs(firstDepths[index] - cover.particles[index].z));
+        }
+      }
+
+      const material = coverParticleGpuMaterial(window.THREE);
+      const gpuDepthOcclusion = material.depthTest === true && material.depthWrite === true;
+      const vertexShader = String(material.vertexShader || '');
+      const gpuRenderSource = String(drawCoverParticleSceneGpu);
+      const cpuRenderSource = String(drawCoverParticleScene);
+      const enginePlaySource = String(playCoverParticleEngine);
+      const playStateSource = String(updatePlayState);
+      const motionBehavior = {
+        pausedDepthFlat: vertexShader.includes('position.z * uAudioActive')
+          && cpuRenderSource.includes('particle.z * (audioActive ? 1 : 0)'),
+        playbackSignedParticleWave: vertexShader.includes('float naturalWave = waveA * 0.42')
+          && vertexShader.includes('float waveDepth = uAudioActive * naturalWave')
+          && cpuRenderSource.includes('const naturalWave = waveA * 0.42')
+          && cpuRenderSource.includes('const waveDepth = audioGate * naturalWave'),
+        audioGateUniform: vertexShader.includes('uniform float uAudioActive')
+          && gpuRenderSource.includes('uniforms.uAudioActive.value = audioActive ? 1 : 0'),
+        playbackClockGate: cpuRenderSource.includes('const audioActive = isPlaybackClockRunning()'),
+        backgroundMotionGate: enginePlaySource.includes('!isPlaybackClockRunning()')
+          && playStateSource.includes('if (isPlaybackClockRunning()) playCoverParticleEngine()'),
+        noPositiveOnlyLift: !vertexShader.includes('sheetLift')
+          && !vertexShader.includes('pulseLift')
+          && !cpuRenderSource.includes('sheetLift')
+          && !cpuRenderSource.includes('pulseLift'),
+        wholeLowFrequencyPulse: cpuRenderSource.includes('const wholePulse = audioActive')
+          && cpuRenderSource.includes('Math.pow(cover.bass, 1.1)')
+      };
+      const sampleWaveDepth = (particle, time, audioGate = 1) => {
+        const bass = 0.6;
+        const energy = 0.4;
+        const beat = 0.35;
+        const sheetTime = time * (0.68 + bass * 0.54 + beat * 0.12);
+        const waveA = Math.sin(sheetTime + particle.wavePhase);
+        const waveB = Math.sin(sheetTime * 0.73 + particle.wavePhase * 1.31 + particle.x * 5.2);
+        const waveC = Math.sin(sheetTime * 1.17 - particle.wavePhase * 0.89 + particle.y * 6.6);
+        const radialWave = Math.sin(Math.hypot(particle.x, particle.y) * 14 - sheetTime * 1.28 + particle.wavePhase * 0.18);
+        const naturalWave = waveA * 0.42 + waveB * 0.28 + waveC * 0.2 + radialWave * 0.1;
+        const lowDrive = Math.max(0, Math.min(1.25, bass * 0.82 + energy * 0.22));
+        return audioGate * naturalWave * (0.01 + lowDrive * 0.014 + beat * 0.004) * particle.waveStrength;
+      };
+      let moving = 0;
+      let forward = 0;
+      let backward = 0;
+      let signedDelta = 0;
+      let absoluteDelta = 0;
+      let pausedMax = 0;
+      for (const particle of cover.particles) {
+        pausedMax = Math.max(pausedMax, Math.abs(sampleWaveDepth(particle, 1.4, 0)));
+        const delta = sampleWaveDepth(particle, 1.4) - sampleWaveDepth(particle, 0.6);
+        if (Math.abs(delta) > 1e-6) moving += 1;
+        if (delta > 1e-6) forward += 1;
+        else if (delta < -1e-6) backward += 1;
+        signedDelta += delta;
+        absoluteDelta += Math.abs(delta);
+      }
+      const waveMotion = {
+        pausedMax,
+        movingRatio: moving / Math.max(1, cover.particles.length),
+        forwardRatio: forward / Math.max(1, cover.particles.length),
+        backwardRatio: backward / Math.max(1, cover.particles.length),
+        signedBias: Math.abs(signedDelta) / Math.max(1e-9, absoluteDelta)
+      };
+      material.dispose();
+      result = {
+        first,
+        second,
+        sameParticleCount: firstDepths.length === cover.particles.length,
+        maxDepthDelta,
+        resizeKeepsAnchors,
+        gpuDepthOcclusion,
+        motionBehavior,
+        waveMotion,
+        chladniUnchanged: state.chladni === chladniRefs.root
+          && state.chladni.runtime === chladniRefs.runtime
+          && state.chladni.palette === chladniRefs.palette
+          && state.chladni.frame === chladniRefs.frame
+          && state.chladni.lastDiagnostics === chladniRefs.lastDiagnostics
+      };
+    } finally {
+      Math.random = originalRandom;
+      cover.image = originalCover.image;
+      cover.imageSignature = originalCover.imageSignature;
+      cover.sampleSignature = originalCover.sampleSignature;
+      cover.particles = originalCover.particles;
+      cover.gpuSignature = originalCover.gpuSignature;
+    }
+    return result;
+  })()`);
+
+  const presetSurfaceCoverage = await evaluate(`(async () => {
+    const stage = document.querySelector('.stage');
+    if (!stage) return { available: false, allCoverStage: false, surfaces: [] };
+
+    const specifications = [
+      ['wallpaper', '#wallpaperScene', '#wallpaperScene'],
+      ['void-prism', '#voidPrismScene', '#voidPrismCore'],
+      ['free-cubes', '#freeCubeScene', '#freeCubeCore'],
+      ['dynamic-cube', '#dynamicCubeScene', '#dynamicCubeCore'],
+      ['topography', '#sonicTopographyScene', '#sonicTopographyCore'],
+      ['chladni', '#chladniScene', '#chladniCore'],
+      ['cover-particles', '#coverParticleScene', '#coverParticleRig'],
+      ['sandbox', '#sandboxPlaybackScene', '#sandboxPlaybackScene']
+    ];
+    const snapshots = [];
+    const surfaces = [];
+
+    try {
+      for (const [name, sceneSelector, surfaceSelector] of specifications) {
+        const scene = document.querySelector(sceneSelector);
+        const surface = document.querySelector(surfaceSelector);
+        if (!scene || !surface) {
+          surfaces.push({ name, available: false, coversStage: false });
+          continue;
+        }
+        snapshots.push({ scene, hidden: scene.hidden });
+        scene.hidden = false;
+      }
+
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const stageRect = stage.getBoundingClientRect();
+      for (const [name, , surfaceSelector] of specifications) {
+        const surface = document.querySelector(surfaceSelector);
+        if (!surface) continue;
+        const rect = surface.getBoundingClientRect();
+        const tolerance = 1.5;
+        const coversStage = rect.left <= stageRect.left + tolerance
+          && rect.top <= stageRect.top + tolerance
+          && rect.right >= stageRect.right - tolerance
+          && rect.bottom >= stageRect.bottom - tolerance;
+        surfaces.push({
+          name,
+          available: true,
+          coversStage,
+          widthRatio: stageRect.width > 0 ? rect.width / stageRect.width : 0,
+          heightRatio: stageRect.height > 0 ? rect.height / stageRect.height : 0,
+          leftDelta: rect.left - stageRect.left,
+          topDelta: rect.top - stageRect.top,
+          rightDelta: rect.right - stageRect.right,
+          bottomDelta: rect.bottom - stageRect.bottom
+        });
+      }
+    } finally {
+      for (const snapshot of snapshots) snapshot.scene.hidden = snapshot.hidden;
+    }
+
+    return {
+      available: true,
+      allCoverStage: surfaces.length === specifications.length
+        && surfaces.every((surface) => surface.available && surface.coversStage),
+      surfaces
+    };
   })()`);
 
   const taskDurationMs = Math.max(0, ((metricsAfter.TaskDuration || 0) - (metricsBefore.TaskDuration || 0)) * 1000);
@@ -1163,7 +1489,6 @@ try {
       && voidCanvasBypass.drawImageCalls === 0
       && voidCanvasBypass.layoutReads <= 2,
     hiddenWallpaperSkips2dCanvas: wallpaperCanvasBypass.canvasOpacity === '0'
-      && wallpaperCanvasBypass.motionUpdates > 0
       && wallpaperCanvasBypass.drawImageCalls === 0
       && wallpaperCanvasBypass.layoutReads <= 2,
     renderClarityControl: clarity.available === true
@@ -1227,16 +1552,61 @@ try {
       && renderQualityLifecycle.dynamicCounters.timerExtensionRequests === 1
       && renderQualityLifecycle.dynamicCounters.queriesCreated === 1,
     coverParticleEngineUsesVisibilityEdges: coverParticleLifecycle.available === true
-      && coverParticleLifecycle.playAfterEntry === 1
+      && coverParticleLifecycle.playWhilePaused === 0
+      && coverParticleLifecycle.playAfterPlaybackStart === 1
       && coverParticleLifecycle.playAfterRepeatedVisible === 1
+      && coverParticleLifecycle.pauseAfterPlaybackPause === 1
       && coverParticleLifecycle.pauseAfterExit === 1
       && coverParticleLifecycle.pauseAfterRepeatedHidden === 1
-      && coverParticleLifecycle.playAfterReentry === 2,
+      && coverParticleLifecycle.playAfterPausedReentry === 1
+      && coverParticleLifecycle.playAfterReentryPlaybackStart === 2,
     coverParticleSkipsStableGpuResize: coverParticleLifecycle.gpuAvailable === true
       && coverParticleLifecycle.gpuSetSizeCalls === 0,
+    coverParticleMotionControlIsRealtime: coverParticleLifecycle.motionControl?.available === true
+      && coverParticleLifecycle.motionControl.min === '0'
+      && coverParticleLifecycle.motionControl.max === '200'
+      && coverParticleLifecycle.motionControl.step === '1'
+      && coverParticleLifecycle.motionControl.stateAmplitude === 2
+      && coverParticleLifecycle.motionControl.output === '200%'
+      && coverParticleLifecycle.motionControl.runtimeValue === '200%'
+      && coverParticleLifecycle.motionControl.motionUniforms[0] === 0
+      && coverParticleLifecycle.motionControl.motionUniforms[1] > 0
+      && Math.abs(
+        coverParticleLifecycle.motionControl.motionUniforms[2]
+          - coverParticleLifecycle.motionControl.motionUniforms[1] * 2
+      ) <= 1e-7
+      && coverParticleLifecycle.motionControl.particlesStable === true
+      && coverParticleLifecycle.motionControl.geometryStable === true,
+    coverParticleMatchesReferenceSampling: coverParticleDepthMapping.first.count === 256 * 256
+      && coverParticleDepthMapping.first.minSize >= 0.82
+      && coverParticleDepthMapping.first.maxSize <= 0.94
+      && coverParticleDepthMapping.resizeKeepsAnchors === true,
+    coverParticlePlaybackMotionIsGated: Object.values(coverParticleDepthMapping.motionBehavior || {})
+      .every(Boolean)
+      && coverParticleDepthMapping.waveMotion?.pausedMax <= 1e-9
+      && coverParticleDepthMapping.waveMotion?.movingRatio >= 0.99
+      && coverParticleDepthMapping.waveMotion?.forwardRatio >= 0.35
+      && coverParticleDepthMapping.waveMotion?.backwardRatio >= 0.35
+      && coverParticleDepthMapping.waveMotion?.signedBias <= 0.08,
+    coverBrightnessMapsToStable3dDepth: coverParticleDepthMapping.first.bands.dark.count > 1000
+      && coverParticleDepthMapping.first.bands.mid.count > 1000
+      && coverParticleDepthMapping.first.bands.bright.count > 1000
+      && coverParticleDepthMapping.first.correlation >= 0.9
+      && coverParticleDepthMapping.second.correlation >= 0.9
+      && coverParticleDepthMapping.first.depthSpan >= 0.1
+      && coverParticleDepthMapping.first.bands.dark.meanZ < coverParticleDepthMapping.first.bands.mid.meanZ
+      && coverParticleDepthMapping.first.bands.mid.meanZ < coverParticleDepthMapping.first.bands.bright.meanZ
+      && coverParticleDepthMapping.sameParticleCount === true
+      && coverParticleDepthMapping.maxDepthDelta <= 1e-7,
+    coverParticleUsesDepthOcclusion: coverParticleDepthMapping.gpuDepthOcclusion === true,
+    coverParticleReliefStaysCompact: coverParticleDepthMapping.first.depthSpan >= 0.1
+      && coverParticleDepthMapping.first.depthSpan <= 0.15,
+    coverParticleLeavesChladniUntouched: coverParticleDepthMapping.chladniUnchanged === true,
+    presetRenderSurfacesCoverStage: presetSurfaceCoverage.available === true
+      && presetSurfaceCoverage.allCoverStage === true,
     sonicTracksNativeRefresh: sonicRefresh.nativeRefresh === true
       && sonicRefresh.lyricNativeRefresh === true
-      && sonicRefresh.homeNativeRefresh === false
+      && sonicRefresh.homeNativeRefresh === true
       && sonicRefresh.sandboxInterval === 0
       && sonicRefresh.coverParticleFpsLimit >= 1000
       && sonicRefresh.grid >= sonicGridMinimum
@@ -1288,6 +1658,8 @@ try {
     presetFsr,
     renderQualityLifecycle,
     coverParticleLifecycle,
+    coverParticleDepthMapping,
+    presetSurfaceCoverage,
     dynamicCubeRefresh: {
       ...dynamicCubeRefresh,
       renderFps: Number(dynamicCubeRefresh.renderFps.toFixed(1)),
