@@ -330,7 +330,7 @@ try {
       && lyricSampleStyle.filter === 'none'
       && artistStyle.textShadow !== 'none';
     const defaultWallpaperQa = window.__defaultWallpaperQa || {};
-    const cacheToken = '20260722-cover-particle-wave-1';
+    const cacheToken = '20260723-sonic-wide-controls-1';
     const appScript = Array.from(document.scripts).find((script) => script.src.includes('/app.js'));
     const styleLink = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
       .find((link) => link.href.includes('/styles.css'));

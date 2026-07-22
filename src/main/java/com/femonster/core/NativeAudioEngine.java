@@ -2,10 +2,18 @@ package com.femonster.core;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 public final class NativeAudioEngine {
+    private static final int NATIVE_SAMPLE_HEADER_SIZE = 5;
+    private static final int LOW_FREQUENCY_BAND_COUNT = 512;
+    private static final List<Float> EMPTY_LOW_FREQUENCY_BANDS =
+        Collections.nCopies(LOW_FREQUENCY_BAND_COUNT, 0.0f);
+
     private final Path dllPath;
     private final boolean windows;
     private boolean available;
@@ -29,6 +37,7 @@ public final class NativeAudioEngine {
         body.put("sampleSource", sample.active ? "xaudio2-native-loopback" : "inactive");
         body.put("sampleRate", sample.sampleRate);
         body.put("lowFrequencyAmplitude", sample.lowFrequencyAmplitude);
+        body.put("lowFrequencyBands", sample.lowFrequencyBands);
         body.put("dll", dllPath.toString());
         body.put("status", status);
         body.put("error", error);
@@ -47,6 +56,7 @@ public final class NativeAudioEngine {
         body.put("backend", available ? "xaudio2" : "html-audio-fallback");
         body.put("source", sample.active ? "xaudio2-native-loopback" : "inactive");
         body.put("lowFrequencyAmplitude", sample.lowFrequencyAmplitude);
+        body.put("lowFrequencyBands", sample.lowFrequencyBands);
         body.put("energy", sample.energy);
         body.put("bass", sample.lowFrequencyAmplitude);
         body.put("beat", sample.beat);
@@ -89,13 +99,15 @@ public final class NativeAudioEngine {
         if (!available) return NativeSample.empty();
         try {
             float[] values = nativeSampleState();
-            if (values == null || values.length < 5) return NativeSample.empty();
+            if (values == null || values.length < NATIVE_SAMPLE_HEADER_SIZE) return NativeSample.empty();
+            float lowFrequencyAmplitude = clamp01(values[0]);
             return new NativeSample(
-                clamp01(values[0]),
+                lowFrequencyAmplitude,
                 clamp01(values[1]),
                 clamp01(values[2]),
                 Math.max(0, Math.round(values[3])),
-                values[4] > 0.5f
+                values[4] > 0.5f,
+                lowFrequencyBands(values, lowFrequencyAmplitude)
             );
         } catch (UnsatisfiedLinkError | SecurityException e) {
             return NativeSample.empty();
@@ -106,6 +118,15 @@ public final class NativeAudioEngine {
         if (!Float.isFinite(value)) return 0.0f;
         if (value < 0.0f) return 0.0f;
         return Math.min(value, 1.0f);
+    }
+
+    private static List<Float> lowFrequencyBands(float[] values, float fallback) {
+        List<Float> bands = new ArrayList<>(LOW_FREQUENCY_BAND_COUNT);
+        for (int index = 0; index < LOW_FREQUENCY_BAND_COUNT; index += 1) {
+            int nativeIndex = NATIVE_SAMPLE_HEADER_SIZE + index;
+            bands.add(nativeIndex < values.length ? clamp01(values[nativeIndex]) : fallback);
+        }
+        return bands;
     }
 
     private static native boolean nativeInit();
@@ -127,10 +148,11 @@ public final class NativeAudioEngine {
         float energy,
         float beat,
         int sampleRate,
-        boolean active
+        boolean active,
+        List<Float> lowFrequencyBands
     ) {
         static NativeSample empty() {
-            return new NativeSample(0.0f, 0.0f, 0.0f, 0, false);
+            return new NativeSample(0.0f, 0.0f, 0.0f, 0, false, EMPTY_LOW_FREQUENCY_BANDS);
         }
     }
 }

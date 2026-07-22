@@ -389,6 +389,21 @@ try {
       });
     }
     const driven = window.FeSandboxDiagnostics.chladni();
+    window.FeChladniRuntime.update(runtime, {
+      now: start + 53 * 28,
+      playing: false,
+      bass: 1.25,
+      energy: 1.25,
+      mid: 1.25,
+      treble: 1.25,
+      beat: 1.25,
+      yaw: 0.16,
+      pitch: -0.1,
+      zoom: 1.04,
+      reducedMotion: false,
+      pixelRatio: 1
+    });
+    const paused = window.FeSandboxDiagnostics.chladni();
     return {
       first,
       textDragResults,
@@ -405,6 +420,7 @@ try {
       cubeButtonPressed,
       rotated,
       driven,
+      paused,
       cardLabel: document.querySelector('#diyChladniPreset strong')?.textContent.trim() || '',
       cardInSceneList: Boolean(document.querySelector('#diyScenePresetList #diyChladniPreset')),
       sceneVisible: document.querySelector('#chladniScene')?.hidden === false,
@@ -456,7 +472,12 @@ try {
       && scene.driven.rotation.y > scene.rotated.rotation.y,
     audioResponse: scene.driven.audio.bass > 0.45 && scene.driven.audio.energy > 0.35 && scene.driven.audio.treble > 0.35,
     modeMorph: scene.driven.modeFrom.join(',') !== scene.first.modeFrom.join(',') || scene.driven.modeBlend > 0,
-    restrainedMotion: scene.driven.bassDisplacementGain === 1.35 && scene.driven.rotationSpeed <= 0.05,
+    controlledMotion: scene.driven.bassDisplacementGain === 1.35 && scene.driven.rotationSpeed <= 0.05,
+    lowFrequencyWholeJump: scene.driven.bassScaleGain === 0.032
+      && scene.driven.beatScaleGain === 0.012
+      && scene.driven.overallScale >= 1.032
+      && scene.driven.overallScale <= 1.056
+      && scene.paused.overallScale === 1,
     sixFaceCube: scene.first.faceCount === 6
       && scene.first.faceNames.length === 6
       && scene.first.particlesPerFace >= 83000

@@ -693,6 +693,343 @@ try {
     const inactiveProjectilesStayFrozen = topo.projectilesActive === false
       && topo.meteorMesh.instanceMatrix.version === clearedMeteorVersion
       && topo.particleMesh.instanceMatrix.version === clearedParticleVersion;
+    const originalPlaybackClockRunning = isPlaybackClockRunning;
+    const originalAnalysisLive = state.audioAnalysis.live;
+    const visualAudioKeys = ['lowFrequencyAmplitude', 'subBass', 'bass', 'lowMid', 'energy', 'beat'];
+    const originalVisualAudio = Object.fromEntries(
+      visualAudioKeys.map((key) => [key, state.visual[key]])
+    );
+    const originalVisualLowFrequencyBands = state.visual.lowFrequencyBands;
+    const originalVisualLowFrequencyBandValues = originalVisualLowFrequencyBands
+      ? Array.from(originalVisualLowFrequencyBands)
+      : null;
+    const visualHasLowFrequencyBandsVersion = Object.prototype.hasOwnProperty.call(
+      state.visual,
+      'lowFrequencyBandsVersion'
+    );
+    const originalVisualLowFrequencyBandsVersion = state.visual.lowFrequencyBandsVersion;
+    const originalFrameLowFrequencyBands = topo.frameAudio?.lowFrequencyBands;
+    const originalFrameLowFrequencyBandValues = originalFrameLowFrequencyBands
+      ? Array.from(originalFrameLowFrequencyBands)
+      : null;
+    const originalFrameLowFrequencyBandTargets = topo.frameAudio?.lowFrequencyBandTargets;
+    const originalFrameLowFrequencyBandTargetValues = originalFrameLowFrequencyBandTargets
+      ? Array.from(originalFrameLowFrequencyBandTargets)
+      : null;
+    const originalSonicLastMotionAt = topo.lastMotionAt;
+    const originalSonicLastRenderAt = topo.lastRenderAt;
+    const originalFrameAudio = Object.fromEntries(
+      Object.entries(topo.frameAudio || {})
+        .filter(([, value]) => typeof value === 'number')
+    );
+    const lowFrequencySpectrumTexture = topo.uniforms.uLowFrequencySpectrum?.value
+      || topo.material.uniforms?.uLowFrequencySpectrum?.value
+      || null;
+    const lowFrequencySpectrumData = topo.material.userData?.lowFrequencySpectrumData
+      || lowFrequencySpectrumTexture?.image?.data
+      || null;
+    const originalSpectrumBytes = lowFrequencySpectrumData
+      ? Uint8Array.from(lowFrequencySpectrumData)
+      : null;
+    const originalUniformAudio = Object.fromEntries(
+      Object.entries(topo.uniforms)
+        .filter(([, uniform]) => typeof uniform?.value === 'number')
+        .map(([key, uniform]) => [key, uniform.value])
+    );
+    const quietLowFrequencyBands = new Float32Array(SONIC_LOW_FREQUENCY_BAND_COUNT);
+    quietLowFrequencyBands[41] = 0.24;
+    quietLowFrequencyBands[410] = 0.08;
+    const activeLowFrequencyBands = new Float32Array(SONIC_LOW_FREQUENCY_BAND_COUNT);
+    activeLowFrequencyBands[41] = 0.82;
+    activeLowFrequencyBands[410] = 0.44;
+    activeLowFrequencyBands[511] = 1;
+    const setVisualLowFrequencyBands = (bands) => {
+      state.visual.lowFrequencyBands = bands;
+      if (visualHasLowFrequencyBandsVersion) {
+        state.visual.lowFrequencyBandsVersion = (Number(state.visual.lowFrequencyBandsVersion) || 0) + 1;
+      }
+    };
+    const readSpectrumSamples = () => lowFrequencySpectrumData
+      ? [
+          lowFrequencySpectrumData[41],
+          lowFrequencySpectrumData[250],
+          lowFrequencySpectrumData[410],
+          lowFrequencySpectrumData[511]
+        ]
+      : [];
+    const lowFrequencyTransition = {};
+    try {
+      state.audioAnalysis.live = false;
+      setVisualLowFrequencyBands(quietLowFrequencyBands);
+      Object.assign(state.visual, {
+        lowFrequencyAmplitude: 0.18,
+        subBass: 0.16,
+        bass: 0.12,
+        lowMid: 0.08,
+        energy: 0.12,
+        beat: 0.06
+      });
+      isPlaybackClockRunning = () => true;
+      topo.lastRenderAt = 0;
+      updateSonicTopographyMotion();
+      lowFrequencyTransition.quietAmplitude = topo.uniforms.uLowFrequencyAmplitude.value;
+      lowFrequencyTransition.quietSpectrumSamples = readSpectrumSamples();
+      if (topo.frameAudio?.lowFrequencyBands) topo.frameAudio.lowFrequencyBands.fill(0);
+      if (topo.frameAudio?.lowFrequencyBandTargets) topo.frameAudio.lowFrequencyBandTargets.fill(0);
+      if (topo.frameAudio) {
+        topo.frameAudio.lowFrequencyAmplitude = 0;
+        topo.frameAudio.subBass = 0;
+        topo.frameAudio.bass = 0;
+        topo.frameAudio.lowMid = 0;
+      }
+      if (lowFrequencySpectrumData) lowFrequencySpectrumData.fill(0);
+      setVisualLowFrequencyBands(activeLowFrequencyBands);
+      Object.assign(state.visual, {
+        lowFrequencyAmplitude: 0.86,
+        subBass: 0.8,
+        bass: 0.72,
+        lowMid: 0.36,
+        energy: 0.68,
+        beat: 0.52
+      });
+      lowFrequencyTransition.riseSpectrum = [];
+      lowFrequencyTransition.riseAmplitude = [];
+      for (let frame = 0; frame < 24; frame += 1) {
+        topo.lastMotionAt = performance.now() - 16;
+        topo.lastRenderAt = 0;
+        updateSonicTopographyMotion();
+        lowFrequencyTransition.riseSpectrum.push(lowFrequencySpectrumData?.[511] || 0);
+        lowFrequencyTransition.riseAmplitude.push(topo.uniforms.uLowFrequencyAmplitude.value);
+      }
+      lowFrequencyTransition.activeAmplitude = topo.uniforms.uLowFrequencyAmplitude.value;
+      lowFrequencyTransition.activeSubBass = topo.uniforms.uSubBass.value;
+      lowFrequencyTransition.activeBass = topo.uniforms.uBass.value;
+      lowFrequencyTransition.activeLowMid = topo.uniforms.uLowMid.value;
+      lowFrequencyTransition.activeSpectrumSamples = readSpectrumSamples();
+      setVisualLowFrequencyBands(new Float32Array(SONIC_LOW_FREQUENCY_BAND_COUNT));
+      Object.assign(state.visual, {
+        lowFrequencyAmplitude: 0,
+        subBass: 0,
+        bass: 0,
+        lowMid: 0,
+        energy: 0,
+        beat: 0
+      });
+      lowFrequencyTransition.releaseSpectrum = [];
+      lowFrequencyTransition.releaseAmplitude = [];
+      for (let frame = 0; frame < 12; frame += 1) {
+        topo.lastMotionAt = performance.now() - 16;
+        topo.lastRenderAt = 0;
+        updateSonicTopographyMotion();
+        lowFrequencyTransition.releaseSpectrum.push(lowFrequencySpectrumData?.[511] || 0);
+        lowFrequencyTransition.releaseAmplitude.push(topo.uniforms.uLowFrequencyAmplitude.value);
+      }
+      isPlaybackClockRunning = () => false;
+      topo.lastRenderAt = 0;
+      updateSonicTopographyMotion();
+      lowFrequencyTransition.pausedAmplitude = topo.uniforms.uLowFrequencyAmplitude.value;
+      lowFrequencyTransition.pausedSubBass = topo.uniforms.uSubBass.value;
+      lowFrequencyTransition.pausedBass = topo.uniforms.uBass.value;
+      lowFrequencyTransition.pausedLowMid = topo.uniforms.uLowMid.value;
+      lowFrequencyTransition.pausedSpectrumZero = !!lowFrequencySpectrumData
+        && lowFrequencySpectrumData.length === SONIC_LOW_FREQUENCY_BAND_COUNT
+        && Array.from(lowFrequencySpectrumData).every((value) => value === 0);
+    } finally {
+      isPlaybackClockRunning = originalPlaybackClockRunning;
+      state.audioAnalysis.live = originalAnalysisLive;
+      Object.assign(state.visual, originalVisualAudio);
+      state.visual.lowFrequencyBands = originalVisualLowFrequencyBands;
+      if (typeof originalVisualLowFrequencyBands?.set === 'function' && originalVisualLowFrequencyBandValues) {
+        originalVisualLowFrequencyBands.set(originalVisualLowFrequencyBandValues);
+      }
+      if (visualHasLowFrequencyBandsVersion) {
+        state.visual.lowFrequencyBandsVersion = originalVisualLowFrequencyBandsVersion;
+      } else {
+        delete state.visual.lowFrequencyBandsVersion;
+      }
+      if (topo.frameAudio) {
+        Object.assign(topo.frameAudio, originalFrameAudio);
+        if (originalFrameLowFrequencyBands) {
+          topo.frameAudio.lowFrequencyBands = originalFrameLowFrequencyBands;
+          if (typeof originalFrameLowFrequencyBands.set === 'function') {
+            originalFrameLowFrequencyBands.set(originalFrameLowFrequencyBandValues);
+          }
+        }
+        if (originalFrameLowFrequencyBandTargets) {
+          topo.frameAudio.lowFrequencyBandTargets = originalFrameLowFrequencyBandTargets;
+          if (typeof originalFrameLowFrequencyBandTargets.set === 'function') {
+            originalFrameLowFrequencyBandTargets.set(originalFrameLowFrequencyBandTargetValues);
+          }
+        } else {
+          delete topo.frameAudio.lowFrequencyBandTargets;
+        }
+      }
+      topo.lastMotionAt = originalSonicLastMotionAt;
+      topo.lastRenderAt = originalSonicLastRenderAt;
+      Object.entries(originalUniformAudio).forEach(([key, value]) => {
+        topo.uniforms[key].value = value;
+      });
+      if (lowFrequencySpectrumData && originalSpectrumBytes) {
+        lowFrequencySpectrumData.set(originalSpectrumBytes);
+        if (lowFrequencySpectrumTexture) lowFrequencySpectrumTexture.needsUpdate = true;
+      }
+    }
+    const terrainMatrix = new window.THREE.Matrix4();
+    const terrainPosition = new window.THREE.Vector3();
+    const bassColumnCluster = SONIC_BASS_COLUMN_CLUSTER;
+    const bassColumnRadius = Number(bassColumnCluster.radius) || 0;
+    const bassColumnBandAttribute = topo.terrain.geometry.getAttribute('aBassColumnBand');
+    const bassColumnPositions = [];
+    const bassColumnBandIndices = [];
+    for (let index = 0; index < topo.terrain.count; index += 1) {
+      topo.terrain.getMatrixAt(index, terrainMatrix);
+      terrainPosition.setFromMatrixPosition(terrainMatrix);
+      const gridX = terrainPosition.x / SONIC_TOPOGRAPHY_SPACING;
+      const gridZ = terrainPosition.z / SONIC_TOPOGRAPHY_SPACING;
+      const xDistance = gridX - bassColumnCluster.center;
+      const zDistance = gridZ - bassColumnCluster.center;
+      if (bassColumnRadius > 0 && xDistance * xDistance + zDistance * zDistance <= bassColumnRadius ** 2 + 0.001) {
+        bassColumnPositions.push([
+          Number(terrainPosition.x.toFixed(2)),
+          Number(terrainPosition.z.toFixed(2))
+        ]);
+        if (bassColumnBandAttribute) bassColumnBandIndices.push(Math.round(bassColumnBandAttribute.getX(index)));
+      }
+    }
+    const sonicVertexShader = String(topo.material.vertexShader || '');
+    const sonicMotionSource = String(updateSonicTopographyMotion);
+    const sonicBuildSource = String(buildSonicTopography);
+    const uniqueColumnX = [...new Set(bassColumnPositions.map((position) => position[0]))].sort((a, b) => a - b);
+    const uniqueColumnZ = [...new Set(bassColumnPositions.map((position) => position[1]))].sort((a, b) => a - b);
+    const centerColumns = bassColumnPositions.filter(([x, z]) => Math.abs(x) < 0.01 && Math.abs(z) < 0.01);
+    const positionsAreContiguous = (positions) => positions.length === bassColumnRadius * 2 + 1
+      && positions.slice(1).every((position, index) => (
+        Math.abs(position - positions[index] - SONIC_TOPOGRAPHY_SPACING) < 0.01
+    ));
+    const positionKey = (x, z) => String(x) + ',' + String(z);
+    const positionKeys = new Set(bassColumnPositions.map(([x, z]) => positionKey(x, z)));
+    const circularlySymmetric = bassColumnPositions.every(([x, z]) => (
+      positionKeys.has(positionKey(-x, z))
+        && positionKeys.has(positionKey(x, -z))
+        && positionKeys.has(positionKey(z, x))
+    ));
+    const maxCoreRadiusSquared = bassColumnPositions.reduce((maximum, [x, z]) => Math.max(
+      maximum,
+      (x / SONIC_TOPOGRAPHY_SPACING) ** 2 + (z / SONIC_TOPOGRAPHY_SPACING) ** 2
+    ), 0);
+    const uniqueBandIndices = [...new Set(bassColumnBandIndices)].sort((a, b) => a - b);
+    const transitionStart = bassColumnRadius;
+    const transitionEnd = transitionStart + bassColumnCluster.feather;
+    const transitionSamples = Array.from({ length: bassColumnCluster.feather + 2 }, (_, index) => {
+      const distance = transitionStart
+        + (transitionEnd - transitionStart) * index / (bassColumnCluster.feather + 1);
+      const normalized = clamp((distance - transitionStart) / (transitionEnd - transitionStart), 0, 1);
+      return 1 - normalized * normalized * (3 - 2 * normalized);
+    });
+    const bassColumns = {
+      count: bassColumnPositions.length,
+      uniqueX: uniqueColumnX.length,
+      uniqueZ: uniqueColumnZ.length,
+      oddCenteredCore: bassColumnCluster.count % 2 === 1
+        && bassColumnCluster.center === 0
+        && centerColumns.length === 1
+        && Math.abs(uniqueColumnX[0] + uniqueColumnX.at(-1)) < 0.01
+        && Math.abs(uniqueColumnZ[0] + uniqueColumnZ.at(-1)) < 0.01,
+      circularCore: bassColumnRadius === 18
+        && circularlySymmetric
+        && Math.abs(maxCoreRadiusSquared - 324) < 0.01
+        && positionKeys.has(positionKey(18 * SONIC_TOPOGRAPHY_SPACING, 0))
+        && !positionKeys.has(positionKey(18 * SONIC_TOPOGRAPHY_SPACING, SONIC_TOPOGRAPHY_SPACING)),
+      clusteredContiguously: positionsAreContiguous(uniqueColumnX)
+        && positionsAreContiguous(uniqueColumnZ),
+      reusesTerrain: topo.group.children.length === 3
+        && topo.group.children.filter((child) => child.isInstancedMesh).length === 3,
+      shaderSelectsCluster: sonicVertexShader.includes('bassColumnGrid - vec2(0.0)')
+        && /dot\\s*\\(\\s*bassColumnDelta\\s*,\\s*bassColumnDelta\\s*\\)/.test(sonicVertexShader)
+        && /step\\s*\\(\\s*324\\.5\\s*,\\s*bassColumnRadiusSquared\\s*\\)/.test(sonicVertexShader),
+      frequencyBandContract: SONIC_LOW_FREQUENCY_BAND_COUNT === 512
+        && typeof SONIC_LOW_FREQUENCY_MIN_HZ !== 'undefined'
+        && typeof SONIC_LOW_FREQUENCY_MAX_HZ !== 'undefined'
+        && SONIC_LOW_FREQUENCY_MIN_HZ === 20
+        && SONIC_LOW_FREQUENCY_MAX_HZ === 150,
+      spectrumTexture: {
+        isDataTexture: lowFrequencySpectrumTexture?.isDataTexture === true,
+        width: lowFrequencySpectrumTexture?.image?.width || 0,
+        height: lowFrequencySpectrumTexture?.image?.height || 0,
+        bytes: lowFrequencySpectrumData?.length || 0,
+        followsVisualBands: lowFrequencyTransition.quietSpectrumSamples?.length === 4
+          && lowFrequencyTransition.activeSpectrumSamples?.length === 4
+          && lowFrequencyTransition.activeSpectrumSamples[0] >= 205
+          && lowFrequencyTransition.activeSpectrumSamples[1] === 0
+          && lowFrequencyTransition.activeSpectrumSamples[2] >= 110
+          && lowFrequencyTransition.activeSpectrumSamples[3] >= 245,
+        pausedZero: lowFrequencyTransition.pausedSpectrumZero === true
+      },
+      silkyRise: lowFrequencyTransition.riseSpectrum?.length === 24
+        && lowFrequencyTransition.riseSpectrum[0] > 0
+        && lowFrequencyTransition.riseSpectrum[0] < 255
+        && new Set(lowFrequencyTransition.riseSpectrum).size >= 8
+        && lowFrequencyTransition.riseSpectrum.slice(1).every((value, index) => (
+          value >= lowFrequencyTransition.riseSpectrum[index]
+        ))
+        && lowFrequencyTransition.riseSpectrum.at(-1) >= 245
+        && lowFrequencyTransition.riseAmplitude?.length === 24
+        && lowFrequencyTransition.riseAmplitude[0] > 0
+        && lowFrequencyTransition.riseAmplitude[0] < 0.86
+        && lowFrequencyTransition.riseAmplitude.slice(1).every((value, index) => (
+          value >= lowFrequencyTransition.riseAmplitude[index]
+        ))
+        && lowFrequencyTransition.riseAmplitude.at(-1) >= 0.82,
+      silkyRelease: lowFrequencyTransition.releaseSpectrum?.length === 12
+        && lowFrequencyTransition.releaseSpectrum[0] > 0
+        && lowFrequencyTransition.releaseSpectrum[0] < lowFrequencyTransition.riseSpectrum.at(-1)
+        && new Set(lowFrequencyTransition.releaseSpectrum).size >= 8
+        && lowFrequencyTransition.releaseSpectrum.slice(1).every((value, index) => (
+          value <= lowFrequencyTransition.releaseSpectrum[index]
+        ))
+        && lowFrequencyTransition.releaseSpectrum.at(-1) > 0
+        && lowFrequencyTransition.releaseAmplitude?.length === 12
+        && lowFrequencyTransition.releaseAmplitude[0] > 0
+        && lowFrequencyTransition.releaseAmplitude[0] < lowFrequencyTransition.riseAmplitude.at(-1)
+        && lowFrequencyTransition.releaseAmplitude.slice(1).every((value, index) => (
+          value <= lowFrequencyTransition.releaseAmplitude[index]
+        ))
+        && lowFrequencyTransition.releaseAmplitude.at(-1) > 0,
+      shaderSamples512Bands: /uniform\\s+sampler2D\\s+uLowFrequencySpectrum\\s*;/.test(sonicVertexShader)
+        && /texture2D\\s*\\(\\s*uLowFrequencySpectrum/.test(sonicVertexShader)
+        && /attribute\\s+float\\s+aBassColumnBand\\s*;/.test(sonicVertexShader)
+        && sonicBuildSource.includes('SONIC_LOW_FREQUENCY_BAND_COUNT')
+        && bassColumnBandAttribute?.isInstancedBufferAttribute === true
+        && bassColumnBandIndices.length === bassColumnCluster.count
+        && uniqueBandIndices.length === SONIC_LOW_FREQUENCY_BAND_COUNT
+        && uniqueBandIndices[0] === 0
+        && uniqueBandIndices.at(-1) === SONIC_LOW_FREQUENCY_BAND_COUNT - 1,
+      centerUsesAggregateAmplitude: /bassColumnCenterMask[\\s\\S]{0,800}uLowFrequencyAmplitude/.test(sonicVertexShader),
+      transitionSamples,
+      transitionsIntoRelief: sonicVertexShader.includes('float bassColumnRadius = sqrt(bassColumnRadiusSquared)')
+        && sonicVertexShader.includes('float bassColumnTransition = 1.0 - smoothstep(')
+        && sonicVertexShader.includes('float bassColumnBlend = max(bassColumnCoreMask, bassColumnTransition)')
+        && bassColumnCluster.feather === 6
+        && Math.abs(transitionEnd - transitionStart - 6) < 0.001
+        && transitionSamples[0] === 1
+        && transitionSamples.at(-1) === 0
+        && transitionSamples.slice(1).every((value, index) => value < transitionSamples[index]),
+      amplitudeDriven: sonicVertexShader.includes('float bassColumnLift')
+        && sonicMotionSource.includes('uniforms.uLowFrequencyAmplitude.value = audio.lowFrequencyAmplitude')
+        && lowFrequencyTransition.activeAmplitude >= 0.82
+        && lowFrequencyTransition.activeAmplitude > lowFrequencyTransition.riseAmplitude[0] * 4
+        && lowFrequencyTransition.pausedAmplitude === 0,
+      contributesToTerrain: sonicVertexShader.includes('float bassColumnLift')
+        && sonicVertexShader.includes('float audioElevation = bassColumnLift + subLift'),
+      playbackClockGated: sonicMotionSource.includes('const audioDriving = isPlaybackClockRunning()'),
+      activeLowFrequencyReachedUniforms: lowFrequencyTransition.activeSubBass >= 0.85
+        && lowFrequencyTransition.activeBass >= 0.71
+        && lowFrequencyTransition.activeLowMid >= 0.35,
+      pausedUniformsZero: lowFrequencyTransition.pausedSubBass === 0
+        && lowFrequencyTransition.pausedBass === 0
+        && lowFrequencyTransition.pausedAmplitude === 0
+        && lowFrequencyTransition.pausedLowMid === 0
+    };
     topo.renderer.render = originalRender;
     topo.renderer.setRenderTarget = originalSetRenderTarget;
     els.sonicTopographyCore.getBoundingClientRect = originalGetBoundingClientRect;
@@ -701,8 +1038,75 @@ try {
       style.setProperty = originalPlaybackStyleSetProperties[index];
     });
     updateAudioSpectrum = originalUpdateAudioSpectrum;
+    const sonicPanel = document.querySelector('#sonicPresetControls');
+    const sonicControlElements = {
+      coreColor: document.querySelector('#sonicCoreColorInput'),
+      outerColor: document.querySelector('#sonicOuterColorInput'),
+      brightness: document.querySelector('#sonicBrightnessRange'),
+      exposure: document.querySelector('#sonicExposureRange'),
+      columnHeight: document.querySelector('#sonicColumnHeightRange'),
+      fieldOfView: document.querySelector('#sonicFovRange'),
+      smoothing: document.querySelector('#sonicSmoothingRange')
+    };
+    const sonicSettingsStorageKey = typeof SONIC_SETTINGS_PREFS_KEY === 'string'
+      ? SONIC_SETTINGS_PREFS_KEY
+      : '';
+    const sonicSettingsLoadSource = typeof loadSonicSettingsPreferences === 'function'
+      ? String(loadSonicSettingsPreferences)
+      : '';
+    const sonicSettingsSaveSource = typeof saveSonicSettingsPreferences === 'function'
+      ? String(saveSonicSettingsPreferences)
+      : '';
+    const sonicSettingsApplySource = typeof applySonicTopographySettings === 'function'
+      ? String(applySonicTopographySettings)
+      : '';
+    const sonicCameraRadius = Math.hypot(
+      Number(topo.camera.position.x) || 0,
+      Number(topo.camera.position.y) || 0,
+      Number(topo.camera.position.z) || 0
+    );
+    const sonicCamera = {
+      constantFov: Number(SONIC_TOPOGRAPHY_CAMERA.fov) || 0,
+      runtimeFov: Number(topo.camera.fov) || 0,
+      radius: sonicCameraRadius,
+      visibleHalfSpan: Math.tan((Number(topo.camera.fov) || 0) * Math.PI / 360) * sonicCameraRadius
+    };
+    const sonicControls = {
+      panelVisibleInTopography: !!sonicPanel && sonicPanel.hidden === false,
+      complete: Object.values(sonicControlElements).every(Boolean),
+      inputTypes: {
+        coreColor: sonicControlElements.coreColor?.type || '',
+        outerColor: sonicControlElements.outerColor?.type || '',
+        brightness: sonicControlElements.brightness?.type || '',
+        exposure: sonicControlElements.exposure?.type || '',
+        columnHeight: sonicControlElements.columnHeight?.type || '',
+        fieldOfView: sonicControlElements.fieldOfView?.type || '',
+        smoothing: sonicControlElements.smoothing?.type || ''
+      },
+      defaultFov: Number(sonicControlElements.fieldOfView?.value) || 0,
+      persistenceKey: sonicSettingsStorageKey,
+      loadsPreferences: sonicSettingsLoadSource.includes('localStorage.getItem(SONIC_SETTINGS_PREFS_KEY)'),
+      savesPreferences: /localStorage\\.setItem\\(\\s*SONIC_SETTINGS_PREFS_KEY\\s*,/.test(sonicSettingsSaveSource),
+      appliesSettings: sonicSettingsApplySource.length > 0,
+      shaderUniforms: {
+        coreColor: !!topo.uniforms.uCoreColumnColor
+          && /uniform\\s+vec3\\s+uCoreColumnColor\\s*;/.test(String(topo.material.fragmentShader || '')),
+        outerColor: !!topo.uniforms.uOuterColumnColor
+          && /uniform\\s+vec3\\s+uOuterColumnColor\\s*;/.test(String(topo.material.fragmentShader || '')),
+        brightness: !!topo.uniforms.uSonicBrightness
+          && /uniform\\s+float\\s+uSonicBrightness\\s*;/.test(String(topo.material.fragmentShader || '')),
+        exposure: !!topo.uniforms.uSonicExposure
+          && /uniform\\s+float\\s+uSonicExposure\\s*;/.test(String(topo.material.fragmentShader || '')),
+        columnHeight: !!topo.uniforms.uColumnHeightScale
+          && /uniform\\s+float\\s+uColumnHeightScale\\s*;/.test(sonicVertexShader)
+          && /bassColumnLift[\\s\\S]{0,240}uColumnHeightScale|uColumnHeightScale[\\s\\S]{0,240}bassColumnLift/.test(sonicVertexShader)
+      },
+      smoothingAffectsEnvelope: /SONIC_BASS_COLUMN_ATTACK_SECONDS[\\s\\S]{0,320}smoothing|smoothing[\\s\\S]{0,320}SONIC_BASS_COLUMN_ATTACK_SECONDS/.test(sonicMotionSource)
+        && /SONIC_BASS_COLUMN_RELEASE_SECONDS[\\s\\S]{0,320}smoothing|smoothing[\\s\\S]{0,320}SONIC_BASS_COLUMN_RELEASE_SECONDS/.test(sonicMotionSource)
+    };
     const nativeRefresh = playbackPresetsUseNativeRefresh();
     setDiyPreset('lyric');
+    sonicControls.panelHiddenOutsideTopography = !!sonicPanel && sonicPanel.hidden === true;
     const lyricNativeRefresh = playbackPresetsUseNativeRefresh();
     const sandboxInterval = sandboxFrameInterval();
     const coverParticleFpsLimit = coverParticleEngineOptions().fpsLimit;
@@ -728,6 +1132,9 @@ try {
       particleMatrixUploadDelta: idleParticleMatrixUploadDelta,
       activeProjectilesAdvance,
       inactiveProjectilesStayFrozen,
+      sonicCamera,
+      sonicControls,
+      bassColumns,
       contextLost: topo.renderer.getContext().isContextLost()
     };
   })()`);
@@ -1316,16 +1723,30 @@ try {
       const gpuDepthOcclusion = material.depthTest === true && material.depthWrite === true;
       const vertexShader = String(material.vertexShader || '');
       const gpuRenderSource = String(drawCoverParticleSceneGpu);
+      const gpuGeometrySource = String(rebuildCoverParticleGpuGeometry);
       const cpuRenderSource = String(drawCoverParticleScene);
       const enginePlaySource = String(playCoverParticleEngine);
       const playStateSource = String(updatePlayState);
       const motionBehavior = {
         pausedDepthFlat: vertexShader.includes('position.z * uAudioActive')
           && cpuRenderSource.includes('particle.z * (audioActive ? 1 : 0)'),
-        playbackSignedParticleWave: vertexShader.includes('float naturalWave = waveA * 0.42')
+        playbackSignedParticleWave: vertexShader.includes('float naturalWave = mix(baseNaturalWave, lowFrequencyWave, lowSegmentMix)')
           && vertexShader.includes('float waveDepth = uAudioActive * naturalWave')
-          && cpuRenderSource.includes('const naturalWave = waveA * 0.42')
+          && cpuRenderSource.includes('const naturalWave = baseNaturalWave * (1 - lowSegmentMix)')
           && cpuRenderSource.includes('const waveDepth = audioGate * naturalWave'),
+        hundredSegmentLowWave: vertexShader.includes('segmentProgress * 6.28318530718 * 100.0')
+          && vertexShader.includes('float lowSegmentMix = clamp(lowDrive * 0.72, 0.0, 0.68)')
+          && cpuRenderSource.includes('segmentProgress * Math.PI * 2 * COVER_PARTICLE_LOW_WAVE_SEGMENTS')
+          && cpuRenderSource.includes('const lowSegmentMix = clamp(lowDrive * 0.72, 0, 0.68)'),
+        randomPerParticleLowCycles: vertexShader.includes('attribute float aLowCyclePhase')
+          && vertexShader.includes('attribute float aLowCycleRate')
+          && vertexShader.includes('sin(sheetTime * aLowCycleRate + aLowCyclePhase)')
+          && vertexShader.includes('float randomCycleMix = clamp(uBass * 1.08, 0.0, 0.78)')
+          && gpuGeometrySource.includes("geometry.setAttribute('aLowCyclePhase'")
+          && gpuGeometrySource.includes("geometry.setAttribute('aLowCycleRate'")
+          && cpuRenderSource.includes('Math.sin(sheetTime * particle.lowCycleRate + particle.lowCyclePhase)')
+          && cpuRenderSource.includes('const randomCycleMix = clamp(bass * 1.08, 0, 0.78)')
+          && cpuRenderSource.includes('const lowFrequencyWave = lowSegmentWave * (1 - randomCycleMix)'),
         audioGateUniform: vertexShader.includes('uniform float uAudioActive')
           && gpuRenderSource.includes('uniforms.uAudioActive.value = audioActive ? 1 : 0'),
         playbackClockGate: cpuRenderSource.includes('const audioActive = isPlaybackClockRunning()'),
@@ -1347,8 +1768,20 @@ try {
         const waveB = Math.sin(sheetTime * 0.73 + particle.wavePhase * 1.31 + particle.x * 5.2);
         const waveC = Math.sin(sheetTime * 1.17 - particle.wavePhase * 0.89 + particle.y * 6.6);
         const radialWave = Math.sin(Math.hypot(particle.x, particle.y) * 14 - sheetTime * 1.28 + particle.wavePhase * 0.18);
-        const naturalWave = waveA * 0.42 + waveB * 0.28 + waveC * 0.2 + radialWave * 0.1;
         const lowDrive = Math.max(0, Math.min(1.25, bass * 0.82 + energy * 0.22));
+        const baseNaturalWave = waveA * 0.42 + waveB * 0.28 + waveC * 0.2 + radialWave * 0.1;
+        const segmentProgress = Math.max(0, Math.min(1, (particle.x + 0.64) / 1.28));
+        const lowSegmentWave = Math.sin(
+          segmentProgress * Math.PI * 2 * COVER_PARTICLE_LOW_WAVE_SEGMENTS
+            + particle.y * 0.65
+            - sheetTime * 0.56
+        );
+        const lowSegmentMix = Math.max(0, Math.min(0.68, lowDrive * 0.72));
+        const randomParticleCycle = Math.sin(sheetTime * particle.lowCycleRate + particle.lowCyclePhase);
+        const randomCycleMix = Math.max(0, Math.min(0.78, bass * 1.08));
+        const lowFrequencyWave = lowSegmentWave * (1 - randomCycleMix)
+          + randomParticleCycle * randomCycleMix;
+        const naturalWave = baseNaturalWave * (1 - lowSegmentMix) + lowFrequencyWave * lowSegmentMix;
         return audioGate * naturalWave * (0.01 + lowDrive * 0.014 + beat * 0.004) * particle.waveStrength;
       };
       let moving = 0;
@@ -1373,6 +1806,54 @@ try {
         backwardRatio: backward / Math.max(1, cover.particles.length),
         signedBias: Math.abs(signedDelta) / Math.max(1e-9, absoluteDelta)
       };
+      const segmentSamples = 4096;
+      let segmentCrossings = 0;
+      let previousSegmentWave = Math.sin(0.37);
+      for (let index = 1; index <= segmentSamples; index += 1) {
+        const progress = index / segmentSamples;
+        const segmentWave = Math.sin(
+          progress * Math.PI * 2 * COVER_PARTICLE_LOW_WAVE_SEGMENTS + 0.37
+        );
+        if ((previousSegmentWave < 0 && segmentWave >= 0) || (previousSegmentWave >= 0 && segmentWave < 0)) {
+          segmentCrossings += 1;
+        }
+        previousSegmentWave = segmentWave;
+      }
+      const lowWaveSegments = {
+        target: COVER_PARTICLE_LOW_WAVE_SEGMENTS,
+        measured: segmentCrossings / 2,
+        phaseSpan: Math.PI * 2 * COVER_PARTICLE_LOW_WAVE_SEGMENTS
+      };
+      let positiveRates = 0;
+      let negativeRates = 0;
+      let instantaneousForward = 0;
+      let instantaneousBackward = 0;
+      let minAbsoluteRate = Infinity;
+      let maxAbsoluteRate = 0;
+      const uniquePhases = new Set();
+      const cycleSheetTime = 1.4 * (0.68 + 0.6 * 0.54 + 0.35 * 0.12);
+      for (const particle of cover.particles) {
+        if (particle.lowCycleRate > 0) positiveRates += 1;
+        else if (particle.lowCycleRate < 0) negativeRates += 1;
+        const cyclePosition = Math.sin(
+          cycleSheetTime * particle.lowCycleRate + particle.lowCyclePhase
+        );
+        if (cyclePosition > 0) instantaneousForward += 1;
+        else if (cyclePosition < 0) instantaneousBackward += 1;
+        const absoluteRate = Math.abs(particle.lowCycleRate);
+        minAbsoluteRate = Math.min(minAbsoluteRate, absoluteRate);
+        maxAbsoluteRate = Math.max(maxAbsoluteRate, absoluteRate);
+        uniquePhases.add(Math.round(particle.lowCyclePhase * 10000));
+      }
+      const randomLowCycles = {
+        positiveRateRatio: positiveRates / Math.max(1, cover.particles.length),
+        negativeRateRatio: negativeRates / Math.max(1, cover.particles.length),
+        forwardRatio: instantaneousForward / Math.max(1, cover.particles.length),
+        backwardRatio: instantaneousBackward / Math.max(1, cover.particles.length),
+        minAbsoluteRate,
+        maxAbsoluteRate,
+        uniquePhaseCount: uniquePhases.size
+      };
       material.dispose();
       result = {
         first,
@@ -1383,6 +1864,8 @@ try {
         gpuDepthOcclusion,
         motionBehavior,
         waveMotion,
+        lowWaveSegments,
+        randomLowCycles,
         chladniUnchanged: state.chladni === chladniRefs.root
           && state.chladni.runtime === chladniRefs.runtime
           && state.chladni.palette === chladniRefs.palette
@@ -1588,6 +2071,16 @@ try {
       && coverParticleDepthMapping.waveMotion?.forwardRatio >= 0.35
       && coverParticleDepthMapping.waveMotion?.backwardRatio >= 0.35
       && coverParticleDepthMapping.waveMotion?.signedBias <= 0.08,
+    coverParticleUsesHundredLowWaveSegments: coverParticleDepthMapping.lowWaveSegments?.target === 100
+      && coverParticleDepthMapping.lowWaveSegments?.measured === 100
+      && Math.abs(coverParticleDepthMapping.lowWaveSegments.phaseSpan - Math.PI * 200) <= 1e-9,
+    coverParticleRandomLowCyclesRunBothWays: coverParticleDepthMapping.randomLowCycles?.positiveRateRatio >= 0.45
+      && coverParticleDepthMapping.randomLowCycles?.negativeRateRatio >= 0.45
+      && coverParticleDepthMapping.randomLowCycles?.forwardRatio >= 0.45
+      && coverParticleDepthMapping.randomLowCycles?.backwardRatio >= 0.45
+      && coverParticleDepthMapping.randomLowCycles?.minAbsoluteRate >= 0.58
+      && coverParticleDepthMapping.randomLowCycles?.maxAbsoluteRate <= 1.26
+      && coverParticleDepthMapping.randomLowCycles?.uniquePhaseCount >= 1000,
     coverBrightnessMapsToStable3dDepth: coverParticleDepthMapping.first.bands.dark.count > 1000
       && coverParticleDepthMapping.first.bands.mid.count > 1000
       && coverParticleDepthMapping.first.bands.bright.count > 1000
@@ -1622,7 +2115,52 @@ try {
     sonicSkipsIdleProjectileUploads: sonicRefresh.meteorMatrixUploadDelta === 0
       && sonicRefresh.particleMatrixUploadDelta === 0,
     sonicActiveProjectileMotionPreserved: sonicRefresh.activeProjectilesAdvance === true
-      && sonicRefresh.inactiveProjectilesStayFrozen === true
+      && sonicRefresh.inactiveProjectilesStayFrozen === true,
+    sonicWideCameraShowsFullScene: sonicRefresh.sonicCamera?.constantFov === 60
+      && sonicRefresh.sonicCamera?.runtimeFov === 60
+      && sonicRefresh.sonicCamera?.visibleHalfSpan >= 78,
+    sonicControlsPersistAndReachShader: sonicRefresh.sonicControls?.panelVisibleInTopography === true
+      && sonicRefresh.sonicControls?.panelHiddenOutsideTopography === true
+      && sonicRefresh.sonicControls?.complete === true
+      && sonicRefresh.sonicControls?.inputTypes?.coreColor === 'color'
+      && sonicRefresh.sonicControls?.inputTypes?.outerColor === 'color'
+      && sonicRefresh.sonicControls?.inputTypes?.brightness === 'range'
+      && sonicRefresh.sonicControls?.inputTypes?.exposure === 'range'
+      && sonicRefresh.sonicControls?.inputTypes?.columnHeight === 'range'
+      && sonicRefresh.sonicControls?.inputTypes?.fieldOfView === 'range'
+      && sonicRefresh.sonicControls?.inputTypes?.smoothing === 'range'
+      && sonicRefresh.sonicControls?.defaultFov === 60
+      && sonicRefresh.sonicControls?.persistenceKey === 'fe-monster-sonic-settings-v1'
+      && sonicRefresh.sonicControls?.loadsPreferences === true
+      && sonicRefresh.sonicControls?.savesPreferences === true
+      && sonicRefresh.sonicControls?.appliesSettings === true
+      && Object.values(sonicRefresh.sonicControls?.shaderUniforms || {}).every(Boolean)
+      && sonicRefresh.sonicControls?.smoothingAffectsEnvelope === true,
+    sonicBassColumnsReuseTerrainAndStopPaused: sonicRefresh.bassColumns?.count === 1009
+      && sonicRefresh.bassColumns?.uniqueX === 37
+      && sonicRefresh.bassColumns?.uniqueZ === 37
+      && sonicRefresh.bassColumns?.oddCenteredCore === true
+      && sonicRefresh.bassColumns?.circularCore === true
+      && sonicRefresh.bassColumns?.clusteredContiguously === true
+      && sonicRefresh.bassColumns?.reusesTerrain === true
+      && sonicRefresh.bassColumns?.shaderSelectsCluster === true
+      && sonicRefresh.bassColumns?.frequencyBandContract === true
+      && sonicRefresh.bassColumns?.spectrumTexture?.isDataTexture === true
+      && sonicRefresh.bassColumns?.spectrumTexture?.width === 512
+      && sonicRefresh.bassColumns?.spectrumTexture?.height === 1
+      && sonicRefresh.bassColumns?.spectrumTexture?.bytes === 512
+      && sonicRefresh.bassColumns?.spectrumTexture?.followsVisualBands === true
+      && sonicRefresh.bassColumns?.spectrumTexture?.pausedZero === true
+      && sonicRefresh.bassColumns?.silkyRise === true
+      && sonicRefresh.bassColumns?.silkyRelease === true
+      && sonicRefresh.bassColumns?.shaderSamples512Bands === true
+      && sonicRefresh.bassColumns?.centerUsesAggregateAmplitude === true
+      && sonicRefresh.bassColumns?.transitionsIntoRelief === true
+      && sonicRefresh.bassColumns?.amplitudeDriven === true
+      && sonicRefresh.bassColumns?.contributesToTerrain === true
+      && sonicRefresh.bassColumns?.playbackClockGated === true
+      && sonicRefresh.bassColumns?.activeLowFrequencyReachedUniforms === true
+      && sonicRefresh.bassColumns?.pausedUniformsZero === true
   };
   const result = {
     pass: Object.values(checks).every(Boolean),

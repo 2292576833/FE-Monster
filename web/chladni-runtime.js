@@ -17,6 +17,8 @@
   const PLANE_VIEW_ELEVATION = PI / 4;
   const PLANE_CAMERA_DISTANCE = 28.3;
   const ROUNDED_CORNER_RADIUS = 0.3;
+  const BASS_SCALE_GAIN = 0.032;
+  const BEAT_SCALE_GAIN = 0.012;
   const MAX_PIXEL_RATIO = 2.25;
   const MODES = Object.freeze([
     Object.freeze([2, 3]),
@@ -494,7 +496,11 @@
     runtime.group.rotation.x = cubeMode ? -0.18 : 0;
     runtime.group.rotation.y = (cubeMode ? CUBE_VIEW_YAW : 0) + runtime.autoRotation;
     runtime.group.rotation.z = 0;
-    runtime.group.scale.setScalar(1 + runtime.bass * 0.008 + runtime.beat * 0.006);
+    const reducedMotionScale = reducedMotion ? 0.35 : 1;
+    const overallJump = playing
+      ? (runtime.bass * BASS_SCALE_GAIN + runtime.beat * BEAT_SCALE_GAIN) * reducedMotionScale
+      : 0;
+    runtime.group.scale.setScalar(1 + overallJump);
 
     const zoom = clamp(frame && frame.zoom || 1, 0.58, 2.35);
     if (cubeMode) {
@@ -722,6 +728,9 @@
       threeDimensional: true,
       displacementAxis: 'y',
       bassDisplacementGain: 1.35,
+      bassScaleGain: BASS_SCALE_GAIN,
+      beatScaleGain: BEAT_SCALE_GAIN,
+      overallScale: Number(runtime.group.scale.x.toFixed(4)),
       modeFrom: runtime.modeFrom.slice(),
       modeTo: runtime.modeTo.slice(),
       modeBlend: Number(runtime.modeBlend.toFixed(4)),

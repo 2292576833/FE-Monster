@@ -3,7 +3,7 @@ import process from 'node:process';
 const baseUrl = String(
   process.env.FE_TEST_BASE_URL || 'http://127.0.0.1:31881'
 ).replace(/\/$/, '');
-const expectedToken = '20260722-cover-particle-wave-1';
+const expectedToken = '20260723-sonic-wide-controls-1';
 
 const rootResponse = await fetch(`${baseUrl}/?playback-cache-check=${Date.now()}`, {
   cache: 'no-store'

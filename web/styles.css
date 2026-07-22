@@ -11731,6 +11731,136 @@ button {
   transition: transform 90ms linear;
 }
 
+.sonic-preset-controls {
+  display: grid;
+  gap: 13px;
+  padding: 16px 0;
+  border-top: 1px solid rgba(232, 249, 255, 0.1);
+}
+
+.sonic-preset-controls[hidden] {
+  display: none !important;
+}
+
+.sonic-preset-controls__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sonic-preset-controls__head > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.sonic-preset-controls__head strong {
+  color: rgba(244, 251, 255, 0.94);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.sonic-preset-controls__head small {
+  color: rgba(184, 213, 226, 0.68);
+  font-size: 9px;
+  font-weight: 720;
+}
+
+.sonic-preset-controls__head button {
+  min-height: 30px;
+  border: 1px solid rgba(131, 228, 255, 0.28);
+  border-radius: 9px;
+  padding: 4px 10px;
+  color: rgba(232, 249, 255, 0.9);
+  background: rgba(131, 228, 255, 0.075);
+  font-size: 10px;
+  font-weight: 820;
+  cursor: pointer;
+}
+
+.sonic-color-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sonic-color-controls label {
+  display: flex;
+  min-width: 0;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid rgba(232, 249, 255, 0.13);
+  border-radius: 10px;
+  padding: 6px 8px 6px 10px;
+  color: rgba(232, 249, 255, 0.82);
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 10px;
+  font-weight: 780;
+  cursor: pointer;
+}
+
+.sonic-color-controls input[type="color"] {
+  width: 23px;
+  height: 23px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.sonic-color-controls input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.sonic-color-controls input[type="color"]::-webkit-color-swatch {
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+}
+
+.sonic-range-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 7px;
+}
+
+.sonic-range-control label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  color: rgba(232, 249, 255, 0.84);
+  font-size: 11px;
+  font-weight: 780;
+}
+
+.sonic-range-control output {
+  color: rgba(155, 230, 255, 0.92);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 850;
+}
+
+.sonic-range-control input[type="range"] {
+  width: 100%;
+}
+
+.sonic-preset-controls__head button:hover,
+.sonic-color-controls label:hover {
+  border-color: rgba(131, 228, 255, 0.48);
+  background: rgba(131, 228, 255, 0.1);
+}
+
+.sonic-preset-controls__head button:focus-visible,
+.sonic-color-controls label:has(input:focus-visible) {
+  outline: 2px solid rgba(131, 228, 255, 0.84);
+  outline-offset: 2px;
+}
+
 .diy-control {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 52px;

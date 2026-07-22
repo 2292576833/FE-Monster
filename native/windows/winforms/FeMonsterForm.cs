@@ -20,6 +20,7 @@ internal sealed class FeMonsterForm : Form
     private const int HTCAPTION = 0x0002;
     private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
     private const int DWMWCP_ROUND = 2;
+    private const int WINDOW_VISUAL_RADIUS = 34;
     private readonly ClientOptions options;
     private readonly WebView2 webView = new() { Dock = DockStyle.Fill };
     private RecordingToolbarForm? recordingToolbar;
@@ -65,6 +66,12 @@ internal sealed class FeMonsterForm : Form
     protected override void OnResize(EventArgs e)
     {
         base.OnResize(e);
+        ApplyRoundedCorners();
+    }
+
+    protected override void OnDpiChanged(DpiChangedEventArgs e)
+    {
+        base.OnDpiChanged(e);
         ApplyRoundedCorners();
     }
 
@@ -331,11 +338,11 @@ internal sealed class FeMonsterForm : Form
         if (enabled)
         {
             restoreBounds = Bounds;
-            Region = null;
             WindowState = FormWindowState.Normal;
             Bounds = Screen.FromControl(this).Bounds;
             TopMost = true;
             fullscreen = true;
+            ApplyRoundedCorners();
             return;
         }
 
@@ -381,8 +388,7 @@ internal sealed class FeMonsterForm : Form
 
     private void ApplyRoundedCorners()
     {
-        if (!IsHandleCreated || fullscreen || WindowState == FormWindowState.Minimized) return;
-        Region = null;
+        if (!IsHandleCreated || WindowState == FormWindowState.Minimized || ClientSize.Width < 2 || ClientSize.Height < 2) return;
 
         try
         {
@@ -395,6 +401,23 @@ internal sealed class FeMonsterForm : Form
         catch (EntryPointNotFoundException)
         {
         }
+
+        int radius = Math.Max(1, (int)Math.Round(WINDOW_VISUAL_RADIUS * DeviceDpi / 96d));
+        using var path = RoundedRectPath(new Rectangle(Point.Empty, ClientSize), radius);
+        Region = new Region(path);
+    }
+
+    private static GraphicsPath RoundedRectPath(Rectangle rect, int radius)
+    {
+        int safeRadius = Math.Min(radius, Math.Min(rect.Width, rect.Height) / 2);
+        int diameter = safeRadius * 2;
+        var path = new GraphicsPath();
+        path.AddArc(rect.Left, rect.Top, diameter, diameter, 180, 90);
+        path.AddArc(rect.Right - diameter, rect.Top, diameter, diameter, 270, 90);
+        path.AddArc(rect.Right - diameter, rect.Bottom - diameter, diameter, diameter, 0, 90);
+        path.AddArc(rect.Left, rect.Bottom - diameter, diameter, diameter, 90, 90);
+        path.CloseFigure();
+        return path;
     }
 }
 

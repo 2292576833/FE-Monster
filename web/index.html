@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="/components/BorderGlow.css?v=20260705-button-border-glow-fix" />
     <link rel="stylesheet" href="border-glow-buttons.css?v=20260705-button-border-glow-fix" />
   <link rel="stylesheet" href="text-fonts.css?v=20260721-licensed-fonts-1" />
-  <link rel="stylesheet" href="styles.css?v=20260722-cover-particle-wave-1" />
+  <link rel="stylesheet" href="styles.css?v=20260723-sonic-wide-controls-1" />
   <link rel="stylesheet" href="rhythm-game.css?v=20260716-rhythm-game-2" />
     <link rel="stylesheet" href="black-gold-buttons.css?v=20260714-black-react-bits-glass-16" />
   </head>
@@ -1161,6 +1161,45 @@
             <span id="diyCoverParticleMotionValue">80%</span>
             <input id="diyCoverParticleMotionRange" type="range" min="0" max="200" step="1" value="80" aria-label="&#31890;&#23376;&#24459;&#21160;&#24133;&#24230;" aria-valuetext="80%" />
           </div>
+          <section class="sonic-preset-controls" id="sonicPresetControls" data-diy-preset-control="topography" aria-label="Sonic 预设参数" hidden>
+            <header class="sonic-preset-controls__head">
+              <span>
+                <strong>Sonic 参数</strong>
+                <small id="sonicPaletteMode">颜色跟随封面</small>
+              </span>
+              <button id="sonicFollowCoverButton" type="button">跟随封面</button>
+            </header>
+            <div class="sonic-color-controls" role="group" aria-label="音柱颜色">
+              <label for="sonicCoreColorInput">
+                <span>中间音柱</span>
+                <input id="sonicCoreColorInput" type="color" value="#ffffff" aria-label="中间音柱颜色" />
+              </label>
+              <label for="sonicOuterColorInput">
+                <span>外围音柱</span>
+                <input id="sonicOuterColorInput" type="color" value="#83e4ff" aria-label="外围音柱颜色" />
+              </label>
+            </div>
+            <div class="sonic-range-control">
+              <label for="sonicBrightnessRange">亮度 <output id="sonicBrightnessValue" for="sonicBrightnessRange">100%</output></label>
+              <input id="sonicBrightnessRange" type="range" min="40" max="200" step="1" value="100" aria-valuetext="100%" />
+            </div>
+            <div class="sonic-range-control">
+              <label for="sonicExposureRange">曝光 <output id="sonicExposureValue" for="sonicExposureRange">0.00 EV</output></label>
+              <input id="sonicExposureRange" type="range" min="-150" max="150" step="5" value="0" aria-valuetext="0.00 EV" />
+            </div>
+            <div class="sonic-range-control">
+              <label for="sonicColumnHeightRange">音柱高度 <output id="sonicColumnHeightValue" for="sonicColumnHeightRange">100%</output></label>
+              <input id="sonicColumnHeightRange" type="range" min="50" max="250" step="1" value="100" aria-valuetext="100%" />
+            </div>
+            <div class="sonic-range-control">
+              <label for="sonicFovRange">广角视野 <output id="sonicFovValue" for="sonicFovRange">60°</output></label>
+              <input id="sonicFovRange" type="range" min="50" max="75" step="1" value="60" aria-valuetext="60°" />
+            </div>
+            <div class="sonic-range-control">
+              <label for="sonicSmoothingRange">升降丝滑度 <output id="sonicSmoothingValue" for="sonicSmoothingRange">100%</output></label>
+              <input id="sonicSmoothingRange" type="range" min="50" max="200" step="1" value="100" aria-valuetext="100%" />
+            </div>
+          </section>
           <div class="diy-control" id="diyCubeIntensityControl" data-diy-preset-control="cube" hidden>
             <label for="cubeIntensityRange">魔方强度</label>
             <input id="cubeIntensityRange" type="range" min="40" max="180" value="110" />
@@ -1570,8 +1609,8 @@
     <script src="storm-ocean-runtime.js?v=20260718-fine-waves-120"></script>
     <script src="free-cube-runtime.js?v=20260718-material-clarity-2"></script>
     <script src="void-prism-runtime.js?v=20260721-text-fonts-1"></script>
-    <script src="chladni-runtime.js?v=20260721-chladni-particles-1"></script>
-    <script src="app.js?v=20260722-cover-particle-wave-1"></script>
+    <script src="chladni-runtime.js?v=20260723-chladni-low-bass-jump-1"></script>
+    <script src="app.js?v=20260723-sonic-wide-controls-1"></script>
     <script src="rhythm-game.js?v=20260718-rhythm-game-orbit-lock-1"></script>
   </body>
 </html>

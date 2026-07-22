@@ -12,6 +12,7 @@
 #include <wrl/client.h>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cmath>
 #include <cstdint>
@@ -29,6 +30,8 @@ constexpr double kPi = 3.14159265358979323846;
 constexpr int kLowMinHz = 20;
 constexpr int kLowMaxHz = 150;
 constexpr int kLowStepHz = 10;
+constexpr size_t kLowProbeCount = (kLowMaxHz - kLowMinHz) / kLowStepHz + 1;
+constexpr size_t kLowBandCount = 512;
 constexpr size_t kAnalysisWindow = 2048;
 constexpr size_t kAnalysisHop = 1024;
 
@@ -44,6 +47,7 @@ std::atomic<float> g_low_frequency{ 0.0f };
 std::atomic<float> g_energy{ 0.0f };
 std::atomic<float> g_beat{ 0.0f };
 std::atomic<float> g_sample_rate{ 0.0f };
+std::array<std::atomic<float>, kLowBandCount> g_low_frequency_bands{};
 
 float clamp01(float value) {
     if (!std::isfinite(value)) return 0.0f;
@@ -129,7 +133,11 @@ float read_mono_frame(const BYTE* frame, const WAVEFORMATEX* format, bool float_
     return clamp01((sum / static_cast<float>(channels) + 1.0f) * 0.5f) * 2.0f - 1.0f;
 }
 
-void publish_sample(float low_raw, float energy_raw) {
+void publish_sample(
+    float low_raw,
+    float energy_raw,
+    const std::array<float, kLowBandCount>* low_bands = nullptr
+) {
     const float low = clamp01(low_raw);
     const float previous_low = g_low_frequency.load(std::memory_order_relaxed);
     const float low_rate = low > previous_low ? 0.38f : 0.085f;
@@ -144,6 +152,16 @@ void publish_sample(float low_raw, float energy_raw) {
     const float beat_raw = clamp01((low - previous_low) * 5.2f + low * 0.18f);
     const float previous_beat = g_beat.load(std::memory_order_relaxed);
     g_beat.store(clamp01(previous_beat + (beat_raw - previous_beat) * 0.42f), std::memory_order_relaxed);
+
+    for (size_t index = 0; index < kLowBandCount; index += 1) {
+        const float band = low_bands ? clamp01((*low_bands)[index]) : 0.0f;
+        const float previous_band = g_low_frequency_bands[index].load(std::memory_order_relaxed);
+        const float band_rate = band > previous_band ? 0.38f : 0.085f;
+        g_low_frequency_bands[index].store(
+            clamp01(previous_band + (band - previous_band) * band_rate),
+            std::memory_order_relaxed
+        );
+    }
 }
 
 void decay_sample() {
@@ -156,13 +174,15 @@ void analyze_window(const std::vector<float>& samples, UINT32 sample_rate) {
     double rms_sum = 0.0;
     double low_sum = 0.0;
     int low_count = 0;
+    std::array<float, kLowProbeCount> low_probes{};
 
     for (size_t index = 0; index < kAnalysisWindow; index += 1) {
         const double sample = samples[index];
         rms_sum += sample * sample;
     }
 
-    for (int hz = kLowMinHz; hz <= kLowMaxHz; hz += kLowStepHz) {
+    for (size_t probe_index = 0; probe_index < kLowProbeCount; probe_index += 1) {
+        const int hz = kLowMinHz + static_cast<int>(probe_index) * kLowStepHz;
         double real = 0.0;
         double imag = 0.0;
         const double angle_step = 2.0 * kPi * static_cast<double>(hz) / static_cast<double>(sample_rate);
@@ -174,13 +194,27 @@ void analyze_window(const std::vector<float>& samples, UINT32 sample_rate) {
             imag -= sample * std::sin(angle);
         }
         const double amplitude = std::sqrt(real * real + imag * imag) * 4.0 / static_cast<double>(kAnalysisWindow);
+        low_probes[probe_index] = static_cast<float>(amplitude);
         low_sum += amplitude;
         low_count += 1;
     }
 
+    std::array<float, kLowBandCount> low_bands{};
+    for (size_t band_index = 0; band_index < kLowBandCount; band_index += 1) {
+        const double probe_position = static_cast<double>(band_index)
+            * static_cast<double>(kLowProbeCount - 1)
+            / static_cast<double>(kLowBandCount - 1);
+        const size_t lower_probe = static_cast<size_t>(probe_position);
+        const size_t upper_probe = std::min(lower_probe + 1, kLowProbeCount - 1);
+        const float blend = static_cast<float>(probe_position - static_cast<double>(lower_probe));
+        const float interpolated = low_probes[lower_probe]
+            + (low_probes[upper_probe] - low_probes[lower_probe]) * blend;
+        low_bands[band_index] = clamp01(interpolated * 3.6f);
+    }
+
     const float low = clamp01(static_cast<float>((low_sum / std::max(1, low_count)) * 3.6));
     const float energy = clamp01(static_cast<float>(std::sqrt(rms_sum / static_cast<double>(kAnalysisWindow)) * 1.9));
-    publish_sample(low, energy);
+    publish_sample(low, energy, &low_bands);
     g_capture_active.store(true, std::memory_order_relaxed);
 }
 
@@ -351,16 +385,18 @@ extern "C" JNIEXPORT jfloatArray JNICALL Java_com_femonster_core_NativeAudioEngi
     JNIEnv* env,
     jclass
 ) {
-    jfloat values[5] = {
-        g_low_frequency.load(std::memory_order_relaxed),
-        g_energy.load(std::memory_order_relaxed),
-        g_beat.load(std::memory_order_relaxed),
-        g_sample_rate.load(std::memory_order_relaxed),
-        g_capture_active.load(std::memory_order_relaxed) ? 1.0f : 0.0f
-    };
-    jfloatArray result = env->NewFloatArray(5);
+    std::array<jfloat, 5 + kLowBandCount> values{};
+    values[0] = g_low_frequency.load(std::memory_order_relaxed);
+    values[1] = g_energy.load(std::memory_order_relaxed);
+    values[2] = g_beat.load(std::memory_order_relaxed);
+    values[3] = g_sample_rate.load(std::memory_order_relaxed);
+    values[4] = g_capture_active.load(std::memory_order_relaxed) ? 1.0f : 0.0f;
+    for (size_t index = 0; index < kLowBandCount; index += 1) {
+        values[5 + index] = g_low_frequency_bands[index].load(std::memory_order_relaxed);
+    }
+    jfloatArray result = env->NewFloatArray(static_cast<jsize>(values.size()));
     if (!result) return nullptr;
-    env->SetFloatArrayRegion(result, 0, 5, values);
+    env->SetFloatArrayRegion(result, 0, static_cast<jsize>(values.size()), values.data());
     return result;
 }
 

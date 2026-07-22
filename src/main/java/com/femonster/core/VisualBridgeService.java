@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 
 public final class VisualBridgeService {
+    private static final int LOW_FREQUENCY_BAND_COUNT = 512;
+
     private final PlayerService player;
     private final NativeAudioEngine audioEngine;
 
@@ -82,12 +84,14 @@ public final class VisualBridgeService {
         double nativeLow = clamp01(SimpleJson.asDouble(nativeSample.get("lowFrequencyAmplitude"), 0));
         double nativeEnergy = clamp01(SimpleJson.asDouble(nativeSample.get("energy"), 0));
         double nativeBeat = clamp01(SimpleJson.asDouble(nativeSample.get("beat"), 0));
-        if (nativeActive && (nativeLow > 0.0005 || nativeEnergy > 0.0005 || nativeBeat > 0.0005)) {
+        List<Double> nativeLowBands = lowFrequencyBands(nativeSample.get("lowFrequencyBands"), nativeLow);
+        if (nativeActive) {
             Map<String, Object> map = new LinkedHashMap<>();
             double energy = clamp01(Math.max(nativeEnergy, nativeLow * 0.72));
             map.put("energy", energy);
             map.put("bass", nativeLow);
             map.put("lowFrequencyAmplitude", nativeLow);
+            map.put("lowFrequencyBands", nativeLowBands);
             map.put("lowFrequencyMinHz", 20);
             map.put("lowFrequencyMaxHz", 150);
             map.put("mid", clamp01(energy * 0.48));
@@ -105,6 +109,7 @@ public final class VisualBridgeService {
         map.put("energy", 0.46 + 0.18 * wave(t * 2.2));
         map.put("bass", bass);
         map.put("lowFrequencyAmplitude", bass);
+        map.put("lowFrequencyBands", lowFrequencyBands(null, bass));
         map.put("lowFrequencyMinHz", 20);
         map.put("lowFrequencyMaxHz", 150);
         map.put("mid", 0.38 + 0.22 * wave(t * 3.3));
@@ -114,6 +119,18 @@ public final class VisualBridgeService {
         map.put("sampleRate", 0);
         map.put("source", "java-fallback");
         return map;
+    }
+
+    private static List<Double> lowFrequencyBands(Object value, double fallback) {
+        List<Object> source = SimpleJson.asList(value);
+        List<Double> bands = new ArrayList<>(LOW_FREQUENCY_BAND_COUNT);
+        for (int index = 0; index < LOW_FREQUENCY_BAND_COUNT; index += 1) {
+            double band = index < source.size()
+                ? SimpleJson.asDouble(source.get(index), fallback)
+                : fallback;
+            bands.add(clamp01(band));
+        }
+        return bands;
     }
 
     private static double clamp01(double value) {

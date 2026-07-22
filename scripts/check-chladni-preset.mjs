@@ -23,8 +23,11 @@ const checks = {
   threeDimensional: /displacement/.test(runtime) && /position\.y/.test(runtime),
   autoRotation: /autoRotation/.test(runtime) && /rotation\.y/.test(runtime),
   audioResponse: /bass/.test(runtime) && /beat/.test(runtime) && /treble/.test(runtime),
-  restrainedBassMotion: /uBass \* 1\.35/.test(runtime)
-    && /runtime\.bass \* 0\.008/.test(runtime),
+  lowFrequencyWholeJump: /uBass \* 1\.35/.test(runtime)
+    && /BASS_SCALE_GAIN = 0\.032/.test(runtime)
+    && /BEAT_SCALE_GAIN = 0\.012/.test(runtime)
+    && /const overallJump = playing/.test(runtime)
+    && /overallScale: Number\(runtime\.group\.scale\.x/.test(runtime),
   automaticRotation: /0\.035 \+ runtime\.energy \* 0\.01/.test(runtime)
     && /runtime\.autoRotation \+= dt \* runtime\.rotationSpeed/.test(runtime)
     && /mouseOrbitEnabled: false/.test(runtime),

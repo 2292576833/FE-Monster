@@ -264,6 +264,21 @@ const els = {
   diyCoverParticleMotionValue: $('#diyCoverParticleMotionValue'),
   diyBookLyricPreset: $('#diyBookLyricPreset'),
   diyCubeIntensityControl: $('#diyCubeIntensityControl'),
+  sonicPresetControls: $('#sonicPresetControls'),
+  sonicCoreColorInput: $('#sonicCoreColorInput'),
+  sonicOuterColorInput: $('#sonicOuterColorInput'),
+  sonicPaletteMode: $('#sonicPaletteMode'),
+  sonicFollowCoverButton: $('#sonicFollowCoverButton'),
+  sonicBrightnessRange: $('#sonicBrightnessRange'),
+  sonicBrightnessValue: $('#sonicBrightnessValue'),
+  sonicExposureRange: $('#sonicExposureRange'),
+  sonicExposureValue: $('#sonicExposureValue'),
+  sonicColumnHeightRange: $('#sonicColumnHeightRange'),
+  sonicColumnHeightValue: $('#sonicColumnHeightValue'),
+  sonicFovRange: $('#sonicFovRange'),
+  sonicFovValue: $('#sonicFovValue'),
+  sonicSmoothingRange: $('#sonicSmoothingRange'),
+  sonicSmoothingValue: $('#sonicSmoothingValue'),
   freeCubePresetControls: $('#freeCubePresetControls'),
   freeCubeHeartButton: $('#freeCubeHeartButton'),
   freeCubeBackgroundButton: $('#freeCubeBackgroundButton'),
@@ -448,6 +463,7 @@ const RENDER_PROFILE = detectRenderProfile();
 document.documentElement.dataset.renderTier = RENDER_PROFILE.tier;
 const PLAYBACK_REST_YAW = 0.22;
 const PLAYBACK_REST_PITCH = -0.16;
+const COVER_PARTICLE_LOW_WAVE_SEGMENTS = 100;
 const PLAYLIST_SONG_RENDER_RADIUS = 7;
 const LOCAL_PLAYLIST_ID = 'local-import';
 const LOCAL_AUDIO_EXTENSIONS = new Set([
@@ -465,10 +481,16 @@ const SONIC_TOPOGRAPHY_GRID = RENDER_PROFILE.topographyGrid;
 const SONIC_TOPOGRAPHY_SPACING = 0.98;
 const SONIC_TOPOGRAPHY_SIZE = 0.91;
 const SONIC_TOPOGRAPHY_HALF = (SONIC_TOPOGRAPHY_GRID * SONIC_TOPOGRAPHY_SPACING) / 2;
+const SONIC_LOW_FREQUENCY_BAND_COUNT = 512;
+const SONIC_LOW_FREQUENCY_MIN_HZ = 20;
+const SONIC_LOW_FREQUENCY_MAX_HZ = 150;
+const SONIC_BASS_COLUMN_CLUSTER = Object.freeze({ count: 1009, radius: 18, center: 0, feather: 6 });
+const SONIC_BASS_COLUMN_ATTACK_SECONDS = 0.07;
+const SONIC_BASS_COLUMN_RELEASE_SECONDS = 0.22;
 const SONIC_TOPOGRAPHY_RIPPLES = 10;
 const SONIC_TOPOGRAPHY_METEORS = reducedMotion ? Math.min(10, RENDER_PROFILE.topographyMeteors) : RENDER_PROFILE.topographyMeteors;
 const SONIC_TOPOGRAPHY_PARTICLES = reducedMotion ? Math.min(90, RENDER_PROFILE.topographyParticles) : RENDER_PROFILE.topographyParticles;
-const SONIC_TOPOGRAPHY_CAMERA = { x: 32.2, y: 23, z: 32.2, fov: 45 };
+const SONIC_TOPOGRAPHY_CAMERA = Object.freeze({ x: 98, y: 68, z: 98, fov: 60 });
 const BOOT_LOGO_TEXT = 'FE moster';
 const MUSIC_PROVIDERS = {
   netease: {
@@ -539,6 +561,16 @@ const PRESET_FSR_PREFS_KEY = 'fe-monster-preset-fsr-v1';
 const TEXT_PALETTE_PREFS_KEY = 'fe-monster-text-preset-palettes-v1';
 const TEXT_FONT_PREFS_KEY = 'fe-monster-text-preset-fonts-v1';
 const PLAYBACK_LYRIC_PALETTE_PREFS_KEY = 'fe-monster-playback-lyric-palette-v1';
+const SONIC_SETTINGS_PREFS_KEY = 'fe-monster-sonic-settings-v1';
+const DEFAULT_SONIC_SETTINGS = Object.freeze({
+  coreColor: null,
+  outerColor: null,
+  brightness: 1,
+  exposure: 0,
+  columnHeight: 1,
+  fov: SONIC_TOPOGRAPHY_CAMERA.fov,
+  smoothing: 1
+});
 const TEXT_PALETTE_PRESET_IDS = Object.freeze(['depth', 'flow', 'book-effect', 'focus-echo', 'book']);
 const TEXT_PALETTE_DEFAULT_COLOR = '#eafbff';
 const TEXT_FONT_DEFAULT_ID = 'system';
@@ -793,6 +825,37 @@ function loadPlaybackLyricPalettePreference() {
 }
 
 const INITIAL_PLAYBACK_LYRIC_PALETTE_PREFERENCE = loadPlaybackLyricPalettePreference();
+
+function normalizeSonicSettings(source = {}) {
+  const normalizeOptionalColor = (value) => (
+    typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value.trim())
+      ? value.trim().toLowerCase()
+      : null
+  );
+  const bounded = (value, fallback, minimum, maximum) => {
+    const numeric = Number(value);
+    return clamp(Number.isFinite(numeric) ? numeric : fallback, minimum, maximum);
+  };
+  return {
+    coreColor: normalizeOptionalColor(source?.coreColor),
+    outerColor: normalizeOptionalColor(source?.outerColor),
+    brightness: bounded(source?.brightness, DEFAULT_SONIC_SETTINGS.brightness, 0.4, 2),
+    exposure: bounded(source?.exposure, DEFAULT_SONIC_SETTINGS.exposure, -1.5, 1.5),
+    columnHeight: bounded(source?.columnHeight, DEFAULT_SONIC_SETTINGS.columnHeight, 0.5, 2.5),
+    fov: bounded(source?.fov, DEFAULT_SONIC_SETTINGS.fov, 50, 75),
+    smoothing: bounded(source?.smoothing, DEFAULT_SONIC_SETTINGS.smoothing, 0.5, 2)
+  };
+}
+
+function loadSonicSettingsPreferences() {
+  try {
+    return normalizeSonicSettings(JSON.parse(window.localStorage.getItem(SONIC_SETTINGS_PREFS_KEY) || '{}'));
+  } catch (error) {
+    return normalizeSonicSettings();
+  }
+}
+
+const INITIAL_SONIC_SETTINGS = loadSonicSettingsPreferences();
 const FAVORITE_SONGS_KEY = 'fe-monster-favorite-songs-v1';
 const SEARCH_SUGGESTION_CACHE_MS = 60 * 1000;
 const PLAYLIST_FAVORITE_CACHE_MS = 60 * 1000;
@@ -1778,6 +1841,7 @@ const state = {
     energy: 0,
     bass: 0,
     lowFrequencyAmplitude: 0,
+    lowFrequencyBands: new Float32Array(SONIC_LOW_FREQUENCY_BAND_COUNT),
     beat: 0,
     mid: 0,
     treble: 0,
@@ -1800,6 +1864,7 @@ const state = {
     energy: 0,
     bass: 0,
     lowFrequencyAmplitude: 0,
+    lowFrequencyBands: new Float32Array(SONIC_LOW_FREQUENCY_BAND_COUNT),
     beat: 0,
     mid: 0,
     treble: 0,
@@ -1850,6 +1915,7 @@ const state = {
     blocked: false,
     bass: 0,
     lowFrequencyAmplitude: 0,
+    lowFrequencyBands: new Float32Array(SONIC_LOW_FREQUENCY_BAND_COUNT),
     energy: 0,
     mid: 0,
     treble: 0,
@@ -1935,6 +2001,8 @@ const state = {
     terrain: null,
     material: null,
     uniforms: null,
+    lowFrequencySpectrum: null,
+    lowFrequencySpectrumData: null,
     meteorMesh: null,
     meteorMaterial: null,
     particleMesh: null,
@@ -1966,9 +2034,13 @@ const state = {
     wasAudioDriving: false,
     projectilesActive: false,
     projectilesNeedClear: false,
+    settings: { ...INITIAL_SONIC_SETTINGS },
     frameAudio: {
       subBass: 0,
       bass: 0,
+      lowFrequencyAmplitude: 0,
+      lowFrequencyBands: new Float32Array(SONIC_LOW_FREQUENCY_BAND_COUNT),
+      lowFrequencyBandTargets: new Float32Array(SONIC_LOW_FREQUENCY_BAND_COUNT),
       lowMid: 0,
       mid: 0,
       highMid: 0,
@@ -3681,7 +3753,36 @@ function resetSpectrumForSong(song = state.currentSong) {
     silenceFrames: 0
   });
   if (state.audioAnalysis.previousData) state.audioAnalysis.previousData.fill(0);
+  state.audioAnalysis.lowFrequencyBands.fill(0);
+  state.visual.lowFrequencyBands.fill(0);
+  state.visualBridge.lowFrequencyBands.fill(0);
   updateSpectrumUi();
+}
+
+function writeLowFrequencyBands(target, source, fallback = 0) {
+  if (!target || !target.length) return;
+  const fallbackValue = clamp(Number(fallback) || 0, 0, 1);
+  const sourceLength = source && typeof source !== 'string'
+    ? Math.max(0, Math.floor(Number(source.length) || 0))
+    : 0;
+  if (!sourceLength) {
+    target.fill(fallbackValue);
+    return;
+  }
+  if (sourceLength === 1) {
+    target.fill(clamp(Number(source[0]) || fallbackValue, 0, 1));
+    return;
+  }
+  const sourceScale = (sourceLength - 1) / Math.max(1, target.length - 1);
+  for (let index = 0; index < target.length; index += 1) {
+    const sourcePosition = index * sourceScale;
+    const lowerIndex = Math.floor(sourcePosition);
+    const upperIndex = Math.min(sourceLength - 1, lowerIndex + 1);
+    const mix = sourcePosition - lowerIndex;
+    const lower = clamp(Number(source[lowerIndex]) || 0, 0, 1);
+    const upper = clamp(Number(source[upperIndex]) || 0, 0, 1);
+    target[index] = lower + (upper - lower) * mix;
+  }
 }
 
 function applyBridgeVisual() {
@@ -3693,6 +3794,7 @@ function applyBridgeVisual() {
   );
   state.visual.energy = state.visualBridge.energy;
   state.visual.lowFrequencyAmplitude = lowFrequency;
+  state.visual.lowFrequencyBands.set(state.visualBridge.lowFrequencyBands);
   state.visual.bass = clamp(Math.max(state.visualBridge.bass, lowFrequency), 0, 1);
   state.visual.beat = state.visualBridge.beat;
   state.visual.mid = state.visualBridge.mid;
@@ -3734,7 +3836,7 @@ async function ensureAudioAnalysis() {
     }
     if (!analysis.analyser) {
       analysis.analyser = analysis.context.createAnalyser();
-      analysis.analyser.fftSize = 1024;
+      analysis.analyser.fftSize = 4096;
       analysis.analyser.smoothingTimeConstant = 0.8;
       analysis.data = new Uint8Array(analysis.analyser.frequencyBinCount);
       analysis.previousData = new Float32Array(analysis.analyser.frequencyBinCount);
@@ -3776,6 +3878,19 @@ function rmsFrequencyBand(data, analyser, fromHz, toHz) {
     sumSquares += value * value;
   }
   return clamp(Math.sqrt(sumSquares / Math.max(1, to - from)), 0, 1);
+}
+
+function sampleFrequencyAmplitude(data, analyser, frequencyHz) {
+  if (!data || !data.length) return 0;
+  const sampleRate = analyser && analyser.context && analyser.context.sampleRate
+    ? analyser.context.sampleRate
+    : state.audioAnalysis.sampleRate || 44100;
+  const nyquist = sampleRate / 2;
+  const binPosition = clamp((frequencyHz / nyquist) * data.length, 0, data.length - 1);
+  const lowerIndex = Math.floor(binPosition);
+  const upperIndex = Math.min(data.length - 1, lowerIndex + 1);
+  const mix = binPosition - lowerIndex;
+  return clamp(((data[lowerIndex] || 0) + ((data[upperIndex] || 0) - (data[lowerIndex] || 0)) * mix) / 255, 0, 1);
 }
 
 function updateAudioSpectrum() {
@@ -3927,6 +4042,8 @@ function updateAudioSpectrum() {
     if (analysis.silenceFrames > 50) {
       analysis.live = false;
       analysis.blocked = true;
+      analysis.lowFrequencyBands.fill(0);
+      state.visual.lowFrequencyBands.fill(0);
       applyBridgeVisual();
       return false;
     }
@@ -3941,6 +4058,18 @@ function updateAudioSpectrum() {
   analysis.bass += (bassRaw - analysis.bass) * dt;
   const lowFrequencyRate = lowFrequencyRaw > analysis.lowFrequencyAmplitude ? 0.34 : 0.075;
   analysis.lowFrequencyAmplitude += (lowFrequencyRaw - analysis.lowFrequencyAmplitude) * lowFrequencyRate;
+  for (let index = 0; index < SONIC_LOW_FREQUENCY_BAND_COUNT; index += 1) {
+    const progress = index / Math.max(1, SONIC_LOW_FREQUENCY_BAND_COUNT - 1);
+    const frequencyHz = SONIC_LOW_FREQUENCY_MIN_HZ
+      + (SONIC_LOW_FREQUENCY_MAX_HZ - SONIC_LOW_FREQUENCY_MIN_HZ) * progress;
+    const rawAmplitude = sampleFrequencyAmplitude(data, analysis.analyser, frequencyHz);
+    const targetAmplitude = clamp(rawAmplitude * 1.55, 0, 1);
+    const currentAmplitude = analysis.lowFrequencyBands[index] || 0;
+    const response = targetAmplitude > currentAmplitude ? 0.34 : 0.075;
+    const amplitude = currentAmplitude + (targetAmplitude - currentAmplitude) * response;
+    analysis.lowFrequencyBands[index] = amplitude;
+    state.visual.lowFrequencyBands[index] = amplitude;
+  }
   analysis.mid += (midRaw - analysis.mid) * dt;
   analysis.treble += (trebleRaw - analysis.treble) * dt;
   analysis.energy += (energyRaw - analysis.energy) * dt;
@@ -4576,7 +4705,7 @@ function updateChladniVisibility() {
 function updateChladniMotion() {
   const runtime = state.chladni.runtime;
   if (!state.playbackPage || !isChladniPreset() || !runtime || !window.FeChladniRuntime) return;
-  const playing = !!els.audio && !els.audio.paused && !els.audio.ended;
+  const playing = isPlaybackClockRunning();
   const live = state.audioAnalysis.live ? state.audioAnalysis : state.visual;
   const frame = state.chladni.frame;
   frame.now = performance.now();
@@ -4643,10 +4772,27 @@ function createSonicTopographyTheme(palette) {
 }
 
 function createSonicTopographyMaterial(THREE, theme) {
+  const lowFrequencySpectrumData = new Uint8Array(SONIC_LOW_FREQUENCY_BAND_COUNT);
+  const lowFrequencySpectrum = new THREE.DataTexture(
+    lowFrequencySpectrumData,
+    SONIC_LOW_FREQUENCY_BAND_COUNT,
+    1,
+    THREE.LuminanceFormat,
+    THREE.UnsignedByteType
+  );
+  lowFrequencySpectrum.magFilter = THREE.NearestFilter;
+  lowFrequencySpectrum.minFilter = THREE.NearestFilter;
+  lowFrequencySpectrum.generateMipmaps = false;
+  lowFrequencySpectrum.flipY = false;
+  lowFrequencySpectrum.unpackAlignment = 1;
+  lowFrequencySpectrum.needsUpdate = true;
+
   const uniforms = {
     uTime: { value: 0 },
     uSubBass: { value: 0 },
     uBass: { value: 0 },
+    uLowFrequencyAmplitude: { value: 0 },
+    uLowFrequencySpectrum: { value: lowFrequencySpectrum },
     uLowMid: { value: 0 },
     uMid: { value: 0 },
     uHighMid: { value: 0 },
@@ -4677,6 +4823,11 @@ function createSonicTopographyMaterial(THREE, theme) {
     uCoolEdge: { value: theme.uCoolEdge.clone() },
     uWarmCore: { value: theme.uWarmCore.clone() },
     uWarmEdge: { value: theme.uWarmEdge.clone() },
+    uCoreColumnColor: { value: theme.uWarmCore.clone() },
+    uOuterColumnColor: { value: theme.uCoolEdge.clone() },
+    uSonicBrightness: { value: DEFAULT_SONIC_SETTINGS.brightness },
+    uSonicExposure: { value: DEFAULT_SONIC_SETTINGS.exposure },
+    uColumnHeightScale: { value: DEFAULT_SONIC_SETTINGS.columnHeight },
     uRippleColor: { value: theme.uRippleColor.clone() },
     uGlowIntensity: { value: theme.uGlowIntensity }
   };
@@ -4685,6 +4836,8 @@ function createSonicTopographyMaterial(THREE, theme) {
     uniform float uTime;
     uniform float uSubBass;
     uniform float uBass;
+    uniform float uLowFrequencyAmplitude;
+    uniform sampler2D uLowFrequencySpectrum;
     uniform float uLowMid;
     uniform float uMid;
     uniform float uHighMid;
@@ -4693,6 +4846,8 @@ function createSonicTopographyMaterial(THREE, theme) {
     uniform float uEnergy;
     uniform float uAudioPulse;
     uniform float uIdleBreath;
+    uniform float uColumnHeightScale;
+    attribute float aBassColumnBand;
 
     struct Ripple {
       vec2 pos;
@@ -4710,6 +4865,8 @@ function createSonicTopographyMaterial(THREE, theme) {
     varying vec3 vNormal;
     varying float vRelativeY;
     varying vec2 vInstancePos;
+    varying float vBassColumnBlend;
+    varying float vBassColumnRadialMix;
 
     vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
     vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -4742,6 +4899,11 @@ function createSonicTopographyMaterial(THREE, theme) {
       return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
     }
 
+    float sampleLowFrequencyBand(float bandIndex) {
+      float sampleX = (clamp(bandIndex, 0.0, 511.0) + 0.5) / 512.0;
+      return texture2D(uLowFrequencySpectrum, vec2(sampleX, 0.5)).r;
+    }
+
     void main() {
       vUv = uv;
       vNormal = normal;
@@ -4766,6 +4928,40 @@ function createSonicTopographyMaterial(THREE, theme) {
       float lowGate = smoothstep(0.055, 0.22, lowDrive);
       float rhythmGate = lowGate * (0.32 + uAudioPulse * 0.68);
 
+      vec2 bassColumnGrid = pos2D / ${SONIC_TOPOGRAPHY_SPACING.toFixed(2)};
+      vec2 bassColumnDelta = bassColumnGrid - vec2(${SONIC_BASS_COLUMN_CLUSTER.center.toFixed(1)});
+      float bassColumnRadiusSquared = dot(bassColumnDelta, bassColumnDelta);
+      float bassColumnRadius = sqrt(bassColumnRadiusSquared);
+      float bassColumnCoreMask = 1.0 - step(
+        ${(SONIC_BASS_COLUMN_CLUSTER.radius ** 2 + 0.5).toFixed(1)},
+        bassColumnRadiusSquared
+      );
+      float bassColumnTransition = 1.0 - smoothstep(
+        ${SONIC_BASS_COLUMN_CLUSTER.radius.toFixed(1)},
+        ${(SONIC_BASS_COLUMN_CLUSTER.radius + SONIC_BASS_COLUMN_CLUSTER.feather).toFixed(1)},
+        bassColumnRadius
+      );
+      float bassColumnBlend = max(bassColumnCoreMask, bassColumnTransition);
+      vBassColumnBlend = bassColumnBlend;
+      vBassColumnRadialMix = smoothstep(
+        ${(SONIC_BASS_COLUMN_CLUSTER.radius * 0.55).toFixed(1)},
+        ${(SONIC_BASS_COLUMN_CLUSTER.radius + SONIC_BASS_COLUMN_CLUSTER.feather).toFixed(1)},
+        bassColumnRadius
+      );
+      float bassColumnCenterMask = (1.0 - step(0.5, abs(bassColumnDelta.x)))
+        * (1.0 - step(0.5, abs(bassColumnDelta.y)));
+      float bassColumnBandIndex = aBassColumnBand;
+      float bassColumnDrive = 0.0;
+      if (bassColumnBlend > 0.001) {
+        float bassColumnBandDrive = sampleLowFrequencyBand(bassColumnBandIndex);
+        bassColumnDrive = mix(
+          bassColumnBandDrive,
+          clamp(uLowFrequencyAmplitude, 0.0, 1.0),
+          bassColumnCenterMask
+        );
+      }
+      float bassColumnLift = bassColumnBlend * bassColumnDrive * (6.5 + rnd * 3.5) * uColumnHeightScale;
+
       float subRegion = smoothstep(31.0, 0.0, centerDist);
       float subLift = uSubBass * rhythmGate * subRegion * 4.15;
 
@@ -4786,7 +4982,7 @@ function createSonicTopographyMaterial(THREE, theme) {
       }
 
       float kickSurface = mix(baseNoise, wave, uSmoothness * 0.5 + 0.2) * lowDrive * rhythmGate * 0.56;
-      float audioElevation = subLift + bassLift + lowMidLift + midLift + highMidLift + kickSurface;
+      float audioElevation = bassColumnLift + subLift + bassLift + lowMidLift + midLift + highMidLift + kickSurface;
       if (rnd > 0.99) {
         audioElevation += uEnergy * rhythmGate * 0.72;
       }
@@ -4859,6 +5055,10 @@ function createSonicTopographyMaterial(THREE, theme) {
     uniform vec3 uCoolEdge;
     uniform vec3 uWarmCore;
     uniform vec3 uWarmEdge;
+    uniform vec3 uCoreColumnColor;
+    uniform vec3 uOuterColumnColor;
+    uniform float uSonicBrightness;
+    uniform float uSonicExposure;
     uniform vec3 uRippleColor;
     uniform float uGlowIntensity;
 
@@ -4869,6 +5069,8 @@ function createSonicTopographyMaterial(THREE, theme) {
     varying vec3 vNormal;
     varying float vRelativeY;
     varying vec2 vInstancePos;
+    varying float vBassColumnBlend;
+    varying float vBassColumnRadialMix;
 
     float random(vec2 st) {
       return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
@@ -4892,6 +5094,8 @@ function createSonicTopographyMaterial(THREE, theme) {
       vec3 zoneCore = mix(coolCore, warmCore, warmBlend);
       vec3 zoneEdge = mix(coolEdge, warmEdge, warmBlend);
       vec3 targetGlow = mix(zoneCore, zoneEdge, fract(rnd * 11.0));
+      vec3 sonicColumnColor = mix(uCoreColumnColor, uOuterColumnColor, vBassColumnRadialMix);
+      targetGlow = mix(targetGlow, sonicColumnColor, vBassColumnBlend * (0.78 + normElevation * 0.18));
       float distFade = 1.0 - smoothstep(46.0, 88.0, centerDist);
       targetGlow = mix(targetGlow, vec3(0.4, 0.8, 1.0), uBrightness * 0.6);
       float visualFloor = clamp(0.035 + uBrightness * 0.05 + uAir * 0.04, 0.035, 0.16);
@@ -4943,18 +5147,121 @@ function createSonicTopographyMaterial(THREE, theme) {
       float aerialFog = smoothstep(30.0, 65.0, vDistance);
       vec3 atmosphericColor = mix(cBase1, cBase2, 0.4);
       finalColor = mix(finalColor, atmosphericColor, aerialFog * 0.5);
+      finalColor *= uSonicBrightness * exp2(uSonicExposure);
 
       float alphaFade = 1.0 - smoothstep(55.0, 78.0, vDistance);
       gl_FragColor = vec4(finalColor, alphaFade);
     }
   `;
 
-  return new THREE.ShaderMaterial({
+  const material = new THREE.ShaderMaterial({
     uniforms,
     vertexShader,
     fragmentShader,
     transparent: true
   });
+  material.userData.lowFrequencySpectrum = lowFrequencySpectrum;
+  material.userData.lowFrequencySpectrumData = lowFrequencySpectrumData;
+  return material;
+}
+
+function sonicTopographyPaletteColors() {
+  const topo = state.sonicTopography;
+  const palette = topo.palette || fallbackLyricPalette(state.currentSong);
+  return {
+    core: rgbHexValue(palette?.highlight || palette?.glow || { r: 255, g: 255, b: 255 }),
+    outer: rgbHexValue(palette?.glow || palette?.primary || { r: 131, g: 228, b: 255 })
+  };
+}
+
+function resolvedSonicTopographyColors() {
+  const automatic = sonicTopographyPaletteColors();
+  const settings = state.sonicTopography.settings || DEFAULT_SONIC_SETTINGS;
+  return {
+    core: settings.coreColor || automatic.core,
+    outer: settings.outerColor || automatic.outer
+  };
+}
+
+function saveSonicSettingsPreferences() {
+  try {
+    window.localStorage.setItem(SONIC_SETTINGS_PREFS_KEY, JSON.stringify(
+      normalizeSonicSettings(state.sonicTopography.settings)
+    ));
+  } catch (error) {}
+}
+
+function syncSonicSettingsControls() {
+  const settings = normalizeSonicSettings(state.sonicTopography.settings);
+  const colors = resolvedSonicTopographyColors();
+  const isAutomatic = !settings.coreColor && !settings.outerColor;
+  const isCustom = !!settings.coreColor && !!settings.outerColor;
+  if (els.sonicCoreColorInput) els.sonicCoreColorInput.value = colors.core;
+  if (els.sonicOuterColorInput) els.sonicOuterColorInput.value = colors.outer;
+  if (els.sonicPaletteMode) {
+    els.sonicPaletteMode.textContent = isAutomatic
+      ? '颜色跟随封面'
+      : isCustom ? '中间与外围自定义' : '部分颜色自定义';
+  }
+  if (els.sonicFollowCoverButton) {
+    els.sonicFollowCoverButton.classList.toggle('is-active', isAutomatic);
+    els.sonicFollowCoverButton.setAttribute('aria-pressed', String(isAutomatic));
+  }
+  const syncRange = (input, output, rawValue, text) => {
+    if (input) {
+      input.value = String(rawValue);
+      input.setAttribute('aria-valuetext', text);
+      syncElasticRangeVisual(input);
+    }
+    if (output) output.textContent = text;
+  };
+  syncRange(els.sonicBrightnessRange, els.sonicBrightnessValue, Math.round(settings.brightness * 100), `${Math.round(settings.brightness * 100)}%`);
+  const exposureText = `${settings.exposure > 0 ? '+' : ''}${settings.exposure.toFixed(2)} EV`;
+  syncRange(els.sonicExposureRange, els.sonicExposureValue, Math.round(settings.exposure * 100), exposureText);
+  syncRange(els.sonicColumnHeightRange, els.sonicColumnHeightValue, Math.round(settings.columnHeight * 100), `${Math.round(settings.columnHeight * 100)}%`);
+  syncRange(els.sonicFovRange, els.sonicFovValue, Math.round(settings.fov), `${Math.round(settings.fov)}°`);
+  syncRange(els.sonicSmoothingRange, els.sonicSmoothingValue, Math.round(settings.smoothing * 100), `${Math.round(settings.smoothing * 100)}%`);
+}
+
+function sonicTopographyCameraFitRadius(aspect, fov) {
+  const verticalFov = clamp(Number(fov) || SONIC_TOPOGRAPHY_CAMERA.fov, 50, 75) * Math.PI / 180;
+  const safeAspect = clamp(Number(aspect) || 1, 0.3, 4);
+  const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * safeAspect);
+  const fitFov = Math.min(verticalFov, horizontalFov);
+  const activeRadius = Math.min(Math.SQRT2 * SONIC_TOPOGRAPHY_HALF, 78);
+  return Math.hypot(activeRadius, 10) * 1.1 / Math.sin(fitFov / 2);
+}
+
+function updateSonicTopographyCameraFit() {
+  const topo = state.sonicTopography;
+  if (!topo.camera) return;
+  const settings = normalizeSonicSettings(topo.settings);
+  topo.camera.fov = settings.fov;
+  topo.baseCameraRadius = sonicTopographyCameraFitRadius(topo.camera.aspect, settings.fov);
+  topo.camera.updateProjectionMatrix();
+  if (topo.scene?.fog) {
+    const activeRadius = Math.min(Math.SQRT2 * SONIC_TOPOGRAPHY_HALF, 78);
+    topo.scene.fog.near = topo.baseCameraRadius * 0.58;
+    topo.scene.fog.far = topo.baseCameraRadius + activeRadius * 1.8;
+  }
+}
+
+function applySonicTopographySettings(options = {}) {
+  const topo = state.sonicTopography;
+  topo.settings = normalizeSonicSettings(topo.settings);
+  const settings = topo.settings;
+  const colors = resolvedSonicTopographyColors();
+  if (topo.uniforms) {
+    topo.uniforms.uCoreColumnColor?.value?.set?.(colors.core);
+    topo.uniforms.uOuterColumnColor?.value?.set?.(colors.outer);
+    if (topo.uniforms.uSonicBrightness) topo.uniforms.uSonicBrightness.value = settings.brightness;
+    if (topo.uniforms.uSonicExposure) topo.uniforms.uSonicExposure.value = settings.exposure;
+    if (topo.uniforms.uColumnHeightScale) topo.uniforms.uColumnHeightScale.value = settings.columnHeight;
+  }
+  updateSonicTopographyCameraFit();
+  if (options.persist !== false) saveSonicSettingsPreferences();
+  if (options.sync !== false) syncSonicSettingsControls();
+  if (options.renderConfig !== false) renderDiySelectedPresetConfig();
 }
 
 function buildSonicTopography() {
@@ -4978,8 +5285,8 @@ function buildSonicTopography() {
   els.sonicTopographyCore.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(theme.uBaseColor1.clone(), 30, 95);
-  const camera = new THREE.PerspectiveCamera(SONIC_TOPOGRAPHY_CAMERA.fov, 1, 0.1, 500);
+  scene.fog = new THREE.Fog(theme.uBaseColor1.clone(), 100, 320);
+  const camera = new THREE.PerspectiveCamera(state.sonicTopography.settings.fov, 1, 0.1, 500);
   camera.position.set(SONIC_TOPOGRAPHY_CAMERA.x, SONIC_TOPOGRAPHY_CAMERA.y, SONIC_TOPOGRAPHY_CAMERA.z);
   camera.lookAt(0, 0, 0);
 
@@ -4991,7 +5298,36 @@ function buildSonicTopography() {
   key.position.set(10, 20, 10);
   scene.add(key);
 
+  const bassColumnRadius = SONIC_BASS_COLUMN_CLUSTER.radius;
+  const bassColumnCorePoints = [];
+  for (let gridZ = -bassColumnRadius; gridZ <= bassColumnRadius; gridZ += 1) {
+    const rowHalfWidth = Math.floor(Math.sqrt(bassColumnRadius ** 2 - gridZ ** 2));
+    const row = [];
+    for (let gridX = -rowHalfWidth; gridX <= rowHalfWidth; gridX += 1) {
+      row.push({ x: gridX, z: gridZ });
+    }
+    if ((gridZ + bassColumnRadius) % 2 === 1) row.reverse();
+    bassColumnCorePoints.push(...row);
+  }
+  const bassColumnPointKey = (gridX, gridZ) => `${gridX},${gridZ}`;
+  const bassColumnBandByPoint = new Map();
+  let nonCenterColumnIndex = 0;
+  bassColumnCorePoints.forEach((point) => {
+    if (point.x === 0 && point.z === 0) {
+      bassColumnBandByPoint.set(bassColumnPointKey(point.x, point.z), 0);
+      return;
+    }
+    const bandIndex = Math.floor(
+      nonCenterColumnIndex * SONIC_LOW_FREQUENCY_BAND_COUNT / (SONIC_BASS_COLUMN_CLUSTER.count - 1)
+    );
+    bassColumnBandByPoint.set(bassColumnPointKey(point.x, point.z), bandIndex);
+    nonCenterColumnIndex += 1;
+  });
+  const bassColumnBandValues = new Float32Array(count);
   const geometry = new THREE.BoxGeometry(SONIC_TOPOGRAPHY_SIZE, 1, SONIC_TOPOGRAPHY_SIZE);
+  const bassColumnBandAttribute = new THREE.InstancedBufferAttribute(bassColumnBandValues, 1);
+  bassColumnBandAttribute.setUsage(THREE.StaticDrawUsage);
+  geometry.setAttribute('aBassColumnBand', bassColumnBandAttribute);
   const material = createSonicTopographyMaterial(THREE, theme);
   const terrain = new THREE.InstancedMesh(geometry, material, count);
   terrain.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -5019,8 +5355,25 @@ function buildSonicTopography() {
   let index = 0;
   for (let x = 0; x < SONIC_TOPOGRAPHY_GRID; x += 1) {
     for (let z = 0; z < SONIC_TOPOGRAPHY_GRID; z += 1) {
+      const gridX = x - SONIC_TOPOGRAPHY_GRID / 2;
+      const gridZ = z - SONIC_TOPOGRAPHY_GRID / 2;
       const px = x * SONIC_TOPOGRAPHY_SPACING - offset;
       const pz = z * SONIC_TOPOGRAPHY_SPACING - offset;
+      let bassColumnBand = bassColumnBandByPoint.get(bassColumnPointKey(gridX, gridZ));
+      const gridRadius = Math.hypot(gridX, gridZ);
+      if (!Number.isFinite(bassColumnBand)
+          && gridRadius < bassColumnRadius + SONIC_BASS_COLUMN_CLUSTER.feather) {
+        let nearestDistanceSquared = Infinity;
+        bassColumnCorePoints.forEach((point) => {
+          const dx = gridX - point.x;
+          const dz = gridZ - point.z;
+          const distanceSquared = dx * dx + dz * dz;
+          if (distanceSquared >= nearestDistanceSquared) return;
+          nearestDistanceSquared = distanceSquared;
+          bassColumnBand = bassColumnBandByPoint.get(bassColumnPointKey(point.x, point.z));
+        });
+      }
+      bassColumnBandValues[index] = Number.isFinite(bassColumnBand) ? bassColumnBand : 0;
       dummy.position.set(px, 0.5, pz);
       dummy.rotation.set(0, 0, 0);
       dummy.scale.set(1, 1, 1);
@@ -5044,6 +5397,7 @@ function buildSonicTopography() {
   }
 
   terrain.instanceMatrix.needsUpdate = true;
+  bassColumnBandAttribute.needsUpdate = true;
   meteorMesh.instanceMatrix.needsUpdate = true;
   particleMesh.instanceMatrix.needsUpdate = true;
 
@@ -5056,6 +5410,8 @@ function buildSonicTopography() {
   topo.terrain = terrain;
   topo.material = material;
   topo.uniforms = material.uniforms;
+  topo.lowFrequencySpectrum = material.userData.lowFrequencySpectrum;
+  topo.lowFrequencySpectrumData = material.userData.lowFrequencySpectrumData;
   topo.meteorMesh = meteorMesh;
   topo.meteorMaterial = meteorMesh.material;
   topo.particleMesh = particleMesh;
@@ -5067,6 +5423,7 @@ function buildSonicTopography() {
   topo.ripples = material.uniforms.uRipples.value;
   topo.meteors = Array.from({ length: SONIC_TOPOGRAPHY_METEORS }, () => ({ active: false, x: 0, y: -1000, z: 0, speed: 0, strength: 0 }));
   topo.particles = Array.from({ length: SONIC_TOPOGRAPHY_PARTICLES }, () => ({ active: false, x: 0, y: -1000, z: 0, vx: 0, vy: 0, vz: 0, life: 0, maxLife: 1, scale: 1 }));
+  applySonicTopographySettings({ persist: false, sync: true, renderConfig: false });
   topo.built = true;
   observePresetRendererSize(topo, els.sonicTopographyCore, resizeSonicTopographyRenderer);
   applySonicTopographyPalette(topo.palette || fallbackLyricPalette(state.currentSong));
@@ -5087,7 +5444,7 @@ function resizeSonicTopographyRenderer() {
   if (topo.renderQuality) topo.renderQuality.resize(width, height, topo.renderer.getPixelRatio?.() || renderPixelRatio('webgl'));
   else topo.renderer.setSize(width, height, false);
   topo.camera.aspect = width / Math.max(1, height);
-  topo.camera.updateProjectionMatrix();
+  updateSonicTopographyCameraFit();
 }
 
 function updateSonicTopographyVisibility() {
@@ -5633,6 +5990,18 @@ function resetSonicTopographyAudioMotion(topo) {
   topo.lastBeat = 0;
   topo.pulseCooldown = 0;
   topo.meteorCooldown = 0;
+  if (topo.frameAudio) {
+    topo.frameAudio.lowFrequencyAmplitude = 0;
+    topo.frameAudio.subBass = 0;
+    topo.frameAudio.bass = 0;
+    topo.frameAudio.lowMid = 0;
+    topo.frameAudio.lowFrequencyBands?.fill(0);
+    topo.frameAudio.lowFrequencyBandTargets?.fill(0);
+  }
+  if (topo.lowFrequencySpectrumData && topo.lowFrequencySpectrum) {
+    topo.lowFrequencySpectrumData.fill(0);
+    topo.lowFrequencySpectrum.needsUpdate = true;
+  }
   topo.ripples.forEach((ripple) => {
     ripple.strength = 0;
     ripple.isActive = 0;
@@ -5664,14 +6033,44 @@ function updateSonicTopographyMotion() {
     : 1;
   topo.lastMotionAt = nowMs;
 
-  const audioDriving = Boolean(els.audio.src && !els.audio.paused && !els.audio.ended);
+  const audioDriving = isPlaybackClockRunning();
   const live = audioDriving
     ? (state.audioAnalysis.live ? state.audioAnalysis : state.visual)
     : null;
   const audio = topo.frameAudio;
-  audio.subBass = audioDriving ? clamp(live.subBass || 0, 0, 1) : 0;
-  audio.bass = audioDriving ? clamp(live.bass || 0, 0, 1) : 0;
-  audio.lowMid = audioDriving ? clamp(live.lowMid || 0, 0, 1) : 0;
+  const lowFrequencyAmplitudeTarget = audioDriving
+    ? clamp(Math.max(
+        Number(live.lowFrequencyAmplitude) || 0,
+        Number(state.visual.lowFrequencyAmplitude) || 0,
+        Number(live.subBass) || 0,
+        Number(live.bass) || 0
+      ), 0, 1)
+    : 0;
+  const subBassTarget = audioDriving
+    ? clamp(Math.max(Number(live.subBass) || 0, Number(state.visual.lowFrequencyAmplitude) || 0), 0, 1)
+    : 0;
+  const bassTarget = audioDriving
+    ? clamp(Math.max(Number(live.bass) || 0, Number(state.visual.bass) || 0), 0, 1)
+    : 0;
+  const lowMidTarget = audioDriving ? clamp(live.lowMid || 0, 0, 1) : 0;
+  const smoothing = normalizeSonicSettings(topo.settings).smoothing;
+  const attackResponse = 1 - Math.exp(-dt / (SONIC_BASS_COLUMN_ATTACK_SECONDS * smoothing));
+  const releaseResponse = 1 - Math.exp(-dt / (SONIC_BASS_COLUMN_RELEASE_SECONDS * smoothing));
+  if (audioDriving) {
+    audio.lowFrequencyAmplitude += (lowFrequencyAmplitudeTarget - audio.lowFrequencyAmplitude)
+      * (lowFrequencyAmplitudeTarget > audio.lowFrequencyAmplitude ? attackResponse : releaseResponse);
+    audio.subBass += (subBassTarget - audio.subBass)
+      * (subBassTarget > audio.subBass ? attackResponse : releaseResponse);
+    audio.bass += (bassTarget - audio.bass)
+      * (bassTarget > audio.bass ? attackResponse : releaseResponse);
+    audio.lowMid += (lowMidTarget - audio.lowMid)
+      * (lowMidTarget > audio.lowMid ? attackResponse : releaseResponse);
+  } else {
+    audio.lowFrequencyAmplitude = 0;
+    audio.subBass = 0;
+    audio.bass = 0;
+    audio.lowMid = 0;
+  }
   audio.mid = audioDriving ? clamp(live.mid || 0, 0, 1) : 0;
   audio.highMid = audioDriving ? clamp(live.highMid || 0, 0, 1) : 0;
   audio.presence = audioDriving ? clamp(live.presence || 0, 0, 1) : 0;
@@ -5704,10 +6103,37 @@ function updateSonicTopographyMotion() {
     audio.smoothness = 0.86;
   }
 
+  writeLowFrequencyBands(
+    audio.lowFrequencyBandTargets,
+    audioDriving && live ? live.lowFrequencyBands : null,
+    lowFrequencyAmplitudeTarget
+  );
+  if (topo.lowFrequencySpectrumData && topo.lowFrequencySpectrum) {
+    let spectrumChanged = false;
+    for (let index = 0; index < SONIC_LOW_FREQUENCY_BAND_COUNT; index += 1) {
+      const targetAmplitude = audioDriving ? audio.lowFrequencyBandTargets[index] || 0 : 0;
+      let amplitude = audio.lowFrequencyBands[index] || 0;
+      if (audioDriving) {
+        amplitude += (targetAmplitude - amplitude)
+          * (targetAmplitude > amplitude ? attackResponse : releaseResponse);
+      } else {
+        amplitude = 0;
+      }
+      audio.lowFrequencyBands[index] = amplitude;
+      const encodedAmplitude = Math.round(clamp(amplitude, 0, 1) * 255);
+      if (topo.lowFrequencySpectrumData[index] !== encodedAmplitude) {
+        topo.lowFrequencySpectrumData[index] = encodedAmplitude;
+        spectrumChanged = true;
+      }
+    }
+    if (spectrumChanged) topo.lowFrequencySpectrum.needsUpdate = true;
+  }
+
   const uniforms = topo.uniforms;
   uniforms.uTime.value = now;
   uniforms.uSubBass.value = audio.subBass;
   uniforms.uBass.value = audio.bass;
+  uniforms.uLowFrequencyAmplitude.value = audio.lowFrequencyAmplitude;
   uniforms.uLowMid.value = audio.lowMid;
   uniforms.uMid.value = audio.mid;
   uniforms.uHighMid.value = audio.highMid;
@@ -5779,10 +6205,11 @@ function updateSonicTopographyMotion() {
   if (!topo.resizeObserver) resizeSonicTopographyRenderer();
 
   if (!state.playbackVisual.dragging && !reducedMotion) topo.autoYaw += dt * 0.05;
-  const baseRadius = Math.hypot(SONIC_TOPOGRAPHY_CAMERA.x, SONIC_TOPOGRAPHY_CAMERA.y, SONIC_TOPOGRAPHY_CAMERA.z);
+  const referenceRadius = Math.hypot(SONIC_TOPOGRAPHY_CAMERA.x, SONIC_TOPOGRAPHY_CAMERA.y, SONIC_TOPOGRAPHY_CAMERA.z);
+  const baseRadius = topo.baseCameraRadius || referenceRadius;
   const radius = baseRadius / clamp(state.playbackVisual.zoom || 1, 0.58, 2.35);
   const baseAzimuth = Math.atan2(SONIC_TOPOGRAPHY_CAMERA.x, SONIC_TOPOGRAPHY_CAMERA.z);
-  const baseElevation = Math.asin(SONIC_TOPOGRAPHY_CAMERA.y / baseRadius);
+  const baseElevation = Math.asin(SONIC_TOPOGRAPHY_CAMERA.y / referenceRadius);
   const yaw = baseAzimuth + topo.autoYaw + (state.playbackVisual.yaw - PLAYBACK_REST_YAW) * 0.72;
   const elevation = clamp(baseElevation + (state.playbackVisual.pitch - PLAYBACK_REST_PITCH) * 0.48, 0.1, Math.PI / 2 - 0.1);
   const horizontalRadius = Math.cos(elevation) * radius;
@@ -6185,6 +6612,7 @@ function applySonicTopographyPalette(palette) {
   if (topo.particleMaterial && topo.particleMaterial.color && topo.meteorMaterial && topo.meteorMaterial.color) {
     topo.particleMaterial.color.copy(topo.meteorMaterial.color);
   }
+  applySonicTopographySettings({ persist: false, sync: true, renderConfig: false });
 }
 
 function rgbHexValue(color) {
@@ -14510,7 +14938,15 @@ const DIY_PRESET_CONFIG_LABELS = Object.freeze({
   nodalMode: '节点模态',
   chladniDisplayMode: '克拉尼形态',
   faceCount: '3D面数',
-  autoRotation: '自动旋转'
+  autoRotation: '自动旋转',
+  sonicColumnCount: '低频音柱数量',
+  sonicCoreColor: '中间音柱颜色',
+  sonicOuterColor: '外围音柱颜色',
+  sonicBrightness: 'Sonic 亮度',
+  sonicExposure: 'Sonic 曝光',
+  sonicColumnHeight: '音柱高度',
+  sonicFov: '广角视野',
+  sonicSmoothing: '升降丝滑度'
 });
 
 function diyPresetConfigLabel(key) {
@@ -14547,6 +14983,17 @@ function builtinDiyPresetConfiguration() {
     runtimeControls.seamCount = diagnostics.seamCount || 4;
     runtimeControls.reflectionMode = 'Metal012 镜面精抛 · 高清反射 · 8K源材质';
     runtimeControls.reflectionResolution = diagnostics.reflectionResolution || [];
+  } else if (preset === 'topography') {
+    const settings = normalizeSonicSettings(state.sonicTopography.settings);
+    const colors = resolvedSonicTopographyColors();
+    runtimeControls.sonicColumnCount = SONIC_BASS_COLUMN_CLUSTER.count;
+    runtimeControls.sonicCoreColor = settings.coreColor || `跟随封面 · ${colors.core}`;
+    runtimeControls.sonicOuterColor = settings.outerColor || `跟随封面 · ${colors.outer}`;
+    runtimeControls.sonicBrightness = `${Math.round(settings.brightness * 100)}%`;
+    runtimeControls.sonicExposure = `${settings.exposure > 0 ? '+' : ''}${settings.exposure.toFixed(2)} EV`;
+    runtimeControls.sonicColumnHeight = `${Math.round(settings.columnHeight * 100)}%`;
+    runtimeControls.sonicFov = `${Math.round(settings.fov)}°`;
+    runtimeControls.sonicSmoothing = `${Math.round(settings.smoothing * 100)}%`;
   } else if (preset === 'chladni') {
     const diagnostics = chladniRuntimeSnapshot();
     runtimeControls.chladniDisplayMode = state.chladni.mode === 'plane' ? '平面' : '3D六面';
@@ -14599,6 +15046,9 @@ function syncDiyPresetAdjustmentVisibility() {
   }
   if (els.diyCubeIntensityControl) {
     els.diyCubeIntensityControl.hidden = state.diyPreset !== 'cube';
+  }
+  if (els.sonicPresetControls) {
+    els.sonicPresetControls.hidden = state.diyPreset !== 'topography';
   }
   if (els.freeCubePresetControls) {
     els.freeCubePresetControls.hidden = !isFreeCubePreset();
@@ -18113,10 +18563,11 @@ async function refreshPlayerState() {
 
 function applyAudioBridgePayload(audio = {}) {
   const energy = Number(audio.energy) || 0;
-  const lowFrequency = Number(audio.lowFrequencyAmplitude) || Number(audio.bass) || 0;
+  const lowFrequency = clamp(Number(audio.lowFrequencyAmplitude) || Number(audio.bass) || 0, 0, 1);
   state.visualBridge.energy = energy;
   state.visualBridge.bass = Number(audio.bass) || lowFrequency;
   state.visualBridge.lowFrequencyAmplitude = lowFrequency;
+  writeLowFrequencyBands(state.visualBridge.lowFrequencyBands, audio.lowFrequencyBands, lowFrequency);
   state.visualBridge.beat = Number(audio.beat) || 0;
   state.visualBridge.mid = Number(audio.mid) || clamp(energy * 0.48, 0, 1);
   state.visualBridge.treble = Number(audio.treble) || clamp(energy * 0.28, 0, 1);
@@ -19177,6 +19628,55 @@ function bindEvents() {
       renderDiySelectedPresetConfig();
     });
   }
+  if (els.sonicCoreColorInput) {
+    els.sonicCoreColorInput.addEventListener('input', () => {
+      state.sonicTopography.settings.coreColor = els.sonicCoreColorInput.value;
+      applySonicTopographySettings();
+    });
+  }
+  if (els.sonicOuterColorInput) {
+    els.sonicOuterColorInput.addEventListener('input', () => {
+      state.sonicTopography.settings.outerColor = els.sonicOuterColorInput.value;
+      applySonicTopographySettings();
+    });
+  }
+  if (els.sonicFollowCoverButton) {
+    els.sonicFollowCoverButton.addEventListener('click', () => {
+      state.sonicTopography.settings.coreColor = null;
+      state.sonicTopography.settings.outerColor = null;
+      applySonicTopographySettings();
+    });
+  }
+  if (els.sonicBrightnessRange) {
+    els.sonicBrightnessRange.addEventListener('input', () => {
+      state.sonicTopography.settings.brightness = Number(els.sonicBrightnessRange.value) / 100;
+      applySonicTopographySettings();
+    });
+  }
+  if (els.sonicExposureRange) {
+    els.sonicExposureRange.addEventListener('input', () => {
+      state.sonicTopography.settings.exposure = Number(els.sonicExposureRange.value) / 100;
+      applySonicTopographySettings();
+    });
+  }
+  if (els.sonicColumnHeightRange) {
+    els.sonicColumnHeightRange.addEventListener('input', () => {
+      state.sonicTopography.settings.columnHeight = Number(els.sonicColumnHeightRange.value) / 100;
+      applySonicTopographySettings();
+    });
+  }
+  if (els.sonicFovRange) {
+    els.sonicFovRange.addEventListener('input', () => {
+      state.sonicTopography.settings.fov = Number(els.sonicFovRange.value);
+      applySonicTopographySettings();
+    });
+  }
+  if (els.sonicSmoothingRange) {
+    els.sonicSmoothingRange.addEventListener('input', () => {
+      state.sonicTopography.settings.smoothing = Number(els.sonicSmoothingRange.value) / 100;
+      applySonicTopographySettings();
+    });
+  }
   if (els.freeCubeHeartButton) {
     els.freeCubeHeartButton.addEventListener('click', toggleFreeCubeHeart);
   }
@@ -20125,6 +20625,9 @@ function buildCoverParticleSamples(width, height, dpr) {
         size: 0.82 + coverParticleNoise(x, y, 5) * 0.12,
         wavePhase: sheetPhase,
         waveStrength: 0.54 + relief * 0.66 + coverParticleNoise(x, y, 6) * 0.12,
+        lowCyclePhase: coverParticleNoise(x, y, 7) * Math.PI * 2,
+        lowCycleRate: (coverParticleNoise(x, y, 8) < 0.5 ? -1 : 1)
+          * (0.58 + coverParticleNoise(x, y, 9) * 0.68),
         bumpDriftX: driftX * driftMagnitude,
         bumpDriftY: driftY * driftMagnitude
       });
@@ -20186,6 +20689,8 @@ function coverParticleGpuMaterial(THREE) {
       attribute float aSize;
       attribute float aWavePhase;
       attribute float aWaveStrength;
+      attribute float aLowCyclePhase;
+      attribute float aLowCycleRate;
       attribute vec2 aDrift;
       uniform vec2 uResolution;
       uniform vec2 uCenter;
@@ -20219,8 +20724,15 @@ function coverParticleGpuMaterial(THREE) {
         float waveB = sin(sheetTime * 0.73 + aWavePhase * 1.31 + position.x * 5.2);
         float waveC = sin(sheetTime * 1.17 - aWavePhase * 0.89 + position.y * 6.6);
         float radialWave = sin(length(position.xy) * 14.0 - sheetTime * 1.28 + aWavePhase * 0.18);
-        float naturalWave = waveA * 0.42 + waveB * 0.28 + waveC * 0.20 + radialWave * 0.10;
         float lowDrive = clamp(uBass * 0.82 + uEnergy * 0.22, 0.0, 1.25);
+        float baseNaturalWave = waveA * 0.42 + waveB * 0.28 + waveC * 0.20 + radialWave * 0.10;
+        float segmentProgress = clamp((position.x + 0.64) / 1.28, 0.0, 1.0);
+        float lowSegmentWave = sin(segmentProgress * 6.28318530718 * ${COVER_PARTICLE_LOW_WAVE_SEGMENTS}.0 + position.y * 0.65 - sheetTime * 0.56);
+        float lowSegmentMix = clamp(lowDrive * 0.72, 0.0, 0.68);
+        float randomParticleCycle = sin(sheetTime * aLowCycleRate + aLowCyclePhase);
+        float randomCycleMix = clamp(uBass * 1.08, 0.0, 0.78);
+        float lowFrequencyWave = mix(lowSegmentWave, randomParticleCycle, randomCycleMix);
+        float naturalWave = mix(baseNaturalWave, lowFrequencyWave, lowSegmentMix);
         float beatDrive = clamp(uBeat, 0.0, 1.4);
         float waveDepth = uAudioActive * naturalWave * (0.010 + lowDrive * 0.014 + beatDrive * 0.004) * aWaveStrength * uMotionScale;
         float motionAmount = abs(waveDepth) * 8.0;
@@ -20343,6 +20855,8 @@ function rebuildCoverParticleGpuGeometry() {
   const sizes = new Float32Array(count);
   const wavePhases = new Float32Array(count);
   const waveStrengths = new Float32Array(count);
+  const lowCyclePhases = new Float32Array(count);
+  const lowCycleRates = new Float32Array(count);
   const drifts = new Float32Array(count * 2);
   for (let index = 0; index < count; index += 1) {
     const particle = particles[index];
@@ -20358,6 +20872,8 @@ function rebuildCoverParticleGpuGeometry() {
     sizes[index] = particle.size;
     wavePhases[index] = particle.wavePhase;
     waveStrengths[index] = particle.waveStrength;
+    lowCyclePhases[index] = particle.lowCyclePhase;
+    lowCycleRates[index] = particle.lowCycleRate;
     drifts[p2] = particle.bumpDriftX;
     drifts[p2 + 1] = particle.bumpDriftY;
   }
@@ -20369,6 +20885,8 @@ function rebuildCoverParticleGpuGeometry() {
   geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
   geometry.setAttribute('aWavePhase', new THREE.BufferAttribute(wavePhases, 1));
   geometry.setAttribute('aWaveStrength', new THREE.BufferAttribute(waveStrengths, 1));
+  geometry.setAttribute('aLowCyclePhase', new THREE.BufferAttribute(lowCyclePhases, 1));
+  geometry.setAttribute('aLowCycleRate', new THREE.BufferAttribute(lowCycleRates, 1));
   geometry.setAttribute('aDrift', new THREE.BufferAttribute(drifts, 2));
 
   const points = new THREE.Points(geometry, cover.gpuMaterial);
@@ -20514,8 +21032,19 @@ function drawCoverParticleScene(width, height, dpr) {
     const waveB = Math.sin(sheetTime * 0.73 + particle.wavePhase * 1.31 + particle.x * 5.2);
     const waveC = Math.sin(sheetTime * 1.17 - particle.wavePhase * 0.89 + particle.y * 6.6);
     const radialWave = Math.sin(Math.hypot(particle.x, particle.y) * 14 - sheetTime * 1.28 + particle.wavePhase * 0.18);
-    const naturalWave = waveA * 0.42 + waveB * 0.28 + waveC * 0.2 + radialWave * 0.1;
     const lowDrive = clamp(bass * 0.82 + energy * 0.22, 0, 1.25);
+    const baseNaturalWave = waveA * 0.42 + waveB * 0.28 + waveC * 0.2 + radialWave * 0.1;
+    const segmentProgress = clamp((particle.x + 0.64) / 1.28, 0, 1);
+    const lowSegmentWave = Math.sin(
+      segmentProgress * Math.PI * 2 * COVER_PARTICLE_LOW_WAVE_SEGMENTS
+        + particle.y * 0.65
+        - sheetTime * 0.56
+    );
+    const lowSegmentMix = clamp(lowDrive * 0.72, 0, 0.68);
+    const randomParticleCycle = Math.sin(sheetTime * particle.lowCycleRate + particle.lowCyclePhase);
+    const randomCycleMix = clamp(bass * 1.08, 0, 0.78);
+    const lowFrequencyWave = lowSegmentWave * (1 - randomCycleMix) + randomParticleCycle * randomCycleMix;
+    const naturalWave = baseNaturalWave * (1 - lowSegmentMix) + lowFrequencyWave * lowSegmentMix;
     const audioGate = audioActive ? 1 : 0;
     const waveDepth = audioGate * naturalWave * (0.01 + lowDrive * 0.014 + beat * 0.004) * particle.waveStrength * motionScale;
     const motionAmount = Math.abs(waveDepth) * 8;
@@ -21420,6 +21949,7 @@ async function init() {
   initRenderCapabilityBridge();
   applyRuntimeDataset();
   loadWallpaperPrefs();
+  applySonicTopographySettings({ persist: false, sync: true, renderConfig: false });
   restoreSandboxDraft();
   await loadBundledSceneLibrary();
   bindEvents();
