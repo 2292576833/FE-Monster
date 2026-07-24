@@ -9,14 +9,19 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $rootPath = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$packageMetadata = Get-Content -LiteralPath (Join-Path $rootPath 'package.json') -Raw | ConvertFrom-Json
+$appVersion = [string]$packageMetadata.version
+if ($appVersion -notmatch '^\d+\.\d+\.\d+$') {
+  throw "package.json contains an invalid release version: $appVersion"
+}
 $outputPath = [System.IO.Path]::GetFullPath($OutputDir)
 $workRoot = Join-Path $rootPath 'out\installer'
 $payloadParent = Join-Path $workRoot 'payload'
 $payloadRoot = Join-Path $payloadParent 'FE Monster'
 $setupRoot = Join-Path $workRoot 'setup'
 $payloadZip = Join-Path $setupRoot 'FE-Monster-Payload.zip'
-$installerExe = Join-Path $outputPath 'FE-Monster-Setup.exe'
-$setupBundleOutput = Join-Path $outputPath 'FE-Monster-Setup-Bundle.zip'
+$installerExe = Join-Path $outputPath "FE-Monster-Setup-$appVersion.exe"
+$setupBundleOutput = Join-Path $outputPath "FE-Monster-Setup-Bundle-$appVersion.zip"
 $setupProject = Join-Path $rootPath 'native\windows\setup\FeMonsterSetup.csproj'
 $setupProjectDir = Split-Path -Parent $setupProject
 $setupPayloadResource = Join-Path $setupProjectDir 'SetupPayload.zip'
@@ -208,7 +213,6 @@ function Stage-Payload {
     Copy-File $communityUrlFile (Join-Path $payloadRoot 'data\community-server-url.txt')
   }
 
-  Stage-RuntimeNodeModules
   Stage-GesturePythonRuntime
   Copy-File (Join-Path $rootPath 'out\fe-monster-java.jar') (Join-Path $payloadRoot 'out\fe-monster-java.jar')
   Copy-Dir (Join-Path $rootPath 'native\windows\build') (Join-Path $payloadRoot 'native\windows\build')
@@ -227,9 +231,6 @@ function Stage-Payload {
   foreach ($required in @(
     'out\fe-monster-java.jar',
     'web\index.html',
-    'node_modules\NeteaseCloudMusicApi',
-    'node_modules\@sansenjian\qq-music-api\dist\cli.js',
-    'node_modules\kugoumusicapi\app.js',
     'runtime\python\python.exe',
     'runtime\python-site-packages\cv2',
     'runtime\python-site-packages\mediapipe',
@@ -244,45 +245,69 @@ function Stage-Payload {
   }
 }
 
-function Stage-RuntimeNodeModules {
-  $runtimeRoot = Join-Path $workRoot 'runtime-node-modules'
-  Reset-Directory $runtimeRoot
-  Set-Content -Encoding UTF8 -Path (Join-Path $runtimeRoot 'package.json') -Value @'
-{
-  "private": true,
-  "dependencies": {
-    "@sansenjian/qq-music-api": "^2.4.0",
-    "NeteaseCloudMusicApi": "^4.32.0",
-    "kugoumusicapi": "https://codeload.github.com/MakcRe/KuGouMusicApi/tar.gz/283f1e97b110726b208a64b486a657c0fc0a6126"
-  }
-}
-'@
-
-  $npm = Find-Exe 'npm.cmd' @(
-    (Join-Path $Env:ProgramFiles 'nodejs'),
-    (Join-Path ${Env:ProgramFiles(x86)} 'nodejs')
-  )
-  if ([string]::IsNullOrWhiteSpace($npm)) {
-    throw 'npm.cmd was not found; cannot build runtime node_modules.'
-  }
-
-  Write-Host '== Installing runtime music API node_modules'
-  Push-Location $runtimeRoot
-  try {
-    & $npm install --omit=dev --no-audit --no-fund --no-package-lock
-    if ($LASTEXITCODE -ne 0) { throw "npm install failed with exit code $LASTEXITCODE" }
-  } finally {
-    Pop-Location
-  }
-
-  Copy-Dir (Join-Path $runtimeRoot 'node_modules') (Join-Path $payloadRoot 'node_modules')
-}
-
 function Test-GesturePythonImports {
   param([string]$PythonExe)
   if (!(Test-Path $PythonExe)) { return $false }
-  & $PythonExe -c "import cv2, mediapipe, pyautogui, pygrabber; print('gesture-python-ok')"
+  & $PythonExe -B -c "import cv2, mediapipe, pyautogui, pygrabber; print('gesture-python-ok')"
   return $LASTEXITCODE -eq 0
+}
+
+function Remove-StagedGestureDevelopmentFiles {
+  param(
+    [string]$PythonDestination,
+    [string]$SitePackagesDestination
+  )
+
+  $beforeBytes = @($PythonDestination, $SitePackagesDestination) |
+    ForEach-Object { Get-ChildItem -LiteralPath $_ -Recurse -File -Force } |
+    Measure-Object -Property Length -Sum
+
+  foreach ($relativePath in @(
+    'Lib\ensurepip',
+    'Lib\idlelib',
+    'Lib\lib2to3',
+    'Lib\pydoc_data',
+    'Lib\turtledemo',
+    'include',
+    'libs',
+    'Scripts'
+  )) {
+    $target = Join-Path $PythonDestination $relativePath
+    if (Test-Path -LiteralPath $target) {
+      Remove-Item -LiteralPath $target -Recurse -Force
+    }
+  }
+
+  foreach ($target in @(
+    (Join-Path $SitePackagesDestination 'pip'),
+    (Join-Path $SitePackagesDestination 'cv2\samples')
+  )) {
+    if (Test-Path -LiteralPath $target) {
+      Remove-Item -LiteralPath $target -Recurse -Force
+    }
+  }
+  Get-ChildItem -LiteralPath $SitePackagesDestination -Directory -Filter 'pip-*.dist-info' -Force |
+    Remove-Item -Recurse -Force
+
+  foreach ($scanRoot in @($PythonDestination, $SitePackagesDestination)) {
+    Get-ChildItem -LiteralPath $scanRoot -Recurse -Directory -Force |
+      Where-Object { $_.Name -eq '__pycache__' } |
+      Sort-Object -Property FullName -Descending |
+      Remove-Item -Recurse -Force
+    Get-ChildItem -LiteralPath $scanRoot -Recurse -File -Force |
+      Where-Object { $_.Extension -in @('.pyc', '.pyo') } |
+      Remove-Item -Force
+  }
+  Get-ChildItem -LiteralPath $SitePackagesDestination -Recurse -Directory -Force |
+    Where-Object { $_.Name -in @('test', 'tests') } |
+    Sort-Object -Property FullName -Descending |
+    Remove-Item -Recurse -Force
+
+  $afterBytes = @($PythonDestination, $SitePackagesDestination) |
+    ForEach-Object { Get-ChildItem -LiteralPath $_ -Recurse -File -Force } |
+    Measure-Object -Property Length -Sum
+  $savedMiB = [math]::Round(($beforeBytes.Sum - $afterBytes.Sum) / 1MB, 2)
+  Write-Host "== Removed $savedMiB MiB of Python caches, tests, package-manager and development files"
 }
 
 function Stage-GesturePythonRuntime {
@@ -317,6 +342,7 @@ function Stage-GesturePythonRuntime {
   Write-Host '== Staging gesture Python runtime'
   Copy-DirExcept $pythonHome $pythonDest @((Join-Path $pythonHome 'Lib\site-packages'))
   Copy-Dir $sitePackagesSource $sitePackagesDest
+  Remove-StagedGestureDevelopmentFiles $pythonDest $sitePackagesDest
 
   $stagedPython = Join-Path $pythonDest 'python.exe'
   $previousPythonPath = $Env:PYTHONPATH
@@ -343,6 +369,38 @@ function New-PayloadZip {
     [System.IO.Compression.CompressionLevel]::Optimal,
     $false
   )
+}
+
+function Assert-PluginOnlyPayloadZip {
+  if (!(Test-Path $payloadZip)) { throw "Payload zip was not found: $payloadZip" }
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+  $archive = [System.IO.Compression.ZipFile]::OpenRead($payloadZip)
+  try {
+    $forbidden = @(
+      'node_modules/neteasecloudmusicapi/',
+      'node_modules/@sansenjian/qq-music-api/',
+      'node_modules/kugoumusicapi/',
+      'scripts/start-ncm-api.ps1',
+      'scripts/start-qq-api.ps1',
+      'scripts/start-kugou-api.ps1',
+      'scripts/netease-api-server.cjs',
+      'scripts/kugou-api-server.cjs',
+      'scripts/ensure-music-api-dependencies.ps1'
+    )
+    $entries = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/').ToLowerInvariant() })
+    $blocked = @($entries | Where-Object {
+      $name = $_
+      @($forbidden | Where-Object { $name.Contains($_) }).Count -gt 0
+    })
+    if ($blocked.Count -gt 0) {
+      throw "Payload still contains built-in music API implementations: $($blocked -join ', ')"
+    }
+    if (!$NoNodeBundle -and !($entries -contains 'fe monster/runtime/node/node.exe')) {
+      throw 'Payload is missing runtime/node/node.exe required by imported Node API plugins.'
+    }
+  } finally {
+    $archive.Dispose()
+  }
 }
 
 function New-SetupExe {
@@ -380,7 +438,7 @@ if errorlevel 1 pause
   $publishDir = Join-Path $workRoot 'setup-publish'
   if (Test-Path $publishDir) { Remove-Item -LiteralPath $publishDir -Recurse -Force }
   Write-Host '== Publishing setup stub'
-  & dotnet publish $setupProject -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=false -p:PublishReadyToRun=false -p:DebugType=None -p:DebugSymbols=false -o $publishDir
+  & dotnet publish $setupProject -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:PublishReadyToRun=false -p:DebugType=None -p:DebugSymbols=false -o $publishDir
   if ($LASTEXITCODE -ne 0) { throw "dotnet publish setup failed with exit code $LASTEXITCODE" }
 
   $stub = Join-Path $publishDir 'FE-Monster-Setup.exe'
@@ -407,6 +465,7 @@ if ($ReusePayloadZip) {
   Stage-Payload
   New-PayloadZip
 }
+Assert-PluginOnlyPayloadZip
 New-SetupExe
 
 $size = [math]::Round((Get-Item $installerExe).Length / 1MB, 2)

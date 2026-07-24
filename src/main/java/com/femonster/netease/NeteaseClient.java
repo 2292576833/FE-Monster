@@ -114,6 +114,19 @@ public final class NeteaseClient implements MusicProviderClient {
         return json;
     }
 
+    @Override
+    public void rememberBrowserSession(Map<String, String> cookies) {
+        if (cookies == null || cookies.isEmpty()) return;
+        StringJoiner joined = new StringJoiner("; ");
+        for (Map.Entry<String, String> entry : cookies.entrySet()) {
+            String name = entry.getKey() == null ? "" : entry.getKey().trim();
+            String value = entry.getValue() == null ? "" : entry.getValue().trim();
+            if (!name.isBlank() && !value.isBlank()) joined.add(name + "=" + value);
+        }
+        String nextCookie = joined.toString();
+        if (!nextCookie.isBlank()) rememberCookie(nextCookie);
+    }
+
     public Object jsonGet(String path, Map<String, String> params) {
         return SimpleJson.parse(rawGet(path, params));
     }
@@ -239,6 +252,62 @@ public final class NeteaseClient implements MusicProviderClient {
         body.put("label", label());
         body.put("playlists", playlists);
         return body;
+    }
+
+    @Override
+    public Map<String, Object> recommendedPlaylistsPayload(int limit) {
+        int requestLimit = Math.max(1, Math.min(30, limit));
+        Object root = jsonGet("/recommend/resource", Map.of());
+        List<Playlist> playlists = recommendedPlaylistsFrom(root, "recommend", requestLimit);
+        String source = "daily";
+
+        if (playlists.isEmpty()) {
+            root = jsonGet("/personalized", Map.of("limit", String.valueOf(requestLimit)));
+            playlists = recommendedPlaylistsFrom(root, "result", requestLimit);
+            source = "personalized";
+        }
+
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (Playlist playlist : playlists) {
+            Map<String, Object> item = playlist.toMap();
+            item.put("recommended", true);
+            item.put("recommendationSource", source);
+            items.add(item);
+        }
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("ok", true);
+        body.put("provider", "netease");
+        body.put("label", label());
+        body.put("source", source);
+        body.put("playlists", items);
+        Map<String, Object> rootMap = SimpleJson.asMap(root);
+        if (items.isEmpty() && rootMap.containsKey("error")) body.put("error", rootMap.get("error"));
+        return body;
+    }
+
+    private List<Playlist> recommendedPlaylistsFrom(Object root, String key, int limit) {
+        Map<String, Object> map = SimpleJson.asMap(root);
+        List<Object> values = SimpleJson.asList(map.get(key));
+        if (values.isEmpty()) values = SimpleJson.asList(SimpleJson.asMap(map.get("data")).get(key));
+        List<Playlist> playlists = new ArrayList<>();
+        for (Object value : values) {
+            Map<String, Object> item = SimpleJson.asMap(value);
+            Playlist playlist = new Playlist();
+            playlist.id = idString(item.get("id"));
+            playlist.name = SimpleJson.asString(item.get("name"), "");
+            playlist.cover = firstNonBlank(
+                SimpleJson.asString(item.get("picUrl"), ""),
+                SimpleJson.asString(item.get("coverImgUrl"), "")
+            );
+            playlist.trackCount = SimpleJson.asInt(item.get("trackCount"), 0);
+            playlist.playCount = SimpleJson.asLong(item.get("playCount"), 0);
+            playlist.creator = SimpleJson.asString(SimpleJson.asMap(item.get("creator")).get("nickname"), label());
+            playlist.provider = "netease";
+            if (!playlist.id.isBlank()) playlists.add(playlist);
+            if (playlists.size() >= limit) break;
+        }
+        return playlists;
     }
 
     public List<Playlist> userPlaylists(String uid) {

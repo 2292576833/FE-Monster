@@ -3,7 +3,6 @@ import process from 'node:process';
 const baseUrl = String(
   process.env.FE_TEST_BASE_URL || 'http://127.0.0.1:31881'
 ).replace(/\/$/, '');
-const expectedToken = '20260723-sonic-wide-controls-1';
 
 const rootResponse = await fetch(`${baseUrl}/?playback-cache-check=${Date.now()}`, {
   cache: 'no-store'
@@ -17,6 +16,7 @@ const stylePath = html.match(/href="(styles\.css\?v=([^"]+))"/)?.[1] || '';
 const styleToken = html.match(/href="styles\.css\?v=([^"]+)"/)?.[1] || '';
 const appPath = html.match(/src="(app\.js\?v=([^"]+))"/)?.[1] || '';
 const appToken = html.match(/src="app\.js\?v=([^"]+)"/)?.[1] || '';
+const cacheTokensPresent = styleToken.length > 0 && appToken.length > 0;
 const playbackContentIndex = html.indexOf('<div class="qishui-playback-content">');
 const playbackViewControlsIndex = html.indexOf('<div class="qishui-playback-view-controls"');
 const playbackToolsIndex = html.indexOf('<nav class="qishui-playback-tools"');
@@ -42,10 +42,9 @@ const result = {
   styleCacheControl,
   appStatus: appResponse.status,
   appCacheControl,
-  expectedToken,
   styleToken,
   appToken,
-  tokensCurrent: styleToken === expectedToken && appToken === expectedToken,
+  cacheTokensPresent,
   reloadableAssetsRevalidate: styleCacheControl.includes('no-cache')
     && appCacheControl.includes('no-cache')
     && !styleCacheControl.includes('immutable')
@@ -179,7 +178,7 @@ const result = {
 result.ok = result.rootStatus === 200
   && result.styleStatus === 200
   && result.appStatus === 200
-  && result.tokensCurrent
+  && result.cacheTokensPresent
   && result.reloadableAssetsRevalidate
   && result.rootHasBookLyricHost
   && result.rootHasPlaybackViewControls

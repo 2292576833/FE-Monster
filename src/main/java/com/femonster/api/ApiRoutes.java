@@ -6,6 +6,7 @@ import com.femonster.http.HttpUtil;
 import com.femonster.json.SimpleJson;
 import com.femonster.model.Song;
 import com.femonster.music.MusicProviderRegistry;
+import com.femonster.netease.NeteaseClient;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
@@ -28,8 +29,27 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public final class ApiRoutes {
+    private static final String WALLPAPER_WEB_ENTRY_PREFIX = "/api/wallpapers/web-entry/";
+    private static final String WALLPAPER_WEB_FILE_PREFIX = "/api/wallpapers/web/";
+    private static final String WALLPAPER_WEB_HOST = "wallpaper.localhost";
+    private static final String WALLPAPER_WEB_CSP = String.join(" ",
+        "sandbox allow-scripts allow-same-origin allow-forms allow-pointer-lock;",
+        "default-src 'self' data: blob: https:;",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:;",
+        "style-src 'self' 'unsafe-inline' data: blob: https:;",
+        "img-src 'self' data: blob: https:;",
+        "media-src 'self' data: blob: https:;",
+        "font-src 'self' data: blob: https:;",
+        "connect-src 'self' https: wss:;",
+        "worker-src 'self' data: blob:;",
+        "object-src 'none';",
+        "base-uri 'self';",
+        "form-action 'none';",
+        "frame-ancestors http://127.0.0.1:* http://localhost:* http://[::1]:*;"
+    );
     private final AppContext context;
     private final HttpClient coverClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(4)).build();
+    private final AudioStreamProxy audioStreamProxy = new AudioStreamProxy();
 
     private ApiRoutes(AppContext context) {
         this.context = context;
@@ -41,11 +61,21 @@ public final class ApiRoutes {
     }
 
     private void handle(HttpExchange exchange) throws IOException {
-        if (HttpUtil.handleOptions(exchange)) return;
         try {
             String path = exchange.getRequestURI().getPath();
             String method = exchange.getRequestMethod().toUpperCase();
+            if (isWallpaperWebHost(exchange)
+                && (!"GET".equals(method) || !path.startsWith(WALLPAPER_WEB_FILE_PREFIX))) {
+                HttpUtil.sendJson(exchange, 403, HttpUtil.error("isolated wallpaper origin"));
+                return;
+            }
+            if (HttpUtil.handleOptions(exchange)) return;
             Map<String, String> query = HttpUtil.query(exchange);
+
+            if ("/api/audio/stream".equals(path)) {
+                audioStreamProxy.handle(exchange, query);
+                return;
+            }
 
             if ("GET".equals(method)) {
                 handleGet(exchange, path, query);
@@ -67,6 +97,18 @@ public final class ApiRoutes {
     }
 
     private void handleGet(HttpExchange exchange, String path, Map<String, String> query) throws IOException {
+        if (path.startsWith(WALLPAPER_WEB_ENTRY_PREFIX)) {
+            handleWallpaperWebEntry(exchange, path);
+            return;
+        }
+        if (path.startsWith(WALLPAPER_WEB_FILE_PREFIX)) {
+            if (!isWallpaperWebHost(exchange)) {
+                HttpUtil.sendJson(exchange, 403, HttpUtil.error("web wallpaper resources require isolated origin"));
+                return;
+            }
+            handleWallpaperWebFile(exchange, path);
+            return;
+        }
         switch (path) {
             case "/api/app/version" -> HttpUtil.sendJson(exchange, appVersion());
             case "/api/app/machine" -> HttpUtil.sendJson(exchange, context.machine.payload());
@@ -121,15 +163,19 @@ public final class ApiRoutes {
                 songCommentId(query),
                 HttpUtil.intParam(query, "limit", 20, 1, 80)
             ));
-            case "/api/lyric", "/api/netease/lyric" -> HttpUtil.sendRawJson(exchange, 200, context.netease.rawGet(
+            case "/api/lyric", "/api/netease/lyric" -> HttpUtil.sendRawJson(exchange, 200, requireNetease().rawGet(
                 "/lyric",
                 mapOf("id", HttpUtil.param(query, "id", ""))
             ));
             case "/api/cover" -> handleCover(exchange, query);
             case "/api/login/status" -> HttpUtil.sendJson(exchange, context.music.accountPayload(providerFrom(path, query)));
+            case "/api/netease/login/browser/status", "/api/qq/login/browser/status", "/api/kugou/login/browser/status", "/api/qishui/login/browser/status" -> HttpUtil.sendJson(
+                exchange,
+                context.browserLogin.status(providerFrom(path, query), HttpUtil.param(query, "session", ""))
+            );
             case "/api/login/qr/key", "/api/netease/login/qr/key", "/api/qq/login/qr/key", "/api/kugou/login/qr/key", "/api/qishui/login/qr/key" -> HttpUtil.sendRawJson(exchange, 200, context.music.loginQrKeyPayload(providerFrom(path, query)));
             case "/api/netease/service/status", "/api/qq/service/status", "/api/kugou/service/status", "/api/qishui/service/status" -> HttpUtil.sendJson(exchange, context.music.serviceStatus(providerFrom(path, query)));
-            case "/api/netease/login/status" -> HttpUtil.sendRawJson(exchange, 200, context.netease.rawGet("/login/status"));
+            case "/api/netease/login/status" -> HttpUtil.sendRawJson(exchange, 200, requireNetease().rawGet("/login/status"));
             case "/api/qq/login/status", "/api/kugou/login/status", "/api/qishui/login/status" -> HttpUtil.sendJson(exchange, context.music.accountPayload(providerFrom(path, query)));
             case "/api/netease/login/qr/create", "/api/qq/login/qr/create", "/api/kugou/login/qr/create", "/api/qishui/login/qr/create" -> HttpUtil.sendRawJson(exchange, 200, context.music.loginQrCreatePayload(
                 providerFrom(path, query),
@@ -142,18 +188,22 @@ public final class ApiRoutes {
             ));
             case "/api/netease/user/playlists", "/api/qq/user/playlists", "/api/kugou/user/playlists", "/api/qishui/user/playlists" -> HttpUtil.sendJson(exchange, context.music.userPlaylistsPayload(providerFrom(path, query)));
             case "/api/user/playlists" -> HttpUtil.sendJson(exchange, SimpleJson.asList(context.music.userPlaylistsPayload(providerFrom(path, query)).get("playlists")));
+            case "/api/recommend/playlists" -> HttpUtil.sendJson(exchange, context.music.recommendedPlaylistsPayload(
+                providerFrom(path, query),
+                HttpUtil.intParam(query, "limit", 12, 1, 30)
+            ));
             case "/api/playlist/tracks", "/api/netease/playlist/tracks", "/api/qq/playlist/tracks", "/api/kugou/playlist/tracks", "/api/qishui/playlist/tracks" -> HttpUtil.sendJson(exchange, context.music.playlistTracksPayload(
                 providerFrom(path, query),
                 HttpUtil.param(query, "id", ""),
                 HttpUtil.intParam(query, "limit", 0, 0, Integer.MAX_VALUE)
             ));
-            case "/api/netease/daily/recommend" -> HttpUtil.sendJson(exchange, context.netease.dailyRecommendPayload(
+            case "/api/netease/daily/recommend" -> HttpUtil.sendJson(exchange, requireNetease().dailyRecommendPayload(
                 HttpUtil.intParam(query, "limit", 30, 1, 50)
             ));
-            case "/api/netease/recent/songs" -> HttpUtil.sendJson(exchange, context.netease.recentSongsPayload(
+            case "/api/netease/recent/songs" -> HttpUtil.sendJson(exchange, requireNetease().recentSongsPayload(
                 HttpUtil.intParam(query, "limit", 30, 1, 50)
             ));
-            case "/api/netease/liked/songs" -> HttpUtil.sendJson(exchange, context.netease.likedSongsPayload(
+            case "/api/netease/liked/songs" -> HttpUtil.sendJson(exchange, requireNetease().likedSongsPayload(
                 HttpUtil.intParam(query, "limit", 30, 1, 50)
             ));
             case "/api/player/state" -> HttpUtil.sendJson(exchange, context.player.state());
@@ -197,6 +247,8 @@ public final class ApiRoutes {
     }
 
     private void cleanupBackgroundServices() {
+        String osName = System.getProperty("os.name", "").toLowerCase();
+        if (!osName.contains("win")) return;
         Path script = context.paths.root.resolve("scripts").resolve("stop-stale-fe-monster.ps1");
         if (!Files.isRegularFile(script)) return;
 
@@ -229,12 +281,26 @@ public final class ApiRoutes {
     }
 
     private void handlePost(HttpExchange exchange, String path, Map<String, String> query) throws IOException {
-        if ("/api/music-apis/import".equals(path)) {
-            handleMusicApiImport(exchange, query);
+        if (path.equals("/api/netease/login/browser/start") || path.equals("/api/qq/login/browser/start")
+            || path.equals("/api/kugou/login/browser/start") || path.equals("/api/qishui/login/browser/start")) {
+            requireLocalBrowserLogin(exchange);
+            HttpUtil.sendJson(exchange, context.browserLogin.start(
+                providerFrom(path, query),
+                exchange.getLocalAddress().getPort()
+            ));
             return;
         }
-        if ("/api/qishui/login/phone/send".equals(path) || "/api/qishui/login/phone/verify".equals(path)) {
-            handleQishuiPhoneLogin(exchange, path);
+        if (path.equals("/api/netease/login/browser/cancel") || path.equals("/api/qq/login/browser/cancel")
+            || path.equals("/api/kugou/login/browser/cancel") || path.equals("/api/qishui/login/browser/cancel")) {
+            requireLocalBrowserLogin(exchange);
+            HttpUtil.sendJson(exchange, context.browserLogin.cancel(
+                providerFrom(path, query),
+                HttpUtil.param(query, "session", "")
+            ));
+            return;
+        }
+        if ("/api/music-apis/import".equals(path)) {
+            handleMusicApiImport(exchange, query);
             return;
         }
         if ("/api/wallpapers/import".equals(path)) {
@@ -257,6 +323,10 @@ public final class ApiRoutes {
                 ));
                 HttpUtil.sendJson(exchange, saved);
             }
+            case "/api/wallpapers/activate" -> HttpUtil.sendJson(
+                exchange,
+                context.wallpapers.activate(SimpleJson.asString(root.get("id"), ""))
+            );
             case "/api/sandbox/generate", "/api/sandbox/codex/commit", "/api/sandbox/codex/rework",
                 "/api/sandbox/presets", "/api/sandbox/presets/delete",
                 "/api/sandbox/components", "/api/sandbox/components/delete",
@@ -285,42 +355,6 @@ public final class ApiRoutes {
             ));
             default -> HttpUtil.notFound(exchange);
         }
-    }
-
-    private void handleQishuiPhoneLogin(HttpExchange exchange, String path) throws IOException {
-        String contentType = exchange.getRequestHeaders().getFirst("Content-Type");
-        if (contentType == null || !contentType.toLowerCase().contains("application/json")) {
-            throw new IllegalArgumentException("qishui phone login requires application/json");
-        }
-        byte[] bytes = exchange.getRequestBody().readNBytes(2049);
-        if (bytes.length > 2048) throw new IllegalArgumentException("qishui phone login request is too large");
-        Map<String, Object> body = SimpleJson.parseObject(new String(bytes, StandardCharsets.UTF_8));
-        Object rawPhone = body.get("phone");
-        String phone = rawPhone instanceof String value ? value : "";
-        if (!phone.matches("^1[3-9]\\d{9}$")) {
-            throw new IllegalArgumentException("phone must be an 11-digit mainland China mobile number");
-        }
-        if (path.endsWith("/send")) {
-            Map<String, Object> payload = context.music.loginPhoneSendPayload("qishui", phone);
-            HttpUtil.sendJson(exchange, qishuiPhoneLoginStatus(payload), payload);
-            return;
-        }
-        Object rawCode = body.get("code");
-        String code = rawCode instanceof String value ? value : "";
-        if (!code.matches("^\\d{6}$")) throw new IllegalArgumentException("verification code must be exactly 6 digits");
-        Map<String, Object> payload = context.music.loginPhoneVerifyPayload("qishui", phone, code);
-        HttpUtil.sendJson(exchange, qishuiPhoneLoginStatus(payload), payload);
-    }
-
-    private static int qishuiPhoneLoginStatus(Map<String, Object> payload) {
-        if (SimpleJson.asBoolean(payload.get("ok"), false)) return 200;
-        String code = SimpleJson.asString(payload.get("code"), "");
-        if ("SEND_COOLDOWN".equals(code) || "UPSTREAM_RATE_LIMITED".equals(code)) return 429;
-        if ("CAPTCHA_REQUIRED".equals(code) || "OFFICIAL_CLIENT_REQUIRED".equals(code)
-            || "ADDITIONAL_VERIFICATION_REQUIRED".equals(code) || "VERIFY_REJECTED".equals(code)
-            || "SEND_REJECTED".equals(code)) return 409;
-        if ("INVALID_PHONE".equals(code) || "INVALID_CODE".equals(code)) return 400;
-        return 502;
     }
 
     private void handleMusicApiImport(HttpExchange exchange, Map<String, String> query) throws IOException {
@@ -376,6 +410,29 @@ public final class ApiRoutes {
             }
         } catch (IllegalArgumentException error) {
             throw new IllegalArgumentException("music API import requires a local application origin");
+        }
+    }
+
+    private static void requireLocalBrowserLogin(HttpExchange exchange) {
+        if (!"1".equals(exchange.getRequestHeaders().getFirst("X-FE-Monster-Login"))) {
+            throw new IllegalArgumentException("official browser login must be started by the local application");
+        }
+        var remote = exchange.getRemoteAddress();
+        if (remote == null || remote.getAddress() == null || !remote.getAddress().isLoopbackAddress()) {
+            throw new IllegalArgumentException("official browser login is only available from this device");
+        }
+        String origin = exchange.getRequestHeaders().getFirst("Origin");
+        if (origin == null || origin.isBlank()) return;
+        try {
+            URI uri = URI.create(origin);
+            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase();
+            int originPort = uri.getPort() >= 0 ? uri.getPort() : 80;
+            int servicePort = exchange.getLocalAddress().getPort();
+            if (!("127.0.0.1".equals(host) || "localhost".equals(host) || "::1".equals(host)) || originPort != servicePort) {
+                throw new IllegalArgumentException("official browser login requires a local application origin");
+            }
+        } catch (IllegalArgumentException error) {
+            throw new IllegalArgumentException("official browser login requires a local application origin");
         }
     }
 
@@ -666,10 +723,42 @@ public final class ApiRoutes {
 
     private void handleWallpaperFile(HttpExchange exchange, Map<String, String> query) throws IOException {
         Path file = context.wallpapers.resolveServableFile(HttpUtil.param(query, "path", ""));
+        sendWallpaperFile(exchange, file, false);
+    }
+
+    private void handleWallpaperWebEntry(HttpExchange exchange, String path) throws IOException {
+        WallpaperWebRoute route = parseWallpaperWebRoute(path, WALLPAPER_WEB_ENTRY_PREFIX);
+        context.wallpapers.resolveWebFile(route.projectKey(), route.relativePath());
+
+        String location = "http://" + WALLPAPER_WEB_HOST + ":" + exchange.getLocalAddress().getPort()
+            + WALLPAPER_WEB_FILE_PREFIX + encodePathSegment(route.projectKey())
+            + "/" + encodeRelativePath(route.relativePath());
+        exchange.getResponseHeaders().set("Location", location);
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        exchange.getResponseHeaders().set("Referrer-Policy", "no-referrer");
+        exchange.sendResponseHeaders(302, -1);
+        exchange.close();
+    }
+
+    private void handleWallpaperWebFile(HttpExchange exchange, String path) throws IOException {
+        WallpaperWebRoute route = parseWallpaperWebRoute(path, WALLPAPER_WEB_FILE_PREFIX);
+        Path file = context.wallpapers.resolveWebFile(route.projectKey(), route.relativePath());
+        sendWallpaperFile(exchange, file, true);
+    }
+
+    private void sendWallpaperFile(HttpExchange exchange, Path file, boolean isolatedWebResource) throws IOException {
         long size = Files.size(file);
-        HttpUtil.addCors(exchange);
+        if (isolatedWebResource) {
+            addWallpaperWebSecurityHeaders(exchange);
+        } else {
+            HttpUtil.addCors(exchange);
+        }
         exchange.getResponseHeaders().set("Content-Type", context.wallpapers.contentType(file));
         exchange.getResponseHeaders().set("Accept-Ranges", "bytes");
+        exchange.getResponseHeaders().set(
+            "Cache-Control",
+            isolatedWebResource && isHtml(file) ? "no-cache" : "private, max-age=300"
+        );
 
         String range = exchange.getRequestHeaders().getFirst("Range");
         if (range != null && range.startsWith("bytes=")) {
@@ -696,6 +785,57 @@ public final class ApiRoutes {
         try (var out = exchange.getResponseBody()) {
             Files.copy(file, out);
         }
+    }
+
+    private static WallpaperWebRoute parseWallpaperWebRoute(String path, String prefix) throws IOException {
+        String suffix = path.substring(prefix.length());
+        int slash = suffix.indexOf('/');
+        if (slash <= 0 || slash == suffix.length() - 1) {
+            throw new IOException("invalid web wallpaper route");
+        }
+        String projectKey = suffix.substring(0, slash).trim();
+        String relativePath = suffix.substring(slash + 1);
+        if (!projectKey.matches("[A-Za-z0-9_-]{8,80}") || relativePath.isBlank()) {
+            throw new IOException("invalid web wallpaper route");
+        }
+        return new WallpaperWebRoute(projectKey, relativePath);
+    }
+
+    private static void addWallpaperWebSecurityHeaders(HttpExchange exchange) {
+        exchange.getResponseHeaders().set("Content-Security-Policy", WALLPAPER_WEB_CSP);
+        exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+        exchange.getResponseHeaders().set("Referrer-Policy", "no-referrer");
+        exchange.getResponseHeaders().set("Cross-Origin-Resource-Policy", "same-origin");
+        exchange.getResponseHeaders().set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    }
+
+    private static boolean isWallpaperWebHost(HttpExchange exchange) {
+        String host = exchange.getRequestHeaders().getFirst("Host");
+        if (host == null) return false;
+        String normalized = host.trim().toLowerCase();
+        return normalized.equals(WALLPAPER_WEB_HOST) || normalized.startsWith(WALLPAPER_WEB_HOST + ":");
+    }
+
+    private static boolean isHtml(Path file) {
+        String lower = file.getFileName().toString().toLowerCase();
+        return lower.endsWith(".html") || lower.endsWith(".htm");
+    }
+
+    private static String encodeRelativePath(String value) {
+        StringBuilder encoded = new StringBuilder();
+        for (String segment : value.replace('\\', '/').split("/")) {
+            if (segment.isBlank()) continue;
+            if (!encoded.isEmpty()) encoded.append('/');
+            encoded.append(encodePathSegment(segment));
+        }
+        return encoded.toString();
+    }
+
+    private static String encodePathSegment(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
+    }
+
+    private record WallpaperWebRoute(String projectKey, String relativePath) {
     }
 
     private static long[] parseByteRange(String header, long size) {
@@ -764,10 +904,19 @@ public final class ApiRoutes {
     private static Map<String, Object> appVersion() {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("name", "FE Monster Java");
-        body.put("version", "1.1.5");
+        body.put("version", "1.1.6");
         body.put("runtime", System.getProperty("java.version"));
         body.put("ok", true);
         return body;
+    }
+
+    private NeteaseClient requireNetease() {
+        var config = context.musicApis.provider("netease");
+        NeteaseClient client = context.netease;
+        if (!config.enabled() || !config.configured() || client == null) {
+            throw new IllegalArgumentException("music API plugin is not configured: netease");
+        }
+        return client;
     }
 
     private static Song songFromQuery(Map<String, String> query) {
@@ -853,7 +1002,7 @@ public final class ApiRoutes {
 
     private static Map<String, Object> updatePayload() {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("version", "1.1.5");
+        body.put("version", "1.1.6");
         body.put("downloadUrl", "");
         body.put("releaseNotes", "New translucent playback page, clearer lyrics, independent lyric colors, rhythm mode, and adaptive preset performance.");
         body.put("fileSize", 0);

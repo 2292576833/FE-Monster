@@ -57,22 +57,12 @@ function Test-DependencyCache {
 
   try {
     $cache = Get-Content -Raw -Path $dependencyCacheFile | ConvertFrom-Json
-    if ($cache.version -ne 2) { return $false }
+    if ($cache.version -ne 3) { return $false }
     if (![string]::Equals([string]$cache.machine, [string]$Env:COMPUTERNAME, [StringComparison]::OrdinalIgnoreCase)) { return $false }
     if (![string]::Equals([string]$cache.root, $rootPath, [StringComparison]::OrdinalIgnoreCase)) { return $false }
 
     $validatedAt = [datetime]::Parse([string]$cache.validatedAt)
     if (((Get-Date) - $validatedAt) -gt [timespan]::FromHours(12)) { return $false }
-
-    foreach ($relative in @(
-      'scripts\netease-api-server.cjs',
-      'scripts\kugou-api-server.cjs',
-      'node_modules\NeteaseCloudMusicApi',
-      'node_modules\@sansenjian\qq-music-api\dist\cli.js',
-      'node_modules\kugoumusicapi\app.js'
-    )) {
-      if (!(Test-Path (Join-Path $rootPath $relative))) { return $false }
-    }
 
     if ([string]::IsNullOrWhiteSpace((Find-Exe 'node.exe' @((Join-Path $rootPath 'runtime\node'), (Join-Path $Env:ProgramFiles 'nodejs'), (Join-Path ${Env:ProgramFiles(x86)} 'nodejs'))))) {
       return $false
@@ -91,7 +81,7 @@ function Test-DependencyCache {
 function Save-DependencyCache {
   if (!(Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir | Out-Null }
   [pscustomobject]@{
-    version = 2
+    version = 3
     machine = $Env:COMPUTERNAME
     root = $rootPath
     validatedAt = (Get-Date).ToUniversalTime().ToString('o')
@@ -176,7 +166,7 @@ try {
     exit 1
   }
 
-  Write-Log 'Music APIs will be probed and started in the background after the local client server is ready.'
+  Write-Log 'Only user-imported music API plugins are eligible to start after the local client server is ready.'
 
   if (Get-Command Find-JavaRuntime -ErrorAction SilentlyContinue) {
     $javaExe = Find-JavaRuntime -Root $rootPath -MinimumMajor 26 -PreferWindowless

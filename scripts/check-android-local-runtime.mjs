@@ -15,9 +15,11 @@ function sourceFilesUnder(directory) {
 }
 
 const mainActivity = read("android/app/src/main/java/com/femonster/mobile/MainActivity.java");
+const playbackService = read("android/app/src/main/java/com/femonster/mobile/PlaybackForegroundService.java");
 const buildGradle = read("android/app/build.gradle");
 const mobileRuntime = read("android/app/src/main/androidWeb/fe-monster-mobile-runtime.js");
 const mobileCss = read("android/app/src/main/androidWeb/fe-monster-mobile.css");
+const webApp = read("web/app.js");
 const manifest = read("android/app/src/main/AndroidManifest.xml");
 const buildScript = read("scripts/build-android.ps1");
 const networkSecurityConfigPath = path.join(root, "android/app/src/main/res/xml/network_security_config.xml");
@@ -77,6 +79,21 @@ const checks = {
     "/api/search",
     "/api/sandbox/presets"
   ].every((route) => mobileRuntime.includes(route)),
+  playbackForegroundServiceIsMediaScoped:
+    manifest.includes('android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK')
+    && manifest.includes('android:foregroundServiceType="mediaPlayback"')
+    && playbackService.includes("startForeground(NOTIFICATION_ID")
+    && mobileRuntime.includes("bridge?.setPlaybackActive?.(Boolean(active), title, artist)")
+    && mobileRuntime.includes("audio.addEventListener('play', () => {")
+    && mobileRuntime.includes("audio.addEventListener('pause', () => {")
+    && mobileRuntime.includes("audio.addEventListener('error', stopNow)"),
+  playbackRendererIsRetainedInBackground:
+    mainActivity.includes("if (webView != null && !webPlaybackActive) webView.onPause()")
+    && mainActivity.includes("setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)"),
+  androidClarityUsesDeviceTier:
+    webApp.includes("const mobileDprMax = lowEndAndroid ? 1 : highEndAndroid ? 2 : ANDROID_CLIENT ? 1.5 : 1;")
+    && webApp.includes("return window.feMonsterAndroidPerformanceTier === 'high' ? 100 : 90;")
+    && webApp.includes("antialias: ANDROID_CLIENT && RENDER_PROFILE.tier !== 'economy'"),
   landscapeHasIndependentComposition: mobileCss.includes("data-fe-orientation=\"landscape\"")
     && mobileCss.includes("orientation: landscape")
     && mobileCss.includes("grid-template-columns"),

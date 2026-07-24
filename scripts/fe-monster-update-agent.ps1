@@ -54,7 +54,7 @@ function Get-CommunityUrl {
 }
 
 function Get-InstalledVersion {
-  return '1.1.5'
+  return '1.1.6'
 }
 
 function Invoke-AutoInstall {

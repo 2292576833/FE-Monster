@@ -32,7 +32,9 @@ function Test-FeMonsterProcess {
       $command.Contains('@sansenjian\qq-music-api') -or
       $command.Contains('@sansenjian/qq-music-api') -or
       $command.Contains('qq-music-api\dist\cli.js') -or
-      $command.Contains('qq-music-api/dist/cli.js')
+      $command.Contains('qq-music-api/dist/cli.js') -or
+      $command.Contains('\data\music-api\packages\') -or
+      $command.Contains('/data/music-api/packages/')
     )
   }
 

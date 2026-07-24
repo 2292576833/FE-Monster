@@ -108,14 +108,41 @@ function makeFixture() {
       const url = new URL(call.pathAndQuery, "https://fe-monster.local/");
       const isLoginStatus = url.pathname.endsWith("/login/status") || url.pathname === "/api/login/status";
       const isPhoneVerify = url.pathname === "/api/qishui/login/phone/verify";
+      const isSearch = url.pathname === "/api/search" || url.pathname.endsWith("/search");
+      const isPlayerLoad = url.pathname === "/api/player/load"
+        || url.pathname === "/api/song/url"
+        || url.pathname.endsWith("/song/url");
       const status = gatewayOnline ? 200 : 503;
       const payload = gatewayOnline
-        ? {
-            ok: true,
-            provider: call.provider,
-            loggedIn: isLoginStatus || isPhoneVerify,
-            account: accounts[call.provider]
-          }
+        ? isSearch
+          ? {
+              ok: true,
+              provider: call.provider,
+              songs: [{
+                id: `${call.provider}-search-song`,
+                title: `${call.provider} search song`,
+                artist: "FE Monster",
+                provider: call.provider
+              }]
+            }
+          : isPlayerLoad
+            ? {
+                ok: true,
+                provider: call.provider,
+                playable: true,
+                url: `https://media.example/${call.provider}-search-song.mp3`,
+                song: {
+                  id: `${call.provider}-search-song`,
+                  title: `${call.provider} search song`,
+                  provider: call.provider
+                }
+              }
+            : {
+                ok: true,
+                provider: call.provider,
+                loggedIn: isLoginStatus || isPhoneVerify,
+                account: accounts[call.provider]
+              }
         : {
             ok: false,
             provider: call.provider,
@@ -251,6 +278,30 @@ async function main() {
     qqStatus.payload.account?.id === "qq-account"
       && neteaseAgain.payload.account?.id === "netease-account"
       && qqStatus.payload.account?.id !== neteaseAgain.payload.account?.id);
+
+  const neteaseSearch = await responseJson(fixture.sandbox.fetch(
+    "/api/search?q=%E7%A8%BB%E9%A6%99&limit=8&provider=netease"
+  ));
+  check("neteaseSearchUsesNativeGateway",
+    neteaseSearch.response.status === 200
+      && neteaseSearch.payload.songs?.[0]?.id === "netease-search-song"
+      && fixture.bridgeCalls.some((call) => call.pathAndQuery.includes("/api/search?")
+        && call.provider === "netease"),
+    neteaseSearch.payload);
+
+  const neteasePlayback = await responseJson(fixture.sandbox.fetch(
+    "/api/player/load?id=netease-search-song&provider=netease&quality=standard"
+  ));
+  check("neteaseSearchResultLoadsThroughNativeGateway",
+    neteasePlayback.response.status === 200
+      && neteasePlayback.payload.playable === true
+      && /^https:\/\//.test(neteasePlayback.payload.url || "")
+      && fixture.bridgeCalls.some((call) => call.pathAndQuery.includes("/api/player/load?")
+        && call.provider === "netease"),
+    neteasePlayback.payload);
+
+  check("androidSearchSubmitIsNotBlockedByLocalOnlyHandler",
+    !runtimeSource.includes("本机模式不把搜索发送到电脑端；请从歌单页选择手机中的本地音乐。"));
 
   const credentialSentinels = {
     phone: "13900001234",

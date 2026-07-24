@@ -175,20 +175,33 @@ public final class GenericMusicClient implements MusicProviderClient {
     }
 
     @Override
-    public Map<String, Object> loginPhoneSendPayload(String phone) {
-        if (!"qishui".equals(id)) return MusicProviderClient.super.loginPhoneSendPayload(phone);
-        return phoneLoginPayload(rawJsonPost("/login/phone/send", Map.of("phone", phone == null ? "" : phone)));
-    }
-
-    @Override
-    public Map<String, Object> loginPhoneVerifyPayload(String phone, String code) {
-        if (!"qishui".equals(id)) return MusicProviderClient.super.loginPhoneVerifyPayload(phone, code);
-        Map<String, Object> payload = phoneLoginPayload(rawJsonPost("/login/phone/verify", Map.of(
-            "phone", phone == null ? "" : phone,
-            "code", code == null ? "" : code
-        )));
-        if (SimpleJson.asBoolean(payload.get("ok"), false)) rememberQishuiAccount(payload);
-        return payload;
+    public void rememberBrowserSession(Map<String, String> cookies) {
+        if (cookies == null || cookies.isEmpty()) return;
+        Map<String, String> updates = new LinkedHashMap<>();
+        StringJoiner joined = new StringJoiner("; ");
+        for (Map.Entry<String, String> entry : cookies.entrySet()) {
+            String name = entry.getKey() == null ? "" : entry.getKey().trim();
+            String value = entry.getValue() == null ? "" : entry.getValue().trim();
+            if (name.isBlank() || value.isBlank()) continue;
+            joined.add(name + "=" + value);
+            if (isSessionCookieName(name)) updates.put(name, value);
+        }
+        String cookie = joined.toString();
+        putIfPresent(updates, "cookie", cookie);
+        if ("qq".equals(id)) {
+            putIfPresent(updates, "uin", normalizeQqUin(firstCookieValue(cookies, "uin", "p_uin", "wxuin")));
+        } else if ("kugou".equals(id)) {
+            String kugoo = firstCookieValue(cookies, "KuGoo");
+            putIfPresent(updates, "userid", firstNonBlank(
+                firstCookieValue(cookies, "userid", "KugooID", "kugooid"),
+                nestedCookieValue(kugoo, "KugooID", "userid")
+            ));
+            putIfPresent(updates, "token", firstNonBlank(
+                firstCookieValue(cookies, "token", "KugooToken", "kugootoken", "KugooPwd"),
+                nestedCookieValue(kugoo, "KugooPwd", "token")
+            ));
+        }
+        rememberSession(updates);
     }
 
     @Override
@@ -241,6 +254,10 @@ public final class GenericMusicClient implements MusicProviderClient {
         params.put("songmid", songId);
         params.put("songid", songId);
         params.put("hash", songId);
+        if ("kugou".equals(id) && songId.matches("[0-9]+")) {
+            params.put("album_audio_id", songId);
+            params.put("audio_id", songId);
+        }
         params.put("quality", effectiveQuality);
         params.put("level", effectiveQuality);
         String raw = switch (id) {
@@ -320,6 +337,68 @@ public final class GenericMusicClient implements MusicProviderClient {
     }
 
     @Override
+    public Map<String, Object> recommendedPlaylistsPayload(int limit) {
+        int requestLimit = Math.max(1, Math.min(30, limit));
+        Map<String, String> params = authParams();
+        params.put("page", "1");
+        params.put("pageNo", "1");
+        params.put("limit", String.valueOf(requestLimit));
+        params.put("pageSize", String.valueOf(requestLimit));
+        params.put("pagesize", String.valueOf(requestLimit));
+        String[] candidates = switch (id) {
+            case "qq" -> new String[] {
+                "/getRecommendPlaylist",
+                "/getSongLists",
+                "/recommend/playlist",
+                "/top/playlist"
+            };
+            case "kugou" -> new String[] {
+                "/recommend/playlist",
+                "/top/playlist",
+                "/playlist/recommend"
+            };
+            default -> new String[] {
+                "/recommend/playlist",
+                "/top/playlist",
+                "/playlist"
+            };
+        };
+
+        List<Playlist> playlists = List.of();
+        String source = "plugin";
+        for (String path : candidates) {
+            Object root = SimpleJson.parse(rawGet(path, params));
+            List<Playlist> extracted = extractPlaylists(root);
+            if (extracted.isEmpty()) continue;
+            playlists = extracted;
+            source = path.contains("/top/") ? "top" : "daily";
+            break;
+        }
+
+        if (playlists.isEmpty()) {
+            playlists = extractPlaylists(userPlaylistsPayload());
+            source = "library";
+        }
+
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (Playlist playlist : playlists) {
+            if (items.size() >= requestLimit) break;
+            Map<String, Object> item = playlist.toMap();
+            item.put("recommended", true);
+            item.put("recommendationSource", source);
+            items.add(item);
+        }
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("ok", true);
+        body.put("provider", id);
+        body.put("label", label);
+        body.put("source", source);
+        body.put("playlists", items);
+        return body;
+    }
+
+    @Override
     public Map<String, Object> playlistTracksPayload(String playlistId, int limit) {
         Map<String, String> params = authParams();
         int requestLimit = limit > 0 ? limit : 100000;
@@ -334,21 +413,42 @@ public final class GenericMusicClient implements MusicProviderClient {
         params.put("limit", String.valueOf(requestLimit));
         params.put("pagesize", String.valueOf(requestLimit));
         params.put("pageSize", String.valueOf(requestLimit));
-        String raw = switch (id) {
-            case "qq" -> rawGetAny(params, "/getSongListDetail", "/playlist/detail", "/playlist/tracks");
-            case "kugou" -> rawGetAny(params, "/playlist/track/all", "/playlist/track/all/new", "/playlist/detail", "/playlist/tracks");
-            default -> rawGetAny(
-                params,
-                "/playlist/tracks",
+        Object root;
+        List<Song> songs;
+        if ("kugou".equals(id)) {
+            root = Map.of();
+            songs = List.of();
+            for (String path : new String[] {
                 "/playlist/track/all",
+                "/playlist/track/all/new",
                 "/playlist/detail",
-                "/playlist/song",
-                "/playlist/songs",
-                "/songlist"
-            );
-        };
-        Object root = SimpleJson.parse(raw);
-        Map<String, Object> body = songsPayload(extractSongs(root, limit), "playlist");
+                "/playlist/tracks"
+            }) {
+                Object candidate = SimpleJson.parse(rawGet(path, params));
+                List<Song> extracted = extractSongs(candidate, limit);
+                root = candidate;
+                if (!extracted.isEmpty()) {
+                    songs = extracted;
+                    break;
+                }
+            }
+        } else {
+            String raw = switch (id) {
+                case "qq" -> rawGetAny(params, "/getSongListDetail", "/playlist/detail", "/playlist/tracks");
+                default -> rawGetAny(
+                    params,
+                    "/playlist/tracks",
+                    "/playlist/track/all",
+                    "/playlist/detail",
+                    "/playlist/song",
+                    "/playlist/songs",
+                    "/songlist"
+                );
+            };
+            root = SimpleJson.parse(raw);
+            songs = extractSongs(root, limit);
+        }
+        Map<String, Object> body = songsPayload(songs, "playlist");
         body.put("ok", !SimpleJson.asMap(root).containsKey("error"));
         return body;
     }
@@ -491,7 +591,7 @@ public final class GenericMusicClient implements MusicProviderClient {
     private String rawRequest(String method, String path, Map<String, String> params) {
         try {
             HttpRequest.Builder builder = HttpRequest.newBuilder(buildUri(path, params))
-                .timeout(Duration.ofSeconds(12))
+                .timeout(Duration.ofSeconds("qishui".equals(id) ? 25 : 12))
                 .header("Accept", "application/json, text/plain, */*");
             addQishuiCookieHeader(builder);
             if ("POST".equalsIgnoreCase(method)) {
@@ -511,43 +611,12 @@ public final class GenericMusicClient implements MusicProviderClient {
         }
     }
 
-    private String rawJsonPost(String path, Map<String, String> body) {
-        try {
-            HttpRequest.Builder builder = HttpRequest.newBuilder(buildUri(path, Map.of()))
-                .timeout(Duration.ofSeconds(12))
-                .header("Accept", "application/json")
-                .header("Content-Type", "application/json; charset=utf-8");
-            addQishuiCookieHeader(builder);
-            HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(SimpleJson.stringify(body), StandardCharsets.UTF_8)).build();
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            rememberCookieHeaders(response.headers().allValues("Set-Cookie"));
-            String responseBody = cleanJsonBody(response.body());
-            if (!responseBody.isBlank() && !SimpleJson.asMap(SimpleJson.parse(responseBody)).isEmpty()) return responseBody;
-            return errorPayload(label + " API HTTP " + response.statusCode());
-        } catch (IOException | InterruptedException | IllegalArgumentException e) {
-            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
-            return errorPayload(label + " API unavailable at " + baseUrl + ": " + exceptionDetail(e));
-        }
-    }
-
     private void addQishuiCookieHeader(HttpRequest.Builder builder) {
         if (!"qishui".equals(id)) return;
         synchronized (session) {
             String cookie = sessionCookieStringLocked();
             if (!cookie.isBlank()) builder.header("Cookie", cookie);
         }
-    }
-
-    private Map<String, Object> phoneLoginPayload(String raw) {
-        Map<String, Object> payload = new LinkedHashMap<>(SimpleJson.asMap(SimpleJson.parse(raw)));
-        if (payload.isEmpty()) {
-            payload.put("ok", false);
-            payload.put("code", "INVALID_ADAPTER_RESPONSE");
-            payload.put("error", "汽水音乐本地适配器返回了无效响应");
-        }
-        payload.putIfAbsent("provider", id);
-        payload.putIfAbsent("label", label);
-        return payload;
     }
 
     private Map<String, String> authParams() {
@@ -624,14 +693,6 @@ public final class GenericMusicClient implements MusicProviderClient {
         }
     }
 
-    private void rememberQishuiAccount(Map<String, Object> payload) {
-        Map<String, Object> account = SimpleJson.asMap(payload.get("account"));
-        Map<String, String> updates = new LinkedHashMap<>();
-        putIfPresent(updates, "nickname", SimpleJson.asString(account.get("nickname"), ""));
-        putIfPresent(updates, "avatarUrl", SimpleJson.asString(account.get("avatarUrl"), ""));
-        rememberSession(updates);
-    }
-
     private void rememberQqSession(Object root) {
         Map<String, Object> rootMap = SimpleJson.asMap(root);
         boolean ok = SimpleJson.asBoolean(rootMap.get("isOk"), false)
@@ -693,22 +754,60 @@ public final class GenericMusicClient implements MusicProviderClient {
 
     private boolean isSessionCookieName(String name) {
         if (name == null || name.isBlank()) return false;
+        String lower = name.toLowerCase();
         if ("qq".equals(id)) {
-            return "uin".equals(name) || "skey".equals(name) || "p_skey".equals(name) || "qqmusic_key".equals(name);
+            return "uin".equals(lower) || "p_uin".equals(lower) || "wxuin".equals(lower)
+                || "skey".equals(lower) || "p_skey".equals(lower)
+                || "qqmusic_key".equals(lower) || "qm_keyst".equals(lower);
         }
         if ("kugou".equals(id)) {
-            return "token".equals(name) || "userid".equals(name) || "vip_token".equals(name) || "vip_type".equals(name)
-                || "dfid".equals(name) || name.startsWith("KUGOU_API_") || "t1".equals(name);
+            return "token".equals(lower) || "kugootoken".equals(lower)
+                || "userid".equals(lower) || "kugooid".equals(lower) || "kugoo".equals(lower)
+                || "vip_token".equals(lower) || "vip_type".equals(lower)
+                || "dfid".equals(lower) || lower.startsWith("kugou_api_") || "t1".equals(lower);
         }
         if ("qishui".equals(id)) {
-            return "sessionid".equals(name) || "sessionid_ss".equals(name) || "sid_tt".equals(name) || "sid_guard".equals(name)
-                || "uid_tt".equals(name) || "uid_tt_ss".equals(name)
-                || "passport_auth_status".equals(name) || "passport_auth_status_ss".equals(name)
-                || "passport_csrf_token".equals(name) || "passport_csrf_token_default".equals(name)
-                || "ttwid".equals(name) || "odin_tt".equals(name) || "install_id".equals(name)
-                || "store-idc".equals(name) || "store-country-code".equals(name) || "store-country-sign".equals(name);
+            return "sessionid".equals(lower) || "sessionid_ss".equals(lower) || "sid_tt".equals(lower) || "sid_guard".equals(lower)
+                || "uid_tt".equals(lower) || "uid_tt_ss".equals(lower)
+                || "passport_auth_status".equals(lower) || "passport_auth_status_ss".equals(lower)
+                || "passport_csrf_token".equals(lower) || "passport_csrf_token_default".equals(lower)
+                || "ttwid".equals(lower) || "odin_tt".equals(lower) || "install_id".equals(lower)
+                || "store-idc".equals(lower) || "store-country-code".equals(lower) || "store-country-sign".equals(lower);
         }
         return false;
+    }
+
+    private static String firstCookieValue(Map<String, String> cookies, String... names) {
+        if (cookies == null || names == null) return "";
+        for (String wanted : names) {
+            for (Map.Entry<String, String> entry : cookies.entrySet()) {
+                if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(wanted)) {
+                    String value = entry.getValue();
+                    if (value != null && !value.isBlank()) return value.trim();
+                }
+            }
+        }
+        return "";
+    }
+
+    private static String nestedCookieValue(String raw, String... names) {
+        if (raw == null || raw.isBlank() || names == null) return "";
+        String decoded;
+        try {
+            decoded = URLDecoder.decode(raw, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException ignored) {
+            decoded = raw;
+        }
+        for (String part : decoded.split("[&;]")) {
+            int separator = part.indexOf('=');
+            if (separator <= 0) continue;
+            String key = part.substring(0, separator).trim();
+            String value = part.substring(separator + 1).trim();
+            for (String name : names) {
+                if (key.equalsIgnoreCase(name) && !value.isBlank()) return value;
+            }
+        }
+        return "";
     }
 
     private void rememberSession(Map<String, String> updates) {

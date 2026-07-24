@@ -1,5 +1,5 @@
 param(
-  [string]$InstallDir = (Join-Path $Env:LOCALAPPDATA 'FE Monster'),
+  [string]$InstallDir = $(if (Test-Path -LiteralPath 'D:\') { 'D:\FE Monster' } else { Join-Path $Env:LOCALAPPDATA 'FE Monster' }),
   [switch]$NoLaunch,
   [switch]$NoShortcuts,
   [switch]$SkipSystemNodeInstall,
@@ -13,7 +13,7 @@ $payloadZip = Join-Path $setupRoot 'FE-Monster-Payload.zip'
 $installPath = [System.IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($InstallDir))
 $outDir = Join-Path $installPath 'out'
 $installLog = Join-Path $outDir 'install.log'
-$appVersion = '1.1.5'
+$appVersion = '1.1.6'
 
 function Write-Log {
   param([string]$Message)
@@ -331,12 +331,6 @@ function Assert-RequiredFiles {
     'web\index.html',
     'scripts\launch-fe-monster.ps1',
     'scripts\uninstall-fe-monster.ps1',
-    'scripts\start-ncm-api.ps1',
-    'scripts\start-qq-api.ps1',
-    'scripts\start-kugou-api.ps1',
-    'node_modules\NeteaseCloudMusicApi',
-    'node_modules\@sansenjian\qq-music-api\dist\cli.js',
-    'node_modules\kugoumusicapi\app.js',
     'runtime\python\python.exe',
     'runtime\python-site-packages\cv2',
     'runtime\python-site-packages\mediapipe',
@@ -377,50 +371,6 @@ function Wait-HttpOk {
     Start-Sleep -Milliseconds 500
   } while ((Get-Date) -lt $deadline)
   return $false
-}
-
-function Test-MusicApis {
-  $services = @(
-    @{ Script = 'start-ncm-api.ps1'; Port = 3010; Probe = '/login/status' },
-    @{ Script = 'start-qq-api.ps1'; Port = 3011; Probe = '/getHotkey' },
-    @{ Script = 'start-kugou-api.ps1'; Port = 3012; Probe = '/search/hot' }
-  )
-
-  foreach ($service in $services) {
-    $script = Join-Path $installPath ('scripts\' + $service.Script)
-    Write-Log ("Starting music API {0} on port {1}..." -f $service.Script, $service.Port)
-    $argumentLine = @(
-      '-NoProfile',
-      '-WindowStyle',
-      'Hidden',
-      '-File',
-      (Quote-Arg $script),
-      '-Root',
-      (Quote-Arg $installPath),
-      '-Port',
-      [string]$service.Port
-    ) -join ' '
-    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
-    $startInfo.FileName = 'powershell.exe'
-    $startInfo.Arguments = $argumentLine
-    $startInfo.WorkingDirectory = $installPath
-    $startInfo.UseShellExecute = $false
-    $startInfo.CreateNoWindow = $true
-    $startInfo.RedirectStandardOutput = $false
-    $startInfo.RedirectStandardError = $false
-    $process = [System.Diagnostics.Process]::Start($startInfo)
-    if ($null -eq $process) { throw "Could not start $($service.Script)" }
-    if (!$process.WaitForExit(45000)) {
-      try { $process.Kill() } catch {}
-      throw "Music API startup timed out: $($service.Script)"
-    }
-    if ($process.ExitCode -ne 0) {
-      throw "Music API did not become ready: $($service.Script). See $outDir"
-    }
-
-    $url = 'http://127.0.0.1:{0}{1}' -f $service.Port, $service.Probe
-    if (!(Wait-HttpOk $url 8)) { throw "Music API health check failed: $url" }
-  }
 }
 
 function Get-FreeLocalPort {
@@ -464,14 +414,10 @@ function Test-JavaServer {
   $jar = Join-Path $installPath 'out\fe-monster-java.jar'
   $previous = @{
     FE_MONSTER_PORT = $Env:FE_MONSTER_PORT
-    FE_NETEASE_BASE_URL = $Env:FE_NETEASE_BASE_URL
-    FE_QQ_BASE_URL = $Env:FE_QQ_BASE_URL
-    FE_KUGOU_BASE_URL = $Env:FE_KUGOU_BASE_URL
+    FE_MUSIC_API_AUTOSTART = $Env:FE_MUSIC_API_AUTOSTART
   }
   $Env:FE_MONSTER_PORT = [string]$port
-  $Env:FE_NETEASE_BASE_URL = 'http://127.0.0.1:3010'
-  $Env:FE_QQ_BASE_URL = 'http://127.0.0.1:3011'
-  $Env:FE_KUGOU_BASE_URL = 'http://127.0.0.1:3012'
+  $Env:FE_MUSIC_API_AUTOSTART = '0'
 
   $process = $null
   try {
@@ -500,10 +446,8 @@ try {
   Write-Log 'FE Monster setup started.'
   Copy-Payload
   Write-InstalledComputerId
-  Try-InstallSystemNode
   Invoke-RuntimeCheck
   Assert-RequiredFiles
-  Test-MusicApis
   Test-JavaServer
   if (!$NoRegistration) {
     Register-Uninstaller

@@ -51,20 +51,23 @@ public final class LocalClientLauncher {
 
     public static Map<String, Object> runtimePayload(Map<String, Object> nativeAudio, Map<String, Object> settings) {
         boolean nativeAudioActive = Boolean.TRUE.equals(nativeAudio.get("active"));
+        boolean mac = System.getProperty("os.name", "").toLowerCase().contains("mac");
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("ok", true);
         body.put("clientMode", "embedded");
-        body.put("renderPreset", "directx11");
-        body.put("renderBackend", "chromium-angle-d3d11");
+        body.put("renderPreset", mac ? "metal-webgl" : "directx11");
+        body.put("renderBackend", mac ? "wkwebview-metal-webgl" : "chromium-angle-d3d11");
         body.put("audioBackend", nativeAudioActive ? "xaudio2" : "html-audio-fallback");
-        body.put("audioSpatialBackend", "x3daudio");
-        body.put("audioDecoder", "media-foundation");
+        body.put("audioSpatialBackend", mac ? "web-audio-panner" : "x3daudio");
+        body.put("audioDecoder", mac ? "webkit-media" : "media-foundation");
         body.put("settings", settings);
         body.put("nativeAudio", nativeAudio);
-        body.put("launchFlags", launchFlags(settings));
-        body.put("note", nativeAudioActive
-            ? "DirectX 11 is used through Chromium ANGLE; audio is routed through the native XAudio2/X3DAudio bridge."
-            : "DirectX 11 is used through Chromium ANGLE; build native/windows/fe-monster-xaudio2.dll to enable XAudio2/X3DAudio audio.");
+        body.put("launchFlags", mac ? List.of() : launchFlags(settings));
+        body.put("note", mac
+            ? "WKWebView uses WebKit's Metal-backed compositor and Web Audio fallback."
+            : (nativeAudioActive
+                ? "DirectX 11 is used through Chromium ANGLE; audio is routed through the native XAudio2/X3DAudio bridge."
+                : "DirectX 11 is used through Chromium ANGLE; build native/windows/fe-monster-xaudio2.dll to enable XAudio2/X3DAudio audio."));
         return body;
     }
 

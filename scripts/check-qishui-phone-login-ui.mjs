@@ -49,7 +49,7 @@ if (!address || typeof address === "string") throw new Error("Test server did no
 const baseUrl = `http://127.0.0.1:${address.port}`;
 const debugPort = 17000 + (process.pid % 12000);
 const profile = path.resolve(tmpdir(), `fe-monster-qishui-login-${process.pid}`);
-const screenshotPath = path.resolve("artifacts", "qishui-guest-login.png");
+const screenshotPath = path.resolve("artifacts", "qishui-qr-only-login.png");
 const playbackScreenshotPath = path.resolve("artifacts", "qishui-playback-card.png");
 const playbackExpandedScreenshotPath = path.resolve("artifacts", "qishui-playback-card-expanded.png");
 const playbackPresetScreenshotPath = path.resolve("artifacts", "unified-playback-preset-panel.png");
@@ -123,64 +123,31 @@ try {
         headers: { 'content-type': 'application/json; charset=utf-8' }
       });
       window.__qishuiRequests = [];
-      window.__qishuiLoggedIn = false;
       window.fetch = async (input, init = {}) => {
         const requestUrl = new URL(typeof input === 'string' ? input : input.url, location.href);
         const pathname = requestUrl.pathname;
-        if (pathname === '/api/qishui/login/phone/send') {
-          const body = JSON.parse(String(init.body || '{}'));
-          window.__qishuiRequests.push({ route: 'send', method: String(init.method || 'GET'), body });
-          if (body.phone === '13600000005') {
-            return jsonResponse({
-              ok: false,
-              sent: false,
-              code: 'SEND_UNCONFIRMED',
-              error: 'unconfirmed send'
-            });
-          }
-          if (body.phone === '13700000006') {
-            return jsonResponse({
-              ok: false,
-              sent: false,
-              code: 'UPSTREAM_RATE_LIMITED',
-              error: 'rate limited',
-              retryAfterSeconds: 90
-            }, 429);
-          }
+        if (pathname === '/api/qishui/login/qr/key') {
+          window.__qishuiRequests.push({ route: 'qr-key', method: String(init.method || 'GET') });
+          return jsonResponse({ code: 200, data: { unikey: 'qishui-qr-only-test' } });
+        }
+        if (pathname === '/api/qishui/login/qr/create') {
+          window.__qishuiRequests.push({ route: 'qr-create', method: String(init.method || 'GET') });
           return jsonResponse({
-            ok: true,
-            provider: 'qishui',
-            sent: true,
-            cooldownSeconds: 75,
-            message: '验证码已发送'
+            code: 200,
+            data: {
+              qrimg: 'data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22160%22 height=%22160%22%3E%3Crect width=%22160%22 height=%22160%22 fill=%22white%22/%3E%3Cpath d=%22M16 16h48v48H16zM96 16h48v48H96zM16 96h48v48H16zM80 80h16v16H80zM112 96h32v48h-32z%22 fill=%22black%22/%3E%3C/svg%3E'
+            }
           });
         }
-        if (pathname === '/api/qishui/login/phone/verify') {
-          const body = JSON.parse(String(init.body || '{}'));
-          window.__qishuiRequests.push({ route: 'verify', method: String(init.method || 'GET'), body });
-          if (body.code === '654321') {
-            return jsonResponse({
-              ok: false,
-              code: 'INVALID_CODE',
-              error: '验证码无效或已过期'
-            }, 409);
-          }
-          window.__qishuiLoggedIn = true;
-          return jsonResponse({
-            ok: true,
-            provider: 'qishui',
-            loggedIn: true,
-            message: '登录成功',
-            account: { id: 'qishui-ui-qa', nickname: '汽水测试账号' }
-          });
+        if (pathname === '/api/qishui/login/qr/check') {
+          window.__qishuiRequests.push({ route: 'qr-check', method: String(init.method || 'GET') });
+          return jsonResponse({ code: 801, message: '等待扫码' });
         }
         if (pathname === '/api/login/status' && requestUrl.searchParams.get('provider') === 'qishui') {
           return jsonResponse({
             provider: 'qishui',
-            loggedIn: window.__qishuiLoggedIn,
-            account: window.__qishuiLoggedIn
-              ? { id: 'qishui-ui-qa', nickname: '汽水测试账号' }
-              : null
+            loggedIn: false,
+            account: null
           });
         }
         if (pathname === '/api/music-apis') {
@@ -193,7 +160,7 @@ try {
               baseUrl: 'http://127.0.0.1:3013',
               enabled: true,
               configured: true,
-              loginQr: false,
+              loginQr: true,
               status: 'ready'
             }]
           });
@@ -208,7 +175,7 @@ try {
       };
     })();`,
   });
-  await command("Page.navigate", { url: `${baseUrl}/?qa=qishui-phone-login` });
+  await command("Page.navigate", { url: `${baseUrl}/?qa=qishui-qr-only-login` });
   await delay(2200);
 
   const evaluation = await command("Runtime.evaluate", {
@@ -226,110 +193,28 @@ try {
 
       await waitFor(() => document.readyState === 'complete' && typeof showLoginDialog === 'function', 'client scripts');
       await refreshMusicApiProviders({ silent: true });
-      showLoginDialog();
+      await showLoginDialog();
       const qishuiTab = document.querySelector('[data-login-provider="qishui"]');
       if (!qishuiTab) throw new Error('Qishui provider tab is missing');
       qishuiTab.click();
-      const phoneInput = document.querySelector('#qishuiPhoneInput');
-      const codeInput = document.querySelector('#qishuiCodeInput');
-      const sendButton = document.querySelector('#qishuiSendCodeButton');
-      const guestButton = document.querySelector('#qishuiGuestButton');
-      const form = document.querySelector('#qishuiPhoneLogin');
-      const status = document.querySelector('#qishuiPhoneStatus');
-      if (!phoneInput || !codeInput || !sendButton || !guestButton || !form || !status) {
-        throw new Error('Qishui phone login controls are incomplete');
-      }
-      await waitFor(() => !form.hidden && state.activeProvider === 'qishui', 'Qishui phone form');
-
-      const requestsBeforeGuest = window.__qishuiRequests.length;
-      guestButton.click();
-      await waitFor(() => document.querySelector('#neteaseLoginDialog')?.hidden === true, 'guest dialog close');
-      await new Promise((resolve) => setTimeout(resolve, 240));
-      const guestModeEntered = state.qishuiGuestMode === true
-        && state.activeProvider === 'qishui'
-        && state.loginLoggedIn === false
-        && document.querySelector('#neteaseLoginLabel')?.textContent.includes('访客');
-      const guestKeptAccountFeaturesOff = document.querySelector('#loginVipBadge')?.hidden !== false
-        && document.querySelector('#neteaseLoginButton')?.classList.contains('is-logged-in') === false
-        && state.playlistsLoggedIn === false
-        && state.userPlaylists.length === 0;
-      const guestSkippedPhoneAuth = window.__qishuiRequests.length === requestsBeforeGuest;
-      const guestUsesStandardQuality = JSON.stringify(playbackQualityOptions('qishui').map((option) => option.id))
-        === JSON.stringify(['standard']);
-
-      showLoginDialog();
-      qishuiTab.click();
-      await waitFor(() => !form.hidden && state.activeProvider === 'qishui', 'Qishui phone form after guest');
-
-      phoneInput.value = '123';
-      phoneInput.dispatchEvent(new Event('input', { bubbles: true }));
-      sendButton.click();
-      await waitFor(() => status.textContent.includes('有效'), 'invalid phone validation');
-      const invalidPhoneBlocked = window.__qishuiRequests.length === 0;
-
-      phoneInput.value = '13600000005';
-      phoneInput.dispatchEvent(new Event('input', { bubbles: true }));
-      sendButton.click();
-      await waitFor(() => window.__qishuiRequests.some((request) => request.route === 'send' && request.body.phone === '13600000005'), 'unconfirmed send request');
-      await waitFor(() => !state.qishuiPhoneSending && status.textContent.includes('unconfirmed send'), 'unconfirmed send rejection');
-      const unconfirmedSendBlocked = !sendButton.disabled && state.qishuiPhoneCooldownUntil <= Date.now();
-
-      phoneInput.value = '13700000006';
-      phoneInput.dispatchEvent(new Event('input', { bubbles: true }));
-      sendButton.click();
+      await waitFor(() => state.activeProvider === 'qishui', 'Qishui provider activation');
       await waitFor(
-        () => window.__qishuiRequests.filter((request) => request.route === 'send' && request.body.phone === '13700000006').length === 1,
-        'rate-limited send request'
+        () => document.querySelector('#neteaseQrImage')?.getAttribute('src')?.startsWith('data:image/'),
+        'Qishui QR image'
       );
-      await waitFor(() => !state.qishuiPhoneSending && sendButton.disabled, 'rate-limit cooldown');
-      const rateLimitCooldownLabel = sendButton.textContent.trim();
-      sendButton.click();
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      const rateLimitRequestCount = window.__qishuiRequests.filter(
-        (request) => request.route === 'send' && request.body.phone === '13700000006'
-      ).length;
-      closeLoginDialog();
-      showLoginDialog();
-      qishuiTab.click();
-      await waitFor(() => !form.hidden && sendButton.disabled, 'preserved rate-limit cooldown');
-      const rateLimitCooldownPreserved = state.qishuiPhoneCooldownUntil > Date.now();
-      clearQishuiPhoneCooldownTimer();
-      state.qishuiPhoneCooldownUntil = 0;
-      syncQishuiPhoneControls();
-
-      phoneInput.value = '13800138000';
-      phoneInput.dispatchEvent(new Event('input', { bubbles: true }));
-      sendButton.click();
-      await waitFor(() => window.__qishuiRequests.some((request) => request.route === 'send'), 'send request');
-      await waitFor(() => sendButton.disabled, 'cooldown state');
-      await waitFor(() => !state.qishuiPhoneSending && status.textContent.includes('验证码已发送'), 'send completion');
-
-      const sendRequest = window.__qishuiRequests.find((request) => request.route === 'send' && request.body.phone === '13800138000');
-      const cooldownLabel = sendButton.textContent.trim();
-      const sendStatus = status.textContent.trim();
-
-      codeInput.value = '12345';
-      codeInput.dispatchEvent(new Event('input', { bubbles: true }));
-      form.requestSubmit();
-      await waitFor(() => status.textContent.includes('6 位'), 'invalid code validation');
-      const invalidCodeBlocked = !window.__qishuiRequests.some((request) => request.route === 'verify');
-
-      codeInput.value = '654321';
-      codeInput.dispatchEvent(new Event('input', { bubbles: true }));
-      form.requestSubmit();
-      await waitFor(() => window.__qishuiRequests.filter((request) => request.route === 'verify').length === 1, 'rejected verify request');
-      await waitFor(() => !state.qishuiPhoneVerifying && status.textContent.includes('验证码无效或已过期'), 'verify error');
-      const verifyErrorSurfaced = status.textContent.includes('验证码无效或已过期');
-
-      codeInput.value = '123456';
-      codeInput.dispatchEvent(new Event('input', { bubbles: true }));
-      form.requestSubmit();
-      await waitFor(() => window.__qishuiRequests.filter((request) => request.route === 'verify').length === 2, 'successful verify request');
-      await waitFor(() => window.__qishuiLoggedIn, 'logged-in state');
-      await waitFor(() => status.textContent.includes('登录成功'), 'verify completion');
-      await waitFor(() => state.qishuiGuestMode === false, 'guest mode exit after login');
-
-      const verifyRequest = window.__qishuiRequests.find((request) => request.route === 'verify' && request.body.code === '123456');
+      const providerTabs = Array.from(document.querySelectorAll('[data-login-provider]'));
+      const providerTabAutoDetected = providerTabs.length === 1
+        && providerTabs[0].dataset.loginProvider === 'qishui'
+        && providerTabs[0].textContent.trim() === '汽水音乐';
+      const qrStage = document.querySelector('#qrLoginStage');
+      const qrOnlyVisible = qrStage && !qrStage.hidden
+        && document.querySelector('#qishuiPhoneLogin') === null
+        && document.querySelector('#qishuiPhoneInput') === null
+        && document.querySelector('#qishuiGuestButton') === null;
+      const qrRequestsComplete = window.__qishuiRequests.some((request) => request.route === 'qr-key')
+        && window.__qishuiRequests.some((request) => request.route === 'qr-create');
+      const phoneRequestsAbsent = window.__qishuiRequests.every((request) => !String(request.route).includes('phone'));
+      const qrStatus = document.querySelector('#neteaseQrStatus')?.textContent.trim() || '';
       closeLoginDialog();
       const boot = document.querySelector('#bootScreen');
       if (boot) boot.hidden = true;
@@ -1284,26 +1169,11 @@ try {
         && !document.querySelector('#rhythmGameScene')?.hidden;
       window.FeRhythmGame?.close();
       const result = {
-        providerTabConfigured: !qishuiTab.classList.contains('is-unconfigured'),
-        guestModeEntered,
-        guestKeptAccountFeaturesOff,
-        guestSkippedPhoneAuth,
-        guestUsesStandardQuality,
-        invalidPhoneBlocked,
-        unconfirmedSendBlocked,
-        rateLimitRequestCount,
-        rateLimitCooldownLabel,
-        rateLimitCooldownPreserved,
-        invalidCodeBlocked,
-        verifyErrorSurfaced,
-        sendMethod: sendRequest?.method || '',
-        sendBody: sendRequest?.body || null,
-        cooldownLabel,
-        sendStatus,
-        verifyMethod: verifyRequest?.method || '',
-        verifyBody: verifyRequest?.body || null,
-        verifyStatus: status.textContent.trim(),
-        codeCleared: codeInput.value === '',
+        providerTabAutoDetected,
+        qrOnlyVisible,
+        qrRequestsComplete,
+        phoneRequestsAbsent,
+        qrStatus,
         playbackCardVisible,
         playbackCardContent,
         playbackViewControlsIntegrated,
@@ -1385,26 +1255,11 @@ try {
         playbackRhythmTool,
         playbackComputedStyle,
       };
-      result.ok = result.providerTabConfigured
-        && result.guestModeEntered
-        && result.guestKeptAccountFeaturesOff
-        && result.guestSkippedPhoneAuth
-        && result.guestUsesStandardQuality
-        && result.invalidPhoneBlocked
-        && result.unconfirmedSendBlocked
-        && result.rateLimitRequestCount === 1
-        && result.rateLimitCooldownLabel.includes('90')
-        && result.rateLimitCooldownPreserved
-        && result.invalidCodeBlocked
-        && result.verifyErrorSurfaced
-        && result.sendMethod === 'POST'
-        && JSON.stringify(result.sendBody) === JSON.stringify({ phone: '13800138000' })
-        && result.cooldownLabel.includes('75')
-        && result.sendStatus.includes('验证码已发送')
-        && result.verifyMethod === 'POST'
-        && JSON.stringify(result.verifyBody) === JSON.stringify({ phone: '13800138000', code: '123456' })
-        && result.verifyStatus.includes('登录成功')
-        && result.codeCleared
+      result.ok = result.providerTabAutoDetected
+        && result.qrOnlyVisible
+        && result.qrRequestsComplete
+        && result.phoneRequestsAbsent
+        && result.qrStatus.length > 0
         && result.playbackCardVisible
         && result.playbackCardContent
         && result.playbackViewControlsIntegrated
@@ -2044,8 +1899,6 @@ try {
     expression: `(() => {
       if (state.diyOpen) setDiyOpen(false);
       setPlaybackPlaylistPickerOpen(false);
-      window.__qishuiLoggedIn = false;
-      state.qishuiGuestMode = false;
       renderLoginStatus({ provider: 'qishui', loggedIn: false, account: null });
       const boot = document.querySelector('#bootScreen');
       if (boot) boot.hidden = true;
@@ -2073,11 +1926,15 @@ try {
   await delay(300);
   const tempRoot = path.resolve(tmpdir()) + path.sep;
   if (profile.startsWith(tempRoot) && existsSync(profile)) {
-    rmSync(profile, {
-      recursive: true,
-      force: true,
-      maxRetries: 6,
-      retryDelay: 200,
-    });
+    try {
+      rmSync(profile, {
+        recursive: true,
+        force: true,
+        maxRetries: 20,
+        retryDelay: 250,
+      });
+    } catch (error) {
+      process.stderr.write(`Qishui login profile cleanup deferred: ${error.code || error.message}\n`);
+    }
   }
 }

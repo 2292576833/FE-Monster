@@ -57,6 +57,7 @@ public final class MusicApiConfigService implements AutoCloseable {
     private final Path configFile;
     private final Path packagesDir;
     private final Path stagingDir;
+    private final Path logsDir;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(1)).build();
     private final ExecutorService starter = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "fe-music-api-starter");
@@ -75,8 +76,10 @@ public final class MusicApiConfigService implements AutoCloseable {
         this.configFile = apiDir.resolve("providers.json");
         this.packagesDir = apiDir.resolve("packages");
         this.stagingDir = apiDir.resolve("staging");
+        this.logsDir = apiDir.resolve("logs");
         Files.createDirectories(packagesDir);
         Files.createDirectories(stagingDir);
+        Files.createDirectories(logsDir);
         load();
     }
 
@@ -221,6 +224,15 @@ public final class MusicApiConfigService implements AutoCloseable {
 
     public Map<String, Object> refreshStatus(String provider) {
         ProviderConfig config = provider(provider);
+        if (!config.enabled() || !config.configured()) {
+            statuses.put(config.id(), "not-configured");
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("ok", true);
+            body.put("provider", config.id());
+            body.put("reachable", false);
+            body.put("status", "not-configured");
+            return body;
+        }
         boolean reachable = isReachable(config);
         statuses.put(config.id(), reachable ? "ready" : statuses.getOrDefault(config.id(), "unavailable"));
         Map<String, Object> body = new LinkedHashMap<>();
@@ -260,12 +272,13 @@ public final class MusicApiConfigService implements AutoCloseable {
                     String id = normalizeSupportedId(SimpleJson.asString(item.get("id"), ""));
                     ProviderConfig fallback = next.get(id);
                     String source = SimpleJson.asString(item.get("source"), fallback.source());
-                    Launcher launcher = "builtin".equals(source) ? fallback.launcher() : parseStoredLauncher(item);
+                    if (!Set.of("imported-json", "imported-zip").contains(source)) continue;
+                    Launcher launcher = "imported-zip".equals(source) ? parseStoredLauncher(item) : null;
                     ProviderConfig parsed = parseProvider(
                         item,
                         fallback,
                         source,
-                        SimpleJson.asString(item.get("package"), ""),
+                        "imported-zip".equals(source) ? SimpleJson.asString(item.get("package"), "") : "",
                         launcher,
                         SimpleJson.asBoolean(item.get("configured"), fallback.configured()),
                         true
@@ -322,8 +335,9 @@ public final class MusicApiConfigService implements AutoCloseable {
             }
             statuses.put(config.id(), "starting");
             ProcessBuilder builder = processBuilder(config);
-            builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
-            builder.redirectError(ProcessBuilder.Redirect.DISCARD);
+            Path logFile = logsDir.resolve(config.id() + ".log");
+            builder.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
+            builder.redirectError(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
             process = builder.start();
             if (closed || !isCurrent(config)) {
                 destroyProcessTree(process);
@@ -484,10 +498,6 @@ public final class MusicApiConfigService implements AutoCloseable {
         boolean enabled = SimpleJson.asBoolean(map.get("enabled"), fallback.enabled());
         boolean autostart = SimpleJson.asBoolean(map.get("autostart"), launcher != null && fallback.autostart());
         boolean loginQr = SimpleJson.asBoolean(map.get("loginQr"), fallback.loginQr());
-        if ("netease".equals(id)) {
-            enabled = true;
-            configured = true;
-        }
         String safePackage = normalizePackageDirectory(packageDirectory);
         Launcher safeLauncher = allowStoredLauncher ? launcher : null;
         return new ProviderConfig(id, label, appName, baseUrl, healthPath, enabled, configured, autostart, loginQr, source, safePackage, safeLauncher);
@@ -495,16 +505,15 @@ public final class MusicApiConfigService implements AutoCloseable {
 
     private Map<String, ProviderConfig> defaults() {
         LinkedHashMap<String, ProviderConfig> map = new LinkedHashMap<>();
-        map.put("netease", builtin("netease", "网易云", "网易云音乐 App", "http://127.0.0.1:3010", "/login/status", "scripts/netease-api-server.cjs", List.of()));
-        map.put("qq", builtin("qq", "QQ音乐", "QQ音乐 App", "http://127.0.0.1:3011", "/getHotkey", "node_modules/@sansenjian/qq-music-api/dist/cli.js", List.of("serve", "--port", "${port}", "--json")));
-        map.put("kugou", builtin("kugou", "酷狗音乐", "酷狗音乐 App", "http://127.0.0.1:3012", "/search/hot", "scripts/kugou-api-server.cjs", List.of("--port=${port}")));
-        map.put("qishui", new ProviderConfig("qishui", "汽水音乐", "汽水音乐 App", "http://127.0.0.1:3013", "/health", true, false, false, false, "builtin-slot", "", null));
+        map.put("netease", pluginSlot("netease", "网易云", "网易云音乐 App", "http://127.0.0.1:3010", "/login/status", true));
+        map.put("qq", pluginSlot("qq", "QQ音乐", "QQ音乐 App", "http://127.0.0.1:3011", "/getHotkey", true));
+        map.put("kugou", pluginSlot("kugou", "酷狗音乐", "酷狗音乐 App", "http://127.0.0.1:3012", "/search/hot", true));
+        map.put("qishui", pluginSlot("qishui", "汽水音乐", "汽水音乐 App", "http://127.0.0.1:3013", "/health", false));
         return map;
     }
 
-    private ProviderConfig builtin(String id, String label, String appName, String baseUrl, String healthPath, String entry, List<String> args) {
-        Launcher launcher = new Launcher("node", entry, args);
-        return new ProviderConfig(id, label, appName, baseUrl, healthPath, true, true, true, true, "builtin", "", launcher);
+    private ProviderConfig pluginSlot(String id, String label, String appName, String baseUrl, String healthPath, boolean loginQr) {
+        return new ProviderConfig(id, label, appName, baseUrl, healthPath, true, false, false, loginQr, "plugin-slot", "", null);
     }
 
     private List<Path> extractZip(InputStream input, Path staging) throws IOException {
@@ -598,6 +607,7 @@ public final class MusicApiConfigService implements AutoCloseable {
         return argument
             .replace("${port}", String.valueOf(URI.create(config.baseUrl()).getPort()))
             .replace("${root}", paths.root.toString())
+            .replace("${data}", paths.dataDir.toString())
             .replace("${package}", working.toString());
     }
 
@@ -609,13 +619,24 @@ public final class MusicApiConfigService implements AutoCloseable {
 
     private String nodeExecutable() {
         List<Path> candidates = new ArrayList<>();
-        candidates.add(paths.root.resolve("runtime").resolve("node").resolve("node.exe"));
-        String programFiles = System.getenv().getOrDefault("ProgramFiles", "");
-        String programFilesX86 = System.getenv().getOrDefault("ProgramFiles(x86)", "");
-        if (!programFiles.isBlank()) candidates.add(Path.of(programFiles, "nodejs", "node.exe"));
-        if (!programFilesX86.isBlank()) candidates.add(Path.of(programFilesX86, "nodejs", "node.exe"));
+        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        String executable = windows ? "node.exe" : "node";
+        String override = System.getenv("FE_MONSTER_NODE");
+        if (override != null && !override.isBlank()) candidates.add(Path.of(override.trim()));
+        candidates.add(paths.root.resolve("runtime").resolve("node").resolve(executable));
+        candidates.add(paths.root.resolve("runtime").resolve("node").resolve("bin").resolve(executable));
+        if (windows) {
+            String programFiles = System.getenv().getOrDefault("ProgramFiles", "");
+            String programFilesX86 = System.getenv().getOrDefault("ProgramFiles(x86)", "");
+            if (!programFiles.isBlank()) candidates.add(Path.of(programFiles, "nodejs", executable));
+            if (!programFilesX86.isBlank()) candidates.add(Path.of(programFilesX86, "nodejs", executable));
+        } else {
+            candidates.add(Path.of("/opt/homebrew/bin/node"));
+            candidates.add(Path.of("/usr/local/bin/node"));
+            candidates.add(Path.of("/usr/bin/node"));
+        }
         for (Path candidate : candidates) if (Files.isRegularFile(candidate)) return candidate.toString();
-        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win") ? "node.exe" : "node";
+        return executable;
     }
 
     private static void destroyProcessTree(Process process) {

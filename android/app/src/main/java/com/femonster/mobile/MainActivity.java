@@ -169,6 +169,8 @@ public final class MainActivity extends Activity {
     private PermissionRequest pendingPermissionRequest;
     private PendingHttpDownload pendingHttpDownload;
     private boolean backDispatchPending;
+    private boolean activityResumed;
+    private volatile boolean webPlaybackActive;
     private View customView;
     private WebChromeClient.CustomViewCallback customViewCallback;
 
@@ -200,6 +202,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        activityResumed = true;
         if (webView != null) webView.onResume();
         applyImmersiveMode();
     }
@@ -212,7 +215,8 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
-        if (webView != null) webView.onPause();
+        activityResumed = false;
+        if (webView != null && !webPlaybackActive) webView.onPause();
         super.onPause();
     }
 
@@ -224,6 +228,8 @@ public final class MainActivity extends Activity {
         }
         for (String id : new ArrayList<>(blobDownloads.keySet())) cancelBlobDownload(id);
         musicGatewayRequests.shutdownNow();
+        webPlaybackActive = false;
+        stopService(new Intent(this, PlaybackForegroundService.class));
         if (webView != null) {
             webView.stopLoading();
             webView.removeJavascriptInterface("FeMonsterAndroid");
@@ -336,7 +342,7 @@ public final class MainActivity extends Activity {
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG);
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            webView.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, true);
+            webView.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
         }
         webView.setBackgroundColor(Color.rgb(5, 5, 9));
         webView.addJavascriptInterface(new AndroidBridge(), "FeMonsterAndroid");
@@ -572,6 +578,8 @@ public final class MainActivity extends Activity {
 
         @Override
         public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+            webPlaybackActive = false;
+            stopService(new Intent(MainActivity.this, PlaybackForegroundService.class));
             if (customView != null) hideCustomView();
             if (root != null && view != null) root.removeView(view);
             if (view != null) {
@@ -850,16 +858,37 @@ public final class MainActivity extends Activity {
         int query = path.indexOf('?');
         String pathname = query >= 0 ? path.substring(0, query) : path;
         if ("/api/providers".equals(pathname) || "/api/music-apis".equals(pathname)) return query < 0;
-        if ("/api/login/status".equals(pathname)) {
-            return path.matches("^/api/login/status\\?provider=(netease|qq|kugou|qishui)$");
+        if (
+            "/api/login/status".equals(pathname)
+                || "/api/search".equals(pathname)
+                || "/api/player/load".equals(pathname)
+                || "/api/song/url".equals(pathname)
+                || "/api/lyric".equals(pathname)
+                || "/api/user/playlists".equals(pathname)
+                || "/api/playlist/tracks".equals(pathname)
+        ) {
+            return providerFromMusicPath(path).matches("netease|qq|kugou|qishui");
         }
-        return pathname.matches("^/api/(netease|qq|kugou|qishui)/(login/(qr/(key|create|check)|status|phone/(send|verify))|user/playlists)$");
+        return pathname.matches(
+            "^/api/(netease|qq|kugou|qishui)/(login/(qr/(key|create|check)|status|phone/(send|verify))|user/playlists|playlist/tracks|search|song/url|lyric)$"
+        );
     }
 
     private String providerFromMusicPath(String path) {
-        if (path.startsWith("/api/login/status?")) {
-            java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("(?:^|[?&])provider=(netease|qq|kugou|qishui)(?:&|$)").matcher(path);
-            return matcher.find() ? matcher.group(1) : "gateway";
+        int query = path.indexOf('?');
+        String pathname = query >= 0 ? path.substring(0, query) : path;
+        if (
+            "/api/login/status".equals(pathname)
+                || "/api/search".equals(pathname)
+                || "/api/player/load".equals(pathname)
+                || "/api/song/url".equals(pathname)
+                || "/api/lyric".equals(pathname)
+                || "/api/user/playlists".equals(pathname)
+                || "/api/playlist/tracks".equals(pathname)
+        ) {
+            Uri uri = Uri.parse(LOCAL_APP_ORIGIN + (path.startsWith("/") ? path.substring(1) : path));
+            String provider = uri.getQueryParameter("provider");
+            return provider == null || provider.isBlank() ? "netease" : provider.toLowerCase(Locale.ROOT);
         }
         String prefix = "/api/";
         if (!path.startsWith(prefix)) return "gateway";
@@ -1230,6 +1259,38 @@ public final class MainActivity extends Activity {
         @JavascriptInterface
         public String getMusicGatewayState() {
             return musicGatewayState;
+        }
+
+        @JavascriptInterface
+        public void setPlaybackActive(boolean active, String title, String artist) {
+            runOnUiThread(() -> {
+                boolean wasActive = webPlaybackActive;
+                webPlaybackActive = active;
+                if (active) {
+                    Intent intent = PlaybackForegroundService.playbackIntent(
+                        MainActivity.this,
+                        title,
+                        artist
+                    );
+                    try {
+                        if (wasActive) {
+                            startService(intent);
+                        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            startForegroundService(intent);
+                        } else {
+                            startService(intent);
+                        }
+                    } catch (RuntimeException error) {
+                        webPlaybackActive = false;
+                        stopService(new Intent(MainActivity.this, PlaybackForegroundService.class));
+                        if (!activityResumed && webView != null) webView.onPause();
+                        android.util.Log.e("FE-PLAYBACK", "Unable to start playback service", error);
+                    }
+                } else {
+                    stopService(new Intent(MainActivity.this, PlaybackForegroundService.class));
+                    if (!activityResumed && webView != null) webView.onPause();
+                }
+            });
         }
 
         @JavascriptInterface

@@ -20,9 +20,11 @@ internal sealed class FeMonsterForm : Form
     private const int HTCAPTION = 0x0002;
     private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
     private const int DWMWCP_ROUND = 2;
-    private const int WINDOW_VISUAL_RADIUS = 34;
+    private const int WINDOW_VISUAL_RADIUS_DIP = 34;
     private readonly ClientOptions options;
     private readonly WebView2 webView = new() { Dock = DockStyle.Fill };
+    private readonly DesktopSceneHost desktopSceneHost;
+    private CoreWebView2Environment? webEnvironment;
     private RecordingToolbarForm? recordingToolbar;
     private Rectangle restoreBounds;
     private bool fullscreen;
@@ -31,6 +33,7 @@ internal sealed class FeMonsterForm : Form
     public FeMonsterForm(ClientOptions options)
     {
         this.options = options;
+        desktopSceneHost = new DesktopSceneHost(options);
         Text = "FE Monster";
         Icon = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         Width = options.Width;
@@ -54,7 +57,7 @@ internal sealed class FeMonsterForm : Form
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
-        ApplyRoundedCorners();
+        ApplyWindowCornerPolicy();
     }
 
     protected override async void OnShown(EventArgs e)
@@ -66,17 +69,18 @@ internal sealed class FeMonsterForm : Form
     protected override void OnResize(EventArgs e)
     {
         base.OnResize(e);
-        ApplyRoundedCorners();
+        ApplyWindowCornerPolicy();
     }
 
     protected override void OnDpiChanged(DpiChangedEventArgs e)
     {
         base.OnDpiChanged(e);
-        ApplyRoundedCorners();
+        ApplyWindowCornerPolicy();
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
+        desktopSceneHost.Dispose();
         recordingToolbar?.Close();
         recordingToolbar = null;
         RequestServerQuitAsync().GetAwaiter().GetResult();
@@ -97,8 +101,9 @@ internal sealed class FeMonsterForm : Form
             userDataFolder: userDataFolder,
             options: new CoreWebView2EnvironmentOptions(BuildBrowserArguments())
         );
+        webEnvironment = environment;
 
-        webView.DefaultBackgroundColor = Color.Black;
+        webView.DefaultBackgroundColor = Color.FromArgb(255, 2, 2, 2);
         await webView.EnsureCoreWebView2Async(environment);
         webView.CoreWebView2.WebMessageReceived += HandleWebMessage;
         webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
@@ -138,6 +143,12 @@ internal sealed class FeMonsterForm : Form
                 return;
             }
 
+            if (string.Equals(type.GetString(), "fe-desktop-scene", StringComparison.OrdinalIgnoreCase))
+            {
+                HandleDesktopSceneMessage(document.RootElement);
+                return;
+            }
+
             if (!string.Equals(type.GetString(), "fe-window", StringComparison.OrdinalIgnoreCase)) return;
 
             var action = document.RootElement.TryGetProperty("action", out var actionElement)
@@ -154,6 +165,49 @@ internal sealed class FeMonsterForm : Form
         {
             ApplyWindowAction(e.TryGetWebMessageAsString());
         }
+    }
+
+    private async void HandleDesktopSceneMessage(JsonElement root)
+    {
+        string action = ReadString(root, "action").Trim().ToLowerInvariant();
+        string snapshotJson = root.TryGetProperty("snapshot", out var snapshot)
+            && snapshot.ValueKind == JsonValueKind.Object
+                ? snapshot.GetRawText()
+                : "{}";
+        try
+        {
+            if (action == "disable" || action == "hide"
+                || (action == "toggle" && desktopSceneHost.IsEnabled))
+            {
+                desktopSceneHost.Disable();
+            }
+            else if (action == "update")
+            {
+                desktopSceneHost.Update(snapshotJson);
+            }
+            else
+            {
+                if (webEnvironment is null) throw new InvalidOperationException("WebView2 environment is not ready.");
+                await desktopSceneHost.EnableAsync(webEnvironment, snapshotJson);
+            }
+            PostDesktopSceneResult(desktopSceneHost.IsEnabled, "");
+        }
+        catch (Exception error)
+        {
+            desktopSceneHost.Disable();
+            PostDesktopSceneResult(false, error.Message);
+        }
+    }
+
+    private void PostDesktopSceneResult(bool enabled, string error)
+    {
+        if (webView.CoreWebView2 is null) return;
+        webView.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(new
+        {
+            type = "fe-desktop-scene-result",
+            enabled,
+            error
+        }));
     }
 
     private void HandleRecordingToolbarMessage(JsonElement root)
@@ -342,7 +396,7 @@ internal sealed class FeMonsterForm : Form
             Bounds = Screen.FromControl(this).Bounds;
             TopMost = true;
             fullscreen = true;
-            ApplyRoundedCorners();
+            ApplyWindowCornerPolicy();
             return;
         }
 
@@ -350,7 +404,7 @@ internal sealed class FeMonsterForm : Form
         WindowState = FormWindowState.Normal;
         if (!restoreBounds.IsEmpty) Bounds = restoreBounds;
         fullscreen = false;
-        ApplyRoundedCorners();
+        ApplyWindowCornerPolicy();
     }
 
     private void BeginWindowDrag()
@@ -386,7 +440,7 @@ internal sealed class FeMonsterForm : Form
         return element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.True;
     }
 
-    private void ApplyRoundedCorners()
+    private void ApplyWindowCornerPolicy()
     {
         if (!IsHandleCreated || WindowState == FormWindowState.Minimized || ClientSize.Width < 2 || ClientSize.Height < 2) return;
 
@@ -402,22 +456,30 @@ internal sealed class FeMonsterForm : Form
         {
         }
 
-        int radius = Math.Max(1, (int)Math.Round(WINDOW_VISUAL_RADIUS * DeviceDpi / 96d));
-        using var path = RoundedRectPath(new Rectangle(Point.Empty, ClientSize), radius);
-        Region = new Region(path);
+        var previousRegion = Region;
+        Region? nextRegion = fullscreen
+            ? null
+            : CreateRoundedWindowRegion(ClientSize.Width, ClientSize.Height);
+        Region = nextRegion;
+        previousRegion?.Dispose();
     }
 
-    private static GraphicsPath RoundedRectPath(Rectangle rect, int radius)
+    private Region CreateRoundedWindowRegion(int width, int height)
     {
-        int safeRadius = Math.Min(radius, Math.Min(rect.Width, rect.Height) / 2);
-        int diameter = safeRadius * 2;
-        var path = new GraphicsPath();
-        path.AddArc(rect.Left, rect.Top, diameter, diameter, 180, 90);
-        path.AddArc(rect.Right - diameter, rect.Top, diameter, diameter, 270, 90);
-        path.AddArc(rect.Right - diameter, rect.Bottom - diameter, diameter, diameter, 0, 90);
-        path.AddArc(rect.Left, rect.Bottom - diameter, diameter, diameter, 90, 90);
+        float scale = Math.Max(1f, DeviceDpi / 96f);
+        float radius = Math.Min(
+            WINDOW_VISUAL_RADIUS_DIP * scale,
+            Math.Max(1f, Math.Min(width, height) / 2f)
+        );
+        float diameter = radius * 2f;
+        using var path = new GraphicsPath();
+        path.StartFigure();
+        path.AddArc(0, 0, diameter, diameter, 180, 90);
+        path.AddArc(width - diameter, 0, diameter, diameter, 270, 90);
+        path.AddArc(width - diameter, height - diameter, diameter, diameter, 0, 90);
+        path.AddArc(0, height - diameter, diameter, diameter, 90, 90);
         path.CloseFigure();
-        return path;
+        return new Region(path);
     }
 }
 

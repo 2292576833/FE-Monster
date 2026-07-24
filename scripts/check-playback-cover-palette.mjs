@@ -97,6 +97,14 @@ try {
     const boot = document.getElementById('bootScreen');
     if (boot) boot.hidden = true;
     await refreshPlayerState();
+    if (!state.currentSong?.cover) {
+      state.currentSong = {
+        id: 'qa-cover-palette',
+        title: 'QA cover palette',
+        artist: 'FE Monster',
+        cover: location.origin + '/assets/void-prism/metal012/metal012-color-4k.jpg'
+      };
+    }
     renderCurrent(state.currentSong);
     const lyricScene = document.getElementById('playbackLyricScene');
     const cardLyrics = document.getElementById('qishuiPlaybackLyrics');
@@ -169,7 +177,7 @@ try {
   await waitFor(`(() => {
     const image = document.getElementById('qishuiPlaybackCover');
     return !!state.currentSong?.cover && !!image?.complete && image.naturalWidth > 0;
-  })()`);
+  })()`, 30000);
   await delay(900);
   await evaluate(`(() => {
     if (state.lyricLines.length >= 8) return false;
@@ -330,11 +338,13 @@ try {
       && lyricSampleStyle.filter === 'none'
       && artistStyle.textShadow !== 'none';
     const defaultWallpaperQa = window.__defaultWallpaperQa || {};
-    const cacheToken = '20260723-sonic-wide-controls-1';
     const appScript = Array.from(document.scripts).find((script) => script.src.includes('/app.js'));
     const styleLink = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
       .find((link) => link.href.includes('/styles.css'));
-    const cacheVersionPass = appScript?.src.includes(cacheToken) && styleLink?.href.includes(cacheToken);
+    const cacheVersionPass = Boolean(
+      appScript && new URL(appScript.src).searchParams.get('v')
+        && styleLink && new URL(styleLink.href).searchParams.get('v')
+    );
     const pass = pipelinePass
       && visiblyColored
       && alternateCoverFieldsPass

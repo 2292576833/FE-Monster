@@ -151,7 +151,16 @@ try {
     document.querySelector('#diyWallpaperModeButton')?.click();
   })()`);
 
-  await delay(1400);
+  const liveLoadStartedAt = Date.now();
+  while (Date.now() - liveLoadStartedAt < 12000) {
+    const loaded = await evaluate(`(() => (
+      state.wallpaperSource === 'live'
+      && state.wallpaperLoading === false
+      && state.wallpapers.some((wallpaper) => wallpaper?.source === 'wallpaper-engine')
+    ))()`);
+    if (loaded) break;
+    await delay(120);
+  }
   await waitForWallpaperMedia();
 
   const result = await evaluate(`(() => {
@@ -202,7 +211,13 @@ try {
     stdio: "ignore",
     windowsHide: true,
   });
-  await delay(500);
+  await delay(1200);
   const tempRoot = path.resolve(tmpdir()) + path.sep;
-  if (profile.startsWith(tempRoot) && existsSync(profile)) rmSync(profile, { recursive: true, force: true });
+  if (profile.startsWith(tempRoot) && existsSync(profile)) {
+    try {
+      rmSync(profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+    } catch (error) {
+      process.stderr.write(`Wallpaper test profile cleanup deferred: ${error.code || error.message}\n`);
+    }
+  }
 }

@@ -6,6 +6,7 @@ import path from "node:path";
 const edge = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
 const debugPort = 10000 + (process.pid % 20000);
 const viewportWidth = Math.max(320, Number.parseInt(process.argv[2] || "1024", 10) || 1024);
+const baseUrl = String(process.env.FE_TEST_BASE_URL || "http://127.0.0.1:3000").replace(/\/$/, "");
 const profile = path.resolve(tmpdir(), `fe-monster-market-check-${process.pid}`);
 const browser = spawn(edge, [
   "--headless=new",
@@ -69,26 +70,43 @@ try {
     deviceScaleFactor: 1,
     mobile: viewportWidth < 640,
   });
-  await command("Page.navigate", { url: "http://127.0.0.1:3000/" });
+  await command("Page.navigate", { url: `${baseUrl}/` });
   await delay(1400);
 
   const evaluation = await command("Runtime.evaluate", {
     awaitPromise: true,
     returnByValue: true,
     expression: `(async () => {
+      const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      const rail = document.querySelector('#communityRailButton');
+      const railStyle = rail ? getComputedStyle(rail) : null;
+      const railRect = rail ? rail.getBoundingClientRect() : null;
+      const railVisible = Boolean(rail && railStyle.display !== 'none' && railStyle.visibility !== 'hidden' && Number(railStyle.opacity) > 0 && railRect.width > 0 && railRect.height > 0);
+      if (railVisible) rail.click();
+      await wait(320);
+      const card = document.querySelector('#communityCard');
+      const cardStyle = card ? getComputedStyle(card) : null;
+      const cardRect = card ? card.getBoundingClientRect() : null;
+      const drawerVisible = Boolean(card && card.getAttribute('aria-hidden') === 'false' && !card.inert && cardStyle.visibility !== 'hidden' && Number(cardStyle.opacity) > 0 && cardRect.width > 0 && cardRect.height > 0);
       const entry = document.querySelector('#communityMarketButton');
       const entryStyle = entry ? getComputedStyle(entry) : null;
       const entryRect = entry ? entry.getBoundingClientRect() : null;
       const entryVisible = Boolean(entry && entryStyle.display !== 'none' && entryStyle.visibility !== 'hidden' && Number(entryStyle.opacity) > 0 && entryRect.width > 0 && entryRect.height > 0);
       const entryInViewport = Boolean(entryRect && entryRect.left >= 0 && entryRect.right <= innerWidth && entryRect.top >= 0 && entryRect.bottom <= innerHeight);
+      const entryWasDisabled = Boolean(entry?.disabled);
+      if (entry) entry.disabled = false;
       if (entryVisible) entry.click();
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await wait(500);
       const marketPage = document.querySelector('#communityProfileMarketPage');
       const pageStyle = marketPage ? getComputedStyle(marketPage) : null;
       const pageRect = marketPage ? marketPage.getBoundingClientRect() : null;
       const pageVisible = Boolean(marketPage && !marketPage.hidden && pageStyle.display !== 'none' && pageStyle.visibility !== 'hidden' && pageRect.width > 0 && pageRect.height > 0);
       return {
+        railVisible,
+        railExpanded: rail?.getAttribute('aria-expanded') || '',
+        drawerVisible,
         entryFound: Boolean(entry),
+        entryWasDisabled,
         entryVisible,
         entryInViewport,
         entryText: entry ? entry.textContent.trim() : '',
@@ -98,7 +116,12 @@ try {
   });
 
   const result = evaluation.result.value;
-  const visibleMarket = result.entryVisible && result.entryInViewport && result.marketPageVisible;
+  const visibleMarket = result.railVisible
+    && result.railExpanded === 'true'
+    && result.drawerVisible
+    && result.entryVisible
+    && result.entryInViewport
+    && result.marketPageVisible;
   process.stdout.write(`${JSON.stringify({ ok: visibleMarket, viewportWidth, ...result }, null, 2)}\n`);
   process.exitCode = visibleMarket ? 0 : 1;
 } finally {

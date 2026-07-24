@@ -42,11 +42,13 @@ tasks.register("syncFeMonsterWebAssets", Sync) {
 tasks.register("prepareAndroidNodeGateway") {
     def sourceDir = file("src/main/nodeGateway")
     def qishuiAdapter = file("src/main/nodeGateway/providers/qishui.cjs")
+    def neteaseQrCheckPatch = file("src/main/nodeGateway/patches/netease-login-qr-check.js")
     inputs.files(
         new File(sourceDir, "main.cjs"),
         new File(sourceDir, "package.json"),
         new File(sourceDir, "package-lock.json"),
-        qishuiAdapter
+        qishuiAdapter,
+        neteaseQrCheckPatch
     )
     outputs.dir(nodeGatewayAssetsDir)
 
@@ -68,6 +70,11 @@ tasks.register("prepareAndroidNodeGateway") {
         exec {
             workingDir projectDir
             commandLine "npm.cmd", "ci", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund"
+        }
+        copy {
+            from(neteaseQrCheckPatch)
+            into new File(projectDir, "node_modules/NeteaseCloudMusicApi/module")
+            rename { "login_qr_check.js" }
         }
     }
 }
@@ -130,8 +137,8 @@ android {
         applicationId "com.femonster.mobile"
         minSdk 23
         targetSdk 35
-        versionCode 7
-        versionName "1.1.0"
+        versionCode 9
+        versionName "1.1.6"
         externalNativeBuild {
             cmake {
                 arguments "-DANDROID_STL=c++_shared"

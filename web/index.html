@@ -5,11 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="referrer" content="no-referrer" />
     <title>FE Monster Java</title>
+    <script>
+      const clientMode = new URLSearchParams(window.location.search).get('client');
+      if (clientMode === 'embedded' || clientMode === 'desktop-scene') {
+        document.documentElement.dataset.fePlatform = 'desktop';
+      }
+      if (clientMode) document.documentElement.setAttribute('data-fe-client', clientMode);
+    </script>
     <link rel="stylesheet" href="/components/GlassSurface.css?v=20260706-black-glass-scroll" />
     <link rel="stylesheet" href="/components/BorderGlow.css?v=20260705-button-border-glow-fix" />
     <link rel="stylesheet" href="border-glow-buttons.css?v=20260705-button-border-glow-fix" />
   <link rel="stylesheet" href="text-fonts.css?v=20260721-licensed-fonts-1" />
-  <link rel="stylesheet" href="styles.css?v=20260723-sonic-wide-controls-1" />
+  <link rel="stylesheet" href="styles.css?v=20260724-lyric-transform-multirow-1" />
   <link rel="stylesheet" href="rhythm-game.css?v=20260716-rhythm-game-2" />
     <link rel="stylesheet" href="black-gold-buttons.css?v=20260714-black-react-bits-glass-16" />
   </head>
@@ -531,7 +538,55 @@
       <main class="stage" aria-label="白色粒子球播放舞台">
         <canvas id="orbCanvas" aria-hidden="true"></canvas>
         <div class="stage-glow" aria-hidden="true"></div>
-        <section class="community-card" id="communityCard" aria-label="FE Monster 社区">
+        <button
+          class="community-rail-button glass-surface glass-surface--react-bits glass-surface--black glass-surface--fallback"
+          id="communityRailButton"
+          type="button"
+          aria-label="打开 FE Monster 社区"
+          aria-controls="communityCard"
+          aria-expanded="false"
+          data-glass-surface
+          data-glass-radius="16"
+          data-glass-brightness="62"
+          data-glass-opacity="0.9"
+          data-glass-blur="12"
+          data-glass-displace="0.34"
+          data-glass-background-opacity="0.16"
+          data-glass-saturation="1.18"
+          data-glass-distortion-scale="-156"
+          data-glass-red-offset="-4"
+          data-glass-green-offset="20"
+          data-glass-blue-offset="36"
+        >
+          <span class="glass-surface__content">
+            <span class="community-rail-icon" aria-hidden="true"><span></span></span>
+            <span class="community-rail-copy">
+              <strong>社区</strong>
+              <small>好友 · 一起听</small>
+            </span>
+            <span class="community-rail-chevron" aria-hidden="true"></span>
+          </span>
+        </button>
+        <section
+          class="community-card glass-surface glass-surface--react-bits glass-surface--black glass-surface--fallback"
+          id="communityCard"
+          aria-label="FE Monster 社区"
+          aria-hidden="true"
+          inert
+          data-glass-surface
+          data-glass-radius="20"
+          data-glass-brightness="58"
+          data-glass-opacity="0.92"
+          data-glass-blur="13"
+          data-glass-displace="0.42"
+          data-glass-background-opacity="0.2"
+          data-glass-saturation="1.2"
+          data-glass-distortion-scale="-168"
+          data-glass-red-offset="-5"
+          data-glass-green-offset="19"
+          data-glass-blue-offset="34"
+        >
+          <div class="glass-surface__content">
           <div class="community-card__head">
             <span class="community-avatar" id="communityAvatar" role="button" tabindex="0" aria-label="打开社区个人资料">
               <img id="communityAvatarImage" alt="" />
@@ -546,7 +601,7 @@
               <span class="community-broadcast-icon" aria-hidden="true"></span>
               <span class="community-broadcast-dot" aria-hidden="true"></span>
             </button>
-            <button class="community-collapse-button" id="communityCollapseButton" type="button" aria-label="折叠社区卡片" aria-expanded="true">
+            <button class="community-collapse-button" id="communityCollapseButton" type="button" aria-label="收起社区" aria-controls="communityCard" aria-expanded="true">
               <span aria-hidden="true"></span>
             </button>
           </div>
@@ -554,6 +609,16 @@
           <div class="community-id-row">
             <span>FE ID</span>
             <strong id="communityFeId">--------</strong>
+          </div>
+          <div class="community-listening-stats" aria-label="&#25105;&#30340;&#21548;&#27468;&#32479;&#35745;">
+            <span>
+              <small>&#32047;&#35745;&#21548;&#27468;</small>
+              <strong id="communityListeningDuration">0 &#20998;&#38047;</strong>
+            </span>
+            <span>
+              <small>&#21435;&#37325;&#27468;&#26354;</small>
+              <strong id="communityListeningSongs">0 &#39318;</strong>
+            </span>
           </div>
 
           <form class="community-add-form" id="communityAddForm">
@@ -574,6 +639,7 @@
             <span class="community-empty">暂无在线好友</span>
           </div>
           <div class="community-status" id="communityStatus">社区服务准备中</div>
+          </div>
         </section>
         <section class="community-message-dialog" id="communityMessageDialog" aria-label="社区消息" hidden>
           <div class="community-message-panel" id="communityMessagePanel">
@@ -598,6 +664,7 @@
         <div class="community-message-bubbles" id="communityMessageBubbles" aria-live="polite"></div>
         <div class="community-broadcast-toast" id="communityBroadcastToast" aria-live="polite" hidden></div>
         <div class="community-listen-bubbles" id="communityListenBubbles" aria-live="polite"></div>
+        <div class="community-danmaku-layer" id="communityDanmakuLayer" aria-live="polite" aria-label="一起听弹幕"></div>
         <section class="community-profile-dialog" id="communityProfileDialog" aria-label="社区个人资料" hidden>
           <div class="community-profile-panel" id="communityProfilePanel">
             <header class="community-profile-head" id="communityProfileHead">
@@ -666,7 +733,10 @@
               <span>LISTEN TOGETHER</span>
               <strong id="listenMiniTitle">一起听歌</strong>
             </div>
-            <button id="listenMiniClose" type="button" aria-label="关闭一起听">×</button>
+            <span class="listen-mini-head-actions">
+              <button id="listenMiniClose" type="button" aria-label="关闭一起听">×</button>
+              <button id="listenMiniCollapse" type="button" aria-label="将一起听收起到左侧" aria-expanded="true">‹</button>
+            </span>
           </header>
           <div class="listen-mini-body">
             <p id="listenMiniStatus">等待好友回应</p>
@@ -683,6 +753,15 @@
         <section class="wallpaper-scene" id="wallpaperScene" aria-label="壁纸模式" hidden>
           <img class="wallpaper-media wallpaper-media--image" id="wallpaperImage" alt="" />
           <video class="wallpaper-media wallpaper-media--video" id="wallpaperVideo" muted loop playsinline></video>
+          <iframe
+            class="wallpaper-media wallpaper-media--web"
+            id="wallpaperWebFrame"
+            title="Wallpaper Engine 网页壁纸"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock"
+            referrerpolicy="no-referrer"
+            allow="autoplay"
+            hidden
+          ></iframe>
           <div class="wallpaper-empty" id="wallpaperEmpty">导入或选择壁纸</div>
         </section>
         <section class="rhythm-game" id="rhythmGameScene" aria-label="音游模式" hidden>
@@ -802,6 +881,9 @@
               <div class="book-lyric-artist" id="bookLyricArtist"></div>
             </div>
           </div>
+          <div class="multi-row-lyric-stage" id="multiRowLyricStage" aria-hidden="true">
+            <div class="multi-row-lyric-list" id="multiRowLyricList"></div>
+          </div>
           <div class="playback-lyric-rig" id="playbackLyricRig" aria-live="polite">
             <div class="playback-lyric-core" id="playbackLyricCore">
               <div class="blur-lyric-mount" id="blurLyricMount" aria-hidden="true"></div>
@@ -854,6 +936,48 @@
                   aria-pressed="false"
                   title="放大播放页"
                 ><span aria-hidden="true"></span></button>
+                <button
+                  class="qishui-playback-view-button qishui-playback-desktop-toggle"
+                  id="qishuiPlaybackDesktopToggle"
+                  type="button"
+                  aria-label="将当前场景映射到桌面"
+                  aria-pressed="false"
+                  title="将当前场景与文字映射到桌面"
+                ><span aria-hidden="true"></span></button>
+                <button
+                  class="qishui-playback-view-button qishui-playback-bilingual-toggle"
+                  id="qishuiPlaybackBilingualToggle"
+                  type="button"
+                  aria-label="Toggle bilingual lyrics"
+                  aria-pressed="true"
+                  title="Toggle bilingual lyrics"
+                ><b aria-hidden="true">译</b></button>
+                <button
+                  class="qishui-playback-view-button qishui-playback-multi-row-toggle"
+                  id="qishuiPlaybackMultiRowToggle"
+                  type="button"
+                  aria-label="&#24320;&#21551;&#22810;&#25490;&#27468;&#35789;"
+                  aria-pressed="false"
+                  title="&#24320;&#21551;&#22810;&#25490;&#27468;&#35789;"
+                ><b aria-hidden="true">&#22810;</b></button>
+                <button
+                  class="qishui-playback-view-button qishui-playback-obr-toggle"
+                  id="qishuiPlaybackObrToggle"
+                  type="button"
+                  aria-label="开启 Google OBR 官方内核空间音频"
+                  aria-pressed="false"
+                  aria-busy="false"
+                  data-obr-backend="uninitialized"
+                  title="开启 Google OBR 官方内核空间音频"
+                ><span aria-hidden="true"></span><b aria-hidden="true">OBR</b></button>
+                <button
+                  class="qishui-playback-view-button qishui-playback-obr-layout-toggle"
+                  id="qishuiPlaybackObrLayoutToggle"
+                  type="button"
+                  aria-label="切换 Google OBR 声道布局，当前 2.0"
+                  data-obr-channel-layout="stereo"
+                  title="Google OBR 虚拟声道：2.0"
+                >2.0</button>
               </div>
               <nav class="qishui-playback-tools" id="qishuiPlaybackTools" aria-label="播放页功能">
                 <button type="button" data-playback-tool="playlists" aria-pressed="false" aria-controls="orbPlaylists playlistShelf">歌单</button>
@@ -952,6 +1076,41 @@
                   <small>下一首</small>
                 </button>
               </footer>
+              <div class="qishui-playback-danmaku" id="qishuiPlaybackDanmaku">
+                <button
+                  class="qishui-playback-danmaku-toggle"
+                  id="qishuiPlaybackDanmakuToggle"
+                  type="button"
+                  aria-label="发送一起听弹幕"
+                  aria-expanded="false"
+                  aria-controls="qishuiPlaybackDanmakuComposer"
+                  hidden
+                ><span aria-hidden="true">弹</span></button>
+                <form
+                  class="qishui-playback-danmaku-composer glass-surface glass-surface--black glass-surface--fallback"
+                  id="qishuiPlaybackDanmakuComposer"
+                  data-glass-surface
+                  data-glass-radius="16"
+                  data-glass-brightness="50"
+                  data-glass-opacity="0.9"
+                  data-glass-blur="7"
+                  data-glass-displace="0.12"
+                  data-glass-background-opacity="0.04"
+                  data-glass-saturation="1.14"
+                  data-glass-distortion-scale="-72"
+                  data-glass-red-offset="-2"
+                  data-glass-green-offset="4"
+                  data-glass-blue-offset="10"
+                  aria-hidden="true"
+                  inert
+                  autocomplete="off"
+                >
+                  <div class="glass-surface__content">
+                    <input id="qishuiPlaybackDanmakuInput" type="text" placeholder="发送一起听弹幕" aria-label="弹幕内容" />
+                    <button id="qishuiPlaybackDanmakuSend" type="submit">发送</button>
+                  </div>
+                </form>
+              </div>
             </div>
           </article>
           <p class="qishui-playback-wheel-hint" id="qishuiPlaybackWheelHint">滚轮向上上一首 · 向下下一首</p>
@@ -1170,6 +1329,10 @@
               <button id="sonicFollowCoverButton" type="button">跟随封面</button>
             </header>
             <div class="sonic-color-controls" role="group" aria-label="音柱颜色">
+              <label for="sonicCenterColorInput">
+                <span>核心音柱</span>
+                <input id="sonicCenterColorInput" type="color" value="#ffffff" aria-label="核心音柱颜色" />
+              </label>
               <label for="sonicCoreColorInput">
                 <span>中间音柱</span>
                 <input id="sonicCoreColorInput" type="color" value="#ffffff" aria-label="中间音柱颜色" />
@@ -1177,6 +1340,24 @@
               <label for="sonicOuterColorInput">
                 <span>外围音柱</span>
                 <input id="sonicOuterColorInput" type="color" value="#83e4ff" aria-label="外围音柱颜色" />
+              </label>
+            </div>
+            <div class="sonic-effect-controls" role="group" aria-label="Sonic 粒子效果">
+              <label class="sonic-effect-toggle" for="sonicFountainToggle">
+                <span>粒子喷泉</span>
+                <input id="sonicFountainToggle" type="checkbox" role="switch" aria-label="粒子喷泉" />
+              </label>
+              <label class="sonic-effect-color" for="sonicFountainColorInput">
+                <span>喷泉颜色</span>
+                <input id="sonicFountainColorInput" type="color" value="#ffffff" aria-label="粒子喷泉颜色" />
+              </label>
+              <label class="sonic-effect-toggle" for="sonicStarfieldToggle">
+                <span>星空粒子</span>
+                <input id="sonicStarfieldToggle" type="checkbox" role="switch" aria-label="星空粒子" />
+              </label>
+              <label class="sonic-effect-color" for="sonicStarfieldColorInput">
+                <span>星空颜色</span>
+                <input id="sonicStarfieldColorInput" type="color" value="#dff7ff" aria-label="星空粒子颜色" />
               </label>
             </div>
             <div class="sonic-range-control">
@@ -1192,8 +1373,8 @@
               <input id="sonicColumnHeightRange" type="range" min="50" max="250" step="1" value="100" aria-valuetext="100%" />
             </div>
             <div class="sonic-range-control">
-              <label for="sonicFovRange">广角视野 <output id="sonicFovValue" for="sonicFovRange">60°</output></label>
-              <input id="sonicFovRange" type="range" min="50" max="75" step="1" value="60" aria-valuetext="60°" />
+              <label for="sonicFovRange">广角视野 <output id="sonicFovValue" for="sonicFovRange">44°</output></label>
+              <input id="sonicFovRange" type="range" min="42" max="68" step="1" value="44" aria-valuetext="44°" />
             </div>
             <div class="sonic-range-control">
               <label for="sonicSmoothingRange">升降丝滑度 <output id="sonicSmoothingValue" for="sonicSmoothingRange">100%</output></label>
@@ -1347,6 +1528,18 @@
               >恢复自动</button>
             </div>
           </section>
+          <div class="diy-control diy-control--bilingual-lyrics">
+            <label class="diy-toggle" for="bilingualLyricsToggle">
+              <span>&#21452;&#35821;&#23383;&#24149;</span>
+              <input
+                id="bilingualLyricsToggle"
+                type="checkbox"
+                aria-label="&#26174;&#31034;&#21407;&#25991;&#21644;&#32763;&#35793;&#23383;&#24149;"
+                checked
+              />
+            </label>
+            <span id="bilingualLyricsValue">ON</span>
+          </div>
           <div class="diy-control">
             <label for="lyricBrightnessRange">歌词亮度</label>
             <input id="lyricBrightnessRange" type="range" min="60" max="180" value="112" />
@@ -1518,45 +1711,16 @@
             <button class="login-close-button" id="neteaseLoginClose" type="button" aria-label="关闭登录弹窗"></button>
           </header>
 
-          <div class="login-provider-tabs" id="loginProviderTabs" role="tablist" aria-label="选择音乐平台">
-            <button class="login-provider-tab is-active" type="button" data-login-provider="netease" aria-pressed="true">网易云</button>
-            <button class="login-provider-tab" type="button" data-login-provider="qq" aria-pressed="false">QQ音乐</button>
-            <button class="login-provider-tab" type="button" data-login-provider="kugou" aria-pressed="false">酷狗音乐</button>
-            <button class="login-provider-tab is-unconfigured" type="button" data-login-provider="qishui" aria-pressed="false">汽水音乐</button>
-          </div>
+          <div class="login-provider-tabs" id="loginProviderTabs" role="tablist" aria-label="已识别的音乐平台" aria-live="polite"></div>
 
           <div class="music-api-import" id="musicApiImportPanel">
             <span>
-              <strong>本地音乐 API</strong>
-              <small id="musicApiImportStatus" role="status" aria-live="polite">可导入 JSON 配置或受信任的 ZIP API 包</small>
+              <strong>音乐平台 API 插件</strong>
+              <small id="musicApiImportStatus" role="status" aria-live="polite">未导入插件前无法搜索、播放或登录平台</small>
             </span>
-            <button id="musicApiImportButton" type="button">导入 API</button>
+            <button id="musicApiImportButton" type="button">导入 API 插件</button>
             <input id="musicApiImportInput" type="file" accept=".json,.feapi,.zip,application/json,application/zip" hidden />
           </div>
-
-          <form class="qishui-phone-login" id="qishuiPhoneLogin" autocomplete="on" novalidate hidden>
-            <div class="qishui-phone-copy">
-              <strong>选择汽水音乐使用方式</strong>
-              <small>访客可直接搜索、播放公开免费歌曲；手机号登录用于同步账号功能。</small>
-            </div>
-            <button class="qishui-guest-button" id="qishuiGuestButton" type="button">免登录进入访客模式</button>
-            <label class="qishui-phone-field" for="qishuiPhoneInput">
-              <span>手机号</span>
-              <span class="qishui-phone-input-shell">
-                <b>+86</b>
-                <input id="qishuiPhoneInput" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="11" placeholder="请输入 11 位手机号" />
-              </span>
-            </label>
-            <div class="qishui-code-row">
-              <label class="qishui-phone-field" for="qishuiCodeInput">
-                <span>短信验证码</span>
-                <input id="qishuiCodeInput" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6 位验证码" />
-              </label>
-              <button id="qishuiSendCodeButton" type="button">获取验证码</button>
-            </div>
-            <button class="qishui-login-submit" id="qishuiLoginButton" type="submit">登录汽水音乐</button>
-            <p class="qishui-phone-status" id="qishuiPhoneStatus" role="status" aria-live="polite">请输入手机号获取验证码</p>
-          </form>
 
           <div class="qr-login-stage" id="qrLoginStage">
             <div class="qr-code-shell" id="neteaseQrShell">
@@ -1564,7 +1728,11 @@
               <span id="neteaseQrPlaceholder">生成二维码</span>
             </div>
             <p class="qr-login-status" id="neteaseQrStatus">点击右上角按钮开始登录</p>
-            <button class="qr-refresh-button" id="neteaseQrRefresh" type="button">刷新二维码</button>
+            <div class="login-method-actions">
+              <button class="qr-refresh-button" id="neteaseQrRefresh" type="button">刷新二维码</button>
+              <button class="official-browser-login-button" id="officialBrowserLoginButton" type="button">官方浏览器登录</button>
+            </div>
+            <p class="official-browser-login-status" id="officialBrowserLoginStatus" role="status" aria-live="polite" hidden></p>
             <div class="android-login-workflow" id="androidLoginWorkflow" hidden>
               <p id="androidQrHelp">保存二维码后，在音乐 App 的扫一扫中从相册选择。</p>
               <div class="android-login-actions">
@@ -1609,8 +1777,8 @@
     <script src="storm-ocean-runtime.js?v=20260718-fine-waves-120"></script>
     <script src="free-cube-runtime.js?v=20260718-material-clarity-2"></script>
     <script src="void-prism-runtime.js?v=20260721-text-fonts-1"></script>
-    <script src="chladni-runtime.js?v=20260723-chladni-low-bass-jump-1"></script>
-    <script src="app.js?v=20260723-sonic-wide-controls-1"></script>
+    <script src="chladni-runtime.js?v=20260723-chladni-low-bass-jump-2"></script>
+    <script src="app.js?v=20260724-lyric-transform-multirow-1"></script>
     <script src="rhythm-game.js?v=20260718-rhythm-game-orbit-lock-1"></script>
   </body>
 </html>

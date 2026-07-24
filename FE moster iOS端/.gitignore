@@ -1,0 +1,11 @@
+.cache/
+.build/
+BuildOutput/
+DerivedData/
+Vendor/NodeMobile.xcframework/
+App/GeneratedResources/
+FEMonsterIOS.xcodeproj/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcuserstate
+

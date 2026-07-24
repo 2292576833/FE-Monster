@@ -1,0 +1,9 @@
+{
+  "name": "fe-monster-netease-api-runtime",
+  "version": "4.32.0",
+  "private": true,
+  "license": "MIT",
+  "dependencies": {
+    "NeteaseCloudMusicApi": "4.32.0"
+  }
+}

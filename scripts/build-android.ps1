@@ -106,7 +106,7 @@ try {
 
 if ($Configuration -eq 'Debug') {
   $distDirectory = Join-Path $rootPath 'dist'
-  $apkDestination = Join-Path $distDirectory 'FE-Monster-Android-1.1.0-local-debug.apk'
+  $apkDestination = Join-Path $distDirectory 'FE-Monster-Android-1.1.6-local-debug.apk'
   if (!(Test-Path $apkSource)) {
     throw "Android build succeeded but the APK was not found: $apkSource"
   }

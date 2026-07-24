@@ -86,18 +86,6 @@ function Test-Node {
   return -not [string]::IsNullOrWhiteSpace((Find-Exe 'node.exe' @((Join-Path $rootPath 'runtime\node'), (Join-Path $Env:ProgramFiles 'nodejs'), (Join-Path ${Env:ProgramFiles(x86)} 'nodejs'))))
 }
 
-function Find-Npm {
-  return Find-Exe 'npm.cmd' @((Join-Path $rootPath 'runtime\node'), (Join-Path $Env:ProgramFiles 'nodejs'), (Join-Path ${Env:ProgramFiles(x86)} 'nodejs'))
-}
-
-function Find-Pnpm {
-  return Find-Exe 'pnpm.cmd' @((Join-Path $rootPath 'runtime\node'), (Join-Path $Env:ProgramFiles 'nodejs'), (Join-Path ${Env:ProgramFiles(x86)} 'nodejs'))
-}
-
-function Find-Corepack {
-  return Find-Exe 'corepack.cmd' @((Join-Path $rootPath 'runtime\node'), (Join-Path $Env:ProgramFiles 'nodejs'), (Join-Path ${Env:ProgramFiles(x86)} 'nodejs'))
-}
-
 function Install-WingetPackage {
   param(
     [string]$Name,
@@ -167,75 +155,6 @@ function Ensure-JavaRuntime {
 
   Write-Host 'Java 26: missing'
   $missing.Add('Java 26') | Out-Null
-}
-
-function Test-NodeModules {
-  $required = @(
-    'node_modules\NeteaseCloudMusicApi',
-    'node_modules\@sansenjian\qq-music-api',
-    'node_modules\kugoumusicapi'
-  )
-  foreach ($relative in $required) {
-    if (!(Test-Path (Join-Path $rootPath $relative))) { return $false }
-  }
-  return $true
-}
-
-function Ensure-NodeModules {
-  if (Test-NodeModules) {
-    Write-Host 'Node packages: OK'
-    return
-  }
-
-  if (!$InstallMissing) {
-    Write-Host 'Node packages: missing'
-    $missing.Add('Node packages') | Out-Null
-    return
-  }
-
-  Ensure-Dependency 'Git' { -not [string]::IsNullOrWhiteSpace((Find-Exe 'git.exe' @((Join-Path $Env:ProgramFiles 'Git')))) } 'Git.Git'
-  $npm = Find-Npm
-  if ([string]::IsNullOrWhiteSpace($npm)) {
-    Write-Host 'npm: missing'
-    $missing.Add('npm') | Out-Null
-    return
-  }
-
-  Write-Host 'Installing music API Node packages...'
-  $runtimeInstallRoot = Join-Path $outDir 'runtime-node-modules'
-  if (Test-Path $runtimeInstallRoot) { Remove-Item -LiteralPath $runtimeInstallRoot -Recurse -Force }
-  New-Item -ItemType Directory -Path $runtimeInstallRoot | Out-Null
-  Set-Content -Encoding UTF8 -Path (Join-Path $runtimeInstallRoot 'package.json') -Value @'
-{
-  "private": true,
-  "dependencies": {
-    "@sansenjian/qq-music-api": "^2.4.0",
-    "NeteaseCloudMusicApi": "^4.32.0",
-    "kugoumusicapi": "https://codeload.github.com/MakcRe/KuGouMusicApi/tar.gz/283f1e97b110726b208a64b486a657c0fc0a6126"
-  }
-}
-'@
-
-  Push-Location $runtimeInstallRoot
-  try {
-    & $npm install --omit=dev --no-audit --no-fund --no-package-lock
-    if ($LASTEXITCODE -ne 0) { $missing.Add('Node packages') | Out-Null; return }
-  } finally {
-    Pop-Location
-  }
-
-  if (Test-Path (Join-Path $rootPath 'node_modules')) {
-    Remove-Item -LiteralPath (Join-Path $rootPath 'node_modules') -Recurse -Force
-  }
-  & robocopy.exe (Join-Path $runtimeInstallRoot 'node_modules') (Join-Path $rootPath 'node_modules') /E /R:2 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
-  if ($LASTEXITCODE -gt 7) {
-    $missing.Add('Node packages') | Out-Null
-    return
-  }
-
-  if (!(Test-NodeModules)) {
-    $missing.Add('Node packages') | Out-Null
-  }
 }
 
 function Test-GesturePythonRuntime {
@@ -333,7 +252,6 @@ Ensure-JavaRuntime
 Ensure-Dependency '.NET Desktop Runtime 8' { Test-DotNetDesktop8 } 'Microsoft.DotNet.DesktopRuntime.8'
 Ensure-Dependency 'Microsoft Edge WebView2 Runtime' { Test-WebView2Runtime } 'Microsoft.EdgeWebView2Runtime'
 Ensure-Dependency 'Node.js LTS' { Test-Node } 'OpenJS.NodeJS.LTS'
-Ensure-NodeModules
 Ensure-GesturePythonRuntime
 
 if ($missing.Count -gt 0) {

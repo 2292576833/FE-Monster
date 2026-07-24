@@ -72,6 +72,12 @@ try {
     returnByValue: true,
     expression: `(async () => {
       const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      const withTimeout = (promise, label, timeoutMs = 15000) => Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Client polish timeout: ' + label)), timeoutMs))
+      ]);
+      state.providers.netease = { ...state.providers.netease, enabled: true, configured: true };
+      state.activeProvider = 'netease';
       renderLoginStatus({ provider: 'netease', loggedIn: true, account: { nickname: 'QA', vipType: 110 } });
       els.bootScreen.hidden = true;
       enterPlaybackPage();
@@ -154,11 +160,11 @@ try {
       writeWavText(36, 'data');
       wavView.setUint32(40, 800, true);
       new Uint8Array(wavBuffer, 44).fill(128);
-      const localImportResult = await importLocalAudioFiles([
+      const localImportResult = await withTimeout(importLocalAudioFiles([
         new File([wavBuffer], 'Playback Fixture.wav', { type: 'audio/wav', lastModified: 10 }),
         new File([new Uint8Array([0])], 'Local Fixture.flac', { type: 'audio/flac', lastModified: 11 }),
         new File([new Uint8Array([1])], 'Lossless Fixture.ape', { type: '', lastModified: 12 })
-      ], { openShelf: false, silent: true });
+      ], { openShelf: false, silent: true }), 'local audio import');
       await new Promise((resolve) => requestAnimationFrame(resolve));
       const localPlaylistCard = document.querySelector('[data-playlist-id="local-import"]');
       const localImportReady = localImportResult.added === 3
@@ -171,9 +177,11 @@ try {
       state.queue = localWavSong ? [localWavSong] : [];
       state.queueIndex = localWavSong ? 0 : -1;
       state.localQueueActive = Boolean(localWavSong);
-      const localPlaybackLoaded = localWavSong ? await loadSong(localWavSong, { autoplay: false }) : false;
+      const localPlaybackLoaded = localWavSong
+        ? await withTimeout(loadSong(localWavSong, { autoplay: false }), 'local song load')
+        : false;
       await wait(160);
-      await refreshPlayerState();
+      await withTimeout(refreshPlayerState(), 'player state refresh');
       const localPlaybackReady = Boolean(localPlaybackLoaded
         && state.localQueueActive
         && state.currentSong?.id === localWavSong?.id
@@ -236,13 +244,13 @@ try {
       }
       enterPresetPlaybackPage('lyric');
 
-      await refreshWallpapers({ source: 'imported', scan: false });
+      await withTimeout(refreshWallpapers({ source: 'imported', scan: false }), 'imported wallpaper refresh');
       const importedImage = visibleWallpapers().find((wallpaper) => wallpaper.kind === 'image');
       if (importedImage) selectWallpaper(importedImage.id);
       await wait(500);
       const importedVisible = Boolean(importedImage && !els.wallpaperImage.hidden && els.wallpaperImage.naturalWidth > 0);
 
-      await refreshWallpapers({ source: 'live', scan: true });
+      await withTimeout(refreshWallpapers({ source: 'live', scan: true }), 'live wallpaper refresh');
       const liveVideo = visibleWallpapers().find((wallpaper) => wallpaper.kind === 'video');
       if (liveVideo) selectWallpaper(liveVideo.id);
       await wait(1600);
@@ -365,5 +373,17 @@ try {
   });
   await delay(500);
   const tempRoot = path.resolve(tmpdir()) + path.sep;
-  if (profile.startsWith(tempRoot) && existsSync(profile)) rmSync(profile, { recursive: true, force: true });
+  if (profile.startsWith(tempRoot)) {
+    for (let attempt = 0; attempt < 16 && existsSync(profile); attempt += 1) {
+      try {
+        rmSync(profile, { recursive: true, force: true });
+      } catch (error) {
+        if (attempt === 15) {
+          process.stderr.write(`Client polish profile cleanup deferred: ${error.message}\n`);
+          break;
+        }
+        await delay(250);
+      }
+    }
+  }
 }

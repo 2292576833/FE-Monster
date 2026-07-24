@@ -497,7 +497,7 @@ internal sealed class SetupOptions
     public static SetupOptions Parse(string[] args)
     {
         bool quiet = false;
-        string installDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FE Monster");
+        string installDir = GetDefaultInstallDir();
         bool launchAfterInstall = true;
         List<string> forwarded = new();
 
@@ -527,6 +527,20 @@ internal sealed class SetupOptions
         }
 
         return new SetupOptions(quiet, installDir, launchAfterInstall, forwarded);
+    }
+
+    private static string GetDefaultInstallDir()
+    {
+        const string preferredDrive = @"D:\";
+        if (Directory.Exists(preferredDrive))
+        {
+            return Path.Combine(preferredDrive, "FE Monster");
+        }
+
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "FE Monster"
+        );
     }
 
     private static bool IsInstallDirArg(string value)

@@ -24,7 +24,7 @@ const checks = {
   autoRotation: /autoRotation/.test(runtime) && /rotation\.y/.test(runtime),
   audioResponse: /bass/.test(runtime) && /beat/.test(runtime) && /treble/.test(runtime),
   lowFrequencyWholeJump: /uBass \* 1\.35/.test(runtime)
-    && /BASS_SCALE_GAIN = 0\.032/.test(runtime)
+    && /BASS_SCALE_GAIN = 0\.072/.test(runtime)
     && /BEAT_SCALE_GAIN = 0\.012/.test(runtime)
     && /const overallJump = playing/.test(runtime)
     && /overallScale: Number\(runtime\.group\.scale\.x/.test(runtime),

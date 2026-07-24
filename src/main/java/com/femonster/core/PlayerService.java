@@ -203,9 +203,20 @@ public final class PlayerService {
         if (queueIndex < 0 || queueIndex >= queue.size()) {
             queueIndex = offset > 0 ? -1 : queue.size();
         }
-        queueIndex = (queueIndex + offset + queue.size()) % queue.size();
-        Map<String, Object> body = load(queue.get(queueIndex), quality);
+        Map<String, Object> body = null;
+        for (int attempt = 0; attempt < queue.size(); attempt++) {
+            queueIndex = (queueIndex + offset + queue.size()) % queue.size();
+            body = load(queue.get(queueIndex), quality);
+            if (Boolean.TRUE.equals(body.get("playable")) && !String.valueOf(body.getOrDefault("url", "")).isBlank()) {
+                body.put("action", offset < 0 ? "previous" : "next");
+                body.put("skipped", attempt);
+                return body;
+            }
+        }
+        if (body == null) body = transportBody(false);
         body.put("action", offset < 0 ? "previous" : "next");
+        body.put("skipped", queue.size());
+        body.put("error", "no playable songs in queue");
         return body;
     }
 

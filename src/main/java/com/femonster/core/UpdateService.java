@@ -20,6 +20,10 @@ public final class UpdateService {
     }
 
     public Map<String, Object> startInstall(Map<String, Object> release) {
+        String osName = System.getProperty("os.name", "").toLowerCase();
+        if (!osName.contains("win")) {
+            return error("Automatic updates are not available on macOS yet. Install a signed FE Monster app update manually.");
+        }
         String downloadUrl = SimpleJson.asString(release.get("downloadUrl"), "");
         String version = SimpleJson.asString(release.get("version"), "");
         if (downloadUrl.isBlank() || !downloadUrl.matches("(?i)^https?://.+")) {

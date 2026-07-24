@@ -139,25 +139,102 @@ try {
   await command("Page.enable");
   await command("Runtime.enable");
   await command("Page.navigate", { url: `${baseUrl}/?qa=community-offline` });
+  await command("Page.bringToFront");
   const evaluation = await command("Runtime.evaluate", {
     awaitPromise: true,
     returnByValue: true,
     expression: `(async () => {
       const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      const appStarted = performance.now();
+      while (typeof renderCommunityState !== 'function' && performance.now() - appStarted < 8000) {
+        await wait(100);
+      }
+      const pageCommunityState = await fetch('/api/community/state?provider=netease', {
+        cache: 'no-store'
+      }).then((response) => response.json());
+      if (typeof renderCommunityState === 'function') renderCommunityState(pageCommunityState);
       const started = performance.now();
       while (performance.now() - started < 8000) {
         const card = document.querySelector('#communityCard');
-        if (card?.dataset?.serverState) break;
+        if (card?.dataset?.serverState === 'offline') break;
         await wait(100);
       }
       const card = document.querySelector('#communityCard');
+      const rail = document.querySelector('#communityRailButton');
+      const railStyle = rail ? getComputedStyle(rail) : null;
+      const railRect = rail ? rail.getBoundingClientRect() : null;
+      const railVisible = Boolean(rail
+        && railStyle.display !== 'none'
+        && railStyle.visibility !== 'hidden'
+        && Number(railStyle.opacity) > 0
+        && railRect.width > 0
+        && railRect.height > 0);
+      const defaultDrawerHidden = card?.getAttribute('aria-hidden') === 'true' && Boolean(card?.inert);
+      if (railVisible) rail.click();
+      await wait(320);
+      const cardStyle = card ? getComputedStyle(card) : null;
+      const cardRect = card ? card.getBoundingClientRect() : null;
+      const drawerOpens = Boolean(card
+        && card.getAttribute('aria-hidden') === 'false'
+        && !card.inert
+        && cardStyle.visibility !== 'hidden'
+        && Number(cardStyle.opacity) > 0
+        && cardRect.width > 0
+        && cardRect.height > 0);
       const market = document.querySelector('#communityMarketButton');
       const messages = document.querySelector('#communityMessageButton');
+      const originalFetch = window.fetch;
+      let transientAttempts = 0;
+      let transientRecovered = false;
+      try {
+        window.fetch = async (input, options) => {
+          if (String(input?.url || input || '').includes('/__qa/community-transient')) {
+            transientAttempts += 1;
+            const recovered = transientAttempts >= 5;
+            return new Response(JSON.stringify(recovered ? { ok: true } : { error: 'transient' }), {
+              status: recovered ? 200 : 503,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+          return originalFetch(input, options);
+        };
+        transientRecovered = Boolean((await communityApiJson('/__qa/community-transient')).ok);
+      } finally {
+        window.fetch = originalFetch;
+      }
+
+      const originalCommunityApiJson = communityApiJson;
+      let queuedRefreshCalls = 0;
+      try {
+        communityApiJson = async () => {
+          queuedRefreshCalls += 1;
+          await wait(70);
+          return { ok: false, serverOnline: false, loggedIn: false, friends: [] };
+        };
+        state.community.loading = false;
+        state.community.refreshQueued = false;
+        const firstRefresh = refreshCommunityState('netease');
+        await wait(10);
+        refreshCommunityState('netease');
+        await firstRefresh;
+        await wait(180);
+      } finally {
+        communityApiJson = originalCommunityApiJson;
+      }
       return {
+        railVisible,
+        railExpanded: rail?.getAttribute('aria-expanded') || '',
+        defaultDrawerHidden,
+        drawerOpens,
+        pageServerOnline: pageCommunityState.serverOnline,
+        pageStateOk: pageCommunityState.ok,
         offlineClass: Boolean(card?.classList.contains('is-server-offline')),
         serverState: card?.dataset?.serverState || '',
         status: document.querySelector('#communityStatus')?.textContent?.trim() || '',
         networkActionsDisabled: Boolean(market?.disabled && messages?.disabled),
+        transientAttempts,
+        transientRecovered,
+        queuedRefreshCalls,
       };
     })()`,
   });
@@ -177,9 +254,16 @@ try {
     && result.reportedServerUrl === result.configuredServerUrl
     && result.afterStopServerOnline === false
     && result.afterStopOk === false
+    && result.railVisible
+    && result.railExpanded === "true"
+    && result.defaultDrawerHidden
+    && result.drawerOpens
     && result.offlineClass
     && result.serverState === "offline"
-    && result.networkActionsDisabled;
+    && result.networkActionsDisabled
+    && result.transientRecovered
+    && result.transientAttempts === 5
+    && result.queuedRefreshCalls >= 2;
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   process.exitCode = result.ok ? 0 : 1;
 } finally {

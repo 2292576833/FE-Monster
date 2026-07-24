@@ -1,0 +1,8 @@
+/.build-macos/
+/dist/
+/App/.build/
+/.DS_Store
+**/.DS_Store
+*.xcuserstate
+xcuserdata/
+

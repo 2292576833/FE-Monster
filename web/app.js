@@ -1,4 +1,18 @@
 const $ = (selector) => document.querySelector(selector);
+const URL_PARAMS = new URLSearchParams(window.location.search);
+const DESKTOP_SCENE_CLIENT = URL_PARAMS.get('client') === 'desktop-scene';
+const OFFICIAL_BROWSER_LOGIN_PROVIDER = (URL_PARAMS.get('official-login') || '').trim().toLowerCase();
+const OFFICIAL_BROWSER_LOGIN_MODE = ['netease', 'qq', 'kugou', 'qishui'].includes(OFFICIAL_BROWSER_LOGIN_PROVIDER);
+document.documentElement.classList.toggle('official-browser-login-mode', OFFICIAL_BROWSER_LOGIN_MODE);
+const desktopSceneRuntime = {
+  enabled: DESKTOP_SCENE_CLIENT,
+  pending: false,
+  ready: false,
+  applying: false,
+  queuedSnapshot: null,
+  publishFrame: 0,
+  channel: null
+};
 
 const els = {
   bootScreen: $('#bootScreen'),
@@ -9,12 +23,15 @@ const els = {
   appShell: $('.app-shell'),
   stage: $('.stage'),
   canvas: $('#orbCanvas'),
+  communityRailButton: $('#communityRailButton'),
   communityCard: $('#communityCard'),
   communityAvatar: $('#communityAvatar'),
   communityAvatarImage: $('#communityAvatarImage'),
   communityName: $('#communityName'),
   communityMeta: $('#communityMeta'),
   communityFeId: $('#communityFeId'),
+  communityListeningDuration: $('#communityListeningDuration'),
+  communityListeningSongs: $('#communityListeningSongs'),
   communityBroadcastButton: $('#communityBroadcastButton'),
   communityCollapseButton: $('#communityCollapseButton'),
   communityAddForm: $('#communityAddForm'),
@@ -41,6 +58,7 @@ const els = {
   communityMessageBubbles: $('#communityMessageBubbles'),
   communityBroadcastToast: $('#communityBroadcastToast'),
   communityListenBubbles: $('#communityListenBubbles'),
+  communityDanmakuLayer: $('#communityDanmakuLayer'),
   communityProfileDialog: $('#communityProfileDialog'),
   communityProfilePanel: $('#communityProfilePanel'),
   communityProfileHead: $('#communityProfileHead'),
@@ -70,6 +88,7 @@ const els = {
   listenMiniHandle: $('#listenMiniHandle'),
   listenMiniTitle: $('#listenMiniTitle'),
   listenMiniClose: $('#listenMiniClose'),
+  listenMiniCollapse: $('#listenMiniCollapse'),
   listenMiniStatus: $('#listenMiniStatus'),
   listenMiniTrack: $('#listenMiniTrack'),
   listenAcceptButton: $('#listenAcceptButton'),
@@ -248,6 +267,8 @@ const els = {
   playbackLyricPaletteAutoButton: $('#playbackLyricPaletteAutoButton'),
   playbackLyricPaletteCustomInput: $('#playbackLyricPaletteCustomInput'),
   playbackLyricPaletteResetButton: $('#playbackLyricPaletteResetButton'),
+  bilingualLyricsToggle: $('#bilingualLyricsToggle'),
+  bilingualLyricsValue: $('#bilingualLyricsValue'),
   diySceneNonePreset: $('#diySceneNonePreset'),
   diyScenePresetList: $('#diyScenePresetList'),
   diyCubePreset: $('#diyCubePreset'),
@@ -265,8 +286,13 @@ const els = {
   diyBookLyricPreset: $('#diyBookLyricPreset'),
   diyCubeIntensityControl: $('#diyCubeIntensityControl'),
   sonicPresetControls: $('#sonicPresetControls'),
+  sonicCenterColorInput: $('#sonicCenterColorInput'),
   sonicCoreColorInput: $('#sonicCoreColorInput'),
   sonicOuterColorInput: $('#sonicOuterColorInput'),
+  sonicFountainToggle: $('#sonicFountainToggle'),
+  sonicFountainColorInput: $('#sonicFountainColorInput'),
+  sonicStarfieldToggle: $('#sonicStarfieldToggle'),
+  sonicStarfieldColorInput: $('#sonicStarfieldColorInput'),
   sonicPaletteMode: $('#sonicPaletteMode'),
   sonicFollowCoverButton: $('#sonicFollowCoverButton'),
   sonicBrightnessRange: $('#sonicBrightnessRange'),
@@ -296,6 +322,7 @@ const els = {
   wallpaperScene: $('#wallpaperScene'),
   wallpaperImage: $('#wallpaperImage'),
   wallpaperVideo: $('#wallpaperVideo'),
+  wallpaperWebFrame: $('#wallpaperWebFrame'),
   wallpaperEmpty: $('#wallpaperEmpty'),
   wallpaperImportedModeButton: $('#wallpaperImportedModeButton'),
   wallpaperLiveModeButton: $('#wallpaperLiveModeButton'),
@@ -335,6 +362,8 @@ const els = {
   musicApiImportStatus: $('#musicApiImportStatus'),
   loginClose: $('#neteaseLoginClose'),
   loginRefresh: $('#neteaseQrRefresh'),
+  officialBrowserLoginButton: $('#officialBrowserLoginButton'),
+  officialBrowserLoginStatus: $('#officialBrowserLoginStatus'),
   loginCommunityStrip: $('#loginCommunityStrip'),
   loginCommunityName: $('#loginCommunityName'),
   loginCommunityId: $('#loginCommunityId'),
@@ -343,13 +372,6 @@ const els = {
   qrPlaceholder: $('#neteaseQrPlaceholder'),
   qrStatus: $('#neteaseQrStatus'),
   qrLoginStage: $('#qrLoginStage'),
-  qishuiPhoneLogin: $('#qishuiPhoneLogin'),
-  qishuiPhoneInput: $('#qishuiPhoneInput'),
-  qishuiCodeInput: $('#qishuiCodeInput'),
-  qishuiSendCodeButton: $('#qishuiSendCodeButton'),
-  qishuiLoginButton: $('#qishuiLoginButton'),
-  qishuiGuestButton: $('#qishuiGuestButton'),
-  qishuiPhoneStatus: $('#qishuiPhoneStatus'),
   androidLoginWorkflow: $('#androidLoginWorkflow'),
   androidQrHelp: $('#androidQrHelp'),
   androidQrSaveButton: $('#androidQrSaveButton'),
@@ -399,6 +421,8 @@ const els = {
   bookLyricPage: $('#bookLyricPage'),
   bookLyricList: $('#bookLyricList'),
   bookLyricArtist: $('#bookLyricArtist'),
+  multiRowLyricStage: $('#multiRowLyricStage'),
+  multiRowLyricList: $('#multiRowLyricList'),
   rainGlassCanvas: $('#rainGlassCanvas'),
   playbackLyricRig: $('#playbackLyricRig'),
   playbackLyricCore: $('#playbackLyricCore'),
@@ -410,6 +434,16 @@ const els = {
   qishuiPlaybackPhone: $('#qishuiPlaybackPhone'),
   qishuiPlaybackVisibilityToggle: $('#qishuiPlaybackVisibilityToggle'),
   qishuiPlaybackScaleToggle: $('#qishuiPlaybackScaleToggle'),
+  qishuiPlaybackDesktopToggle: $('#qishuiPlaybackDesktopToggle'),
+  qishuiPlaybackBilingualToggle: $('#qishuiPlaybackBilingualToggle'),
+  qishuiPlaybackMultiRowToggle: $('#qishuiPlaybackMultiRowToggle'),
+  qishuiPlaybackObrToggle: $('#qishuiPlaybackObrToggle'),
+  qishuiPlaybackObrLayoutToggle: $('#qishuiPlaybackObrLayoutToggle'),
+  qishuiPlaybackDanmakuToggle: $('#qishuiPlaybackDanmakuToggle'),
+  qishuiPlaybackDanmakuComposer: $('#qishuiPlaybackDanmakuComposer'),
+  qishuiPlaybackDanmakuForm: $('#qishuiPlaybackDanmakuComposer'),
+  qishuiPlaybackDanmakuInput: $('#qishuiPlaybackDanmakuInput'),
+  qishuiPlaybackDanmakuSend: $('#qishuiPlaybackDanmakuSend'),
   qishuiPlaybackTools: $('#qishuiPlaybackTools'),
   qishuiPlaybackBackdrop: $('#qishuiPlaybackBackdrop'),
   qishuiPlaybackCoverFrame: $('#qishuiPlaybackCoverFrame'),
@@ -463,8 +497,11 @@ const RENDER_PROFILE = detectRenderProfile();
 document.documentElement.dataset.renderTier = RENDER_PROFILE.tier;
 const PLAYBACK_REST_YAW = 0.22;
 const PLAYBACK_REST_PITCH = -0.16;
-const COVER_PARTICLE_LOW_WAVE_SEGMENTS = 100;
-const PLAYLIST_SONG_RENDER_RADIUS = 7;
+const COVER_PARTICLE_MACRO_WAVE_SEGMENTS = 12;
+const COVER_PARTICLE_LOW_WAVE_SEGMENTS = 200;
+const COVER_PARTICLE_SHOCK_DURATION_SECONDS = 0.36;
+const PLAYLIST_SONG_RENDER_RADIUS = 5;
+const PLAYLIST_SONG_RENDER_BUFFER = 2;
 const LOCAL_PLAYLIST_ID = 'local-import';
 const LOCAL_AUDIO_EXTENSIONS = new Set([
   'mp3', 'flac', 'wav', 'wave', 'm4a', 'aac', 'ogg', 'oga', 'opus', 'webm', 'mp4', 'mka',
@@ -484,13 +521,29 @@ const SONIC_TOPOGRAPHY_HALF = (SONIC_TOPOGRAPHY_GRID * SONIC_TOPOGRAPHY_SPACING)
 const SONIC_LOW_FREQUENCY_BAND_COUNT = 512;
 const SONIC_LOW_FREQUENCY_MIN_HZ = 20;
 const SONIC_LOW_FREQUENCY_MAX_HZ = 150;
-const SONIC_BASS_COLUMN_CLUSTER = Object.freeze({ count: 1009, radius: 18, center: 0, feather: 6 });
+const SONIC_BASS_COLUMN_CLUSTER = Object.freeze({
+  count: 1793,
+  radius: 24,
+  center: 0,
+  feather: 6,
+  coreRadius: 3,
+  coreFeather: 6,
+  coreHeightScale: 3,
+  innerHeightScale: 1.9,
+  outerHeightScale: 0.58
+});
 const SONIC_BASS_COLUMN_ATTACK_SECONDS = 0.07;
 const SONIC_BASS_COLUMN_RELEASE_SECONDS = 0.22;
 const SONIC_TOPOGRAPHY_RIPPLES = 10;
 const SONIC_TOPOGRAPHY_METEORS = reducedMotion ? Math.min(10, RENDER_PROFILE.topographyMeteors) : RENDER_PROFILE.topographyMeteors;
-const SONIC_TOPOGRAPHY_PARTICLES = reducedMotion ? Math.min(90, RENDER_PROFILE.topographyParticles) : RENDER_PROFILE.topographyParticles;
-const SONIC_TOPOGRAPHY_CAMERA = Object.freeze({ x: 98, y: 68, z: 98, fov: 60 });
+const SONIC_TOPOGRAPHY_PARTICLES = 640;
+const SONIC_STARFIELD_PARTICLES = 3600;
+const SONIC_STARFIELD_LAYERS = Object.freeze([
+  Object.freeze({ name: 'near', count: 900, minRadiusScale: 0.6, maxRadiusScale: 0.78, brightness: 1, drift: 4.8 }),
+  Object.freeze({ name: 'middle', count: 1200, minRadiusScale: 0.84, maxRadiusScale: 1.02, brightness: 0.68, drift: 3.6 }),
+  Object.freeze({ name: 'far', count: 1500, minRadiusScale: 1.08, maxRadiusScale: 1.36, brightness: 0.42, drift: 2.6 })
+]);
+const SONIC_TOPOGRAPHY_CAMERA = Object.freeze({ x: 98, y: 68, z: 98, fov: 44 });
 const BOOT_LOGO_TEXT = 'FE moster';
 const MUSIC_PROVIDERS = {
   netease: {
@@ -498,7 +551,9 @@ const MUSIC_PROVIDERS = {
     label: '\u7f51\u6613\u4e91',
     appName: '\u7f51\u6613\u4e91\u97f3\u4e50 App',
     apiUrl: 'http://127.0.0.1:3010',
-    setup: '\u91cd\u65b0\u8fd0\u884c run.cmd\uff0c\u5e94\u7528\u4f1a\u81ea\u52a8\u542f\u52a8\u7f51\u6613\u4e91 API',
+    setup: '\u8bf7\u5728\u767b\u5f55\u9875\u5bfc\u5165\u7f51\u6613\u4e91 API \u63d2\u4ef6',
+    enabled: false,
+    configured: false,
     loginQr: true
   },
   qq: {
@@ -506,7 +561,9 @@ const MUSIC_PROVIDERS = {
     label: 'QQ\u97f3\u4e50',
     appName: 'QQ\u97f3\u4e50 App',
     apiUrl: 'http://127.0.0.1:3011',
-    setup: '\u9700\u8981\u542f\u52a8\u652f\u6301 /login/qr/key \u7684 QQ\u97f3\u4e50 API \u670d\u52a1\u5230 3011',
+    setup: '\u8bf7\u5728\u767b\u5f55\u9875\u5bfc\u5165 QQ\u97f3\u4e50 API \u63d2\u4ef6',
+    enabled: false,
+    configured: false,
     loginQr: true
   },
   kugou: {
@@ -514,8 +571,9 @@ const MUSIC_PROVIDERS = {
     label: '\u9177\u72d7\u97f3\u4e50',
     appName: '\u9177\u72d7\u97f3\u4e50 App',
     apiUrl: 'http://127.0.0.1:3012',
-    setup: '\u9700\u8981\u542f\u52a8\u652f\u6301 /login/qr/key \u7684 \u9177\u72d7\u97f3\u4e50 API \u670d\u52a1\u5230 3012',
-    configured: true,
+    setup: '\u8bf7\u5728\u767b\u5f55\u9875\u5bfc\u5165\u9177\u72d7\u97f3\u4e50 API \u63d2\u4ef6',
+    enabled: false,
+    configured: false,
     loginQr: true
   },
   qishui: {
@@ -523,7 +581,8 @@ const MUSIC_PROVIDERS = {
     label: '\u6c7d\u6c34\u97f3\u4e50',
     appName: '\u6c7d\u6c34\u97f3\u4e50 App',
     apiUrl: 'http://127.0.0.1:3013',
-    setup: '\u8bf7\u5728\u767b\u5f55\u9875\u5bfc\u5165\u6c7d\u6c34\u97f3\u4e50 API \u914d\u7f6e\u6216 ZIP \u5305',
+    setup: '\u8bf7\u5728\u767b\u5f55\u9875\u5bfc\u5165\u6c7d\u6c34\u97f3\u4e50 API \u63d2\u4ef6',
+    enabled: false,
     configured: false,
     loginQr: false
   }
@@ -560,11 +619,30 @@ const RENDER_CLARITY_PREFS_KEY = 'fe-monster-render-clarity-v1';
 const PRESET_FSR_PREFS_KEY = 'fe-monster-preset-fsr-v1';
 const TEXT_PALETTE_PREFS_KEY = 'fe-monster-text-preset-palettes-v1';
 const TEXT_FONT_PREFS_KEY = 'fe-monster-text-preset-fonts-v1';
+const TEXT_TRANSFORM_PREFS_KEY = 'fe-monster-text-preset-transforms-v1';
 const PLAYBACK_LYRIC_PALETTE_PREFS_KEY = 'fe-monster-playback-lyric-palette-v1';
+const BILINGUAL_LYRICS_PREFS_KEY = 'fe-monster-bilingual-lyrics-v1';
+const MULTI_ROW_LYRICS_PREFS_KEY = 'fe-monster-multi-row-lyrics-v1';
 const SONIC_SETTINGS_PREFS_KEY = 'fe-monster-sonic-settings-v1';
+const SONIC_CAMERA_FRAMING_VERSION = 3;
+const GOOGLE_OBR_PREFS_KEY = 'fe-monster-google-obr-spatial-audio-v1';
+const GOOGLE_OBR_BACKEND = 'google-obr-official';
+const GOOGLE_OBR_REVISION = '478dc7c752d5eccae534635139ff0253eee3a14a';
+const GOOGLE_OBR_WORKLET_URL = 'vendor/google-obr/obr-worklet.js?v=478dc7c752d5-surround2';
+const GOOGLE_OBR_CHANNEL_LAYOUTS = Object.freeze({
+  stereo: Object.freeze({ id: 'stereo', label: '2.0', channels: 2 }),
+  '5.1': Object.freeze({ id: '5.1', label: '5.1', channels: 6 }),
+  '7.1': Object.freeze({ id: '7.1', label: '7.1', channels: 8 })
+});
+const GOOGLE_OBR_RECOVERY_DELAYS = Object.freeze([250, 800, 2000, 5000, 10000]);
 const DEFAULT_SONIC_SETTINGS = Object.freeze({
+  centerColor: null,
   coreColor: null,
   outerColor: null,
+  fountainEnabled: false,
+  fountainColor: '#ffffff',
+  starfieldEnabled: false,
+  starfieldColor: '#dff7ff',
   brightness: 1,
   exposure: 0,
   columnHeight: 1,
@@ -717,6 +795,10 @@ function loadRenderClarityPreferences() {
 }
 
 function initialAutoRenderClarityPercent() {
+  if (ANDROID_CLIENT) {
+    if (RENDER_PROFILE.tier === 'economy') return 80;
+    return window.feMonsterAndroidPerformanceTier === 'high' ? 100 : 90;
+  }
   if (MOBILE_RENDER_TARGET) return RENDER_PROFILE.tier === 'economy' ? 60 : 75;
   if (RENDER_PROFILE.tier === 'economy') return 65;
   if (RENDER_PROFILE.tier === 'balanced') return 85;
@@ -815,6 +897,40 @@ function loadTextFontPreferences() {
 
 const INITIAL_TEXT_FONT_PREFERENCES = loadTextFontPreferences();
 
+function normalizeTextPresetTransform(source = {}) {
+  const bounded = (value, fallback, minimum, maximum) => {
+    const numeric = Number(value);
+    return clamp(Number.isFinite(numeric) ? numeric : fallback, minimum, maximum);
+  };
+  const rotation = (value) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return 0;
+    return ((numeric + 180) % 360 + 360) % 360 - 180;
+  };
+  return {
+    rotateX: rotation(source?.rotateX),
+    rotateY: rotation(source?.rotateY),
+    rotateZ: rotation(source?.rotateZ),
+    scale: bounded(source?.scale, 1, 0.5, 2.5)
+  };
+}
+
+function loadTextPresetTransforms() {
+  let source = {};
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(TEXT_TRANSFORM_PREFS_KEY) || '{}');
+    source = stored?.transforms && typeof stored.transforms === 'object' ? stored.transforms : stored;
+  } catch (error) {
+    source = {};
+  }
+  return TEXT_PALETTE_PRESET_IDS.reduce((transforms, preset) => {
+    transforms[preset] = normalizeTextPresetTransform(source?.[preset]);
+    return transforms;
+  }, {});
+}
+
+const INITIAL_TEXT_PRESET_TRANSFORMS = loadTextPresetTransforms();
+
 function loadPlaybackLyricPalettePreference() {
   try {
     const stored = JSON.parse(window.localStorage.getItem(PLAYBACK_LYRIC_PALETTE_PREFS_KEY) || '{}');
@@ -826,30 +942,94 @@ function loadPlaybackLyricPalettePreference() {
 
 const INITIAL_PLAYBACK_LYRIC_PALETTE_PREFERENCE = loadPlaybackLyricPalettePreference();
 
+function loadBilingualLyricsPreference() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(BILINGUAL_LYRICS_PREFS_KEY) || '{}');
+    if (typeof stored === 'boolean') return stored;
+    return stored?.enabled !== false;
+  } catch (error) {
+    return true;
+  }
+}
+
+const INITIAL_BILINGUAL_LYRICS_ENABLED = loadBilingualLyricsPreference();
+
+function loadMultiRowLyricsPreference() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(MULTI_ROW_LYRICS_PREFS_KEY) || '{}');
+    if (typeof stored === 'boolean') return stored;
+    return stored?.enabled === true;
+  } catch (error) {
+    return false;
+  }
+}
+
+const INITIAL_MULTI_ROW_LYRICS_ENABLED = loadMultiRowLyricsPreference();
+
+function loadGoogleObrPreference() {
+  try {
+    const serialized = window.localStorage.getItem(GOOGLE_OBR_PREFS_KEY);
+    if (serialized === null) return true;
+    const stored = JSON.parse(serialized);
+    if (typeof stored === 'boolean') return stored;
+    return stored?.enabled !== false;
+  } catch (error) {
+    return true;
+  }
+}
+
+const INITIAL_GOOGLE_OBR_REQUESTED = loadGoogleObrPreference();
+
+function normalizeGoogleObrChannelLayout(value) {
+  return GOOGLE_OBR_CHANNEL_LAYOUTS[value]?.id || 'stereo';
+}
+
+function loadGoogleObrChannelLayoutPreference() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(GOOGLE_OBR_PREFS_KEY) || '{}');
+    return normalizeGoogleObrChannelLayout(stored?.channelLayout);
+  } catch (error) {
+    return 'stereo';
+  }
+}
+
+const INITIAL_GOOGLE_OBR_CHANNEL_LAYOUT = loadGoogleObrChannelLayoutPreference();
+
 function normalizeSonicSettings(source = {}) {
   const normalizeOptionalColor = (value) => (
     typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value.trim())
       ? value.trim().toLowerCase()
       : null
   );
+  const normalizeColor = (value, fallback) => normalizeOptionalColor(value) || fallback;
   const bounded = (value, fallback, minimum, maximum) => {
     const numeric = Number(value);
     return clamp(Number.isFinite(numeric) ? numeric : fallback, minimum, maximum);
   };
   return {
+    centerColor: normalizeOptionalColor(source?.centerColor),
     coreColor: normalizeOptionalColor(source?.coreColor),
     outerColor: normalizeOptionalColor(source?.outerColor),
+    fountainEnabled: source?.fountainEnabled === true,
+    fountainColor: normalizeColor(source?.fountainColor, DEFAULT_SONIC_SETTINGS.fountainColor),
+    starfieldEnabled: source?.starfieldEnabled === true,
+    starfieldColor: normalizeColor(source?.starfieldColor, DEFAULT_SONIC_SETTINGS.starfieldColor),
     brightness: bounded(source?.brightness, DEFAULT_SONIC_SETTINGS.brightness, 0.4, 2),
     exposure: bounded(source?.exposure, DEFAULT_SONIC_SETTINGS.exposure, -1.5, 1.5),
     columnHeight: bounded(source?.columnHeight, DEFAULT_SONIC_SETTINGS.columnHeight, 0.5, 2.5),
-    fov: bounded(source?.fov, DEFAULT_SONIC_SETTINGS.fov, 50, 75),
+    fov: bounded(source?.fov, DEFAULT_SONIC_SETTINGS.fov, 42, 68),
     smoothing: bounded(source?.smoothing, DEFAULT_SONIC_SETTINGS.smoothing, 0.5, 2)
   };
 }
 
 function loadSonicSettingsPreferences() {
   try {
-    return normalizeSonicSettings(JSON.parse(window.localStorage.getItem(SONIC_SETTINGS_PREFS_KEY) || '{}'));
+    const stored = JSON.parse(window.localStorage.getItem(SONIC_SETTINGS_PREFS_KEY) || '{}');
+    if (stored?.cameraFramingVersion !== SONIC_CAMERA_FRAMING_VERSION
+        && [50, 55].includes(Number(stored?.fov))) {
+      stored.fov = SONIC_TOPOGRAPHY_CAMERA.fov;
+    }
+    return normalizeSonicSettings(stored);
   } catch (error) {
     return normalizeSonicSettings();
   }
@@ -863,6 +1043,11 @@ const COMMUNITY_BIO_KEY = 'fe-monster-community-bio-v1';
 const COMMUNITY_MESSAGE_DND_KEY = 'fe-monster-community-message-dnd-v1';
 const COMMUNITY_CARD_COLLAPSED_KEY = 'fe-monster-community-card-collapsed-v1';
 const COMMUNITY_FAVORITE_LISTEN_KEY = 'fe-monster-community-favorite-listen-v1';
+const COMMUNITY_LISTENING_STATS_KEY = 'fe-monster-community-listening-stats-v1';
+const COMMUNITY_API_RETRY_DELAYS = Object.freeze([120, 320, 700, 1400]);
+const COMMUNITY_API_TIMEOUT_MS = 8000;
+const COMMUNITY_EVENT_STALE_MS = 35000;
+const COMMUNITY_EVENT_HEARTBEAT_MS = 10000;
 const COMMUNITY_FAVORITE_LISTEN_THRESHOLD_MS = 2 * 60 * 60 * 1000;
 const COMMUNITY_FAVORITE_LISTEN_NOTIFY_MS = 24 * 60 * 60 * 1000;
 const COMMUNITY_FAVORITE_BUBBLE_MS = 2000;
@@ -1081,11 +1266,13 @@ function detectRenderProfile() {
 
   if (MOBILE_RENDER_TARGET) {
     const lowEndAndroid = ANDROID_CLIENT && window.feMonsterAndroidPerformanceTier === 'low';
+    const highEndAndroid = ANDROID_CLIENT && window.feMonsterAndroidPerformanceTier === 'high';
+    const mobileDprMax = lowEndAndroid ? 1 : highEndAndroid ? 2 : ANDROID_CLIENT ? 1.5 : 1;
     return Object.freeze({
       tier: lowEndAndroid ? 'economy' : 'mobile',
-      canvasDprMax: 1,
-      playbackDprMax: 1,
-      webglDprMax: 1,
+      canvasDprMax: mobileDprMax,
+      playbackDprMax: mobileDprMax,
+      webglDprMax: mobileDprMax,
       cubeGrid: lowEndAndroid ? 15 : 18,
       topographyGrid: lowEndAndroid ? 64 : 84,
       topographyMeteors: lowEndAndroid ? 3 : 6,
@@ -1395,6 +1582,7 @@ const state = {
     cache: new Map()
   },
   userPlaylists: [],
+  recommendedPlaylists: [],
   localPlaylistSongs: [],
   localObjectUrls: new Set(),
   localQueueActive: false,
@@ -1407,7 +1595,12 @@ const state = {
   songFocusIndex: 0,
   songWheelDelta: 0,
   songWheelFrame: 0,
+  songCoverHydrationTimer: 0,
   songButtonCache: [],
+  songButtonBackCache: [],
+  shelfSongButtonsById: new Map(),
+  shelfCurrentSongButtons: [],
+  shelfCurrentSongId: '',
   playlistSongPageOpen: false,
   playbackPlaylistPickerOpen: false,
   playlistLoadRequestId: 0,
@@ -1454,7 +1647,19 @@ const state = {
   textFontPreferences: INITIAL_TEXT_FONT_PREFERENCES,
   textFontAvailability: {},
   textFontStack: '',
+  textPresetTransforms: INITIAL_TEXT_PRESET_TRANSFORMS,
+  textPresetGesture: {
+    dragging: false,
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    startRotateX: 0,
+    startRotateY: 0
+  },
   playbackLyricPalettePreference: INITIAL_PLAYBACK_LYRIC_PALETTE_PREFERENCE,
+  bilingualLyricsEnabled: INITIAL_BILINGUAL_LYRICS_ENABLED,
+  multiRowLyricsEnabled: INITIAL_MULTI_ROW_LYRICS_ENABLED,
+  multiRowLyricSignature: '',
   lyricBrightness: 1.12,
   lyricSpeed: 1,
   cubeIntensity: 1.1,
@@ -1469,6 +1674,8 @@ const state = {
   wallpaperSource: 'imported',
   activeWallpaperId: '',
   activeWallpaperIds: { imported: '', live: '' },
+  wallpaperNativeActivationId: '',
+  wallpaperNativeActivationPending: '',
   wallpaperLoading: false,
   sandbox: {
     open: false,
@@ -1588,6 +1795,13 @@ const state = {
     bass: 0,
     energy: 0,
     beat: 0,
+    waveTime: 0,
+    shockAge: COVER_PARTICLE_SHOCK_DURATION_SECONDS,
+    shockStrength: 0,
+    shockCooldown: 0,
+    shockArmed: true,
+    lastShockDrive: 0,
+    lastBassInput: 0,
     lastWidth: 0,
     lastHeight: 0,
     lastDpr: 0,
@@ -1704,20 +1918,21 @@ const state = {
   windowDragging: false,
   windowDragSuppressClick: false,
   activeProvider: 'netease',
-  providers: MUSIC_PROVIDERS,
+  providers: Object.fromEntries(
+    Object.entries(MUSIC_PROVIDERS).map(([id, provider]) => [id, { ...provider }])
+  ),
   loginStatusByProvider: {},
   loginStatusRetryTimers: {},
   loginStatusRetryAttempts: {},
   loginQrKey: '',
   loginQrTimer: 0,
   loginQrLoading: false,
+  officialBrowserLoginSession: '',
+  officialBrowserLoginProvider: '',
+  officialBrowserLoginTimer: 0,
+  officialBrowserLoginLoading: false,
   musicApiImporting: false,
   loginQrRequestId: 0,
-  qishuiPhoneSending: false,
-  qishuiPhoneVerifying: false,
-  qishuiPhoneCooldownUntil: 0,
-  qishuiPhoneCooldownTimer: 0,
-  qishuiGuestMode: false,
   qishuiPlaybackCard: {
     wheelDelta: 0,
     switching: false,
@@ -1750,12 +1965,17 @@ const state = {
     lastProvider: '',
     friendsSignature: '',
     refreshTimer: 0,
+    refreshRetryDelay: 1200,
     eventSource: null,
     eventKey: '',
     eventCursor: '',
     eventReconnectTimer: 0,
     eventReconnectDelay: 1200,
     eventConnected: false,
+    eventLastActivityAt: 0,
+    eventHeartbeatTimer: 0,
+    eventSeenSeqs: new Set(),
+    eventSeenOrder: [],
     selectedFriendId: '',
     messages: [],
     messageTimer: 0,
@@ -1768,8 +1988,12 @@ const state = {
     broadcastSeenKey: '',
     broadcastUnread: false,
     broadcastToastTimer: 0,
-    cardCollapsed: loadCommunityCardCollapsed(),
+    cardCollapsed: false,
     favoriteListening: loadCommunityFavoriteListening(),
+    listeningStats: loadCommunityListeningStats(),
+    listeningStatsLastAt: 0,
+    listeningStatsSavedAt: 0,
+    listeningStatsPlaying: false,
     loveBubbles: [],
     messagePanelX: 0,
     messagePanelY: 0,
@@ -1813,8 +2037,20 @@ const state = {
     listenSyncSignature: '',
     listenSyncing: false,
     listenUnavailableSignature: '',
+    listenUnavailableSignatures: new Set(),
+    listenStateRevision: 0,
+    listenDismissedIds: new Set(),
+    listenRecoveryActive: false,
+    danmakuOpen: false,
+    danmakuSeenIds: new Set(),
+    danmakuSeenOrder: [],
+    danmakuBubbleTimers: new Map(),
+    danmakuPointerX: Number.NaN,
+    danmakuPointerY: Number.NaN,
+    danmakuRepelFrame: 0,
     listenMiniX: 22,
     listenMiniY: 118,
+    listenMiniCollapsed: false,
     listenMiniDragging: false,
     listenMiniPointerId: null,
     listenMiniStartX: 0,
@@ -1901,11 +2137,32 @@ const state = {
       diagnostics: null
     }
   },
+  obrSpatialAudio: {
+    requested: INITIAL_GOOGLE_OBR_REQUESTED,
+    channelLayout: INITIAL_GOOGLE_OBR_CHANNEL_LAYOUT,
+    enabled: false,
+    loading: false,
+    refreshQueued: false,
+    backend: 'uninitialized',
+    revision: '',
+    error: '',
+    processedBlocks: 0,
+    inputRms: 0,
+    outputRms: 0,
+    graph: null,
+    graphPromise: null,
+    activationPromise: null,
+    operationId: 0,
+    recoveryTimer: 0,
+    recoveryAttempt: 0,
+    previousRuntimeBackend: ''
+  },
   audioAnalysis: {
     context: null,
     analyser: null,
     source: null,
     sourceMode: '',
+    outputConnected: false,
     backend: 'web-audio',
     output: 'windows-wasapi',
     sampleRate: 0,
@@ -2007,6 +2264,8 @@ const state = {
     meteorMaterial: null,
     particleMesh: null,
     particleMaterial: null,
+    starfield: null,
+    starfieldMaterial: null,
     dummy: null,
     palette: null,
     theme: null,
@@ -2016,6 +2275,7 @@ const state = {
     meteorIndex: 0,
     particles: [],
     particleIndex: 0,
+    fountainEmitters: [],
     lastWidth: 0,
     lastHeight: 0,
     lastMotionAt: 0,
@@ -2024,6 +2284,7 @@ const state = {
     autoYaw: 0,
     lastBeat: 0,
     lastMeteorAt: 0,
+    lastFountainAt: 0,
     pulseCooldown: 0,
     meteorCooldown: 0,
     bass: 0,
@@ -2087,6 +2348,7 @@ const state = {
     mouseActive: false,
     lastMouseAt: 0,
     quality: RENDER_PROFILE.orbQualityMax,
+    drawable: [],
     lastFrameTime: 0,
     lastPaintAt: 0,
     lastSpectrumAt: 0,
@@ -2119,10 +2381,53 @@ async function apiJson(path, options = {}) {
   return json;
 }
 
+async function communityApiJson(path, options = {}) {
+  const {
+    retryDelays = COMMUNITY_API_RETRY_DELAYS,
+    timeoutMs = COMMUNITY_API_TIMEOUT_MS,
+    signal: externalSignal,
+    ...requestOptions
+  } = options;
+  const method = safeText(requestOptions.method, 'GET').toUpperCase();
+  const delays = method === 'GET' || method === 'HEAD'
+    ? (Array.isArray(retryDelays) ? retryDelays : COMMUNITY_API_RETRY_DELAYS)
+    : [];
+
+  for (let attempt = 0; ; attempt += 1) {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const abortFromExternal = () => controller?.abort(externalSignal?.reason);
+    if (externalSignal?.aborted) abortFromExternal();
+    else externalSignal?.addEventListener?.('abort', abortFromExternal, { once: true });
+    const timeout = controller && timeoutMs > 0
+      ? window.setTimeout(() => controller.abort(new DOMException('社区请求超时', 'TimeoutError')), timeoutMs)
+      : 0;
+    try {
+      return await apiJson(path, {
+        ...requestOptions,
+        signal: controller?.signal || externalSignal
+      });
+    } catch (error) {
+      const retryableStatus = [408, 425, 429, 502, 503, 504].includes(Number(error?.status));
+      const retryableNetwork = error instanceof TypeError
+        || error?.name === 'AbortError'
+        || error?.name === 'TimeoutError';
+      if (externalSignal?.aborted || attempt >= delays.length || (!retryableStatus && !retryableNetwork)) {
+        throw error;
+      }
+      const delay = Math.max(0, Number(delays[attempt]) || 0);
+      if (delay) await new Promise((resolve) => window.setTimeout(resolve, delay));
+    } finally {
+      window.clearTimeout(timeout);
+      externalSignal?.removeEventListener?.('abort', abortFromExternal);
+    }
+  }
+}
+
 function applyRuntimeDataset() {
   document.documentElement.dataset.clientMode = state.clientRuntime.mode;
   document.documentElement.dataset.renderPreset = state.clientRuntime.renderPreset;
   document.documentElement.dataset.audioBackend = state.clientRuntime.audioBackend;
+  document.documentElement.dataset.audioSpatialBackend = state.clientRuntime.audioSpatialBackend;
   document.documentElement.dataset.gpuAcceleration = String(state.clientRuntime.settings.gpuAcceleration);
   document.documentElement.dataset.directX11 = String(state.clientRuntime.settings.directX11);
   document.documentElement.dataset.gestureControl = String(state.clientRuntime.settings.gestureControl);
@@ -2466,30 +2771,8 @@ function observeRenderClarityFrame(now = performance.now()) {
   clarity.frameSamples.push(frameMs);
   if (clarity.frameSamples.length > 60) clarity.frameSamples.shift();
   if (now - clarity.lastUiUpdateAt >= 500) syncRenderClarityControls(now);
-  if (!clarity.auto || clarity.frameSamples.length < 60) return;
-
-  const p90FrameMs = renderClarityPercentile(clarity.frameSamples, 0.9);
-  const targetFrameMs = sceneKey === 'home'
-    ? Math.max(clarity.targetFrameMs, RENDER_PROFILE.targetFrameMs)
-    : clarity.targetFrameMs;
-  if (reducedMotion) return;
-  if (p90FrameMs > targetFrameMs * 1.08) {
-    clarity.overBudgetFrames += 1;
-    clarity.underBudgetFrames = Math.max(0, clarity.underBudgetFrames - 2);
-  } else if (p90FrameMs < targetFrameMs * 0.72) {
-    clarity.underBudgetFrames += 1;
-    clarity.overBudgetFrames = Math.max(0, clarity.overBudgetFrames - 2);
-  } else {
-    clarity.overBudgetFrames = Math.max(0, clarity.overBudgetFrames - 1);
-    clarity.underBudgetFrames = Math.max(0, clarity.underBudgetFrames - 1);
-  }
-  if (now - clarity.lastAdjustmentAt < 1500) return;
-  const current = autoRenderClarityPercent(sceneKey);
-  if (clarity.overBudgetFrames >= 24) {
-    setAutoRenderClarityPercent(sceneKey, current - RENDER_CLARITY_STEP, now);
-  } else if (clarity.underBudgetFrames >= 180) {
-    setAutoRenderClarityPercent(sceneKey, current + RENDER_CLARITY_STEP, now);
-  }
+  // Rendering quality is deliberately fixed after initialization. Frame samples
+  // remain diagnostic-only so scene clarity never changes while the user watches.
 }
 
 function sandboxRenderPixelRatio() {
@@ -2873,7 +3156,13 @@ async function refreshClientRuntime() {
     state.clientRuntime.renderPreset = runtime.renderPreset || state.clientRuntime.renderPreset;
     state.clientRuntime.renderBackend = runtime.renderBackend || state.clientRuntime.renderBackend;
     state.clientRuntime.audioBackend = runtime.audioBackend || state.clientRuntime.audioBackend;
-    state.clientRuntime.audioSpatialBackend = runtime.audioSpatialBackend || state.clientRuntime.audioSpatialBackend;
+    const runtimeSpatialBackend = runtime.audioSpatialBackend || state.clientRuntime.audioSpatialBackend;
+    if (state.obrSpatialAudio.enabled) {
+      state.obrSpatialAudio.previousRuntimeBackend = runtimeSpatialBackend;
+      state.clientRuntime.audioSpatialBackend = GOOGLE_OBR_BACKEND;
+    } else {
+      state.clientRuntime.audioSpatialBackend = runtimeSpatialBackend;
+    }
     state.clientRuntime.audioDecoder = runtime.audioDecoder || state.clientRuntime.audioDecoder;
     state.clientRuntime.nativeAudioActive = nativeAudio.active === true;
     Object.assign(state.clientRuntime.settings, {
@@ -3664,6 +3953,35 @@ function mediaIsSameOrigin(url) {
   }
 }
 
+function mediaIsLocalMusicApi(url) {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url, window.location.href);
+    if (parsed.protocol !== 'http:' || parsed.pathname !== '/audio') return false;
+    return Object.values(state.providers || {}).some((provider) => {
+      try {
+        return new URL(provider.apiUrl || '').origin === parsed.origin;
+      } catch (error) {
+        return false;
+      }
+    });
+  } catch (error) {
+    return false;
+  }
+}
+
+function browserAudioUrl(url) {
+  const source = safeText(url, '').trim();
+  if (!source || mediaIsSameOrigin(source) || mediaIsLocalMusicApi(source)) return source;
+  try {
+    const parsed = new URL(source, window.location.href);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return source;
+    return `/api/audio/stream?url=${encodeURIComponent(parsed.href)}`;
+  } catch (error) {
+    return source;
+  }
+}
+
 const WALLPAPER_PREFS_KEY = 'fe-monster-wallpaper-prefs';
 const WALLPAPER_PREFS_VERSION = 6;
 const WALLPAPER_FIT_MODES = new Set(['fill', 'fit', 'stretch', 'center', 'tile']);
@@ -3816,7 +4134,461 @@ function applyBridgeVisual() {
   updateSpectrumUi();
 }
 
-async function ensureAudioAnalysis() {
+function saveGoogleObrPreference(enabled = state.obrSpatialAudio.requested) {
+  try {
+    window.localStorage.setItem(GOOGLE_OBR_PREFS_KEY, JSON.stringify({
+      enabled: !!enabled,
+      channelLayout: normalizeGoogleObrChannelLayout(state.obrSpatialAudio.channelLayout)
+    }));
+  } catch (error) {
+  }
+}
+
+function googleObrStatusLabel() {
+  const spatial = state.obrSpatialAudio;
+  const layout = GOOGLE_OBR_CHANNEL_LAYOUTS[normalizeGoogleObrChannelLayout(spatial.channelLayout)];
+  if (spatial.enabled) return `Google OBR 官方内核运行中 · ${layout.label}`;
+  if (spatial.recoveryTimer) return `Google OBR 正在恢复连接 · ${layout.label}`;
+  if (spatial.loading) return '正在加载 Google OBR 官方内核';
+  if (spatial.backend === 'waiting-for-audio' || (spatial.requested && spatial.backend === 'uninitialized')) {
+    return 'Google OBR 已待命，播放音乐后启用';
+  }
+  if (spatial.backend === 'capture-stream-unsupported') return '当前音源无法接入 Google OBR';
+  if (spatial.error) return `Google OBR 不可用：${spatial.error}`;
+  return 'Google OBR 官方内核空间音频';
+}
+
+function syncGoogleObrToggle() {
+  const button = els.qishuiPlaybackObrToggle;
+  const layoutButton = els.qishuiPlaybackObrLayoutToggle;
+  const spatial = state.obrSpatialAudio;
+  const layout = GOOGLE_OBR_CHANNEL_LAYOUTS[normalizeGoogleObrChannelLayout(spatial.channelLayout)];
+  document.documentElement.dataset.obrSpatialBackend = spatial.backend;
+  document.documentElement.dataset.obrSpatialEnabled = String(spatial.enabled);
+  document.documentElement.dataset.obrChannelLayout = layout.id;
+  if (layoutButton) {
+    layoutButton.textContent = layout.label;
+    layoutButton.dataset.obrChannelLayout = layout.id;
+    layoutButton.setAttribute('aria-label', `切换 Google OBR 声道布局，当前 ${layout.label}`);
+    layoutButton.title = `Google OBR 虚拟声道：${layout.label}`;
+    layoutButton.disabled = spatial.loading;
+  }
+  if (!button) return;
+  const status = googleObrStatusLabel();
+  const action = spatial.enabled ? '关闭' : spatial.requested ? '取消' : '开启';
+  const label = spatial.loading ? status : `${action}${status}`;
+  button.classList.toggle('is-active', spatial.enabled);
+  button.classList.toggle('is-loading', spatial.loading);
+  button.setAttribute('aria-pressed', String(spatial.enabled));
+  button.setAttribute('aria-busy', String(spatial.loading));
+  button.dataset.obrBackend = spatial.backend;
+  button.setAttribute('aria-label', label);
+  button.title = spatial.enabled && spatial.processedBlocks
+    ? `${label} · 已处理 ${spatial.processedBlocks} 个 PCM 块`
+    : label;
+}
+
+function setAudioParamSmoothly(parameter, value, context, duration = 0.045) {
+  if (!parameter || !context) return;
+  const now = context.currentTime;
+  const current = Number.isFinite(parameter.value) ? parameter.value : value;
+  parameter.cancelScheduledValues(now);
+  parameter.setValueAtTime(current, now);
+  parameter.linearRampToValueAtTime(value, now + duration);
+}
+
+function ensureDryAudioOutput(analysis) {
+  if (analysis.dryGain || !analysis.context || !analysis.analyser) return analysis.dryGain;
+  analysis.dryGain = analysis.context.createGain();
+  analysis.dryGain.gain.value = 1;
+  analysis.analyser.connect(analysis.dryGain);
+  analysis.dryGain.connect(analysis.context.destination);
+  analysis.outputConnected = true;
+  return analysis.dryGain;
+}
+
+function setGoogleObrRuntimeBackend(active) {
+  const spatial = state.obrSpatialAudio;
+  if (active) {
+    if (!spatial.previousRuntimeBackend) {
+      spatial.previousRuntimeBackend = state.clientRuntime.audioSpatialBackend || 'x3daudio';
+    }
+    state.clientRuntime.audioSpatialBackend = GOOGLE_OBR_BACKEND;
+  } else if (spatial.previousRuntimeBackend) {
+    state.clientRuntime.audioSpatialBackend = spatial.previousRuntimeBackend;
+    spatial.previousRuntimeBackend = '';
+  }
+  applyRuntimeDataset();
+}
+
+function clearGoogleObrRecovery() {
+  const spatial = state.obrSpatialAudio;
+  window.clearTimeout(spatial.recoveryTimer);
+  spatial.recoveryTimer = 0;
+}
+
+function disposeOfficialGoogleObrGraph(graph = state.obrSpatialAudio.graph) {
+  if (!graph) return;
+  window.clearTimeout(graph.disableTimer);
+  graph.disableTimer = 0;
+  if (graph.pendingProcess) {
+    const pending = graph.pendingProcess;
+    graph.pendingProcess = null;
+    window.clearTimeout(pending.timeout);
+    pending.reject(new Error('Google OBR 音频链路已重建'));
+  }
+  try { graph.node.port.postMessage({ type: 'set-enabled', enabled: false }); } catch (error) {}
+  try { graph.node.disconnect(); } catch (error) {}
+  try { graph.wetGain.disconnect(); } catch (error) {}
+  try { graph.node.port.close(); } catch (error) {}
+  graph.node.onprocessorerror = null;
+  graph.ready = false;
+  if (state.obrSpatialAudio.graph === graph) state.obrSpatialAudio.graph = null;
+}
+
+function scheduleGoogleObrRecovery() {
+  const spatial = state.obrSpatialAudio;
+  if (
+    !spatial.requested ||
+    spatial.recoveryTimer ||
+    !els.audio?.src ||
+    document.hidden ||
+    navigator.onLine === false
+  ) return;
+  const attempt = Math.min(spatial.recoveryAttempt, GOOGLE_OBR_RECOVERY_DELAYS.length - 1);
+  const delay = GOOGLE_OBR_RECOVERY_DELAYS[attempt];
+  spatial.recoveryAttempt = Math.min(spatial.recoveryAttempt + 1, GOOGLE_OBR_RECOVERY_DELAYS.length - 1);
+  spatial.recoveryTimer = window.setTimeout(async () => {
+    spatial.recoveryTimer = 0;
+    if (!spatial.requested || !els.audio?.src) return;
+    await ensureAudioAnalysis({ announceObrFailure: false });
+    if (spatial.requested && !spatial.enabled) scheduleGoogleObrRecovery();
+  }, delay);
+  syncGoogleObrToggle();
+}
+
+function failGoogleObr(error, options = {}) {
+  const spatial = state.obrSpatialAudio;
+  const message = safeText(error && error.message ? error.message : error, '官方内核加载失败');
+  if (options.graph) disposeOfficialGoogleObrGraph(options.graph);
+  spatial.enabled = false;
+  spatial.loading = false;
+  spatial.requested = true;
+  spatial.error = message;
+  if (![GOOGLE_OBR_BACKEND, 'capture-stream-unsupported'].includes(spatial.backend)) {
+    spatial.backend = 'unavailable';
+  }
+  saveGoogleObrPreference(true);
+  if (spatial.graph) {
+    spatial.graph.node.port.postMessage({ type: 'set-enabled', enabled: false });
+    setAudioParamSmoothly(spatial.graph.dryGain.gain, 1, spatial.graph.context);
+    setAudioParamSmoothly(spatial.graph.wetGain.gain, 0, spatial.graph.context);
+  }
+  setGoogleObrRuntimeBackend(false);
+  syncGoogleObrToggle();
+  if (options.announce !== false) toast(`Google OBR 未启用：${message}`);
+  if (options.recover !== false) scheduleGoogleObrRecovery();
+  return false;
+}
+
+async function createOfficialGoogleObrGraph(analysis) {
+  if (!analysis.context?.audioWorklet || typeof AudioWorkletNode !== 'function') {
+    throw new Error('当前播放内核不支持 AudioWorklet');
+  }
+
+  const channelLayout = normalizeGoogleObrChannelLayout(state.obrSpatialAudio.channelLayout);
+  await analysis.context.audioWorklet.addModule(GOOGLE_OBR_WORKLET_URL);
+  const node = new AudioWorkletNode(analysis.context, 'fe-google-obr', {
+    numberOfInputs: 1,
+    numberOfOutputs: 1,
+    outputChannelCount: [2],
+    channelCount: 2,
+    channelCountMode: 'explicit',
+    channelInterpretation: 'speakers',
+    processorOptions: { channelLayout }
+  });
+  const wetGain = analysis.context.createGain();
+  wetGain.gain.value = 0;
+  analysis.analyser.connect(node);
+  node.connect(wetGain);
+  wetGain.connect(analysis.context.destination);
+
+  const graph = {
+    context: analysis.context,
+    node,
+    dryGain: ensureDryAudioOutput(analysis),
+    wetGain,
+    backend: '',
+    revision: '',
+    channelLayout,
+    inputChannelCount: GOOGLE_OBR_CHANNEL_LAYOUTS[channelLayout].channels,
+    ready: false,
+    processedBlocks: 0,
+    pendingProcess: null,
+    disableTimer: 0
+  };
+
+  await new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(
+      () => reject(new Error('Google OBR 官方内核初始化超时')),
+      15000
+    );
+    const settle = (callback, value) => {
+      window.clearTimeout(timeout);
+      callback(value);
+    };
+    node.port.onmessage = (event) => {
+      const message = event.data || {};
+      if (message.type === 'ready') {
+        if (
+          message.backend !== GOOGLE_OBR_BACKEND ||
+          message.revision !== GOOGLE_OBR_REVISION
+        ) {
+          settle(reject, new Error('Google OBR 官方内核身份校验失败'));
+          return;
+        }
+        graph.backend = message.backend;
+        graph.revision = message.revision;
+        graph.channelLayout = normalizeGoogleObrChannelLayout(message.channelLayout || channelLayout);
+        graph.inputChannelCount = Number(message.inputChannelCount)
+          || GOOGLE_OBR_CHANNEL_LAYOUTS[graph.channelLayout].channels;
+        graph.ready = true;
+        settle(resolve, graph);
+        return;
+      }
+      if (message.type === 'metrics') {
+        graph.processedBlocks = Math.max(graph.processedBlocks, Number(message.processedBlocks) || 0);
+        state.obrSpatialAudio.processedBlocks = graph.processedBlocks;
+        state.obrSpatialAudio.inputRms = Number(message.inputRms) || 0;
+        state.obrSpatialAudio.outputRms = Number(message.outputRms) || 0;
+        if (graph.pendingProcess && graph.processedBlocks > graph.pendingProcess.afterBlock) {
+          const pending = graph.pendingProcess;
+          graph.pendingProcess = null;
+          window.clearTimeout(pending.timeout);
+          pending.resolve(message);
+        }
+        if (state.obrSpatialAudio.enabled) syncGoogleObrToggle();
+        return;
+      }
+      if (message.type === 'error') {
+        const workletError = new Error(safeText(message.message, 'Google OBR Process 失败'));
+        if (!graph.ready) settle(reject, workletError);
+        else {
+          if (graph.pendingProcess) {
+            const pending = graph.pendingProcess;
+            graph.pendingProcess = null;
+            window.clearTimeout(pending.timeout);
+            pending.reject(workletError);
+          }
+          if (state.obrSpatialAudio.requested) {
+            failGoogleObr(workletError, { announce: false, graph });
+          } else {
+            disposeOfficialGoogleObrGraph(graph);
+          }
+        }
+      }
+    };
+    node.onprocessorerror = () => {
+      const processorError = new Error('Google OBR AudioWorklet 已停止');
+      if (!graph.ready) settle(reject, processorError);
+      else if (state.obrSpatialAudio.requested) {
+        failGoogleObr(processorError, { announce: false, graph });
+      } else {
+        disposeOfficialGoogleObrGraph(graph);
+      }
+    };
+  });
+
+  return graph;
+}
+
+async function ensureOfficialGoogleObrGraph(analysis = state.audioAnalysis) {
+  const spatial = state.obrSpatialAudio;
+  const channelLayout = normalizeGoogleObrChannelLayout(spatial.channelLayout);
+  if (spatial.graph?.ready && spatial.graph.channelLayout === channelLayout) return spatial.graph;
+  if (spatial.graph?.ready) disposeOfficialGoogleObrGraph(spatial.graph);
+  if (spatial.graphPromise) return spatial.graphPromise;
+  spatial.graphPromise = createOfficialGoogleObrGraph(analysis)
+    .then((graph) => {
+      spatial.graph = graph;
+      spatial.backend = graph.backend;
+      spatial.revision = graph.revision;
+      spatial.error = '';
+      return graph;
+    })
+    .finally(() => {
+      spatial.graphPromise = null;
+    });
+  return spatial.graphPromise;
+}
+
+function waitForGoogleObrProcessedBlock(graph) {
+  if (graph.pendingProcess) return graph.pendingProcess.promise;
+  const afterBlock = graph.processedBlocks;
+  let resolvePending;
+  let rejectPending;
+  const promise = new Promise((resolve, reject) => {
+    resolvePending = resolve;
+    rejectPending = reject;
+  });
+  const timeout = window.setTimeout(() => {
+    if (!graph.pendingProcess || graph.pendingProcess.promise !== promise) return;
+    graph.pendingProcess = null;
+    rejectPending(new Error('Google OBR 未收到实时 PCM'));
+  }, 5000);
+  graph.pendingProcess = {
+    afterBlock,
+    promise,
+    resolve: resolvePending,
+    reject: rejectPending,
+    timeout
+  };
+  return promise;
+}
+
+async function activateOfficialGoogleObr(options = {}) {
+  const spatial = state.obrSpatialAudio;
+  if (spatial.activationPromise) return spatial.activationPromise;
+  const analysis = state.audioAnalysis;
+  if (analysis.sourceMode !== 'media') {
+    spatial.backend = 'capture-stream-unsupported';
+    return failGoogleObr('当前音源只能使用 captureStream，无法安全替换原声输出', options);
+  }
+  const operationId = ++spatial.operationId;
+  const activation = (async () => {
+    spatial.loading = true;
+    spatial.error = '';
+    syncGoogleObrToggle();
+    const graph = await ensureOfficialGoogleObrGraph(analysis);
+    window.clearTimeout(graph.disableTimer);
+    graph.disableTimer = 0;
+    const processed = waitForGoogleObrProcessedBlock(graph);
+    graph.node.port.postMessage({ type: 'set-enabled', enabled: true });
+    await processed;
+    if (!spatial.requested || operationId !== spatial.operationId) {
+      graph.node.port.postMessage({ type: 'set-enabled', enabled: false });
+      return false;
+    }
+    setAudioParamSmoothly(graph.dryGain.gain, 0, graph.context);
+    setAudioParamSmoothly(graph.wetGain.gain, 1, graph.context);
+    spatial.enabled = true;
+    spatial.loading = false;
+    spatial.backend = graph.backend;
+    spatial.revision = graph.revision;
+    spatial.error = '';
+    spatial.recoveryAttempt = 0;
+    clearGoogleObrRecovery();
+    setGoogleObrRuntimeBackend(true);
+    saveGoogleObrPreference(true);
+    syncGoogleObrToggle();
+    if (options.announce !== false) toast(`Google OBR ${GOOGLE_OBR_CHANNEL_LAYOUTS[graph.channelLayout].label} 空间音频已开启`);
+    return true;
+  })();
+  spatial.activationPromise = activation;
+  try {
+    return await activation;
+  } catch (error) {
+    if (!spatial.requested || operationId !== spatial.operationId) {
+      spatial.loading = false;
+      syncGoogleObrToggle();
+      return false;
+    }
+    return failGoogleObr(error, options);
+  } finally {
+    if (spatial.activationPromise === activation) spatial.activationPromise = null;
+  }
+}
+
+async function setGoogleObrSpatialAudioEnabled(enabled, options = {}) {
+  const spatial = state.obrSpatialAudio;
+  if (!enabled) {
+    spatial.operationId += 1;
+    clearGoogleObrRecovery();
+    spatial.recoveryAttempt = 0;
+    spatial.requested = false;
+    spatial.enabled = false;
+    spatial.loading = false;
+    spatial.error = '';
+    setGoogleObrRuntimeBackend(false);
+    saveGoogleObrPreference(false);
+    if (spatial.graph) {
+      const graph = spatial.graph;
+      window.clearTimeout(graph.disableTimer);
+      setAudioParamSmoothly(graph.dryGain.gain, 1, graph.context);
+      setAudioParamSmoothly(graph.wetGain.gain, 0, graph.context);
+      graph.disableTimer = window.setTimeout(() => {
+        graph.disableTimer = 0;
+        graph.node.port.postMessage({ type: 'set-enabled', enabled: false });
+      }, 70);
+    }
+    syncGoogleObrToggle();
+    if (options.announce !== false) toast('Google OBR 空间音频已关闭');
+    return true;
+  }
+
+  spatial.requested = true;
+  spatial.error = '';
+  saveGoogleObrPreference(true);
+  if (!els.audio?.src) {
+    spatial.backend = 'waiting-for-audio';
+    spatial.loading = false;
+    syncGoogleObrToggle();
+    if (options.announce !== false) toast('Google OBR 已待命，播放音乐后自动启用');
+    return true;
+  }
+
+  const ready = await ensureAudioAnalysis({ announceObrFailure: options.announce !== false });
+  return ready && spatial.enabled;
+}
+
+async function setGoogleObrChannelLayout(value, options = {}) {
+  const spatial = state.obrSpatialAudio;
+  const channelLayout = normalizeGoogleObrChannelLayout(value);
+  if (channelLayout === spatial.channelLayout) {
+    syncGoogleObrToggle();
+    return !spatial.requested || spatial.enabled || !els.audio?.src;
+  }
+
+  spatial.channelLayout = channelLayout;
+  spatial.operationId += 1;
+  clearGoogleObrRecovery();
+  const graph = spatial.graph;
+  if (graph) {
+    setAudioParamSmoothly(graph.dryGain.gain, 1, graph.context, 0.03);
+    setAudioParamSmoothly(graph.wetGain.gain, 0, graph.context, 0.03);
+    disposeOfficialGoogleObrGraph(graph);
+  }
+  spatial.enabled = false;
+  spatial.loading = false;
+  spatial.error = '';
+  setGoogleObrRuntimeBackend(false);
+  saveGoogleObrPreference(spatial.requested);
+  syncGoogleObrToggle();
+  if (!spatial.requested || !els.audio?.src) return true;
+  const ready = await ensureAudioAnalysis({ announceObrFailure: options.announce !== false });
+  if (ready && options.announce !== false) {
+    toast(`Google OBR 已切换到 ${GOOGLE_OBR_CHANNEL_LAYOUTS[channelLayout].label}`);
+  }
+  return ready && spatial.enabled;
+}
+
+function cycleGoogleObrChannelLayout() {
+  const order = ['stereo', '5.1', '7.1'];
+  const current = order.indexOf(normalizeGoogleObrChannelLayout(state.obrSpatialAudio.channelLayout));
+  setGoogleObrChannelLayout(order[(current + 1) % order.length]).catch((error) => {
+    failGoogleObr(error);
+  });
+}
+
+function toggleGoogleObrSpatialAudio() {
+  const spatial = state.obrSpatialAudio;
+  if (spatial.loading) return;
+  setGoogleObrSpatialAudioEnabled(!spatial.enabled && !spatial.requested).catch((error) => {
+    failGoogleObr(error);
+  });
+}
+
+async function ensureAudioAnalysis(options = {}) {
   const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextCtor || !els.audio) return false;
 
@@ -3843,26 +4615,42 @@ async function ensureAudioAnalysis() {
     }
     if (!analysis.source) {
       const capture = els.audio.captureStream || els.audio.mozCaptureStream;
-      if (capture) {
+      const audioUrl = els.audio.currentSrc || els.audio.src;
+      if (mediaIsSameOrigin(audioUrl)) {
+        try {
+          analysis.source = analysis.context.createMediaElementSource(els.audio);
+          analysis.source.connect(analysis.analyser);
+          analysis.sourceMode = 'media';
+          ensureDryAudioOutput(analysis);
+        } catch (error) {
+          analysis.source = null;
+        }
+      }
+      if (!analysis.source && capture) {
         analysis.source = analysis.context.createMediaStreamSource(capture.call(els.audio));
         analysis.source.connect(analysis.analyser);
         analysis.sourceMode = 'capture';
-      } else if (mediaIsSameOrigin(els.audio.currentSrc || els.audio.src)) {
-        analysis.source = analysis.context.createMediaElementSource(els.audio);
-        analysis.source.connect(analysis.analyser);
-        analysis.analyser.connect(analysis.context.destination);
-        analysis.sourceMode = 'media';
-      } else {
+      }
+      if (!analysis.source) {
         analysis.blocked = true;
         updateSpectrumUi();
         return false;
       }
     }
     analysis.ready = true;
+    analysis.blocked = false;
+    if (state.obrSpatialAudio.requested && !state.obrSpatialAudio.enabled) {
+      await activateOfficialGoogleObr({
+        announce: options.announceObrFailure === true
+      });
+    }
     return true;
   } catch (error) {
     analysis.blocked = true;
     analysis.ready = false;
+    if (state.obrSpatialAudio.requested) {
+      failGoogleObr(error, { announce: options.announceObrFailure === true });
+    }
     updateSpectrumUi();
     return false;
   }
@@ -4311,6 +5099,73 @@ function observePresetRendererSize(owner, element, resizeRenderer) {
   owner.resizeObserver.observe(element);
 }
 
+function disposeThreeSceneResources(root) {
+  if (!root?.traverse) return;
+  const disposed = new Set();
+  const disposeValue = (value) => {
+    if (!value || disposed.has(value) || typeof value.dispose !== 'function') return;
+    disposed.add(value);
+    value.dispose();
+  };
+  root.traverse((object) => {
+    disposeValue(object.geometry);
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    materials.forEach((material) => {
+      if (!material || disposed.has(material)) return;
+      Object.values(material).forEach((value) => {
+        if (value?.isTexture) disposeValue(value);
+      });
+      Object.values(material.uniforms || {}).forEach((uniform) => {
+        if (uniform?.value?.isTexture) disposeValue(uniform.value);
+      });
+      disposeValue(material);
+    });
+  });
+}
+
+function disposePresetRenderer(owner, rootElement) {
+  if (!owner) return;
+  owner.resizeObserver?.disconnect?.();
+  owner.resizeObserver = null;
+  owner.renderQuality?.dispose?.();
+  disposeThreeSceneResources(owner.scene);
+  if (owner.renderer) {
+    owner.renderer.renderLists?.dispose?.();
+    owner.renderer.dispose?.();
+    owner.renderer.forceContextLoss?.();
+  }
+  if (rootElement) rootElement.textContent = '';
+}
+
+function disposeDynamicCube() {
+  const cube = state.dynamicCube;
+  if (!cube.built) return;
+  disposePresetRenderer(cube, els.dynamicCubeCore);
+  Object.assign(cube, {
+    built: false,
+    count: 0,
+    positions: null,
+    directions: null,
+    phases: null,
+    weights: null,
+    renderer: null,
+    renderQuality: null,
+    scene: null,
+    camera: null,
+    group: null,
+    mesh: null,
+    dummy: null,
+    color: null,
+    lastWidth: 0,
+    lastHeight: 0,
+    lastZoom: 1,
+    lastRenderAt: 0,
+    push: 0,
+    bass: 0,
+    energy: 0
+  });
+}
+
 function resizeDynamicCubeRenderer() {
   const cube = state.dynamicCube;
   if (!cube.renderer || !cube.camera || !els.dynamicCubeCore) return;
@@ -4344,6 +5199,7 @@ function updateDynamicCubeVisibility() {
   if (els.dynamicCubeScene) els.dynamicCubeScene.hidden = !visible;
   els.appShell.classList.toggle('has-dynamic-cube', visible);
   if (visible) buildDynamicCube();
+  else disposeDynamicCube();
 }
 
 function updateDynamicCubeMotion() {
@@ -4823,6 +5679,7 @@ function createSonicTopographyMaterial(THREE, theme) {
     uCoolEdge: { value: theme.uCoolEdge.clone() },
     uWarmCore: { value: theme.uWarmCore.clone() },
     uWarmEdge: { value: theme.uWarmEdge.clone() },
+    uCenterColumnColor: { value: theme.uWarmCore.clone() },
     uCoreColumnColor: { value: theme.uWarmCore.clone() },
     uOuterColumnColor: { value: theme.uCoolEdge.clone() },
     uSonicBrightness: { value: DEFAULT_SONIC_SETTINGS.brightness },
@@ -4867,6 +5724,7 @@ function createSonicTopographyMaterial(THREE, theme) {
     varying vec2 vInstancePos;
     varying float vBassColumnBlend;
     varying float vBassColumnRadialMix;
+    varying float vBassColumnCoreMix;
 
     vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
     vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -4943,11 +5801,28 @@ function createSonicTopographyMaterial(THREE, theme) {
       );
       float bassColumnBlend = max(bassColumnCoreMask, bassColumnTransition);
       vBassColumnBlend = bassColumnBlend;
-      vBassColumnRadialMix = smoothstep(
+      float bassColumnRadialMix = smoothstep(
         ${(SONIC_BASS_COLUMN_CLUSTER.radius * 0.55).toFixed(1)},
         ${(SONIC_BASS_COLUMN_CLUSTER.radius + SONIC_BASS_COLUMN_CLUSTER.feather).toFixed(1)},
         bassColumnRadius
       );
+      vBassColumnRadialMix = bassColumnRadialMix;
+      float bassColumnHeightProfile = mix(
+        ${SONIC_BASS_COLUMN_CLUSTER.innerHeightScale.toFixed(2)},
+        ${SONIC_BASS_COLUMN_CLUSTER.outerHeightScale.toFixed(2)},
+        bassColumnRadialMix
+      );
+      float bassColumnCoreHeightMix = 1.0 - smoothstep(
+        ${SONIC_BASS_COLUMN_CLUSTER.coreRadius.toFixed(1)},
+        ${(SONIC_BASS_COLUMN_CLUSTER.coreRadius + SONIC_BASS_COLUMN_CLUSTER.coreFeather).toFixed(1)},
+        bassColumnRadius
+      );
+      bassColumnHeightProfile = mix(
+        bassColumnHeightProfile,
+        ${SONIC_BASS_COLUMN_CLUSTER.coreHeightScale.toFixed(2)},
+        bassColumnCoreHeightMix
+      );
+      vBassColumnCoreMix = bassColumnCoreHeightMix;
       float bassColumnCenterMask = (1.0 - step(0.5, abs(bassColumnDelta.x)))
         * (1.0 - step(0.5, abs(bassColumnDelta.y)));
       float bassColumnBandIndex = aBassColumnBand;
@@ -4960,7 +5835,25 @@ function createSonicTopographyMaterial(THREE, theme) {
           bassColumnCenterMask
         );
       }
-      float bassColumnLift = bassColumnBlend * bassColumnDrive * (6.5 + rnd * 3.5) * uColumnHeightScale;
+      float bassColumnLift = bassColumnBlend * bassColumnDrive * (6.5 + rnd * 3.5)
+        * bassColumnHeightProfile * uColumnHeightScale;
+
+      vec2 smallBassCell = floor(pos2D / 7.0);
+      vec2 smallBassLocal = fract(pos2D / 7.0) - 0.5;
+      float smallBassSeed = random(smallBassCell + vec2(23.7, 51.3));
+      vec2 smallBassCenter = (vec2(
+        random(smallBassCell + vec2(7.1, 19.7)),
+        random(smallBassCell + vec2(31.9, 11.3))
+      ) - 0.5) * 0.26;
+      float smallBassDistance = length(smallBassLocal - smallBassCenter);
+      float smallBassPresence = step(0.84, smallBassSeed);
+      float smallBassShape = (1.0 - smoothstep(0.07, 0.31, smallBassDistance))
+        * smallBassPresence * (1.0 - bassColumnBlend);
+      float smallBassPulse = 0.72
+        + sin(uTime * (1.1 + smallBassSeed * 0.7) + smallBassSeed * 6.283) * 0.28;
+      float smallBassDrive = clamp(max(uLowFrequencyAmplitude, lowDrive) * lowGate, 0.0, 1.0);
+      float smallBassLift = smallBassShape * smallBassDrive * smallBassPulse
+        * (0.65 + smallBassSeed * 0.35) * 1.25 * uColumnHeightScale;
 
       float subRegion = smoothstep(31.0, 0.0, centerDist);
       float subLift = uSubBass * rhythmGate * subRegion * 4.15;
@@ -4982,7 +5875,8 @@ function createSonicTopographyMaterial(THREE, theme) {
       }
 
       float kickSurface = mix(baseNoise, wave, uSmoothness * 0.5 + 0.2) * lowDrive * rhythmGate * 0.56;
-      float audioElevation = bassColumnLift + subLift + bassLift + lowMidLift + midLift + highMidLift + kickSurface;
+      float audioElevation = bassColumnLift + smallBassLift + subLift + bassLift
+        + lowMidLift + midLift + highMidLift + kickSurface;
       if (rnd > 0.99) {
         audioElevation += uEnergy * rhythmGate * 0.72;
       }
@@ -5055,6 +5949,7 @@ function createSonicTopographyMaterial(THREE, theme) {
     uniform vec3 uCoolEdge;
     uniform vec3 uWarmCore;
     uniform vec3 uWarmEdge;
+    uniform vec3 uCenterColumnColor;
     uniform vec3 uCoreColumnColor;
     uniform vec3 uOuterColumnColor;
     uniform float uSonicBrightness;
@@ -5071,6 +5966,7 @@ function createSonicTopographyMaterial(THREE, theme) {
     varying vec2 vInstancePos;
     varying float vBassColumnBlend;
     varying float vBassColumnRadialMix;
+    varying float vBassColumnCoreMix;
 
     float random(vec2 st) {
       return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
@@ -5094,7 +5990,8 @@ function createSonicTopographyMaterial(THREE, theme) {
       vec3 zoneCore = mix(coolCore, warmCore, warmBlend);
       vec3 zoneEdge = mix(coolEdge, warmEdge, warmBlend);
       vec3 targetGlow = mix(zoneCore, zoneEdge, fract(rnd * 11.0));
-      vec3 sonicColumnColor = mix(uCoreColumnColor, uOuterColumnColor, vBassColumnRadialMix);
+      vec3 middleOuterColumnColor = mix(uCoreColumnColor, uOuterColumnColor, vBassColumnRadialMix);
+      vec3 sonicColumnColor = mix(middleOuterColumnColor, uCenterColumnColor, vBassColumnCoreMix);
       targetGlow = mix(targetGlow, sonicColumnColor, vBassColumnBlend * (0.78 + normElevation * 0.18));
       float distFade = 1.0 - smoothstep(46.0, 88.0, centerDist);
       targetGlow = mix(targetGlow, vec3(0.4, 0.8, 1.0), uBrightness * 0.6);
@@ -5168,8 +6065,10 @@ function createSonicTopographyMaterial(THREE, theme) {
 function sonicTopographyPaletteColors() {
   const topo = state.sonicTopography;
   const palette = topo.palette || fallbackLyricPalette(state.currentSong);
+  const middle = palette?.highlight || palette?.glow || { r: 255, g: 255, b: 255 };
   return {
-    core: rgbHexValue(palette?.highlight || palette?.glow || { r: 255, g: 255, b: 255 }),
+    center: rgbHexValue(mixRgb(middle, { r: 255, g: 255, b: 255 }, 0.58)),
+    core: rgbHexValue(middle),
     outer: rgbHexValue(palette?.glow || palette?.primary || { r: 131, g: 228, b: 255 })
   };
 }
@@ -5178,6 +6077,7 @@ function resolvedSonicTopographyColors() {
   const automatic = sonicTopographyPaletteColors();
   const settings = state.sonicTopography.settings || DEFAULT_SONIC_SETTINGS;
   return {
+    center: settings.centerColor || automatic.center,
     core: settings.coreColor || automatic.core,
     outer: settings.outerColor || automatic.outer
   };
@@ -5186,7 +6086,10 @@ function resolvedSonicTopographyColors() {
 function saveSonicSettingsPreferences() {
   try {
     window.localStorage.setItem(SONIC_SETTINGS_PREFS_KEY, JSON.stringify(
-      normalizeSonicSettings(state.sonicTopography.settings)
+      {
+        ...normalizeSonicSettings(state.sonicTopography.settings),
+        cameraFramingVersion: SONIC_CAMERA_FRAMING_VERSION
+      }
     ));
   } catch (error) {}
 }
@@ -5194,14 +6097,25 @@ function saveSonicSettingsPreferences() {
 function syncSonicSettingsControls() {
   const settings = normalizeSonicSettings(state.sonicTopography.settings);
   const colors = resolvedSonicTopographyColors();
-  const isAutomatic = !settings.coreColor && !settings.outerColor;
-  const isCustom = !!settings.coreColor && !!settings.outerColor;
+  const isAutomatic = !settings.centerColor && !settings.coreColor && !settings.outerColor;
+  const isCustom = !!settings.centerColor && !!settings.coreColor && !!settings.outerColor;
+  if (els.sonicCenterColorInput) els.sonicCenterColorInput.value = colors.center;
   if (els.sonicCoreColorInput) els.sonicCoreColorInput.value = colors.core;
   if (els.sonicOuterColorInput) els.sonicOuterColorInput.value = colors.outer;
+  if (els.sonicFountainColorInput) els.sonicFountainColorInput.value = settings.fountainColor;
+  if (els.sonicStarfieldColorInput) els.sonicStarfieldColorInput.value = settings.starfieldColor;
+  if (els.sonicFountainToggle) {
+    els.sonicFountainToggle.checked = settings.fountainEnabled;
+    els.sonicFountainToggle.setAttribute('aria-checked', String(settings.fountainEnabled));
+  }
+  if (els.sonicStarfieldToggle) {
+    els.sonicStarfieldToggle.checked = settings.starfieldEnabled;
+    els.sonicStarfieldToggle.setAttribute('aria-checked', String(settings.starfieldEnabled));
+  }
   if (els.sonicPaletteMode) {
     els.sonicPaletteMode.textContent = isAutomatic
       ? '颜色跟随封面'
-      : isCustom ? '中间与外围自定义' : '部分颜色自定义';
+      : isCustom ? '核心、中间与外围自定义' : '部分颜色自定义';
   }
   if (els.sonicFollowCoverButton) {
     els.sonicFollowCoverButton.classList.toggle('is-active', isAutomatic);
@@ -5224,12 +6138,12 @@ function syncSonicSettingsControls() {
 }
 
 function sonicTopographyCameraFitRadius(aspect, fov) {
-  const verticalFov = clamp(Number(fov) || SONIC_TOPOGRAPHY_CAMERA.fov, 50, 75) * Math.PI / 180;
+  const verticalFov = clamp(Number(fov) || SONIC_TOPOGRAPHY_CAMERA.fov, 42, 68) * Math.PI / 180;
   const safeAspect = clamp(Number(aspect) || 1, 0.3, 4);
   const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * safeAspect);
   const fitFov = Math.min(verticalFov, horizontalFov);
   const activeRadius = Math.min(Math.SQRT2 * SONIC_TOPOGRAPHY_HALF, 78);
-  return Math.hypot(activeRadius, 10) * 1.1 / Math.sin(fitFov / 2);
+  return Math.hypot(activeRadius, 10) * 0.84 / Math.sin(fitFov / 2);
 }
 
 function updateSonicTopographyCameraFit() {
@@ -5252,12 +6166,16 @@ function applySonicTopographySettings(options = {}) {
   const settings = topo.settings;
   const colors = resolvedSonicTopographyColors();
   if (topo.uniforms) {
+    topo.uniforms.uCenterColumnColor?.value?.set?.(colors.center);
     topo.uniforms.uCoreColumnColor?.value?.set?.(colors.core);
     topo.uniforms.uOuterColumnColor?.value?.set?.(colors.outer);
     if (topo.uniforms.uSonicBrightness) topo.uniforms.uSonicBrightness.value = settings.brightness;
     if (topo.uniforms.uSonicExposure) topo.uniforms.uSonicExposure.value = settings.exposure;
     if (topo.uniforms.uColumnHeightScale) topo.uniforms.uColumnHeightScale.value = settings.columnHeight;
   }
+  if (topo.particleMaterial?.color) topo.particleMaterial.color.set(settings.fountainColor);
+  if (topo.starfield) topo.starfield.visible = settings.starfieldEnabled;
+  if (topo.starfieldMaterial?.color) topo.starfieldMaterial.color.set(settings.starfieldColor);
   updateSonicTopographyCameraFit();
   if (options.persist !== false) saveSonicSettingsPreferences();
   if (options.sync !== false) syncSonicSettingsControls();
@@ -5276,7 +6194,9 @@ function buildSonicTopography() {
   const offset = (SONIC_TOPOGRAPHY_GRID * SONIC_TOPOGRAPHY_SPACING) / 2;
   const theme = topo.theme || createSonicTopographyTheme(topo.palette || fallbackLyricPalette(state.currentSong));
 
-  const renderer = createDirectX11Renderer(THREE, { antialias: false });
+  const renderer = createDirectX11Renderer(THREE, {
+    antialias: ANDROID_CLIENT && RENDER_PROFILE.tier !== 'economy'
+  });
   renderer.setClearColor(0x000000, 0);
   renderer.setPixelRatio(renderPixelRatio('webgl'));
   const renderQuality = createPresetRenderQuality(renderer, 0.2);
@@ -5323,6 +6243,41 @@ function buildSonicTopography() {
     bassColumnBandByPoint.set(bassColumnPointKey(point.x, point.z), bandIndex);
     nonCenterColumnIndex += 1;
   });
+  const smoothstepNumber = (start, end, value) => {
+    const progress = clamp((value - start) / Math.max(0.001, end - start), 0, 1);
+    return progress * progress * (3 - 2 * progress);
+  };
+  const fountainEmitters = new Array(SONIC_LOW_FREQUENCY_BAND_COUNT);
+  bassColumnCorePoints.forEach((point) => {
+    const band = bassColumnBandByPoint.get(bassColumnPointKey(point.x, point.z));
+    if (!Number.isFinite(band)) return;
+    const radius = Math.hypot(point.x, point.z);
+    if (fountainEmitters[band] && fountainEmitters[band].radius <= radius) return;
+    const radialMix = smoothstepNumber(
+      SONIC_BASS_COLUMN_CLUSTER.radius * 0.55,
+      SONIC_BASS_COLUMN_CLUSTER.radius + SONIC_BASS_COLUMN_CLUSTER.feather,
+      radius
+    );
+    const radialHeight = SONIC_BASS_COLUMN_CLUSTER.innerHeightScale
+      + (SONIC_BASS_COLUMN_CLUSTER.outerHeightScale - SONIC_BASS_COLUMN_CLUSTER.innerHeightScale) * radialMix;
+    const coreMix = 1 - smoothstepNumber(
+      SONIC_BASS_COLUMN_CLUSTER.coreRadius,
+      SONIC_BASS_COLUMN_CLUSTER.coreRadius + SONIC_BASS_COLUMN_CLUSTER.coreFeather,
+      radius
+    );
+    const heightProfile = radialHeight
+      + (SONIC_BASS_COLUMN_CLUSTER.coreHeightScale - radialHeight) * coreMix;
+    const x = point.x * SONIC_TOPOGRAPHY_SPACING;
+    const z = point.z * SONIC_TOPOGRAPHY_SPACING;
+    const randomValue = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453123;
+    const randomScale = randomValue - Math.floor(randomValue);
+    fountainEmitters[band] = {
+      x,
+      z,
+      radius,
+      liftScale: (6.5 + randomScale * 3.5) * heightProfile
+    };
+  });
   const bassColumnBandValues = new Float32Array(count);
   const geometry = new THREE.BoxGeometry(SONIC_TOPOGRAPHY_SIZE, 1, SONIC_TOPOGRAPHY_SIZE);
   const bassColumnBandAttribute = new THREE.InstancedBufferAttribute(bassColumnBandValues, 1);
@@ -5343,13 +6298,102 @@ function buildSonicTopography() {
   group.add(meteorMesh);
 
   const particleMesh = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(0.8, 0.8, 0.8),
+    new THREE.BoxGeometry(0.58, 0.58, 0.58),
     new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6, toneMapped: false }),
     SONIC_TOPOGRAPHY_PARTICLES
   );
   particleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   particleMesh.frustumCulled = false;
   group.add(particleMesh);
+
+  const starfieldPositions = new Float32Array(SONIC_STARFIELD_PARTICLES * 3);
+  const starfieldColors = new Float32Array(SONIC_STARFIELD_PARTICLES * 3);
+  const starfieldDrift = new Float32Array(SONIC_STARFIELD_PARTICLES * 3);
+  const starfieldPhase = new Float32Array(SONIC_STARFIELD_PARTICLES);
+  const starfieldRadius = Math.max(54, Math.min(110, SONIC_TOPOGRAPHY_HALF * 1.05));
+  let starfieldIndex = 0;
+  const starfieldLayers = SONIC_STARFIELD_LAYERS.map((layer) => {
+    const minRadius = starfieldRadius * layer.minRadiusScale;
+    const maxRadius = starfieldRadius * layer.maxRadiusScale;
+    for (let layerIndex = 0; layerIndex < layer.count; layerIndex += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = minRadius + Math.random() * (maxRadius - minRadius);
+      const offset = starfieldIndex * 3;
+      const brightness = layer.brightness * (0.82 + Math.random() * 0.18);
+      starfieldPositions[offset] = Math.cos(angle) * radius;
+      starfieldPositions[offset + 1] = 3 + Math.random() * starfieldRadius * (0.52 + layer.brightness * 0.32);
+      starfieldPositions[offset + 2] = Math.sin(angle) * radius;
+      starfieldColors[offset] = brightness;
+      starfieldColors[offset + 1] = brightness;
+      starfieldColors[offset + 2] = brightness;
+      starfieldDrift[offset] = layer.drift * (0.45 + Math.random() * 0.55);
+      starfieldDrift[offset + 1] = layer.drift * (0.24 + Math.random() * 0.38);
+      starfieldDrift[offset + 2] = layer.drift * (0.45 + Math.random() * 0.55);
+      starfieldPhase[starfieldIndex] = Math.random() * Math.PI * 2;
+      starfieldIndex += 1;
+    }
+    return Object.freeze({
+      name: layer.name,
+      count: layer.count,
+      minRadius,
+      maxRadius,
+      brightness: layer.brightness,
+      drift: layer.drift
+    });
+  });
+  const starfieldGeometry = new THREE.BufferGeometry();
+  const starfieldPositionAttribute = new THREE.BufferAttribute(starfieldPositions, 3);
+  const starfieldColorAttribute = new THREE.BufferAttribute(starfieldColors, 3);
+  const starfieldDriftAttribute = new THREE.BufferAttribute(starfieldDrift, 3);
+  const starfieldPhaseAttribute = new THREE.BufferAttribute(starfieldPhase, 1);
+  starfieldPositionAttribute.setUsage(THREE.StaticDrawUsage);
+  starfieldColorAttribute.setUsage(THREE.StaticDrawUsage);
+  starfieldDriftAttribute.setUsage(THREE.StaticDrawUsage);
+  starfieldPhaseAttribute.setUsage(THREE.StaticDrawUsage);
+  starfieldGeometry.setAttribute('position', starfieldPositionAttribute);
+  starfieldGeometry.setAttribute('color', starfieldColorAttribute);
+  starfieldGeometry.setAttribute('aStarDrift', starfieldDriftAttribute);
+  starfieldGeometry.setAttribute('aStarPhase', starfieldPhaseAttribute);
+  starfieldGeometry.computeBoundingSphere();
+  const starfieldTexture = new THREE.CanvasTexture(createPlaybackParticleSprite(48, 0.08));
+  const starfieldDriftUniforms = { uStarfieldTime: { value: 0 } };
+  const starfieldMaterial = new THREE.PointsMaterial({
+    color: DEFAULT_SONIC_SETTINGS.starfieldColor,
+    size: 0.38,
+    sizeAttenuation: true,
+    vertexColors: true,
+    map: starfieldTexture,
+    transparent: true,
+    opacity: 0.82,
+    alphaTest: 0.01,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false
+  });
+  starfieldMaterial.userData.driftUniforms = starfieldDriftUniforms;
+  starfieldMaterial.onBeforeCompile = (shader) => {
+    shader.uniforms.uStarfieldTime = starfieldDriftUniforms.uStarfieldTime;
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nattribute vec3 aStarDrift;\nattribute float aStarPhase;\nuniform float uStarfieldTime;'
+      )
+      .replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        transformed += vec3(
+          aStarDrift.x * sin(uStarfieldTime * 0.17 + aStarPhase),
+          aStarDrift.y * sin(uStarfieldTime * 0.13 + aStarPhase * 1.37),
+          aStarDrift.z * cos(uStarfieldTime * 0.15 + aStarPhase * 0.83)
+        );`
+      );
+  };
+  starfieldMaterial.customProgramCacheKey = () => 'fe-monster-sonic-starfield-drift-v1';
+  const starfield = new THREE.Points(starfieldGeometry, starfieldMaterial);
+  starfield.frustumCulled = false;
+  starfield.visible = false;
+  starfield.userData.layers = starfieldLayers;
+  scene.add(starfield);
 
   const dummy = new THREE.Object3D();
   let index = 0;
@@ -5416,6 +6460,8 @@ function buildSonicTopography() {
   topo.meteorMaterial = meteorMesh.material;
   topo.particleMesh = particleMesh;
   topo.particleMaterial = particleMesh.material;
+  topo.starfield = starfield;
+  topo.starfieldMaterial = starfieldMaterial;
   topo.dummy = dummy;
   topo.meteorTargetColor = new THREE.Color();
   topo.whiteColor = new THREE.Color(0xffffff);
@@ -5423,6 +6469,7 @@ function buildSonicTopography() {
   topo.ripples = material.uniforms.uRipples.value;
   topo.meteors = Array.from({ length: SONIC_TOPOGRAPHY_METEORS }, () => ({ active: false, x: 0, y: -1000, z: 0, speed: 0, strength: 0 }));
   topo.particles = Array.from({ length: SONIC_TOPOGRAPHY_PARTICLES }, () => ({ active: false, x: 0, y: -1000, z: 0, vx: 0, vy: 0, vz: 0, life: 0, maxLife: 1, scale: 1 }));
+  topo.fountainEmitters = fountainEmitters;
   applySonicTopographySettings({ persist: false, sync: true, renderConfig: false });
   topo.built = true;
   observePresetRendererSize(topo, els.sonicTopographyCore, resizeSonicTopographyRenderer);
@@ -5447,11 +6494,68 @@ function resizeSonicTopographyRenderer() {
   updateSonicTopographyCameraFit();
 }
 
+function disposeSonicTopography() {
+  const topo = state.sonicTopography;
+  if (!topo.built) return;
+  disposePresetRenderer(topo, els.sonicTopographyCore);
+  topo.lowFrequencySpectrum?.dispose?.();
+  Object.assign(topo, {
+    built: false,
+    count: 0,
+    renderer: null,
+    renderQuality: null,
+    scene: null,
+    camera: null,
+    group: null,
+    terrain: null,
+    material: null,
+    uniforms: null,
+    lowFrequencySpectrum: null,
+    lowFrequencySpectrumData: null,
+    meteorMesh: null,
+    meteorMaterial: null,
+    particleMesh: null,
+    particleMaterial: null,
+    starfield: null,
+    starfieldMaterial: null,
+    dummy: null,
+    theme: null,
+    ripples: [],
+    rippleIndex: 0,
+    meteors: [],
+    meteorIndex: 0,
+    particles: [],
+    particleIndex: 0,
+    fountainEmitters: [],
+    lastWidth: 0,
+    lastHeight: 0,
+    lastMotionAt: 0,
+    lastRenderAt: 0,
+    autoYaw: 0,
+    lastBeat: 0,
+    lastMeteorAt: 0,
+    lastFountainAt: 0,
+    pulseCooldown: 0,
+    meteorCooldown: 0,
+    bass: 0,
+    mid: 0,
+    treble: 0,
+    energy: 0,
+    audioPulse: 0,
+    wasAudioDriving: false,
+    projectilesActive: false,
+    projectilesNeedClear: false
+  });
+  topo.frameAudio.lowFrequencyBands.fill(0);
+  topo.frameAudio.lowFrequencyBandTargets.fill(0);
+}
+
 function updateSonicTopographyVisibility() {
   const visible = state.playbackPage && isSonicTopographyPreset();
   if (els.sonicTopographyScene) els.sonicTopographyScene.hidden = !visible;
   els.appShell.classList.toggle('has-sonic-topography', visible);
   if (visible) buildSonicTopography();
+  else disposeSonicTopography();
 }
 
 function wallpaperById(id) {
@@ -5588,9 +6692,55 @@ function setWallpaperMediaSize(width, height) {
   updateWallpaperAutoSize();
 }
 
+function unloadWallpaperWebFrame() {
+  if (!els.wallpaperWebFrame) return;
+  els.wallpaperWebFrame.onload = null;
+  els.wallpaperWebFrame.onerror = null;
+  els.wallpaperWebFrame.hidden = true;
+  els.wallpaperWebFrame.removeAttribute('data-active-src');
+  if (els.wallpaperWebFrame.getAttribute('src') !== 'about:blank') {
+    els.wallpaperWebFrame.src = 'about:blank';
+  }
+}
+
+async function activateNativeWallpaperScene(wallpaper) {
+  if (!wallpaper || wallpaper.kind !== 'scene' || wallpaper.requiresNativeEngine !== true) return false;
+  const wallpaperId = safeText(wallpaper.id, '');
+  if (!wallpaperId || state.wallpaperNativeActivationPending === wallpaperId) return false;
+  state.wallpaperNativeActivationPending = wallpaperId;
+  setWallpaperStatus(`正在通过 Wallpaper Engine 应用「${safeText(wallpaper.name, '场景壁纸')}」...`);
+  try {
+    const payload = await apiJson('/api/wallpapers/activate', {
+      method: 'POST',
+      body: JSON.stringify({ id: wallpaperId })
+    });
+    state.wallpaperNativeActivationId = wallpaperId;
+    setWallpaperStatus(payload.message || '场景壁纸已通过 Wallpaper Engine 应用到桌面');
+    return true;
+  } catch (error) {
+    setWallpaperStatus(error.message || '无法启动 Wallpaper Engine 场景壁纸');
+    return false;
+  } finally {
+    if (state.wallpaperNativeActivationPending === wallpaperId) {
+      state.wallpaperNativeActivationPending = '';
+    }
+  }
+}
+
 function applyWallpaperMedia(wallpaper) {
   if (!els.wallpaperImage || !els.wallpaperVideo || !els.wallpaperEmpty) return;
-  const hasWallpaper = !!wallpaper && !!wallpaper.url;
+  const wallpaperKind = safeText(wallpaper?.kind, 'image');
+  const imageUrl = safeText(
+    wallpaperKind === 'scene' ? (wallpaper?.previewUrl || wallpaper?.url) : wallpaper?.url,
+    ''
+  );
+  const webEntryUrl = safeText(wallpaper?.entryUrl, '');
+  const hasWallpaper = !!wallpaper && (
+    (wallpaperKind === 'web' && !!webEntryUrl)
+    || (wallpaperKind === 'scene' && (!!imageUrl || wallpaper.requiresNativeEngine === true))
+    || !!imageUrl
+  );
+  els.wallpaperEmpty.textContent = '导入或选择壁纸';
   els.wallpaperEmpty.hidden = hasWallpaper;
   els.wallpaperImage.hidden = true;
   els.wallpaperVideo.hidden = true;
@@ -5604,11 +6754,21 @@ function applyWallpaperMedia(wallpaper) {
   els.wallpaperVideo.removeAttribute('src');
   els.wallpaperVideo.load();
   els.wallpaperImage.removeAttribute('src');
+  unloadWallpaperWebFrame();
   els.wallpaperScene?.style.removeProperty('--wallpaper-tile-image');
   setWallpaperMediaSize(0, 0);
   if (!hasWallpaper) return;
 
-  if (wallpaper.kind === 'video') {
+  if (wallpaperKind === 'web' && els.wallpaperWebFrame) {
+    els.wallpaperWebFrame.onload = () => setWallpaperStatus(`网页壁纸「${safeText(wallpaper.name, 'Wallpaper')}」已加载`);
+    els.wallpaperWebFrame.onerror = () => setWallpaperStatus('网页壁纸加载失败，请刷新 Wallpaper Engine 列表');
+    els.wallpaperWebFrame.dataset.activeSrc = webEntryUrl;
+    els.wallpaperWebFrame.src = webEntryUrl;
+    els.wallpaperWebFrame.hidden = false;
+    return;
+  }
+
+  if (wallpaperKind === 'video') {
     els.wallpaperVideo.preload = 'metadata';
     els.wallpaperVideo.muted = true;
     els.wallpaperVideo.loop = true;
@@ -5623,10 +6783,18 @@ function applyWallpaperMedia(wallpaper) {
     return;
   }
 
+  if (!imageUrl) {
+    els.wallpaperEmpty.textContent = wallpaperKind === 'scene'
+      ? '选择后由 Wallpaper Engine 原生加载场景'
+      : '壁纸预览不可用';
+    els.wallpaperEmpty.hidden = false;
+    return;
+  }
+
   els.wallpaperImage.onload = () => setWallpaperMediaSize(els.wallpaperImage.naturalWidth, els.wallpaperImage.naturalHeight);
   els.wallpaperImage.onerror = () => setWallpaperStatus('壁纸图片加载失败，可尝试重新导入');
-  els.wallpaperScene?.style.setProperty('--wallpaper-tile-image', `url(${JSON.stringify(wallpaper.url)})`);
-  els.wallpaperImage.src = wallpaper.url;
+  els.wallpaperScene?.style.setProperty('--wallpaper-tile-image', `url(${JSON.stringify(imageUrl)})`);
+  els.wallpaperImage.src = imageUrl;
   els.wallpaperImage.hidden = false;
 }
 
@@ -5670,7 +6838,7 @@ function renderWallpaperList() {
       const image = document.createElement('img');
       image.alt = '';
       image.loading = 'lazy';
-      image.src = wallpaper.url;
+      image.src = wallpaper.previewUrl || wallpaper.url;
       thumb.appendChild(image);
     }
 
@@ -5685,7 +6853,13 @@ function renderWallpaperList() {
 
     const kind = document.createElement('span');
     kind.className = 'diy-wallpaper-kind';
-    kind.textContent = wallpaper.kind === 'video' ? '动态' : '图片';
+    kind.textContent = wallpaper.kind === 'video'
+      ? '动态'
+      : wallpaper.kind === 'web'
+        ? '网页'
+        : wallpaper.kind === 'scene'
+          ? '场景'
+          : '图片';
 
     button.appendChild(thumb);
     button.appendChild(copy);
@@ -5704,6 +6878,7 @@ function selectWallpaper(id) {
   state.activeWallpaperIds[state.wallpaperSource] = wallpaper.id;
   saveWallpaperPrefs();
   renderWallpaperList();
+  if (wallpaper.kind === 'scene') activateNativeWallpaperScene(wallpaper);
 }
 
 async function refreshWallpapers(options = {}) {
@@ -5758,12 +6933,14 @@ function updateWallpaperVisibility() {
   els.appShell.classList.toggle('has-wallpaper-mode', visible);
   if (visible) {
     const mediaMissing = (!els.wallpaperImage || els.wallpaperImage.hidden)
-      && (!els.wallpaperVideo || els.wallpaperVideo.hidden);
+      && (!els.wallpaperVideo || els.wallpaperVideo.hidden)
+      && (!els.wallpaperWebFrame || els.wallpaperWebFrame.hidden);
     if (mediaMissing && visibleWallpapers().length) renderWallpaperList();
     updateWallpaperAutoSize();
   }
   if (visible && !state.wallpapers.length && !state.wallpaperLoading) refreshWallpapers({ source: state.wallpaperSource });
   if (!visible && els.wallpaperVideo) els.wallpaperVideo.pause();
+  if (!visible) unloadWallpaperWebFrame();
   if (visible && els.wallpaperVideo && !els.wallpaperVideo.hidden) els.wallpaperVideo.play().catch(() => {});
 }
 
@@ -5781,9 +6958,20 @@ function playCoverParticleEngine() {
   } catch (error) {}
 }
 
+function resetCoverParticleShock() {
+  const cover = state.coverParticle;
+  cover.shockAge = COVER_PARTICLE_SHOCK_DURATION_SECONDS;
+  cover.shockStrength = 0;
+  cover.shockCooldown = 0;
+  cover.shockArmed = false;
+  cover.lastShockDrive = 0;
+  cover.lastBassInput = 0;
+}
+
 function pauseCoverParticleEngine(force = false) {
   const cover = state.coverParticle;
   const container = cover.engineContainer;
+  resetCoverParticleShock();
   if (!container || (!force && !cover.enginePlaying)) return;
   if (typeof container.pause === 'function') {
     try { container.pause(); } catch (error) {}
@@ -5799,6 +6987,7 @@ function updateCoverParticleVisibility() {
   if (els.appShell) els.appShell.classList.toggle('has-cover-particle-scene', visible);
   updateCoverParticleBackgroundMode();
   if (visible) {
+    applyCoverParticlePalette(state.coverParticle.palette || fallbackLyricPalette(state.currentSong));
     updateCoverParticleImage(state.currentSong);
     if (visibilityChanged) ensureCoverParticleEngine().then(playCoverParticleEngine);
   } else if (visibilityChanged) {
@@ -5883,8 +7072,8 @@ function spawnSonicTopographyParticle(x, y, z, speed) {
   particle.vy = Math.random() * 2 + speed * 10;
   particle.vz = (Math.random() - 0.5) * 2;
   particle.life = 0;
-  particle.maxLife = 0.5 + Math.random() * 0.5;
-  particle.scale = Math.random() * 0.6 + 0.2;
+  particle.maxLife = 0.65 + Math.random() * 0.55;
+  particle.scale = Math.random() * 0.52 + 0.16;
   topo.particleIndex = (index + 1) % topo.particles.length;
   topo.projectilesActive = true;
 }
@@ -5990,6 +7179,7 @@ function resetSonicTopographyAudioMotion(topo) {
   topo.lastBeat = 0;
   topo.pulseCooldown = 0;
   topo.meteorCooldown = 0;
+  topo.lastFountainAt = 0;
   if (topo.frameAudio) {
     topo.frameAudio.lowFrequencyAmplitude = 0;
     topo.frameAudio.subBass = 0;
@@ -6053,7 +7243,8 @@ function updateSonicTopographyMotion() {
     ? clamp(Math.max(Number(live.bass) || 0, Number(state.visual.bass) || 0), 0, 1)
     : 0;
   const lowMidTarget = audioDriving ? clamp(live.lowMid || 0, 0, 1) : 0;
-  const smoothing = normalizeSonicSettings(topo.settings).smoothing;
+  const settings = normalizeSonicSettings(topo.settings);
+  const smoothing = settings.smoothing;
   const attackResponse = 1 - Math.exp(-dt / (SONIC_BASS_COLUMN_ATTACK_SECONDS * smoothing));
   const releaseResponse = 1 - Math.exp(-dt / (SONIC_BASS_COLUMN_RELEASE_SECONDS * smoothing));
   if (audioDriving) {
@@ -6108,11 +7299,15 @@ function updateSonicTopographyMotion() {
     audioDriving && live ? live.lowFrequencyBands : null,
     lowFrequencyAmplitudeTarget
   );
+  let fountainBand = -1;
+  let fountainRise = 0;
+  let fountainAmplitude = 0;
   if (topo.lowFrequencySpectrumData && topo.lowFrequencySpectrum) {
     let spectrumChanged = false;
     for (let index = 0; index < SONIC_LOW_FREQUENCY_BAND_COUNT; index += 1) {
       const targetAmplitude = audioDriving ? audio.lowFrequencyBandTargets[index] || 0 : 0;
       let amplitude = audio.lowFrequencyBands[index] || 0;
+      const previousAmplitude = amplitude;
       if (audioDriving) {
         amplitude += (targetAmplitude - amplitude)
           * (targetAmplitude > amplitude ? attackResponse : releaseResponse);
@@ -6120,6 +7315,12 @@ function updateSonicTopographyMotion() {
         amplitude = 0;
       }
       audio.lowFrequencyBands[index] = amplitude;
+      const rise = amplitude - previousAmplitude;
+      if (rise > fountainRise && amplitude > 0.08) {
+        fountainBand = index;
+        fountainRise = rise;
+        fountainAmplitude = amplitude;
+      }
       const encodedAmplitude = Math.round(clamp(amplitude, 0, 1) * 255);
       if (topo.lowFrequencySpectrumData[index] !== encodedAmplitude) {
         topo.lowFrequencySpectrumData[index] = encodedAmplitude;
@@ -6168,9 +7369,6 @@ function updateSonicTopographyMotion() {
     topo.meteorTargetColor.copy(theme.uWarmCore).lerp(topo.whiteColor, 0.7);
     topo.meteorMaterial.color.lerp(topo.meteorTargetColor, lerpSpeed);
   }
-  if (topo.particleMaterial && topo.particleMaterial.color && topo.meteorMaterial && topo.meteorMaterial.color) {
-    topo.particleMaterial.color.copy(topo.meteorMaterial.color);
-  }
 
   const lowBassDrive = clamp(Math.max(audio.subBass * 1.25, audio.bass), 0, 1);
   if (!audioDriving) {
@@ -6183,6 +7381,25 @@ function updateSonicTopographyMotion() {
     if (topo.meteorCooldown > 0) topo.meteorCooldown = Math.max(0, topo.meteorCooldown - simulationStep);
     const lowBassTransient = Math.max(0, lowBassDrive - topo.lastBeat);
     const pulseStrength = clamp(Math.max(audio.fluxPulse * 1.45, lowBassTransient * 2.2, audio.beat * lowBassDrive * 0.72), 0, 1);
+    const fountainEmitter = topo.fountainEmitters[fountainBand];
+    if (settings.fountainEnabled
+        && fountainEmitter
+        && fountainRise > 0.006
+        && nowMs - topo.lastFountainAt >= 32) {
+      const burstCount = 6 + Math.min(12, Math.floor(fountainRise * 28 + fountainAmplitude * 4));
+      const emissionY = 0.5
+        + fountainAmplitude * fountainEmitter.liftScale * settings.columnHeight;
+      const emissionSpeed = 0.05 + fountainRise * 0.6 + lowBassDrive * 0.05;
+      for (let particle = 0; particle < burstCount; particle += 1) {
+        spawnSonicTopographyParticle(
+          fountainEmitter.x,
+          emissionY,
+          fountainEmitter.z,
+          emissionSpeed
+        );
+      }
+      topo.lastFountainAt = nowMs;
+    }
     const pulseRateBase = pulseStrength > topo.audioPulse ? 0.34 : 0.075;
     const pulseRate = 1 - Math.pow(1 - pulseRateBase, simulationStep);
     topo.audioPulse += (pulseStrength - topo.audioPulse) * pulseRate;
@@ -6204,6 +7421,11 @@ function updateSonicTopographyMotion() {
 
   if (!topo.resizeObserver) resizeSonicTopographyRenderer();
 
+  if (settings.starfieldEnabled && topo.starfield && !reducedMotion) {
+    const driftTime = topo.starfieldMaterial?.userData?.driftUniforms?.uStarfieldTime;
+    if (driftTime) driftTime.value += dt;
+    topo.starfield.rotation.y += dt * 0.045;
+  }
   if (!state.playbackVisual.dragging && !reducedMotion) topo.autoYaw += dt * 0.05;
   const referenceRadius = Math.hypot(SONIC_TOPOGRAPHY_CAMERA.x, SONIC_TOPOGRAPHY_CAMERA.y, SONIC_TOPOGRAPHY_CAMERA.z);
   const baseRadius = topo.baseCameraRadius || referenceRadius;
@@ -6588,12 +7810,6 @@ function applySonicTopographyPalette(palette) {
   topo.palette = palette;
   topo.theme = createSonicTopographyTheme(palette);
 
-  if (els.sonicTopographyScene) {
-    els.sonicTopographyScene.style.setProperty('--topography-cover-glow', rgbTriplet(palette.glow));
-    els.sonicTopographyScene.style.setProperty('--topography-cover-hot', rgbTriplet(palette.highlight));
-    els.sonicTopographyScene.style.setProperty('--topography-cover-depth', rgbTriplet(palette.depth));
-  }
-
   if (!topo.uniforms || !topo.theme) return;
   topo.uniforms.uBaseColor1.value.copy(topo.theme.uBaseColor1);
   topo.uniforms.uBaseColor2.value.copy(topo.theme.uBaseColor2);
@@ -6623,7 +7839,7 @@ function rgbHexValue(color) {
 function applyCoverParticlePalette(palette) {
   const source = palette || fallbackLyricPalette(state.currentSong);
   state.coverParticle.palette = source;
-  if (!els.coverParticleScene || !source) return;
+  if (!els.coverParticleScene || !source || !coverParticlePresetVisible()) return;
   const fallback = [source.primary, source.glow, source.highlight];
   const coverColors = [0, 1, 2].map((index) => source.coverColors?.[index] || fallback[index]);
   const softColors = coverColors.map((color, index) => playbackGlowColor(color, index));
@@ -6706,7 +7922,7 @@ function applyLyricPalette(palette) {
   applyQishuiPlaybackPalette(palette);
   const lyricPalette = resolvedTextLyricPalette(palette);
   const target = els.playbackLyricScene;
-  if (target) {
+  if (target && textLyricsEnabled()) {
     const white = { r: 255, g: 255, b: 255 };
     const gradientStart = mixRgb(lyricPalette.highlight, white, 0.12);
     const gradientMid = mixRgb(lyricPalette.glow, white, 0.04);
@@ -6791,6 +8007,7 @@ function resetCoverParticleSamples() {
   state.coverParticle.sampleSignature = '';
   state.coverParticle.particles = [];
   state.coverParticle.gpuSignature = '';
+  resetCoverParticleShock();
 }
 
 function updateCoverParticleImage(song = state.currentSong) {
@@ -6873,10 +8090,13 @@ function bookLyricSignature(lines) {
   const last = lines[lines.length - 1] || {};
   return [
     state.lyricSignature,
+    state.bilingualLyricsEnabled ? 'bilingual' : 'original',
     lines.length,
     safeText(first.text, ''),
+    playbackLyricTranslationText(first),
     Number(first.time) || 0,
     safeText(last.text, ''),
+    playbackLyricTranslationText(last),
     Number(last.time) || 0
   ].join('|');
 }
@@ -7158,12 +8378,19 @@ function scheduleBookLyricFit() {
 
 function createBookLyricLine(line, index, options = {}) {
   const button = document.createElement('button');
+  const translationText = state.bilingualLyricsEnabled
+    ? playbackLyricTranslationText(line).replace(/\s*\r?\n+\s*/g, ' ').trim()
+    : '';
   button.className = ['book-lyric-line', options.lineClass].filter(Boolean).join(' ');
   button.type = 'button';
   button.dataset.bookLyricIndex = String(index);
   button.dataset.bookLyricTime = String(Number(line.time) || 0);
   button.dataset.text = safeText(line.text, playbackLyricText());
-  button.setAttribute('aria-label', `${formatTime(Number(line.time) || 0)} ${safeText(line.text, '')}`);
+  if (translationText) button.dataset.translation = translationText;
+  button.setAttribute(
+    'aria-label',
+    `${formatTime(Number(line.time) || 0)} ${safeText(line.text, '')}${translationText ? ` ${translationText}` : ''}`
+  );
 
   const text = document.createElement('span');
   text.className = 'book-lyric-line-text';
@@ -7184,6 +8411,20 @@ function createBookLyricLine(line, index, options = {}) {
   text.appendChild(base);
   text.appendChild(highlight);
   button.appendChild(text);
+  if (translationText) {
+    const translation = document.createElement('span');
+    translation.className = 'book-lyric-translation';
+    const translationBase = document.createElement('span');
+    translationBase.className = 'book-lyric-translation-copy book-lyric-translation-copy--base';
+    translationBase.textContent = translationText;
+    const translationHighlight = document.createElement('span');
+    translationHighlight.className = 'book-lyric-translation-copy book-lyric-translation-copy--hot';
+    translationHighlight.textContent = translationText;
+    translationHighlight.setAttribute('aria-hidden', 'true');
+    translation.appendChild(translationBase);
+    translation.appendChild(translationHighlight);
+    button.appendChild(translation);
+  }
   return button;
 }
 
@@ -7400,6 +8641,126 @@ function saveCommunityFavoriteListening() {
   try {
     window.localStorage.setItem(COMMUNITY_FAVORITE_LISTEN_KEY, JSON.stringify(state.community.favoriteListening || { friends: {} }));
   } catch (error) {}
+}
+
+function loadCommunityListeningStats() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(COMMUNITY_LISTENING_STATS_KEY) || '{}');
+    const songKeys = Array.isArray(stored.songKeys)
+      ? [...new Set(stored.songKeys.map((key) => safeText(key, '').trim()).filter(Boolean))]
+      : [];
+    return {
+      listenMs: Math.max(0, Math.round(Number(stored.listenMs) || 0)),
+      songKeys,
+      songCountFloor: Math.max(0, Math.round(Number(stored.songCountFloor) || 0))
+    };
+  } catch (error) {
+    return { listenMs: 0, songKeys: [], songCountFloor: 0 };
+  }
+}
+
+function saveCommunityListeningStats() {
+  try {
+    window.localStorage.setItem(COMMUNITY_LISTENING_STATS_KEY, JSON.stringify({
+      version: 1,
+      listenMs: state.community.listeningStats.listenMs,
+      songKeys: state.community.listeningStats.songKeys,
+      songCountFloor: state.community.listeningStats.songCountFloor
+    }));
+    state.community.listeningStatsSavedAt = Date.now();
+  } catch (error) {}
+}
+
+function communityListeningRemoteMaximum(profile = {}, keys = []) {
+  const sources = [
+    profile,
+    profile.stats,
+    profile.listening,
+    profile.listeningStats,
+    profile.musicStats
+  ].filter((source) => source && typeof source === 'object');
+  return sources.reduce((maximum, source) => keys.reduce((value, key) => {
+    const numeric = Number(source[key]);
+    return Number.isFinite(numeric) ? Math.max(value, numeric) : value;
+  }, maximum), 0);
+}
+
+function mergeCommunityListeningStats(profile = {}) {
+  const stats = state.community.listeningStats;
+  const remoteListenMs = communityListeningRemoteMaximum(profile, [
+    'listenMs',
+    'listeningMs',
+    'totalListenMs',
+    'listenDurationMs',
+    'listeningDurationMs',
+    'totalListeningMs',
+    'listenDuration'
+  ]);
+  const remoteSongCount = communityListeningRemoteMaximum(profile, [
+    'songCount',
+    'songsCount',
+    'listenedSongs',
+    'listenedSongCount',
+    'uniqueSongCount',
+    'totalSongs'
+  ]);
+  const nextListenMs = Math.max(stats.listenMs, Math.round(remoteListenMs));
+  const nextSongFloor = Math.max(stats.songCountFloor, Math.round(remoteSongCount));
+  if (nextListenMs === stats.listenMs && nextSongFloor === stats.songCountFloor) return false;
+  stats.listenMs = nextListenMs;
+  stats.songCountFloor = nextSongFloor;
+  saveCommunityListeningStats();
+  return true;
+}
+
+function formatCommunityListeningDuration(milliseconds) {
+  const minutes = Math.floor(Math.max(0, Number(milliseconds) || 0) / 60000);
+  if (minutes < 60) return `${minutes} \u5206\u949f`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder ? `${hours} \u5c0f\u65f6 ${remainder} \u5206` : `${hours} \u5c0f\u65f6`;
+}
+
+function renderCommunityListeningStats(profile = null) {
+  if (profile) mergeCommunityListeningStats(profile);
+  const stats = state.community.listeningStats;
+  const songCount = Math.max(stats.songCountFloor, stats.songKeys.length);
+  if (els.communityListeningDuration) {
+    els.communityListeningDuration.textContent = formatCommunityListeningDuration(stats.listenMs);
+  }
+  if (els.communityListeningSongs) {
+    els.communityListeningSongs.textContent = `${songCount} \u9996`;
+  }
+}
+
+function recordCommunityListeningStats(listenMsDelta, song = state.currentSong) {
+  const stats = state.community.listeningStats;
+  const delta = Math.max(0, Math.min(30000, Math.round(Number(listenMsDelta) || 0)));
+  const signature = communitySongSignature(song || {});
+  const hadSong = !!signature && stats.songKeys.includes(signature);
+  if (delta > 0) stats.listenMs += delta;
+  if (signature && !hadSong) stats.songKeys.push(signature);
+  if (delta <= 0 && (!signature || hadSong)) return;
+  renderCommunityListeningStats();
+  if (!hadSong || Date.now() - state.community.listeningStatsSavedAt >= 15000) {
+    saveCommunityListeningStats();
+  }
+}
+
+function flushCommunityListeningStats() {
+  const nowMs = performance.now();
+  const previous = state.community.listeningStatsLastAt;
+  state.community.listeningStatsLastAt = nowMs;
+  if (
+    state.community.listeningStatsPlaying
+    && previous > 0
+    && state.currentSong
+    && state.currentSong.id
+    && els.audio.src
+  ) {
+    recordCommunityListeningStats(nowMs - previous, state.currentSong);
+  }
+  state.community.listeningStatsPlaying = false;
 }
 
 function songCoverSource(song = {}) {
@@ -8027,6 +9388,12 @@ function normalizeSearchResults(songs) {
 
 async function fetchSearchSuggestions(keyword) {
   const provider = providerInfo(state.activeProvider).id;
+  if (!providerConfigured(provider)) {
+    state.searchSuggestions.songs = [];
+    state.searchSuggestions.loading = false;
+    renderSearchSuggestionStatus(`请先导入${providerInfo(provider).label} API 插件`);
+    return;
+  }
   const cacheKey = `${provider}:${keyword.toLowerCase()}`;
   const cached = state.searchSuggestions.cache.get(cacheKey);
   if (cached && Date.now() - cached.time < SEARCH_SUGGESTION_CACHE_MS) {
@@ -8160,7 +9527,19 @@ function localPlaylistDescriptor() {
 }
 
 function playbackPlaylists() {
-  return [localPlaylistDescriptor(), ...state.userPlaylists];
+  const playlists = [
+    localPlaylistDescriptor(),
+    ...state.recommendedPlaylists,
+    ...state.userPlaylists
+  ];
+  const seen = new Set();
+  return playlists.filter((playlist) => {
+    if (!playlist || !playlist.id) return false;
+    const key = `${safeText(playlist.provider, state.activeProvider)}:${playlist.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function openLocalPlaylist() {
@@ -8242,7 +9621,8 @@ function playlistSignature(playlists) {
       playlist.name || '',
       playlist.cover || '',
       playlist.trackCount || 0,
-      playlist.playCount || 0
+      playlist.playCount || 0,
+      playlist.recommended === true ? 'recommended' : ''
     ].join('|'))
     .join('::');
 }
@@ -8439,8 +9819,8 @@ function setCommunityCardCollapsed(collapsed) {
   state.community.cardCollapsed = !!collapsed;
   if (els.communityCard) els.communityCard.classList.toggle('is-collapsed', state.community.cardCollapsed);
   if (els.communityCollapseButton) {
-    els.communityCollapseButton.setAttribute('aria-expanded', String(!state.community.cardCollapsed));
-    els.communityCollapseButton.setAttribute('aria-label', state.community.cardCollapsed ? '展开社区卡片' : '折叠社区卡片');
+    els.communityCollapseButton.setAttribute('aria-expanded', String(state.playbackChrome.communityVisible));
+    els.communityCollapseButton.setAttribute('aria-label', '收起社区');
     els.communityCollapseButton.title = els.communityCollapseButton.getAttribute('aria-label');
   }
   saveCommunityCardCollapsed(state.community.cardCollapsed);
@@ -8475,14 +9855,19 @@ function communityBroadcastKey(broadcast = {}) {
 }
 
 function renderCommunityBroadcastButton() {
-  if (!els.communityBroadcastButton) return;
   const hasBroadcast = !!state.community.broadcastLatest;
-  els.communityBroadcastButton.classList.toggle('has-broadcast', hasBroadcast);
-  els.communityBroadcastButton.classList.toggle('is-unread', !!state.community.broadcastUnread);
-  els.communityBroadcastButton.setAttribute('aria-pressed', String(!!state.community.broadcastUnread));
-  els.communityBroadcastButton.title = hasBroadcast
-    ? state.community.broadcastLatest.title
-    : '\u793e\u533a\u516c\u544a\u5e7f\u64ad';
+  const unread = !!state.community.broadcastUnread;
+  if (els.communityBroadcastButton) {
+    els.communityBroadcastButton.classList.toggle('has-broadcast', hasBroadcast);
+    els.communityBroadcastButton.classList.toggle('is-unread', unread);
+    els.communityBroadcastButton.setAttribute('aria-pressed', String(unread));
+    els.communityBroadcastButton.title = hasBroadcast
+      ? state.community.broadcastLatest.title
+      : '\u793e\u533a\u516c\u544a\u5e7f\u64ad';
+  }
+  if (els.communityRailButton) {
+    els.communityRailButton.classList.toggle('has-unread', unread);
+  }
 }
 
 function hideCommunityBroadcastToast() {
@@ -8588,6 +9973,14 @@ function communitySongSignature(song = {}) {
 function communitySongPosition(song = {}) {
   const position = Number(song.position);
   return Number.isFinite(position) ? Math.max(0, position) : 0;
+}
+
+function communitySongPlaybackPosition(song = {}) {
+  const position = communitySongPosition(song);
+  const reportedAt = Number(song.reportedAt);
+  if (song.playing === false || !Number.isFinite(reportedAt) || reportedAt <= 0) return position;
+  const transitSeconds = clamp((Date.now() - reportedAt) / 1000, 0, 10);
+  return position + transitSeconds;
 }
 
 function communitySongDuration(song = {}) {
@@ -8874,6 +10267,7 @@ function renderCommunityState(payload = {}) {
   const nextFriendsSignature = hasCommunityIdentity ? communityFriendsSignature(friends) : '';
   state.community.profile = hasCommunityIdentity ? profile : null;
   state.community.friends = friends;
+  renderCommunityListeningStats(hasCommunityIdentity ? profile : null);
   if (hasCommunityIdentity) {
     const remoteBio = safeText(profile.bio, '').slice(0, 180);
     if (remoteBio && remoteBio !== state.community.profileBio && document.activeElement !== els.communityProfileBio) {
@@ -8948,11 +10342,17 @@ function renderCommunityState(payload = {}) {
 }
 
 async function refreshCommunityState(provider = state.activeProvider) {
-  if (document.hidden || !els.communityCard || state.community.loading) return null;
+  if (document.hidden || !els.communityCard) return null;
+  if (state.community.loading) {
+    state.community.refreshQueued = true;
+    return null;
+  }
   state.community.loading = true;
+  state.community.refreshQueued = false;
   state.community.lastProvider = provider;
   try {
-    const payload = await apiJson(`/api/community/state?${query({ provider })}`);
+    const payload = await communityApiJson(`/api/community/state?${query({ provider })}`);
+    state.community.refreshRetryDelay = 1200;
     renderCommunityState(payload);
     return payload;
   } catch (error) {
@@ -8962,9 +10362,16 @@ async function refreshCommunityState(provider = state.activeProvider) {
       provider,
       error: error.message || '社区服务器未连接'
     });
+    const retryDelay = clamp(state.community.refreshRetryDelay || 1200, 1000, 15000);
+    state.community.refreshRetryDelay = Math.min(15000, Math.round(retryDelay * 1.6));
+    scheduleCommunityRefresh(Math.round(retryDelay * (0.85 + Math.random() * 0.3)));
     return null;
   } finally {
     state.community.loading = false;
+    if (state.community.refreshQueued && !document.hidden) {
+      state.community.refreshQueued = false;
+      scheduleCommunityRefresh(40);
+    }
   }
 }
 
@@ -8985,7 +10392,7 @@ function communityEventIdentityKey() {
 function communityEventUrl() {
   const profile = state.community.profile || {};
   const feId = safeText(profile.feId, '');
-  if (!feId || typeof EventSource === 'undefined') return '';
+  if (!feId || typeof window.EventSource === 'undefined') return '';
   const params = { feId };
   if (state.community.eventCursor) params.after = state.community.eventCursor;
   return `/api/community/events?${query(params)}`;
@@ -8993,16 +10400,21 @@ function communityEventUrl() {
 
 function stopCommunityEventStream(reset = false) {
   window.clearTimeout(state.community.eventReconnectTimer);
+  window.clearTimeout(state.community.eventHeartbeatTimer);
   state.community.eventReconnectTimer = 0;
+  state.community.eventHeartbeatTimer = 0;
   if (state.community.eventSource) {
     try { state.community.eventSource.close(); } catch (error) {}
   }
   state.community.eventSource = null;
   state.community.eventConnected = false;
+  state.community.eventLastActivityAt = 0;
   if (reset) {
     state.community.eventKey = '';
     state.community.eventCursor = '';
     state.community.eventReconnectDelay = 1200;
+    state.community.eventSeenSeqs.clear();
+    state.community.eventSeenOrder.length = 0;
   }
 }
 
@@ -9010,10 +10422,48 @@ function scheduleCommunityEventReconnect() {
   window.clearTimeout(state.community.eventReconnectTimer);
   const delay = clamp(state.community.eventReconnectDelay || 1200, 1000, 12000);
   state.community.eventReconnectDelay = Math.min(12000, Math.round(delay * 1.45));
+  const jitteredDelay = Math.round(delay * (0.85 + Math.random() * 0.3));
   state.community.eventReconnectTimer = window.setTimeout(() => {
     state.community.eventReconnectTimer = 0;
     ensureCommunityEventStream();
-  }, delay);
+  }, jitteredDelay);
+}
+
+function touchCommunityEventStream() {
+  state.community.eventLastActivityAt = performance.now();
+  window.clearTimeout(state.community.eventHeartbeatTimer);
+  state.community.eventHeartbeatTimer = window.setTimeout(
+    checkCommunityEventHeartbeat,
+    COMMUNITY_EVENT_HEARTBEAT_MS
+  );
+}
+
+function checkCommunityEventHeartbeat() {
+  window.clearTimeout(state.community.eventHeartbeatTimer);
+  state.community.eventHeartbeatTimer = 0;
+  if (!state.community.eventSource || document.hidden) return;
+  const idleFor = performance.now() - state.community.eventLastActivityAt;
+  if (!state.community.eventLastActivityAt || idleFor >= COMMUNITY_EVENT_STALE_MS) {
+    stopCommunityEventStream(false);
+    scheduleCommunityRefresh(80);
+    if (state.community.eventKey || communityEventIdentityKey()) scheduleCommunityEventReconnect();
+    return;
+  }
+  state.community.eventHeartbeatTimer = window.setTimeout(
+    checkCommunityEventHeartbeat,
+    Math.min(COMMUNITY_EVENT_HEARTBEAT_MS, COMMUNITY_EVENT_STALE_MS - idleFor)
+  );
+}
+
+function communityEventAlreadyHandled(seq) {
+  if (!seq) return false;
+  if (state.community.eventSeenSeqs.has(seq)) return true;
+  state.community.eventSeenSeqs.add(seq);
+  state.community.eventSeenOrder.push(seq);
+  while (state.community.eventSeenOrder.length > 512) {
+    state.community.eventSeenSeqs.delete(state.community.eventSeenOrder.shift());
+  }
+  return false;
 }
 
 function ensureCommunityEventStream() {
@@ -9037,16 +10487,25 @@ function ensureCommunityEventStream() {
   state.community.eventKey = key;
 
   try {
-    const source = new EventSource(url);
+    const source = new window.EventSource(url);
     state.community.eventSource = source;
     source.addEventListener('open', () => {
+      if (state.community.eventSource !== source) return;
       state.community.eventConnected = true;
       state.community.eventReconnectDelay = 1200;
+      touchCommunityEventStream();
     });
     source.addEventListener('community-ready', () => {
+      if (state.community.eventSource !== source) return;
       state.community.eventConnected = true;
+      touchCommunityEventStream();
+      scheduleCommunityRefresh(80);
     });
-    source.addEventListener('community', handleCommunityServerEvent);
+    source.addEventListener('community', (event) => {
+      if (state.community.eventSource !== source) return;
+      touchCommunityEventStream();
+      handleCommunityServerEvent(event);
+    });
     source.addEventListener('error', () => {
       if (state.community.eventSource !== source) return;
       source.close();
@@ -9073,6 +10532,7 @@ function handleCommunityServerEvent(event) {
   const payload = envelope.payload || {};
   const seq = safeText(envelope.seq || event.lastEventId, '');
   if (seq) state.community.eventCursor = seq;
+  if (communityEventAlreadyHandled(seq)) return;
 
   if (type === 'message.sent') {
     const message = payload.message || {};
@@ -9103,11 +10563,7 @@ function handleCommunityServerEvent(event) {
     const activeId = safeText(state.community.activeSession && state.community.activeSession.id, '');
     const leftId = safeText(session.id, '');
     if (!leftId || !activeId || leftId === activeId) {
-      state.community.pendingInvite = null;
-      state.community.activeSession = null;
-      state.community.listenSyncSignature = '';
-      stopCommunityCall(false);
-      hideListenMini({ clearSession: true });
+      resetCommunityListenState({ sessionId: leftId || activeId });
       toast('一起听已结束');
     }
     refreshCommunityListenState().catch(() => {});
@@ -10094,6 +11550,7 @@ function handleCommunityFriendAction(event) {
 
 function showListenMini({ title = '一起听歌', status = '', song = null } = {}) {
   if (!els.listenMini) return;
+  if (!state.community.pendingInvite && !state.community.activeSession) return;
   els.listenMini.hidden = false;
   if (els.listenMiniTitle) els.listenMiniTitle.textContent = title;
   if (els.listenMiniStatus) els.listenMiniStatus.textContent = status || '一起听连接中';
@@ -10104,18 +11561,71 @@ function showListenMini({ title = '一起听歌', status = '', song = null } = {
   setListenMiniPosition();
 }
 
+function setListenMiniCollapsed(collapsed) {
+  const nextCollapsed = !!collapsed && !!(state.community.pendingInvite || state.community.activeSession);
+  state.community.listenMiniCollapsed = nextCollapsed;
+  if (!els.listenMini) return;
+  els.listenMini.classList.toggle('is-left-collapsed', nextCollapsed);
+  els.listenMini.setAttribute('aria-label', nextCollapsed ? '一起听歌，已收起到左侧' : '一起听歌');
+  if (els.listenMiniCollapse) {
+    els.listenMiniCollapse.setAttribute('aria-expanded', nextCollapsed ? 'false' : 'true');
+    els.listenMiniCollapse.setAttribute('aria-label', nextCollapsed ? '展开一起听窗口' : '将一起听收起到左侧');
+    els.listenMiniCollapse.textContent = nextCollapsed ? '›' : '‹';
+    els.listenMiniCollapse.title = nextCollapsed ? '展开一起听' : '收起到左侧';
+  }
+}
+
+function toggleListenMiniCollapsed() {
+  setListenMiniCollapsed(!state.community.listenMiniCollapsed);
+}
+
 function hideListenMini({ clearSession = false } = {}) {
   if (els.listenMini) els.listenMini.hidden = true;
+  endListenMiniDrag();
   state.community.pendingInvite = null;
   if (clearSession) {
     state.community.activeSession = null;
     state.community.listenSyncSignature = '';
   }
+  syncCommunityDanmakuControls();
   if (els.listenAcceptButton) els.listenAcceptButton.hidden = true;
   if (els.listenDeclineButton) els.listenDeclineButton.hidden = true;
   if (els.listenLeaveButton) els.listenLeaveButton.hidden = true;
   if (els.listenCallButton) els.listenCallButton.hidden = true;
   if (els.listenHangupButton) els.listenHangupButton.hidden = true;
+}
+
+function communityListenIdDismissed(id = '') {
+  const target = safeText(id, '');
+  return !!target && state.community.listenDismissedIds.has(target);
+}
+
+function rememberDismissedCommunityListenId(id = '') {
+  const target = safeText(id, '');
+  if (!target) return;
+  state.community.listenDismissedIds.add(target);
+  while (state.community.listenDismissedIds.size > 16) {
+    const oldest = state.community.listenDismissedIds.values().next().value;
+    state.community.listenDismissedIds.delete(oldest);
+  }
+}
+
+function resetCommunityListenState({ sessionId = '', inviteId = '' } = {}) {
+  const activeId = safeText(sessionId || (state.community.activeSession && state.community.activeSession.id), '');
+  const pendingId = safeText(inviteId || (state.community.pendingInvite && state.community.pendingInvite.id), '');
+  rememberDismissedCommunityListenId(activeId);
+  rememberDismissedCommunityListenId(pendingId);
+  state.community.listenStateRevision += 1;
+  state.community.pendingInvite = null;
+  state.community.activeSession = null;
+  state.community.listenSyncSignature = '';
+  state.community.listenUnavailableSignature = '';
+  state.community.listenUnavailableSignatures.clear();
+  state.community.listenSyncing = false;
+  setListenMiniCollapsed(false);
+  syncCommunityDanmakuControls();
+  stopCommunityCall(false);
+  hideListenMini({ clearSession: true });
 }
 
 function setListenMiniPosition() {
@@ -10135,6 +11645,7 @@ function setListenMiniPosition() {
 
 function beginListenMiniDrag(event) {
   if (event.button !== 0) return;
+  if (event.target instanceof Element && event.target.closest('button, a, input, select, textarea')) return;
   state.community.listenMiniDragging = true;
   state.community.listenMiniPointerId = event.pointerId;
   state.community.listenMiniStartX = state.community.listenMiniX;
@@ -10176,10 +11687,12 @@ async function applyCommunityListenSync(payload = {}) {
   if (me && sourceId && sourceId === me) return;
 
   const incomingSessionId = safeText(session.id, '');
+  if (communityListenIdDismissed(incomingSessionId)) return;
   const activeSessionId = safeText(state.community.activeSession && state.community.activeSession.id, '');
   if (activeSessionId && incomingSessionId && activeSessionId !== incomingSessionId) return;
 
   const currentSignature = communitySongSignature(currentCommunitySongPayload());
+  if (state.community.listenUnavailableSignatures.has(signature) && signature !== currentSignature) return;
   state.community.listenSyncSignature = signature;
   if (incomingSessionId) state.community.activeSession = session;
   showListenMini({
@@ -10197,7 +11710,7 @@ async function applyCommunityListenSync(payload = {}) {
       { ...song, provider: safeText(song.provider, state.activeProvider) },
       {
         communitySync: true,
-        position: communitySongPosition(song),
+        position: communitySongPlaybackPosition(song),
         autoplay: song.playing !== false
       }
     );
@@ -10209,41 +11722,44 @@ async function applyCommunityListenSync(payload = {}) {
 async function leaveCommunityListen() {
   const invite = state.community.pendingInvite;
   if (invite && invite.id && !state.community.activeSession) {
-    await respondCommunityListen(false);
+    resetCommunityListenState({ inviteId: invite.id });
+    apiJson(`/api/community/listen/respond?${query({ provider: state.activeProvider })}`, {
+      method: 'POST',
+      body: JSON.stringify({ inviteId: invite.id, accepted: false })
+    }).catch(() => {});
     return;
   }
 
   const session = state.community.activeSession;
   if (!session || !session.id) {
-    hideListenMini({ clearSession: true });
+    resetCommunityListenState();
     return;
   }
 
+  resetCommunityListenState({ sessionId: session.id });
   try {
     const payload = await apiJson(`/api/community/listen/leave?${query({ provider: state.activeProvider })}`, {
       method: 'POST',
       body: JSON.stringify({ sessionId: session.id })
     });
     if (!payload.ok) throw new Error(payload.error || '退出一起听失败');
-    state.community.pendingInvite = null;
-    state.community.activeSession = null;
-    state.community.listenSyncSignature = '';
-    stopCommunityCall(false);
-    hideListenMini({ clearSession: true });
     if (payload.state) renderCommunityListenState(payload.state);
     toast('已退出一起听');
   } catch (error) {
-    toast(error.message || '退出一起听失败');
+    toast(error.message || '已在本地退出，一起听服务器未响应');
   }
 }
 
 function renderCommunityListenState(payload = {}) {
-  const incoming = Array.isArray(payload.incoming) ? payload.incoming : [];
-  const sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
+  const incoming = (Array.isArray(payload.incoming) ? payload.incoming : [])
+    .filter((invite) => !communityListenIdDismissed(invite && invite.id));
+  const sessions = (Array.isArray(payload.sessions) ? payload.sessions : [])
+    .filter((session) => !communityListenIdDismissed(session && session.id));
   const incomingInvite = incoming[0] || null;
   const activeSession = sessions[0] || null;
   state.community.pendingInvite = incomingInvite;
   state.community.activeSession = activeSession;
+  syncCommunityDanmakuControls();
 
   if (!incomingInvite && !activeSession) {
     hideListenMini({ clearSession: true });
@@ -10274,8 +11790,7 @@ function renderCommunityListenState(payload = {}) {
     if (els.listenHangupButton) els.listenHangupButton.hidden = !state.community.call.active;
 
     const sessionSignature = communitySongSignature(activeSession.song || {});
-    const currentSignature = communitySongSignature(currentCommunitySongPayload());
-    if (sessionSignature && sessionSignature !== currentSignature && !state.community.listenSyncing) {
+    if (sessionSignature && !state.community.listenSyncing) {
       applyCommunityListenSync({ session: activeSession, song: activeSession.song }).catch(() => {});
     }
   }
@@ -10283,8 +11798,10 @@ function renderCommunityListenState(payload = {}) {
 
 async function refreshCommunityListenState() {
   if (document.hidden || !(state.community.profile && state.community.profile.feId)) return;
+  const revision = state.community.listenStateRevision;
   try {
-    const payload = await apiJson(`/api/community/listen/state?${query({ provider: state.activeProvider })}`);
+    const payload = await communityApiJson(`/api/community/listen/state?${query({ provider: state.activeProvider })}`);
+    if (revision !== state.community.listenStateRevision) return;
     renderCommunityListenState(payload);
     if (state.community.activeSession) await pollCommunityCallSignals();
   } catch (error) {
@@ -10294,6 +11811,20 @@ async function refreshCommunityListenState() {
 async function respondCommunityListen(accepted) {
   const invite = state.community.pendingInvite;
   if (!invite || !invite.id) return;
+  if (!accepted) {
+    resetCommunityListenState({ inviteId: invite.id });
+    try {
+      const payload = await apiJson(`/api/community/listen/respond?${query({ provider: state.activeProvider })}`, {
+        method: 'POST',
+        body: JSON.stringify({ inviteId: invite.id, accepted: false })
+      });
+      if (!payload.ok) throw new Error(payload.error || '拒绝邀请失败');
+      toast('已拒绝邀请');
+    } catch (error) {
+      toast(error.message || '已在本地关闭邀请');
+    }
+    return;
+  }
   try {
     const payload = await apiJson(`/api/community/listen/respond?${query({ provider: state.activeProvider })}`, {
       method: 'POST',
@@ -10303,8 +11834,7 @@ async function respondCommunityListen(accepted) {
     state.community.pendingInvite = null;
     if (payload.session) state.community.activeSession = payload.session;
     if (payload.state) renderCommunityListenState(payload.state);
-    if (!accepted) hideListenMini();
-    toast(accepted ? '已加入一起听' : '已拒绝邀请');
+    toast('已加入一起听');
   } catch (error) {
     toast(error.message || '处理邀请失败');
   }
@@ -10316,6 +11846,181 @@ function communitySessionTargetId() {
   const members = Array.isArray(session && session.members) ? session.members : [];
   const other = members.find((member) => member && String(member.feId) !== me);
   return other ? String(other.feId) : '';
+}
+
+function rememberCommunityDanmakuId(id = '') {
+  const normalized = safeText(id, '');
+  if (!normalized || state.community.danmakuSeenIds.has(normalized)) return false;
+  state.community.danmakuSeenIds.add(normalized);
+  state.community.danmakuSeenOrder.push(normalized);
+  while (state.community.danmakuSeenOrder.length > 256) {
+    state.community.danmakuSeenIds.delete(state.community.danmakuSeenOrder.shift());
+  }
+  return true;
+}
+
+function removeCommunityDanmakuBubble(bubble) {
+  if (!bubble) return;
+  const id = safeText(bubble.dataset && bubble.dataset.communityDanmakuId, '');
+  const timer = id ? state.community.danmakuBubbleTimers.get(id) : 0;
+  if (timer) window.clearTimeout(timer);
+  if (id) state.community.danmakuBubbleTimers.delete(id);
+  removeElement(bubble);
+}
+
+function clearCommunityDanmakuBubbles() {
+  state.community.danmakuBubbleTimers.forEach((timer) => window.clearTimeout(timer));
+  state.community.danmakuBubbleTimers.clear();
+  if (els.communityDanmakuLayer) clearElement(els.communityDanmakuLayer);
+  state.community.danmakuPointerX = Number.NaN;
+  state.community.danmakuPointerY = Number.NaN;
+  if (state.community.danmakuRepelFrame) window.cancelAnimationFrame(state.community.danmakuRepelFrame);
+  state.community.danmakuRepelFrame = 0;
+}
+
+function setCommunityDanmakuComposerOpen(open) {
+  const active = !!safeText(state.community.activeSession && state.community.activeSession.id, '');
+  const nextOpen = !!open && active;
+  state.community.danmakuOpen = nextOpen;
+  if (els.qishuiPlaybackDanmakuComposer) {
+    if (els.qishuiPlaybackDanmakuComposer.parentElement !== document.body) {
+      document.body.appendChild(els.qishuiPlaybackDanmakuComposer);
+    }
+    els.qishuiPlaybackDanmakuComposer.classList.toggle('is-open', nextOpen);
+    els.qishuiPlaybackDanmakuComposer.setAttribute('aria-hidden', nextOpen ? 'false' : 'true');
+    els.qishuiPlaybackDanmakuComposer.inert = !nextOpen;
+  }
+  if (els.qishuiPlaybackDanmakuToggle) {
+    els.qishuiPlaybackDanmakuToggle.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+    els.qishuiPlaybackDanmakuToggle.classList.toggle('is-active', nextOpen);
+  }
+  if (nextOpen && els.qishuiPlaybackDanmakuInput) {
+    window.requestAnimationFrame(() => els.qishuiPlaybackDanmakuInput.focus());
+  }
+}
+
+function syncCommunityDanmakuControls() {
+  const active = !!safeText(state.community.activeSession && state.community.activeSession.id, '');
+  if (els.qishuiPlaybackDanmakuToggle) els.qishuiPlaybackDanmakuToggle.hidden = !active;
+  if (!active) {
+    setCommunityDanmakuComposerOpen(false);
+    clearCommunityDanmakuBubbles();
+  }
+}
+
+function showCommunityDanmakuBubble(payload = {}, { local = false } = {}) {
+  const sessionId = safeText(state.community.activeSession && state.community.activeSession.id, '');
+  const incomingSessionId = safeText(payload.sessionId, '');
+  const text = safeText(payload.text, '').trim();
+  const id = safeText(payload.id, `danmaku-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  if (!els.communityDanmakuLayer || !sessionId || !text) return null;
+  if (incomingSessionId && incomingSessionId !== sessionId) return null;
+  if (!rememberCommunityDanmakuId(id)) return null;
+
+  const bubble = document.createElement('article');
+  bubble.className = `community-danmaku-bubble glass-surface glass-surface--fallback${local ? ' is-local' : ''}`;
+  bubble.dataset.communityDanmakuId = id;
+  bubble.style.setProperty('--danmaku-x', `${4 + Math.random() * 76}%`);
+  bubble.style.setProperty('--danmaku-y', `${8 + Math.random() * 70}%`);
+  bubble.style.setProperty('--danmaku-drift-x', `${Math.round((Math.random() - 0.5) * 54)}px`);
+  bubble.style.setProperty('--danmaku-drift-y', `${Math.round(-20 - Math.random() * 30)}px`);
+  bubble.style.setProperty('--danmaku-repel-x', '0px');
+  bubble.style.setProperty('--danmaku-repel-y', '0px');
+
+  const content = document.createElement('div');
+  content.className = 'glass-surface__content';
+  const sender = safeText(payload.senderName, local ? '我' : '好友').slice(0, 24);
+  if (sender) {
+    const name = document.createElement('strong');
+    name.textContent = sender;
+    content.appendChild(name);
+  }
+  const message = document.createElement('span');
+  message.textContent = text;
+  content.appendChild(message);
+  bubble.appendChild(content);
+  els.communityDanmakuLayer.appendChild(bubble);
+
+  state.community.danmakuBubbleTimers.set(id, window.setTimeout(() => removeCommunityDanmakuBubble(bubble), 3000));
+  return bubble;
+}
+
+function updateCommunityDanmakuRepulsion() {
+  state.community.danmakuRepelFrame = 0;
+  if (!els.communityDanmakuLayer) return;
+  const pointerX = state.community.danmakuPointerX;
+  const pointerY = state.community.danmakuPointerY;
+  const radius = 138;
+  els.communityDanmakuLayer.querySelectorAll('.community-danmaku-bubble').forEach((bubble) => {
+    if (!Number.isFinite(pointerX) || !Number.isFinite(pointerY)) {
+      bubble.style.setProperty('--danmaku-repel-x', '0px');
+      bubble.style.setProperty('--danmaku-repel-y', '0px');
+      return;
+    }
+    const rect = bubble.getBoundingClientRect();
+    let dx = rect.left + rect.width / 2 - pointerX;
+    let dy = rect.top + rect.height / 2 - pointerY;
+    let distance = Math.hypot(dx, dy);
+    if (distance < 0.01) {
+      dx = 0;
+      dy = -1;
+      distance = 1;
+    }
+    if (distance >= radius) {
+      bubble.style.setProperty('--danmaku-repel-x', '0px');
+      bubble.style.setProperty('--danmaku-repel-y', '0px');
+      return;
+    }
+    const force = Math.pow(1 - distance / radius, 2) * 64;
+    bubble.style.setProperty('--danmaku-repel-x', `${(dx / distance * force).toFixed(2)}px`);
+    bubble.style.setProperty('--danmaku-repel-y', `${(dy / distance * force).toFixed(2)}px`);
+  });
+}
+
+function scheduleCommunityDanmakuRepulsion(event = {}) {
+  if (!els.communityDanmakuLayer || !els.communityDanmakuLayer.childElementCount) return;
+  state.community.danmakuPointerX = Number(event.clientX);
+  state.community.danmakuPointerY = Number(event.clientY);
+  if (state.community.danmakuRepelFrame) return;
+  state.community.danmakuRepelFrame = window.requestAnimationFrame(updateCommunityDanmakuRepulsion);
+}
+
+function handleCommunityDanmakuRelay(relay = {}) {
+  const type = safeText(relay.type || relay.relayType, '');
+  if (type !== 'listen.danmaku') return;
+  showCommunityDanmakuBubble(relay.payload || relay.data || {});
+}
+
+async function sendCommunityDanmaku(event) {
+  if (event && typeof event.preventDefault === 'function') event.preventDefault();
+  const sessionId = safeText(state.community.activeSession && state.community.activeSession.id, '');
+  const targetId = communitySessionTargetId();
+  const text = safeText(els.qishuiPlaybackDanmakuInput && els.qishuiPlaybackDanmakuInput.value, '').trim();
+  if (!sessionId || !targetId || !text) return;
+  const me = safeText(state.community.profile && state.community.profile.feId, '');
+  const payload = {
+    id: `${me || 'local'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    sessionId,
+    text,
+    senderId: me,
+    senderName: safeText(state.community.profile && (state.community.profile.username || state.community.profile.displayName), '我'),
+    sentAt: Date.now()
+  };
+  showCommunityDanmakuBubble(payload, { local: true });
+  if (els.qishuiPlaybackDanmakuInput) els.qishuiPlaybackDanmakuInput.value = '';
+  if (els.qishuiPlaybackDanmakuSend) els.qishuiPlaybackDanmakuSend.disabled = true;
+  try {
+    const response = await apiJson(`/api/community/relay?${query({ provider: state.activeProvider })}`, {
+      method: 'POST',
+      body: JSON.stringify({ targetId, type: 'listen.danmaku', payload })
+    });
+    if (response && response.ok === false) throw new Error(response.error || '弹幕发送失败');
+  } catch (error) {
+    toast(error.message || '弹幕发送失败');
+  } finally {
+    if (els.qishuiPlaybackDanmakuSend) els.qishuiPlaybackDanmakuSend.disabled = false;
+    if (state.community.danmakuOpen && els.qishuiPlaybackDanmakuInput) els.qishuiPlaybackDanmakuInput.focus();
+  }
 }
 
 async function sendCommunityCallSignal(type, payload = {}) {
@@ -10452,15 +12157,29 @@ async function pollCommunityCallSignals() {
 }
 
 async function reportCommunityListening(force = false) {
-  if (document.hidden || !(state.community.profile && state.community.profile.feId)) return;
+  const nowMs = performance.now();
+  const previousLocalTick = state.community.listeningStatsLastAt;
+  state.community.listeningStatsLastAt = nowMs;
+  if (document.hidden) {
+    state.community.listeningStatsPlaying = false;
+    state.community.lastListenReportAt = nowMs;
+    return;
+  }
   const hasSong = !!(state.currentSong && state.currentSong.id);
   const activeSession = !!state.community.activeSession;
   const playing = !els.audio.paused && !!els.audio.src && hasSong;
+  if (playing) {
+    state.community.listeningStatsPlaying = true;
+    const listenMsDelta = previousLocalTick > 0 ? nowMs - previousLocalTick : 0;
+    recordCommunityListeningStats(listenMsDelta, state.currentSong);
+  } else {
+    state.community.listeningStatsPlaying = false;
+  }
+  if (!(state.community.profile && state.community.profile.feId)) return;
   const unavailableSync = activeSession &&
     !els.audio.src &&
     state.community.listenUnavailableSignature &&
     state.community.listenUnavailableSignature === communitySongSignature(state.currentSong || {});
-  const nowMs = performance.now();
   if (!hasSong || unavailableSync || (!playing && !activeSession)) {
     state.community.lastListenReportAt = nowMs;
     return;
@@ -10470,6 +12189,7 @@ async function reportCommunityListening(force = false) {
   const minInterval = activeSession ? 4500 : 14000;
   if (!force && delta < minInterval) return;
   state.community.lastListenReportAt = nowMs;
+  const listenRevision = state.community.listenStateRevision;
   try {
     const payload = await apiJson(`/api/community/listening?${query({ provider: state.activeProvider })}`, {
       method: 'POST',
@@ -10484,7 +12204,9 @@ async function reportCommunityListening(force = false) {
         friends: Array.isArray(payload.friends) ? payload.friends : state.community.friends
       });
     }
-    const syncedSessions = Array.isArray(payload.syncedSessions) ? payload.syncedSessions : [];
+    if (listenRevision !== state.community.listenStateRevision) return;
+    const syncedSessions = (Array.isArray(payload.syncedSessions) ? payload.syncedSessions : [])
+      .filter((session) => !communityListenIdDismissed(session && session.id));
     if (syncedSessions.length) {
       const activeId = safeText(state.community.activeSession && state.community.activeSession.id, '');
       state.community.activeSession = syncedSessions.find((session) => safeText(session.id, '') === activeId) || syncedSessions[0];
@@ -10499,19 +12221,112 @@ function clearLoginQrTimer() {
   state.loginQrTimer = 0;
 }
 
+function setOfficialBrowserLoginStatus(message = '', hidden = false) {
+  if (!els.officialBrowserLoginStatus) return;
+  els.officialBrowserLoginStatus.textContent = safeText(message, '');
+  els.officialBrowserLoginStatus.hidden = hidden || !message;
+}
+
+function clearOfficialBrowserLoginTimer(options = {}) {
+  window.clearInterval(state.officialBrowserLoginTimer);
+  state.officialBrowserLoginTimer = 0;
+  const session = state.officialBrowserLoginSession;
+  const provider = state.officialBrowserLoginProvider;
+  state.officialBrowserLoginSession = '';
+  state.officialBrowserLoginProvider = '';
+  state.officialBrowserLoginLoading = false;
+  if (els.officialBrowserLoginButton) {
+    els.officialBrowserLoginButton.disabled = false;
+    els.officialBrowserLoginButton.textContent = '官方浏览器登录';
+  }
+  if (options.cancel && session && provider) {
+    void apiJson(`${providerPath('/login/browser/cancel', provider)}?${query({ session })}`, {
+      method: 'POST',
+      headers: { 'X-FE-Monster-Login': '1' }
+    }).catch(() => {});
+  }
+}
+
+async function checkOfficialBrowserLogin() {
+  const session = state.officialBrowserLoginSession;
+  const provider = state.officialBrowserLoginProvider;
+  if (!session || !provider || document.hidden) return;
+  try {
+    const payload = await apiJson(`${providerPath('/login/browser/status', provider)}?${query({ session })}`);
+    if (session !== state.officialBrowserLoginSession || provider !== state.officialBrowserLoginProvider) return;
+    setOfficialBrowserLoginStatus(payload.message || '请在官方窗口中完成登录');
+    if (payload.loggedIn) {
+      clearOfficialBrowserLoginTimer();
+      setOfficialBrowserLoginStatus(`${providerInfo(provider).label}官方登录成功，正在同步账号与歌单`);
+      const account = await refreshLoginStatus(provider);
+      await refreshUserPlaylists();
+      if (account?.loggedIn) window.setTimeout(closeLoginDialog, 700);
+      return;
+    }
+    if (payload.terminal) {
+      clearOfficialBrowserLoginTimer();
+      setOfficialBrowserLoginStatus(payload.message || '官方浏览器登录未完成');
+    }
+  } catch (error) {
+    clearOfficialBrowserLoginTimer();
+    setOfficialBrowserLoginStatus(error.message || '官方浏览器登录连接失败');
+  }
+}
+
+async function startOfficialBrowserLogin() {
+  const provider = state.activeProvider;
+  if (!providerConfigured(provider) || state.officialBrowserLoginLoading) return;
+  clearOfficialBrowserLoginTimer({ cancel: true });
+  state.officialBrowserLoginLoading = true;
+  if (els.officialBrowserLoginButton) {
+    els.officialBrowserLoginButton.disabled = true;
+    els.officialBrowserLoginButton.textContent = '正在打开官方窗口';
+  }
+  setOfficialBrowserLoginStatus(`正在打开${providerInfo(provider).label}官方登录页面`);
+  try {
+    const payload = await apiJson(providerPath('/login/browser/start', provider), {
+      method: 'POST',
+      headers: { 'X-FE-Monster-Login': '1' }
+    });
+    state.officialBrowserLoginSession = safeText(payload.session, '');
+    state.officialBrowserLoginProvider = provider;
+    state.officialBrowserLoginLoading = false;
+    if (!state.officialBrowserLoginSession) throw new Error(payload.error || '未创建官方浏览器登录会话');
+    if (els.officialBrowserLoginButton) {
+      els.officialBrowserLoginButton.disabled = false;
+      els.officialBrowserLoginButton.textContent = '关闭官方登录窗口';
+    }
+    setOfficialBrowserLoginStatus(payload.message || `请在${providerInfo(provider).label}官方窗口中扫码登录`);
+    state.officialBrowserLoginTimer = window.setInterval(checkOfficialBrowserLogin, 1500);
+    window.setTimeout(checkOfficialBrowserLogin, 450);
+  } catch (error) {
+    clearOfficialBrowserLoginTimer();
+    setOfficialBrowserLoginStatus(error.message || '无法打开官方浏览器登录');
+  }
+}
+
+function toggleOfficialBrowserLogin() {
+  if (state.officialBrowserLoginSession) {
+    clearOfficialBrowserLoginTimer({ cancel: true });
+    setOfficialBrowserLoginStatus('已关闭官方浏览器登录窗口');
+    return;
+  }
+  startOfficialBrowserLogin();
+}
+
 function setQrStatus(message) {
   els.qrStatus.textContent = message;
 }
 
 function closeLoginDialog() {
   clearLoginQrTimer();
+  clearOfficialBrowserLoginTimer({ cancel: true });
   state.loginQrKey = '';
   state.loginQrLoading = false;
-  if (els.qishuiPhoneInput) els.qishuiPhoneInput.value = '';
-  if (els.qishuiCodeInput) els.qishuiCodeInput.value = '';
   els.loginDialog.hidden = true;
   els.loginButton.setAttribute('aria-expanded', 'false');
   els.loginRefresh.disabled = false;
+  if (OFFICIAL_BROWSER_LOGIN_MODE) window.close();
 }
 
 function providerInfo(provider = state.activeProvider) {
@@ -10521,180 +12336,41 @@ function providerInfo(provider = state.activeProvider) {
 
 function providerConfigured(provider = state.activeProvider) {
   const info = providerInfo(provider);
-  return info.enabled !== false && info.configured !== false;
+  return info.enabled === true && info.configured === true;
 }
 
 function setMusicApiImportStatus(message) {
-  if (els.musicApiImportStatus) els.musicApiImportStatus.textContent = safeText(message, '可导入 JSON 配置或受信任的 ZIP API 包');
-}
-
-function setQishuiPhoneStatus(message) {
-  if (els.qishuiPhoneStatus) els.qishuiPhoneStatus.textContent = safeText(message, '请输入手机号获取验证码');
-}
-
-function clearQishuiPhoneCooldownTimer() {
-  window.clearInterval(state.qishuiPhoneCooldownTimer);
-  state.qishuiPhoneCooldownTimer = 0;
-}
-
-function syncQishuiPhoneControls() {
-  const remaining = Math.max(0, Math.ceil((state.qishuiPhoneCooldownUntil - Date.now()) / 1000));
-  const busy = state.qishuiPhoneSending || state.qishuiPhoneVerifying;
-  if (els.qishuiPhoneInput) els.qishuiPhoneInput.disabled = busy;
-  if (els.qishuiCodeInput) els.qishuiCodeInput.disabled = busy;
-  if (els.qishuiSendCodeButton) {
-    els.qishuiSendCodeButton.disabled = state.qishuiPhoneSending || remaining > 0;
-    els.qishuiSendCodeButton.textContent = state.qishuiPhoneSending
-      ? '发送中'
-      : remaining > 0
-        ? `${remaining} 秒后重发`
-        : '获取验证码';
-  }
-  if (els.qishuiLoginButton) {
-    els.qishuiLoginButton.disabled = busy;
-    els.qishuiLoginButton.textContent = state.qishuiPhoneVerifying ? '登录中…' : '登录汽水音乐';
-  }
-  if (els.qishuiGuestButton) els.qishuiGuestButton.disabled = busy;
-  if (!remaining && state.qishuiPhoneCooldownTimer) clearQishuiPhoneCooldownTimer();
-}
-
-function startQishuiPhoneCooldown(seconds = 60) {
-  state.qishuiPhoneCooldownUntil = Date.now() + clamp(Number(seconds) || 60, 1, 300) * 1000;
-  clearQishuiPhoneCooldownTimer();
-  syncQishuiPhoneControls();
-  state.qishuiPhoneCooldownTimer = window.setInterval(syncQishuiPhoneControls, 500);
-}
-
-function syncLoginMethod(provider = state.activeProvider) {
-  const phoneLogin = providerInfo(provider).id === 'qishui';
-  if (els.qishuiPhoneLogin) els.qishuiPhoneLogin.hidden = !phoneLogin;
-  if (els.qrLoginStage) els.qrLoginStage.hidden = phoneLogin;
-  if (phoneLogin) syncQishuiPhoneControls();
-}
-
-function qishuiPhoneValue() {
-  return safeText(els.qishuiPhoneInput?.value, '').replace(/\D/g, '').slice(0, 11);
-}
-
-function qishuiCodeValue() {
-  return safeText(els.qishuiCodeInput?.value, '').replace(/\D/g, '').slice(0, 6);
-}
-
-function enterQishuiGuestMode() {
-  if (!setActiveProvider('qishui')) return;
-  state.qishuiGuestMode = true;
-  state.loginLoggedIn = false;
-  state.playlistsLoggedIn = false;
-  state.userPlaylists = [];
-  renderLoginStatus({ provider: 'qishui', loggedIn: false, account: null });
-  renderCommunityState({ provider: 'qishui', loggedIn: false, account: null });
-  renderPlaylistOrbit(playbackPlaylists());
-  closeLoginDialog();
-  toast('已进入汽水音乐访客模式：可搜索播放公开免费歌曲，账号歌单、社区和会员歌曲不可用');
-  window.requestAnimationFrame(() => els.searchInput?.focus());
-}
-
-async function sendQishuiPhoneCode() {
-  if (state.qishuiPhoneSending || state.qishuiPhoneVerifying) return;
-  if (state.qishuiPhoneCooldownUntil > Date.now()) {
-    syncQishuiPhoneControls();
-    return;
-  }
-  const phone = qishuiPhoneValue();
-  if (!/^1[3-9]\d{9}$/.test(phone)) {
-    setQishuiPhoneStatus('请输入有效的中国大陆 11 位手机号');
-    els.qishuiPhoneInput?.focus();
-    return;
-  }
-  state.qishuiPhoneSending = true;
-  syncQishuiPhoneControls();
-  setQishuiPhoneStatus('正在请求汽水音乐发送验证码…');
-  try {
-    const payload = await apiJson('/api/qishui/login/phone/send', {
-      method: 'POST',
-      body: JSON.stringify({ phone })
-    });
-    if (payload?.ok !== true || payload?.sent !== true) {
-      throw new Error(payload?.error || '汽水音乐未确认验证码已发送，请稍后重试');
-    }
-    const retryAfter = Number(payload.cooldownSeconds ?? payload.retryAfterSeconds ?? payload.retryAfter ?? payload.data?.retryAfter ?? 60);
-    startQishuiPhoneCooldown(retryAfter);
-    setQishuiPhoneStatus(payload.message || '验证码已发送，请查看短信');
-    els.qishuiCodeInput?.focus();
-  } catch (error) {
-    const payload = error?.payload && typeof error.payload === 'object' ? error.payload : {};
-    const rateLimited = error?.status === 429
-      || error?.code === 'UPSTREAM_RATE_LIMITED'
-      || error?.code === 'SEND_COOLDOWN';
-    if (rateLimited) {
-      const retryAfter = Number(
-        payload.retryAfterSeconds
-        ?? payload.cooldownSeconds
-        ?? payload.retryAfter
-        ?? payload.data?.retryAfter
-        ?? 60
-      );
-      startQishuiPhoneCooldown(retryAfter);
-    }
-    setQishuiPhoneStatus(error.message || '验证码发送失败，请稍后重试');
-  } finally {
-    state.qishuiPhoneSending = false;
-    syncQishuiPhoneControls();
-  }
-}
-
-async function verifyQishuiPhoneLogin(event) {
-  event?.preventDefault?.();
-  if (state.qishuiPhoneSending || state.qishuiPhoneVerifying) return;
-  const phone = qishuiPhoneValue();
-  const code = qishuiCodeValue();
-  if (!/^1[3-9]\d{9}$/.test(phone)) {
-    setQishuiPhoneStatus('请输入有效的中国大陆 11 位手机号');
-    els.qishuiPhoneInput?.focus();
-    return;
-  }
-  if (!/^\d{6}$/.test(code)) {
-    setQishuiPhoneStatus('请输入短信中的 6 位验证码');
-    els.qishuiCodeInput?.focus();
-    return;
-  }
-  state.qishuiPhoneVerifying = true;
-  syncQishuiPhoneControls();
-  setQishuiPhoneStatus('正在验证并建立本机会话…');
-  try {
-    const payload = await apiJson('/api/qishui/login/phone/verify', {
-      method: 'POST',
-      body: JSON.stringify({ phone, code })
-    });
-    if (els.qishuiCodeInput) els.qishuiCodeInput.value = '';
-    const account = await refreshLoginStatus('qishui');
-    const loggedIn = account.loggedIn === true || payload.loggedIn === true || payload.success === true;
-    if (loggedIn && !account.loggedIn) {
-      renderLoginStatus({ ...payload, provider: 'qishui', loggedIn: true, account: payload.account || {} });
-    }
-    if (!loggedIn) throw new Error(payload.message || '验证码已通过，但汽水音乐未返回有效会话');
-    setQishuiPhoneStatus(payload.message || '登录成功，正在同步账号');
-    await refreshUserPlaylists().catch(() => {});
-    window.setTimeout(closeLoginDialog, 500);
-  } catch (error) {
-    setQishuiPhoneStatus(error.message || '登录失败，请检查验证码后重试');
-  } finally {
-    state.qishuiPhoneVerifying = false;
-    syncQishuiPhoneControls();
-  }
+  if (els.musicApiImportStatus) els.musicApiImportStatus.textContent = safeText(message, '未导入插件前无法使用音乐平台');
 }
 
 function syncMusicApiProviderTabs() {
   if (!els.loginProviderTabs) return;
-  els.loginProviderTabs.querySelectorAll('[data-login-provider]').forEach((tab) => {
-    const configured = providerConfigured(tab.dataset.loginProvider);
-    tab.classList.toggle('is-unconfigured', !configured);
-    tab.removeAttribute('aria-disabled');
+  const configuredProviders = Object.values(state.providers)
+    .filter((provider) => provider && providerConfigured(provider.id));
+  els.loginProviderTabs.replaceChildren();
+  configuredProviders.forEach((provider) => {
+    const tab = document.createElement('button');
+    const active = provider.id === state.activeProvider;
+    tab.className = `login-provider-tab${active ? ' is-active' : ''}`;
+    tab.type = 'button';
+    tab.dataset.loginProvider = provider.id;
+    tab.setAttribute('aria-pressed', String(active));
+    tab.textContent = provider.label;
+    els.loginProviderTabs.appendChild(tab);
   });
+  els.loginProviderTabs.hidden = configuredProviders.length === 0;
 }
 
 function mergeMusicApiProviders(payload = {}) {
   const providers = Array.isArray(payload.providers) ? payload.providers : [];
+  state.providers = Object.fromEntries(
+    Object.entries(MUSIC_PROVIDERS).map(([id, provider]) => [id, {
+      ...provider,
+      enabled: false,
+      configured: false,
+      apiStatus: ''
+    }])
+  );
   providers.forEach((item) => {
     const id = safeText(item && item.id, '');
     if (!id || !MUSIC_PROVIDERS[id]) return;
@@ -10703,8 +12379,8 @@ function mergeMusicApiProviders(payload = {}) {
       label: safeText(item.label, state.providers[id].label),
       appName: safeText(item.appName, state.providers[id].appName),
       apiUrl: safeText(item.baseUrl, state.providers[id].apiUrl),
-      enabled: item.enabled !== false,
-      configured: item.configured !== false,
+      enabled: item.enabled === true,
+      configured: item.configured === true,
       loginQr: item.loginQr === undefined ? state.providers[id].loginQr !== false : item.loginQr !== false,
       apiStatus: safeText(item.status, '')
     };
@@ -10715,7 +12391,7 @@ function mergeMusicApiProviders(payload = {}) {
     state.loginQrRequestId += 1;
     state.loginQrLoading = false;
     const fallback = Object.keys(MUSIC_PROVIDERS).find((provider) => providerConfigured(provider));
-    if (fallback) setActiveProvider(fallback, { reloadQr: !els.loginDialog.hidden });
+    if (fallback) setActiveProvider(fallback, { reloadQr: false });
   }
   return providers;
 }
@@ -10928,10 +12604,6 @@ function providerHasPlaybackVip(provider = playbackQualityProvider()) {
 }
 
 function playbackQualityOptions(provider = playbackQualityProvider()) {
-  const id = providerInfo(provider).id;
-  if (id === 'qishui' && state.qishuiGuestMode) {
-    return qualityDefinitions(id).filter((option) => option.id === 'standard');
-  }
   const hasVip = providerHasPlaybackVip(provider);
   return qualityDefinitions(provider).filter((option) => !option.vip || hasVip);
 }
@@ -11082,36 +12754,28 @@ function setActiveProvider(provider, options = {}) {
   const requestedProvider = safeText(provider, 'netease');
   if (!MUSIC_PROVIDERS[requestedProvider] || !providerConfigured(requestedProvider)) {
     clearLoginQrTimer();
+    state.loginQrRequestId += 1;
+    state.loginQrLoading = false;
     resetQrImage('请先导入 API');
-    setQrStatus(`${safeText(MUSIC_PROVIDERS[requestedProvider]?.label, '该平台')} API 尚未配置，请在上方导入配置或 ZIP 包`);
-    setMusicApiImportStatus(`等待导入${safeText(MUSIC_PROVIDERS[requestedProvider]?.label, '音乐')} API`);
+    setQrStatus(`${safeText(MUSIC_PROVIDERS[requestedProvider]?.label, '该平台')} API 插件尚未导入，请先在上方导入插件`);
+    setMusicApiImportStatus(`等待导入${safeText(MUSIC_PROVIDERS[requestedProvider]?.label, '音乐')} API 插件`);
     els.musicApiImportButton?.focus();
     return false;
   }
   const nextProvider = providerInfo(requestedProvider).id;
   const changed = state.activeProvider !== nextProvider;
+  if (changed) clearOfficialBrowserLoginTimer({ cancel: true });
   state.activeProvider = nextProvider;
   const info = providerInfo(nextProvider);
   syncAndroidLoginWorkflow(nextProvider);
-  syncLoginMethod(nextProvider);
 
-  if (els.loginTitle) els.loginTitle.textContent = nextProvider === 'qishui'
-    ? '汽水音乐'
-    : info.loginQr === false
-      ? `${info.label} API`
-      : `${info.label}\u4e8c\u7ef4\u7801\u767b\u5f55`;
-  if (els.loginSubtitle) els.loginSubtitle.textContent = nextProvider === 'qishui'
-    ? '免登录可播放公开免费歌曲；手机号登录用于同步账号功能'
-    : info.loginQr === false
-      ? '\u5df2\u542f\u7528\u641c\u7d22\u4e0e\u64ad\u653e\uff0c\u5f53\u524d API \u5305\u672a\u58f0\u660e\u626b\u7801\u767b\u5f55'
-      : `\u4f7f\u7528${info.appName}\u626b\u7801\u786e\u8ba4`;
-  if (els.loginProviderTabs) {
-    els.loginProviderTabs.querySelectorAll('[data-login-provider]').forEach((tab) => {
-      const active = tab.dataset.loginProvider === nextProvider;
-      tab.classList.toggle('is-active', active);
-      tab.setAttribute('aria-pressed', String(active));
-    });
-  }
+  if (els.loginTitle) els.loginTitle.textContent = info.loginQr === false
+    ? `${info.label} API`
+    : `${info.label}\u4e8c\u7ef4\u7801\u767b\u5f55`;
+  if (els.loginSubtitle) els.loginSubtitle.textContent = info.loginQr === false
+    ? '\u5df2\u542f\u7528\u641c\u7d22\u4e0e\u64ad\u653e\uff0c\u5f53\u524d API \u5305\u672a\u58f0\u660e\u626b\u7801\u767b\u5f55'
+    : `\u4f7f\u7528${info.appName}\u626b\u7801\u786e\u8ba4`;
+  if (els.qrImage) els.qrImage.alt = `${info.label}\u767b\u5f55\u4e8c\u7ef4\u7801`;
   syncMusicApiProviderTabs();
 
   if (changed) {
@@ -11119,8 +12783,8 @@ function setActiveProvider(provider, options = {}) {
     state.loginQrLoading = false;
     state.playbackQuality = preferredPlaybackQuality(nextProvider);
     state.loginQrKey = '';
-    if (els.qishuiCodeInput) els.qishuiCodeInput.value = '';
     state.userPlaylists = [];
+    state.recommendedPlaylists = [];
     state.playlistsLoggedIn = false;
     state.playbackPlaylistPickerOpen = false;
     closePlaylistShelf({ resetActive: true, reopenPicker: false });
@@ -11148,8 +12812,6 @@ function setActiveProvider(provider, options = {}) {
 function renderLoginStatus(payload = {}) {
   const loggedIn = !!payload.loggedIn;
   const provider = providerInfo(payload.provider || state.activeProvider);
-  if (provider.id === 'qishui' && loggedIn) state.qishuiGuestMode = false;
-  const guest = provider.id === 'qishui' && !loggedIn && state.qishuiGuestMode;
   const vip = loggedIn && accountHasVip(payload);
   state.loginStatusByProvider[provider.id] = payload;
   if (playbackCardVisible() && playbackCardProvider(playbackCardSong()).id === provider.id) {
@@ -11161,17 +12823,11 @@ function renderLoginStatus(payload = {}) {
   els.loginButton.classList.toggle('has-vip', vip);
   els.loginLabel.textContent = loggedIn
     ? accountName(payload) || `${provider.label}\u5df2\u767b\u5f55`
-    : guest
-      ? `${provider.label} · 访客`
-      : `${provider.label}\u767b\u5f55`;
+    : `${provider.label}\u767b\u5f55`;
   if (els.loginVipBadge) els.loginVipBadge.hidden = !vip;
   els.loginButton.setAttribute('aria-label', loggedIn
     ? `${provider.label}\u5df2\u767b\u5f55\uff1a${els.loginLabel.textContent}${vip ? '\uff0cVIP\u4f1a\u5458' : ''}`
-    : provider.id === 'qishui'
-      ? guest
-        ? '汽水音乐访客模式，打开账号登录'
-        : '打开汽水音乐访客或手机号登录'
-      : `\u6253\u5f00${provider.label}\u4e8c\u7ef4\u7801\u767b\u5f55`);
+    : `\u6253\u5f00${provider.label}\u4e8c\u7ef4\u7801\u767b\u5f55`);
   if (provider.id === playbackQualityProvider()) {
     state.playbackQuality = normalizePlaybackQuality(provider.id, preferredPlaybackQuality(provider.id, state.playbackQuality));
   }
@@ -11180,6 +12836,7 @@ function renderLoginStatus(payload = {}) {
 }
 
 const LOGIN_STATUS_RETRY_DELAYS = Object.freeze([320, 700, 1400, 2600]);
+const CONFIRMED_LOGIN_RETRY_DELAYS = Object.freeze([0, 180, 420, 800, 1400, 2400]);
 
 function loginStatusNeedsRetry(payload = {}) {
   const code = safeText(payload.code, '').toUpperCase();
@@ -11210,6 +12867,13 @@ function scheduleLoginStatusRetry(provider = state.activeProvider) {
 
 async function refreshLoginStatus(provider = state.activeProvider) {
   const id = providerInfo(provider).id;
+  if (!providerConfigured(id)) {
+    clearLoginStatusRetry(id);
+    const payload = { provider: id, loggedIn: false, pluginRequired: true };
+    renderLoginStatus(payload);
+    if (id === state.activeProvider) renderCommunityState(payload);
+    return payload;
+  }
   try {
     const payload = await apiJson(`/api/login/status?${query({ provider: id })}`);
     const retryable = loginStatusNeedsRetry(payload);
@@ -11231,6 +12895,18 @@ async function refreshLoginStatus(provider = state.activeProvider) {
   }
 }
 
+async function waitForConfirmedLoginAccount(provider = state.activeProvider) {
+  const id = providerInfo(provider).id;
+  let account = { provider: id, loggedIn: false };
+  for (const delay of CONFIRMED_LOGIN_RETRY_DELAYS) {
+    if (delay > 0) await new Promise((resolve) => window.setTimeout(resolve, delay));
+    if (id !== state.activeProvider) return account;
+    account = await refreshLoginStatus(id);
+    if (account?.loggedIn) return account;
+  }
+  return account;
+}
+
 function resetQrImage(message = '\u751f\u6210\u4e8c\u7ef4\u7801') {
   els.qrImage.removeAttribute('src');
   els.qrShell.classList.remove('has-qr');
@@ -11238,12 +12914,14 @@ function resetQrImage(message = '\u751f\u6210\u4e8c\u7ef4\u7801') {
   if (els.androidQrSaveButton) els.androidQrSaveButton.disabled = true;
 }
 
-function showLoginDialog() {
+async function showLoginDialog() {
   els.loginDialog.hidden = false;
   els.loginButton.setAttribute('aria-expanded', 'true');
-  setActiveProvider(state.activeProvider);
-  loadLoginQr();
-  refreshMusicApiProviders({ silent: true });
+  setOfficialBrowserLoginStatus('', true);
+  if (els.officialBrowserLoginButton) els.officialBrowserLoginButton.hidden = ANDROID_CLIENT;
+  await refreshMusicApiProviders({ silent: true });
+  if (els.loginDialog.hidden) return;
+  if (setActiveProvider(state.activeProvider)) await loadLoginQr();
 }
 
 function qrCodeMessage(code, message, provider = state.activeProvider) {
@@ -11349,11 +13027,16 @@ async function checkLoginQr() {
 
     if (loginQrSucceeded(payload, provider)) {
       clearLoginQrTimer();
-      const account = await refreshLoginStatus(provider);
-      await refreshUserPlaylists();
-      window.setTimeout(() => {
-        if (account.loggedIn) closeLoginDialog();
-      }, 650);
+      setQrStatus(`${providerInfo(provider).label}\u767b\u5f55\u5df2\u786e\u8ba4\uff0c\u6b63\u5728\u540c\u6b65\u8d26\u53f7\u4e0e\u6b4c\u5355`);
+      const account = await waitForConfirmedLoginAccount(provider);
+      if (provider !== state.activeProvider) return;
+      if (account?.loggedIn) {
+        await refreshUserPlaylists();
+        setQrStatus(`${providerInfo(provider).label}\u767b\u5f55\u6210\u529f`);
+        window.setTimeout(closeLoginDialog, 420);
+      } else {
+        setQrStatus('\u624b\u673a\u7aef\u5df2\u786e\u8ba4\uff0c\u8d26\u53f7\u540c\u6b65\u8d85\u65f6\uff0c\u8bf7\u70b9\u51fb\u5237\u65b0\u91cd\u8bd5');
+      }
     }
   } catch (error) {
     clearLoginQrTimer();
@@ -11368,19 +13051,7 @@ async function loadLoginQr() {
   if (!providerConfigured(provider)) {
     clearLoginQrTimer();
     resetQrImage('请先导入 API');
-    setQrStatus(`${info.label} API 尚未配置，请在上方导入配置或 ZIP 包`);
-    return;
-  }
-  if (provider === 'qishui') {
-    clearLoginQrTimer();
-    state.loginQrKey = '';
-    syncLoginMethod(provider);
-    setQishuiPhoneStatus(state.loginStatusByProvider.qishui?.loggedIn
-      ? '汽水音乐已登录，可重新验证以切换账号'
-      : state.qishuiGuestMode
-        ? '当前为访客模式；需要同步账号时可使用手机号登录'
-        : '可免登录进入访客模式，或输入手机号获取验证码');
-    syncQishuiPhoneControls();
+    setQrStatus(`${info.label} API 插件尚未导入，请先在上方导入插件`);
     return;
   }
   if (info.loginQr === false) {
@@ -11451,15 +13122,18 @@ function playlistSubtitle(playlist) {
 
 function createPlaylistCard(playlist, index) {
   const local = playlist.local || playlist.provider === 'local';
+  const recommended = playlist.recommended === true;
   const provider = local ? { id: 'local', label: '本地' } : providerInfo(playlist.provider || state.activeProvider);
   const button = document.createElement('button');
   button.className = 'orb-playlist-card';
   button.classList.toggle('is-local-playlist', local);
+  button.classList.toggle('is-recommended-playlist', recommended);
   button.type = 'button';
   button.dataset.playlistId = playlist.id;
   button.dataset.playlistProvider = provider.id;
   button.dataset.playlistName = safeText(playlist.name, `${provider.label}\u6b4c\u5355`);
   button.dataset.playlistCover = safeText(playlist.cover, '');
+  button.dataset.playlistRecommended = String(recommended);
   button.dataset.slot = String(index + 1);
   button.dataset.playlistIndex = String(index);
   button.style.setProperty('--album-index', String(index));
@@ -11490,6 +13164,13 @@ function createPlaylistCard(playlist, index) {
 
   const copy = document.createElement('span');
   copy.className = 'orb-playlist-copy';
+
+  if (recommended) {
+    const badge = document.createElement('span');
+    badge.className = 'orb-playlist-recommendation';
+    badge.textContent = '今日推荐';
+    copy.appendChild(badge);
+  }
 
   const title = document.createElement('strong');
   title.textContent = safeText(playlist.name, `${provider.label}\u6b4c\u5355`);
@@ -11548,26 +13229,57 @@ function updateSongButtonFocusVisual(button, itemIndex, focusIndex) {
   button.style.setProperty('--song-offset', String(offset));
   button.style.setProperty('--song-distance', String(distance));
   button.style.setProperty('--song-scale', String(clamp(1 - distance * 0.09, 0.62, 1)));
-  button.setAttribute('aria-selected', String(focused));
+  const selected = String(focused);
+  if (button.getAttribute('aria-selected') !== selected) {
+    button.setAttribute('aria-selected', selected);
+  }
+  const tabIndex = focused ? 0 : -1;
+  if (button.tabIndex !== tabIndex) button.tabIndex = tabIndex;
+}
+
+function hydrateVisibleShelfSongCovers() {
+  state.songCoverHydrationTimer = 0;
+  const buttons = state.songButtonCache;
+  if (!buttons.length) return;
+  for (const button of buttons) {
+    const itemIndex = Number(button.dataset.songIndex);
+    if (Math.abs(itemIndex - state.songFocusIndex) > PLAYLIST_SONG_RENDER_RADIUS) continue;
+    const image = button.querySelector('.shelf-song-cover img[data-src]');
+    if (!image || image.hasAttribute('src')) continue;
+    image.src = image.dataset.src;
+  }
+}
+
+function scheduleVisibleShelfSongCoverHydration(delay = 90) {
+  window.clearTimeout(state.songCoverHydrationTimer);
+  state.songCoverHydrationTimer = window.setTimeout(hydrateVisibleShelfSongCovers, delay);
 }
 
 function setSongFocus(index, options = {}) {
-  const buttons = state.songButtonCache.length
-    ? state.songButtonCache
-    : Array.from(els.playlistSongStack.querySelectorAll('.shelf-song-button'));
-  if (!buttons.length) return;
-  if (!state.songButtonCache.length) state.songButtonCache = buttons;
-  const count = buttons.length;
-  const previousIndex = clamp(Math.round(state.songFocusIndex || 0), 0, count - 1);
+  const count = state.activePlaylistSongs.length;
+  if (!count) return;
   state.songFocusIndex = ((Math.round(index) % count) + count) % count;
-  const windowPadding = PLAYLIST_SONG_RENDER_RADIUS + 2;
-  const forceAll = options.forceAll || Math.abs(previousIndex - state.songFocusIndex) > PLAYLIST_SONG_RENDER_RADIUS * 2;
-  const start = forceAll ? 0 : Math.max(0, Math.min(previousIndex, state.songFocusIndex) - windowPadding);
-  const end = forceAll ? count - 1 : Math.min(count - 1, Math.max(previousIndex, state.songFocusIndex) + windowPadding);
-  for (let itemIndex = start; itemIndex <= end; itemIndex += 1) {
-    updateSongButtonFocusVisual(buttons[itemIndex], itemIndex, state.songFocusIndex);
+
+  const renderedIndices = state.songButtonCache.map((button) => Number(button.dataset.songIndex));
+  const renderedStart = renderedIndices.length ? Math.min(...renderedIndices) : -1;
+  const renderedEnd = renderedIndices.length ? Math.max(...renderedIndices) : -1;
+  const visibleStart = Math.max(0, state.songFocusIndex - PLAYLIST_SONG_RENDER_RADIUS);
+  const visibleEnd = Math.min(count - 1, state.songFocusIndex + PLAYLIST_SONG_RENDER_RADIUS);
+  if (options.forceAll || renderedStart < 0 || visibleStart < renderedStart || visibleEnd > renderedEnd) {
+    renderShelfSongWindow(state.songFocusIndex);
+  } else {
+    for (const button of [...state.songButtonCache, ...state.songButtonBackCache]) {
+      updateSongButtonFocusVisual(button, Number(button.dataset.songIndex), state.songFocusIndex);
+    }
+    rebuildShelfSongButtonLookup();
+    updateShelfCurrentSong();
   }
-  if (options.focus !== false) buttons[state.songFocusIndex]?.focus({ preventScroll: true });
+  scheduleVisibleShelfSongCoverHydration();
+  if (options.focus !== false) {
+    state.songButtonCache
+      .find((button) => Number(button.dataset.songIndex) === state.songFocusIndex)
+      ?.focus({ preventScroll: true });
+  }
 }
 
 function renderPlaylistOrbit(playlists) {
@@ -11583,7 +13295,9 @@ function renderPlaylistOrbit(playlists) {
     return;
   }
 
-  els.playlistStatus.textContent = '\u6211\u7684\u6b4c\u5355';
+  els.playlistStatus.textContent = visible.some((playlist) => playlist.recommended === true)
+    ? '今日推荐 · 我的歌单'
+    : '\u6211\u7684\u6b4c\u5355';
   const fragment = document.createDocumentFragment();
   visible.forEach((playlist, index) => fragment.appendChild(createPlaylistCard(playlist, index)));
   clearElement(els.playlistCards);
@@ -11597,24 +13311,40 @@ function renderPlaylistOrbit(playlists) {
 async function refreshUserPlaylists() {
   if (document.hidden || state.playlistsLoading) return;
   const provider = state.activeProvider;
-  if (provider === 'qishui' && state.qishuiGuestMode) {
+  if (!providerConfigured(provider)) {
     state.playlistsLoggedIn = false;
     state.userPlaylists = [];
+    state.recommendedPlaylists = [];
     renderPlaylistOrbit(playbackPlaylists());
     return;
   }
   state.playlistsLoading = true;
   try {
-    const data = await apiJson(providerPath('/user/playlists', provider));
+    const [libraryResult, recommendationResult] = await Promise.allSettled([
+      apiJson(providerPath('/user/playlists', provider)),
+      apiJson(`/api/recommend/playlists?${query({ provider, limit: 12 })}`)
+    ]);
     if (provider !== state.activeProvider) return;
-    const playlists = Array.isArray(data.playlists) ? data.playlists : [];
-    state.playlistsLoggedIn = !!data.loggedIn;
-    state.userPlaylists = state.playlistsLoggedIn ? playlists : [];
-
+    const library = libraryResult.status === 'fulfilled' ? libraryResult.value : {};
+    const recommendations = recommendationResult.status === 'fulfilled'
+      ? recommendationResult.value
+      : {};
+    const playlists = Array.isArray(library.playlists) ? library.playlists : [];
+    const recommended = Array.isArray(recommendations.playlists) ? recommendations.playlists : [];
+    state.playlistsLoggedIn = !!library.loggedIn;
+    state.userPlaylists = state.playlistsLoggedIn
+      ? playlists.map((playlist) => ({ ...playlist, provider }))
+      : [];
+    state.recommendedPlaylists = recommended.map((playlist) => ({
+      ...playlist,
+      provider,
+      recommended: true
+    }));
     renderPlaylistOrbit(playbackPlaylists());
   } catch (error) {
     state.playlistsLoggedIn = false;
     state.userPlaylists = [];
+    state.recommendedPlaylists = [];
     renderPlaylistOrbit(playbackPlaylists());
   } finally {
     state.playlistsLoading = false;
@@ -11628,7 +13358,8 @@ function scheduleUserPlaylistsRefresh(delay = 0) {
 
 function playlistById(playlistId) {
   if (String(playlistId) === LOCAL_PLAYLIST_ID) return localPlaylistDescriptor();
-  return state.userPlaylists.find((playlist) => String(playlist.id) === String(playlistId)) || null;
+  return [...state.recommendedPlaylists, ...state.userPlaylists]
+    .find((playlist) => String(playlist.id) === String(playlistId)) || null;
 }
 
 function degrees360(value) {
@@ -11733,11 +13464,26 @@ function positionShelfNearCard(card) {
 function syncPlaybackChromeClasses() {
   const playback = state.playbackPage;
   const pinned = state.playbackChrome.dockPinned;
+  const communityOpen = state.playbackChrome.communityVisible;
   els.appShell.classList.toggle('is-search-peek', playback && state.playbackChrome.searchVisible);
   els.appShell.classList.toggle('is-dock-peek', state.playbackChrome.dockVisible || pinned);
   els.appShell.classList.toggle('is-dock-pinned', pinned);
-  els.appShell.classList.toggle('is-community-summoned', playback && state.playbackChrome.communityVisible);
+  els.appShell.classList.toggle('is-community-summoned', communityOpen);
   els.appShell.classList.toggle('is-playback-controls-hidden', playback && state.playbackChrome.controlsHidden);
+  if (els.communityRailButton) {
+    els.communityRailButton.classList.toggle('is-active', communityOpen);
+    els.communityRailButton.setAttribute('aria-expanded', String(communityOpen));
+    els.communityRailButton.setAttribute('aria-label', communityOpen ? '收起 FE Monster 社区' : '打开 FE Monster 社区');
+  }
+  if (els.communityCard) {
+    els.communityCard.setAttribute('aria-hidden', String(!communityOpen));
+    els.communityCard.inert = !communityOpen;
+  }
+  if (els.communityCollapseButton) {
+    els.communityCollapseButton.setAttribute('aria-expanded', String(communityOpen));
+    els.communityCollapseButton.setAttribute('aria-label', '收起社区');
+    els.communityCollapseButton.title = '收起社区';
+  }
   if (els.dockPinButton) {
     els.dockPinButton.classList.toggle('is-active', state.playbackChrome.dockPinned);
     els.dockPinButton.setAttribute('aria-pressed', String(state.playbackChrome.dockPinned));
@@ -11775,18 +13521,25 @@ function setPlaybackControlsHidden(hidden) {
 }
 
 function showCommunityPageFromPlayback() {
-  if (!state.playbackPage) return;
   state.playbackChrome.communityVisible = true;
-  syncPlaybackChromeClasses();
   setCommunityCardCollapsed(false);
+  syncPlaybackChromeClasses();
+}
+
+function focusCommunityDrawerControl(open) {
+  window.setTimeout(() => {
+    if (state.playbackChrome.communityVisible !== open) return;
+    const focusTarget = open ? els.communityCollapseButton : els.communityRailButton;
+    focusTarget?.focus({ preventScroll: true });
+  }, 260);
 }
 
 function toggleCommunityPageFromPlayback() {
-  if (!state.playbackPage) return;
   const visible = !state.playbackChrome.communityVisible;
   state.playbackChrome.communityVisible = visible;
-  syncPlaybackChromeClasses();
   if (visible) setCommunityCardCollapsed(false);
+  syncPlaybackChromeClasses();
+  focusCommunityDrawerControl(visible);
 }
 
 function isPointerNearSearchBar(event) {
@@ -11918,6 +13671,15 @@ function clearQishuiPlaybackVisibilityTransition() {
   els.qishuiPlaybackCard.removeAttribute('aria-busy');
 }
 
+function scheduleQishuiPlaybackVisibilityFrame(callback) {
+  state.qishuiPlaybackCard.visibilityTransitionFrame = window.requestAnimationFrame(() => {
+    state.qishuiPlaybackCard.visibilityTransitionFrame = window.requestAnimationFrame(() => {
+      state.qishuiPlaybackCard.visibilityTransitionFrame = 0;
+      callback();
+    });
+  });
+}
+
 function commitQishuiPlaybackHiddenState(hidden) {
   const nextHidden = !!hidden;
   state.qishuiPlaybackCard.hiddenByUser = nextHidden;
@@ -11951,19 +13713,18 @@ function setQishuiPlaybackHidden(hidden) {
       card.classList.add('is-visibility-snap');
       commitQishuiPlaybackHiddenState(true);
       card.classList.remove('is-visibility-sliding-right');
-      void card.offsetWidth;
-      card.classList.remove('is-visibility-snap');
-      card.removeAttribute('aria-busy');
+      scheduleQishuiPlaybackVisibilityFrame(() => {
+        card.classList.remove('is-visibility-snap');
+        card.removeAttribute('aria-busy');
+      });
     }, PLAYBACK_CARD_VISIBILITY_TRANSITION_MS);
     return;
   }
 
   card.classList.add('is-visibility-snap', 'is-visibility-sliding-right');
   commitQishuiPlaybackHiddenState(false);
-  void card.offsetWidth;
-  card.classList.remove('is-visibility-snap');
-  state.qishuiPlaybackCard.visibilityTransitionFrame = window.requestAnimationFrame(() => {
-    state.qishuiPlaybackCard.visibilityTransitionFrame = 0;
+  scheduleQishuiPlaybackVisibilityFrame(() => {
+    card.classList.remove('is-visibility-snap');
     card.classList.remove('is-visibility-sliding-right');
     card.removeAttribute('aria-busy');
   });
@@ -12002,27 +13763,22 @@ function renderQishuiPlaybackIdentity(provider = playbackCardProvider()) {
   const payload = local ? null : state.loginStatusByProvider[provider.id];
   const loading = !local && !payload;
   const loggedIn = !!(payload && payload.loggedIn);
-  const guest = provider.id === 'qishui' && !loggedIn && state.qishuiGuestMode;
   const avatarUrl = loggedIn ? accountAvatar(payload) : '';
   const vipLabel = loggedIn ? accountVipLabel(payload) : '';
   const accountLabel = local
     ? '本地音乐'
     : loggedIn
       ? accountName(payload) || `${provider.label}用户`
-      : guest
-        ? '汽水访客'
-        : loading
-          ? '读取账号中'
-          : `${provider.label}未登录`;
+      : loading
+        ? '读取账号中'
+        : `${provider.label}未登录`;
   const statusLabel = local
     ? '本地播放'
     : loggedIn
       ? '已登录'
-      : guest
-        ? '访客模式'
-        : loading
-          ? '连接中'
-          : '未登录';
+      : loading
+        ? '连接中'
+        : '未登录';
 
   els.qishuiPlaybackAccount.dataset.provider = provider.id;
   els.qishuiPlaybackAccount.classList.toggle('is-logged-in', loggedIn);
@@ -12612,6 +14368,21 @@ function finishQishuiPlaybackSwitch(switchId) {
   }
 }
 
+function nextPlaybackQueueIndex(direction) {
+  if (!state.queue.length) return -1;
+  let current = Number.isInteger(state.queueIndex) ? state.queueIndex : -1;
+  if (current < 0 || current >= state.queue.length) {
+    const currentSong = state.currentSong || {};
+    current = state.queue.findIndex((song) => (
+      String(song.id || '') === String(currentSong.id || '')
+      && safeText(song.provider, state.activeProvider) === safeText(currentSong.provider, state.activeProvider)
+    ));
+  }
+  if (current < 0) current = direction < 0 ? 0 : -1;
+  const offset = direction < 0 ? -1 : 1;
+  return (current + offset + state.queue.length) % state.queue.length;
+}
+
 function switchQishuiPlaybackTrack(direction) {
   const song = playbackCardSong();
   if (!song || state.qishuiPlaybackCard.switching) return;
@@ -12637,9 +14408,13 @@ function switchQishuiPlaybackTrack(direction) {
   const minimumExit = reducedMotion
     ? Promise.resolve()
     : new Promise((resolve) => window.setTimeout(resolve, 110));
+  const queuedIndex = nextPlaybackQueueIndex(direction);
+  const switchTrack = queuedIndex >= 0
+    ? playQueueIndex(queuedIndex).then(() => updateShelfCurrentSong())
+    : transport(previous ? '/api/player/previous' : '/api/player/next');
   let watchdogTimer = 0;
   const transportReady = Promise.race([
-    Promise.resolve(transport(previous ? '/api/player/previous' : '/api/player/next')).catch(() => {}),
+    Promise.resolve(switchTrack).catch(() => {}),
     new Promise((resolve) => {
       watchdogTimer = window.setTimeout(resolve, 6000);
     })
@@ -12816,7 +14591,8 @@ function createShelfSongButton(song, index) {
     const image = document.createElement('img');
     image.alt = '';
     image.loading = 'lazy';
-    image.src = coverUrl;
+    image.decoding = 'async';
+    image.dataset.src = coverUrl;
     image.addEventListener('load', () => cover.classList.add('has-cover'));
     image.addEventListener('error', () => removeElement(image));
     cover.appendChild(image);
@@ -12849,67 +14625,91 @@ function createShelfSongButton(song, index) {
   return button;
 }
 
-function updateShelfCurrentSong() {
-  const currentId = state.currentSong && state.currentSong.id ? String(state.currentSong.id) : '';
-  [els.playlistSongStack, els.playlistSongStackBack].forEach((stack) => {
-    if (!stack) return;
-    stack.querySelectorAll('.shelf-song-button').forEach((button) => {
-      const isCurrent = currentId && String(button.dataset.songId) === currentId;
-      button.classList.toggle('is-current', !!isCurrent);
-      if (isCurrent) button.setAttribute('aria-current', 'true');
-      else button.removeAttribute('aria-current');
-    });
-  });
+function setShelfCurrentSongButtonState(button, current) {
+  if (!button) return;
+  button.classList.toggle('is-current', current);
+  if (current) button.setAttribute('aria-current', 'true');
+  else button.removeAttribute('aria-current');
 }
 
-function renderShelfSongsInto(stack) {
-  if (!stack) return;
+function rebuildShelfSongButtonLookup() {
+  const buttonsById = new Map();
+  [...state.songButtonCache, ...state.songButtonBackCache].forEach((button) => {
+    const songId = String(button.dataset.songId || '');
+    if (!songId) return;
+    const matches = buttonsById.get(songId);
+    if (matches) matches.push(button);
+    else buttonsById.set(songId, [button]);
+  });
+  state.shelfSongButtonsById = buttonsById;
+}
+
+function updateShelfCurrentSong() {
+  const currentId = state.currentSong && state.currentSong.id ? String(state.currentSong.id) : '';
+  if (
+    currentId === state.shelfCurrentSongId
+    && state.shelfCurrentSongButtons.every((button) => button.isConnected)
+  ) {
+    return;
+  }
+  state.shelfCurrentSongButtons.forEach((button) => setShelfCurrentSongButtonState(button, false));
+  const currentButtons = currentId
+    ? (state.shelfSongButtonsById.get(currentId) || [])
+    : [];
+  currentButtons.forEach((button) => setShelfCurrentSongButtonState(button, true));
+  state.shelfCurrentSongButtons = currentButtons;
+  state.shelfCurrentSongId = currentId;
+}
+
+function renderShelfSongsInto(stack, focusIndex) {
+  if (!stack) return [];
   clearElement(stack);
   if (!state.activePlaylistSongs.length) {
     const empty = document.createElement('div');
     empty.className = 'playlist-shelf-empty';
     empty.textContent = '暂无可播放歌曲';
     stack.appendChild(empty);
-    return;
+    return [];
   }
 
   const fragment = document.createDocumentFragment();
-  state.activePlaylistSongs.forEach((song, index) => fragment.appendChild(createShelfSongButton(song, index)));
+  const radius = PLAYLIST_SONG_RENDER_RADIUS + PLAYLIST_SONG_RENDER_BUFFER;
+  const start = Math.max(0, focusIndex - radius);
+  const end = Math.min(state.activePlaylistSongs.length - 1, focusIndex + radius);
+  const buttons = [];
+  for (let index = start; index <= end; index += 1) {
+    const song = state.activePlaylistSongs[index];
+    const button = createShelfSongButton(song, index);
+    updateSongButtonFocusVisual(button, index, focusIndex);
+    button.classList.add('is-mounted');
+    fragment.appendChild(button);
+    buttons.push(button);
+  }
   stack.appendChild(fragment);
-  const mount = () => stack.querySelectorAll('.shelf-song-button').forEach((button) => button.classList.add('is-mounted'));
-  if (!reducedMotion) window.requestAnimationFrame(mount);
-  else mount();
+  return buttons;
+}
+
+function renderShelfSongWindow(focusIndex) {
+  state.songButtonBackCache = renderShelfSongsInto(els.playlistSongStackBack, focusIndex);
+  state.songButtonCache = renderShelfSongsInto(els.playlistSongStack, focusIndex);
+  rebuildShelfSongButtonLookup();
+  state.shelfCurrentSongButtons = [];
+  state.shelfCurrentSongId = '';
+  updateShelfCurrentSong();
 }
 
 function renderShelfSongs() {
-  renderShelfSongsInto(els.playlistSongStackBack);
-  clearElement(els.playlistSongStack);
-  state.songButtonCache = [];
-  if (!state.activePlaylistSongs.length) {
-    const empty = document.createElement('div');
-    empty.className = 'playlist-shelf-empty';
-    empty.textContent = '暂无可播放歌曲';
-    els.playlistSongStack.appendChild(empty);
-    return;
-  }
-
-  const fragment = document.createDocumentFragment();
-  state.activePlaylistSongs.forEach((song, index) => fragment.appendChild(createShelfSongButton(song, index)));
-  els.playlistSongStack.appendChild(fragment);
-  state.songButtonCache = Array.from(els.playlistSongStack.querySelectorAll('.shelf-song-button'));
-  updateShelfCurrentSong();
+  const currentId = state.currentSong && state.currentSong.id ? String(state.currentSong.id) : '';
   const currentIndex = state.activePlaylistSongs.findIndex((song) => {
-    const currentId = state.currentSong && state.currentSong.id ? String(state.currentSong.id) : '';
     return currentId && String(song.id) === currentId;
   });
-  setSongFocus(currentIndex >= 0 ? currentIndex : clamp(state.songFocusIndex || 0, 0, state.activePlaylistSongs.length - 1), { forceAll: true });
-  if (!reducedMotion) {
-    window.requestAnimationFrame(() => {
-      els.playlistSongStack.querySelectorAll('.shelf-song-button').forEach((button) => button.classList.add('is-mounted'));
-    });
-  } else {
-    els.playlistSongStack.querySelectorAll('.shelf-song-button').forEach((button) => button.classList.add('is-mounted'));
-  }
+  const lastIndex = Math.max(0, state.activePlaylistSongs.length - 1);
+  const focusIndex = currentIndex >= 0
+    ? currentIndex
+    : clamp(state.songFocusIndex || 0, 0, lastIndex);
+  state.songFocusIndex = focusIndex;
+  renderShelfSongWindow(focusIndex);
+  scheduleVisibleShelfSongCoverHydration(0);
 }
 
 function renderPlaylistShelf(playlist, songs, options = {}) {
@@ -12948,7 +14748,13 @@ function renderShelfLoading(playlist) {
   state.activePlaylist = playlist;
   state.activePlaylistSongs = [];
   state.songFocusIndex = 0;
+  window.clearTimeout(state.songCoverHydrationTimer);
+  state.songCoverHydrationTimer = 0;
   state.songButtonCache = [];
+  state.songButtonBackCache = [];
+  state.shelfSongButtonsById = new Map();
+  state.shelfCurrentSongButtons = [];
+  state.shelfCurrentSongId = '';
   state.playlistSongPageOpen = true;
   state.playbackPlaylistPickerOpen = false;
   if (els.selectedPlaylistAlbum) els.selectedPlaylistAlbum.classList.remove('is-local-playlist');
@@ -12991,7 +14797,13 @@ function closePlaylistShelf({ resetActive = false, reopenPicker = true } = {}) {
     state.activePlaylistId = '';
     state.activePlaylist = null;
     state.activePlaylistSongs = [];
+    window.clearTimeout(state.songCoverHydrationTimer);
+    state.songCoverHydrationTimer = 0;
     state.songButtonCache = [];
+    state.songButtonBackCache = [];
+    state.shelfSongButtonsById = new Map();
+    state.shelfCurrentSongButtons = [];
+    state.shelfCurrentSongId = '';
     updateActivePlaylistCard();
   }
   updateActivePlaylistCard();
@@ -13096,11 +14908,21 @@ async function playShelfSong(button) {
     });
     state.queue = state.activePlaylistSongs;
     state.queueIndex = index;
-    const loaded = await loadSong(song);
+    let loaded = await loadSong(song, { silent: true });
+    if (!loaded) {
+      loaded = await transport('/api/player/next', {
+        maxAttempts: state.activePlaylistSongs.length,
+        autoSkipUnavailable: true,
+        unavailableReason: `${safeText(song.title, '当前歌曲')}没有可用音源`
+      });
+    }
     if (loaded) {
       await refreshPlayerState();
       updateShelfCurrentSong();
-      setSongFocus(index);
+      const playingIndex = state.activePlaylistSongs.findIndex((item) => (
+        String(item.id || '') === String(state.currentSong?.id || '')
+      ));
+      setSongFocus(playingIndex >= 0 ? playingIndex : index);
       closePlaylistShelf({ reopenPicker: false });
       toast(`正在播放：${safeText(song.title, '歌曲')}`);
     }
@@ -13118,6 +14940,20 @@ function playbackLyricText(song = state.currentSong) {
 
 function playbackLyricSubtitle(song = state.currentSong) {
   return safeText(song && (song.artist || song.album), 'READY');
+}
+
+function playbackLyricTranslationText(line) {
+  const translation = safeText(line && line.translationText, '').trim();
+  const original = safeText(line && line.text, '').trim();
+  return translation && translation !== original ? translation : '';
+}
+
+function playbackLyricSecondaryText(line, song = state.currentSong) {
+  if (state.bilingualLyricsEnabled !== false) {
+    const translation = playbackLyricTranslationText(line);
+    if (translation) return translation;
+  }
+  return playbackLyricSubtitle(song);
 }
 
 function parseLyricTime(raw) {
@@ -13808,6 +15644,7 @@ function setPlaybackLyricLine(text, subtitle, progress = 0, currentTime = Number
   const progressPercent = clamp(progress, 0, 1) * 100;
   const glyphRenderMode = playbackGlyphRenderMode();
   const lineChanged = line !== state.lyricDisplayText || glyphRenderMode !== state.lyricGlyphRenderMode;
+  const subtitleChanged = nextSubtitle !== state.lyricSubtitleText;
 
   if (lineChanged) {
     els.playbackLyricScene.querySelectorAll('.playback-lyric-layer').forEach((layer) => {
@@ -13818,11 +15655,14 @@ function setPlaybackLyricLine(text, subtitle, progress = 0, currentTime = Number
     if (state.textPreset === 'focus-echo') triggerFocusEchoTransition();
   }
 
-  if (nextSubtitle !== state.lyricSubtitleText) {
+  if (subtitleChanged) {
     els.playbackLyricSubtitle.textContent = nextSubtitle;
-    updateBookLyricArtist(nextSubtitle);
     state.lyricSubtitleText = nextSubtitle;
   }
+  if (els.playbackLyricSubtitle.dataset.text !== nextSubtitle) {
+    els.playbackLyricSubtitle.dataset.text = nextSubtitle;
+  }
+  updateBookLyricArtist(playbackLyricSubtitle());
 
   if (Math.abs(progressPercent - state.lyricProgressPercent) >= 0.01) {
     els.playbackLyricScene.style.setProperty('--lyric-line-progress', `${progressPercent.toFixed(2)}%`);
@@ -13832,9 +15672,11 @@ function setPlaybackLyricLine(text, subtitle, progress = 0, currentTime = Number
 
   if (state.textPreset === 'flow') syncBlurLyricComponent(line);
   if (state.textPreset === 'book') updateBookLyricLines(progressPercent, currentTime);
+  if (state.multiRowLyricsEnabled) renderMultiRowLyrics();
   if (playbackCardLyricsVisible()) {
     updateQishuiPlaybackLyrics(line, nextSubtitle, currentTime);
   }
+  if (lineChanged || subtitleChanged) scheduleDesktopSceneSnapshot();
 }
 
 function lyricTimelineTime(currentTime, visualLead = 0) {
@@ -13958,9 +15800,8 @@ function bookLyricProgressEndTime(line, fallbackEndTime) {
 
 function updatePlaybackLyricAtTime(currentTime = els.audio.currentTime || 0, visualLead = 0) {
   const lines = state.lyricLines;
-  const subtitle = playbackLyricSubtitle();
   if (!lines.length) {
-    setPlaybackLyricLine(playbackLyricText(), subtitle, 0);
+    setPlaybackLyricLine(playbackLyricText(), playbackLyricSubtitle(), 0);
     state.lyricIndex = -1;
     return;
   }
@@ -13979,7 +15820,7 @@ function updatePlaybackLyricAtTime(currentTime = els.audio.currentTime || 0, vis
   const progressEndTime = state.textPreset === 'book' ? bookLyricProgressEndTime(line, endTime) : endTime;
   const progress = lyricProgressForLineAtTime(line, displayTime, progressEndTime, { linear: state.textPreset === 'book' });
   if (state.lyricIndex !== index) state.lyricIndex = index;
-  setPlaybackLyricLine(line.text, subtitle, progress, displayTime);
+  setPlaybackLyricLine(line.text, playbackLyricSecondaryText(line), progress, displayTime);
 }
 
 function lyricSignatureForSong(song = state.currentSong) {
@@ -14147,9 +15988,11 @@ function syncPlaybackLyricVisibility() {
 
 function updatePlaybackSceneTransform() {
   if (!els.playbackLyricScene) return;
-  setStylePropertyIfChanged(els.playbackLyricScene, '--scene-rotate-x', `${state.playbackVisual.pitch}rad`);
-  setStylePropertyIfChanged(els.playbackLyricScene, '--scene-rotate-y', `${state.playbackVisual.yaw}rad`);
-  setStylePropertyIfChanged(els.playbackLyricScene, '--playback-zoom', (state.playbackVisual.zoom || 1).toFixed(3));
+  if (textLyricsEnabled()) {
+    setStylePropertyIfChanged(els.playbackLyricScene, '--scene-rotate-x', `${state.playbackVisual.pitch}rad`);
+    setStylePropertyIfChanged(els.playbackLyricScene, '--scene-rotate-y', `${state.playbackVisual.yaw}rad`);
+    setStylePropertyIfChanged(els.playbackLyricScene, '--playback-zoom', (state.playbackVisual.zoom || 1).toFixed(3));
+  }
   if (coverParticlePresetVisible()) {
     setStylePropertyIfChanged(els.coverParticleScene, '--scene-rotate-x', `${state.playbackVisual.pitch}rad`);
     setStylePropertyIfChanged(els.coverParticleScene, '--scene-rotate-y', `${state.playbackVisual.yaw}rad`);
@@ -14540,6 +16383,157 @@ function setPlaybackLyricPalettePreference(mode, color) {
   requestOrbFrame();
 }
 
+function saveBilingualLyricsPreference() {
+  try {
+    window.localStorage.setItem(BILINGUAL_LYRICS_PREFS_KEY, JSON.stringify({
+      version: 1,
+      enabled: state.bilingualLyricsEnabled
+    }));
+  } catch (error) {
+  }
+}
+
+function syncBilingualLyricsControl() {
+  if (els.bilingualLyricsToggle) {
+    els.bilingualLyricsToggle.checked = state.bilingualLyricsEnabled;
+  }
+  if (els.bilingualLyricsValue) {
+    els.bilingualLyricsValue.textContent = state.bilingualLyricsEnabled ? 'ON' : 'OFF';
+  }
+  if (els.qishuiPlaybackBilingualToggle) {
+    const enabled = state.bilingualLyricsEnabled !== false;
+    const label = enabled ? '关闭双语歌词' : '开启双语歌词';
+    els.qishuiPlaybackBilingualToggle.classList.toggle('is-active', enabled);
+    els.qishuiPlaybackBilingualToggle.setAttribute('aria-pressed', String(enabled));
+    els.qishuiPlaybackBilingualToggle.setAttribute('aria-label', label);
+    els.qishuiPlaybackBilingualToggle.title = label;
+    const glyph = els.qishuiPlaybackBilingualToggle.querySelector('b');
+    if (glyph) glyph.textContent = enabled ? '译' : '原';
+  }
+}
+
+function setBilingualLyricsEnabled(enabled) {
+  state.bilingualLyricsEnabled = !!enabled;
+  saveBilingualLyricsPreference();
+  syncBilingualLyricsControl();
+  state.lyricBookSignature = '';
+  if (state.qishuiPlaybackCard) state.qishuiPlaybackCard.lyricSignature = '';
+  syncPlaybackLyricToCurrentTime();
+  renderBookLyricLines(true);
+  state.multiRowLyricSignature = '';
+  renderMultiRowLyrics(true);
+  updateQishuiPlaybackLyrics(
+    state.lyricDisplayText,
+    state.lyricSubtitleText,
+    currentPlaybackLyricTime()
+  );
+  scheduleDesktopSceneSnapshot();
+  requestOrbFrame();
+}
+
+function saveMultiRowLyricsPreference() {
+  try {
+    window.localStorage.setItem(MULTI_ROW_LYRICS_PREFS_KEY, JSON.stringify({
+      version: 1,
+      enabled: state.multiRowLyricsEnabled
+    }));
+  } catch (error) {
+  }
+}
+
+function syncMultiRowLyricsControl() {
+  const enabled = state.multiRowLyricsEnabled === true;
+  if (els.qishuiPlaybackMultiRowToggle) {
+    const label = enabled ? '关闭多排歌词' : '开启多排歌词';
+    els.qishuiPlaybackMultiRowToggle.classList.toggle('is-active', enabled);
+    els.qishuiPlaybackMultiRowToggle.setAttribute('aria-pressed', String(enabled));
+    els.qishuiPlaybackMultiRowToggle.setAttribute('aria-label', label);
+    els.qishuiPlaybackMultiRowToggle.title = label;
+    const glyph = els.qishuiPlaybackMultiRowToggle.querySelector('b');
+    if (glyph) glyph.textContent = enabled ? '单' : '多';
+  }
+  if (els.playbackLyricScene) {
+    els.playbackLyricScene.classList.toggle('is-multi-row-text', enabled && textLyricsEnabled());
+  }
+  if (els.multiRowLyricStage) {
+    els.multiRowLyricStage.setAttribute('aria-hidden', String(!enabled || !textLyricsEnabled()));
+  }
+}
+
+function multiRowDisplayLines() {
+  if (state.lyricLines.length) return state.lyricLines;
+  return [{
+    time: 0,
+    text: playbackLyricText(),
+    translationText: state.bilingualLyricsEnabled ? playbackLyricSubtitle() : '',
+    fallback: true
+  }];
+}
+
+function createMultiRowLyricLine(line, index, active) {
+  const item = document.createElement('div');
+  item.className = 'multi-row-lyric-line';
+  item.dataset.multiRowLyricIndex = String(index);
+  item.classList.toggle('is-past', index < active);
+  item.classList.toggle('is-current', index === active);
+  item.classList.toggle('is-future', index > active);
+  item.style.setProperty('--multi-row-distance', String(Math.min(4, Math.abs(index - active))));
+  if (index === active) item.setAttribute('aria-current', 'true');
+
+  const main = document.createElement('span');
+  main.className = 'multi-row-lyric-main';
+  main.textContent = safeText(line?.text, playbackLyricText());
+  item.appendChild(main);
+
+  const translation = state.bilingualLyricsEnabled
+    ? safeText(line?.translationText, '')
+    : '';
+  if (translation) {
+    const subtitle = document.createElement('span');
+    subtitle.className = 'multi-row-lyric-translation';
+    subtitle.textContent = translation;
+    item.appendChild(subtitle);
+  }
+  return item;
+}
+
+function renderMultiRowLyrics(force = false) {
+  if (!els.multiRowLyricList) return;
+  syncMultiRowLyricsControl();
+  if (!state.multiRowLyricsEnabled || !textLyricsEnabled()) return;
+  const lines = multiRowDisplayLines();
+  const active = state.lyricLines.length
+    ? clamp(state.lyricIndex, 0, Math.max(0, lines.length - 1))
+    : 0;
+  const signature = `${state.lyricSignature}|${active}|${state.bilingualLyricsEnabled ? 1 : 0}|${lines.length}`;
+  if (force || signature !== state.multiRowLyricSignature) {
+    state.multiRowLyricSignature = signature;
+    clearElement(els.multiRowLyricList);
+    const start = Math.max(0, Math.min(active - 2, lines.length - 7));
+    const end = Math.min(lines.length, start + 7);
+    for (let index = start; index < end; index += 1) {
+      els.multiRowLyricList.appendChild(createMultiRowLyricLine(lines[index], index, active));
+    }
+  }
+  const current = els.multiRowLyricList.querySelector('.multi-row-lyric-line.is-current');
+  if (current) current.style.setProperty('--multi-row-progress', `${clamp(state.lyricProgressPercent, 0, 100).toFixed(2)}%`);
+}
+
+function setMultiRowLyricsEnabled(enabled) {
+  state.multiRowLyricsEnabled = !!enabled;
+  if (state.multiRowLyricsEnabled && !textLyricsEnabled()) {
+    setTextPreset(TEXT_PALETTE_PRESET_IDS.includes(state.lastSelectableTextPreset)
+      ? state.lastSelectableTextPreset
+      : 'depth');
+  }
+  saveMultiRowLyricsPreference();
+  state.multiRowLyricSignature = '';
+  syncMultiRowLyricsControl();
+  renderMultiRowLyrics(true);
+  scheduleDesktopSceneSnapshot();
+  requestOrbFrame();
+}
+
 function updateBookEffectTextTransform() {
   if (!els.playbackLyricScene) return;
   const transform = state.bookEffectTransform;
@@ -14547,6 +16541,7 @@ function updateBookEffectTextTransform() {
   els.playbackLyricScene.style.setProperty('--book-effect-y', `${transform.y.toFixed(1)}px`);
   els.playbackLyricScene.style.setProperty('--book-effect-rotate', `${transform.rotate.toFixed(2)}deg`);
   els.playbackLyricScene.classList.toggle('is-book-effect-adjusting', !!transform.dragging);
+  scheduleDesktopSceneSnapshot();
 }
 
 function bookEffectTextGestureMode(event) {
@@ -14697,6 +16692,7 @@ function updateChladniTextTransform() {
   els.playbackLyricScene.style.setProperty('--chladni-text-rotate-y', `${transform.rotateY.toFixed(2)}deg`);
   els.playbackLyricScene.style.setProperty('--chladni-text-scale', transform.scale.toFixed(3));
   els.playbackLyricScene.classList.toggle('is-chladni-text-dragging', !!transform.dragging);
+  scheduleDesktopSceneSnapshot();
 }
 
 function chladniTextDragTarget() {
@@ -14706,6 +16702,13 @@ function chladniTextDragTarget() {
 
 function chladniTextPointInside(event, target = chladniTextDragTarget(), padding = 34) {
   if (!target) return false;
+  const stageRect = els.stage?.getBoundingClientRect();
+  if (stageRect && (
+    event.clientX < stageRect.left + 24
+    || event.clientX > stageRect.right - 24
+    || event.clientY < stageRect.top + 24
+    || event.clientY > stageRect.bottom - 24
+  )) return false;
   const rect = target.getBoundingClientRect();
   if (!rect.width || !rect.height) return false;
   const transformScale = Math.max(0.1, Number(state.chladniTextTransform?.scale) || 1);
@@ -14783,6 +16786,132 @@ function scaleChladniTextFromWheel(event) {
   return true;
 }
 
+function textPresetTransform(preset = state.textPreset) {
+  const id = TEXT_PALETTE_PRESET_IDS.includes(preset) ? preset : 'depth';
+  const transform = normalizeTextPresetTransform(state.textPresetTransforms?.[id]);
+  state.textPresetTransforms[id] = transform;
+  return transform;
+}
+
+function saveTextPresetTransforms() {
+  try {
+    window.localStorage.setItem(TEXT_TRANSFORM_PREFS_KEY, JSON.stringify({
+      version: 1,
+      transforms: state.textPresetTransforms
+    }));
+  } catch (error) {
+  }
+}
+
+function updateTextPresetTransform({ persist = false } = {}) {
+  if (!els.playbackLyricScene) return;
+  const transform = textPresetTransform();
+  els.playbackLyricScene.style.setProperty('--text-preset-rotate-x', `${transform.rotateX.toFixed(2)}deg`);
+  els.playbackLyricScene.style.setProperty('--text-preset-rotate-y', `${transform.rotateY.toFixed(2)}deg`);
+  els.playbackLyricScene.style.setProperty('--text-preset-rotate-z', `${transform.rotateZ.toFixed(2)}deg`);
+  els.playbackLyricScene.style.setProperty('--text-preset-scale', transform.scale.toFixed(3));
+  els.playbackLyricScene.classList.toggle('is-text-preset-adjusting', !!state.textPresetGesture.dragging);
+  if (persist) saveTextPresetTransforms();
+  scheduleDesktopSceneSnapshot();
+  requestOrbFrame();
+}
+
+function textPresetTargets() {
+  if (!state.playbackPage || state.textPreset === 'none') return [];
+  if (state.multiRowLyricsEnabled) return [els.multiRowLyricStage].filter(Boolean);
+  if (state.textPreset === 'book') return [els.bookLyricStage].filter(Boolean);
+  return [els.playbackLyricText, els.playbackLyricSubtitle].filter((target) => {
+    if (!target) return false;
+    const rect = target.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  });
+}
+
+function textPresetPointInside(event, padding = 18) {
+  const source = event.target instanceof Element ? event.target : null;
+  if (source?.closest('button, input, select, textarea, a, [role="button"], [role="slider"], #qishuiPlaybackCard')) {
+    return false;
+  }
+  const stageRect = els.stage?.getBoundingClientRect();
+  if (stageRect && (
+    event.clientX < stageRect.left + 24
+    || event.clientX > stageRect.right - 24
+    || event.clientY < stageRect.top + 24
+    || event.clientY > stageRect.bottom - 24
+  )) return false;
+  return textPresetTargets().some((target) => {
+    const rect = target.getBoundingClientRect();
+    if (!rect.width || !rect.height) return false;
+    const scale = Math.max(0.1, Number(textPresetTransform().scale) || 1);
+    const stableWidth = Math.max(1, Math.min(rect.width, target.offsetWidth * scale || rect.width));
+    const stableHeight = Math.max(1, Math.min(rect.height, target.offsetHeight * scale || rect.height));
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    return event.clientX >= centerX - stableWidth / 2 - padding
+      && event.clientX <= centerX + stableWidth / 2 + padding
+      && event.clientY >= centerY - stableHeight / 2 - padding
+      && event.clientY <= centerY + stableHeight / 2 + padding;
+  });
+}
+
+function beginTextPresetGesture(event) {
+  if (event.shiftKey) return false;
+  if (!textPresetPointInside(event, 12)) return false;
+  const gesture = state.textPresetGesture;
+  const transform = textPresetTransform();
+  gesture.dragging = true;
+  gesture.pointerId = event.pointerId;
+  gesture.startX = event.clientX;
+  gesture.startY = event.clientY;
+  gesture.startRotateX = transform.rotateX;
+  gesture.startRotateY = transform.rotateY;
+  if (els.stage) {
+    els.stage.classList.remove('is-text-preset-hover');
+    els.stage.classList.add('is-text-preset-adjusting');
+  }
+  updateTextPresetTransform();
+  return true;
+}
+
+function moveTextPresetGesture(event) {
+  const gesture = state.textPresetGesture;
+  if (!gesture.dragging || gesture.pointerId !== event.pointerId) return false;
+  const transform = textPresetTransform();
+  transform.rotateX = ((gesture.startRotateX - (event.clientY - gesture.startY) * 0.52 + 180) % 360 + 360) % 360 - 180;
+  transform.rotateY = ((gesture.startRotateY + (event.clientX - gesture.startX) * 0.52 + 180) % 360 + 360) % 360 - 180;
+  state.textPresetTransforms[state.textPreset] = transform;
+  updateTextPresetTransform();
+  return true;
+}
+
+function endTextPresetGesture(event) {
+  const gesture = state.textPresetGesture;
+  if (!gesture.dragging || gesture.pointerId !== event.pointerId) return false;
+  gesture.dragging = false;
+  gesture.pointerId = null;
+  if (els.stage) els.stage.classList.remove('is-text-preset-adjusting');
+  updateTextPresetTransform({ persist: true });
+  return true;
+}
+
+function scaleTextPresetFromWheel(event) {
+  if (!textPresetPointInside(event)) return false;
+  const transform = textPresetTransform();
+  const direction = event.deltaY < 0 ? 1 : -1;
+  const step = clamp(Math.abs(Number(event.deltaY) || 0) / 520, 0.055, 0.18);
+  transform.scale = clamp(transform.scale * Math.exp(direction * step), 0.5, 2.5);
+  state.textPresetTransforms[state.textPreset] = transform;
+  updateTextPresetTransform({ persist: true });
+  return true;
+}
+
+function resetTextPresetTransform(event) {
+  if (!textPresetPointInside(event)) return false;
+  state.textPresetTransforms[state.textPreset] = normalizeTextPresetTransform();
+  updateTextPresetTransform({ persist: true });
+  return true;
+}
+
 function captureStagePointer(pointerId) {
   try {
     els.stage.setPointerCapture(pointerId);
@@ -14810,6 +16939,7 @@ function resetPlaybackView() {
 
 function updateLyricDiyVars() {
   if (!els.playbackLyricScene) return;
+  updateTextPresetTransform();
   els.playbackLyricScene.style.setProperty('--lyric-brightness', state.lyricBrightness.toFixed(2));
   els.playbackLyricScene.style.setProperty('--lyric-speed', state.lyricSpeed.toFixed(2));
   els.playbackLyricScene.style.setProperty('--lyric-duration', `${Math.round(720 / state.lyricSpeed)}ms`);
@@ -14940,8 +17070,13 @@ const DIY_PRESET_CONFIG_LABELS = Object.freeze({
   faceCount: '3D面数',
   autoRotation: '自动旋转',
   sonicColumnCount: '低频音柱数量',
+  sonicCenterColor: '核心音柱颜色',
   sonicCoreColor: '中间音柱颜色',
   sonicOuterColor: '外围音柱颜色',
+  sonicFountain: '粒子喷泉',
+  sonicFountainColor: '喷泉颜色',
+  sonicStarfield: '星空粒子',
+  sonicStarfieldColor: '星空颜色',
   sonicBrightness: 'Sonic 亮度',
   sonicExposure: 'Sonic 曝光',
   sonicColumnHeight: '音柱高度',
@@ -14987,8 +17122,13 @@ function builtinDiyPresetConfiguration() {
     const settings = normalizeSonicSettings(state.sonicTopography.settings);
     const colors = resolvedSonicTopographyColors();
     runtimeControls.sonicColumnCount = SONIC_BASS_COLUMN_CLUSTER.count;
+    runtimeControls.sonicCenterColor = settings.centerColor || `跟随封面 · ${colors.center}`;
     runtimeControls.sonicCoreColor = settings.coreColor || `跟随封面 · ${colors.core}`;
     runtimeControls.sonicOuterColor = settings.outerColor || `跟随封面 · ${colors.outer}`;
+    runtimeControls.sonicFountain = settings.fountainEnabled;
+    runtimeControls.sonicFountainColor = settings.fountainColor;
+    runtimeControls.sonicStarfield = settings.starfieldEnabled;
+    runtimeControls.sonicStarfieldColor = settings.starfieldColor;
     runtimeControls.sonicBrightness = `${Math.round(settings.brightness * 100)}%`;
     runtimeControls.sonicExposure = `${settings.exposure > 0 ? '+' : ''}${settings.exposure.toFixed(2)} EV`;
     runtimeControls.sonicColumnHeight = `${Math.round(settings.columnHeight * 100)}%`;
@@ -15309,6 +17449,7 @@ function setDiyPreset(preset) {
   syncDiyPresetAdjustmentVisibility();
   renderDiySelectedPresetConfig();
   applyPresetUpscaler({ force: true });
+  scheduleDesktopSceneSnapshot();
 }
 
 function setTextPreset(preset) {
@@ -15342,11 +17483,14 @@ function setTextPreset(preset) {
   if (els.bookLyricStage) {
     els.bookLyricStage.setAttribute('aria-hidden', state.textPreset === 'book' ? 'false' : 'true');
   }
+  state.multiRowLyricSignature = '';
+  syncMultiRowLyricsControl();
   resetLyricFrameSync();
   triggerFocusEchoTransition();
   updateTextPresetAvailability();
   updateBookEffectTextTransform();
   updateChladniTextTransform();
+  updateTextPresetTransform();
   syncBlurLyricComponent();
   if (state.textPreset === 'book') {
     resetBookLyricScrollState();
@@ -15356,8 +17500,10 @@ function setTextPreset(preset) {
     state.lyricBookCurrentLine = null;
     resetBookLyricScrollState();
   }
+  renderMultiRowLyrics(true);
   renderDiySelectedPresetConfig();
   requestOrbFrame();
+  scheduleDesktopSceneSnapshot();
 }
 
 function syncBlurLyricComponent(text = state.lyricDisplayText) {
@@ -16664,7 +18810,7 @@ function initSandboxRenderer() {
   const THREE = window.THREE;
   const renderer = createDirectX11Renderer(THREE, {
     canvas: els.sandboxCanvas,
-    antialias: !MOBILE_RENDER_TARGET && RENDER_PROFILE.tier !== 'economy',
+    antialias: RENDER_PROFILE.tier !== 'economy' && (!MOBILE_RENDER_TARGET || ANDROID_CLIENT),
     alpha: true
   });
   renderer.setClearColor(0x030708, 1);
@@ -18387,6 +20533,270 @@ function postNativeWindowAction(action, payload = {}) {
   return false;
 }
 
+function desktopSceneSnapshot() {
+  const audioDuration = Number(els.audio?.duration);
+  const fallbackDuration = Number(state.playerClock?.duration) || Number(state.currentSong?.duration) || 0;
+  const duration = Number.isFinite(audioDuration) && audioDuration > 0 ? audioDuration : fallbackDuration;
+  return {
+    diyPreset: state.diyPreset,
+    textPreset: state.textPreset,
+    sandboxPresetId: state.sandbox.playbackPresetId || state.sandbox.selectedPresetId || '',
+    lyricBrightness: state.lyricBrightness,
+    lyricSpeed: state.lyricSpeed,
+    cubeIntensity: state.cubeIntensity,
+    wallpaperOpacity: state.wallpaperOpacity,
+    wallpaperBrightness: state.wallpaperBrightness,
+    wallpaperBlur: state.wallpaperBlur,
+    wallpaperScale: state.wallpaperScale,
+    wallpaperFitMode: state.wallpaperFitMode,
+    wallpaperSource: state.wallpaperSource,
+    activeWallpaperId: state.activeWallpaperId,
+    sonicSettings: normalizeSonicSettings(state.sonicTopography.settings),
+    chladniMode: state.chladni.mode,
+    coverParticleBackgroundEnabled: !!state.coverParticle.backgroundEnabled,
+    coverParticleMotionAmplitude: state.coverParticle.motionAmplitude,
+    textPalettePreferences: state.textPalettePreferences,
+    textFontPreferences: state.textFontPreferences,
+    textTransforms: {
+      bookEffect: {
+        x: state.bookEffectTransform.x,
+        y: state.bookEffectTransform.y,
+        rotate: state.bookEffectTransform.rotate
+      },
+      chladni: {
+        x: state.chladniTextTransform.x,
+        y: state.chladniTextTransform.y,
+        rotate: state.chladniTextTransform.rotate,
+        rotateX: state.chladniTextTransform.rotateX,
+        rotateY: state.chladniTextTransform.rotateY,
+        scale: state.chladniTextTransform.scale
+      },
+      presets: state.textPresetTransforms
+    },
+    lyricPlayback: {
+      song: state.currentSong ? { ...state.currentSong } : null,
+      signature: state.lyricSignature,
+      lines: Array.isArray(state.lyricLines) ? state.lyricLines : [],
+      displayText: state.lyricDisplayText,
+      subtitleText: state.lyricSubtitleText,
+      progressPercent: state.lyricProgressPercent,
+      position: currentPlaybackLyricTime(Number(state.currentSong?.position) || 0),
+      duration,
+      playing: isPlaybackClockRunning(),
+      bilingualLyricsEnabled: state.bilingualLyricsEnabled !== false,
+      multiRowLyricsEnabled: state.multiRowLyricsEnabled === true
+    }
+  };
+}
+
+function syncDesktopSceneToggle() {
+  const button = els.qishuiPlaybackDesktopToggle;
+  if (!button) return;
+  button.disabled = desktopSceneRuntime.pending;
+  button.classList.toggle('is-active', desktopSceneRuntime.enabled);
+  button.setAttribute('aria-pressed', String(desktopSceneRuntime.enabled));
+  const label = desktopSceneRuntime.enabled ? '停止桌面场景映射' : '将当前场景映射到桌面';
+  button.setAttribute('aria-label', label);
+  button.title = label;
+}
+
+function postNativeDesktopScene(action, snapshot = desktopSceneSnapshot()) {
+  const bridge = window.chrome?.webview;
+  if (!bridge || typeof bridge.postMessage !== 'function') return false;
+  bridge.postMessage({ type: 'fe-desktop-scene', action, snapshot });
+  return true;
+}
+
+function handleDesktopSceneBridgeMessage(event) {
+  let payload = event?.data;
+  if (typeof payload === 'string') {
+    try { payload = JSON.parse(payload); } catch (error) { return; }
+  }
+  if (!payload || typeof payload !== 'object') return;
+  if (payload.type === 'fe-desktop-scene-result' && !DESKTOP_SCENE_CLIENT) {
+    desktopSceneRuntime.pending = false;
+    desktopSceneRuntime.enabled = payload.enabled === true;
+    syncDesktopSceneToggle();
+    if (payload.error) toast(payload.error);
+    else toast(desktopSceneRuntime.enabled ? '当前场景已映射到桌面' : '桌面场景映射已关闭');
+    return;
+  }
+  if (payload.type === 'fe-desktop-scene-state' && DESKTOP_SCENE_CLIENT) {
+    applyDesktopSceneSnapshot(payload.snapshot);
+  }
+}
+
+function publishDesktopSceneSnapshot() {
+  desktopSceneRuntime.publishFrame = 0;
+  if (
+    DESKTOP_SCENE_CLIENT
+    || !desktopSceneRuntime.enabled
+    || desktopSceneRuntime.applying
+  ) return;
+  const snapshot = desktopSceneSnapshot();
+  desktopSceneRuntime.channel?.postMessage({ type: 'state', snapshot });
+  postNativeDesktopScene('update', snapshot);
+}
+
+function scheduleDesktopSceneSnapshot() {
+  if (
+    DESKTOP_SCENE_CLIENT
+    || !desktopSceneRuntime.enabled
+    || desktopSceneRuntime.applying
+    || desktopSceneRuntime.publishFrame
+  ) return;
+  desktopSceneRuntime.publishFrame = window.requestAnimationFrame(publishDesktopSceneSnapshot);
+}
+
+async function applyDesktopSceneSnapshot(snapshot = {}) {
+  if (!DESKTOP_SCENE_CLIENT || !snapshot || typeof snapshot !== 'object') return;
+  if (!desktopSceneRuntime.ready) {
+    desktopSceneRuntime.queuedSnapshot = snapshot;
+    return;
+  }
+  desktopSceneRuntime.applying = true;
+  try {
+    state.lyricBrightness = clamp(Number(snapshot.lyricBrightness) || state.lyricBrightness, 0.6, 1.8);
+    state.lyricSpeed = clamp(Number(snapshot.lyricSpeed) || state.lyricSpeed, 0.6, 1.8);
+    state.cubeIntensity = clamp(Number(snapshot.cubeIntensity) || state.cubeIntensity, 0.65, 1.7);
+    state.wallpaperOpacity = clamp(Number(snapshot.wallpaperOpacity) || state.wallpaperOpacity, 0.3, 1);
+    state.wallpaperBrightness = clamp(Number(snapshot.wallpaperBrightness) || state.wallpaperBrightness, 0.35, 1.5);
+    state.wallpaperBlur = clamp(Number(snapshot.wallpaperBlur) || 0, 0, 24);
+    state.wallpaperScale = clamp(Number(snapshot.wallpaperScale) || state.wallpaperScale, 0.7, 1);
+    state.wallpaperFitMode = normalizeWallpaperFitMode(snapshot.wallpaperFitMode || state.wallpaperFitMode);
+    if (snapshot.wallpaperSource === 'live' || snapshot.wallpaperSource === 'imported') {
+      state.wallpaperSource = snapshot.wallpaperSource;
+    }
+    if (snapshot.activeWallpaperId) state.activeWallpaperId = snapshot.activeWallpaperId;
+    if (snapshot.textPalettePreferences && typeof snapshot.textPalettePreferences === 'object') {
+      Object.assign(state.textPalettePreferences, snapshot.textPalettePreferences);
+    }
+    if (snapshot.textFontPreferences && typeof snapshot.textFontPreferences === 'object') {
+      Object.assign(state.textFontPreferences, snapshot.textFontPreferences);
+    }
+    if (snapshot.textTransforms && typeof snapshot.textTransforms === 'object') {
+      if (snapshot.textTransforms.bookEffect && typeof snapshot.textTransforms.bookEffect === 'object') {
+        Object.assign(state.bookEffectTransform, snapshot.textTransforms.bookEffect);
+      }
+      if (snapshot.textTransforms.chladni && typeof snapshot.textTransforms.chladni === 'object') {
+        Object.assign(state.chladniTextTransform, snapshot.textTransforms.chladni);
+      }
+      if (snapshot.textTransforms.presets && typeof snapshot.textTransforms.presets === 'object') {
+        TEXT_PALETTE_PRESET_IDS.forEach((preset) => {
+          state.textPresetTransforms[preset] = normalizeTextPresetTransform(snapshot.textTransforms.presets[preset]);
+        });
+      }
+    }
+    const lyricPlayback = snapshot.lyricPlayback && typeof snapshot.lyricPlayback === 'object'
+      ? snapshot.lyricPlayback
+      : null;
+    if (lyricPlayback) {
+      if (Object.prototype.hasOwnProperty.call(lyricPlayback, 'song')) {
+        state.currentSong = lyricPlayback.song && typeof lyricPlayback.song === 'object'
+          ? { ...lyricPlayback.song }
+          : null;
+      }
+      if (Array.isArray(lyricPlayback.lines)) state.lyricLines = lyricPlayback.lines;
+      state.lyricSignature = safeText(lyricPlayback.signature, lyricSignatureForSong(state.currentSong));
+      state.bilingualLyricsEnabled = lyricPlayback.bilingualLyricsEnabled !== false;
+      state.multiRowLyricsEnabled = lyricPlayback.multiRowLyricsEnabled === true;
+      updatePlayerClock(
+        Number(lyricPlayback.position) || 0,
+        Number(lyricPlayback.duration) || 0,
+        lyricPlayback.playing === true
+      );
+      resetLyricFrameSync();
+    }
+    state.sonicTopography.settings = normalizeSonicSettings(snapshot.sonicSettings || state.sonicTopography.settings);
+    state.chladni.mode = snapshot.chladniMode === 'radial' ? 'radial' : 'cube';
+    state.coverParticle.backgroundEnabled = snapshot.coverParticleBackgroundEnabled !== false;
+    state.coverParticle.motionAmplitude = clamp(
+      Number(snapshot.coverParticleMotionAmplitude) || state.coverParticle.motionAmplitude,
+      0,
+      2
+    );
+
+    const sandboxPresetId = safeText(snapshot.sandboxPresetId, '');
+    const sandboxPreset = sandboxPresetId
+      ? state.sandbox.presets.find((item) => String(item.id) === sandboxPresetId)
+      : null;
+    if (sandboxPreset) {
+      enterDiyScenePresetPlayback(sandboxPresetId);
+      setTextPreset(snapshot.textPreset || state.textPreset);
+    } else {
+      setDiyPreset(normalizeDiyPreset(snapshot.diyPreset));
+      setTextPreset(snapshot.textPreset || state.textPreset);
+      enterPlaybackPage();
+    }
+    updateLyricDiyVars();
+    updateWallpaperDiyVars();
+    applySonicTopographySettings({ persist: false, sync: false, renderConfig: false });
+    updateCoverParticleBackgroundMode();
+    applyTextFontPreference();
+    applyLyricPalette(state.playbackVisual.palette || fallbackLyricPalette());
+    updateBookEffectTextTransform();
+    updateChladniTextTransform();
+    if (lyricPlayback) {
+      renderCurrent(state.currentSong);
+      syncBilingualLyricsControl();
+      syncMultiRowLyricsControl();
+      setPlaybackLyricLine(
+        lyricPlayback.displayText,
+        lyricPlayback.subtitleText,
+        clamp((Number(lyricPlayback.progressPercent) || 0) / 100, 0, 1),
+        Number(lyricPlayback.position) || 0
+      );
+      if (state.textPreset === 'book') {
+        state.lyricBookSignature = '';
+        renderBookLyricLines(true);
+        updateBookLyricLines(state.lyricProgressPercent, Number(lyricPlayback.position) || 0);
+      }
+      renderMultiRowLyrics(true);
+      updatePlayState();
+    }
+    requestOrbFrame();
+  } finally {
+    desktopSceneRuntime.applying = false;
+  }
+}
+
+function initDesktopSceneBridge() {
+  const bridge = window.chrome?.webview;
+  bridge?.addEventListener?.('message', handleDesktopSceneBridgeMessage);
+  if (typeof window.BroadcastChannel === 'function') {
+    desktopSceneRuntime.channel = new BroadcastChannel('fe-monster-desktop-scene-v1');
+    desktopSceneRuntime.channel.addEventListener('message', (event) => {
+      const payload = event.data;
+      if (DESKTOP_SCENE_CLIENT && payload?.type === 'state') {
+        applyDesktopSceneSnapshot(payload.snapshot);
+      }
+    });
+  }
+  syncDesktopSceneToggle();
+}
+
+function finishDesktopSceneInitialization() {
+  desktopSceneRuntime.ready = true;
+  if (!DESKTOP_SCENE_CLIENT) return;
+  if (els.bootScreen) els.bootScreen.hidden = true;
+  state.playbackChrome.communityVisible = false;
+  enterPlaybackPage();
+  const queued = desktopSceneRuntime.queuedSnapshot;
+  desktopSceneRuntime.queuedSnapshot = null;
+  if (queued) applyDesktopSceneSnapshot(queued);
+}
+
+function toggleDesktopSceneMapping() {
+  if (DESKTOP_SCENE_CLIENT || desktopSceneRuntime.pending) return;
+  desktopSceneRuntime.pending = true;
+  syncDesktopSceneToggle();
+  if (!postNativeDesktopScene('toggle')) {
+    desktopSceneRuntime.pending = false;
+    syncDesktopSceneToggle();
+    toast('桌面映射需要 Windows 正式客户端');
+  }
+}
+
 async function requestAppWindowAction(action) {
   const nativeWindowActions = new Set(['fullscreen', 'normal', 'restore', 'minimize', 'minimise']);
   if (nativeWindowActions.has(action) && postNativeWindowAction(action)) {
@@ -18476,10 +20886,13 @@ function renderCurrent(song = state.currentSong) {
   updateQualityButton(song);
   renderQishuiPlaybackCard(song);
   syncElasticRangeVisuals();
+  scheduleDesktopSceneSnapshot();
 }
 
 function updatePlayState() {
-  const playing = !els.audio.paused && !!els.audio.src;
+  const playing = DESKTOP_SCENE_CLIENT
+    ? isPlaybackClockRunning()
+    : !els.audio.paused && !!els.audio.src;
   els.playButton.classList.toggle('is-playing', playing);
   els.playButton.title = playing ? '暂停' : '播放';
   els.playButton.setAttribute('aria-label', playing ? '暂停' : '播放');
@@ -18489,9 +20902,11 @@ function updatePlayState() {
   updateQishuiPlaybackPlayState(playing);
   if (isPlaybackClockRunning()) playCoverParticleEngine();
   else pauseCoverParticleEngine();
+  scheduleDesktopSceneSnapshot();
 }
 
 async function refreshPlayerState() {
+  if (DESKTOP_SCENE_CLIENT) return;
   if (document.hidden) return;
   if (state.localQueueActive && isLocalSong(state.currentSong)) {
     const position = Number.isFinite(els.audio.currentTime) ? els.audio.currentTime : 0;
@@ -18622,8 +21037,29 @@ function renderManualProgress(position = 0, duration = 0) {
   syncPlaybackLyricAtTime(safePosition);
 }
 
+async function skipUnavailableCommunitySong(reason = '') {
+  if (!state.community.activeSession || state.community.listenRecoveryActive) return false;
+  state.community.listenRecoveryActive = true;
+  if (els.listenMiniStatus) els.listenMiniStatus.textContent = '当前歌曲无可用音源，正在自动跳过';
+  try {
+    return await transport('/api/player/next', {
+      autoSkipUnavailable: true,
+      unavailableReason: reason
+    });
+  } finally {
+    state.community.listenRecoveryActive = false;
+  }
+}
+
 function applyCommunityUnavailableSong(song = {}, reason = '') {
   const signature = communitySongSignature(song);
+  if (signature) {
+    state.community.listenUnavailableSignatures.add(signature);
+    while (state.community.listenUnavailableSignatures.size > 32) {
+      const oldest = state.community.listenUnavailableSignatures.values().next().value;
+      state.community.listenUnavailableSignatures.delete(oldest);
+    }
+  }
   const duration = communitySongDuration(song);
   const position = communitySongPosition(song);
   state.currentSong = {
@@ -18654,7 +21090,7 @@ function applyCommunityUnavailableSong(song = {}, reason = '') {
 }
 
 async function applyCommunityPlaybackControls(song = {}) {
-  const position = communitySongPosition(song);
+  const position = communitySongPlaybackPosition(song);
   const duration = communitySongDuration(song);
   if (!els.audio.src) {
     state.currentSong = { ...(state.currentSong || {}), ...song, duration, position };
@@ -18662,14 +21098,20 @@ async function applyCommunityPlaybackControls(song = {}) {
     renderManualProgress(position, duration);
     return;
   }
-  setAudioPlaybackPosition(position);
+  setAudioPlaybackPosition(position, 0.35);
   if (song.playing === false) {
     els.audio.pause();
     await apiJson('/api/player/pause').catch(() => {});
   } else if (els.audio.paused) {
     await apiJson('/api/player/play').catch(() => {});
-    await els.audio.play().catch(() => {});
+    try {
+      await els.audio.play();
+    } catch (error) {
+      await skipUnavailableCommunitySong(error.message);
+      return;
+    }
   }
+  if (song.playing !== false) await ensureAudioAnalysis();
   updateProgress();
   updatePlayState();
 }
@@ -18692,7 +21134,7 @@ async function loadLocalSong(song, options = {}) {
   renderCurrent(state.currentSong);
   if (options.autoplay === false) els.audio.pause();
   else await els.audio.play();
-  ensureAudioAnalysis();
+  if (options.autoplay !== false) await ensureAudioAnalysis();
   updateProgress();
   updatePlayState();
   return true;
@@ -18712,6 +21154,7 @@ async function loadSong(song, options = {}) {
     if (!data.playable || !data.url) {
       if (options.communitySync) {
         applyCommunityUnavailableSong(song, data.error || '当前歌曲不可播放');
+        await skipUnavailableCommunitySong(data.error || '当前歌曲不可播放');
         return false;
       }
       throw new Error(data.error || '当前歌曲不可播放');
@@ -18725,7 +21168,7 @@ async function loadSong(song, options = {}) {
     };
     state.playbackQuality = safeText(data.quality, quality);
     state.playerUrl = data.url;
-    els.audio.src = data.url;
+    els.audio.src = browserAudioUrl(data.url);
     els.audio.volume = Number(els.volumeRange.value) / 100;
     const targetPosition = Number(options.position ?? song.position) || 0;
     if (targetPosition > 0) {
@@ -18743,7 +21186,7 @@ async function loadSong(song, options = {}) {
       await els.audio.play();
     }
     if (targetPosition > 0) setAudioPlaybackPosition(targetPosition, 0.25);
-    ensureAudioAnalysis();
+    if (options.autoplay !== false) await ensureAudioAnalysis();
     updateProgress();
     updatePlayState();
     if (!options.communitySync && state.community.activeSession) {
@@ -18751,7 +21194,12 @@ async function loadSong(song, options = {}) {
     }
     return true;
   } catch (error) {
-    toast(error.message);
+    if (options.communitySync) {
+      applyCommunityUnavailableSong(song, error.message || '当前歌曲音源加载失败');
+      await skipUnavailableCommunitySong(error.message || '当前歌曲音源加载失败');
+      return false;
+    }
+    if (!options.silent) toast(error.message);
     return false;
   }
 }
@@ -18763,6 +21211,11 @@ async function submitSearch(event) {
   if (!keyword) {
     toast('请输入搜索关键词');
     els.searchInput.focus();
+    return;
+  }
+  if (!providerConfigured(state.activeProvider)) {
+    toast(`请先导入${providerInfo(state.activeProvider).label} API 插件`);
+    showLoginDialog();
     return;
   }
 
@@ -18805,7 +21258,7 @@ async function playQueueIndex(index) {
   if (loaded && !isLocalSong(song)) await refreshPlayerState();
 }
 
-async function transport(path) {
+async function transport(path, options = {}) {
   if (state.localQueueActive) {
     if (!state.queue.length) {
       toast('本地歌单暂无歌曲');
@@ -18816,27 +21269,46 @@ async function transport(path) {
     const index = (current + offset + state.queue.length) % state.queue.length;
     await playQueueIndex(index);
     updateShelfCurrentSong();
-    return;
+    return true;
   }
+
+  const maxAttempts = Math.max(1, Math.min(Number(options.maxAttempts) || state.queue.length || 1, 100));
+  let lastError = safeText(options.unavailableReason, '');
   try {
-    const data = await apiJson(path);
-    if (!data.playable || !data.url) {
-      toast(data.error || '队列里没有可播放歌曲');
-      await refreshPlayerState();
-      return;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const data = await apiJson(path);
+      if (!data.playable || !data.url) {
+        lastError = safeText(data.error, lastError || '歌曲无可用音源或需要会员');
+        if (Number(data.skipped) >= maxAttempts) break;
+        continue;
+      }
+      state.currentSong = data.song || state.currentSong;
+      state.playerUrl = data.url;
+      if (data.quality) state.playbackQuality = safeText(data.quality, state.playbackQuality);
+      els.audio.src = browserAudioUrl(data.url);
+      resetSpectrumForSong(state.currentSong);
+      renderCurrent(state.currentSong);
+      try {
+        await els.audio.play();
+      } catch (error) {
+        lastError = safeText(error && error.message, '音频源格式不受支持');
+        els.audio.removeAttribute('src');
+        els.audio.load();
+        continue;
+      }
+      state.community.listenUnavailableSignature = '';
+      await ensureAudioAnalysis();
+      await refreshPlayerState().catch(() => {});
+      if (state.community.activeSession) await reportCommunityListening(true).catch(() => {});
+      if (options.autoSkipUnavailable) toast('已自动跳过无音源或会员歌曲');
+      return true;
     }
-    state.currentSong = data.song || state.currentSong;
-    state.playerUrl = data.url;
-    if (data.quality) state.playbackQuality = safeText(data.quality, state.playbackQuality);
-    els.audio.src = data.url;
-    resetSpectrumForSong(state.currentSong);
-    renderCurrent(state.currentSong);
-    await els.audio.play();
-    ensureAudioAnalysis();
     await refreshPlayerState();
-    if (state.community.activeSession) reportCommunityListening(true).catch(() => {});
+    toast(lastError || '队列里没有可播放歌曲');
+    return false;
   } catch (error) {
     toast(error.message);
+    return false;
   }
 }
 
@@ -19123,7 +21595,8 @@ function isEditableShortcutTarget(target) {
 }
 
 function dismissTopUiLayer() {
-  if (state.playlistFavorite.open) setPlaylistFavoriteOpen(false);
+  if (els.listenMini && !els.listenMini.hidden) leaveCommunityListen();
+  else if (state.playlistFavorite.open) setPlaylistFavoriteOpen(false);
   else if (state.qualityMenuOpen) setDockQualityMenuOpen(false);
   else if (els.searchSuggestions && !els.searchSuggestions.hidden) setSearchSuggestionsOpen(false);
   else if (state.favoriteLibrary.open) setFavoriteLibraryOpen(false);
@@ -19134,7 +21607,10 @@ function dismissTopUiLayer() {
   else if (state.runtimeSettingsOpen) setRuntimeSettingsOpen(false);
   else if (state.sandbox.open) setSandboxOpen(false);
   else if (state.diyOpen) setDiyOpen(false);
-  else if (state.playbackPage && state.playbackChrome.communityVisible) setPlaybackChromeVisibility({ communityVisible: false });
+  else if (state.playbackChrome.communityVisible) {
+    setPlaybackChromeVisibility({ communityVisible: false });
+    focusCommunityDrawerControl(false);
+  }
   else if (state.playbackPage) playbackBack();
   else if (!els.playlistShelf.hidden) hidePlaylistShelf();
   else return false;
@@ -19239,18 +21715,21 @@ function bindEvents() {
     els.communityAddForm.addEventListener('submit', addCommunityFriend);
     els.communityAddForm.addEventListener('pointerdown', (event) => event.stopPropagation());
   }
+  if (els.communityRailButton) {
+    els.communityRailButton.addEventListener('pointerdown', (event) => event.stopPropagation());
+    els.communityRailButton.addEventListener('click', (event) => {
+      toggleCommunityPageFromPlayback();
+      event.preventDefault();
+      event.stopPropagation();
+    });
+  }
   if (els.communityCard) {
     els.communityCard.addEventListener('pointerdown', (event) => event.stopPropagation());
-    els.communityCard.addEventListener('click', (event) => {
-      if (!state.community.cardCollapsed) return;
-      const target = event.target instanceof Element ? event.target : null;
-      if (target && target.closest('button,input,textarea,select,.community-avatar')) return;
-      setCommunityCardCollapsed(false);
-    });
   }
   if (els.communityCollapseButton) {
     els.communityCollapseButton.addEventListener('click', (event) => {
-      setCommunityCardCollapsed(!state.community.cardCollapsed);
+      setPlaybackChromeVisibility({ communityVisible: false });
+      focusCommunityDrawerControl(false);
       event.preventDefault();
       event.stopPropagation();
     });
@@ -19401,6 +21880,7 @@ function bindEvents() {
     els.listenMiniHandle.addEventListener('pointercancel', endListenMiniDrag);
   }
   if (els.listenMini) els.listenMini.addEventListener('pointerdown', (event) => event.stopPropagation());
+  if (els.listenMiniCollapse) els.listenMiniCollapse.addEventListener('click', toggleListenMiniCollapsed);
   if (els.listenMiniClose) els.listenMiniClose.addEventListener('click', leaveCommunityListen);
   if (els.listenAcceptButton) els.listenAcceptButton.addEventListener('click', () => respondCommunityListen(true));
   if (els.listenDeclineButton) els.listenDeclineButton.addEventListener('click', () => respondCommunityListen(false));
@@ -19546,6 +22026,11 @@ function bindEvents() {
       setPlaybackLyricPalettePreference('manual', els.playbackLyricPaletteCustomInput.value);
     });
   }
+  if (els.bilingualLyricsToggle) {
+    els.bilingualLyricsToggle.addEventListener('change', () => {
+      setBilingualLyricsEnabled(els.bilingualLyricsToggle.checked);
+    });
+  }
   window.addEventListener('pointerup', endDiyCardRotation);
   window.addEventListener('pointercancel', endDiyCardRotation);
   updateDiyCardRotation();
@@ -19628,6 +22113,12 @@ function bindEvents() {
       renderDiySelectedPresetConfig();
     });
   }
+  if (els.sonicCenterColorInput) {
+    els.sonicCenterColorInput.addEventListener('input', () => {
+      state.sonicTopography.settings.centerColor = els.sonicCenterColorInput.value;
+      applySonicTopographySettings();
+    });
+  }
   if (els.sonicCoreColorInput) {
     els.sonicCoreColorInput.addEventListener('input', () => {
       state.sonicTopography.settings.coreColor = els.sonicCoreColorInput.value;
@@ -19640,8 +22131,33 @@ function bindEvents() {
       applySonicTopographySettings();
     });
   }
+  if (els.sonicFountainToggle) {
+    els.sonicFountainToggle.addEventListener('change', () => {
+      state.sonicTopography.settings.fountainEnabled = els.sonicFountainToggle.checked;
+      applySonicTopographySettings();
+    });
+  }
+  if (els.sonicFountainColorInput) {
+    els.sonicFountainColorInput.addEventListener('input', () => {
+      state.sonicTopography.settings.fountainColor = els.sonicFountainColorInput.value;
+      applySonicTopographySettings();
+    });
+  }
+  if (els.sonicStarfieldToggle) {
+    els.sonicStarfieldToggle.addEventListener('change', () => {
+      state.sonicTopography.settings.starfieldEnabled = els.sonicStarfieldToggle.checked;
+      applySonicTopographySettings();
+    });
+  }
+  if (els.sonicStarfieldColorInput) {
+    els.sonicStarfieldColorInput.addEventListener('input', () => {
+      state.sonicTopography.settings.starfieldColor = els.sonicStarfieldColorInput.value;
+      applySonicTopographySettings();
+    });
+  }
   if (els.sonicFollowCoverButton) {
     els.sonicFollowCoverButton.addEventListener('click', () => {
+      state.sonicTopography.settings.centerColor = null;
       state.sonicTopography.settings.coreColor = null;
       state.sonicTopography.settings.outerColor = null;
       applySonicTopographySettings();
@@ -19768,19 +22284,7 @@ function bindEvents() {
   els.loginButton.addEventListener('click', showLoginDialog);
   els.loginClose.addEventListener('click', closeLoginDialog);
   els.loginRefresh.addEventListener('click', loadLoginQr);
-  if (els.qishuiPhoneInput) {
-    els.qishuiPhoneInput.addEventListener('input', () => {
-      els.qishuiPhoneInput.value = qishuiPhoneValue();
-    });
-  }
-  if (els.qishuiCodeInput) {
-    els.qishuiCodeInput.addEventListener('input', () => {
-      els.qishuiCodeInput.value = qishuiCodeValue();
-    });
-  }
-  if (els.qishuiSendCodeButton) els.qishuiSendCodeButton.addEventListener('click', sendQishuiPhoneCode);
-  if (els.qishuiGuestButton) els.qishuiGuestButton.addEventListener('click', enterQishuiGuestMode);
-  if (els.qishuiPhoneLogin) els.qishuiPhoneLogin.addEventListener('submit', verifyQishuiPhoneLogin);
+  if (els.officialBrowserLoginButton) els.officialBrowserLoginButton.addEventListener('click', toggleOfficialBrowserLogin);
   if (els.musicApiImportButton && els.musicApiImportInput) {
     els.musicApiImportButton.addEventListener('click', () => els.musicApiImportInput.click());
     els.musicApiImportInput.addEventListener('change', () => importMusicApiFile(els.musicApiImportInput.files?.[0]));
@@ -19834,9 +22338,9 @@ function bindEvents() {
     setDockQualityMenuOpen(false);
   });
   document.addEventListener('pointerdown', (event) => {
-    if (!state.playbackPage || !state.playbackChrome.communityVisible) return;
+    if (!state.playbackChrome.communityVisible) return;
     const target = event.target instanceof Element ? event.target : null;
-    if (target && target.closest('.community-card, .community-broadcast-toast')) return;
+    if (target && target.closest('.community-card, .community-rail-button, .community-broadcast-toast')) return;
     setPlaybackChromeVisibility({ communityVisible: false });
   });
   document.addEventListener('pointerdown', beginWindowDragGesture, true);
@@ -19940,6 +22444,41 @@ function bindEvents() {
   if (els.qishuiPlaybackVisibilityToggle) {
     els.qishuiPlaybackVisibilityToggle.addEventListener('click', toggleQishuiPlaybackHidden);
   }
+  if (els.qishuiPlaybackDesktopToggle) {
+    els.qishuiPlaybackDesktopToggle.addEventListener('click', toggleDesktopSceneMapping);
+  }
+  if (els.qishuiPlaybackBilingualToggle) {
+    els.qishuiPlaybackBilingualToggle.addEventListener('click', () => {
+      setBilingualLyricsEnabled(!state.bilingualLyricsEnabled);
+    });
+  }
+  if (els.qishuiPlaybackMultiRowToggle) {
+    els.qishuiPlaybackMultiRowToggle.addEventListener('click', () => {
+      setMultiRowLyricsEnabled(!state.multiRowLyricsEnabled);
+    });
+  }
+  if (els.qishuiPlaybackObrToggle) {
+    els.qishuiPlaybackObrToggle.addEventListener('click', toggleGoogleObrSpatialAudio);
+  }
+  if (els.qishuiPlaybackObrLayoutToggle) {
+    els.qishuiPlaybackObrLayoutToggle.addEventListener('click', cycleGoogleObrChannelLayout);
+  }
+  if (els.qishuiPlaybackDanmakuToggle) {
+    els.qishuiPlaybackDanmakuToggle.addEventListener('click', () => {
+      setCommunityDanmakuComposerOpen(!state.community.danmakuOpen);
+    });
+  }
+  if (els.qishuiPlaybackDanmakuForm) {
+    els.qishuiPlaybackDanmakuForm.addEventListener('submit', sendCommunityDanmaku);
+  }
+  window.addEventListener('fe-monster-community-relay', (event) => {
+    handleCommunityDanmakuRelay(event.detail || {});
+  });
+  window.addEventListener('pointermove', scheduleCommunityDanmakuRepulsion, { passive: true });
+  window.addEventListener('pointerout', (event) => {
+    if (event.relatedTarget) return;
+    scheduleCommunityDanmakuRepulsion({ clientX: Number.NaN, clientY: Number.NaN });
+  }, { passive: true });
   if (els.qishuiPlaybackTools) els.qishuiPlaybackTools.addEventListener('click', handlePlaybackCardTool);
   if (els.qishuiPlaybackCard) {
     els.qishuiPlaybackCard.addEventListener('wheel', handleQishuiPlaybackWheel, { passive: false });
@@ -20013,6 +22552,8 @@ function bindEvents() {
     });
   }
   window.addEventListener('fe-blur-lyrics-ready', () => syncBlurLyricComponent());
+  document.addEventListener('input', scheduleDesktopSceneSnapshot, { passive: true });
+  document.addEventListener('change', scheduleDesktopSceneSnapshot, { passive: true });
   window.addEventListener('pointermove', scheduleUiPointerUpdates, { passive: true });
   window.addEventListener('pointerleave', () => {
     cancelUiPointerUpdates();
@@ -20029,11 +22570,23 @@ function bindEvents() {
   window.addEventListener('online', () => {
     scheduleUserPlaylistsRefresh(160);
     state.community.eventReconnectDelay = 1200;
+    state.community.refreshRetryDelay = 1200;
     scheduleCommunityRefresh(160);
     ensureCommunityEventStream();
+    if (state.obrSpatialAudio.requested && !state.obrSpatialAudio.enabled) scheduleGoogleObrRecovery();
   }, { passive: true });
-  window.addEventListener('offline', () => stopCommunityEventStream(false), { passive: true });
-  window.addEventListener('beforeunload', revokeLocalObjectUrls, { once: true });
+  window.addEventListener('offline', () => {
+    stopCommunityEventStream(false);
+    clearGoogleObrRecovery();
+  }, { passive: true });
+  window.addEventListener('beforeunload', () => {
+    clearBackgroundPolling();
+    saveCommunityListeningStats();
+    window.cancelAnimationFrame(desktopSceneRuntime.publishFrame);
+    desktopSceneRuntime.publishFrame = 0;
+    desktopSceneRuntime.channel?.close?.();
+    revokeLocalObjectUrls();
+  }, { once: true });
   window.addEventListener('pageshow', () => scheduleUserPlaylistsRefresh(160), { passive: true });
   window.addEventListener('resize', () => {
     syncPlaybackCardPanelState();
@@ -20051,10 +22604,20 @@ function bindEvents() {
   }, { passive: true });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
+      if (!els.audio.paused && !!els.audio.src) flushCommunityListeningStats();
+      else state.community.listeningStatsLastAt = performance.now();
+      saveCommunityListeningStats();
+      clearBackgroundPolling();
       state.renderClarity.lastFrameAt = 0;
       stopCommunityEventStream(false);
+      clearGoogleObrRecovery();
       return;
     }
+    state.community.listeningStatsLastAt = performance.now();
+    state.community.listeningStatsPlaying = !els.audio.paused && !!els.audio.src;
+    startBackgroundPolling();
+    ensureCommunityEventStream();
+    if (state.obrSpatialAudio.requested && !state.obrSpatialAudio.enabled) scheduleGoogleObrRecovery();
     resetRenderClaritySampling(renderClaritySceneKey(), 30);
     refreshPlayerState().catch(() => {});
     refreshVisualBridge();
@@ -20062,7 +22625,6 @@ function bindEvents() {
     refreshLoginStatus();
     scheduleUserPlaylistsRefresh(160);
     scheduleCommunityRefresh(220);
-    ensureCommunityEventStream();
   });
   document.addEventListener('fullscreenchange', () => {
     if (!document.fullscreenElement && state.appWindowFullscreen) {
@@ -20118,22 +22680,31 @@ function bindEvents() {
   });
   els.audio.addEventListener('play', () => {
     ensureAudioAnalysis();
-    state.community.lastListenReportAt = performance.now();
+    const nowMs = performance.now();
+    state.community.lastListenReportAt = nowMs;
+    state.community.listeningStatsLastAt = nowMs;
+    state.community.listeningStatsPlaying = true;
+    recordCommunityListeningStats(0, state.currentSong);
     updatePlayState();
     requestOrbFrame();
   });
   els.audio.addEventListener('pause', () => {
+    flushCommunityListeningStats();
     reportCommunityListening(true).catch(() => {});
     state.audioAnalysis.live = false;
     applyBridgeVisual();
     updatePlayState();
   });
   els.audio.addEventListener('ended', () => {
+    flushCommunityListeningStats();
     reportCommunityListening(true).catch(() => {});
     transport('/api/player/next');
   });
   els.audio.addEventListener('error', () => {
     const extension = isLocalSong(state.currentSong) ? localAudioExtension(state.currentSong.fileName) : '';
+    if (!extension && state.community.activeSession && !state.community.listenRecoveryActive) {
+      window.setTimeout(() => skipUnavailableCommunitySong('当前音频源格式不受支持').catch(() => {}), 0);
+    }
     toast(extension
       ? `当前播放引擎无法解码 ${extension.toUpperCase()} 音频`
       : '本地客户端无法播放当前音频源');
@@ -20167,6 +22738,11 @@ function updateStageZoom(deltaY) {
 function bindOrbEvents() {
   els.stage.addEventListener('pointerdown', (event) => {
     if (event.button !== 0) return;
+    if (state.playbackPage && beginTextPresetGesture(event)) {
+      captureStagePointer(event.pointerId);
+      event.preventDefault();
+      return;
+    }
     if (state.playbackPage && beginChladniTextGesture(event)) {
       captureStagePointer(event.pointerId);
       event.preventDefault();
@@ -20217,6 +22793,13 @@ function bindOrbEvents() {
     state.orb.mouseY = state.playbackVisual.mouseY;
     state.orb.mouseActive = true;
     state.orb.lastMouseAt = performance.now();
+    if (moveTextPresetGesture(event)) {
+      event.preventDefault();
+      return;
+    }
+    if (!state.textPresetGesture.dragging && els.stage) {
+      els.stage.classList.toggle('is-text-preset-hover', textPresetPointInside(event, 2));
+    }
     if (moveChladniTextGesture(event)) {
       event.preventDefault();
       return;
@@ -20257,6 +22840,10 @@ function bindOrbEvents() {
   });
 
   const endDrag = (event) => {
+    if (endTextPresetGesture(event)) {
+      releaseStagePointer(event.pointerId);
+      return;
+    }
     if (endChladniTextGesture(event)) {
       releaseStagePointer(event.pointerId);
       return;
@@ -20295,6 +22882,7 @@ function bindOrbEvents() {
   els.stage.addEventListener('pointercancel', endDrag);
   els.stage.addEventListener('pointerleave', () => {
     if (!state.orb.dragging) state.orb.mouseActive = false;
+    if (!state.textPresetGesture.dragging) els.stage.classList.remove('is-text-preset-hover');
   }, { passive: true });
   els.stage.addEventListener('pointerup', (event) => {
     if (event.button !== 2 || !state.shelfHiddenByUser) return;
@@ -20312,6 +22900,10 @@ function bindOrbEvents() {
   });
   els.stage.addEventListener('dblclick', (event) => {
     if (!state.playbackPage || event.button !== 0) return;
+    if (resetTextPresetTransform(event)) {
+      event.preventDefault();
+      return;
+    }
     if (state.textPreset === 'book-effect' && state.diyPreset !== 'book') {
       if (!isBookEffectTextPointInside(event, 28)) resetBookEffectTextTransform();
       event.preventDefault();
@@ -20321,6 +22913,10 @@ function bindOrbEvents() {
   });
   els.stage.addEventListener('wheel', (event) => {
     if (event.target.closest('.playlist-song-page, .playlist-shelf, .orb-playlists, button, input, textarea, select')) return;
+    if (scaleTextPresetFromWheel(event)) {
+      event.preventDefault();
+      return;
+    }
     if (scaleChladniTextFromWheel(event)) {
       event.preventDefault();
       return;
@@ -20521,9 +23117,11 @@ function coverParticleNoise(x, y, salt = 0) {
 
 function buildCoverParticleSamples(width, height, dpr) {
   const image = state.coverParticle.image;
-  const sampleSize = reducedMotion ? 192 : MOBILE_RENDER_TARGET ? 224 : 256;
-  const step = 1;
-  const signature = `${state.coverParticle.imageSignature}|${sampleSize}|${step}`;
+  const highDensityDesktop = !reducedMotion && !MOBILE_RENDER_TARGET;
+  const sampleSize = highDensityDesktop ? 512 : reducedMotion ? 192 : 224;
+  const stepX = 1;
+  const stepY = highDensityDesktop ? 2 : 1;
+  const signature = `${state.coverParticle.imageSignature}|${sampleSize}|${stepX}x${stepY}`;
   if (signature === state.coverParticle.sampleSignature && state.coverParticle.particles.length) return;
 
   let data = null;
@@ -20565,8 +23163,8 @@ function buildCoverParticleSamples(width, height, dpr) {
       }
     : null;
   let index = 0;
-  for (let y = 0; y < sampleSize; y += step) {
-    for (let x = 0; x < sampleSize; x += step) {
+  for (let y = 0; y < sampleSize; y += stepY) {
+    for (let x = 0; x < sampleSize; x += stepX) {
       const nx = (x / (sampleSize - 1)) * 2 - 1;
       const ny = (y / (sampleSize - 1)) * 2 - 1;
       const radius = clamp(Math.hypot(nx, ny) / Math.SQRT2, 0, 1);
@@ -20670,6 +23268,8 @@ function coverParticleGpuMaterial(THREE) {
       uBass: { value: 0 },
       uEnergy: { value: 0 },
       uBeat: { value: 0 },
+      uShockProgress: { value: 1 },
+      uShockStrength: { value: 0 },
       uAudioActive: { value: 0 },
       uYawCos: { value: 1 },
       uYawSin: { value: 0 },
@@ -20699,6 +23299,8 @@ function coverParticleGpuMaterial(THREE) {
       uniform float uBass;
       uniform float uEnergy;
       uniform float uBeat;
+      uniform float uShockProgress;
+      uniform float uShockStrength;
       uniform float uAudioActive;
       uniform float uYawCos;
       uniform float uYawSin;
@@ -20719,11 +23321,12 @@ function coverParticleGpuMaterial(THREE) {
 
       void main() {
         float relief = clamp((position.z + 0.04) / 0.14, 0.0, 1.0);
-        float sheetTime = uTime * (0.68 + uBass * 0.54 + uBeat * 0.12);
+        float sheetTime = uTime;
+        float particleRadius = length(position.xy);
         float waveA = sin(sheetTime + aWavePhase);
         float waveB = sin(sheetTime * 0.73 + aWavePhase * 1.31 + position.x * 5.2);
         float waveC = sin(sheetTime * 1.17 - aWavePhase * 0.89 + position.y * 6.6);
-        float radialWave = sin(length(position.xy) * 14.0 - sheetTime * 1.28 + aWavePhase * 0.18);
+        float radialWave = sin(particleRadius * 14.0 - sheetTime * 1.28 + aWavePhase * 0.18);
         float lowDrive = clamp(uBass * 0.82 + uEnergy * 0.22, 0.0, 1.25);
         float baseNaturalWave = waveA * 0.42 + waveB * 0.28 + waveC * 0.20 + radialWave * 0.10;
         float segmentProgress = clamp((position.x + 0.64) / 1.28, 0.0, 1.0);
@@ -20735,10 +23338,37 @@ function coverParticleGpuMaterial(THREE) {
         float naturalWave = mix(baseNaturalWave, lowFrequencyWave, lowSegmentMix);
         float beatDrive = clamp(uBeat, 0.0, 1.4);
         float waveDepth = uAudioActive * naturalWave * (0.010 + lowDrive * 0.014 + beatDrive * 0.004) * aWaveStrength * uMotionScale;
-        float motionAmount = abs(waveDepth) * 8.0;
+        float macroWave = sin(
+          segmentProgress * 6.28318530718 * ${COVER_PARTICLE_MACRO_WAVE_SEGMENTS}.0
+            + position.y * 1.55
+            - sheetTime * 0.42
+        );
+        float macroWaveDepth = uAudioActive * macroWave * lowDrive
+          * (0.018 + beatDrive * 0.006) * aWaveStrength * uMotionScale;
+        float shockDepth = 0.0;
+        if (uShockStrength > 0.001) {
+          float normalizedRadius = particleRadius * 1.104854346;
+          float shockRadius = mix(0.02, 1.04, uShockProgress);
+          float shockRing = 1.0 - smoothstep(
+            0.028,
+            0.10,
+            abs(normalizedRadius - shockRadius)
+          );
+          float shockFade = 1.0 - smoothstep(0.0, 1.0, uShockProgress);
+          shockDepth = uAudioActive * shockRing * shockFade
+            * uShockStrength * 0.028 * uMotionScale;
+        }
+        float dynamicDepth = clamp(waveDepth + macroWaveDepth + shockDepth, -0.070, 0.070);
+        float backLayer = 1.0 - smoothstep(0.22, 0.34, relief);
+        float frontLayer = smoothstep(0.66, 0.78, relief);
+        float depthLayer = frontLayer - backLayer;
+        float depthLayerMotion = uAudioActive * min(uMotionScale, 1.0);
+        float depthLayerOffset = depthLayer * 0.018 * depthLayerMotion;
+        float depthLayerScale = 1.0 + depthLayer * 0.09 * depthLayerMotion;
+        float motionAmount = abs(dynamicDepth) * 8.0;
         float lateralWave = uAudioActive * naturalWave * (0.12 + lowDrive * 0.08) * uMotionScale;
         vec3 source = vec3(position.xy, position.z * uAudioActive)
-          + vec3(aDrift * lateralWave, waveDepth);
+          + vec3(aDrift * lateralWave, depthLayerOffset + dynamicDepth);
 
         float rotatedX = source.x * uYawCos + source.z * uYawSin;
         float rotatedZ = -source.x * uYawSin + source.z * uYawCos;
@@ -20761,14 +23391,19 @@ function coverParticleGpuMaterial(THREE) {
         float depth = clamp((pointZ + 0.9) / 1.8, 0.0, 1.0);
         gl_PointSize = max(
           uMinPointSize,
-          uCoverPixelSize * aSize * (1.0 + motionAmount * 0.08 + interaction * 0.08 + uBass * 0.012) * perspective
+          uCoverPixelSize * aSize * depthLayerScale
+            * (1.0 + motionAmount * 0.08 + interaction * 0.08 + uBass * 0.012)
+            * perspective
         );
         vec2 clip = vec2(point.x / uResolution.x * 2.0 - 1.0, 1.0 - point.y / uResolution.y * 2.0);
         float clipDepth = clamp(-pointZ * 0.72, -0.94, 0.94);
         gl_Position = vec4(clip, clipDepth, 1.0);
 
         vColor = aColor;
-        vAlpha = clamp((0.86 + depth * 0.12 + motionAmount * 0.03 + interaction * 0.08 + uEnergy * 0.035) * aAlpha, 0.52, 1.0);
+        vAlpha = clamp((
+          0.86 + depth * 0.12 + depthLayer * 0.04 * depthLayerMotion
+            + motionAmount * 0.03 + interaction * 0.08 + uEnergy * 0.035
+        ) * aAlpha, 0.52, 1.0);
         vBump = motionAmount;
         vInteraction = interaction;
         vRelief = relief;
@@ -20901,7 +23536,18 @@ function coverParticlePointSize(coverSize, particleCount) {
   return coverSize / Math.max(1, Math.sqrt(Math.max(1, particleCount)));
 }
 
-function drawCoverParticleSceneGpu(frame, width, height, dpr, now, t, audioActive, wholePulse) {
+function drawCoverParticleSceneGpu(
+  frame,
+  width,
+  height,
+  dpr,
+  now,
+  waveTime,
+  audioActive,
+  wholePulse,
+  shockProgress,
+  shockStrength
+) {
   if (!ensureCoverParticleGpu(frame) || !rebuildCoverParticleGpuGeometry()) return false;
   const cover = state.coverParticle;
   const renderer = cover.gpuRenderer;
@@ -20924,10 +23570,12 @@ function drawCoverParticleSceneGpu(frame, width, height, dpr, now, t, audioActiv
   uniforms.uResolution.value.set(width, height);
   uniforms.uCenter.value.set(width * 0.5, height * (0.48 - wholePulse * 0.008));
   uniforms.uMouse.value.set(state.playbackVisual.mouseX * width, state.playbackVisual.mouseY * height);
-  uniforms.uTime.value = t;
+  uniforms.uTime.value = waveTime;
   uniforms.uBass.value = audioActive ? cover.bass : 0;
   uniforms.uEnergy.value = audioActive ? cover.energy : 0;
   uniforms.uBeat.value = audioActive ? cover.beat : 0;
+  uniforms.uShockProgress.value = shockProgress;
+  uniforms.uShockStrength.value = shockStrength;
   uniforms.uAudioActive.value = audioActive ? 1 : 0;
   uniforms.uYawCos.value = Math.cos(coverYaw);
   uniforms.uYawSin.value = Math.sin(coverYaw);
@@ -20960,7 +23608,6 @@ function drawCoverParticleScene(width, height, dpr) {
     Math.max(reducedMotion ? 14000 : 76000, Math.floor(particles.length * (state.playbackVisual.quality || 1)))
   );
   const now = performance.now();
-  const t = now / 1000;
   const audioActive = isPlaybackClockRunning();
   const audioBass = audioActive
     ? clamp(Math.max(Number(state.visual.lowFrequencyAmplitude) || 0, state.visual.bass || 0), 0, 1.25)
@@ -20971,17 +23618,67 @@ function drawCoverParticleScene(width, height, dpr) {
   const audioBeat = audioActive ? clamp(Number(state.visual.beat) || 0, 0, 1.4) : 0;
   const frameStep = state.playbackVisual.frameStep || 1;
   const envelopeStepMs = Math.max(1, frameStep * RENDER_PROFILE.targetFrameMs);
+  const envelopeStepSeconds = envelopeStepMs / 1000;
   const bassRate = 1 - Math.exp(-envelopeStepMs / (audioBass > cover.bass ? 60 : 340));
   const energyRate = 1 - Math.exp(-envelopeStepMs / (audioEnergy > cover.energy ? 85 : 380));
   const beatRate = 1 - Math.exp(-envelopeStepMs / (audioBeat > cover.beat ? 50 : 320));
   cover.bass += (audioBass - cover.bass) * bassRate;
   cover.energy += (audioEnergy - cover.energy) * energyRate;
   cover.beat += (audioBeat - cover.beat) * beatRate;
+  if (audioActive) {
+    cover.waveTime += envelopeStepSeconds * (0.68 + cover.bass * 0.54 + cover.beat * 0.12);
+    const bassRise = Math.max(0, audioBass - cover.lastBassInput);
+    const fluxDrive = clamp(Number(state.visual.fluxPulse) || 0, 0, 1.4);
+    const shockDrive = clamp(Math.max(audioBeat, fluxDrive * 1.35, bassRise * 2.4), 0, 1.2);
+    const shockRise = shockDrive - cover.lastShockDrive;
+    cover.shockCooldown = Math.max(0, cover.shockCooldown - envelopeStepSeconds);
+    if (shockDrive < 0.12) cover.shockArmed = true;
+    if (!reducedMotion
+        && cover.shockArmed
+        && cover.shockCooldown <= 0
+        && shockDrive > 0.22
+        && shockRise > 0.035) {
+      cover.shockAge = 0;
+      cover.shockStrength = Math.max(cover.shockStrength, shockDrive);
+      cover.shockCooldown = 0.16;
+      cover.shockArmed = false;
+    }
+    cover.shockAge = Math.min(
+      COVER_PARTICLE_SHOCK_DURATION_SECONDS,
+      cover.shockAge + envelopeStepSeconds
+    );
+    if (cover.shockAge >= COVER_PARTICLE_SHOCK_DURATION_SECONDS) {
+      cover.shockStrength = 0;
+    } else {
+      cover.shockStrength *= Math.exp(-envelopeStepSeconds / 0.32);
+    }
+    cover.lastShockDrive = shockDrive;
+    cover.lastBassInput = audioBass;
+  } else {
+    resetCoverParticleShock();
+  }
+  const shockProgress = clamp(
+    cover.shockAge / COVER_PARTICLE_SHOCK_DURATION_SECONDS,
+    0,
+    1
+  );
+  const shockStrength = audioActive && !reducedMotion ? cover.shockStrength : 0;
   const wholePulse = audioActive
     ? clamp(Math.pow(cover.bass, 1.1) * 0.88 + cover.beat * 0.12, 0, 1.15)
     : 0;
 
-  if (drawCoverParticleSceneGpu(frame, width, height, dpr, now, t, audioActive, wholePulse)) return;
+  if (drawCoverParticleSceneGpu(
+    frame,
+    width,
+    height,
+    dpr,
+    now,
+    cover.waveTime,
+    audioActive,
+    wholePulse,
+    shockProgress,
+    shockStrength
+  )) return;
 
   const context = frame.canvas.getContext('2d');
   if (!context) return;
@@ -21007,7 +23704,7 @@ function drawCoverParticleScene(width, height, dpr) {
   const mouseLimit = 132 * dpr;
   const mouseLimitSq = mouseLimit * mouseLimit;
   const mousePullBase = (16 + cover.energy * 28) * dpr;
-  const sheetTime = t * (0.68 + bass * 0.54 + beat * 0.12);
+  const sheetTime = cover.waveTime;
   const drawAllParticles = particleLimit >= particles.length;
   const sampleScale = drawAllParticles ? 1 : particles.length / particleLimit;
 
@@ -21031,7 +23728,8 @@ function drawCoverParticleScene(width, height, dpr) {
     const waveA = Math.sin(sheetTime + particle.wavePhase);
     const waveB = Math.sin(sheetTime * 0.73 + particle.wavePhase * 1.31 + particle.x * 5.2);
     const waveC = Math.sin(sheetTime * 1.17 - particle.wavePhase * 0.89 + particle.y * 6.6);
-    const radialWave = Math.sin(Math.hypot(particle.x, particle.y) * 14 - sheetTime * 1.28 + particle.wavePhase * 0.18);
+    const particleRadius = Math.hypot(particle.x, particle.y);
+    const radialWave = Math.sin(particleRadius * 14 - sheetTime * 1.28 + particle.wavePhase * 0.18);
     const lowDrive = clamp(bass * 0.82 + energy * 0.22, 0, 1.25);
     const baseNaturalWave = waveA * 0.42 + waveB * 0.28 + waveC * 0.2 + radialWave * 0.1;
     const segmentProgress = clamp((particle.x + 0.64) / 1.28, 0, 1);
@@ -21047,12 +23745,41 @@ function drawCoverParticleScene(width, height, dpr) {
     const naturalWave = baseNaturalWave * (1 - lowSegmentMix) + lowFrequencyWave * lowSegmentMix;
     const audioGate = audioActive ? 1 : 0;
     const waveDepth = audioGate * naturalWave * (0.01 + lowDrive * 0.014 + beat * 0.004) * particle.waveStrength * motionScale;
-    const motionAmount = Math.abs(waveDepth) * 8;
+    const macroWave = Math.sin(
+      segmentProgress * Math.PI * 2 * COVER_PARTICLE_MACRO_WAVE_SEGMENTS
+        + particle.y * 1.55
+        - sheetTime * 0.42
+    );
+    const macroWaveDepth = audioGate * macroWave * lowDrive
+      * (0.018 + beat * 0.006) * particle.waveStrength * motionScale;
+    let shockDepth = 0;
+    if (shockStrength > 0.001) {
+      const normalizedRadius = particleRadius * 1.104854346;
+      const shockRadius = 0.02 + (1.04 - 0.02) * shockProgress;
+      const shockRing = 1 - smoothstep(
+        0.028,
+        0.1,
+        Math.abs(normalizedRadius - shockRadius)
+      );
+      const shockFade = 1 - smoothstep(0, 1, shockProgress);
+      shockDepth = audioGate * shockRing * shockFade
+        * shockStrength * 0.028 * motionScale;
+    }
+    const dynamicDepth = clamp(waveDepth + macroWaveDepth + shockDepth, -0.07, 0.07);
+    const relief = clamp((particle.z + 0.04) / 0.14, 0, 1);
+    const backLayer = 1 - smoothstep(0.22, 0.34, relief);
+    const frontLayer = smoothstep(0.66, 0.78, relief);
+    const depthLayer = frontLayer - backLayer;
+    const depthLayerMotion = audioGate * Math.min(motionScale, 1);
+    const depthLayerOffset = depthLayer * 0.018 * depthLayerMotion;
+    const depthLayerScale = 1 + depthLayer * 0.09 * depthLayerMotion;
+    const motionAmount = Math.abs(dynamicDepth) * 8;
     const lateralWave = audioGate * naturalWave * (0.12 + lowDrive * 0.08) * motionScale;
     const sourceX = particle.x + particle.bumpDriftX * lateralWave;
     const sourceY = particle.y + particle.bumpDriftY * lateralWave;
     const sourceZ = particle.z * (audioActive ? 1 : 0)
-      + waveDepth;
+      + depthLayerOffset
+      + dynamicDepth;
     const rotatedX = sourceX * yawCos + sourceZ * yawSin;
     const rotatedZ = -sourceX * yawSin + sourceZ * yawCos;
     const rotatedY = sourceY * pitchCos - rotatedZ * pitchSin;
@@ -21077,10 +23804,15 @@ function drawCoverParticleScene(width, height, dpr) {
     let depth = (pointZ + 0.9) / 1.8;
     if (depth < 0) depth = 0;
     else if (depth > 1) depth = 1;
-    let size = coverPixelSize * particle.size * (1 + motionAmount * 0.08 + interaction * 0.08 + bass * 0.012) * perspective;
+    let size = coverPixelSize * particle.size * depthLayerScale
+      * (1 + motionAmount * 0.08 + interaction * 0.08 + bass * 0.012)
+      * perspective;
     const minSize = 0.42 * dpr;
     if (size < minSize) size = minSize;
-    let alpha = (0.86 + depth * 0.12 + motionAmount * 0.03 + interaction * 0.08 + energy * 0.035) * particle.alpha;
+    let alpha = (
+      0.86 + depth * 0.12 + depthLayer * 0.04 * depthLayerMotion
+        + motionAmount * 0.03 + interaction * 0.08 + energy * 0.035
+    ) * particle.alpha;
     if (alpha < 0.52) alpha = 0.52;
     else if (alpha > 1) alpha = 1;
     if (mouseActive) {
@@ -21101,23 +23833,13 @@ function drawCoverParticleScene(width, height, dpr) {
 }
 
 function updatePlaybackQuality(visual) {
-  const now = performance.now();
-  if (visual.lastFrameTime) {
-    const frameMs = now - visual.lastFrameTime;
-    if (frameMs > RENDER_PROFILE.targetFrameMs) visual.quality = Math.max(RENDER_PROFILE.playbackQualityMin, visual.quality - 0.035);
-    else if (frameMs < 18) visual.quality = Math.min(RENDER_PROFILE.playbackQualityMax, visual.quality + 0.01);
-  }
-  visual.lastFrameTime = now;
+  visual.quality = RENDER_PROFILE.playbackQualityMax;
+  visual.lastFrameTime = performance.now();
 }
 
 function updateOrbQuality() {
-  const now = performance.now();
-  if (state.orb.lastFrameTime) {
-    const frameMs = now - state.orb.lastFrameTime;
-    if (frameMs > RENDER_PROFILE.targetFrameMs) state.orb.quality = Math.max(RENDER_PROFILE.orbQualityMin, state.orb.quality - 0.05);
-    else if (frameMs < 18) state.orb.quality = Math.min(RENDER_PROFILE.orbQualityMax, state.orb.quality + 0.01);
-  }
-  state.orb.lastFrameTime = now;
+  state.orb.quality = RENDER_PROFILE.orbQualityMax;
+  state.orb.lastFrameTime = performance.now();
 }
 
 function updateOrbMotion() {
@@ -21140,14 +23862,18 @@ function updateOrbMotion() {
 function updatePlaybackSceneMotion() {
   const visual = state.playbackVisual;
   const now = performance.now();
+  const playbackRunning = isPlaybackClockRunning();
   const simulationStep = playbackPresetsUseNativeRefresh() && visual.lastMotionAt
     ? clamp((now - visual.lastMotionAt) / RENDER_PROFILE.targetFrameMs, 0.05, 2)
     : 1;
   visual.lastMotionAt = now;
   visual.frameStep = simulationStep;
-  const centralLyricsNeedFrame = textLyricsEnabled() && state.textPreset !== 'book';
+  const multiRowLyricsNeedFrame = textLyricsEnabled() && state.multiRowLyricsEnabled;
+  const centralLyricsNeedFrame = textLyricsEnabled()
+    && state.textPreset !== 'book'
+    && !state.multiRowLyricsEnabled;
   const cardLyricsNeedFrame = playbackCardLyricsVisible();
-  if ((centralLyricsNeedFrame || cardLyricsNeedFrame) && state.lyricLines.length) {
+  if ((centralLyricsNeedFrame || multiRowLyricsNeedFrame || cardLyricsNeedFrame) && state.lyricLines.length) {
     syncPlaybackLyricAnimationFrame();
   }
   if (!visual.dragging && !state.orb.reducedMotion) {
@@ -21160,34 +23886,35 @@ function updatePlaybackSceneMotion() {
   visual.pitch = wrapRadians(visual.pitch);
   updatePlaybackSceneTransform();
 
-  const energy = Math.max(state.visual.energy, els.audio.paused ? 0.08 : 0.48);
-  const bass = Math.max(state.visual.bass, els.audio.paused ? 0.06 : 0.38);
-  const lowFrequency = Math.max(Number(state.visual.lowFrequencyAmplitude) || 0, bass);
-  const beat = Math.max(state.visual.beat, els.audio.paused ? 0.04 : 0.32);
-  const targetPulse = els.audio.paused ? 0.08 : clamp(energy * 0.42 + bass * 0.28 + beat * 0.48, 0.08, 1.18);
-  const responseBase = clamp(0.08 * state.lyricSpeed, 0.045, 0.24);
-  const response = 1 - Math.pow(1 - responseBase, simulationStep);
-  visual.lyricPulse += (targetPulse - visual.lyricPulse) * response;
-  const t = now / 1000;
-  const bassJump = els.audio.paused ? 0 : clamp(lowFrequency * 0.95 + beat * 0.58 + visual.lyricPulse * 0.18, 0, 1.45);
-  const bounce = els.audio.paused
-    ? 0
-    : Math.sin(t * (2.2 + state.lyricSpeed * 0.72)) * 2.4 - bassJump * 16;
-  const zoom = clamp(visual.zoom || 1, 0.58, 2.35);
-  const scale = (1 + visual.lyricPulse * 0.026 + bassJump * 0.05) * zoom;
-  const glowSize = Math.round(1 + bassJump * 8);
-  const glowAlpha = clamp(bassJump * 0.42, 0, 0.48);
-  setStylePropertyIfChanged(els.playbackLyricScene, '--lyric-pulse', visual.lyricPulse.toFixed(3));
-  setStylePropertyIfChanged(els.playbackLyricScene, '--lyric-bounce', `${bounce.toFixed(2)}px`);
-  setStylePropertyIfChanged(els.playbackLyricScene, '--lyric-scale', scale.toFixed(3));
-  setStylePropertyIfChanged(els.playbackLyricScene, '--lyric-heart', bassJump.toFixed(3));
-  setStylePropertyIfChanged(els.playbackLyricScene, '--lyric-jump-glow-size', `${glowSize}px`);
-  setStylePropertyIfChanged(els.playbackLyricScene, '--lyric-jump-glow-alpha', glowAlpha.toFixed(3));
-  setStylePropertyIfChanged(
-    els.playbackLyricScene,
-    '--lyric-glow-size',
-    `${Math.round(4 + visual.lyricPulse * 4 + bassJump * 7)}px`
-  );
+  if (centralLyricsNeedFrame) {
+    const energy = Math.max(state.visual.energy, playbackRunning ? 0.48 : 0.08);
+    const bass = Math.max(state.visual.bass, playbackRunning ? 0.38 : 0.06);
+    const lowFrequency = Math.max(Number(state.visual.lowFrequencyAmplitude) || 0, bass);
+    const beat = Math.max(state.visual.beat, playbackRunning ? 0.32 : 0.04);
+    const targetPulse = playbackRunning ? clamp(energy * 0.42 + bass * 0.28 + beat * 0.48, 0.08, 1.18) : 0.08;
+    const responseBase = clamp(0.08 * state.lyricSpeed, 0.045, 0.24);
+    const response = 1 - Math.pow(1 - responseBase, simulationStep);
+    visual.lyricPulse += (targetPulse - visual.lyricPulse) * response;
+    const bassJump = playbackRunning ? clamp(lowFrequency * 0.95 + beat * 0.58 + visual.lyricPulse * 0.18, 0, 1.45) : 0;
+    const bounce = playbackRunning
+      ? Math.sin(now / 1000 * (2.2 + state.lyricSpeed * 0.72)) * 2.4 - bassJump * 16
+      : 0;
+    const zoom = clamp(visual.zoom || 1, 0.58, 2.35);
+    const scale = (1 + visual.lyricPulse * 0.026 + bassJump * 0.05) * zoom;
+    const glowSize = Math.round(1 + bassJump * 8);
+    const glowAlpha = clamp(bassJump * 0.42, 0, 0.48);
+    setStylePropertyIfChanged(els.playbackLyricScene, '--lyric-pulse', visual.lyricPulse.toFixed(3));
+    setStylePropertyIfChanged(els.playbackLyricScene, '--lyric-bounce', `${bounce.toFixed(2)}px`);
+    setStylePropertyIfChanged(els.playbackLyricScene, '--lyric-scale', scale.toFixed(3));
+    setStylePropertyIfChanged(els.playbackLyricScene, '--lyric-heart', bassJump.toFixed(3));
+    setStylePropertyIfChanged(els.playbackLyricScene, '--lyric-jump-glow-size', `${glowSize}px`);
+    setStylePropertyIfChanged(els.playbackLyricScene, '--lyric-jump-glow-alpha', glowAlpha.toFixed(3));
+    setStylePropertyIfChanged(
+      els.playbackLyricScene,
+      '--lyric-glow-size',
+      `${Math.round(4 + visual.lyricPulse * 4 + bassJump * 7)}px`
+    );
+  }
   updateDynamicCubeMotion();
   updateFreeCubeMotion();
   updateVoidPrismMotion();
@@ -21792,25 +24519,46 @@ function drawOrb(now = performance.now()) {
   drawAmbientOrbStreaks(context, width, height, dpr, now);
 
   const particleLimit = Math.max(RENDER_PROFILE.orbParticleFloor, Math.floor(state.particles.length * state.orb.quality));
-  const drawable = state.particles.slice(0, particleLimit).map((p) => {
+  const drawable = state.orb.drawable;
+  while (drawable.length < particleLimit) drawable.push({});
+  drawable.length = particleLimit;
+  for (let index = 0; index < particleLimit; index += 1) {
+    const p = state.particles[index];
+    const projected = drawable[index];
     const wobble = state.orb.reducedMotion ? 0 : Math.sin(t * p.speed + p.phase) * p.drift;
-    const source = {
-      x: p.x + Math.sin(t * 0.42 + p.phase) * p.twist,
-      y: p.y + Math.cos(t * 0.36 + p.phase) * p.twist,
-      z: p.z + wobble
-    };
+    const sourceX = p.x + Math.sin(t * 0.42 + p.phase) * p.twist;
+    const sourceY = p.y + Math.cos(t * 0.36 + p.phase) * p.twist;
+    const sourceZ = p.z + wobble;
     const yaw = state.orb.yaw + p.seed * 0.018 + Math.sin(t * 0.18 + p.phase) * 0.01;
-    const point = rotatePoint(source, yaw, state.orb.pitch + Math.cos(t * 0.14 + p.phase) * 0.012);
-    const perspective = 1.18 / (1.18 - point.z * 0.42);
-    const depth = (point.z + 1) / 2;
-    const trailPoint = rotatePoint(p, yaw - trailYaw, state.orb.pitch - trailPitch);
-    const trailPerspective = 1.18 / (1.18 - trailPoint.z * 0.42);
-    const projectedRadius = Math.hypot(point.x, point.y);
+    const pitch = state.orb.pitch + Math.cos(t * 0.14 + p.phase) * 0.012;
+    const yawCos = Math.cos(yaw);
+    const yawSin = Math.sin(yaw);
+    const pitchCos = Math.cos(pitch);
+    const pitchSin = Math.sin(pitch);
+    const pointX = sourceX * yawCos + sourceZ * yawSin;
+    const yawZ = -sourceX * yawSin + sourceZ * yawCos;
+    const pointY = sourceY * pitchCos - yawZ * pitchSin;
+    const pointZ = sourceY * pitchSin + yawZ * pitchCos;
+    const perspective = 1.18 / (1.18 - pointZ * 0.42);
+    const depth = (pointZ + 1) / 2;
+
+    const trailYawAngle = yaw - trailYaw;
+    const trailPitchAngle = state.orb.pitch - trailPitch;
+    const trailYawCos = Math.cos(trailYawAngle);
+    const trailYawSin = Math.sin(trailYawAngle);
+    const trailPitchCos = Math.cos(trailPitchAngle);
+    const trailPitchSin = Math.sin(trailPitchAngle);
+    const trailPointX = p.x * trailYawCos + p.z * trailYawSin;
+    const trailYawZ = -p.x * trailYawSin + p.z * trailYawCos;
+    const trailPointY = p.y * trailPitchCos - trailYawZ * trailPitchSin;
+    const trailPointZ = p.y * trailPitchSin + trailYawZ * trailPitchCos;
+    const trailPerspective = 1.18 / (1.18 - trailPointZ * 0.42);
+    const projectedRadius = Math.hypot(pointX, pointY);
     const hollow = 0.08 + smoothstep(0.34, 0.82, projectedRadius) * 0.92;
     const rim = smoothstep(0.62, 1.12, projectedRadius);
     const outerFade = 1 - smoothstep(1.34, 1.58, projectedRadius);
-    let x = cx + point.x * radius * perspective;
-    let y = cy + point.y * radius * perspective;
+    let x = cx + pointX * radius * perspective;
+    let y = cy + pointY * radius * perspective;
     let interaction = 0;
     if (mouseActive) {
       const dx = x - mouseX;
@@ -21825,34 +24573,32 @@ function drawOrb(now = performance.now()) {
         y += Math.sin(angle) * push;
       }
     }
-    return {
-      x,
-      y,
-      trailX: cx + trailPoint.x * radius * trailPerspective,
-      trailY: cy + trailPoint.y * radius * trailPerspective,
-      z: point.z,
-      depth,
-      rim,
-      hollow,
-      outerFade,
-      interaction,
-      seed: p.seed,
-      kind: p.kind,
-      shardLength: p.shardLength,
-      shardAngle: p.shardAngle + state.orb.yaw * 0.46,
-      size: (p.size + bass * 0.34 + breath * 0.18) * perspective * dpr,
-      alpha: clamp(
-        p.opacity
-          * (0.24 + depth * 0.66 + rim * 0.42)
-          * hollow
-          * outerFade
-          * (0.9 + Math.sin(t * 1.2 + p.phase) * 0.12)
-          + interaction * 0.34,
-        0,
-        0.98
-      )
-    };
-  });
+    projected.x = x;
+    projected.y = y;
+    projected.trailX = cx + trailPointX * radius * trailPerspective;
+    projected.trailY = cy + trailPointY * radius * trailPerspective;
+    projected.z = pointZ;
+    projected.depth = depth;
+    projected.rim = rim;
+    projected.hollow = hollow;
+    projected.outerFade = outerFade;
+    projected.interaction = interaction;
+    projected.seed = p.seed;
+    projected.kind = p.kind;
+    projected.shardLength = p.shardLength;
+    projected.shardAngle = p.shardAngle + state.orb.yaw * 0.46;
+    projected.size = (p.size + bass * 0.34 + breath * 0.18) * perspective * dpr;
+    projected.alpha = clamp(
+      p.opacity
+        * (0.24 + depth * 0.66 + rim * 0.42)
+        * hollow
+        * outerFade
+        * (0.9 + Math.sin(t * 1.2 + p.phase) * 0.12)
+        + interaction * 0.34,
+      0,
+      0.98
+    );
+  }
 
   context.save();
   context.globalCompositeOperation = 'screen';
@@ -21942,7 +24688,51 @@ function initElasticRangeVisuals() {
   }, { passive: true });
 }
 
+const backgroundPollingTimers = [];
+
+function clearBackgroundPolling() {
+  while (backgroundPollingTimers.length) {
+    window.clearInterval(backgroundPollingTimers.pop());
+  }
+}
+
+function startBackgroundPolling() {
+  clearBackgroundPolling();
+  if (document.hidden) return;
+  const every = (callback, interval) => {
+    backgroundPollingTimers.push(window.setInterval(callback, interval));
+  };
+  every(refreshNativeAudioSample, MOBILE_RENDER_TARGET ? 120 : 50);
+  every(refreshVisualBridge, 1000);
+  every(() => refreshPlayerState().catch(() => {}), 5000);
+  every(refreshUserPlaylists, 30000);
+  every(() => refreshCommunityState(state.activeProvider).catch(() => {}), 15000);
+  every(() => refreshCommunityListenState().catch(() => {}), 5000);
+  every(() => reportCommunityListening(false).catch(() => {}), 5000);
+}
+
+async function initOfficialBrowserLoginMode() {
+  initGlassSurfaces();
+  applyRuntimeDataset();
+  bindEvents();
+  initElasticRangeVisuals();
+  if (els.bootScreen) els.bootScreen.hidden = true;
+  els.loginDialog.hidden = false;
+  els.loginButton.setAttribute('aria-expanded', 'true');
+  if (els.officialBrowserLoginButton) els.officialBrowserLoginButton.hidden = true;
+  setOfficialBrowserLoginStatus('', true);
+
+  await refreshMusicApiProviders({ silent: true });
+  const selected = setActiveProvider(OFFICIAL_BROWSER_LOGIN_PROVIDER, { reloadQr: false });
+  if (selected) await loadLoginQr();
+}
+
 async function init() {
+  if (OFFICIAL_BROWSER_LOGIN_MODE) {
+    await initOfficialBrowserLoginMode();
+    return;
+  }
+  initDesktopSceneBridge();
   initBootScreen();
   initGlassSurfaces();
   initWallpaperAutoSizeObserver();
@@ -21964,6 +24754,9 @@ async function init() {
   applyTextFontPreference();
   syncTextPaletteControls();
   syncPlaybackLyricPaletteControls();
+  syncBilingualLyricsControl();
+  syncMultiRowLyricsControl();
+  syncGoogleObrToggle();
   updateWallpaperDiyVars();
   updateBookLyricTransform();
   updateBookLyricArtist();
@@ -21975,20 +24768,16 @@ async function init() {
   syncSandboxFormPresentation();
   setCommunityCardCollapsed(state.community.cardCollapsed);
   renderCommunityBroadcastButton();
+  renderCommunityListeningStats();
   els.audio.volume = Number(els.volumeRange.value) / 100;
   await Promise.allSettled([refreshClientRuntime(), refreshMusicApiProviders({ silent: true }), refreshPlayerState(), refreshVisualBridge(), refreshNativeAudioSample(), refreshLoginStatus(), refreshUserPlaylists(), refreshSandboxPresets({ silent: true })]);
-  window.setInterval(refreshNativeAudioSample, MOBILE_RENDER_TARGET ? 120 : 50);
-  window.setInterval(refreshVisualBridge, 1000);
-  window.setInterval(() => refreshPlayerState().catch(() => {}), 5000);
-  window.setInterval(refreshUserPlaylists, 30000);
-  window.setInterval(() => refreshCommunityState(state.activeProvider).catch(() => {}), 15000);
-  window.setInterval(() => refreshCommunityListenState().catch(() => {}), 5000);
-  window.setInterval(() => reportCommunityListening(false).catch(() => {}), 5000);
+  finishDesktopSceneInitialization();
+  startBackgroundPolling();
   requestOrbFrame();
 }
 
 function scheduleButtonGlowEnhancement() {
-  if (MOBILE_RENDER_TARGET || reducedMotion || RENDER_PROFILE.tier === 'economy') return;
+  if (OFFICIAL_BROWSER_LOGIN_MODE || MOBILE_RENDER_TARGET || reducedMotion || RENDER_PROFILE.tier === 'economy') return;
   const load = () => import('./border-glow-buttons.js?v=20260712-ui-performance-audit').catch(() => {});
   if ('requestIdleCallback' in window) {
     window.requestIdleCallback(load, { timeout: 2400 });

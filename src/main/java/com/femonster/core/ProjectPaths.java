@@ -14,7 +14,10 @@ public final class ProjectPaths {
     }
 
     public static ProjectPaths detect() {
-        Path root = Path.of("").toAbsolutePath().normalize();
+        String rootOverride = System.getenv("FE_MONSTER_ROOT");
+        Path root = rootOverride == null || rootOverride.isBlank()
+            ? Path.of("").toAbsolutePath().normalize()
+            : Path.of(rootOverride).toAbsolutePath().normalize();
         String webOverride = System.getenv("FE_MONSTER_WEB_ROOT");
         Path webRoot = webOverride == null || webOverride.isBlank()
             ? root.resolve("web")

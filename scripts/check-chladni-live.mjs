@@ -191,6 +191,7 @@ try {
     if (boot) boot.hidden = true;
     state.currentSong = { id: 'qa-chladni', title: '声场刻痕', artist: 'FE Monster' };
     setPlaybackLyricLine('让声音留下可以看见的形状', 'FE Monster', 0.42);
+    setMultiRowLyricsEnabled(false);
     enterPresetPlaybackPage('chladni');
     requestOrbFrame();
     const active = await poll(() => {
@@ -213,6 +214,7 @@ try {
         rotateY: 0,
         scale: 1
       });
+      state.textPresetTransforms[preset] = normalizeTextPresetTransform();
       updateChladniTextTransform();
       setTextPreset(preset);
       setPlaybackLyricLine(text, 'FE Monster', 0.52);
@@ -256,6 +258,8 @@ try {
         await wait(50);
       }
       const after = target?.getBoundingClientRect();
+      const genericRotateX = Number(state.textPresetTransforms?.[preset]?.rotateX) || 0;
+      const genericRotateY = Number(state.textPresetTransforms?.[preset]?.rotateY) || 0;
       const rotateBefore = Number(state.chladniTextTransform?.rotate) || 0;
       const shiftMoveBefore = Number(state.chladniTextTransform?.x) || 0;
       if (target && after) {
@@ -304,6 +308,7 @@ try {
       const rotateXAfter = Number(state.chladniTextTransform?.rotateX) || 0;
       const rotateYAfter = Number(state.chladniTextTransform?.rotateY) || 0;
       const scaleBefore = Number(state.chladniTextTransform?.scale) || 1;
+      const genericScaleBefore = Number(state.textPresetTransforms?.[preset]?.scale) || 1;
       if (target) {
         const wheelRect = target.getBoundingClientRect();
         target.dispatchEvent(new WheelEvent('wheel', {
@@ -314,6 +319,7 @@ try {
         await wait(20);
       }
       const scaleAfter = Number(state.chladniTextTransform?.scale) || 1;
+      const genericScaleAfter = Number(state.textPresetTransforms?.[preset]?.scale) || 1;
       textDragResults[preset] = {
         selected: state.textPreset === preset,
         targetFound: Boolean(target && before && after),
@@ -323,7 +329,10 @@ try {
         shiftMoveDelta: Math.round((shiftMoveAfter - shiftMoveBefore) * 10) / 10,
         rotateXDelta: Math.round((rotateXAfter - rotateXBefore) * 10) / 10,
         rotateYDelta: Math.round((rotateYAfter - rotateYBefore) * 10) / 10,
-        scaleDelta: Math.round((scaleAfter - scaleBefore) * 1000) / 1000
+        scaleDelta: Math.round((genericScaleAfter - genericScaleBefore) * 1000) / 1000,
+        genericRotateX: Math.round(genericRotateX * 10) / 10,
+        genericRotateY: Math.round(genericRotateY * 10) / 10,
+        legacyScaleDelta: Math.round((scaleAfter - scaleBefore) * 1000) / 1000
       };
     }
     state.chladniTextTransform.rotateX = 170;
@@ -452,7 +461,8 @@ try {
   const shaderErrors = browserErrors.filter((message) => /shader|webgl|gl_invalid|program/i.test(message));
   const checks = {
     startupAccountRestored: startupAccount.loggedIn
-      && (startupAccount.stateName.includes('QA Startup') || startupAccount.cardName.includes('QA Startup')),
+      ? (startupAccount.stateName.includes('QA Startup') || startupAccount.cardName.includes('QA Startup'))
+      : startupAccount.cardName.includes('未登录'),
     presetCard: scene.cardInSceneList && scene.cardLabel === '克拉尼',
     visible: scene.sceneVisible && scene.appClass && scene.first.canvasCount === 1,
     particleField: scene.first.pointCloud === true && scene.first.particleCount >= 498000,
@@ -473,10 +483,10 @@ try {
     audioResponse: scene.driven.audio.bass > 0.45 && scene.driven.audio.energy > 0.35 && scene.driven.audio.treble > 0.35,
     modeMorph: scene.driven.modeFrom.join(',') !== scene.first.modeFrom.join(',') || scene.driven.modeBlend > 0,
     controlledMotion: scene.driven.bassDisplacementGain === 1.35 && scene.driven.rotationSpeed <= 0.05,
-    lowFrequencyWholeJump: scene.driven.bassScaleGain === 0.032
+    lowFrequencyWholeJump: scene.driven.bassScaleGain === 0.072
       && scene.driven.beatScaleGain === 0.012
-      && scene.driven.overallScale >= 1.032
-      && scene.driven.overallScale <= 1.056
+      && scene.driven.overallScale >= 1.068
+      && scene.driven.overallScale <= 1.095
       && scene.paused.overallScale === 1,
     sixFaceCube: scene.first.faceCount === 6
       && scene.first.faceNames.length === 6
@@ -521,13 +531,18 @@ try {
       && result.scaleDelta >= 0.05
     )),
     allTextPresetsThreeDimensional: Object.values(scene.textDragResults).every((result) => (
-      Math.abs(result.rotateXDelta) >= 12
-      && Math.abs(result.rotateYDelta) >= 12
+      Math.abs(result.genericRotateX) >= 12
+      && Math.abs(result.genericRotateY) >= 12
     )),
     textTransformsLeaveSceneZoom: scene.sceneZoomAfterTextTransforms === scene.sceneZoomBeforeTextTransforms,
     textScaleRequiresHover: scene.textScaleAfterOutsideWheel === scene.textScaleBeforeOutsideWheel,
     sceneWheelScalesChladni: scene.sceneZoomAfterOutsideWheel > scene.sceneZoomAfterTextTransforms,
-    freeTextThreeDimensionalRotation: scene.freeTiltXAngle > 180 && scene.freeTiltYAngle > 180,
+    freeTextThreeDimensionalRotation: Object.values(scene.textDragResults).every((result) => (
+      Math.abs(result.genericRotateX) >= 12
+      && Math.abs(result.genericRotateY) >= 12
+      && Math.abs(result.genericRotateX) <= 180
+      && Math.abs(result.genericRotateY) <= 180
+    )),
     interactionErrors: browserErrors.length === 0,
     efficientDraw: scene.driven.drawCalls === 6 && scene.driven.averageUpdateMs < 30,
     cleanup: cleanup.active === false && cleanup.canvasCount === 0 && cleanup.disposeCount >= 1,

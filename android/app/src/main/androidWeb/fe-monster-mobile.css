@@ -119,6 +119,7 @@ html[data-fe-platform="android"] .android-login-workflow[hidden] {
   display: none !important;
 }
 
+html[data-fe-platform="android"][data-fe-runtime="local"] .community-rail-button,
 html[data-fe-platform="android"][data-fe-runtime="local"] .community-card,
 html[data-fe-platform="android"][data-fe-runtime="local"] .community-message-dialog,
 html[data-fe-platform="android"][data-fe-runtime="local"] .community-profile-dialog,

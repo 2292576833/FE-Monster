@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import http from "node:http";
 import net from "node:net";
 import os from "node:os";
@@ -468,11 +468,82 @@ try {
   const jarPath = await latestJar();
   const javaPath = javaExecutable();
   assert(javaPath, "Java runtime not found; set FE_TEST_JAVA or FE_JAVA_HOME");
+  const appSource = await readFile(path.join(workspaceRoot, "web", "app.js"), "utf8");
+  const indexSource = await readFile(path.join(workspaceRoot, "web", "index.html"), "utf8");
+  const providerDefaults = appSource.match(/const MUSIC_PROVIDERS = \{([\s\S]*?)\n\};\nconst ANDROID_MUSIC_APP_URIS/)?.[1] || "";
+  assert((providerDefaults.match(/enabled:\s*false/g) || []).length === 4, "All four web provider defaults must start disabled");
+  assert((providerDefaults.match(/configured:\s*false/g) || []).length === 4, "All four web provider defaults must start unconfigured");
+  assert(
+    /return info\.enabled === true && info\.configured === true;/.test(appSource),
+    "Web provider gate is not fail-closed",
+  );
+  assert(
+    /<div class="login-provider-tabs" id="loginProviderTabs"[^>]*><\/div>/.test(indexSource),
+    "Login platform tabs must start empty before plugin inventory loads",
+  );
+  assert(
+    /Object\.values\(state\.providers\)[\s\S]*providerConfigured\(provider\.id\)/.test(appSource)
+      && /tab\.dataset\.loginProvider = provider\.id/.test(appSource),
+    "Login platform tabs are not generated from the imported plugin inventory",
+  );
+  assert(
+    !/qishuiPhone|qishuiGuest|\/login\/phone\//.test(`${indexSource}\n${appSource}`),
+    "Phone or guest login controls remain in the web client",
+  );
+  assert(indexSource.includes('id="qrLoginStage"'), "QR login stage is missing");
+  assert(indexSource.includes("导入 API 插件"), "Login panel does not expose the API plugin import action");
+  passed("fail-closed QR-only dynamic plugin login UI");
 
   tempRoot = await mkdtemp(path.join(os.tmpdir(), "fe-monster-music-api-import-"));
   const dataDir = path.join(tempRoot, "isolated-data");
+  const musicApiDir = path.join(dataDir, "music-api");
+  const providersFile = path.join(musicApiDir, "providers.json");
   const qishuiRequests = [];
   const neteaseRequests = [];
+
+  await mkdir(musicApiDir, { recursive: true });
+  await writeFile(providersFile, JSON.stringify({
+    schema: "fe-monster.music-apis/v1",
+    version: 1,
+    providers: [
+      {
+        id: "netease",
+        enabled: true,
+        configured: true,
+        autostart: true,
+        loginQr: true,
+        source: "builtin",
+        baseUrl: "http://127.0.0.1:3010",
+      },
+      {
+        id: "qq",
+        enabled: true,
+        configured: true,
+        autostart: true,
+        loginQr: true,
+        source: "builtin",
+        baseUrl: "http://127.0.0.1:3011",
+      },
+      {
+        id: "kugou",
+        enabled: true,
+        configured: true,
+        autostart: true,
+        loginQr: true,
+        source: "builtin",
+        baseUrl: "http://127.0.0.1:3012",
+      },
+      {
+        id: "qishui",
+        enabled: true,
+        configured: false,
+        autostart: false,
+        loginQr: false,
+        source: "builtin-slot",
+        baseUrl: "http://127.0.0.1:3013",
+      },
+    ],
+  }), "utf8");
 
   qishuiServer = createQishuiMock(qishuiRequests);
   const qishuiPort = await listen(qishuiServer);
@@ -508,7 +579,50 @@ try {
   const initialApis = await requestJson(baseUrl, "/api/music-apis");
   assert(initialApis.status === 200, `GET /api/music-apis returned HTTP ${initialApis.status}`, initialApis.text);
   assert(initialApis.payload && typeof initialApis.payload === "object", "GET /api/music-apis did not return JSON", initialApis.text);
-  passed("music API inventory route", { status: initialApis.status });
+  const initialProviders = await requestJson(baseUrl, "/api/providers");
+  for (const id of ["netease", "qq", "kugou", "qishui"]) {
+    const slot = objectWithId(initialApis.payload, id);
+    assert(slot, `Default API plugin slot is missing: ${id}`, initialApis.payload);
+    assert(slot.configured !== true, `Legacy built-in API remained configured: ${id}`, slot);
+    assert(slot.source === "plugin-slot", `Legacy built-in API was not migrated to a plugin slot: ${id}`, slot);
+    assert(!providerFrom(initialProviders.payload, id), `Provider was active without an imported API plugin: ${id}`, initialProviders.payload);
+  }
+  const neteaseBeforeBlockedRoutes = neteaseRequests.length;
+  const blockedNeteaseLogin = await requestJson(baseUrl, "/api/netease/login/status");
+  const blockedNeteaseLyric = await requestJson(baseUrl, "/api/netease/lyric?id=plugin-required");
+  const blockedNeteaseSearch = await requestJson(baseUrl, "/api/search?provider=netease&q=plugin-required&limit=1");
+  const blockedNeteaseStatus = await requestJson(baseUrl, "/api/music-apis/status?provider=netease");
+  assert(blockedNeteaseLogin.status >= 400, "Netease login was available without an imported API plugin", blockedNeteaseLogin.payload);
+  assert(blockedNeteaseLyric.status >= 400, "Netease lyric route was available without an imported API plugin", blockedNeteaseLyric.payload);
+  assert(blockedNeteaseSearch.status >= 400, "Netease search was available without an imported API plugin", blockedNeteaseSearch.payload);
+  assert(
+    blockedNeteaseStatus.status === 200
+      && blockedNeteaseStatus.payload?.reachable === false
+      && blockedNeteaseStatus.payload?.status === "not-configured",
+    "Unconfigured Netease status did not stay offline",
+    blockedNeteaseStatus.payload,
+  );
+  assert(
+    neteaseRequests.length === neteaseBeforeBlockedRoutes,
+    "Blocked Netease routes still contacted an external API",
+    neteaseRequests.slice(neteaseBeforeBlockedRoutes),
+  );
+  const migratedConfig = JSON.parse(await readFile(providersFile, "utf8"));
+  assert(
+    ["netease", "qq", "kugou", "qishui"].every((id) => {
+      const slot = providerFrom(migratedConfig, id);
+      return slot?.source === "plugin-slot" && slot.configured !== true;
+    }),
+    "Legacy built-in provider config was not persisted as empty plugin slots",
+    migratedConfig,
+  );
+  passed("plugin-only defaults and legacy migration", {
+    providers: initialProviders.payload?.providers?.length || 0,
+    blockedLogin: blockedNeteaseLogin.status,
+    blockedLyric: blockedNeteaseLyric.status,
+    blockedSearch: blockedNeteaseSearch.status,
+    pluginStatus: blockedNeteaseStatus.payload?.status,
+  });
 
   const guardedConfig = Buffer.from(JSON.stringify({
     providers: [{ id: "qq", baseUrl: qishuiBaseUrl }],

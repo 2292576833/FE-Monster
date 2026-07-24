@@ -1,0 +1,16 @@
+{
+  "schema": "fe-monster.music-api-package/v1",
+  "id": "netease",
+  "label": "网易云音乐",
+  "appName": "网易云音乐 App",
+  "baseUrl": "http://127.0.0.1:3010",
+  "healthPath": "/",
+  "enabled": true,
+  "autostart": true,
+  "loginQr": true,
+  "launcher": {
+    "runtime": "node",
+    "entry": "server.cjs",
+    "args": []
+  }
+}

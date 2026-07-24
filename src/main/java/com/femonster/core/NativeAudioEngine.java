@@ -32,13 +32,13 @@ public final class NativeAudioEngine {
         body.put("requested", true);
         body.put("active", available);
         body.put("backend", available ? "xaudio2" : "html-audio-fallback");
-        body.put("spatialBackend", "x3daudio");
-        body.put("decoder", "media-foundation");
+        body.put("spatialBackend", windows ? "x3daudio" : "web-audio-panner");
+        body.put("decoder", windows ? "media-foundation" : "webkit-media");
         body.put("sampleSource", sample.active ? "xaudio2-native-loopback" : "inactive");
         body.put("sampleRate", sample.sampleRate);
         body.put("lowFrequencyAmplitude", sample.lowFrequencyAmplitude);
         body.put("lowFrequencyBands", sample.lowFrequencyBands);
-        body.put("dll", dllPath.toString());
+        body.put("dll", windows ? dllPath.toString() : "");
         body.put("status", status);
         body.put("error", error);
         body.put("windows", windows);
@@ -54,7 +54,7 @@ public final class NativeAudioEngine {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("active", available && sample.active);
         body.put("backend", available ? "xaudio2" : "html-audio-fallback");
-        body.put("source", sample.active ? "xaudio2-native-loopback" : "inactive");
+        body.put("source", sample.active ? "xaudio2-native-loopback" : (windows ? "inactive" : "web-audio"));
         body.put("lowFrequencyAmplitude", sample.lowFrequencyAmplitude);
         body.put("lowFrequencyBands", sample.lowFrequencyBands);
         body.put("energy", sample.energy);

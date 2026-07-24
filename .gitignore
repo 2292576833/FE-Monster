@@ -12,6 +12,7 @@ data/
 !web/data/storm-ocean-preset.json
 .venv-gesture/
 node_modules/
+download-site/
 __pycache__/
 *.pyc
 
@@ -56,6 +57,8 @@ android/local.properties
 
 # Local QA, render and release evidence (never ship as source)
 artifacts/
+video-analysis/
+videos/
 .tmp/
 .media-home/
 .npm-cache/

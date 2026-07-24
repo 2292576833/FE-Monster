@@ -1,0 +1,957 @@
+/*
+ * FE Monster iOS layout overlay.
+ *
+ * This file is injected after the shared desktop styles. It deliberately keeps
+ * the desktop GlassSurface recipe and changes only sizing and placement for an
+ * iPhone. The shared web/ and components/ trees remain the source of every
+ * visual and text preset.
+ */
+
+:root[data-fe-platform="ios"] {
+  --ios-viewport-height: 100dvh;
+  --ios-viewport-width: 100vw;
+  --ios-safe-top: max(env(safe-area-inset-top, 0px), 0px);
+  --ios-safe-right: max(env(safe-area-inset-right, 0px), 0px);
+  --ios-safe-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
+  --ios-safe-left: max(env(safe-area-inset-left, 0px), 0px);
+  --ios-edge: 8px;
+  --ios-control: 44px;
+  --ios-control-large: 58px;
+  --ios-gap: 8px;
+  --ios-topbar-height: 44px;
+  --ios-sheet-radius: 22px;
+  --ios-glass-border: rgba(229, 247, 255, 0.18);
+  --ios-glass-background:
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.11), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.018)),
+    rgba(0, 0, 0, 0.74);
+  --ios-glass-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.055),
+    0 14px 30px rgba(0, 0, 0, 0.38);
+  --ios-glass-filter: blur(24px) saturate(1.08) brightness(0.82);
+}
+
+html[data-fe-platform="ios"],
+html[data-fe-platform="ios"] body {
+  width: 100%;
+  min-width: 0;
+  height: var(--ios-viewport-height);
+  min-height: var(--ios-viewport-height);
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+html[data-fe-platform="ios"] body {
+  touch-action: manipulation;
+}
+
+html[data-fe-platform="ios"] .app-shell {
+  width: 100%;
+  min-width: 0;
+  height: var(--ios-viewport-height);
+  min-height: var(--ios-viewport-height);
+}
+
+/*
+ * Exact desktop GlassSurface material. These selectors also cover controls
+ * rendered by the shared app without a .glass-surface class.
+ */
+html[data-fe-platform="ios"] :is(
+  .glass-surface,
+  button,
+  [role="button"],
+  .runtime-settings-panel,
+  .search-suggestions,
+  .favorite-library,
+  .playlist-favorite-popover,
+  .community-card,
+  .community-message-panel,
+  .community-profile-panel,
+  .diy-sidebar,
+  .recording-panel,
+  .update-dialog-panel,
+  .netease-login-panel,
+  .player-dock,
+  .playlist-song-page-stage,
+  .selected-playlist-album,
+  .shelf-song-button
+) {
+  border-color: var(--ios-glass-border) !important;
+  background: var(--ios-glass-background) !important;
+  box-shadow: var(--ios-glass-shadow) !important;
+  backdrop-filter: var(--ios-glass-filter) !important;
+  -webkit-backdrop-filter: var(--ios-glass-filter) !important;
+}
+
+html[data-fe-platform="ios"] :is(
+  button,
+  [role="button"],
+  .glass-surface
+):is(:active, [aria-pressed="true"], [aria-expanded="true"], .is-active) {
+  border-color: rgba(229, 247, 255, 0.34) !important;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.17), transparent 40%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.035)),
+    rgba(0, 0, 0, 0.72) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.075),
+    0 12px 26px rgba(0, 0, 0, 0.4) !important;
+}
+
+html[data-fe-platform="ios"] :is(button, [role="button"]):focus-visible {
+  outline: 2px solid rgba(229, 247, 255, 0.9);
+  outline-offset: 2px;
+}
+
+html[data-fe-platform="ios"] :is(button, [role="button"])[disabled],
+html[data-fe-platform="ios"] :is(button, [role="button"])[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.5;
+}
+
+html[data-fe-platform="ios"] .glass-surface__filter,
+html[data-fe-platform="ios"] .rb-border-glow-mount {
+  display: none !important;
+}
+
+html[data-fe-platform="ios"] :is(
+  button,
+  [role="button"],
+  input,
+  select,
+  textarea
+) {
+  box-sizing: border-box;
+  touch-action: manipulation;
+}
+
+html[data-fe-platform="ios"] :is(
+  button,
+  [role="button"],
+  input:not([type="hidden"]):not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea
+) {
+  min-height: var(--ios-control) !important;
+  font-size: max(16px, 1em);
+}
+
+html[data-fe-platform="ios"] input[type="range"] {
+  min-height: var(--ios-control) !important;
+}
+
+html[data-fe-platform="ios"] :is(
+  .diy-preset-card,
+  .diy-page-tab,
+  .diy-wallpaper-mode-button,
+  .diy-wallpaper-fit-button,
+  .login-provider-tab,
+  .android-login-actions button,
+  .ios-login-actions button,
+  .qishui-playback-view-button,
+  .qishui-playback-tools button,
+  .qishui-playback-quality,
+  .qishui-playback-direction,
+  .qishui-playback-play,
+  .playlist-song-back,
+  .diy-close-button,
+  .login-close-button
+) {
+  min-inline-size: var(--ios-control) !important;
+  min-block-size: var(--ios-control) !important;
+}
+
+html[data-fe-platform="ios"] .runtime-topbar,
+html[data-fe-platform="ios"] #runtimeSettingsButton,
+html[data-fe-platform="ios"] #homeButton,
+html[data-fe-platform="ios"] #sandboxModeButton,
+html[data-fe-platform="ios"] .window-control-button,
+html[data-fe-platform="ios"] .qishui-playback-wheel-hint,
+html[data-fe-platform="ios"] #musicApiImportPanel {
+  display: none !important;
+}
+
+/* Compact safe-area-aware top chrome. */
+html[data-fe-platform="ios"] .top-search {
+  top: calc(var(--ios-safe-top) + var(--ios-edge)) !important;
+  right: calc(var(--ios-safe-right) + 104px) !important;
+  left: calc(var(--ios-safe-left) + var(--ios-edge)) !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: var(--ios-topbar-height) !important;
+  border-radius: 14px !important;
+  transform: none !important;
+}
+
+html[data-fe-platform="ios"] .top-search > .glass-surface__content {
+  display: grid !important;
+  grid-template-columns: 18px minmax(0, 1fr) var(--ios-control) var(--ios-control) !important;
+  gap: 2px !important;
+  padding: 0 0 0 12px !important;
+}
+
+html[data-fe-platform="ios"] #topSearchInput {
+  width: 100%;
+  min-width: 0;
+  height: var(--ios-control) !important;
+  padding: 0 6px !important;
+  font-size: 16px !important;
+}
+
+html[data-fe-platform="ios"] :is(.top-favorites-button, .top-search-submit) {
+  width: var(--ios-control) !important;
+  min-width: var(--ios-control) !important;
+  height: var(--ios-control) !important;
+  border-radius: 12px !important;
+}
+
+html[data-fe-platform="ios"] #neteaseLoginButton,
+html[data-fe-platform="ios"] #diyButton {
+  top: calc(var(--ios-safe-top) + var(--ios-edge)) !important;
+  width: var(--ios-control) !important;
+  min-width: var(--ios-control) !important;
+  height: var(--ios-control) !important;
+  border-radius: 14px !important;
+}
+
+html[data-fe-platform="ios"] #neteaseLoginButton {
+  right: calc(var(--ios-safe-right) + 56px) !important;
+}
+
+html[data-fe-platform="ios"] #diyButton,
+html[data-fe-platform="ios"] .app-shell.is-playback-page #diyButton {
+  right: calc(var(--ios-safe-right) + var(--ios-edge)) !important;
+}
+
+html[data-fe-platform="ios"] #neteaseLoginButton > .glass-surface__content,
+html[data-fe-platform="ios"] #diyButton > .glass-surface__content {
+  width: 100% !important;
+  height: 100% !important;
+  gap: 0 !important;
+  padding: 0 !important;
+}
+
+html[data-fe-platform="ios"] :is(.netease-login-label, .login-vip-badge) {
+  display: none !important;
+}
+
+html[data-fe-platform="ios"] :is(.netease-login-mark, .login-avatar) {
+  width: 22px !important;
+  height: 22px !important;
+}
+
+html[data-fe-platform="ios"] .search-suggestions,
+html[data-fe-platform="ios"] .favorite-library,
+html[data-fe-platform="ios"] .playlist-favorite-popover {
+  top: calc(var(--ios-safe-top) + var(--ios-topbar-height) + 16px) !important;
+  right: calc(var(--ios-safe-right) + var(--ios-edge)) !important;
+  left: calc(var(--ios-safe-left) + var(--ios-edge)) !important;
+  width: auto !important;
+  max-width: none !important;
+  max-height: calc(var(--ios-viewport-height) - var(--ios-safe-top) - var(--ios-safe-bottom) - 84px) !important;
+  border-radius: 18px !important;
+  transform: none !important;
+}
+
+/* The shared floating player becomes the primary iPhone stage. */
+html[data-fe-platform="ios"] #qishuiPlaybackCard {
+  top: calc(var(--ios-safe-top) + var(--ios-topbar-height) + 16px) !important;
+  right: calc(var(--ios-safe-right) + var(--ios-edge)) !important;
+  bottom: calc(var(--ios-safe-bottom) + var(--ios-edge)) !important;
+  left: calc(var(--ios-safe-left) + var(--ios-edge)) !important;
+  width: auto !important;
+  height: auto !important;
+  max-width: none !important;
+  max-height: none !important;
+  transform: none !important;
+}
+
+html[data-fe-platform="ios"] #qishuiPlaybackCard:is(.is-expanded, .is-user-hidden) {
+  width: auto !important;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-phone,
+html[data-fe-platform="ios"] .qishui-playback-phone:hover,
+html[data-fe-platform="ios"] .qishui-playback-phone.is-panel-open,
+html[data-fe-platform="ios"] .qishui-playback-phone.is-panel-open:hover {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  border-radius: var(--ios-sheet-radius) !important;
+  transform: none !important;
+  transform-style: flat !important;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-ambient {
+  border-radius: var(--ios-sheet-radius) !important;
+  border-color: var(--ios-glass-border) !important;
+  background: var(--ios-glass-background) !important;
+  box-shadow: var(--ios-glass-shadow) !important;
+  backdrop-filter: var(--ios-glass-filter) !important;
+  -webkit-backdrop-filter: var(--ios-glass-filter) !important;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-content {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows:
+    40px
+    minmax(150px, min(31dvh, 258px))
+    minmax(76px, 1fr)
+    42px
+    var(--ios-control)
+    var(--ios-control-large)
+    var(--ios-control) !important;
+  gap: 7px !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  border-radius: var(--ios-sheet-radius) !important;
+  padding: 12px !important;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-view-controls {
+  position: absolute !important;
+  z-index: 3;
+  top: 10px !important;
+  left: 10px !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, var(--ios-control)) !important;
+  gap: 6px !important;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-view-button {
+  width: var(--ios-control) !important;
+  height: var(--ios-control) !important;
+  border-radius: 13px !important;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-header {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  min-height: 40px !important;
+  padding-left: 100px;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-account {
+  min-height: 40px;
+  cursor: pointer;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-account-avatar {
+  flex-basis: 34px !important;
+  width: 34px !important;
+  height: 34px !important;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-account-copy {
+  max-width: min(50vw, 190px) !important;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-cover {
+  grid-column: 1 !important;
+  grid-row: 2 !important;
+  width: min(64vw, 258px) !important;
+  height: 100% !important;
+  max-height: 258px !important;
+  aspect-ratio: 1 !important;
+  align-self: center !important;
+  justify-self: center !important;
+  border-radius: 17px !important;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-lyrics {
+  grid-column: 1 !important;
+  grid-row: 3 !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  padding: 0 5px !important;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-lyric-page.book-lyric-list {
+  padding: clamp(32px, 7dvh, 64px) 2px !important;
+}
+
+html[data-fe-platform="ios"] #qishuiPlaybackLyricPage .book-lyric-line-text {
+  font-size: 14px !important;
+}
+
+html[data-fe-platform="ios"] #qishuiPlaybackLyricPage
+  .qishui-playback-lyric-line:is(.is-arriving, .is-current.is-scroll-arrived)
+  .book-lyric-line-text {
+  font-size: 19px !important;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-track {
+  grid-column: 1 !important;
+  grid-row: 4 !important;
+  min-height: 42px;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-track-copy strong {
+  font-size: 16px !important;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-quality {
+  height: var(--ios-control) !important;
+  border-radius: 12px !important;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-progress {
+  position: relative;
+  grid-column: 1 !important;
+  grid-row: 5 !important;
+  min-height: var(--ios-control);
+  gap: 0 !important;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-progress-range {
+  width: 100%;
+  min-height: var(--ios-control) !important;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-times {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-controls {
+  grid-column: 1 !important;
+  grid-row: 6 !important;
+  min-height: var(--ios-control-large) !important;
+  justify-content: center !important;
+  gap: 18px !important;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-direction {
+  width: var(--ios-control-large) !important;
+  min-width: var(--ios-control-large) !important;
+  height: var(--ios-control-large) !important;
+  border-radius: 18px !important;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-direction small {
+  display: none !important;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-play {
+  width: 64px !important;
+  min-width: 64px !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  border-radius: 20px !important;
+}
+
+html[data-fe-platform="ios"] .qishui-playback-tools {
+  grid-column: 1 !important;
+  grid-row: 7 !important;
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 5px !important;
+}
+
+html[data-fe-platform="ios"] #qishuiPlaybackCard #qishuiPlaybackTools button {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: var(--ios-control) !important;
+  min-height: var(--ios-control) !important;
+  border-radius: 12px !important;
+  padding: 0 2px !important;
+  font-size: 11px !important;
+}
+
+/* DIY entry chooser and full-width configuration sheet. */
+html[data-fe-platform="ios"] .diy-quick-menu,
+html[data-fe-platform="ios"] .app-shell.is-playback-page.is-diy-open .diy-quick-menu {
+  top: auto !important;
+  right: calc(var(--ios-safe-right) + var(--ios-edge)) !important;
+  bottom: calc(var(--ios-safe-bottom) + var(--ios-edge)) !important;
+  left: calc(var(--ios-safe-left) + var(--ios-edge)) !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: var(--ios-gap) !important;
+  width: auto !important;
+  border: 1px solid var(--ios-glass-border);
+  border-radius: var(--ios-sheet-radius);
+  padding: 10px;
+  background: var(--ios-glass-background) !important;
+  box-shadow: var(--ios-glass-shadow) !important;
+  backdrop-filter: var(--ios-glass-filter) !important;
+  -webkit-backdrop-filter: var(--ios-glass-filter) !important;
+}
+
+html[data-fe-platform="ios"] .diy-quick-menu .diy-page-tab {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: var(--ios-control) !important;
+  border-radius: 13px !important;
+  opacity: 1;
+  transform: none !important;
+}
+
+html[data-fe-platform="ios"] .app-shell.is-diy-open.has-diy-card .diy-quick-menu {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+html[data-fe-platform="ios"] .diy-sidebar,
+html[data-fe-platform="ios"] .app-shell.is-playback-page.is-diy-open.has-diy-card .diy-sidebar,
+html[data-fe-platform="ios"] .app-shell.has-qishui-playback-card.is-playback-diy-panel-open .diy-sidebar {
+  top: auto !important;
+  right: calc(var(--ios-safe-right) + var(--ios-edge)) !important;
+  bottom: calc(var(--ios-safe-bottom) + var(--ios-edge)) !important;
+  left: calc(var(--ios-safe-left) + var(--ios-edge)) !important;
+  width: auto !important;
+  height: min(78dvh, calc(var(--ios-viewport-height) - var(--ios-safe-top) - var(--ios-safe-bottom) - 24px)) !important;
+  max-height: calc(var(--ios-viewport-height) - var(--ios-safe-top) - var(--ios-safe-bottom) - 24px) !important;
+  border: 1px solid var(--ios-glass-border) !important;
+  border-radius: var(--ios-sheet-radius) !important;
+  padding: 14px !important;
+  transform:
+    translate3d(0, calc(100% + var(--ios-safe-bottom) + 24px), 0)
+    !important;
+  transform-style: flat !important;
+  transform-origin: bottom center !important;
+}
+
+html[data-fe-platform="ios"] .app-shell.is-diy-open.has-diy-card .diy-sidebar,
+html[data-fe-platform="ios"] .app-shell.is-diy-open.has-diy-card.is-diy-peek .diy-sidebar,
+html[data-fe-platform="ios"] .app-shell.has-qishui-playback-card.is-playback-diy-panel-open .diy-sidebar {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  transform: translate3d(0, 0, 0) !important;
+}
+
+html[data-fe-platform="ios"] .diy-sidebar-head {
+  min-height: var(--ios-control) !important;
+  margin-bottom: 10px !important;
+  cursor: default !important;
+  touch-action: manipulation !important;
+}
+
+html[data-fe-platform="ios"] .diy-sidebar-head > small {
+  display: none !important;
+}
+
+html[data-fe-platform="ios"] .diy-sidebar .diy-close-button {
+  width: var(--ios-control) !important;
+  height: var(--ios-control) !important;
+  border-radius: 13px !important;
+}
+
+html[data-fe-platform="ios"] :is(
+  .diy-preset-page,
+  .diy-text-page,
+  .diy-wallpaper-page
+) {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-bottom: calc(var(--ios-safe-bottom) + 18px) !important;
+}
+
+html[data-fe-platform="ios"] :is(
+  .diy-preset-options,
+  .diy-preset-options--scene,
+  .diy-preset-options--text
+) {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
+html[data-fe-platform="ios"] .diy-preset-card {
+  min-width: 0 !important;
+  min-height: 64px !important;
+  border-radius: 14px !important;
+  padding: 9px !important;
+}
+
+html[data-fe-platform="ios"] :is(
+  .diy-wallpaper-mode-tabs,
+  .diy-wallpaper-actions,
+  .diy-wallpaper-fit,
+  .sandbox-form-row--split,
+  .sandbox-dimension-grid
+) {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+html[data-fe-platform="ios"] .diy-control {
+  min-height: 64px;
+}
+
+html[data-fe-platform="ios"] .diy-text-palette-swatches {
+  display: grid !important;
+  grid-template-columns: repeat(4, var(--ios-control)) !important;
+  gap: 6px !important;
+}
+
+html[data-fe-platform="ios"] .diy-text-palette-swatches button {
+  width: var(--ios-control) !important;
+  min-width: var(--ios-control) !important;
+  height: var(--ios-control) !important;
+  border-radius: 13px !important;
+}
+
+/* Login is a safe-area bottom sheet with a same-device QR workflow. */
+html[data-fe-platform="ios"] .netease-login-dialog {
+  align-items: flex-end !important;
+  padding:
+    max(var(--ios-edge), var(--ios-safe-top))
+    calc(var(--ios-safe-right) + var(--ios-edge))
+    calc(var(--ios-safe-bottom) + var(--ios-edge))
+    calc(var(--ios-safe-left) + var(--ios-edge)) !important;
+}
+
+html[data-fe-platform="ios"] .netease-login-backdrop {
+  background: rgba(0, 3, 5, 0.66) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+}
+
+html[data-fe-platform="ios"] .netease-login-panel {
+  width: 100% !important;
+  min-height: 0 !important;
+  max-height: calc(var(--ios-viewport-height) - var(--ios-safe-top) - var(--ios-safe-bottom) - 16px) !important;
+  overflow: hidden !important;
+  border: 1px solid var(--ios-glass-border) !important;
+  border-radius: var(--ios-sheet-radius) !important;
+}
+
+html[data-fe-platform="ios"] .netease-login-panel > .glass-surface__content {
+  box-sizing: border-box;
+  max-height: calc(var(--ios-viewport-height) - var(--ios-safe-top) - var(--ios-safe-bottom) - 16px) !important;
+  grid-template-rows: auto auto minmax(0, 1fr) !important;
+  padding: 14px !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+html[data-fe-platform="ios"] .login-panel-head {
+  min-height: var(--ios-control);
+  gap: 10px !important;
+}
+
+html[data-fe-platform="ios"] .login-panel-head strong {
+  font-size: 17px !important;
+}
+
+html[data-fe-platform="ios"] .login-panel-head span {
+  max-width: 32ch;
+  font-size: 12px !important;
+}
+
+html[data-fe-platform="ios"] .login-close-button {
+  width: var(--ios-control) !important;
+  min-width: var(--ios-control) !important;
+  height: var(--ios-control) !important;
+  border-radius: 13px !important;
+}
+
+html[data-fe-platform="ios"] .login-provider-tabs {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+  margin-top: 10px !important;
+  padding: 4px !important;
+}
+
+html[data-fe-platform="ios"] .login-provider-tab {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: var(--ios-control) !important;
+  min-height: var(--ios-control) !important;
+  border-radius: 12px !important;
+  font-size: 13px !important;
+}
+
+html[data-fe-platform="ios"] .qr-login-stage {
+  gap: 9px !important;
+  min-height: 0 !important;
+  padding-top: 10px;
+  padding-bottom: 4px;
+}
+
+html[data-fe-platform="ios"] .qr-code-shell {
+  box-sizing: border-box;
+  width: min(190px, 50vw) !important;
+  height: min(190px, 50vw) !important;
+  border-radius: 16px !important;
+  padding: 9px !important;
+}
+
+html[data-fe-platform="ios"] .qr-login-status {
+  min-height: 18px !important;
+  font-size: 13px !important;
+}
+
+html[data-fe-platform="ios"] .qr-refresh-button {
+  min-width: 132px !important;
+  height: var(--ios-control) !important;
+  border-radius: 13px !important;
+  font-size: 13px !important;
+}
+
+html[data-fe-platform="ios"] .android-login-workflow.ios-login-workflow {
+  display: grid !important;
+  width: 100% !important;
+  max-width: 360px;
+  gap: 8px;
+}
+
+html[data-fe-platform="ios"] .android-login-workflow.ios-login-workflow p {
+  margin: 0;
+  color: rgba(232, 249, 255, 0.74);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+html[data-fe-platform="ios"] .android-login-actions,
+html[data-fe-platform="ios"] .ios-login-actions {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+}
+
+html[data-fe-platform="ios"] .android-login-actions button,
+html[data-fe-platform="ios"] .ios-login-actions button {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: var(--ios-control) !important;
+  border-radius: 12px !important;
+  padding: 0 5px !important;
+  font-size: 12px !important;
+}
+
+/* Playlists and secondary player panels use the same bottom-sheet geometry. */
+html[data-fe-platform="ios"] .app-shell.has-qishui-playback-card .playlist-album-orbit,
+html[data-fe-platform="ios"] .app-shell.has-qishui-playback-card .playlist-song-page-stage {
+  top: auto !important;
+  right: calc(var(--ios-safe-right) + var(--ios-edge)) !important;
+  bottom: calc(var(--ios-safe-bottom) + var(--ios-edge)) !important;
+  left: calc(var(--ios-safe-left) + var(--ios-edge)) !important;
+  width: auto !important;
+  height: min(78dvh, calc(var(--ios-viewport-height) - var(--ios-safe-top) - var(--ios-safe-bottom) - 24px)) !important;
+  max-height: calc(var(--ios-viewport-height) - var(--ios-safe-top) - var(--ios-safe-bottom) - 24px) !important;
+  border-radius: var(--ios-sheet-radius) !important;
+  padding: 12px !important;
+  transform: none !important;
+}
+
+html[data-fe-platform="ios"] .app-shell.has-qishui-playback-card .playlist-song-back {
+  top: 10px !important;
+  right: 10px !important;
+  width: var(--ios-control) !important;
+  height: var(--ios-control) !important;
+  border-radius: 13px !important;
+}
+
+html[data-fe-platform="ios"] .community-message-dialog,
+html[data-fe-platform="ios"] .community-profile-dialog {
+  position: fixed !important;
+  inset:
+    calc(var(--ios-safe-top) + var(--ios-edge))
+    calc(var(--ios-safe-right) + var(--ios-edge))
+    calc(var(--ios-safe-bottom) + var(--ios-edge))
+    calc(var(--ios-safe-left) + var(--ios-edge)) !important;
+}
+
+html[data-fe-platform="ios"] :is(.community-message-panel, .community-profile-panel) {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  border-radius: var(--ios-sheet-radius) !important;
+  transform: none !important;
+}
+
+html[data-fe-platform="ios"] .toast {
+  bottom: calc(var(--ios-safe-bottom) + 18px) !important;
+  max-width: calc(100vw - var(--ios-safe-left) - var(--ios-safe-right) - 24px) !important;
+}
+
+/* Landscape: cover on the left, account/lyrics/controls on the right. */
+@media (orientation: landscape) and (max-height: 620px) {
+  :root[data-fe-platform="ios"] {
+    --ios-edge: 6px;
+  }
+
+  html[data-fe-platform="ios"] .top-search {
+    right: calc(var(--ios-safe-right) + 104px) !important;
+  }
+
+  html[data-fe-platform="ios"] #qishuiPlaybackCard {
+    top: calc(var(--ios-safe-top) + var(--ios-topbar-height) + 12px) !important;
+  }
+
+  html[data-fe-platform="ios"] .qishui-playback-content {
+    grid-template-columns: minmax(168px, 0.9fr) minmax(220px, 1.25fr) !important;
+    grid-template-rows:
+      40px
+      minmax(58px, 1fr)
+      40px
+      var(--ios-control)
+      var(--ios-control-large)
+      var(--ios-control) !important;
+    gap: 5px 12px !important;
+    padding: 10px !important;
+  }
+
+  html[data-fe-platform="ios"] .qishui-playback-header {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    padding-left: 0;
+  }
+
+  html[data-fe-platform="ios"] .qishui-playback-view-controls {
+    top: 8px !important;
+    left: 8px !important;
+  }
+
+  html[data-fe-platform="ios"] .qishui-playback-cover {
+    grid-column: 1 !important;
+    grid-row: 1 / 7 !important;
+    width: min(35vw, calc(var(--ios-viewport-height) - var(--ios-safe-top) - var(--ios-safe-bottom) - 88px)) !important;
+    height: auto !important;
+    max-height: 100% !important;
+  }
+
+  html[data-fe-platform="ios"] .qishui-playback-lyrics {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+  }
+
+  html[data-fe-platform="ios"] .qishui-playback-lyric-page.book-lyric-list {
+    padding: 24px 2px !important;
+  }
+
+  html[data-fe-platform="ios"] .qishui-playback-track {
+    grid-column: 2 !important;
+    grid-row: 3 !important;
+  }
+
+  html[data-fe-platform="ios"] .qishui-playback-progress {
+    grid-column: 2 !important;
+    grid-row: 4 !important;
+  }
+
+  html[data-fe-platform="ios"] .qishui-playback-controls {
+    grid-column: 2 !important;
+    grid-row: 5 !important;
+  }
+
+  html[data-fe-platform="ios"] .qishui-playback-tools {
+    grid-column: 2 !important;
+    grid-row: 6 !important;
+  }
+
+  html[data-fe-platform="ios"] .diy-sidebar,
+  html[data-fe-platform="ios"] .app-shell.is-playback-page.is-diy-open.has-diy-card .diy-sidebar,
+  html[data-fe-platform="ios"] .app-shell.has-qishui-playback-card.is-playback-diy-panel-open .diy-sidebar,
+  html[data-fe-platform="ios"] .netease-login-panel,
+  html[data-fe-platform="ios"] .app-shell.has-qishui-playback-card .playlist-album-orbit,
+  html[data-fe-platform="ios"] .app-shell.has-qishui-playback-card .playlist-song-page-stage {
+    right: calc(var(--ios-safe-right) + var(--ios-edge)) !important;
+    bottom: calc(var(--ios-safe-bottom) + var(--ios-edge)) !important;
+    left: auto !important;
+    width: min(430px, calc(100vw - var(--ios-safe-left) - var(--ios-safe-right) - 16px)) !important;
+    height: calc(var(--ios-viewport-height) - var(--ios-safe-top) - var(--ios-safe-bottom) - 12px) !important;
+    max-height: none !important;
+  }
+
+  html[data-fe-platform="ios"] .netease-login-dialog {
+    justify-content: flex-end !important;
+  }
+
+  html[data-fe-platform="ios"] .qr-login-stage {
+    grid-template-columns: minmax(138px, 0.8fr) minmax(180px, 1fr);
+    grid-template-rows: auto auto auto;
+    align-items: center;
+  }
+
+  html[data-fe-platform="ios"] .qr-code-shell {
+    grid-column: 1;
+    grid-row: 1 / 4;
+    width: min(164px, 36dvh) !important;
+    height: min(164px, 36dvh) !important;
+  }
+}
+
+@media (max-width: 374px) {
+  :root[data-fe-platform="ios"] {
+    --ios-edge: 6px;
+  }
+
+  html[data-fe-platform="ios"] .top-search {
+    right: calc(var(--ios-safe-right) + 100px) !important;
+  }
+
+  html[data-fe-platform="ios"] #neteaseLoginButton {
+    right: calc(var(--ios-safe-right) + 53px) !important;
+  }
+
+  html[data-fe-platform="ios"] .qishui-playback-content {
+    padding: 9px !important;
+    grid-template-rows:
+      38px
+      minmax(132px, min(28dvh, 218px))
+      minmax(66px, 1fr)
+      40px
+      var(--ios-control)
+      54px
+      var(--ios-control) !important;
+  }
+
+  html[data-fe-platform="ios"] .qishui-playback-cover {
+    width: min(58vw, 218px) !important;
+  }
+
+  html[data-fe-platform="ios"] .qishui-playback-controls {
+    gap: 10px !important;
+  }
+
+  html[data-fe-platform="ios"] .qishui-playback-direction {
+    width: 52px !important;
+    min-width: 52px !important;
+    height: 52px !important;
+  }
+
+  html[data-fe-platform="ios"] .qishui-playback-play {
+    width: 58px !important;
+    min-width: 58px !important;
+    height: 58px !important;
+    min-height: 58px !important;
+  }
+
+  html[data-fe-platform="ios"] #qishuiPlaybackCard #qishuiPlaybackTools button {
+    font-size: 10px !important;
+  }
+
+  html[data-fe-platform="ios"] .android-login-actions,
+  html[data-fe-platform="ios"] .ios-login-actions {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-fe-platform="ios"] *,
+  html[data-fe-platform="ios"] *::before,
+  html[data-fe-platform="ios"] *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
+}
+

@@ -1,0 +1,109 @@
+Open Binaural Renderer Patent License 1.0
+
+License Terms.
+
+1.1. Patent License. Subject to the terms and conditions of this License, each
+     Licensor, on behalf of itself, its subsidiaries and their successors in
+     interest and assigns, grants Licensee a non-sublicensable, worldwide,
+     non-exclusive, irrevocable (except as expressly stated in this License)
+     patent license, under its Necessary Claims to make, use, sell, offer for
+     sale, import or distribute the Software.
+
+1.2. Conditions.
+
+1.2.1. Availability. As a condition to the grant of rights to Licensee to make,
+       sell, offer for sale, import or distribute the Software under Section
+       1.1, Licensee must license its Necessary Claims available under this
+       License, and Licensee must reproduce this License with the Software as
+       follows:
+
+       a. For distribution in source code, by including this License in the
+          root directory of the source code with the Software.
+
+       b. For distribution in any other form (including in hardware or in
+          binary, object form, and/or hardware description code (e.g., HDL,
+          RTL, Gate Level Netlist, GDSII, etc.)), by including this License in
+          the documentation, legal notices, and/or other written materials,
+          whether in softcopy or hardcopy form or by providing a website link
+          thereto provided with such Software.
+
+1.2.2. Additional Conditions and Acknowledgements. This license is directly
+       from Licensor to Licensee. Licensee acknowledges as a condition of
+       benefiting from the License that no rights are received under this
+       License from any other parties, including parties performing activities
+       on behalf of Licensor or its subsidiaries.
+
+1.2.3. No-Charge Nature of this License. Licensor and Licensee each acknowledge
+       and agree that the rights granted and/or the obligations undertaken by
+       the other party have value, including monetary value, and that the value
+       provided by Licensor and the value provided by Licensee under this
+       License are equal and do not require additional monetary compensation.
+       Absent such exchange of value, the license granted in Section 1.1 would
+       not be of a no-charge basis.
+
+1.3. Defensive Termination. If any Licensee, its Affiliates, or its agents
+     initiate or file, maintain, or voluntarily participate in an Action
+     against another entity or any person (“Litigating Entity”), all rights
+     granted under this License to Licensee and its Affiliates are immediately
+     terminated as of the date of the initiation of such Action unless
+     1) initiation of such Action was in response to a corresponding Action
+     first brought against such Litigating Entity, or 2) that Action was
+     brought to enforce the terms of this License (including intervention in a
+     third-party action by a Licensee).
+
+1.4. Disclaimers. The Software and Specification are provided “AS IS” and
+     without warranty. The entire risk as to implementing or otherwise using
+     the Software or Specification is assumed by the implementer and user.
+     Licensor expressly disclaims any warranties (express, implied, or
+     otherwise), including implied warranties of merchantability,
+     non-infringement, fitness for a particular purpose, or title, related to
+     the material. IN NO EVENT WILL LICENSOR BE LIABLE TO ANY OTHER PARTY FOR
+     LOST PROFITS OR ANY FORM OF INDIRECT, SPECIAL, INCIDENTAL, OR
+     CONSEQUENTIAL DAMAGES OF ANY CHARACTER FROM ANY CAUSES OF ACTION OF ANY
+     KIND WITH RESPECT TO THIS LICENSE, WHETHER BASED ON BREACH OF CONTRACT,
+     TORT (INCLUDING NEGLIGENCE), OR OTHERWISE, AND WHETHER OR NOT THE OTHER
+     PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Definitions.
+
+2.1. Action. “Action” means any lawsuits, actions, claims, demands or other
+     similar proceedings before a court or a tribunal asserting a claim that an
+     implementation or use of the Software directly or indirectly infringes a
+     patent, including a patent infringement litigation, an arbitration
+     regarding patent infringement, a patent infringement matter brought before
+     an administrative agency (such as the United States International Trade
+     Commission), including those matters seeking exclusion orders or
+     injunctive relief, or other similar proceedings.
+
+2.2. Affiliate. “Affiliate” means an entity that directly or indirectly
+     Controls, is Controlled by, or is under common Control of that party.
+
+2.3. Control. “Control” means direct or indirect control of more than 50% of
+     the voting power to elect directors of that corporation, or for any other
+     entity, the power to direct management of such entity.
+
+2.4. License. “License” means this Open Binaural Renderer Patent License 1.0.
+
+2.5. Licensee. “Licensee” means any person or entity who uses, makes, sells,
+     offers for sale, imports or distributes the Software.
+
+2.6. Licensor. “Licensor” means (i) Google LLC or (ii) any Licensee that makes,
+     sells, offers for sale, imports or distributes the Software.
+
+2.7. Necessary Claims. “Necessary Claims” means, with respect to a person or
+     entity, all claims of patents or patent applications, (a) that currently
+     or at any time in the future, are owned or controlled by such person or by
+     such entity or its subsidiaries, and (b) (i) that would be an Essential
+     Claim as defined by the W3C Policy as of February 5, 2004
+     (https://www.w3.org/Consortium/Patent-Policy-20040205/#def-essential) as
+     if the Specification was a W3C Recommendation; or (ii) that are infringed
+     by the Software.
+
+2.8. Software. “Software” means the open binaural renderer released by Google
+     LLC that may be used with the Alliance for Open Media's Immersive Audio
+     Model and Formats (IAMF) specification.
+
+2.9. Specification. “Specification” means (i) the Software or (ii) any
+     canonical written document released by Google or the Alliance for Open
+     Media that defines the complete operational parameters and instructions
+     for the Software.

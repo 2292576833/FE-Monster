@@ -15,6 +15,7 @@ public final class AppContext {
     public final ProjectPaths paths;
     public volatile NeteaseClient netease;
     public final MusicProviderRegistry music;
+    public final OfficialBrowserLoginService browserLogin;
     public final MusicApiConfigService musicApis;
     public final RuntimeSettingsService runtimeSettings;
     public final GestureControlService gestureControl;
@@ -35,6 +36,7 @@ public final class AppContext {
         this.audioEngine = new NativeAudioEngine(paths);
         this.netease = createNeteaseClient();
         this.music = new MusicProviderRegistry(providerClients(netease));
+        this.browserLogin = new OfficialBrowserLoginService(paths.dataDir, music);
         this.communityModule = new CommunityModuleBridge(paths.root.resolve("plugins").resolve("community"));
         this.machine = new MachineIdentityService(paths, communityModule);
         this.updates = new UpdateService(paths);
@@ -47,6 +49,7 @@ public final class AppContext {
         }
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             this.gestureControl.stop();
+            this.browserLogin.close();
             this.musicApis.close();
         }, "fe-monster-local-services-shutdown"));
     }
@@ -58,12 +61,14 @@ public final class AppContext {
     }
 
     private NeteaseClient createNeteaseClient() {
-        return new NeteaseClient(musicApis.provider("netease").baseUrl(), paths.dataDir.resolve("netease-auth.json"));
+        MusicApiConfigService.ProviderConfig config = musicApis.provider("netease");
+        if (!config.enabled() || !config.configured()) return null;
+        return new NeteaseClient(config.baseUrl(), paths.dataDir.resolve("netease-auth.json"));
     }
 
     private MusicProviderClient[] providerClients(NeteaseClient neteaseClient) {
         List<MusicProviderClient> clients = new ArrayList<>();
-        clients.add(neteaseClient);
+        if (neteaseClient != null) clients.add(neteaseClient);
         for (String id : List.of("qq", "kugou", "qishui")) {
             MusicApiConfigService.ProviderConfig config = musicApis.provider(id);
             if (!config.enabled() || !config.configured()) continue;

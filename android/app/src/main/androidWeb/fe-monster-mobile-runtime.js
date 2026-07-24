@@ -134,8 +134,20 @@
   }
 
   function isNativeMusicApiPath(path) {
-    if (path === '/api/providers' || path === '/api/music-apis' || path === '/api/login/status') return true;
-    return /^\/api\/(netease|qq|kugou|qishui)\/(login\/(qr\/(key|create|check)|status|phone\/(send|verify))|user\/playlists)$/.test(path);
+    if ([
+      '/api/providers',
+      '/api/music-apis',
+      '/api/login/status',
+      '/api/search',
+      '/api/player/load',
+      '/api/song/url',
+      '/api/lyric',
+      '/api/user/playlists',
+      '/api/playlist/tracks'
+    ].includes(path)) {
+      return true;
+    }
+    return /^\/api\/(netease|qq|kugou|qishui)\/(login\/(qr\/(key|create|check)|status|phone\/(send|verify))|user\/playlists|playlist\/tracks|search|song\/url|lyric)$/.test(path);
   }
 
   window.feMonsterAndroidMusicResult = (requestId, status, rawPayload) => {
@@ -428,6 +440,55 @@
     });
   }
 
+  function bindNativePlaybackService() {
+    const audio = document.getElementById('audio');
+    if (!(audio instanceof HTMLMediaElement) || audio.dataset.androidPlaybackService === 'true') return;
+    audio.dataset.androidPlaybackService = 'true';
+    let transitionTimer = 0;
+
+    const sync = (active) => {
+      const title = document.getElementById('qishuiPlaybackTitle')?.textContent?.trim() || 'FE Monster';
+      const artist = document.getElementById('qishuiPlaybackArtist')?.textContent?.trim() || '\u6b63\u5728\u64ad\u653e';
+      try {
+        bridge?.setPlaybackActive?.(Boolean(active), title, artist);
+      } catch (_) {
+        // Playback continues in WebView when the foreground-service bridge is unavailable.
+      }
+    };
+
+    const cancelTransition = () => {
+      if (!transitionTimer) return;
+      clearTimeout(transitionTimer);
+      transitionTimer = 0;
+    };
+    const stopNow = () => {
+      cancelTransition();
+      sync(false);
+    };
+    const stopAfterTrackTransition = () => {
+      cancelTransition();
+      transitionTimer = window.setTimeout(() => {
+        transitionTimer = 0;
+        if (audio.paused || audio.ended) sync(false);
+      }, 5000);
+    };
+
+    audio.addEventListener('play', () => {
+      cancelTransition();
+      sync(true);
+    });
+    audio.addEventListener('pause', () => {
+      if (audio.ended) stopAfterTrackTransition();
+      else stopNow();
+    });
+    audio.addEventListener('ended', stopAfterTrackTransition);
+    audio.addEventListener('emptied', stopAfterTrackTransition);
+    audio.addEventListener('error', stopNow);
+    audio.addEventListener('abort', stopNow);
+    window.addEventListener('pagehide', stopNow);
+    if (!audio.paused && !audio.ended) sync(true);
+  }
+
   function applyLocalUi() {
     root.dataset.feRuntime = 'local';
     root.dataset.feServerState = 'local';
@@ -444,6 +505,7 @@
       '#qishuiPlaybackNextButton'
     ].join(',')).forEach((button) => button.classList.add('glass-button-native'));
     enablePlaybackAccountLogin();
+    bindNativePlaybackService();
     const communityStatus = document.getElementById('communityStatus');
     if (communityStatus) communityStatus.textContent = '本机模式：已与电脑端隔离';
   }
@@ -455,13 +517,6 @@
     event.preventDefault();
     event.stopImmediatePropagation();
     showMessage('本机模式已与电脑端隔离，社区联机功能不运行。');
-  }, true);
-
-  document.addEventListener('submit', (event) => {
-    if (!(event.target instanceof Element) || !event.target.matches('#topSearchForm')) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    showMessage('本机模式不把搜索发送到电脑端；请从歌单页选择手机中的本地音乐。');
   }, true);
 
   document.addEventListener('DOMContentLoaded', applyLocalUi, { once: true });

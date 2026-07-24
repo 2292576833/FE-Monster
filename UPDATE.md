@@ -1,39 +1,62 @@
-# FE Monster 1.1.5
+# FE Monster 1.1.6
 
-Release date: 2026-07-22
+Release date: 2026-07-24
 
 ## 更新内容
 
-- 新增三色半透明悬浮播放页：自动提取歌曲封面颜色，同时透出后方壁纸或场景。
-- 粒子封面提升采样密度，缩小封面浮雕隆起，并改为仅在音乐播放时逐粒子自然前后波动。
-- 移除“须佐能乎”预设及其独立运行时，旧预设值会安全回退到无场景模式。
-- 播放页统一支持网易云、QQ 音乐、酷狗、汽水音乐与本地歌曲的平台身份、歌单、歌曲切换、可拖动进度和音质选择。
-- 播放页歌词复用完整书页滚动逻辑，支持多行平滑滚动、到位高亮、宋体显示和独立颜色调节。
-- 增强“焦点回声”文字预设的暗影层次，并为各文字预设保留独立调色盘。
-- 修复壁纸模式的导入列表、实时壁纸与默认壁纸显示链路，主页面默认进入纯净壁纸模式。
-- 完善音游模式的按键判定、节拍驱动与自定义音乐分析流程。
-- 优化风暴海域、自由方块、Sonic 等预设的纹理、反射和低频响应，并加入自适应清晰度、刷新率与可选 FSR 档位。
-- 优化低配电脑与小窗口下的渲染、歌词和播放页性能，保持桌面客户端既有主布局不变。
-- Android 客户端继续使用独立本地资源和移动端布局，与 Windows 桌面端互不干扰。
+- 所有文字预设支持鼠标悬停滚轮独立缩放、拖动 360° 调整文字角度；Shift+拖动仍可在克拉尼场景中平移文字，双击文字恢复默认变换。
+- 新播放栏新增双语歌词独立开关与多排歌词“多/单”切换；中文字幕更靠近主歌词并跟随主歌词调色板，多排模式只渲染当前附近歌词，未播放句子保持柔和模糊。
+- 修复酷狗音乐歌单与播放地址解析，增强网易云、QQ、酷狗和汽水音乐的扫码登录、会话恢复与连接稳定性。
+- 平台 API 改为用户导入插件模式；登录页会自动识别已导入平台，只保留扫码及官方浏览器登录入口。
+- Google OBR 空间音频支持开关、5.1/7.1 布局与稳定重连；关闭空间音频后，播放链路会直接绕过 OBR。
+- 一起听同步当前歌曲、播放状态和进度，自动跳过无音源或无权限歌曲，并改进关闭、左侧收起与服务器重连。
+- 一起听弹幕使用玻璃气泡，支持鼠标排斥、随机漂浮和 3 秒自动消失。
+- Sonic 增加分层音柱、核心/外围独立配色、喷泉粒子、星空粒子、亮度与曝光调节，并改善低频响应和相机视角。
+- 粒子封面改为更平滑的 200 段低频波动，增加粒子数量、局部隆起、景深与双语歌词同步高亮。
+- 优化歌单滚动、UI 隐藏动画、社区连接、固定画质下的 CPU/内存使用与桌面场景映射。
+- 修复桌面窗口大圆角边缘、壁纸引擎/网页壁纸导入及播放栏玻璃材质布局。
 
-## 安装包
+## Windows 安装包
 
-- Windows x64 单文件安装包：`FE-Monster-Setup-1.1.5.exe`。
-- 安装包内嵌完整载荷，安装时会检查 Node、WebView2、.NET、Java 与本地手势运行时。
-- 本次 GitHub Release 发布 Windows 安装包；Android APK 仍通过独立构建流程生成。
+- Windows x64 单文件安装包：`FE-Monster-Setup-1.1.6.exe`。
+- 默认安装到 `D:\FE Monster`；没有 D 盘时回退到当前用户的本地应用目录，也可在安装器中手动修改。
+- 保留完整场景、字体、粒子和画质资源；仅移除 Python 测试、缓存和构建开发文件，并压缩安装器运行时以减小体积。
+- 安装包包含应用所需的离线载荷与 Node.js 运行时，但不再内嵌任何音乐平台 API 实现。
 - 当前安装包未做 Authenticode 代码签名，Windows SmartScreen 或杀毒软件可能显示未知发布者提示。
 
-## 验证记录
+## API 插件
+
+Release 附件提供四个可独立导入的 ZIP：
+
+- 网易云音乐：`FE-Monster-Netease-API-Plugin-4.32.0.zip`
+- QQ 音乐：`FE-Monster-QQ-API-Plugin-2.4.0.zip`
+- 酷狗音乐：`FE-Monster-Kugou-API-Plugin-1.5.1.zip`
+- 汽水音乐：`FE-Monster-Qishui-API-Plugin-1.0.0.zip`
+
+在 FE Monster 登录页点击“导入 API 插件”，选择对应 ZIP。插件服务只监听本机回环地址；登录与播放能力仍受平台账号、版权、地区和上游接口可用性限制。请仅导入你信任的插件包，并遵守平台条款和当地法律。
+
+默认本机端口分别为：网易云 `127.0.0.1:3010`、QQ `127.0.0.1:3011`、酷狗 `127.0.0.1:3012`、汽水 `127.0.0.1:3013`。ZIP 不需要手动解压；导入后登录页会自动显示对应平台切换按键，再选择扫码或官方浏览器登录。
+
+## SHA-256
+
+| Release 附件 | SHA-256 |
+| --- | --- |
+| `FE-Monster-Setup-1.1.6.exe` | `6254EDAFEB224CA2DE3FFD3EA23D9F41080BB59F4C17E327AD685F6393F19BE4` |
+| `FE-Monster-Netease-API-Plugin-4.32.0.zip` | `37E485DECBD8664FE5EE8BBE5DA3329420A6000F4F564072546C897E3D1F2284` |
+| `FE-Monster-QQ-API-Plugin-2.4.0.zip` | `7309D51F065045FE4CB1119874B93822F2B04A37565DF0F778A13D86CA9D9EBF` |
+| `FE-Monster-Kugou-API-Plugin-1.5.1.zip` | `F3EBCCDB28F163CD16791AF1B8454BEBB6BE3511D166E0137BC745BFFFBA7213` |
+| `FE-Monster-Qishui-API-Plugin-1.0.0.zip` | `C64438BA128EBC973CB8414B1A9F4C5DACE1C6F9F8426572E5D232FC4A3D1F01` |
+
+## 验证
 
 ```powershell
 cmd /c build.cmd
 node --check web/app.js
-node scripts/check-text-preset-palette.mjs
-node scripts/check-playback-lyric-palette.mjs
-node scripts/check-qishui-phone-login-ui.mjs
-node scripts/check-playback-card-performance.mjs
-node scripts/check-playback-runtime-cache.mjs
-node scripts/check-playback-cover-palette.mjs
+node scripts/check-music-api-import.mjs
+node scripts/check-kugou-plugin-playback.mjs
+node scripts/check-google-obr-runtime.mjs
+node scripts/check-community-listen-playback.mjs
+node scripts/check-fixed-quality-performance.mjs
 powershell -NoProfile -File scripts\build-winforms-client.ps1 -Root .
 powershell -NoProfile -File scripts\build-installer.ps1 -EmbedPayload -AllowEmbeddedPayload
 ```

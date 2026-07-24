@@ -337,7 +337,8 @@ try {
         loginUsesAndroidErrorCopy: /\u672c\u673a\u97f3\u4e50\u767b\u5f55\u670d\u52a1/.test(loginDialogText)
           && !/127\.0\.0\.1|run\.cmd|\u5bfc\u5165\s*API/i.test(loginDialogText),
         sandboxEnabled: document.getElementById('sandboxModeButton')?.getAttribute('aria-disabled') !== 'true',
-        communityHidden: !visible(document.getElementById('communityCard')),
+        communityHidden: !visible(document.getElementById('communityCard'))
+          && !visible(document.getElementById('communityRailButton')),
         searchFourColumns: Boolean(searchInput && favorites && searchSubmit
           && searchInput.right <= favorites.left + 1 && favorites.right <= searchSubmit.left + 1
           && favorites.width >= 39.5 && searchSubmit.width >= 39.5),

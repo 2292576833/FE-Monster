@@ -17,7 +17,7 @@
   const PLANE_VIEW_ELEVATION = PI / 4;
   const PLANE_CAMERA_DISTANCE = 28.3;
   const ROUNDED_CORNER_RADIUS = 0.3;
-  const BASS_SCALE_GAIN = 0.032;
+  const BASS_SCALE_GAIN = 0.072;
   const BEAT_SCALE_GAIN = 0.012;
   const MAX_PIXEL_RATIO = 2.25;
   const MODES = Object.freeze([

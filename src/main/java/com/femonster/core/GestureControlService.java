@@ -228,6 +228,10 @@ public final class GestureControlService {
         if (Files.isRegularFile(bundledPython)) {
             candidates.add(List.of(bundledPython.toString()));
         }
+        Path bundledUnixPython = paths.root.resolve("runtime").resolve("python").resolve("bin").resolve("python3").toAbsolutePath().normalize();
+        if (Files.isRegularFile(bundledUnixPython)) {
+            candidates.add(List.of(bundledUnixPython.toString()));
+        }
         Path localWindowsPython = paths.root.resolve(".venv-gesture").resolve("Scripts").resolve("python.exe").toAbsolutePath().normalize();
         if (Files.isRegularFile(localWindowsPython)) {
             candidates.add(List.of(localWindowsPython.toString()));

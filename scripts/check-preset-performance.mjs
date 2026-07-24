@@ -630,6 +630,8 @@ try {
     let layoutReads = 0;
     let sceneStyleWrites = 0;
     let playbackStyleWrites = 0;
+    const playbackStyleWritesByTarget = { lyric: 0, cover: 0 };
+    const playbackStyleProperties = {};
     let probing = true;
     topo.renderer.render = (...args) => {
       renderFrames += 1;
@@ -650,6 +652,9 @@ try {
     playbackStyles.forEach((style, index) => {
       style.setProperty = function (...args) {
         playbackStyleWrites += 1;
+        const target = index === 0 ? 'lyric' : 'cover';
+        playbackStyleWritesByTarget[target] += 1;
+        playbackStyleProperties[args[0]] = (playbackStyleProperties[args[0]] || 0) + 1;
         return originalPlaybackStyleSetProperties[index].apply(this, args);
       };
     });
@@ -659,6 +664,8 @@ try {
     };
     const meteorMatrixVersionBefore = topo.meteorMesh.instanceMatrix.version;
     const particleMatrixVersionBefore = topo.particleMesh.instanceMatrix.version;
+    const starfieldPositionAttribute = topo.starfield?.geometry?.getAttribute?.('position') || null;
+    const starfieldPositionVersionBefore = starfieldPositionAttribute?.version ?? null;
     const probe = () => {
       rafFrames += 1;
       if (probing) requestAnimationFrame(probe);
@@ -667,11 +674,24 @@ try {
     const startedAt = performance.now();
     await wait(600);
     playbackStyleWrites = 0;
+    playbackStyleWritesByTarget.lyric = 0;
+    playbackStyleWritesByTarget.cover = 0;
+    Object.keys(playbackStyleProperties).forEach((key) => delete playbackStyleProperties[key]);
     await wait(1000);
     const elapsed = performance.now() - startedAt;
     probing = false;
+    const idleRenderFrames = renderFrames;
+    const idleRafFrames = Math.max(0, rafFrames - 1);
+    const idleSpectrumSamples = spectrumSamples;
+    const idleRenderTargetSwitches = renderTargetSwitches;
+    const idleLayoutReads = layoutReads;
+    const idleSceneStyleWrites = sceneStyleWrites;
+    const idlePlaybackStyleWrites = playbackStyleWrites;
     const idleMeteorMatrixUploadDelta = topo.meteorMesh.instanceMatrix.version - meteorMatrixVersionBefore;
     const idleParticleMatrixUploadDelta = topo.particleMesh.instanceMatrix.version - particleMatrixVersionBefore;
+    const idleStarfieldPositionUploadDelta = starfieldPositionAttribute
+      ? starfieldPositionAttribute.version - starfieldPositionVersionBefore
+      : null;
     const activeMeteorVersionBefore = topo.meteorMesh.instanceMatrix.version;
     const activeParticleVersionBefore = topo.particleMesh.instanceMatrix.version;
     spawnSonicTopographyMeteor(0.9);
@@ -926,6 +946,37 @@ try {
       const normalized = clamp((distance - transitionStart) / (transitionEnd - transitionStart), 0, 1);
       return 1 - normalized * normalized * (3 - 2 * normalized);
     });
+    const heightProfileStart = bassColumnRadius * 0.55;
+    const heightProfileEnd = transitionEnd;
+    const columnHeightAt = (distance) => {
+      const normalized = clamp(
+        (distance - heightProfileStart) / Math.max(0.001, heightProfileEnd - heightProfileStart),
+        0,
+        1
+      );
+      const radialMix = normalized * normalized * (3 - 2 * normalized);
+      const radialHeight = bassColumnCluster.innerHeightScale
+        + (bassColumnCluster.outerHeightScale - bassColumnCluster.innerHeightScale) * radialMix;
+      const coreStart = bassColumnCluster.coreRadius;
+      const coreEnd = coreStart + bassColumnCluster.coreFeather;
+      const coreNormalized = clamp(
+        (distance - coreStart) / Math.max(0.001, coreEnd - coreStart),
+        0,
+        1
+      );
+      const coreMix = 1 - coreNormalized * coreNormalized * (3 - 2 * coreNormalized);
+      return radialHeight
+        + (bassColumnCluster.coreHeightScale - radialHeight) * coreMix;
+    };
+    const heightProfileSamples = Array.from({ length: 65 }, (_, index) => (
+      columnHeightAt(heightProfileEnd * index / 64)
+    ));
+    const centerHeightScale = columnHeightAt(0);
+    const middleHeightScale = columnHeightAt(
+      bassColumnCluster.coreRadius + bassColumnCluster.coreFeather
+    );
+    const clusterEdgeHeightScale = columnHeightAt(bassColumnRadius);
+    const outerHeightScale = columnHeightAt(heightProfileEnd);
     const bassColumns = {
       count: bassColumnPositions.length,
       uniqueX: uniqueColumnX.length,
@@ -935,18 +986,21 @@ try {
         && centerColumns.length === 1
         && Math.abs(uniqueColumnX[0] + uniqueColumnX.at(-1)) < 0.01
         && Math.abs(uniqueColumnZ[0] + uniqueColumnZ.at(-1)) < 0.01,
-      circularCore: bassColumnRadius === 18
+      circularCore: bassColumnRadius === 24
         && circularlySymmetric
-        && Math.abs(maxCoreRadiusSquared - 324) < 0.01
-        && positionKeys.has(positionKey(18 * SONIC_TOPOGRAPHY_SPACING, 0))
-        && !positionKeys.has(positionKey(18 * SONIC_TOPOGRAPHY_SPACING, SONIC_TOPOGRAPHY_SPACING)),
+        && Math.abs(maxCoreRadiusSquared - bassColumnRadius ** 2) < 0.01
+        && positionKeys.has(positionKey(bassColumnRadius * SONIC_TOPOGRAPHY_SPACING, 0))
+        && !positionKeys.has(positionKey(
+          bassColumnRadius * SONIC_TOPOGRAPHY_SPACING,
+          SONIC_TOPOGRAPHY_SPACING
+        )),
       clusteredContiguously: positionsAreContiguous(uniqueColumnX)
         && positionsAreContiguous(uniqueColumnZ),
       reusesTerrain: topo.group.children.length === 3
         && topo.group.children.filter((child) => child.isInstancedMesh).length === 3,
       shaderSelectsCluster: sonicVertexShader.includes('bassColumnGrid - vec2(0.0)')
         && /dot\\s*\\(\\s*bassColumnDelta\\s*,\\s*bassColumnDelta\\s*\\)/.test(sonicVertexShader)
-        && /step\\s*\\(\\s*324\\.5\\s*,\\s*bassColumnRadiusSquared\\s*\\)/.test(sonicVertexShader),
+        && sonicVertexShader.includes((bassColumnRadius ** 2 + 0.5).toFixed(1)),
       frequencyBandContract: SONIC_LOW_FREQUENCY_BAND_COUNT === 512
         && typeof SONIC_LOW_FREQUENCY_MIN_HZ !== 'undefined'
         && typeof SONIC_LOW_FREQUENCY_MAX_HZ !== 'undefined'
@@ -1005,6 +1059,66 @@ try {
         && uniqueBandIndices[0] === 0
         && uniqueBandIndices.at(-1) === SONIC_LOW_FREQUENCY_BAND_COUNT - 1,
       centerUsesAggregateAmplitude: /bassColumnCenterMask[\\s\\S]{0,800}uLowFrequencyAmplitude/.test(sonicVertexShader),
+      heightProfile: {
+        center: centerHeightScale,
+        middle: middleHeightScale,
+        clusterEdge: clusterEdgeHeightScale,
+        outer: outerHeightScale,
+        ratio: centerHeightScale / Math.max(0.001, outerHeightScale),
+        coreToMiddleRatio: centerHeightScale / Math.max(0.001, middleHeightScale),
+        coreMinimumLift: centerHeightScale * 6.5,
+        middleMaximumLift: middleHeightScale * 10,
+        monotonic: heightProfileSamples.slice(1).every((value, index) => (
+          value <= heightProfileSamples[index] + 1e-7
+        ))
+      },
+      obviousCoreMiddleOuterHeightDifference: bassColumnCluster.coreRadius === 3
+        && bassColumnCluster.coreFeather === 6
+        && bassColumnCluster.coreHeightScale === 3
+        && bassColumnCluster.innerHeightScale === 1.9
+        && bassColumnCluster.outerHeightScale === 0.58
+        && centerHeightScale > middleHeightScale
+        && middleHeightScale > outerHeightScale
+        && centerHeightScale / Math.max(0.001, middleHeightScale) >= 1.55
+        && centerHeightScale / Math.max(0.001, outerHeightScale) >= 3.2
+        && centerHeightScale * 6.5 > middleHeightScale * 10
+        && heightProfileSamples.slice(1).every((value, index) => (
+          value <= heightProfileSamples[index] + 1e-7
+        ))
+        && /float\\s+bassColumnRadialMix\\s*=\\s*smoothstep/.test(sonicVertexShader)
+        && /vBassColumnRadialMix\\s*=\\s*bassColumnRadialMix\\s*;/.test(sonicVertexShader)
+        && /float\\s+bassColumnHeightProfile\\s*=\\s*mix\\s*\\(\\s*1\\.90\\s*,\\s*0\\.58\\s*,\\s*bassColumnRadialMix\\s*\\)/.test(sonicVertexShader)
+        && /float\\s+bassColumnCoreHeightMix\\s*=\\s*1\\.0\\s*-\\s*smoothstep\\s*\\(\\s*3\\.0\\s*,\\s*9\\.0\\s*,\\s*bassColumnRadius\\s*\\)/.test(sonicVertexShader)
+        && /bassColumnHeightProfile\\s*=\\s*mix\\s*\\(\\s*bassColumnHeightProfile\\s*,\\s*3\\.00\\s*,\\s*bassColumnCoreHeightMix\\s*\\)/.test(sonicVertexShader)
+        && /float\\s+bassColumnLift[\\s\\S]{0,260}bassColumnDrive[\\s\\S]{0,220}bassColumnHeightProfile[\\s\\S]{0,120}uColumnHeightScale/.test(sonicVertexShader),
+      smallRandomLowFrequencyBumps: {
+        seededCells: sonicVertexShader.includes('vec2 smallBassCell = floor(pos2D / 7.0)')
+          && sonicVertexShader.includes('float smallBassSeed = random(smallBassCell + vec2(23.7, 51.3))')
+          && sonicVertexShader.includes('float smallBassPresence = step(0.84, smallBassSeed)'),
+        smoothCompactShape: sonicVertexShader.includes(
+          '1.0 - smoothstep(0.07, 0.31, smallBassDistance)'
+        ),
+        outsideColumnCluster: sonicVertexShader.includes(
+          '* smallBassPresence * (1.0 - bassColumnBlend)'
+        ),
+        individuallyPulsed: sonicVertexShader.includes('float smallBassPulse = 0.72')
+          && sonicVertexShader.includes('smallBassSeed * 6.283) * 0.28'),
+        lowFrequencyDriven: sonicVertexShader.includes(
+          'max(uLowFrequencyAmplitude, lowDrive) * lowGate'
+        )
+          && lowFrequencyTransition.activeAmplitude >= 0.82
+          && lowFrequencyTransition.pausedAmplitude === 0
+          && lowFrequencyTransition.pausedSubBass === 0
+          && lowFrequencyTransition.pausedBass === 0
+          && lowFrequencyTransition.pausedSpectrumZero === true,
+        smallerThanCoreColumns: sonicVertexShader.includes(
+          '* (0.65 + smallBassSeed * 0.35) * 1.25 * uColumnHeightScale'
+        )
+          && 1.25 / (centerHeightScale * 6.5) <= 0.1,
+        contributesToTerrain: sonicVertexShader.includes(
+          'float audioElevation = bassColumnLift + smallBassLift + subLift + bassLift'
+        )
+      },
       transitionSamples,
       transitionsIntoRelief: sonicVertexShader.includes('float bassColumnRadius = sqrt(bassColumnRadiusSquared)')
         && sonicVertexShader.includes('float bassColumnTransition = 1.0 - smoothstep(')
@@ -1020,7 +1134,9 @@ try {
         && lowFrequencyTransition.activeAmplitude > lowFrequencyTransition.riseAmplitude[0] * 4
         && lowFrequencyTransition.pausedAmplitude === 0,
       contributesToTerrain: sonicVertexShader.includes('float bassColumnLift')
-        && sonicVertexShader.includes('float audioElevation = bassColumnLift + subLift'),
+        && sonicVertexShader.includes(
+          'float audioElevation = bassColumnLift + smallBassLift + subLift'
+        ),
       playbackClockGated: sonicMotionSource.includes('const audioDriving = isPlaybackClockRunning()'),
       activeLowFrequencyReachedUniforms: lowFrequencyTransition.activeSubBass >= 0.85
         && lowFrequencyTransition.activeBass >= 0.71
@@ -1040,8 +1156,13 @@ try {
     updateAudioSpectrum = originalUpdateAudioSpectrum;
     const sonicPanel = document.querySelector('#sonicPresetControls');
     const sonicControlElements = {
+      centerColor: document.querySelector('#sonicCenterColorInput'),
       coreColor: document.querySelector('#sonicCoreColorInput'),
       outerColor: document.querySelector('#sonicOuterColorInput'),
+      fountainToggle: document.querySelector('#sonicFountainToggle'),
+      fountainColor: document.querySelector('#sonicFountainColorInput'),
+      starfieldToggle: document.querySelector('#sonicStarfieldToggle'),
+      starfieldColor: document.querySelector('#sonicStarfieldColorInput'),
       brightness: document.querySelector('#sonicBrightnessRange'),
       exposure: document.querySelector('#sonicExposureRange'),
       columnHeight: document.querySelector('#sonicColumnHeightRange'),
@@ -1075,8 +1196,13 @@ try {
       panelVisibleInTopography: !!sonicPanel && sonicPanel.hidden === false,
       complete: Object.values(sonicControlElements).every(Boolean),
       inputTypes: {
+        centerColor: sonicControlElements.centerColor?.type || '',
         coreColor: sonicControlElements.coreColor?.type || '',
         outerColor: sonicControlElements.outerColor?.type || '',
+        fountainToggle: sonicControlElements.fountainToggle?.type || '',
+        fountainColor: sonicControlElements.fountainColor?.type || '',
+        starfieldToggle: sonicControlElements.starfieldToggle?.type || '',
+        starfieldColor: sonicControlElements.starfieldColor?.type || '',
         brightness: sonicControlElements.brightness?.type || '',
         exposure: sonicControlElements.exposure?.type || '',
         columnHeight: sonicControlElements.columnHeight?.type || '',
@@ -1089,6 +1215,8 @@ try {
       savesPreferences: /localStorage\\.setItem\\(\\s*SONIC_SETTINGS_PREFS_KEY\\s*,/.test(sonicSettingsSaveSource),
       appliesSettings: sonicSettingsApplySource.length > 0,
       shaderUniforms: {
+        centerColor: !!topo.uniforms.uCenterColumnColor
+          && /uniform\\s+vec3\\s+uCenterColumnColor\\s*;/.test(String(topo.material.fragmentShader || '')),
         coreColor: !!topo.uniforms.uCoreColumnColor
           && /uniform\\s+vec3\\s+uCoreColumnColor\\s*;/.test(String(topo.material.fragmentShader || '')),
         outerColor: !!topo.uniforms.uOuterColumnColor
@@ -1104,7 +1232,176 @@ try {
       smoothingAffectsEnvelope: /SONIC_BASS_COLUMN_ATTACK_SECONDS[\\s\\S]{0,320}smoothing|smoothing[\\s\\S]{0,320}SONIC_BASS_COLUMN_ATTACK_SECONDS/.test(sonicMotionSource)
         && /SONIC_BASS_COLUMN_RELEASE_SECONDS[\\s\\S]{0,320}smoothing|smoothing[\\s\\S]{0,320}SONIC_BASS_COLUMN_RELEASE_SECONDS/.test(sonicMotionSource)
     };
+    const originalSonicSettings = { ...topo.settings };
+    const originalStoredSonicSettings = localStorage.getItem(SONIC_SETTINGS_PREFS_KEY);
+    const originalClockForEffects = isPlaybackClockRunning;
+    const originalAnalysisLiveForEffects = state.audioAnalysis.live;
+    const originalVisualForEffects = {
+      lowFrequencyAmplitude: state.visual.lowFrequencyAmplitude,
+      subBass: state.visual.subBass,
+      bass: state.visual.bass,
+      lowMid: state.visual.lowMid,
+      energy: state.visual.energy,
+      beat: state.visual.beat,
+      fluxPulse: state.visual.fluxPulse,
+      fluxMeteor: state.visual.fluxMeteor,
+      lowFrequencyBands: state.visual.lowFrequencyBands
+    };
+    const dispatchControl = (element, value, eventName) => {
+      if (!element) return;
+      if (element.type === 'checkbox') element.checked = !!value;
+      else element.value = String(value);
+      element.dispatchEvent(new Event(eventName, { bubbles: true }));
+    };
+    const hexColor = (color) => color?.isColor ? ('#' + color.getHexString()) : '';
+    const sonicEffects = {
+      threeIndependentColumnColors: false,
+      preferencesPersist: false,
+      fountainDisabledStaysIdle: false,
+      fountainRisesWithLowFrequency: false,
+      fountainUsesRisingBandColumn: false,
+      fountainColorApplied: false,
+      fountainParticleCapacity: 0,
+      fountainBurstCount: 0,
+      starfieldContract: false,
+      starfieldParticleCount: 0,
+      starfieldPointSize: 0,
+      starfieldLayerCount: 0,
+      starfieldRandomDrift: false,
+      starfieldVisibleWhenEnabled: false,
+      starfieldRotatesOnlyWhenEnabled: false,
+      starfieldColorApplied: false
+    };
+    try {
+      dispatchControl(sonicControlElements.centerColor, '#ff315f', 'input');
+      dispatchControl(sonicControlElements.coreColor, '#31ff7a', 'input');
+      dispatchControl(sonicControlElements.outerColor, '#317aff', 'input');
+      sonicEffects.threeIndependentColumnColors = hexColor(topo.uniforms.uCenterColumnColor?.value) === '#ff315f'
+        && hexColor(topo.uniforms.uCoreColumnColor?.value) === '#31ff7a'
+        && hexColor(topo.uniforms.uOuterColumnColor?.value) === '#317aff';
+
+      dispatchControl(sonicControlElements.fountainColor, '#fff4d6', 'input');
+      dispatchControl(sonicControlElements.starfieldColor, '#8bdcff', 'input');
+      dispatchControl(sonicControlElements.fountainToggle, true, 'change');
+      dispatchControl(sonicControlElements.starfieldToggle, true, 'change');
+      const storedEffects = JSON.parse(localStorage.getItem(SONIC_SETTINGS_PREFS_KEY) || '{}');
+      sonicEffects.preferencesPersist = storedEffects.centerColor === '#ff315f'
+        && storedEffects.coreColor === '#31ff7a'
+        && storedEffects.outerColor === '#317aff'
+        && storedEffects.fountainEnabled === true
+        && storedEffects.fountainColor === '#fff4d6'
+        && storedEffects.starfieldEnabled === true
+        && storedEffects.starfieldColor === '#8bdcff';
+
+      state.audioAnalysis.live = false;
+      isPlaybackClockRunning = () => true;
+      const activeFountainBands = new Float32Array(SONIC_LOW_FREQUENCY_BAND_COUNT);
+      activeFountainBands[211] = 1;
+      const primeLowFrequencyRise = () => {
+        resetSonicTopographyAudioMotion(topo);
+        updateSonicTopographyProjectiles(1 / 60);
+        if (topo.frameAudio?.lowFrequencyBands) topo.frameAudio.lowFrequencyBands.fill(0);
+        if (topo.frameAudio?.lowFrequencyBandTargets) topo.frameAudio.lowFrequencyBandTargets.fill(0);
+        state.visual.lowFrequencyBands = activeFountainBands;
+        Object.assign(state.visual, {
+          lowFrequencyAmplitude: 0.92,
+          subBass: 0.84,
+          bass: 0.76,
+          lowMid: 0.2,
+          energy: 0.54,
+          beat: 0,
+          fluxPulse: 0,
+          fluxMeteor: 0
+        });
+        topo.lastMotionAt = performance.now() - 16;
+        topo.lastRenderAt = 0;
+      };
+
+      dispatchControl(sonicControlElements.fountainToggle, false, 'change');
+      primeLowFrequencyRise();
+      updateSonicTopographyMotion();
+      sonicEffects.fountainDisabledStaysIdle = topo.particles.every((particle) => !particle.active);
+
+      dispatchControl(sonicControlElements.fountainToggle, true, 'change');
+      primeLowFrequencyRise();
+      updateSonicTopographyMotion();
+      const fountainParticles = topo.particles.filter((particle) => particle.active);
+      const fountainParticle = fountainParticles[0];
+      const fountainYBefore = fountainParticle?.y;
+      const fountainEmitter = topo.fountainEmitters?.[211];
+      sonicEffects.fountainParticleCapacity = topo.particles.length;
+      sonicEffects.fountainBurstCount = fountainParticles.length;
+      updateSonicTopographyProjectiles(1 / 60);
+      sonicEffects.fountainRisesWithLowFrequency = !!fountainParticle
+        && fountainParticle.y > fountainYBefore;
+      sonicEffects.fountainUsesRisingBandColumn = !!fountainParticle
+        && !!fountainEmitter
+        && Math.abs(fountainParticle.x - fountainEmitter.x) <= 1
+        && Math.abs(fountainParticle.z - fountainEmitter.z) <= 1;
+      sonicEffects.fountainColorApplied = hexColor(topo.particleMaterial?.color) === '#fff4d6';
+
+      const starfield = topo.starfield;
+      const starfieldGeometry = starfield?.geometry;
+      const starfieldPosition = starfieldGeometry?.getAttribute?.('position');
+      const starfieldColor = starfieldGeometry?.getAttribute?.('color');
+      const starfieldDrift = starfieldGeometry?.getAttribute?.('aStarDrift');
+      const starfieldPhase = starfieldGeometry?.getAttribute?.('aStarPhase');
+      const starfieldLayers = Array.isArray(starfield?.userData?.layers)
+        ? starfield.userData.layers
+        : [];
+      sonicEffects.starfieldParticleCount = starfieldPosition?.count || 0;
+      sonicEffects.starfieldPointSize = Number(starfield?.material?.size) || 0;
+      sonicEffects.starfieldLayerCount = starfieldLayers.length;
+      sonicEffects.starfieldContract = starfield?.isPoints === true
+        && starfieldPosition?.count >= 3600
+        && starfieldColor?.count === starfieldPosition.count
+        && starfieldDrift?.count === starfieldPosition.count
+        && starfieldPhase?.count === starfieldPosition.count
+        && starfieldLayers.length === 3
+        && starfieldLayers.every((layer, index) => index === 0
+          || layer.minRadius > starfieldLayers[index - 1].maxRadius)
+        && starfield.material.vertexColors === true
+        && starfield.material.size > 0
+        && starfield.material.size <= 0.5
+        && starfield?.material?.transparent === true
+        && starfield.material.depthWrite === false
+        && starfield.material.blending === window.THREE.AdditiveBlending
+        && !!starfield.material.map;
+      sonicEffects.starfieldColorApplied = hexColor(starfield?.material?.color) === '#8bdcff';
+      sonicEffects.starfieldVisibleWhenEnabled = starfield?.visible === true;
+      isPlaybackClockRunning = () => false;
+      const starfieldRotationBefore = Number(starfield?.rotation?.y) || 0;
+      const starfieldDriftTime = starfield?.material?.userData?.driftUniforms?.uStarfieldTime;
+      const starfieldDriftTimeBefore = Number(starfieldDriftTime?.value) || 0;
+      const starfieldPositionVersion = starfieldPosition?.version;
+      topo.lastMotionAt = performance.now() - 16;
+      topo.lastRenderAt = 0;
+      updateSonicTopographyMotion();
+      const enabledRotation = Number(starfield?.rotation?.y) || 0;
+      sonicEffects.starfieldRandomDrift = (Number(starfieldDriftTime?.value) || 0) > starfieldDriftTimeBefore;
+      dispatchControl(sonicControlElements.starfieldToggle, false, 'change');
+      topo.lastMotionAt = performance.now() - 16;
+      topo.lastRenderAt = 0;
+      updateSonicTopographyMotion();
+      const disabledRotation = Number(starfield?.rotation?.y) || 0;
+      sonicEffects.starfieldRotatesOnlyWhenEnabled = enabledRotation > starfieldRotationBefore
+        && disabledRotation === enabledRotation
+        && starfield?.visible === false
+        && starfieldPosition?.version === starfieldPositionVersion;
+    } finally {
+      isPlaybackClockRunning = originalClockForEffects;
+      state.audioAnalysis.live = originalAnalysisLiveForEffects;
+      Object.assign(state.visual, originalVisualForEffects);
+      topo.settings = originalSonicSettings;
+      applySonicTopographySettings({ persist: false, sync: true, renderConfig: false });
+      resetSonicTopographyAudioMotion(topo);
+      updateSonicTopographyProjectiles(1 / 60);
+      if (originalStoredSonicSettings == null) localStorage.removeItem(SONIC_SETTINGS_PREFS_KEY);
+      else localStorage.setItem(SONIC_SETTINGS_PREFS_KEY, originalStoredSonicSettings);
+    }
     const nativeRefresh = playbackPresetsUseNativeRefresh();
+    const sonicInstanceCount = topo.count;
+    const sonicContextLost = topo.renderer.getContext().isContextLost();
     setDiyPreset('lyric');
     sonicControls.panelHiddenOutsideTopography = !!sonicPanel && sonicPanel.hidden === true;
     const lyricNativeRefresh = playbackPresetsUseNativeRefresh();
@@ -1119,23 +1416,28 @@ try {
       coverParticleFpsLimit,
       renderTier: RENDER_PROFILE.tier,
       grid: RENDER_PROFILE.topographyGrid,
-      instanceCount: topo.count,
-      renderFps: renderFrames * 1000 / elapsed,
-      rafFps: Math.max(0, rafFrames - 1) * 1000 / elapsed,
-      spectrumFps: spectrumSamples * 1000 / elapsed,
-      renderToRafRatio: renderFrames / Math.max(1, rafFrames - 1),
-      renderTargetSwitches,
-      layoutReads,
-      sceneStyleWrites,
-      playbackStyleWrites,
+      instanceCount: sonicInstanceCount,
+      renderFps: idleRenderFrames * 1000 / elapsed,
+      rafFps: idleRafFrames * 1000 / elapsed,
+      spectrumFps: idleSpectrumSamples * 1000 / elapsed,
+      renderToRafRatio: idleRenderFrames / Math.max(1, idleRafFrames),
+      renderTargetSwitches: idleRenderTargetSwitches,
+      layoutReads: idleLayoutReads,
+      sceneStyleWrites: idleSceneStyleWrites,
+      playbackStyleWrites: idlePlaybackStyleWrites,
+      playbackStyleWritesByTarget,
+      playbackStyleProperties,
+      textPreset: state.textPreset,
       meteorMatrixUploadDelta: idleMeteorMatrixUploadDelta,
       particleMatrixUploadDelta: idleParticleMatrixUploadDelta,
+      starfieldPositionUploadDelta: idleStarfieldPositionUploadDelta,
       activeProjectilesAdvance,
       inactiveProjectilesStayFrozen,
       sonicCamera,
       sonicControls,
+      sonicEffects,
       bassColumns,
-      contextLost: topo.renderer.getContext().isContextLost()
+      contextLost: sonicContextLost
     };
   })()`);
 
@@ -1474,6 +1776,20 @@ try {
       enginePlaying: cover.enginePlaying,
       engineVisible: cover.engineVisible,
       motionAmplitude: cover.motionAmplitude,
+      waveTime: cover.waveTime,
+      shockAge: cover.shockAge,
+      shockStrength: cover.shockStrength,
+      shockCooldown: cover.shockCooldown,
+      shockArmed: cover.shockArmed,
+      lastShockDrive: cover.lastShockDrive,
+      lastBassInput: cover.lastBassInput,
+      visualAudio: {
+        lowFrequencyAmplitude: state.visual.lowFrequencyAmplitude,
+        bass: state.visual.bass,
+        energy: state.visual.energy,
+        beat: state.visual.beat,
+        fluxPulse: state.visual.fluxPulse
+      },
       playerClock: { ...state.playerClock }
     };
     let playCalls = 0;
@@ -1499,17 +1815,58 @@ try {
       }
       await wait(160);
       const playWhilePaused = playCalls;
+      const waveTimeBeforePlayback = cover.waveTime;
 
       state.playerClock.playing = true;
       state.playerClock.updatedAt = performance.now();
       updatePlayState();
       await wait(80);
       const playAfterPlaybackStart = playCalls;
+      const waveTimeAfterPlaybackStart = cover.waveTime;
 
       updateCoverParticleVisibility();
       updateCoverParticleVisibility();
       await wait(120);
       const playAfterRepeatedVisible = playCalls;
+      Object.assign(state.visual, {
+        lowFrequencyAmplitude: 0,
+        bass: 0,
+        energy: 0,
+        beat: 0,
+        fluxPulse: 0
+      });
+      await wait(80);
+      cover.shockCooldown = 0;
+      cover.shockArmed = true;
+      cover.lastShockDrive = 0;
+      cover.lastBassInput = 0;
+      const particlesBeforeShock = cover.particles;
+      const geometryBeforeShock = cover.gpuGeometry;
+      Object.assign(state.visual, {
+        lowFrequencyAmplitude: 0.94,
+        bass: 0.88,
+        energy: 0.72,
+        beat: 0.9,
+        fluxPulse: 0.52
+      });
+      const shockStageRect = els.stage.getBoundingClientRect();
+      drawCoverParticleScene(
+        Math.max(1, Math.round(shockStageRect.width)),
+        Math.max(1, Math.round(shockStageRect.height)),
+        window.devicePixelRatio || 1
+      );
+      requestOrbFrame();
+      await wait(80);
+      const shockOnset = {
+        strength: cover.shockStrength,
+        progress: cover.shockAge / COVER_PARTICLE_SHOCK_DURATION_SECONDS,
+        uniformStrength: cover.gpuMaterial?.uniforms?.uShockStrength?.value,
+        uniformProgress: cover.gpuMaterial?.uniforms?.uShockProgress?.value,
+        particlesStable: cover.particles === particlesBeforeShock,
+        geometryStable: cover.gpuGeometry === geometryBeforeShock
+      };
+      Object.assign(state.visual, original.visualAudio);
+      resetCoverParticleShock();
 
       const motionRange = document.querySelector('#diyCoverParticleMotionRange');
       const particlesBeforeMotionInput = cover.particles;
@@ -1552,11 +1909,29 @@ try {
         originalGpuSetSize = null;
       }
 
+      const waveTimeBeforePause = cover.waveTime;
+      cover.shockAge = 0.08;
+      cover.shockStrength = 0.9;
+      cover.shockCooldown = 0.12;
+      cover.shockArmed = true;
+      cover.lastShockDrive = 0.8;
+      cover.lastBassInput = 0.7;
       state.playerClock.playing = false;
       state.playerClock.updatedAt = performance.now();
       updatePlayState();
       await wait(80);
       const pauseAfterPlaybackPause = pauseCalls;
+      const pausedWaveTimeStart = cover.waveTime;
+      const shockAfterPlaybackPause = {
+        age: cover.shockAge,
+        strength: cover.shockStrength,
+        cooldown: cover.shockCooldown,
+        armed: cover.shockArmed,
+        lastDrive: cover.lastShockDrive,
+        lastBass: cover.lastBassInput
+      };
+      await wait(80);
+      const pausedWaveTimeEnd = cover.waveTime;
 
       setDiyPreset('lyric');
       await wait(80);
@@ -1572,6 +1947,7 @@ try {
       state.playerClock.updatedAt = performance.now();
       updatePlayState();
       await wait(80);
+      const waveTimeAfterResume = cover.waveTime;
       result = {
         available: true,
         gpuAvailable: !!cover.gpuRenderer,
@@ -1584,6 +1960,16 @@ try {
         playAfterPausedReentry,
         playAfterReentryPlaybackStart: playCalls,
         gpuSetSizeCalls,
+        wavePhase: {
+          beforePlayback: waveTimeBeforePlayback,
+          afterPlaybackStart: waveTimeAfterPlaybackStart,
+          beforePause: waveTimeBeforePause,
+          pausedStart: pausedWaveTimeStart,
+          pausedEnd: pausedWaveTimeEnd,
+          afterResume: waveTimeAfterResume
+        },
+        shockOnset,
+        shockAfterPlaybackPause,
         motionControl
       };
     } finally {
@@ -1595,6 +1981,14 @@ try {
       cover.enginePlaying = original.enginePlaying;
       cover.engineVisible = original.engineVisible;
       cover.motionAmplitude = original.motionAmplitude;
+      cover.waveTime = original.waveTime;
+      cover.shockAge = original.shockAge;
+      cover.shockStrength = original.shockStrength;
+      cover.shockCooldown = original.shockCooldown;
+      cover.shockArmed = original.shockArmed;
+      cover.lastShockDrive = original.lastShockDrive;
+      cover.lastBassInput = original.lastBassInput;
+      Object.assign(state.visual, original.visualAudio);
       Object.assign(state.playerClock, original.playerClock);
       updateCoverParticleBackgroundMode();
     }
@@ -1626,7 +2020,13 @@ try {
       imageSignature: cover.imageSignature,
       sampleSignature: cover.sampleSignature,
       particles: cover.particles,
-      gpuSignature: cover.gpuSignature
+      gpuSignature: cover.gpuSignature,
+      shockAge: cover.shockAge,
+      shockStrength: cover.shockStrength,
+      shockCooldown: cover.shockCooldown,
+      shockArmed: cover.shockArmed,
+      lastShockDrive: cover.lastShockDrive,
+      lastBassInput: cover.lastBassInput
     };
     const originalRandom = Math.random;
     const chladniRefs = {
@@ -1726,7 +2126,9 @@ try {
       const gpuGeometrySource = String(rebuildCoverParticleGpuGeometry);
       const cpuRenderSource = String(drawCoverParticleScene);
       const enginePlaySource = String(playCoverParticleEngine);
+      const enginePauseSource = String(pauseCoverParticleEngine);
       const playStateSource = String(updatePlayState);
+      const motionScaleSource = String(coverParticleMotionScale);
       const motionBehavior = {
         pausedDepthFlat: vertexShader.includes('position.z * uAudioActive')
           && cpuRenderSource.includes('particle.z * (audioActive ? 1 : 0)'),
@@ -1734,10 +2136,56 @@ try {
           && vertexShader.includes('float waveDepth = uAudioActive * naturalWave')
           && cpuRenderSource.includes('const naturalWave = baseNaturalWave * (1 - lowSegmentMix)')
           && cpuRenderSource.includes('const waveDepth = audioGate * naturalWave'),
-        hundredSegmentLowWave: vertexShader.includes('segmentProgress * 6.28318530718 * 100.0')
+        twoHundredSegmentLowWave: vertexShader.includes('segmentProgress * 6.28318530718 * 200.0')
           && vertexShader.includes('float lowSegmentMix = clamp(lowDrive * 0.72, 0.0, 0.68)')
           && cpuRenderSource.includes('segmentProgress * Math.PI * 2 * COVER_PARTICLE_LOW_WAVE_SEGMENTS')
           && cpuRenderSource.includes('const lowSegmentMix = clamp(lowDrive * 0.72, 0, 0.68)'),
+        twelveSegmentMacroWave: vertexShader.includes(
+          'segmentProgress * 6.28318530718 * 12.0'
+        )
+          && vertexShader.includes('float macroWaveDepth = uAudioActive * macroWave * lowDrive')
+          && cpuRenderSource.includes(
+            'segmentProgress * Math.PI * 2 * COVER_PARTICLE_MACRO_WAVE_SEGMENTS'
+          )
+          && cpuRenderSource.includes(
+            'const macroWaveDepth = audioGate * macroWave * lowDrive'
+          ),
+        beatOnsetShockwave: vertexShader.includes('uniform float uShockProgress')
+          && vertexShader.includes('uniform float uShockStrength')
+          && vertexShader.includes('float shockRadius = mix(0.02, 1.04, uShockProgress)')
+          && vertexShader.includes('uShockStrength * 0.028 * uMotionScale')
+          && gpuRenderSource.includes('uniforms.uShockProgress.value = shockProgress')
+          && gpuRenderSource.includes('uniforms.uShockStrength.value = shockStrength')
+          && cpuRenderSource.includes('shockDrive > 0.22')
+          && cpuRenderSource.includes('shockRise > 0.035')
+          && cpuRenderSource.includes('cover.shockCooldown = 0.16')
+          && enginePauseSource.includes('resetCoverParticleShock()'),
+        reliefThreeLayerDepth: vertexShader.includes(
+          'float backLayer = 1.0 - smoothstep(0.22, 0.34, relief)'
+        )
+          && vertexShader.includes('float frontLayer = smoothstep(0.66, 0.78, relief)')
+          && vertexShader.includes('float depthLayerOffset = depthLayer * 0.018 * depthLayerMotion')
+          && vertexShader.includes('float depthLayerScale = 1.0 + depthLayer * 0.09 * depthLayerMotion')
+          && cpuRenderSource.includes('const backLayer = 1 - smoothstep(0.22, 0.34, relief)')
+          && cpuRenderSource.includes('const frontLayer = smoothstep(0.66, 0.78, relief)')
+          && cpuRenderSource.includes('const depthLayerOffset = depthLayer * 0.018 * depthLayerMotion')
+          && cpuRenderSource.includes('const depthLayerScale = 1 + depthLayer * 0.09 * depthLayerMotion')
+          && !gpuGeometrySource.includes('aDepthLayer'),
+        cinematicDepthBounded: vertexShader.includes(
+          'clamp(waveDepth + macroWaveDepth + shockDepth, -0.070, 0.070)'
+        )
+          && cpuRenderSource.includes(
+            'clamp(waveDepth + macroWaveDepth + shockDepth, -0.07, 0.07)'
+          ),
+        reducedMotionCinematicFallback: cpuRenderSource.includes('if (!reducedMotion')
+          && cpuRenderSource.includes(
+            'const shockStrength = audioActive && !reducedMotion ? cover.shockStrength : 0'
+          )
+          && motionScaleSource.includes('(reducedMotion ? 0.35 : 1)'),
+        smoothClockedWavePhase: vertexShader.includes('float sheetTime = uTime;')
+          && gpuRenderSource.includes('uniforms.uTime.value = waveTime')
+          && cpuRenderSource.includes('cover.waveTime += envelopeStepSeconds')
+          && cpuRenderSource.includes('const sheetTime = cover.waveTime'),
         randomPerParticleLowCycles: vertexShader.includes('attribute float aLowCyclePhase')
           && vertexShader.includes('attribute float aLowCycleRate')
           && vertexShader.includes('sin(sheetTime * aLowCycleRate + aLowCyclePhase)')
@@ -1806,7 +2254,7 @@ try {
         backwardRatio: backward / Math.max(1, cover.particles.length),
         signedBias: Math.abs(signedDelta) / Math.max(1e-9, absoluteDelta)
       };
-      const segmentSamples = 4096;
+      const segmentSamples = 8192;
       let segmentCrossings = 0;
       let previousSegmentWave = Math.sin(0.37);
       for (let index = 1; index <= segmentSamples; index += 1) {
@@ -1819,10 +2267,65 @@ try {
         }
         previousSegmentWave = segmentWave;
       }
+      const horizontalSamples = new Set(
+        cover.particles.map((particle) => Number(particle.x.toFixed(6)))
+      ).size;
       const lowWaveSegments = {
         target: COVER_PARTICLE_LOW_WAVE_SEGMENTS,
         measured: segmentCrossings / 2,
-        phaseSpan: Math.PI * 2 * COVER_PARTICLE_LOW_WAVE_SEGMENTS
+        phaseSpan: Math.PI * 2 * COVER_PARTICLE_LOW_WAVE_SEGMENTS,
+        horizontalSamples,
+        samplesPerSegment: horizontalSamples / COVER_PARTICLE_LOW_WAVE_SEGMENTS
+      };
+      let macroCrossings = 0;
+      let previousMacroWave = Math.sin(0.37);
+      for (let index = 1; index <= segmentSamples; index += 1) {
+        const progress = index / segmentSamples;
+        const macroWave = Math.sin(
+          progress * Math.PI * 2 * COVER_PARTICLE_MACRO_WAVE_SEGMENTS + 0.37
+        );
+        if ((previousMacroWave < 0 && macroWave >= 0)
+            || (previousMacroWave >= 0 && macroWave < 0)) {
+          macroCrossings += 1;
+        }
+        previousMacroWave = macroWave;
+      }
+      const macroWaveSegments = {
+        target: COVER_PARTICLE_MACRO_WAVE_SEGMENTS,
+        measured: macroCrossings / 2,
+        phaseSpan: Math.PI * 2 * COVER_PARTICLE_MACRO_WAVE_SEGMENTS
+      };
+      const depthLayers = { back: 0, middle: 0, front: 0 };
+      for (const particle of cover.particles) {
+        const relief = clamp((particle.z + 0.04) / 0.14, 0, 1);
+        const backLayer = 1 - smoothstep(0.22, 0.34, relief);
+        const frontLayer = smoothstep(0.66, 0.78, relief);
+        const depthLayer = frontLayer - backLayer;
+        if (depthLayer <= -0.9) depthLayers.back += 1;
+        else if (depthLayer >= 0.9) depthLayers.front += 1;
+        else depthLayers.middle += 1;
+      }
+      depthLayers.offset = 0.018;
+      depthLayers.sizeScale = 0.09;
+      const shockDuration = COVER_PARTICLE_SHOCK_DURATION_SECONDS;
+      const shockProgressSample = 0.5;
+      const shockRadiusSample = 0.02 + (1.04 - 0.02) * shockProgressSample;
+      const sampleShockDepth = (normalizedRadius, audioGate = 1) => {
+        const shockRing = 1 - smoothstep(
+          0.028,
+          0.1,
+          Math.abs(normalizedRadius - shockRadiusSample)
+        );
+        const shockFade = 1 - smoothstep(0, 1, shockProgressSample);
+        return audioGate * shockRing * shockFade * 0.028;
+      };
+      const shockProfile = {
+        duration: shockDuration,
+        midpointRadius: shockRadiusSample,
+        crestDepth: sampleShockDepth(shockRadiusSample),
+        centerDepth: sampleShockDepth(0),
+        outsideDepth: sampleShockDepth(1.3),
+        pausedDepth: sampleShockDepth(shockRadiusSample, 0)
       };
       let positiveRates = 0;
       let negativeRates = 0;
@@ -1865,6 +2368,9 @@ try {
         motionBehavior,
         waveMotion,
         lowWaveSegments,
+        macroWaveSegments,
+        depthLayers,
+        shockProfile,
         randomLowCycles,
         chladniUnchanged: state.chladni === chladniRefs.root
           && state.chladni.runtime === chladniRefs.runtime
@@ -1879,6 +2385,12 @@ try {
       cover.sampleSignature = originalCover.sampleSignature;
       cover.particles = originalCover.particles;
       cover.gpuSignature = originalCover.gpuSignature;
+      cover.shockAge = originalCover.shockAge;
+      cover.shockStrength = originalCover.shockStrength;
+      cover.shockCooldown = originalCover.shockCooldown;
+      cover.shockArmed = originalCover.shockArmed;
+      cover.lastShockDrive = originalCover.lastShockDrive;
+      cover.lastBassInput = originalCover.lastBassInput;
     }
     return result;
   })()`);
@@ -2045,6 +2557,33 @@ try {
       && coverParticleLifecycle.playAfterReentryPlaybackStart === 2,
     coverParticleSkipsStableGpuResize: coverParticleLifecycle.gpuAvailable === true
       && coverParticleLifecycle.gpuSetSizeCalls === 0,
+    coverParticleWavePhaseIsSmoothAndClockGated: coverParticleLifecycle.wavePhase?.afterPlaybackStart
+        > coverParticleLifecycle.wavePhase?.beforePlayback
+      && coverParticleLifecycle.wavePhase?.beforePause
+        >= coverParticleLifecycle.wavePhase?.afterPlaybackStart
+      && coverParticleLifecycle.wavePhase?.pausedStart
+        >= coverParticleLifecycle.wavePhase?.beforePause
+      && Math.abs(
+        coverParticleLifecycle.wavePhase?.pausedEnd
+          - coverParticleLifecycle.wavePhase?.pausedStart
+      ) <= 1e-9
+      && coverParticleLifecycle.wavePhase?.afterResume
+        > coverParticleLifecycle.wavePhase?.pausedEnd,
+    coverParticleShockResetsWhenPlaybackStops: coverParticleLifecycle.shockAfterPlaybackPause?.age
+        === 0.36
+      && coverParticleLifecycle.shockAfterPlaybackPause?.strength === 0
+      && coverParticleLifecycle.shockAfterPlaybackPause?.cooldown === 0
+      && coverParticleLifecycle.shockAfterPlaybackPause?.armed === false
+      && coverParticleLifecycle.shockAfterPlaybackPause?.lastDrive === 0
+      && coverParticleLifecycle.shockAfterPlaybackPause?.lastBass === 0,
+    coverParticleBeatOnsetTriggersShock: coverParticleLifecycle.shockOnset?.strength > 0.2
+      && coverParticleLifecycle.shockOnset?.progress > 0
+      && coverParticleLifecycle.shockOnset?.progress < 1
+      && coverParticleLifecycle.shockOnset?.uniformStrength > 0.2
+      && coverParticleLifecycle.shockOnset?.uniformProgress > 0
+      && coverParticleLifecycle.shockOnset?.uniformProgress < 1
+      && coverParticleLifecycle.shockOnset?.particlesStable === true
+      && coverParticleLifecycle.shockOnset?.geometryStable === true,
     coverParticleMotionControlIsRealtime: coverParticleLifecycle.motionControl?.available === true
       && coverParticleLifecycle.motionControl.min === '0'
       && coverParticleLifecycle.motionControl.max === '200'
@@ -2060,7 +2599,7 @@ try {
       ) <= 1e-7
       && coverParticleLifecycle.motionControl.particlesStable === true
       && coverParticleLifecycle.motionControl.geometryStable === true,
-    coverParticleMatchesReferenceSampling: coverParticleDepthMapping.first.count === 256 * 256
+    coverParticleMatchesReferenceSampling: coverParticleDepthMapping.first.count === 512 * 256
       && coverParticleDepthMapping.first.minSize >= 0.82
       && coverParticleDepthMapping.first.maxSize <= 0.94
       && coverParticleDepthMapping.resizeKeepsAnchors === true,
@@ -2071,9 +2610,28 @@ try {
       && coverParticleDepthMapping.waveMotion?.forwardRatio >= 0.35
       && coverParticleDepthMapping.waveMotion?.backwardRatio >= 0.35
       && coverParticleDepthMapping.waveMotion?.signedBias <= 0.08,
-    coverParticleUsesHundredLowWaveSegments: coverParticleDepthMapping.lowWaveSegments?.target === 100
-      && coverParticleDepthMapping.lowWaveSegments?.measured === 100
-      && Math.abs(coverParticleDepthMapping.lowWaveSegments.phaseSpan - Math.PI * 200) <= 1e-9,
+    coverParticleUsesTwoHundredLowWaveSegments: coverParticleDepthMapping.lowWaveSegments?.target === 200
+      && coverParticleDepthMapping.lowWaveSegments?.measured === 200
+      && Math.abs(coverParticleDepthMapping.lowWaveSegments.phaseSpan - Math.PI * 400) <= 1e-9
+      && coverParticleDepthMapping.lowWaveSegments?.horizontalSamples === 512
+      && coverParticleDepthMapping.lowWaveSegments?.samplesPerSegment >= 2.5,
+    coverParticleUsesTwelveSegmentMacroWave: coverParticleDepthMapping.macroWaveSegments?.target === 12
+      && coverParticleDepthMapping.macroWaveSegments?.measured === 12
+      && Math.abs(
+        coverParticleDepthMapping.macroWaveSegments.phaseSpan - Math.PI * 24
+      ) <= 1e-9,
+    coverParticleUsesReliefThreeLayerDepth: coverParticleDepthMapping.depthLayers?.back > 1000
+      && coverParticleDepthMapping.depthLayers?.middle > 1000
+      && coverParticleDepthMapping.depthLayers?.front > 1000
+      && coverParticleDepthMapping.depthLayers?.offset === 0.018
+      && coverParticleDepthMapping.depthLayers?.sizeScale === 0.09,
+    coverParticleBeatShockwaveIsBounded: coverParticleDepthMapping.shockProfile?.duration === 0.36
+      && coverParticleDepthMapping.shockProfile?.midpointRadius > 0.5
+      && coverParticleDepthMapping.shockProfile?.crestDepth >= 0.013
+      && coverParticleDepthMapping.shockProfile?.crestDepth <= 0.0141
+      && coverParticleDepthMapping.shockProfile?.centerDepth <= 1e-9
+      && coverParticleDepthMapping.shockProfile?.outsideDepth <= 1e-9
+      && coverParticleDepthMapping.shockProfile?.pausedDepth <= 1e-9,
     coverParticleRandomLowCyclesRunBothWays: coverParticleDepthMapping.randomLowCycles?.positiveRateRatio >= 0.45
       && coverParticleDepthMapping.randomLowCycles?.negativeRateRatio >= 0.45
       && coverParticleDepthMapping.randomLowCycles?.forwardRatio >= 0.45
@@ -2113,32 +2671,58 @@ try {
     sonicAvoidsUnusedSceneStyleWrites: sonicRefresh.sceneStyleWrites === 0,
     playbackSceneAvoidsRedundantStyleWrites: sonicRefresh.playbackStyleWrites === 0,
     sonicSkipsIdleProjectileUploads: sonicRefresh.meteorMatrixUploadDelta === 0
-      && sonicRefresh.particleMatrixUploadDelta === 0,
+      && sonicRefresh.particleMatrixUploadDelta === 0
+      && sonicRefresh.starfieldPositionUploadDelta === 0,
     sonicActiveProjectileMotionPreserved: sonicRefresh.activeProjectilesAdvance === true
       && sonicRefresh.inactiveProjectilesStayFrozen === true,
-    sonicWideCameraShowsFullScene: sonicRefresh.sonicCamera?.constantFov === 60
-      && sonicRefresh.sonicCamera?.runtimeFov === 60
-      && sonicRefresh.sonicCamera?.visibleHalfSpan >= 78,
+    sonicCloseCameraFramesColumnScene: sonicRefresh.sonicCamera?.constantFov === 44
+      && sonicRefresh.sonicCamera?.runtimeFov === 44
+      && sonicRefresh.sonicCamera?.visibleHalfSpan >= 30,
+    sonicCameraCloseWithStarfield: sonicRefresh.sonicCamera?.radius <= 185
+      && sonicRefresh.sonicCamera?.radius >= 155
+      && sonicRefresh.sonicEffects?.starfieldParticleCount >= 3600
+      && sonicRefresh.sonicEffects?.starfieldVisibleWhenEnabled === true,
     sonicControlsPersistAndReachShader: sonicRefresh.sonicControls?.panelVisibleInTopography === true
       && sonicRefresh.sonicControls?.panelHiddenOutsideTopography === true
       && sonicRefresh.sonicControls?.complete === true
+      && sonicRefresh.sonicControls?.inputTypes?.centerColor === 'color'
       && sonicRefresh.sonicControls?.inputTypes?.coreColor === 'color'
       && sonicRefresh.sonicControls?.inputTypes?.outerColor === 'color'
+      && sonicRefresh.sonicControls?.inputTypes?.fountainToggle === 'checkbox'
+      && sonicRefresh.sonicControls?.inputTypes?.fountainColor === 'color'
+      && sonicRefresh.sonicControls?.inputTypes?.starfieldToggle === 'checkbox'
+      && sonicRefresh.sonicControls?.inputTypes?.starfieldColor === 'color'
       && sonicRefresh.sonicControls?.inputTypes?.brightness === 'range'
       && sonicRefresh.sonicControls?.inputTypes?.exposure === 'range'
       && sonicRefresh.sonicControls?.inputTypes?.columnHeight === 'range'
       && sonicRefresh.sonicControls?.inputTypes?.fieldOfView === 'range'
       && sonicRefresh.sonicControls?.inputTypes?.smoothing === 'range'
-      && sonicRefresh.sonicControls?.defaultFov === 60
+      && sonicRefresh.sonicControls?.defaultFov === 44
       && sonicRefresh.sonicControls?.persistenceKey === 'fe-monster-sonic-settings-v1'
       && sonicRefresh.sonicControls?.loadsPreferences === true
       && sonicRefresh.sonicControls?.savesPreferences === true
       && sonicRefresh.sonicControls?.appliesSettings === true
       && Object.values(sonicRefresh.sonicControls?.shaderUniforms || {}).every(Boolean)
       && sonicRefresh.sonicControls?.smoothingAffectsEnvelope === true,
-    sonicBassColumnsReuseTerrainAndStopPaused: sonicRefresh.bassColumns?.count === 1009
-      && sonicRefresh.bassColumns?.uniqueX === 37
-      && sonicRefresh.bassColumns?.uniqueZ === 37
+    sonicEffectsRespondToControls: sonicRefresh.sonicEffects?.threeIndependentColumnColors === true
+      && sonicRefresh.sonicEffects?.preferencesPersist === true
+      && sonicRefresh.sonicEffects?.fountainDisabledStaysIdle === true
+      && sonicRefresh.sonicEffects?.fountainRisesWithLowFrequency === true
+      && sonicRefresh.sonicEffects?.fountainUsesRisingBandColumn === true
+      && sonicRefresh.sonicEffects?.fountainColorApplied === true
+      && sonicRefresh.sonicEffects?.starfieldContract === true
+      && sonicRefresh.sonicEffects?.starfieldRandomDrift === true
+      && sonicRefresh.sonicEffects?.starfieldRotatesOnlyWhenEnabled === true
+      && sonicRefresh.sonicEffects?.starfieldColorApplied === true,
+    sonicFountainAndStarfieldDensityEnhanced: sonicRefresh.sonicEffects?.fountainParticleCapacity >= 512
+      && sonicRefresh.sonicEffects?.fountainBurstCount >= 8
+      && sonicRefresh.sonicEffects?.starfieldParticleCount >= 3600
+      && sonicRefresh.sonicEffects?.starfieldPointSize > 0
+      && sonicRefresh.sonicEffects?.starfieldPointSize <= 0.5
+      && sonicRefresh.sonicEffects?.starfieldLayerCount === 3,
+    sonicBassColumnsReuseTerrainAndStopPaused: sonicRefresh.bassColumns?.count === 1793
+      && sonicRefresh.bassColumns?.uniqueX === 49
+      && sonicRefresh.bassColumns?.uniqueZ === 49
       && sonicRefresh.bassColumns?.oddCenteredCore === true
       && sonicRefresh.bassColumns?.circularCore === true
       && sonicRefresh.bassColumns?.clusteredContiguously === true
@@ -2155,6 +2739,9 @@ try {
       && sonicRefresh.bassColumns?.silkyRelease === true
       && sonicRefresh.bassColumns?.shaderSamples512Bands === true
       && sonicRefresh.bassColumns?.centerUsesAggregateAmplitude === true
+      && sonicRefresh.bassColumns?.obviousCoreMiddleOuterHeightDifference === true
+      && !!sonicRefresh.bassColumns?.smallRandomLowFrequencyBumps
+      && Object.values(sonicRefresh.bassColumns.smallRandomLowFrequencyBumps).every(Boolean)
       && sonicRefresh.bassColumns?.transitionsIntoRelief === true
       && sonicRefresh.bassColumns?.amplitudeDriven === true
       && sonicRefresh.bassColumns?.contributesToTerrain === true

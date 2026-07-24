@@ -16,7 +16,7 @@ public final class MusicProviderRegistry {
     public MusicProviderClient get(String provider) {
         String id = normalize(provider);
         MusicProviderClient client = providers.get(id);
-        if (client == null) throw new IllegalArgumentException("unknown music provider: " + id);
+        if (client == null) throw new IllegalArgumentException("music API plugin is not configured: " + id);
         return client;
     }
 
@@ -27,7 +27,6 @@ public final class MusicProviderRegistry {
                 if (client != null) next.put(normalize(client.id()), client);
             }
         }
-        if (!next.containsKey("netease")) throw new IllegalArgumentException("netease provider is required");
         providers = Collections.unmodifiableMap(next);
     }
 
@@ -67,12 +66,8 @@ public final class MusicProviderRegistry {
         return get(provider).loginQrCheckPayload(key);
     }
 
-    public Map<String, Object> loginPhoneSendPayload(String provider, String phone) {
-        return get(provider).loginPhoneSendPayload(phone);
-    }
-
-    public Map<String, Object> loginPhoneVerifyPayload(String provider, String phone, String code) {
-        return get(provider).loginPhoneVerifyPayload(phone, code);
+    public void rememberBrowserSession(String provider, Map<String, String> cookies) {
+        get(provider).rememberBrowserSession(cookies);
     }
 
     public Map<String, Object> search(String provider, String keyword, int page, int limit) {
@@ -89,6 +84,10 @@ public final class MusicProviderRegistry {
 
     public Map<String, Object> userPlaylistsPayload(String provider) {
         return get(provider).userPlaylistsPayload();
+    }
+
+    public Map<String, Object> recommendedPlaylistsPayload(String provider, int limit) {
+        return get(provider).recommendedPlaylistsPayload(limit);
     }
 
     public Map<String, Object> playlistTracksPayload(String provider, String playlistId, int limit) {
