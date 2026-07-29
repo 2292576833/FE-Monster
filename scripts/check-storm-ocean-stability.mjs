@@ -174,6 +174,11 @@ try {
       await wait(250);
       document.querySelector('#diyPresetButton')?.click();
       const enter = await poll(() => document.querySelector('[data-diy-featured-preset="preset-storm-ocean-horizon"]'), 20000);
+      state.playbackVisual.yaw = PLAYBACK_REST_YAW + 0.64;
+      state.playbackVisual.pitch = PLAYBACK_REST_PITCH + 0.38;
+      state.playbackVisual.velocityYaw = 0.012;
+      state.playbackVisual.velocityPitch = -0.009;
+      updatePlaybackSceneTransform();
       enter?.click();
       const playback = document.querySelector('#sandboxPlaybackScene');
       await poll(() => playback?.classList.contains('is-model-ready') || playback?.classList.contains('is-model-failed'), 60000);
@@ -241,6 +246,85 @@ try {
          redundantClearCalls: Math.max(0, rendererClearCalls - rendererRenderCalls * 2),
          stormAttributeMutations,
        };
+       const stage = els.stage;
+       const lyricScene = document.querySelector('#playbackLyricScene');
+       const fixedViewSnapshot = () => {
+         state.sandbox.camera?.updateMatrixWorld?.(true);
+         return {
+           yaw: state.playbackVisual.yaw,
+           pitch: state.playbackVisual.pitch,
+           cameraPosition: state.sandbox.camera?.position?.toArray?.() || [],
+           cameraQuaternion: state.sandbox.camera?.quaternion?.toArray?.() || [],
+           lyricRotateX: lyricScene?.style?.getPropertyValue('--scene-rotate-x') || '',
+           lyricRotateY: lyricScene?.style?.getPropertyValue('--scene-rotate-y') || '',
+         };
+       };
+       const dragFixedView = async (pointerType, pointerId, deltaX, deltaY) => {
+         const rect = stage?.getBoundingClientRect?.();
+         if (!stage || !rect) return false;
+         const startX = window.innerWidth * 0.08;
+         const startY = window.innerHeight * 0.88;
+         stage.dispatchEvent(new PointerEvent('pointerdown', {
+           pointerId,
+           pointerType,
+           button: 0,
+           buttons: 1,
+           clientX: startX,
+           clientY: startY,
+           shiftKey: true,
+           bubbles: true,
+         }));
+         const dragStarted = state.playbackVisual.dragging === true;
+         stage.dispatchEvent(new PointerEvent('pointermove', {
+           pointerId,
+           pointerType,
+           button: -1,
+           buttons: 1,
+           clientX: startX + deltaX,
+           clientY: startY + deltaY,
+           shiftKey: true,
+           bubbles: true,
+         }));
+         stage.dispatchEvent(new PointerEvent('pointerup', {
+           pointerId,
+           pointerType,
+           button: 0,
+           buttons: 0,
+           clientX: startX + deltaX,
+           clientY: startY + deltaY,
+           shiftKey: true,
+           bubbles: true,
+         }));
+         await wait(80);
+         return dragStarted;
+       };
+       const fixedViewBefore = fixedViewSnapshot();
+       const mouseDragStarted = await dragFixedView('mouse', 71, 120, 64);
+       const fixedViewAfterMouse = fixedViewSnapshot();
+       const touchDragStarted = await dragFixedView('touch', 72, -96, 72);
+       const fixedViewAfterTouch = fixedViewSnapshot();
+       const fixedViewInput = {
+         playbackPage: state.playbackPage,
+         diyPreset: state.diyPreset,
+         sandboxPlaybackActive: sandboxPlaybackActive(),
+         orbitSupported: playbackSceneSupportsOrbit(),
+         otherSceneOrbitPreserved: [
+           'cube',
+           'free-cubes',
+           'void-prism',
+           'topography',
+           'cover-particles',
+         ].every((preset) => playbackSceneSupportsOrbit(preset)),
+         mouseDragStarted,
+         touchDragStarted,
+         enteredAtRest: Math.abs(fixedViewBefore.yaw - PLAYBACK_REST_YAW) < 1e-9
+           && Math.abs(fixedViewBefore.pitch - PLAYBACK_REST_PITCH) < 1e-9
+           && fixedViewBefore.lyricRotateX === PLAYBACK_REST_PITCH + 'rad'
+           && fixedViewBefore.lyricRotateY === PLAYBACK_REST_YAW + 'rad',
+         mouseLocked: JSON.stringify(fixedViewAfterMouse) === JSON.stringify(fixedViewBefore),
+         touchLocked: JSON.stringify(fixedViewAfterTouch) === JSON.stringify(fixedViewAfterMouse),
+         draggingStopped: state.playbackVisual.dragging === false,
+       };
        const snapshots = [];
       for (let index = 0; index < 32; index += 1) {
         group?.updateMatrixWorld?.(true);
@@ -269,6 +353,7 @@ try {
         frustumCulled: ocean?.frustumCulled !== false,
          cyclesEnvironment: window.FeStormOceanRuntime?.cyclesEnvironmentDiagnostics?.() || {},
          performanceSample,
+         fixedViewInput,
          transformStable: stable,
         firstSnapshot: snapshots[0] || null,
         lastSnapshot: snapshots.at(-1) || null,
@@ -302,6 +387,11 @@ try {
      && result?.performanceSample?.rendererRenderCalls > 0
      && result?.performanceSample?.redundantClearCalls === 0
      && result?.performanceSample?.stormAttributeMutations <= 20
+     && result?.fixedViewInput?.mouseLocked === true
+     && result?.fixedViewInput?.touchLocked === true
+     && result?.fixedViewInput?.enteredAtRest === true
+     && result?.fixedViewInput?.otherSceneOrbitPreserved === true
+     && result?.fixedViewInput?.draggingStopped === true
      && result?.transformStable === true
     && relevantErrors.length === 0;
   console.log(JSON.stringify({ ...result, screenshotPath, relevantErrors, passed }, null, 2));

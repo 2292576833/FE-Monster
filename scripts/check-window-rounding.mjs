@@ -6,6 +6,8 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 const css = read('web/styles.css');
 const form = read('native/windows/winforms/FeMonsterForm.cs');
 const html = read('web/index.html');
+const borderlessFallback = read('scripts/make-window-borderless.ps1');
+const localClientLauncher = read('src/main/java/com/femonster/desktop/LocalClientLauncher.java');
 
 const cssRadius = Number(css.match(/--window-visual-radius:\s*(\d+)px/)?.[1]);
 const checks = {
@@ -20,6 +22,14 @@ const checks = {
     && /OnDpiChanged\(DpiChangedEventArgs e\)[\s\S]*?ApplyWindowCornerPolicy\(\)/.test(form),
   fullscreenReappliesNativeCornerPolicy: /fullscreen = true;[\s\S]*?ApplyWindowCornerPolicy\(\)/.test(form)
     && /fullscreen = false;[\s\S]*?ApplyWindowCornerPolicy\(\)/.test(form),
+  browserFallbackUsesNativeRoundedRegion: /GetDpiForWindow/.test(borderlessFallback)
+    && /CreateRoundRectRgn/.test(borderlessFallback)
+    && /SetWindowRgn/.test(borderlessFallback)
+    && /WINDOW_VISUAL_RADIUS_DIP\s*=\s*34/.test(borderlessFallback),
+  browserFallbackRestoresFullscreenShape: /\[switch\]\$ShapeOnly/.test(borderlessFallback)
+    && /\[switch\]\$Fullscreen/.test(borderlessFallback)
+    && /SetWindowRgn\(\$window, \[IntPtr\]::Zero, \$true\)/i.test(borderlessFallback)
+    && /Browser\.setWindowBounds[\s\S]*?applyBorderlessWindow\(/.test(localClientLauncher),
   dwmRoundingIsExplicitlyEnabled: /DWMWA_WINDOW_CORNER_PREFERENCE/.test(form)
     && /DwmSetWindowAttribute/.test(form)
     && /DWMWCP_ROUND/.test(form),
