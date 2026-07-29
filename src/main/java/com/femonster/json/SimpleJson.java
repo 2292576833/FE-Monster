@@ -114,6 +114,14 @@ public final class SimpleJson {
                 write(entry.getValue(), out);
             }
             out.append('}');
+        } else if (value instanceof float[] array) {
+            out.append('[');
+            for (int index = 0; index < array.length; index++) {
+                if (index > 0) out.append(',');
+                float item = array[index];
+                out.append(Float.isFinite(item) ? item : 0.0f);
+            }
+            out.append(']');
         } else if (value instanceof Iterable<?> list) {
             out.append('[');
             boolean first = true;

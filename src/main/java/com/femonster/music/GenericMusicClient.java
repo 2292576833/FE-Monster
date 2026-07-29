@@ -23,28 +23,51 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
+import java.util.regex.Pattern;
 
-public final class GenericMusicClient implements MusicProviderClient {
+public class GenericMusicClient implements MusicProviderClient {
+    private static final Pattern SET_COOKIE_SEPARATOR = Pattern.compile(",(?=\\s*[A-Za-z_][A-Za-z0-9_]*=)");
+    private static final Pattern KUGOU_ID_SEPARATOR = Pattern.compile("\\|");
+    private static final Pattern KUGOU_HASH = Pattern.compile("(?i)[a-f0-9]{32}");
+    private static final Pattern DECIMAL_ID = Pattern.compile("[0-9]+");
+
     private final String id;
     private final String label;
     private final String baseUrl;
     private final HttpClient client;
+    private final CookieManager cookieManager;
     private final Path sessionFile;
     private final Map<String, String> session;
+    private final ProviderProtocol protocol;
+    private final boolean explicitProtocol;
 
     public GenericMusicClient(String id, String label, String baseUrl) {
         this(id, label, baseUrl, null);
     }
 
     public GenericMusicClient(String id, String label, String baseUrl, Path sessionFile) {
+        this(id, label, baseUrl, sessionFile, protocolOrNull(id), false);
+    }
+
+    protected GenericMusicClient(
+        String id,
+        String label,
+        String baseUrl,
+        Path sessionFile,
+        ProviderProtocol protocol,
+        boolean explicitProtocol
+    ) {
         this.id = id == null || id.isBlank() ? "music" : id.trim();
         this.label = label == null || label.isBlank() ? this.id : label.trim();
         this.baseUrl = normalizeBase(baseUrl);
         this.sessionFile = sessionFile;
         this.session = loadSession(sessionFile);
+        this.protocol = protocol;
+        this.explicitProtocol = explicitProtocol;
+        this.cookieManager = new CookieManager(null, CookiePolicy.ACCEPT_ALL);
         this.client = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(3))
-            .cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL))
+            .cookieHandler(cookieManager)
             .build();
     }
 
@@ -70,7 +93,7 @@ public final class GenericMusicClient implements MusicProviderClient {
         body.put("provider", id);
         body.put("label", label);
         body.put("baseUrl", baseUrl);
-        body.put("reachable", !SimpleJson.asMap(SimpleJson.parse(rawGet("/", Map.of()))).containsKey("error"));
+        body.put("reachable", !isErrorPayload(rawGet(protocolPath(ProviderProtocol.Operation.HEALTH, "/health"), Map.of())));
         body.put("note", label + " uses a configurable third-party API service.");
         return body;
     }
@@ -79,9 +102,23 @@ public final class GenericMusicClient implements MusicProviderClient {
     public Map<String, Object> accountPayload() {
         Map<String, String> params = authParams();
         String raw = switch (id) {
-            case "qq" -> rawGetAny(params, "/user/getUserDetail", "/user/getUserAvatar", "/user/getCookie", "/login/status");
-            case "kugou" -> rawGetAny(params, "/login/token", "/user/detail", "/user/playlist", "/login/status");
-            default -> rawGetAny(
+            case "qq" -> protocolGet(
+                ProviderProtocol.Operation.ACCOUNT,
+                params,
+                "/user/getUserDetail",
+                "/user/getUserAvatar",
+                "/user/getCookie",
+                "/login/status"
+            );
+            case "kugou" -> protocolGet(
+                ProviderProtocol.Operation.ACCOUNT,
+                params,
+                "/login/status",
+                "/user/detail",
+                "/user/playlist"
+            );
+            default -> protocolGet(
+                ProviderProtocol.Operation.ACCOUNT,
                 params,
                 "/login/status",
                 "/user/account",
@@ -93,7 +130,9 @@ public final class GenericMusicClient implements MusicProviderClient {
         Map<String, Object> login = SimpleJson.asMap(SimpleJson.parse(raw));
         Map<String, Object> account = extractAccount(login);
         applySessionAccountFallback(account);
-        boolean loggedIn = !SimpleJson.asString(account.get("userId"), "").isBlank()
+        boolean providerReportedLogin = SimpleJson.asBoolean(login.get("loggedIn"), false);
+        boolean loggedIn = providerReportedLogin
+            || !SimpleJson.asString(account.get("userId"), "").isBlank()
             || !SimpleJson.asString(account.get("nickname"), "").isBlank()
             || hasAuthSession();
 
@@ -108,70 +147,42 @@ public final class GenericMusicClient implements MusicProviderClient {
     }
 
     @Override
-    public String loginQrKeyPayload() {
-        if ("qq".equals(id)) {
-            return rawGetAny(timestampParams(), "/getQQLoginQr", "/user/getQQLoginQr", "/login/qr/key");
+    public Map<String, Object> configureLogin(Map<String, String> credentials) {
+        if (!"qishui".equals(id)) {
+            throw new IllegalArgumentException("provider does not support direct login configuration: " + id);
         }
-        return rawGetAny(
-            timestampParams(),
-            "/login/qr/key",
-            "/login/qr",
-            "/user/qr/key",
-            "/user/qr",
-            "/qr/key"
+        String raw = rawJsonPost(
+            protocolPath(ProviderProtocol.Operation.SESSION_LOGIN, "/session/token"),
+            credentials == null ? Map.of() : credentials
         );
+        Map<String, Object> body = new LinkedHashMap<>(SimpleJson.asMap(SimpleJson.parse(raw)));
+        body.putIfAbsent("ok", !isErrorPayload(raw));
+        body.put("provider", id);
+        return body;
     }
 
     @Override
-    public String loginQrCreatePayload(String key, boolean qrimg) {
-        if ("qq".equals(id)) {
-            return loginQrKeyPayload();
+    public Map<String, Object> localClientStatus() {
+        if (!"qishui".equals(id)) {
+            throw new IllegalArgumentException("provider does not support local client detection: " + id);
         }
-        Map<String, String> params = timestampParams();
-        params.put("key", key == null ? "" : key);
-        params.put("unikey", key == null ? "" : key);
-        params.put("qrimg", String.valueOf(qrimg));
-        return rawGetAny(
-            params,
-            "/login/qr/create",
-            "/login/qr",
-            "/user/qr/create",
-            "/user/qr",
-            "/qr/create",
-            "/qr"
-        );
+        String raw = rawGet("/local/status", Map.of());
+        Map<String, Object> body = new LinkedHashMap<>(SimpleJson.asMap(SimpleJson.parse(raw)));
+        body.putIfAbsent("ok", !isErrorPayload(raw));
+        body.put("provider", id);
+        return body;
     }
 
     @Override
-    public String loginQrCheckPayload(String key) {
-        Map<String, String> params = timestampParams();
-        String raw;
-        if ("qq".equals(id)) {
-            params.putAll(qqQrCheckParams(key));
-            raw = rawRequestAny(
-                "POST",
-                params,
-                "/checkQQLoginQr",
-                "/user/checkQQLoginQr",
-                "/login/qr/check"
-            );
-            rememberLoginSession(raw);
-            return raw;
+    public Map<String, Object> importLibraryMetadata(Map<String, Object> library) {
+        if (!"qishui".equals(id)) {
+            throw new IllegalArgumentException("provider does not support library metadata import: " + id);
         }
-        params.put("key", key == null ? "" : key);
-        params.put("unikey", key == null ? "" : key);
-        raw = rawGetAny(
-            params,
-            "/login/qr/check",
-            "/login/qr/status",
-            "/login/qr/poll",
-            "/user/qr/check",
-            "/user/qr/status",
-            "/qr/check",
-            "/qr/status"
-        );
-        rememberLoginSession(raw);
-        return raw;
+        String raw = rawJsonPost("/local/library/import", library == null ? Map.of() : library);
+        Map<String, Object> body = new LinkedHashMap<>(SimpleJson.asMap(SimpleJson.parse(raw)));
+        body.putIfAbsent("ok", !isErrorPayload(raw));
+        body.put("provider", id);
+        return body;
     }
 
     @Override
@@ -197,11 +208,25 @@ public final class GenericMusicClient implements MusicProviderClient {
                 nestedCookieValue(kugoo, "KugooID", "userid")
             ));
             putIfPresent(updates, "token", firstNonBlank(
-                firstCookieValue(cookies, "token", "KugooToken", "kugootoken", "KugooPwd"),
-                nestedCookieValue(kugoo, "KugooPwd", "token")
+                firstCookieValue(cookies, "token", "t", "KugooToken", "kugootoken", "KugooPwd"),
+                nestedCookieValue(kugoo, "t", "KugooPwd", "token")
             ));
         }
         rememberSession(updates);
+    }
+
+    @Override
+    public void clearBrowserSession() {
+        synchronized (session) {
+            session.clear();
+            cookieManager.getCookieStore().removeAll();
+            if (sessionFile == null) return;
+            try {
+                Files.deleteIfExists(sessionFile);
+            } catch (IOException error) {
+                throw new IllegalStateException("unable to clear " + id + " browser session", error);
+            }
+        }
     }
 
     @Override
@@ -219,9 +244,22 @@ public final class GenericMusicClient implements MusicProviderClient {
         params.put("pageSize", String.valueOf(limit));
         params.put("pagesize", String.valueOf(limit));
         String raw = switch (id) {
-            case "qq" -> rawGetAny(params, "/getSearchByKey", "/search", "/song/search");
-            case "kugou" -> rawGetAny(params, "/search", "/search/complex", "/song/search");
-            default -> rawGetAny(
+            case "qq" -> protocolGet(
+                ProviderProtocol.Operation.SEARCH,
+                params,
+                "/getSearchByKey",
+                "/search",
+                "/song/search"
+            );
+            case "kugou" -> protocolGet(
+                ProviderProtocol.Operation.SEARCH,
+                params,
+                "/search",
+                "/search/complex",
+                "/song/search"
+            );
+            default -> protocolGet(
+                ProviderProtocol.Operation.SEARCH,
                 params,
                 "/search",
                 "/song/search",
@@ -232,10 +270,6 @@ public final class GenericMusicClient implements MusicProviderClient {
         };
         Object root = SimpleJson.parse(raw);
         List<Song> songs = extractSongs(root, limit);
-        if (songs.isEmpty() && "kugou".equals(id)) {
-            root = SimpleJson.parse(kugouSearchFallback(key, page, limit));
-            songs = extractSongs(root, limit);
-        }
         Map<String, Object> body = songsPayload(songs, "search");
         Map<String, Object> rootMap = SimpleJson.asMap(root);
         boolean ok = !rootMap.containsKey("error");
@@ -246,24 +280,47 @@ public final class GenericMusicClient implements MusicProviderClient {
 
     @Override
     public String songUrl(String songId, String quality) {
-        if (songId == null || songId.isBlank()) return "";
+        Song song = new Song();
+        song.id = songId == null ? "" : songId;
+        song.provider = id;
+        return resolvePlayback(song, quality).url();
+    }
+
+    @Override
+    public Map<String, Object> songUrlPayload(String songId, String quality) {
+        Song song = new Song();
+        song.id = songId == null ? "" : songId;
+        song.provider = id;
+        return resolvePlayback(song, quality).toMap();
+    }
+
+    @Override
+    public PlaybackSource resolvePlayback(Song song, String quality) {
+        if (song == null || !song.hasIdentity()) {
+            return PlaybackSource.unavailable(id, quality, "song id is missing");
+        }
         Map<String, String> params = authParams();
         String effectiveQuality = normalizeSongQuality(id, quality);
-        params.put("id", songId);
-        params.put("mid", songId);
-        params.put("songmid", songId);
-        params.put("songid", songId);
-        params.put("hash", songId);
-        if ("kugou".equals(id) && songId.matches("[0-9]+")) {
-            params.put("album_audio_id", songId);
-            params.put("audio_id", songId);
-        }
+        putSongRequestParams(params, song);
         params.put("quality", effectiveQuality);
         params.put("level", effectiveQuality);
         String raw = switch (id) {
-            case "qq" -> rawGetAny(params, "/getMusicPlay", "/song/url", "/song/play");
-            case "kugou" -> rawGetAny(params, "/song/url", "/song/url/new", "/music/url");
-            default -> rawGetAny(
+            case "qq" -> protocolGet(
+                ProviderProtocol.Operation.SONG_URL,
+                params,
+                "/getMusicPlay",
+                "/song/url",
+                "/song/play"
+            );
+            case "kugou" -> protocolGet(
+                ProviderProtocol.Operation.SONG_URL,
+                params,
+                "/song/url",
+                "/song/url/new",
+                "/music/url"
+            );
+            default -> protocolGet(
+                ProviderProtocol.Operation.SONG_URL,
                 params,
                 "/song/url",
                 "/song/play-url",
@@ -273,28 +330,109 @@ public final class GenericMusicClient implements MusicProviderClient {
                 "/song"
             );
         };
-        Object root = SimpleJson.parse(raw);
-        String url = firstString(root, "url", "playUrl", "play_url", "src", "audio", "location", "purl");
-        if ("kugou".equals(id) && !isPlayableWebAudio(url) && !"128".equals(effectiveQuality)) {
+        Map<String, Object> root = SimpleJson.asMap(SimpleJson.parse(raw));
+        PlaybackSource source = PlaybackSource.fromPayload(id, effectiveQuality, root);
+        if ("kugou".equals(id) && !isPlayableWebAudio(source.url()) && !"128".equals(effectiveQuality)) {
             Map<String, String> fallbackParams = new LinkedHashMap<>(params);
             fallbackParams.put("quality", "128");
             fallbackParams.put("level", "128");
-            Object fallbackRoot = SimpleJson.parse(rawGetAny(fallbackParams, "/song/url", "/song/url/new", "/music/url"));
-            String fallbackUrl = firstString(fallbackRoot, "url", "playUrl", "play_url", "src", "audio", "location", "purl");
-            if (isPlayableWebAudio(fallbackUrl)) url = fallbackUrl;
+            Map<String, Object> fallbackRoot = SimpleJson.asMap(SimpleJson.parse(protocolGet(
+                ProviderProtocol.Operation.SONG_URL,
+                fallbackParams,
+                "/song/url",
+                "/song/url/new",
+                "/music/url"
+            )));
+            PlaybackSource fallback = PlaybackSource.fromPayload(id, "128", fallbackRoot);
+            if (isPlayableWebAudio(fallback.url())) source = fallback;
         }
-        if ("kugou".equals(id) && !isPlayableWebAudio(url)) url = kugouSongUrlFallback(songId);
-        return "kugou".equals(id) && !isPlayableWebAudio(url) ? "" : url;
+        if ("kugou".equals(id) && !isPlayableWebAudio(source.url())) {
+            return PlaybackSource.unavailable(id, effectiveQuality, source.errorMessage());
+        }
+        return source;
     }
 
     @Override
-    public Map<String, Object> songUrlPayload(String songId, String quality) {
-        String url = songUrl(songId, quality);
-        Map<String, Object> body = new LinkedHashMap<>();
+    public Map<String, Object> lyricPayload(String songId) {
+        return lyricPayload(songId, "", "", 0);
+    }
+
+    @Override
+    public Map<String, Object> lyricPayload(
+        String songId,
+        String title,
+        String artist,
+        int durationSeconds
+    ) {
+        if (songId == null || songId.isBlank()) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("ok", false);
+            body.put("provider", id);
+            body.put("error", "song id is missing");
+            return body;
+        }
+
+        Map<String, String> params = authParams();
+        KugouSongIdentity kugouIdentity = "kugou".equals(id) ? parseKugouSongIdentity(songId) : null;
+        String requestId = kugouIdentity == null ? songId : kugouIdentity.primaryId();
+        params.put("id", requestId);
+        params.put("mid", requestId);
+        params.put("songid", requestId);
+        params.put("songmid", requestId);
+        if (kugouIdentity != null) {
+            if (!kugouIdentity.hash().isBlank()) params.put("hash", kugouIdentity.hash());
+            if (!kugouIdentity.albumAudioId().isBlank()) {
+                params.put("album_audio_id", kugouIdentity.albumAudioId());
+                params.put("audio_id", kugouIdentity.albumAudioId());
+                params.put("mixsongid", kugouIdentity.albumAudioId());
+            }
+            if (!kugouIdentity.albumId().isBlank()) params.put("album_id", kugouIdentity.albumId());
+            String keyword = firstNonBlank(title, artist);
+            if (!keyword.isBlank()) {
+                params.put("keyword", keyword);
+                params.put("keywords", keyword);
+            }
+            if (artist != null && !artist.isBlank()) {
+                params.put("artist", artist.trim());
+                params.put("singer", artist.trim());
+            }
+            if (durationSeconds > 0) {
+                long durationMillis = Math.min(Integer.MAX_VALUE, (long) durationSeconds * 1000L);
+                params.put("duration", String.valueOf(durationMillis));
+            }
+        }
+
+        String raw = switch (id) {
+            case "qq" -> protocolGet(
+                ProviderProtocol.Operation.LYRIC,
+                params,
+                "/getLyric",
+                "/lyric",
+                "/song/lyric"
+            );
+            case "kugou" -> protocolGet(
+                ProviderProtocol.Operation.LYRIC,
+                params,
+                "/lyric",
+                "/lyrics",
+                "/song/lyric"
+            );
+            default -> protocolGet(
+                ProviderProtocol.Operation.LYRIC,
+                params,
+                "/lyric",
+                "/lyrics",
+                "/song/lyric"
+            );
+        };
+        Map<String, Object> body = new LinkedHashMap<>(SimpleJson.asMap(SimpleJson.parse(raw)));
+        body.putIfAbsent("ok", !isErrorPayload(raw));
         body.put("provider", id);
-        body.put("url", url);
-        body.put("playable", !url.isBlank());
-        if (url.isBlank()) body.put("error", label + " song url unavailable");
+        putLyricTrack(body, "lrc", namedLyricText(body, "lrc", "lyric", "lyrics"));
+        putLyricTrack(body, "tlyric", namedLyricText(body, "tlyric", "translation", "translatedLyric"));
+        putLyricTrack(body, "romalrc", namedLyricText(body, "romalrc", "romanization", "romanizedLyric"));
+        putLyricTrack(body, "klyric", namedLyricText(body, "klyric", "krc"));
+        putLyricTrack(body, "yrc", namedLyricText(body, "yrc"));
         return body;
     }
 
@@ -302,9 +440,23 @@ public final class GenericMusicClient implements MusicProviderClient {
     public Map<String, Object> userPlaylistsPayload() {
         Map<String, String> params = authParams();
         String raw = switch (id) {
-            case "qq" -> rawGetAny(params, "/user/getUserPlaylists", "/user/getUserCollectedSongLists", "/user/playlists");
-            case "kugou" -> rawGetAny(params, "/user/playlist", "/top/playlist", "/user/listen", "/user/playlists");
-            default -> rawGetAny(
+            case "qq" -> protocolGet(
+                ProviderProtocol.Operation.USER_PLAYLISTS,
+                params,
+                "/user/getUserPlaylists",
+                "/user/getUserCollectedSongLists",
+                "/user/playlists"
+            );
+            case "kugou" -> protocolGet(
+                ProviderProtocol.Operation.USER_PLAYLISTS,
+                params,
+                "/user/playlist",
+                "/top/playlist",
+                "/user/listen",
+                "/user/playlists"
+            );
+            default -> protocolGet(
+                ProviderProtocol.Operation.USER_PLAYLISTS,
                 params,
                 "/user/playlist",
                 "/user/playlists",
@@ -316,23 +468,26 @@ public final class GenericMusicClient implements MusicProviderClient {
         };
         Object root = SimpleJson.parse(raw);
         List<Playlist> extracted = extractPlaylists(root);
-        if (extracted.isEmpty() && "qq".equals(id)) {
+        if (!explicitProtocol && extracted.isEmpty() && "qq".equals(id)) {
             root = SimpleJson.parse(rawGetAny(params, "/user/getUserDetail"));
             extracted = extractPlaylists(root);
         }
-        if (extracted.isEmpty() && "kugou".equals(id)) {
+        if (!explicitProtocol && extracted.isEmpty() && "kugou".equals(id)) {
             root = SimpleJson.parse(rawGetAny(params, "/top/playlist"));
             extracted = extractPlaylists(root);
         }
         List<Map<String, Object>> playlists = new ArrayList<>();
         for (Playlist playlist : extracted) playlists.add(playlist.toMap());
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("ok", !SimpleJson.asMap(root).containsKey("error"));
+        Map<String, Object> rootMap = SimpleJson.asMap(root);
+        boolean metadataOnly = "qishui".equals(id) && SimpleJson.asBoolean(rootMap.get("metadataOnly"), false);
+        body.put("ok", !rootMap.containsKey("error"));
         body.put("provider", id);
         body.put("label", label);
-        body.put("loggedIn", !playlists.isEmpty() || hasAuthSession());
+        body.put("loggedIn", !metadataOnly && (!playlists.isEmpty() || hasAuthSession()));
+        if (metadataOnly) body.put("libraryAvailable", !playlists.isEmpty());
         body.put("playlists", playlists);
-        if (SimpleJson.asMap(root).containsKey("error")) body.put("error", SimpleJson.asMap(root).get("error"));
+        if (rootMap.containsKey("error")) body.put("error", rootMap.get("error"));
         return body;
     }
 
@@ -345,7 +500,7 @@ public final class GenericMusicClient implements MusicProviderClient {
         params.put("limit", String.valueOf(requestLimit));
         params.put("pageSize", String.valueOf(requestLimit));
         params.put("pagesize", String.valueOf(requestLimit));
-        String[] candidates = switch (id) {
+        String[] legacyCandidates = switch (id) {
             case "qq" -> new String[] {
                 "/getRecommendPlaylist",
                 "/getSongLists",
@@ -363,6 +518,10 @@ public final class GenericMusicClient implements MusicProviderClient {
                 "/playlist"
             };
         };
+        String[] candidates = protocolPaths(
+            ProviderProtocol.Operation.RECOMMENDED_PLAYLISTS,
+            legacyCandidates
+        );
 
         List<Playlist> playlists = List.of();
         String source = "plugin";
@@ -401,7 +560,7 @@ public final class GenericMusicClient implements MusicProviderClient {
     @Override
     public Map<String, Object> playlistTracksPayload(String playlistId, int limit) {
         Map<String, String> params = authParams();
-        int requestLimit = limit > 0 ? limit : 100000;
+        int requestLimit = limit > 0 ? limit : 100;
         params.put("id", playlistId == null ? "" : playlistId);
         params.put("ids", playlistId == null ? "" : playlistId);
         params.put("disstid", playlistId == null ? "" : playlistId);
@@ -418,12 +577,13 @@ public final class GenericMusicClient implements MusicProviderClient {
         if ("kugou".equals(id)) {
             root = Map.of();
             songs = List.of();
-            for (String path : new String[] {
+            for (String path : protocolPaths(
+                ProviderProtocol.Operation.PLAYLIST_TRACKS,
                 "/playlist/track/all",
                 "/playlist/track/all/new",
                 "/playlist/detail",
                 "/playlist/tracks"
-            }) {
+            )) {
                 Object candidate = SimpleJson.parse(rawGet(path, params));
                 List<Song> extracted = extractSongs(candidate, limit);
                 root = candidate;
@@ -434,8 +594,15 @@ public final class GenericMusicClient implements MusicProviderClient {
             }
         } else {
             String raw = switch (id) {
-                case "qq" -> rawGetAny(params, "/getSongListDetail", "/playlist/detail", "/playlist/tracks");
-                default -> rawGetAny(
+                case "qq" -> protocolGet(
+                    ProviderProtocol.Operation.PLAYLIST_TRACKS,
+                    params,
+                    "/getSongListDetail",
+                    "/playlist/detail",
+                    "/playlist/tracks"
+                );
+                default -> protocolGet(
+                    ProviderProtocol.Operation.PLAYLIST_TRACKS,
                     params,
                     "/playlist/tracks",
                     "/playlist/track/all",
@@ -491,7 +658,8 @@ public final class GenericMusicClient implements MusicProviderClient {
         params.put("timestamp", String.valueOf(System.currentTimeMillis()));
 
         String raw = switch (id) {
-            case "qq" -> rawRequestAny(
+            case "qq" -> protocolRequest(
+                ProviderProtocol.Operation.PLAYLIST_ADD,
                 "POST",
                 params,
                 "/user/addSongToPlaylist",
@@ -500,7 +668,8 @@ public final class GenericMusicClient implements MusicProviderClient {
                 "/songlist/add",
                 "/addSongToPlaylist"
             );
-            case "kugou" -> rawRequestAny(
+            case "kugou" -> protocolRequest(
+                ProviderProtocol.Operation.PLAYLIST_ADD,
                 "POST",
                 params,
                 "/playlist/add",
@@ -508,7 +677,8 @@ public final class GenericMusicClient implements MusicProviderClient {
                 "/song/addToPlaylist",
                 "/favorite/add"
             );
-            default -> rawRequestAny(
+            default -> protocolRequest(
+                ProviderProtocol.Operation.PLAYLIST_ADD,
                 "POST",
                 params,
                 "/playlist/tracks",
@@ -545,10 +715,162 @@ public final class GenericMusicClient implements MusicProviderClient {
         params.put("biztype", "1");
         params.put("reqtype", "2");
         String raw = "qq".equals(id)
-            ? rawGetAny(params, "/getComments")
-            : rawGetAny(params, "/comments", "/song/comments", "/comment/music");
+            ? protocolGet(ProviderProtocol.Operation.COMMENTS, params, "/getComments")
+            : protocolGet(
+                ProviderProtocol.Operation.COMMENTS,
+                params,
+                "/comments",
+                "/song/comments",
+                "/comment/music"
+            );
         Object root = SimpleJson.parse(raw);
         return CommentPayloads.fromRoot(id, label, root, limit);
+    }
+
+    private static ProviderProtocol protocolOrNull(String provider) {
+        try {
+            return ProviderProtocol.forProvider(provider);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private String protocolPath(ProviderProtocol.Operation operation, String fallback) {
+        if (protocol == null) return fallback;
+        try {
+            return protocol.route(operation).path();
+        } catch (IllegalArgumentException ignored) {
+            return fallback;
+        }
+    }
+
+    private String[] protocolPaths(ProviderProtocol.Operation operation, String... legacyPaths) {
+        LinkedHashMap<String, Boolean> paths = new LinkedHashMap<>();
+        String configured = protocolPath(operation, "");
+        if (!configured.isBlank()) paths.put(configured, Boolean.TRUE);
+        if (!explicitProtocol && legacyPaths != null) {
+            for (String path : legacyPaths) {
+                if (path != null && !path.isBlank()) paths.put(path, Boolean.TRUE);
+            }
+        }
+        return paths.keySet().toArray(String[]::new);
+    }
+
+    private String protocolGet(
+        ProviderProtocol.Operation operation,
+        Map<String, String> params,
+        String... legacyPaths
+    ) {
+        return protocolRequest(operation, "GET", params, legacyPaths);
+    }
+
+    private String protocolRequest(
+        ProviderProtocol.Operation operation,
+        String fallbackMethod,
+        Map<String, String> params,
+        String... legacyPaths
+    ) {
+        String configuredPath = "";
+        if (protocol != null) {
+            try {
+                ProviderProtocol.Route route = protocol.route(operation);
+                configuredPath = route.path();
+                String response = rawRequest(route.method(), route.path(), params);
+                if (explicitProtocol || !isErrorPayload(response)) return response;
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        if (explicitProtocol) {
+            return errorPayload(label + " API operation is not configured: " + operation);
+        }
+        List<String> fallbackPaths = new ArrayList<>();
+        if (legacyPaths != null) {
+            for (String path : legacyPaths) {
+                if (path == null || path.isBlank() || path.equals(configuredPath)) continue;
+                if (!fallbackPaths.contains(path)) fallbackPaths.add(path);
+            }
+        }
+        return rawRequestAny(fallbackMethod, params, fallbackPaths.toArray(String[]::new));
+    }
+
+    private void putSongRequestParams(Map<String, String> params, Song song) {
+        String songId = song == null || song.id == null ? "" : song.id.trim();
+        Map<String, Object> sourceRef = song == null || song.sourceRef == null
+            ? Map.of()
+            : song.sourceRef;
+        String providerSongId = firstNonBlank(
+            sourceText(sourceRef, "providerSongId"),
+            sourceText(sourceRef, "songId"),
+            sourceText(sourceRef, "id"),
+            songId
+        );
+        params.put("id", providerSongId);
+        params.put("songid", providerSongId);
+
+        if ("qq".equals(id)) {
+            String mediaMid = firstNonBlank(
+                sourceText(sourceRef, "mediaMid"),
+                sourceText(sourceRef, "media_mid"),
+                sourceText(sourceRef, "songmid"),
+                sourceText(sourceRef, "mid"),
+                songId
+            );
+            params.put("mid", mediaMid);
+            params.put("songmid", mediaMid);
+            putIfPresent(params, "qqId", firstNonBlank(
+                sourceText(sourceRef, "qqId"),
+                sourceText(sourceRef, "songId")
+            ));
+            return;
+        }
+
+        if ("kugou".equals(id)) {
+            KugouSongIdentity encoded = parseKugouSongIdentity(songId);
+            String hash = firstNonBlank(sourceText(sourceRef, "hash"), encoded.hash());
+            String albumAudioId = firstNonBlank(
+                sourceText(sourceRef, "album_audio_id"),
+                sourceText(sourceRef, "albumAudioId"),
+                sourceText(sourceRef, "audio_id"),
+                encoded.albumAudioId()
+            );
+            String albumId = firstNonBlank(
+                sourceText(sourceRef, "album_id"),
+                sourceText(sourceRef, "albumId"),
+                encoded.albumId()
+            );
+            putIfPresent(params, "hash", hash);
+            putIfPresent(params, "album_audio_id", albumAudioId);
+            putIfPresent(params, "audio_id", albumAudioId);
+            putIfPresent(params, "mixsongid", albumAudioId);
+            putIfPresent(params, "album_id", albumId);
+            if (!hash.isBlank()) params.put("id", hash);
+            else if (!albumAudioId.isBlank()) params.put("id", albumAudioId);
+            return;
+        }
+
+        if ("qishui".equals(id)) {
+            String officialId = firstNonBlank(
+                sourceText(sourceRef, "providerSongId"),
+                sourceText(sourceRef, "officialId")
+            );
+            params.put("id", songId);
+            putIfPresent(params, "providerSongId", officialId);
+            putIfPresent(params, "title", firstNonBlank(sourceText(sourceRef, "matchTitle"), song == null ? "" : song.title));
+            putIfPresent(params, "artist", firstNonBlank(sourceText(sourceRef, "matchArtist"), song == null ? "" : song.artist));
+            putIfPresent(params, "duration", firstNonBlank(
+                sourceText(sourceRef, "matchDuration"),
+                song != null && song.duration > 0 ? String.valueOf(song.duration) : ""
+            ));
+            return;
+        }
+
+        params.put("mid", providerSongId);
+        params.put("songmid", providerSongId);
+        params.put("hash", providerSongId);
+    }
+
+    private static String sourceText(Map<String, Object> sourceRef, String key) {
+        return sourceRef == null ? "" : SimpleJson.asString(sourceRef.get(key), "");
     }
 
     private String rawGetAny(Map<String, String> params, String... paths) {
@@ -569,7 +891,13 @@ public final class GenericMusicClient implements MusicProviderClient {
         Map<String, Object> map = SimpleJson.asMap(SimpleJson.parse(json));
         if (map.containsKey("error")) return true;
         Object ok = map.get("ok");
-        return ok instanceof Boolean b && !b;
+        if (ok instanceof Boolean b && !b) return true;
+        Object success = map.get("success");
+        if (success instanceof Boolean b && !b) return true;
+        int errorCode = SimpleJson.asInt(map.get("error_code"), SimpleJson.asInt(map.get("errorCode"), 0));
+        if (errorCode != 0) return true;
+        String type = SimpleJson.asString(map.get("type"), "");
+        return "api".equalsIgnoreCase(type) || "network".equalsIgnoreCase(type);
     }
 
     private static boolean isAddPlaylistSuccess(Map<String, Object> map) {
@@ -588,12 +916,40 @@ public final class GenericMusicClient implements MusicProviderClient {
         return rawRequest("GET", path, params);
     }
 
+    private String rawJsonPost(String path, Map<String, ?> body) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder(buildUri(path, Map.of()))
+                .timeout(Duration.ofSeconds(12))
+                .header("Accept", "application/json, text/plain, */*")
+                .header("Content-Type", "application/json; charset=utf-8")
+                .POST(HttpRequest.BodyPublishers.ofString(
+                    SimpleJson.stringify(body == null ? Map.of() : body),
+                    StandardCharsets.UTF_8
+                ))
+                .build();
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            rememberCookieHeaders(response.headers().allValues("Set-Cookie"));
+            String payload = cleanJsonBody(response.body());
+            if (response.statusCode() >= 400) {
+                Map<String, Object> error = new LinkedHashMap<>(SimpleJson.asMap(SimpleJson.parse(payload)));
+                error.putIfAbsent("error", label + " API HTTP " + response.statusCode());
+                error.put("ok", false);
+                return SimpleJson.stringify(error);
+            }
+            return payload == null || payload.isBlank()
+                ? errorPayload(label + " API returned empty body")
+                : payload;
+        } catch (IOException | InterruptedException | IllegalArgumentException e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            return errorPayload(label + " API unavailable at " + baseUrl + ": " + exceptionDetail(e));
+        }
+    }
+
     private String rawRequest(String method, String path, Map<String, String> params) {
         try {
             HttpRequest.Builder builder = HttpRequest.newBuilder(buildUri(path, params))
-                .timeout(Duration.ofSeconds("qishui".equals(id) ? 25 : 12))
+                .timeout(Duration.ofSeconds(12))
                 .header("Accept", "application/json, text/plain, */*");
-            addQishuiCookieHeader(builder);
             if ("POST".equalsIgnoreCase(method)) {
                 builder.POST(HttpRequest.BodyPublishers.noBody());
             } else {
@@ -602,20 +958,14 @@ public final class GenericMusicClient implements MusicProviderClient {
             HttpRequest request = builder.build();
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             rememberCookieHeaders(response.headers().allValues("Set-Cookie"));
-            if (response.statusCode() >= 400) return errorPayload(label + " API HTTP " + response.statusCode());
             String body = cleanJsonBody(response.body());
+            if (response.statusCode() >= 400) {
+                return errorPayload(label + " API HTTP " + response.statusCode());
+            }
             return body == null || body.isBlank() ? errorPayload(label + " API returned empty body") : body;
         } catch (IOException | InterruptedException | IllegalArgumentException e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
             return errorPayload(label + " API unavailable at " + baseUrl + ": " + exceptionDetail(e));
-        }
-    }
-
-    private void addQishuiCookieHeader(HttpRequest.Builder builder) {
-        if (!"qishui".equals(id)) return;
-        synchronized (session) {
-            String cookie = sessionCookieStringLocked();
-            if (!cookie.isBlank()) builder.header("Cookie", cookie);
         }
     }
 
@@ -648,13 +998,6 @@ public final class GenericMusicClient implements MusicProviderClient {
                 return !firstNonBlank(session.get("token"), cookieValue(sessionCookieStringLocked(), "token")).isBlank()
                     && !firstNonBlank(session.get("userid"), cookieValue(sessionCookieStringLocked(), "userid")).isBlank();
             }
-            if ("qishui".equals(id)) {
-                String cookie = sessionCookieStringLocked();
-                return !firstNonBlank(
-                    session.get("sessionid"), session.get("sessionid_ss"), session.get("sid_tt"), session.get("sid_guard"),
-                    cookieValue(cookie, "sessionid"), cookieValue(cookie, "sessionid_ss"), cookieValue(cookie, "sid_tt"), cookieValue(cookie, "sid_guard")
-                ).isBlank();
-            }
             return false;
         }
     }
@@ -671,13 +1014,6 @@ public final class GenericMusicClient implements MusicProviderClient {
                 if (SimpleJson.asString(account.get("userId"), "").isBlank() && !userid.isBlank()) account.put("userId", userid);
                 if (SimpleJson.asString(account.get("nickname"), "").isBlank()) putIfNotBlank(account, "nickname", session.get("nickname"));
                 if (SimpleJson.asString(account.get("avatarUrl"), "").isBlank()) putIfNotBlank(account, "avatarUrl", session.get("avatarUrl"));
-            } else if ("qishui".equals(id)) {
-                String cookie = sessionCookieStringLocked();
-                String userId = firstNonBlank(session.get("uid_tt"), session.get("uid_tt_ss"), cookieValue(cookie, "uid_tt"), cookieValue(cookie, "uid_tt_ss"));
-                if (SimpleJson.asString(account.get("userId"), "").isBlank()) putIfNotBlank(account, "userId", userId);
-                if (SimpleJson.asString(account.get("nickname"), "").isBlank()) putIfNotBlank(account, "nickname", session.get("nickname"));
-                if (SimpleJson.asString(account.get("avatarUrl"), "").isBlank()) putIfNotBlank(account, "avatarUrl", session.get("avatarUrl"));
-                if (SimpleJson.asString(account.get("nickname"), "").isBlank() && hasAuthSession()) account.put("nickname", "汽水音乐用户");
             }
             if (SimpleJson.asString(account.get("vipType"), "").isBlank()) putIfNotBlank(account, "vipType", session.get("vip_type"));
             if (SimpleJson.asString(account.get("vipToken"), "").isBlank()) putIfNotBlank(account, "vipToken", session.get("vip_token"));
@@ -739,7 +1075,7 @@ public final class GenericMusicClient implements MusicProviderClient {
         if (headers == null || headers.isEmpty()) return;
         Map<String, String> updates = new LinkedHashMap<>();
         for (String header : headers) {
-            for (String cookie : header.split(",(?=\\s*[A-Za-z_][A-Za-z0-9_]*=)")) {
+            for (String cookie : SET_COOKIE_SEPARATOR.split(header)) {
                 int semi = cookie.indexOf(';');
                 String pair = (semi >= 0 ? cookie.substring(0, semi) : cookie).trim();
                 int eq = pair.indexOf('=');
@@ -765,14 +1101,6 @@ public final class GenericMusicClient implements MusicProviderClient {
                 || "userid".equals(lower) || "kugooid".equals(lower) || "kugoo".equals(lower)
                 || "vip_token".equals(lower) || "vip_type".equals(lower)
                 || "dfid".equals(lower) || lower.startsWith("kugou_api_") || "t1".equals(lower);
-        }
-        if ("qishui".equals(id)) {
-            return "sessionid".equals(lower) || "sessionid_ss".equals(lower) || "sid_tt".equals(lower) || "sid_guard".equals(lower)
-                || "uid_tt".equals(lower) || "uid_tt_ss".equals(lower)
-                || "passport_auth_status".equals(lower) || "passport_auth_status_ss".equals(lower)
-                || "passport_csrf_token".equals(lower) || "passport_csrf_token_default".equals(lower)
-                || "ttwid".equals(lower) || "odin_tt".equals(lower) || "install_id".equals(lower)
-                || "store-idc".equals(lower) || "store-country-code".equals(lower) || "store-country-sign".equals(lower);
         }
         return false;
     }
@@ -813,11 +1141,15 @@ public final class GenericMusicClient implements MusicProviderClient {
     private void rememberSession(Map<String, String> updates) {
         if (updates.isEmpty()) return;
         synchronized (session) {
+            boolean changed = false;
             for (Map.Entry<String, String> entry : updates.entrySet()) {
                 if (entry.getValue() == null || entry.getValue().isBlank()) continue;
+                String previous = session.get(entry.getKey());
+                if (entry.getValue().equals(previous)) continue;
                 session.put(entry.getKey(), entry.getValue());
+                changed = true;
             }
-            saveSessionLocked();
+            if (changed) saveSessionLocked();
         }
     }
 
@@ -870,6 +1202,42 @@ public final class GenericMusicClient implements MusicProviderClient {
             if (value != null && !value.isBlank()) return value.trim();
         }
         return "";
+    }
+
+    private static String namedLyricText(Object root, String... names) {
+        if (names == null) return "";
+        for (String name : names) {
+            Object value = findNamedValue(root, name, 0);
+            String direct = SimpleJson.asString(value, "");
+            if (!direct.isBlank()) return direct;
+            String nested = firstString(value, "lyric", "lrc", "lyrics", "content", "text");
+            if (!nested.isBlank()) return nested;
+        }
+        return "";
+    }
+
+    private static Object findNamedValue(Object root, String name, int depth) {
+        if (depth > 8 || root == null || name == null) return null;
+        if (root instanceof List<?>) {
+            for (Object item : SimpleJson.asList(root)) {
+                Object nested = findNamedValue(item, name, depth + 1);
+                if (nested != null) return nested;
+            }
+            return null;
+        }
+        Map<String, Object> map = SimpleJson.asMap(root);
+        if (map.containsKey(name)) return map.get(name);
+        for (Object value : map.values()) {
+            if (!(value instanceof Map<?, ?>) && !(value instanceof List<?>)) continue;
+            Object nested = findNamedValue(value, name, depth + 1);
+            if (nested != null) return nested;
+        }
+        return null;
+    }
+
+    private static void putLyricTrack(Map<String, Object> body, String key, String text) {
+        if (body == null || key == null || text == null || text.isBlank()) return;
+        body.put(key, Map.of("lyric", text));
     }
 
     private static String directString(Map<String, Object> map, String key) {
@@ -987,8 +1355,33 @@ public final class GenericMusicClient implements MusicProviderClient {
             );
         } else if ("kugou".equals(id)) {
             song.id = kugouSongId(map);
+        } else if ("qishui".equals(id)) {
+            song.id = firstNonBlank(
+                directString(map, "id"),
+                directString(map, "providerSongId"),
+                directString(map, "trackId")
+            );
         } else {
-            song.id = firstString(map, "id", "mid", "songmid", "songMid", "songId", "songid", "hash", "Hash", "HASH", "fileHash", "FileHash", "filehash", "rid", "album_audio_id", "mixsongid");
+            song.id = firstString(
+                map,
+                "providerSongId",
+                "trackId",
+                "id",
+                "mid",
+                "songmid",
+                "songMid",
+                "songId",
+                "songid",
+                "hash",
+                "Hash",
+                "HASH",
+                "fileHash",
+                "FileHash",
+                "filehash",
+                "rid",
+                "album_audio_id",
+                "mixsongid"
+            );
         }
         song.title = firstString(map, "title", "name", "songname", "songName", "SongName", "filename", "FileName", "audio_name");
         song.artist = artistName(map.get("artist"));
@@ -1008,7 +1401,50 @@ public final class GenericMusicClient implements MusicProviderClient {
         int duration = SimpleJson.asInt(map.get("duration"), SimpleJson.asInt(map.get("interval"), SimpleJson.asInt(map.get("Duration"), SimpleJson.asInt(map.get("timelen"), 0))));
         song.duration = duration > 1000 ? duration / 1000 : duration;
         song.provider = id;
+        Map<String, Object> sourceRef = new LinkedHashMap<>();
+        if ("qq".equals(id)) {
+            Map<String, Object> file = SimpleJson.asMap(map.get("file"));
+            putSourceRef(sourceRef, "mediaMid", firstNonBlank(
+                directString(file, "media_mid"),
+                directString(map, "media_mid"),
+                directString(map, "songmid"),
+                directString(map, "mid")
+            ));
+            putSourceRef(sourceRef, "qqId", firstString(map, "id", "songId", "songid"));
+        } else if ("kugou".equals(id)) {
+            KugouSongIdentity identity = parseKugouSongIdentity(song.id);
+            putSourceRef(sourceRef, "hash", identity.hash());
+            putSourceRef(sourceRef, "album_audio_id", identity.albumAudioId());
+            putSourceRef(sourceRef, "album_id", identity.albumId());
+        } else if ("qishui".equals(id)) {
+            Map<String, Object> supplied = SimpleJson.asMap(map.get("sourceRef"));
+            putSourceRef(sourceRef, "providerSongId", firstNonBlank(
+                directString(supplied, "providerSongId"),
+                directString(map, "providerSongId")
+            ));
+            putSourceRef(sourceRef, "matchTitle", firstNonBlank(
+                directString(supplied, "matchTitle"),
+                song.title
+            ));
+            putSourceRef(sourceRef, "matchArtist", firstNonBlank(
+                directString(supplied, "matchArtist"),
+                song.artist
+            ));
+            putSourceRef(sourceRef, "matchDuration", firstNonBlank(
+                directString(supplied, "matchDuration"),
+                song.duration > 0 ? String.valueOf(song.duration) : ""
+            ));
+            if (SimpleJson.asBoolean(supplied.get("metadataOnly"), false)) {
+                sourceRef.put("metadataOnly", true);
+            }
+        }
+        song.setSourceRef(sourceRef);
         return song;
+    }
+
+    private static void putSourceRef(Map<String, Object> target, String key, String value) {
+        if (target == null || key == null || value == null || value.isBlank()) return;
+        target.put(key, value.trim());
     }
 
     private static String qqAlbumCover(Map<String, Object> map) {
@@ -1037,12 +1473,56 @@ public final class GenericMusicClient implements MusicProviderClient {
             directString(map, "FileHash"),
             directString(map, "filehash")
         );
-        if (!hash.isBlank()) return hash;
+        if (hash.isBlank()) hash = firstString(map, "hash", "Hash", "HASH", "fileHash", "FileHash", "filehash");
+        String albumAudioId = firstString(
+            map,
+            "album_audio_id",
+            "albumAudioId",
+            "audio_id",
+            "audioId",
+            "Audioid",
+            "AudioID",
+            "mixsongid",
+            "mixSongId",
+            "MixSongID"
+        );
+        String albumId = firstString(map, "album_id", "albumId", "albumid", "albumID", "AlbumID");
+        String fallbackId = firstString(map, "songId", "songid", "id", "rid");
+        if (albumAudioId.isBlank() && hash.isBlank()) albumAudioId = fallbackId;
+        KugouSongIdentity identity = new KugouSongIdentity(hash, albumAudioId, albumId);
+        return identity.compound() ? identity.encoded() : identity.primaryId();
+    }
 
-        hash = firstString(map, "hash", "Hash", "HASH", "fileHash", "FileHash", "filehash");
-        if (!hash.isBlank()) return hash;
+    private static KugouSongIdentity parseKugouSongIdentity(String value) {
+        String raw = value == null ? "" : value.trim();
+        if (raw.startsWith("kg|")) {
+            String[] parts = KUGOU_ID_SEPARATOR.split(raw, -1);
+            if (parts.length == 4) return new KugouSongIdentity(parts[1], parts[2], parts[3]);
+        }
+        if (KUGOU_HASH.matcher(raw).matches()) return new KugouSongIdentity(raw, "", "");
+        if (DECIMAL_ID.matcher(raw).matches()) return new KugouSongIdentity("", raw, "");
+        return new KugouSongIdentity(raw, "", "");
+    }
 
-        return firstString(map, "album_audio_id", "audio_id", "mixsongid", "songId", "songid", "id", "rid");
+    private record KugouSongIdentity(String hash, String albumAudioId, String albumId) {
+        private KugouSongIdentity {
+            hash = hash == null ? "" : hash.trim();
+            albumAudioId = albumAudioId == null ? "" : albumAudioId.trim();
+            albumId = albumId == null ? "" : albumId.trim();
+        }
+
+        private String primaryId() {
+            return !hash.isBlank() ? hash : albumAudioId;
+        }
+
+        private boolean compound() {
+            int populated = (hash.isBlank() ? 0 : 1) + (albumAudioId.isBlank() ? 0 : 1) + (albumId.isBlank() ? 0 : 1);
+            return populated > 1;
+        }
+
+        private String encoded() {
+            return "kg|" + hash + "|" + albumAudioId + "|" + albumId;
+        }
     }
 
     private static Map<String, Object> extractAccount(Map<String, Object> root) {
@@ -1169,48 +1649,6 @@ public final class GenericMusicClient implements MusicProviderClient {
             uri.append('?').append(joiner);
         }
         return URI.create(uri.toString());
-    }
-
-    private String kugouSearchFallback(String keyword, int page, int limit) {
-        String url = "https://songsearch.kugou.com/song_search_v2?keyword=" + encode(keyword)
-            + "&page=" + Math.max(1, page)
-            + "&pagesize=" + Math.max(1, limit)
-            + "&platform=WebFilter";
-        try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                .timeout(Duration.ofSeconds(12))
-                .header("Accept", "application/json, text/plain, */*")
-                .GET()
-                .build();
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (response.statusCode() >= 400) return errorPayload(label + " fallback search HTTP " + response.statusCode());
-            return cleanJsonBody(response.body());
-        } catch (IOException | InterruptedException | IllegalArgumentException e) {
-            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
-            return errorPayload(label + " fallback search unavailable: " + exceptionDetail(e));
-        }
-    }
-
-    private String kugouSongUrlFallback(String songId) {
-        String url = "https://m.kugou.com/app/i/getSongInfo.php?cmd=playInfo&hash=" + encode(songId);
-        try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                .timeout(Duration.ofSeconds(12))
-                .header("Accept", "application/json, text/plain, */*")
-                .header("Referer", "https://www.kugou.com/")
-                .header("User-Agent", "Mozilla/5.0")
-                .GET()
-                .build();
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (response.statusCode() >= 400) return "";
-            Map<String, Object> root = SimpleJson.asMap(SimpleJson.parse(cleanJsonBody(response.body())));
-            String playableUrl = directString(root, "url");
-            if (playableUrl.isBlank()) playableUrl = firstString(root.get("backup_url"), "url");
-            return isPlayableWebAudio(playableUrl) ? playableUrl : "";
-        } catch (IOException | InterruptedException | IllegalArgumentException e) {
-            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
-            return "";
-        }
     }
 
     private static String cleanJsonBody(String body) {

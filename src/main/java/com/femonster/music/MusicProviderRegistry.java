@@ -54,20 +54,27 @@ public final class MusicProviderRegistry {
         return get(provider).accountPayload();
     }
 
-    public String loginQrKeyPayload(String provider) {
-        return get(provider).loginQrKeyPayload();
+    public Map<String, Object> configureLogin(String provider, Map<String, String> credentials) {
+        return get(provider).configureLogin(credentials);
     }
 
-    public String loginQrCreatePayload(String provider, String key, boolean qrimg) {
-        return get(provider).loginQrCreatePayload(key, qrimg);
+    public Map<String, Object> localClientStatus(String provider) {
+        return get(provider).localClientStatus();
     }
 
-    public String loginQrCheckPayload(String provider, String key) {
-        return get(provider).loginQrCheckPayload(key);
+    public Map<String, Object> importLibraryMetadata(String provider, Map<String, Object> library) {
+        return get(provider).importLibraryMetadata(library);
     }
 
     public void rememberBrowserSession(String provider, Map<String, String> cookies) {
         get(provider).rememberBrowserSession(cookies);
+    }
+
+    public boolean clearBrowserSession(String provider) {
+        MusicProviderClient client = providers.get(normalize(provider));
+        if (client == null) return false;
+        client.clearBrowserSession();
+        return true;
     }
 
     public Map<String, Object> search(String provider, String keyword, int page, int limit) {
@@ -78,8 +85,30 @@ public final class MusicProviderRegistry {
         return get(provider).songUrl(id, quality);
     }
 
+    public PlaybackSource resolvePlayback(String provider, Song song, String quality) {
+        return get(provider).resolvePlayback(song, quality);
+    }
+
     public Map<String, Object> songUrlPayload(String provider, String id, String quality) {
         return get(provider).songUrlPayload(id, quality);
+    }
+
+    public Map<String, Object> songUrlPayload(String provider, Song song, String quality) {
+        return get(provider).resolvePlayback(song, quality).toMap();
+    }
+
+    public Map<String, Object> lyricPayload(String provider, String songId) {
+        return get(provider).lyricPayload(songId);
+    }
+
+    public Map<String, Object> lyricPayload(
+        String provider,
+        String songId,
+        String title,
+        String artist,
+        int durationSeconds
+    ) {
+        return get(provider).lyricPayload(songId, title, artist, durationSeconds);
     }
 
     public Map<String, Object> userPlaylistsPayload(String provider) {
@@ -108,7 +137,6 @@ public final class MusicProviderRegistry {
         if ("163".equals(value) || "wangyiyun".equals(value)) return "netease";
         if ("qqmusic".equals(value) || "tencent".equals(value)) return "qq";
         if ("kg".equals(value) || "kugoumusic".equals(value)) return "kugou";
-        if ("soda".equals(value) || "qishuimusic".equals(value)) return "qishui";
         return value;
     }
 

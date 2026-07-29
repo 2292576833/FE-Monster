@@ -15,19 +15,47 @@ public interface MusicProviderClient {
 
     Map<String, Object> accountPayload();
 
-    String loginQrKeyPayload();
+    default Map<String, Object> configureLogin(Map<String, String> credentials) {
+        throw new IllegalArgumentException("provider does not support direct login configuration: " + id());
+    }
 
-    String loginQrCreatePayload(String key, boolean qrimg);
+    default Map<String, Object> localClientStatus() {
+        throw new IllegalArgumentException("provider does not support local client detection: " + id());
+    }
 
-    String loginQrCheckPayload(String key);
+    default Map<String, Object> importLibraryMetadata(Map<String, Object> library) {
+        throw new IllegalArgumentException("provider does not support library metadata import: " + id());
+    }
 
     void rememberBrowserSession(Map<String, String> cookies);
+
+    default void clearBrowserSession() {
+        // Providers without a persisted browser session have nothing to clear.
+    }
 
     Map<String, Object> search(String keyword, int page, int limit);
 
     String songUrl(String id, String quality);
 
     Map<String, Object> songUrlPayload(String id, String quality);
+
+    default PlaybackSource resolvePlayback(Song song, String quality) {
+        if (song == null || !song.hasIdentity()) {
+            return PlaybackSource.unavailable(id(), quality, "song id is missing");
+        }
+        return PlaybackSource.fromPayload(id(), quality, songUrlPayload(song.id, quality));
+    }
+
+    Map<String, Object> lyricPayload(String songId);
+
+    default Map<String, Object> lyricPayload(
+        String songId,
+        String title,
+        String artist,
+        int durationSeconds
+    ) {
+        return lyricPayload(songId);
+    }
 
     Map<String, Object> userPlaylistsPayload();
 

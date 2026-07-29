@@ -6,6 +6,8 @@ import com.femonster.json.SimpleJson;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -18,6 +20,7 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -46,6 +49,10 @@ public final class MusicApiConfigService implements AutoCloseable {
     private static final int MAX_ZIP_ENTRIES = 256;
     private static final Set<String> SUPPORTED_IDS = Set.of("netease", "qq", "kugou", "qishui");
     private static final Set<String> PACKAGE_MANIFESTS = Set.of("music-api-package.json", "fe-music-api.json");
+    private static final String BUNDLED_KUGOU_VERSION = "2.0.1";
+    private static final String BUNDLED_KUGOU_FILE = "FE-Monster-Kugou-API-Plugin-" + BUNDLED_KUGOU_VERSION + ".zip";
+    private static final String BUNDLED_QISHUI_VERSION = "3.1.0";
+    private static final String BUNDLED_QISHUI_FILE = "FE-Monster-Qishui-OpenAPI-Plugin-" + BUNDLED_QISHUI_VERSION + ".zip";
     private static final Set<String> WINDOWS_RESERVED = Set.of(
         "con", "prn", "aux", "nul", "clock$",
         "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
@@ -81,6 +88,9 @@ public final class MusicApiConfigService implements AutoCloseable {
         Files.createDirectories(stagingDir);
         Files.createDirectories(logsDir);
         load();
+        cleanupRemovedProviderArtifacts();
+        migrateBundledKugouPackage();
+        migrateBundledQishuiPackage();
     }
 
     public List<ProviderConfig> providers() {
@@ -109,7 +119,7 @@ public final class MusicApiConfigService implements AutoCloseable {
         for (Map<String, Object> item : items) {
             String id = normalizeSupportedId(SimpleJson.asString(item.get("id"), ""));
             ProviderConfig fallback = next.get(id);
-            ProviderConfig parsed = parseProvider(item, fallback, "imported-json", "", null, true, false);
+            ProviderConfig parsed = parseProvider(item, fallback, "imported-json", "", "", null, true, false);
             next.put(id, parsed);
             imported.add(parsed);
         }
@@ -122,6 +132,10 @@ public final class MusicApiConfigService implements AutoCloseable {
     }
 
     public synchronized ImportResult importTrustedZip(InputStream input, boolean trusted) throws IOException {
+        return importTrustedZip(input, trusted, null);
+    }
+
+    private ImportResult importTrustedZip(InputStream input, boolean trusted, String bundledMigrationProvider) throws IOException {
         if (!trusted) throw new IllegalArgumentException("ZIP API package requires explicit local-code trust");
         Path staging = stagingDir.resolve("import-" + UUID.randomUUID()).normalize();
         Files.createDirectories(staging);
@@ -136,6 +150,10 @@ public final class MusicApiConfigService implements AutoCloseable {
             if (!PACKAGE_SCHEMA.equals(schema)) throw new IllegalArgumentException("unsupported music API package schema");
 
             String id = normalizeSupportedId(SimpleJson.asString(root.get("id"), SimpleJson.asString(root.get("provider"), "")));
+            String manifestVersion = validateManifestVersion(SimpleJson.asString(root.get("version"), ""));
+            if ("qishui".equals(id) && !isQishuiOpenApiPackageVersion(manifestVersion)) {
+                throw new IllegalArgumentException("legacy Qishui packages are unsupported; use the official OpenAPI plugin version 3 or newer");
+            }
             ProviderConfig fallback = providers.get(id);
             Path packageRootInStaging = manifest.getParent().toAbsolutePath().normalize();
             Launcher launcher = parseLauncher(root, packageRootInStaging);
@@ -148,8 +166,17 @@ public final class MusicApiConfigService implements AutoCloseable {
 
             ProviderConfig parsed;
             try {
-                parsed = parseProvider(root, fallback, "imported-zip", packageDirectory, launcher, true, true);
+                parsed = parseProvider(root, fallback, "imported-zip", packageDirectory, manifestVersion, launcher, true, true);
                 validateLauncher(parsed);
+                if (bundledMigrationProvider != null) {
+                    String expectedVersion = bundledPackageVersion(bundledMigrationProvider);
+                    if (!bundledMigrationProvider.equals(id) || !expectedVersion.equals(manifestVersion)) {
+                        throw new IllegalArgumentException("bundled music API package identity or version does not match the release");
+                    }
+                    if (!stopManagedProviderForMigration(fallback)) {
+                        throw new BundledMigrationDeferredException("legacy provider listener is not managed by this installation");
+                    }
+                }
                 Map<String, ProviderConfig> next = new LinkedHashMap<>(providers);
                 next.put(id, parsed);
                 activate(next);
@@ -159,6 +186,7 @@ public final class MusicApiConfigService implements AutoCloseable {
             }
             stop(id);
             cleanupReplacedPackage(fallback, parsed);
+            if (bundledMigrationProvider != null) statuses.put(id, "bundled-upgraded");
             return new ImportResult(List.of(parsed), true);
         } catch (IOException | RuntimeException error) {
             deleteTree(staging);
@@ -176,6 +204,7 @@ public final class MusicApiConfigService implements AutoCloseable {
             item.put("appName", config.appName());
             item.put("baseUrl", config.baseUrl());
             item.put("healthPath", config.healthPath());
+            item.put("version", config.manifestVersion().isBlank() ? null : config.manifestVersion());
             item.put("enabled", config.enabled());
             item.put("configured", config.configured());
             item.put("autostart", config.autostart());
@@ -269,16 +298,26 @@ public final class MusicApiConfigService implements AutoCloseable {
                 if (Files.size(configFile) > MAX_JSON_BYTES) throw new IllegalArgumentException("music API config exceeds 64 KB");
                 Map<String, Object> root = parseConfigObject(Files.readString(configFile, StandardCharsets.UTF_8));
                 for (Map<String, Object> item : providerMaps(root)) {
-                    String id = normalizeSupportedId(SimpleJson.asString(item.get("id"), ""));
+                    String id = normalizeId(SimpleJson.asString(item.get("id"), ""));
+                    if (!SUPPORTED_IDS.contains(id)) continue;
                     ProviderConfig fallback = next.get(id);
                     String source = SimpleJson.asString(item.get("source"), fallback.source());
                     if (!Set.of("imported-json", "imported-zip").contains(source)) continue;
+                    String storedVersion = SimpleJson.asString(item.get("version"), "");
+                    if ("qishui".equals(id)
+                        && "imported-zip".equals(source)
+                        && !isQishuiOpenApiPackageVersion(storedVersion)) {
+                        continue;
+                    }
                     Launcher launcher = "imported-zip".equals(source) ? parseStoredLauncher(item) : null;
                     ProviderConfig parsed = parseProvider(
                         item,
                         fallback,
                         source,
                         "imported-zip".equals(source) ? SimpleJson.asString(item.get("package"), "") : "",
+                        "imported-zip".equals(source)
+                            ? validateManifestVersion(SimpleJson.asString(item.get("version"), ""))
+                            : "",
                         launcher,
                         SimpleJson.asBoolean(item.get("configured"), fallback.configured()),
                         true
@@ -333,6 +372,14 @@ public final class MusicApiConfigService implements AutoCloseable {
                 statuses.put(config.id(), "external-service-unavailable");
                 return;
             }
+            if (isPortListening(config)) {
+                statuses.put(config.id(), "replacing-stale-package");
+                if (!reclaimManagedPackageListener(config)) {
+                    statuses.put(config.id(), "port-conflict-unmanaged");
+                    return;
+                }
+                if (closed || !isCurrent(config)) return;
+            }
             statuses.put(config.id(), "starting");
             ProcessBuilder builder = processBuilder(config);
             Path logFile = logsDir.resolve(config.id() + ".log");
@@ -379,7 +426,7 @@ public final class MusicApiConfigService implements AutoCloseable {
     }
 
     private boolean isCurrent(ProviderConfig config) {
-        return config != null && config.equals(providers.get(config.id()));
+        return config != null && config.equals(provider(config.id()));
     }
 
     private ProcessBuilder processBuilder(ProviderConfig config) throws IOException {
@@ -485,6 +532,7 @@ public final class MusicApiConfigService implements AutoCloseable {
         ProviderConfig fallback,
         String source,
         String packageDirectory,
+        String manifestVersion,
         Launcher launcher,
         boolean configured,
         boolean allowStoredLauncher
@@ -497,23 +545,27 @@ public final class MusicApiConfigService implements AutoCloseable {
         String healthPath = validateHealthPath(SimpleJson.asString(map.get("healthPath"), fallback.healthPath()));
         boolean enabled = SimpleJson.asBoolean(map.get("enabled"), fallback.enabled());
         boolean autostart = SimpleJson.asBoolean(map.get("autostart"), launcher != null && fallback.autostart());
-        boolean loginQr = SimpleJson.asBoolean(map.get("loginQr"), fallback.loginQr());
+        // Desktop login is exclusively handled by OfficialBrowserLoginService.
+        // Ignore legacy plugin manifests/config files that still advertise the
+        // removed embedded QR flow so an upgrade cannot bring that UI back.
+        boolean loginQr = false;
         String safePackage = normalizePackageDirectory(packageDirectory);
+        String safeManifestVersion = validateManifestVersion(manifestVersion);
         Launcher safeLauncher = allowStoredLauncher ? launcher : null;
-        return new ProviderConfig(id, label, appName, baseUrl, healthPath, enabled, configured, autostart, loginQr, source, safePackage, safeLauncher);
+        return new ProviderConfig(id, label, appName, baseUrl, healthPath, safeManifestVersion, enabled, configured, autostart, loginQr, source, safePackage, safeLauncher);
     }
 
     private Map<String, ProviderConfig> defaults() {
         LinkedHashMap<String, ProviderConfig> map = new LinkedHashMap<>();
-        map.put("netease", pluginSlot("netease", "网易云", "网易云音乐 App", "http://127.0.0.1:3010", "/login/status", true));
-        map.put("qq", pluginSlot("qq", "QQ音乐", "QQ音乐 App", "http://127.0.0.1:3011", "/getHotkey", true));
-        map.put("kugou", pluginSlot("kugou", "酷狗音乐", "酷狗音乐 App", "http://127.0.0.1:3012", "/search/hot", true));
-        map.put("qishui", pluginSlot("qishui", "汽水音乐", "汽水音乐 App", "http://127.0.0.1:3013", "/health", false));
+        map.put("netease", pluginSlot("netease", "网易云", "网易云音乐 App", "http://127.0.0.1:3010", "/login/status", false));
+        map.put("qq", pluginSlot("qq", "QQ音乐", "QQ音乐 App", "http://127.0.0.1:3011", "/getHotkey", false));
+        map.put("kugou", pluginSlot("kugou", "酷狗音乐", "酷狗音乐 App", "http://127.0.0.1:3012", "/search/hot", false));
+        map.put("qishui", pluginSlot("qishui", "汽水音乐", "汽水音乐 OpenAPI", "http://127.0.0.1:3013", "/health", false));
         return map;
     }
 
     private ProviderConfig pluginSlot(String id, String label, String appName, String baseUrl, String healthPath, boolean loginQr) {
-        return new ProviderConfig(id, label, appName, baseUrl, healthPath, true, false, false, loginQr, "plugin-slot", "", null);
+        return new ProviderConfig(id, label, appName, baseUrl, healthPath, "", true, false, false, loginQr, "plugin-slot", "", null);
     }
 
     private List<Path> extractZip(InputStream input, Path staging) throws IOException {
@@ -588,12 +640,375 @@ public final class MusicApiConfigService implements AutoCloseable {
                 .timeout(Duration.ofSeconds(2))
                 .GET()
                 .build();
-            HttpResponse<Void> response = http.send(request, HttpResponse.BodyHandlers.discarding());
-            return response.statusCode() >= 200 && response.statusCode() < 300;
+            HttpResponse<InputStream> response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            try (InputStream body = response.body()) {
+                if (response.statusCode() < 200 || response.statusCode() >= 300) return false;
+                if (config.manifestVersion().isBlank()) return true;
+                byte[] bytes = body.readNBytes(MAX_JSON_BYTES + 1);
+                if (bytes.length > MAX_JSON_BYTES) return false;
+                Map<String, Object> payload = parseConfigObject(new String(bytes, StandardCharsets.UTF_8));
+                String provider = SimpleJson.asString(payload.get("provider"), "").trim().toLowerCase(Locale.ROOT);
+                String version = SimpleJson.asString(payload.get("version"), "").trim();
+                return config.id().equals(provider) && config.manifestVersion().equals(version);
+            }
         } catch (IOException | InterruptedException | IllegalArgumentException error) {
             if (error instanceof InterruptedException) Thread.currentThread().interrupt();
             return false;
         }
+    }
+
+    private void migrateBundledKugouPackage() {
+        ProviderConfig current = providers.get("kugou");
+        if (!eligibleForBundledKugouMigration(current)) return;
+        Path packageZip = bundledKugouPackage();
+        if (packageZip == null) return;
+
+        try (InputStream input = Files.newInputStream(packageZip)) {
+            importTrustedZip(input, true, "kugou");
+        } catch (BundledMigrationDeferredException error) {
+            statuses.put("kugou", "bundled-upgrade-port-conflict");
+        } catch (IOException | RuntimeException error) {
+            statuses.put("kugou", "bundled-upgrade-failed");
+        }
+    }
+
+    private void migrateBundledQishuiPackage() {
+        ProviderConfig current = providers.get("qishui");
+        if (!eligibleForBundledMigration(current, BUNDLED_QISHUI_VERSION)) return;
+        Path packageZip = bundledPackage(BUNDLED_QISHUI_FILE);
+        if (packageZip == null) return;
+
+        try (InputStream input = Files.newInputStream(packageZip)) {
+            importTrustedZip(input, true, "qishui");
+        } catch (BundledMigrationDeferredException error) {
+            statuses.put("qishui", "bundled-upgrade-port-conflict");
+        } catch (IOException | RuntimeException error) {
+            statuses.put("qishui", "bundled-upgrade-failed");
+        }
+    }
+
+    private void cleanupRemovedProviderArtifacts() {
+        deleteTree(paths.dataDir.resolve("official-browser-login").resolve("qishui"));
+        deleteTree(paths.dataDir.resolve("qishui-open-api"));
+        deleteFile(paths.dataDir.resolve("qishui-auth.json"));
+        deleteFile(logsDir.resolve("qishui.log"));
+        deleteFile(paths.root
+            .resolve("dist")
+            .resolve("plugins")
+            .resolve("FE-Monster-Qishui-API-Plugin-2.0.0.zip"));
+    }
+
+    private static void deleteLegacyProviderDirectories(Path parent, String prefix) {
+        Path normalizedParent = parent.toAbsolutePath().normalize();
+        if (!Files.isDirectory(normalizedParent)) return;
+        try (var entries = Files.list(normalizedParent)) {
+            entries
+                .filter(path -> path.getFileName().toString().startsWith(prefix))
+                .map(path -> path.toAbsolutePath().normalize())
+                .filter(path -> path.startsWith(normalizedParent))
+                .forEach(MusicApiConfigService::deleteTree);
+        } catch (IOException ignored) {
+        }
+    }
+
+    private static void deleteFile(Path file) {
+        try {
+            Files.deleteIfExists(file.toAbsolutePath().normalize());
+        } catch (IOException ignored) {
+        }
+    }
+
+    private boolean eligibleForBundledKugouMigration(ProviderConfig current) {
+        return eligibleForBundledMigration(current, BUNDLED_KUGOU_VERSION);
+    }
+
+    private boolean eligibleForBundledMigration(ProviderConfig current, String bundledVersionValue) {
+        if (current == null || !"imported-zip".equals(current.source()) || current.packageDirectory().isBlank()) {
+            return false;
+        }
+        String installed = current.manifestVersion();
+        if (installed.isBlank()) return true;
+        int[] installedVersion = numericVersion(installed);
+        int[] bundledVersion = numericVersion(bundledVersionValue);
+        if (installedVersion == null || bundledVersion == null) return false;
+        for (int index = 0; index < Math.max(installedVersion.length, bundledVersion.length); index++) {
+            int left = index < installedVersion.length ? installedVersion[index] : 0;
+            int right = index < bundledVersion.length ? bundledVersion[index] : 0;
+            if (left != right) return left < right;
+        }
+        return false;
+    }
+
+    private static int[] numericVersion(String value) {
+        String version = value == null ? "" : value.trim();
+        if (!version.matches("\\d+(?:\\.\\d+)*")) return null;
+        String[] segments = version.split("\\.");
+        int[] numbers = new int[segments.length];
+        try {
+            for (int index = 0; index < segments.length; index++) numbers[index] = Integer.parseInt(segments[index]);
+            return numbers;
+        } catch (NumberFormatException error) {
+            return null;
+        }
+    }
+
+    private static boolean isQishuiOpenApiPackageVersion(String value) {
+        int[] version = numericVersion(value);
+        return version != null && version.length > 0 && version[0] >= 3;
+    }
+
+    private Path bundledKugouPackage() {
+        return bundledPackage(BUNDLED_KUGOU_FILE);
+    }
+
+    private Path bundledPackage(String fileName) {
+        for (Path candidate : List.of(
+            paths.root.resolve("plugins").resolve("music-api").resolve(fileName),
+            paths.root.resolve("dist").resolve("plugins").resolve(fileName)
+        )) {
+            try {
+                if (!Files.isRegularFile(candidate)) continue;
+                Path releaseRoot = paths.root.toRealPath();
+                Path releasePackage = candidate.toRealPath();
+                if (!releasePackage.startsWith(releaseRoot)) continue;
+                return releasePackage;
+            } catch (IOException | RuntimeException ignored) {
+            }
+        }
+        return null;
+    }
+
+    private static String bundledPackageVersion(String providerId) {
+        return switch (providerId) {
+            case "kugou" -> BUNDLED_KUGOU_VERSION;
+            case "qishui" -> BUNDLED_QISHUI_VERSION;
+            default -> throw new IllegalArgumentException("unsupported bundled music API provider");
+        };
+    }
+
+    private boolean stopManagedProviderForMigration(ProviderConfig previous) {
+        if (previous == null) return true;
+        stop(previous.id());
+        if (!isPortListening(previous)) return true;
+        if (!"imported-zip".equals(previous.source()) || previous.packageDirectory().isBlank()) return false;
+        Path previousRoot;
+        try {
+            previousRoot = packageRoot(previous);
+            if (!Files.isDirectory(previousRoot)) return false;
+        } catch (RuntimeException error) {
+            return false;
+        }
+        return reclaimManagedPackageListener(previous, previousRoot);
+    }
+
+    private boolean isPortListening(ProviderConfig config) {
+        try {
+            URI uri = URI.create(config.baseUrl());
+            try (Socket socket = new Socket()) {
+                socket.connect(new InetSocketAddress(uri.getHost(), uri.getPort()), 300);
+                return true;
+            }
+        } catch (IOException | IllegalArgumentException error) {
+            return false;
+        }
+    }
+
+    private boolean reclaimManagedPackageListener(ProviderConfig config) {
+        return reclaimManagedPackageListener(config, packagesDir);
+    }
+
+    private boolean reclaimManagedPackageListener(ProviderConfig config, Path expectedPackageRoot) {
+        int port = URI.create(config.baseUrl()).getPort();
+        Set<Long> listenerIds = listenerProcessIds(port);
+        if (listenerIds.isEmpty()) return false;
+
+        List<ProcessHandle> listeners = new ArrayList<>();
+        for (long pid : listenerIds) {
+            ProcessHandle handle = ProcessHandle.of(pid).orElse(null);
+            if (handle == null || !handle.isAlive() || !isManagedPackageProcess(handle, expectedPackageRoot)) return false;
+            listeners.add(handle);
+        }
+        for (ProcessHandle listener : listeners) destroyProcessTree(listener);
+
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+        while (System.nanoTime() < deadline) {
+            if (!isPortListening(config)) return true;
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        return !isPortListening(config);
+    }
+
+    private Set<Long> listenerProcessIds(int port) {
+        LinkedHashSet<Long> ids = new LinkedHashSet<>();
+        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        List<String> command = windows
+            ? List.of("netstat.exe", "-ano", "-p", "TCP")
+            : List.of("lsof", "-nP", "-iTCP:" + port, "-sTCP:LISTEN", "-t");
+        try {
+            Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+            byte[] bytes = process.getInputStream().readNBytes(2 * 1024 * 1024);
+            if (!process.waitFor(3, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return Set.of();
+            }
+            if (process.exitValue() != 0 && bytes.length == 0) return Set.of();
+            String output = new String(bytes, StandardCharsets.UTF_8);
+            for (String line : output.split("\\R")) {
+                String trimmed = line.trim();
+                if (trimmed.isBlank()) continue;
+                if (!windows) {
+                    try { ids.add(Long.parseLong(trimmed)); } catch (NumberFormatException ignored) {}
+                    continue;
+                }
+                String[] fields = trimmed.split("\\s+");
+                if (fields.length < 5 || !"TCP".equalsIgnoreCase(fields[0])
+                    || !"LISTENING".equalsIgnoreCase(fields[3])
+                    || !fields[1].endsWith(":" + port)) continue;
+                try { ids.add(Long.parseLong(fields[4])); } catch (NumberFormatException ignored) {}
+            }
+        } catch (IOException | InterruptedException error) {
+            if (error instanceof InterruptedException) Thread.currentThread().interrupt();
+            return Set.of();
+        }
+        return ids;
+    }
+
+    private boolean isManagedPackageProcess(ProcessHandle process) {
+        return isManagedPackageProcess(process, packagesDir);
+    }
+
+    private boolean isManagedPackageProcess(ProcessHandle process, Path expectedPackageRoot) {
+        if (process.pid() == ProcessHandle.current().pid()) return false;
+        ProcessHandle.Info info = process.info();
+        String command = info.command().orElse("");
+        String[] arguments = processArguments(process, info);
+        if (command.isBlank() || arguments.length == 0) return false;
+
+        String executable;
+        try {
+            executable = Path.of(command).getFileName().toString().toLowerCase(Locale.ROOT);
+        } catch (RuntimeException error) {
+            return false;
+        }
+        String entry = "";
+        if ("node".equals(executable) || "node.exe".equals(executable)) {
+            for (String argument : arguments) {
+                if (argument == null || argument.isBlank() || argument.startsWith("-")) continue;
+                entry = argument;
+                break;
+            }
+        } else if ("java".equals(executable) || "java.exe".equals(executable)) {
+            entry = argumentAfter(arguments, "-jar");
+        } else if ("powershell".equals(executable) || "powershell.exe".equals(executable)
+            || "pwsh".equals(executable) || "pwsh.exe".equals(executable)) {
+            entry = argumentAfterIgnoreCase(arguments, "-File");
+        } else {
+            return false;
+        }
+        return isPathInsideManagedRoot(entry, expectedPackageRoot);
+    }
+
+    private String[] processArguments(ProcessHandle process, ProcessHandle.Info info) {
+        String[] direct = info.arguments().orElse(new String[0]);
+        if (direct.length > 0) return direct;
+        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        if (!windows) return direct;
+
+        String script = "$p=Get-CimInstance Win32_Process -Filter 'ProcessId = " + process.pid()
+            + "';if($null -ne $p){[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$p.CommandLine))}";
+        try {
+            Process query = new ProcessBuilder(
+                "powershell.exe", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script
+            ).redirectErrorStream(true).start();
+            byte[] bytes = query.getInputStream().readNBytes(MAX_JSON_BYTES + 1);
+            if (!query.waitFor(3, TimeUnit.SECONDS)) {
+                query.destroyForcibly();
+                return new String[0];
+            }
+            if (query.exitValue() != 0 || bytes.length > MAX_JSON_BYTES) return new String[0];
+            String encoded = new String(bytes, StandardCharsets.UTF_8).trim();
+            if (encoded.isBlank()) return new String[0];
+            List<String> commandLine = parseWindowsCommandLine(new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8));
+            if (commandLine.size() <= 1) return new String[0];
+            return commandLine.subList(1, commandLine.size()).toArray(String[]::new);
+        } catch (IOException | InterruptedException | IllegalArgumentException error) {
+            if (error instanceof InterruptedException) Thread.currentThread().interrupt();
+            return new String[0];
+        }
+    }
+
+    private static List<String> parseWindowsCommandLine(String commandLine) {
+        List<String> values = new ArrayList<>();
+        int index = 0;
+        while (index < commandLine.length()) {
+            while (index < commandLine.length() && Character.isWhitespace(commandLine.charAt(index))) index++;
+            if (index >= commandLine.length()) break;
+            StringBuilder value = new StringBuilder();
+            boolean quoted = false;
+            while (index < commandLine.length()) {
+                int slashes = 0;
+                while (index < commandLine.length() && commandLine.charAt(index) == '\\') {
+                    slashes++;
+                    index++;
+                }
+                if (index < commandLine.length() && commandLine.charAt(index) == '"') {
+                    value.append("\\".repeat(slashes / 2));
+                    if ((slashes & 1) == 1) {
+                        value.append('"');
+                        index++;
+                    } else if (quoted && index + 1 < commandLine.length() && commandLine.charAt(index + 1) == '"') {
+                        value.append('"');
+                        index += 2;
+                    } else {
+                        quoted = !quoted;
+                        index++;
+                    }
+                    continue;
+                }
+                value.append("\\".repeat(slashes));
+                if (index >= commandLine.length() || (!quoted && Character.isWhitespace(commandLine.charAt(index)))) break;
+                value.append(commandLine.charAt(index++));
+            }
+            values.add(value.toString());
+            while (index < commandLine.length() && Character.isWhitespace(commandLine.charAt(index))) index++;
+        }
+        return values;
+    }
+
+    private boolean isPathInsideManagedRoot(String raw, Path expectedRoot) {
+        if (raw == null || raw.isBlank()) return false;
+        String value = raw.trim();
+        if (value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+            value = value.substring(1, value.length() - 1);
+        }
+        try {
+            Path candidate = Path.of(value);
+            if (!candidate.isAbsolute() || !Files.isRegularFile(candidate)) return false;
+            Path managedRoot = expectedRoot.toRealPath();
+            Path realEntry = candidate.toRealPath();
+            return !realEntry.equals(managedRoot) && realEntry.startsWith(managedRoot);
+        } catch (IOException | RuntimeException error) {
+            return false;
+        }
+    }
+
+    private static String argumentAfter(String[] arguments, String marker) {
+        for (int index = 0; index + 1 < arguments.length; index++) {
+            if (marker.equals(arguments[index])) return arguments[index + 1];
+        }
+        return "";
+    }
+
+    private static String argumentAfterIgnoreCase(String[] arguments, String marker) {
+        for (int index = 0; index + 1 < arguments.length; index++) {
+            if (marker.equalsIgnoreCase(arguments[index])) return arguments[index + 1];
+        }
+        return "";
     }
 
     private Path packageRoot(ProviderConfig config) {
@@ -725,6 +1140,39 @@ public final class MusicApiConfigService implements AutoCloseable {
         return path;
     }
 
+    private static void destroyProcessTree(ProcessHandle process) {
+        List<ProcessHandle> descendants = process.descendants()
+            .sorted(Comparator.comparingLong(ProcessHandle::pid).reversed())
+            .toList();
+        descendants.forEach(handle -> {
+            try { handle.destroy(); } catch (RuntimeException ignored) {}
+        });
+        try { process.destroy(); } catch (RuntimeException ignored) {}
+
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+        while (process.isAlive() && System.nanoTime() < deadline) {
+            try {
+                Thread.sleep(25);
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        descendants.forEach(handle -> {
+            try { if (handle.isAlive()) handle.destroyForcibly(); } catch (RuntimeException ignored) {}
+        });
+        try { if (process.isAlive()) process.destroyForcibly(); } catch (RuntimeException ignored) {}
+    }
+
+    private static String validateManifestVersion(String value) {
+        String version = value == null ? "" : value.trim();
+        if (version.isBlank()) return "";
+        if (!version.matches("[A-Za-z0-9][A-Za-z0-9._+\\-]{0,31}")) {
+            throw new IllegalArgumentException("invalid music API package version");
+        }
+        return version;
+    }
+
     private static String normalizePackageDirectory(String value) {
         String path = value == null ? "" : value.trim().replace('\\', '/');
         if (path.isBlank()) return "";
@@ -801,6 +1249,7 @@ public final class MusicApiConfigService implements AutoCloseable {
         String appName,
         String baseUrl,
         String healthPath,
+        String manifestVersion,
         boolean enabled,
         boolean configured,
         boolean autostart,
@@ -810,7 +1259,7 @@ public final class MusicApiConfigService implements AutoCloseable {
         Launcher launcher
     ) {
         public ProviderConfig withBaseUrl(String value) {
-            return new ProviderConfig(id, label, appName, value, healthPath, enabled, configured, autostart, loginQr, source, packageDirectory, launcher);
+            return new ProviderConfig(id, label, appName, value, healthPath, manifestVersion, enabled, configured, autostart, loginQr, source, packageDirectory, launcher);
         }
 
         public Map<String, Object> toMap() {
@@ -820,6 +1269,7 @@ public final class MusicApiConfigService implements AutoCloseable {
             map.put("appName", appName);
             map.put("baseUrl", baseUrl);
             map.put("healthPath", healthPath);
+            if (!manifestVersion.isBlank()) map.put("version", manifestVersion);
             map.put("enabled", enabled);
             map.put("configured", configured);
             map.put("autostart", autostart);
@@ -841,6 +1291,12 @@ public final class MusicApiConfigService implements AutoCloseable {
                 items.add(item);
             }
             return items;
+        }
+    }
+
+    private static final class BundledMigrationDeferredException extends RuntimeException {
+        private BundledMigrationDeferredException(String message) {
+            super(message);
         }
     }
 

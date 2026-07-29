@@ -85,36 +85,6 @@ public final class NeteaseClient implements MusicProviderClient {
     }
 
     @Override
-    public String loginQrKeyPayload() {
-        return rawGet("/login/qr/key", timestampParams(), false);
-    }
-
-    @Override
-    public String loginQrCreatePayload(String key, boolean qrimg) {
-        Map<String, String> params = timestampParams();
-        params.put("key", key == null ? "" : key);
-        params.put("qrimg", String.valueOf(qrimg));
-        return rawGet("/login/qr/create", params, false);
-    }
-
-    @Override
-    public String loginQrCheckPayload(String key) {
-        Map<String, String> params = timestampParams();
-        params.put("key", key == null ? "" : key);
-        String json = rawGet("/login/qr/check", params, false);
-        try {
-            Map<String, Object> root = SimpleJson.asMap(SimpleJson.parse(json));
-            String nextCookie = SimpleJson.asString(root.get("cookie"), "");
-            if (SimpleJson.asInt(root.get("code"), 0) == 803 && !nextCookie.isBlank()) {
-                rememberCookie(nextCookie);
-            }
-        } catch (RuntimeException ignored) {
-            // Keep the original upstream payload so the browser can show the API error.
-        }
-        return json;
-    }
-
-    @Override
     public void rememberBrowserSession(Map<String, String> cookies) {
         if (cookies == null || cookies.isEmpty()) return;
         StringJoiner joined = new StringJoiner("; ");
@@ -125,6 +95,18 @@ public final class NeteaseClient implements MusicProviderClient {
         }
         String nextCookie = joined.toString();
         if (!nextCookie.isBlank()) rememberCookie(nextCookie);
+    }
+
+    @Override
+    public synchronized void clearBrowserSession() {
+        cookie = "";
+        if (authFile == null) return;
+        try {
+            Files.deleteIfExists(authFile);
+            Files.deleteIfExists(authFile.resolveSibling(authFile.getFileName().toString() + ".tmp"));
+        } catch (IOException error) {
+            throw new IllegalStateException("unable to clear NetEase browser session", error);
+        }
     }
 
     public Object jsonGet(String path, Map<String, String> params) {
@@ -227,6 +209,16 @@ public final class NeteaseClient implements MusicProviderClient {
         body.put("provider", "netease");
         body.put("url", url);
         body.put("playable", !url.isBlank());
+        return body;
+    }
+
+    @Override
+    public Map<String, Object> lyricPayload(String songId) {
+        Map<String, Object> body = new LinkedHashMap<>(SimpleJson.asMap(jsonGet(
+            "/lyric",
+            Map.of("id", songId == null ? "" : songId)
+        )));
+        body.putIfAbsent("provider", "netease");
         return body;
     }
 
@@ -526,6 +518,7 @@ public final class NeteaseClient implements MusicProviderClient {
     }
 
     private synchronized void rememberCookie(String nextCookie) {
+        if (nextCookie.equals(cookie)) return;
         cookie = nextCookie;
         if (authFile == null) return;
         try {

@@ -13,6 +13,7 @@ public final class Song {
     public String cover = "";
     public String provider = "netease";
     public int duration = 0;
+    public Map<String, Object> sourceRef = Map.of();
 
     public static Song empty() {
         Song song = new Song();
@@ -29,6 +30,7 @@ public final class Song {
         song.cover = SimpleJson.asString(map.get("cover"), "");
         song.provider = SimpleJson.asString(map.get("provider"), "netease");
         song.duration = SimpleJson.asInt(map.get("duration"), 0);
+        song.sourceRef = copySourceRef(map.get("sourceRef"));
         return song;
     }
 
@@ -41,6 +43,9 @@ public final class Song {
         map.put("cover", cover);
         map.put("provider", provider);
         map.put("duration", duration);
+        if (sourceRef != null && !sourceRef.isEmpty()) {
+            map.put("sourceRef", new LinkedHashMap<>(sourceRef));
+        }
         return map;
     }
 
@@ -57,5 +62,20 @@ public final class Song {
 
     public String displayTitle() {
         return title == null || title.isBlank() ? "Untitled" : title;
+    }
+
+    public void setSourceRef(Map<String, Object> value) {
+        sourceRef = copySourceRef(value);
+    }
+
+    private static Map<String, Object> copySourceRef(Object value) {
+        Map<String, Object> source = SimpleJson.asMap(value);
+        if (source.isEmpty()) return Map.of();
+        Map<String, Object> copy = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : source.entrySet()) {
+            if (entry.getKey() == null || entry.getKey().isBlank() || entry.getValue() == null) continue;
+            copy.put(entry.getKey(), entry.getValue());
+        }
+        return copy.isEmpty() ? Map.of() : Map.copyOf(copy);
     }
 }
