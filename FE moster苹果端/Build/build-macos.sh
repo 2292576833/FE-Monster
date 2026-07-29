@@ -38,6 +38,11 @@ install -m 0755 "${SWIFT_EXECUTABLE}" "${MACOS_DIR}/${APP_NAME}"
 install -m 0644 "${SCRIPT_DIR}/Info.plist" "${CONTENTS}/Info.plist"
 printf 'APPL????' > "${CONTENTS}/PkgInfo"
 
+require_command iconutil
+ICONSET_DIR="${SCRIPT_DIR}/AppIcon.iconset"
+[[ -d "${ICONSET_DIR}" ]] || fail "Missing macOS app icon set: ${ICONSET_DIR}"
+iconutil -c icns "${ICONSET_DIR}" -o "${RESOURCES_DIR}/FE-Monster.icns"
+
 bash "${SCRIPT_DIR}/sync-shared-resources.sh" "${JAVA_JAR}" "${RESOURCES_DIR}"
 
 if [[ "${FE_MONSTER_BUNDLE_JRE:-1}" != "0" ]]; then

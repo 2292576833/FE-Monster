@@ -14,12 +14,14 @@
     <string>6.0</string>
     <key>CFBundleName</key>
     <string>FE Monster</string>
+    <key>CFBundleIconFile</key>
+    <string>FE-Monster</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.1.6</string>
+    <string>1.8.8</string>
     <key>CFBundleVersion</key>
-    <string>116</string>
+    <string>188</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.music</string>
     <key>LSMinimumSystemVersion</key>

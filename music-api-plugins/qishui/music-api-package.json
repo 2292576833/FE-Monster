@@ -1,16 +1,17 @@
 {
   "schema": "fe-monster.music-api-package/v1",
   "id": "qishui",
+  "version": "3.1.0",
   "label": "汽水音乐",
-  "appName": "汽水音乐 App",
+  "appName": "汽水音乐 OpenAPI",
   "baseUrl": "http://127.0.0.1:3013",
   "healthPath": "/health",
   "enabled": true,
   "autostart": true,
-  "loginQr": true,
+  "loginQr": false,
   "launcher": {
-    "runtime": "powershell",
-    "entry": "start.ps1",
+    "runtime": "node",
+    "entry": "server.cjs",
     "args": [
       "--port=${port}",
       "--data-dir=${data}/qishui-music-api"

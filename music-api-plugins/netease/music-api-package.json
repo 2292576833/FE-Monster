@@ -7,7 +7,7 @@
   "healthPath": "/",
   "enabled": true,
   "autostart": true,
-  "loginQr": true,
+  "loginQr": false,
   "launcher": {
     "runtime": "node",
     "entry": "server.cjs",

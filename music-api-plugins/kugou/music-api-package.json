@@ -1,18 +1,20 @@
 {
   "schema": "fe-monster.music-api-package/v1",
   "id": "kugou",
+  "version": "2.0.1",
   "label": "酷狗音乐",
   "appName": "酷狗音乐 App",
   "baseUrl": "http://127.0.0.1:3012",
   "healthPath": "/health",
   "enabled": true,
   "autostart": true,
-  "loginQr": true,
+  "loginQr": false,
   "launcher": {
     "runtime": "node",
     "entry": "server.cjs",
     "args": [
-      "--port=${port}"
+      "--port=${port}",
+      "--data-dir=${data}/kugou-music-api"
     ]
   }
 }
