@@ -6,7 +6,7 @@ The APK does not ask for a computer address, does not use the desktop gateway, a
 
 Local music import/playback, packaged scenes, visual playback, DIY settings and presets work without starting the Windows client or any FE Monster server. Android and Windows use separate storage and runtime processes, so changing or closing one does not affect the other.
 
-Music-platform login runs through a Node.js gateway embedded in the APK. It listens only on Android loopback, requires a per-process random bearer that is never exposed to web content, and stores NetEase, QQ, Kugou and Qishui sessions in separate application-private containers. Platform requests still require Internet access to the platforms themselves, but they never pass through the Windows client or a remote FE Monster service. Community synchronization, Codex and Blender generation remain unavailable in this local package.
+Music-platform login runs through a Node.js gateway embedded in the APK. It listens only on Android loopback, requires a per-process random bearer that is never exposed to web content, and stores NetEase, QQ and Kugou sessions in separate application-private containers. Platform requests still require Internet access to the platforms themselves, but they never pass through the Windows client or a remote FE Monster service. Community synchronization, Codex and Blender generation remain unavailable in this local package.
 
 ## Build
 
@@ -20,12 +20,12 @@ Debug outputs:
 
 ```text
 android/app/build/outputs/apk/debug/app-debug.apk
-dist/FE-Monster-Android-1.1.6-local-debug.apk
+dist/FE-Monster-Android-1.8.8-local-debug.apk
 ```
 
 No server URL or access-key build argument is required.
 
-The build downloads the pinned Node.js Mobile 18.20.4 Android archive when it is not already cached, verifies its SHA-256 checksum, and installs the gateway's production-only npm dependencies into generated Android assets. The Qishui adapter source is tracked under the Android project; its local device identity file is generated only after installation and is never packaged.
+The build downloads the pinned Node.js Mobile 18.20.4 Android archive when it is not already cached, verifies its SHA-256 checksum, and installs the gateway's production-only npm dependencies into generated Android assets.
 
 ## Responsive behavior
 

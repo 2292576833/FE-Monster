@@ -656,8 +656,6 @@ public final class MainActivity extends Activity {
                 if (!sessionDirectory.exists() && !sessionDirectory.mkdirs()) {
                     throw new IOException("Unable to create the music session directory");
                 }
-                int qishuiPort = createGatewayPort();
-                while (qishuiPort == musicGatewayPort) qishuiPort = createGatewayPort();
                 int exitCode = startNodeWithArguments(new String[] {
                     "node",
                     new File(nodeProject, "main.cjs").getAbsolutePath(),
@@ -666,9 +664,7 @@ public final class MainActivity extends Activity {
                     "--token",
                     musicGatewayToken,
                     "--port",
-                    String.valueOf(musicGatewayPort),
-                    "--qishui-port",
-                    String.valueOf(qishuiPort)
+                    String.valueOf(musicGatewayPort)
                 });
                 musicGatewayState = "failed";
                 musicGatewayFailure = "On-device gateway stopped with code " + exitCode;
@@ -867,10 +863,10 @@ public final class MainActivity extends Activity {
                 || "/api/user/playlists".equals(pathname)
                 || "/api/playlist/tracks".equals(pathname)
         ) {
-            return providerFromMusicPath(path).matches("netease|qq|kugou|qishui");
+            return providerFromMusicPath(path).matches("netease|qq|kugou");
         }
         return pathname.matches(
-            "^/api/(netease|qq|kugou|qishui)/(login/(qr/(key|create|check)|status|phone/(send|verify))|user/playlists|playlist/tracks|search|song/url|lyric)$"
+            "^/api/(netease|qq|kugou)/(login/(qr/(key|create|check)|status)|user/playlists|playlist/tracks|search|song/url|lyric)$"
         );
     }
 
@@ -1095,14 +1091,16 @@ public final class MainActivity extends Activity {
         return true;
     }
 
+    private boolean isAllowedBridgeExternalUri(Uri uri) {
+        if (uri == null) return false;
+        String scheme = uri.getScheme();
+        return "https".equalsIgnoreCase(scheme) || "http".equalsIgnoreCase(scheme);
+    }
+
     private void openExternal(Uri uri) {
+        if (!isAllowedBridgeExternalUri(uri)) return;
         try {
-            if ("intent".equalsIgnoreCase(uri.getScheme())) {
-                Intent intent = Intent.parseUri(uri.toString(), Intent.URI_INTENT_SCHEME);
-                startActivity(intent);
-            } else {
-                startActivity(new Intent(Intent.ACTION_VIEW, uri));
-            }
+            startActivity(new Intent(Intent.ACTION_VIEW, uri));
         } catch (Exception ignored) {
             Toast.makeText(this, "无法打开外部链接", Toast.LENGTH_SHORT).show();
         }
@@ -1302,7 +1300,7 @@ public final class MainActivity extends Activity {
         @JavascriptInterface
         public boolean clearMusicApiSession(String provider) {
             String normalized = provider == null ? "" : provider.trim().toLowerCase(Locale.ROOT);
-            if (!normalized.matches("netease|qq|kugou|qishui")) return false;
+            if (!normalized.matches("netease|qq|kugou")) return false;
             getPrefs().edit().remove(musicSessionKey(normalized)).apply();
             return true;
         }
@@ -1312,6 +1310,7 @@ public final class MainActivity extends Activity {
             if (uriValue == null || uriValue.trim().isEmpty()) return false;
             try {
                 Uri uri = Uri.parse(uriValue.trim());
+                if (!isAllowedBridgeExternalUri(uri)) return false;
                 runOnUiThread(() -> MainActivity.this.openExternal(uri));
                 return true;
             } catch (Exception ignored) {

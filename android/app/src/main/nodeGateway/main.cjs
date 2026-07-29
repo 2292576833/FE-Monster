@@ -8,7 +8,6 @@ const path = require("node:path");
 
 const HOST = "127.0.0.1";
 const PORT = Number.parseInt(argument("--port", "31110"), 10);
-const QISHUI_PORT = Number.parseInt(argument("--qishui-port", "31113"), 10);
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_UPSTREAM_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MAX_SEARCH_RESULTS = 50;
@@ -35,7 +34,6 @@ function installWritableRuntimePaths() {
   process.env.TMPDIR = path.join(dataDir, "tmp");
   process.env.TMP = process.env.TMPDIR;
   process.env.TEMP = process.env.TMPDIR;
-  process.env.QISHUI_DEVICE_STATE_FILE = path.join(dataDir, "qishui-device.json");
   fs.mkdirSync(process.env.TMPDIR, { recursive: true });
   return dataDir;
 }
@@ -667,60 +665,10 @@ async function invokeProvider(provider, endpoint, params) {
   throw Object.assign(new Error("unknown provider"), { status: 404 });
 }
 
-async function proxyQishui(request, response, endpoint, url, params) {
-  const payload = request.method === "GET" ? null : Buffer.from(JSON.stringify(params), "utf8");
-  const headers = { Accept: "application/json" };
-  headers["X-FE-Android-Gateway-Token"] = GATEWAY_TOKEN;
-  const cookie = parseCookie(request.headers.cookie);
-  if (cookie) headers.Cookie = cookie;
-  if (payload) {
-    headers["Content-Type"] = "application/json; charset=utf-8";
-    headers["Content-Length"] = String(payload.length);
-  }
-  await new Promise((resolve, reject) => {
-    const upstream = http.request({
-      hostname: HOST,
-      port: QISHUI_PORT,
-      method: request.method,
-      path: endpoint + url.search,
-      headers,
-      timeout: 15000,
-    }, (result) => {
-      const chunks = [];
-      result.on("data", (chunk) => chunks.push(chunk));
-      result.on("end", () => {
-        let body;
-        try { body = JSON.parse(Buffer.concat(chunks).toString("utf8")); }
-        catch { body = { ok: false, error: "invalid Qishui response" }; }
-        json(response, result.statusCode || 502, body, result.headers["set-cookie"] || []);
-        resolve();
-      });
-    });
-    upstream.once("error", reject);
-    upstream.once("timeout", () => upstream.destroy(new Error("Qishui request timed out")));
-    if (payload) upstream.write(payload);
-    upstream.end();
-  });
-}
-
-function startQishui() {
-  process.env.PORT = String(QISHUI_PORT);
-  process.env.HOST = HOST;
-  process.env.FE_ANDROID_GATEWAY_TOKEN = GATEWAY_TOKEN;
-  const bundledAdapter = path.join(__dirname, "providers", "qishui.cjs");
-  const sourceAdapter = path.resolve(__dirname, "../../../../../data/music-api/packages/qishui-1784315285676/server.cjs");
-  require(fs.existsSync(bundledAdapter) ? bundledAdapter : sourceAdapter);
-}
-
 async function main() {
   if (!GATEWAY_TOKEN || GATEWAY_TOKEN.length < 32) throw new Error("gateway token is missing");
-  if (!Number.isInteger(PORT) || PORT < 1024 || PORT > 65535
-      || !Number.isInteger(QISHUI_PORT) || QISHUI_PORT < 1024 || QISHUI_PORT > 65535
-      || PORT === QISHUI_PORT) {
-    throw new Error("gateway ports are invalid");
-  }
+  if (!Number.isInteger(PORT) || PORT < 1024 || PORT > 65535) throw new Error("gateway port is invalid");
   const dataDir = installWritableRuntimePaths();
-  startQishui();
   const server = http.createServer(async (request, response) => {
     try {
       const url = new URL(request.url || "/", `http://${HOST}:${PORT}`);
@@ -741,7 +689,6 @@ async function main() {
           { id: "netease", label: "网易云音乐", appName: "网易云音乐", baseUrl: "android://on-device/netease", enabled: true, configured: true, loginQr: true, phoneLogin: false, status: "on-device" },
           { id: "qq", label: "QQ音乐", appName: "QQ音乐", baseUrl: "android://on-device/qq", enabled: true, configured: true, loginQr: true, phoneLogin: false, status: "on-device" },
           { id: "kugou", label: "酷狗音乐", appName: "酷狗音乐", baseUrl: "android://on-device/kugou", enabled: true, configured: true, loginQr: true, phoneLogin: false, status: "on-device" },
-          { id: "qishui", label: "汽水音乐", appName: "汽水音乐", baseUrl: "android://on-device/qishui", enabled: true, configured: true, loginQr: false, phoneLogin: true, status: "on-device" },
         ];
         json(response, 200, url.pathname === "/api/providers"
           ? { ok: true, mode: "android-on-device", providers }
@@ -764,7 +711,7 @@ async function main() {
       const match = genericEndpoint
         ? [url.pathname, genericProvider, genericEndpoint]
         : url.pathname.match(
-          /^\/api\/(netease|qq|kugou|qishui)(\/login\/(?:qr\/(?:key|create|check)|status|phone\/(?:send|verify))|\/user\/playlists|\/playlist\/tracks|\/search|\/song\/url|\/lyric)$/
+          /^\/api\/(netease|qq|kugou)(\/login\/(?:qr\/(?:key|create|check)|status)|\/user\/playlists|\/playlist\/tracks|\/search|\/song\/url|\/lyric)$/
         );
       if (!match) {
         json(response, 404, { ok: false, error: "endpoint not found" });
@@ -772,15 +719,11 @@ async function main() {
       }
       const provider = match[1];
       const endpoint = match[2];
-      if (!/^(netease|qq|kugou|qishui)$/.test(provider)) {
+      if (!/^(netease|qq|kugou)$/.test(provider)) {
         json(response, 400, { ok: false, error: "unknown provider" });
         return;
       }
       const params = { ...queryParameters(url), ...(await bodyParameters(request)), cookie: request.headers.cookie || "" };
-      if (provider === "qishui") {
-        await proxyQishui(request, response, endpoint, url, params);
-        return;
-      }
       const result = await invokeProvider(provider, endpoint, params);
       json(response, result.status, result.body, result.cookie);
     } catch (error) {

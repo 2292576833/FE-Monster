@@ -6,13 +6,13 @@
 
   const root = document.documentElement;
   const bridge = window.FeMonsterAndroid;
+  if (!window.FeMonsterNative && bridge) window.FeMonsterNative = bridge;
   const nativeFetch = window.fetch.bind(window);
   const storageKey = 'fe-monster.android.local-runtime/v1';
   const providerLabels = {
     netease: '\u7f51\u6613\u4e91\u97f3\u4e50',
     qq: 'QQ\u97f3\u4e50',
-    kugou: '\u9177\u72d7\u97f3\u4e50',
-    qishui: '\u6c7d\u6c34\u97f3\u4e50'
+    kugou: '\u9177\u72d7\u97f3\u4e50'
   };
   const nativeMusicRequests = new Map();
   let nativeMusicRequestSequence = 0;
@@ -126,8 +126,8 @@
         baseUrl: `android://on-device/${id}`,
         enabled: true,
         configured: true,
-        loginQr: id !== 'qishui',
-        phoneLogin: id === 'qishui',
+        loginQr: true,
+        phoneLogin: false,
         status: gatewayState
       }))
     };
@@ -147,7 +147,7 @@
     ].includes(path)) {
       return true;
     }
-    return /^\/api\/(netease|qq|kugou|qishui)\/(login\/(qr\/(key|create|check)|status|phone\/(send|verify))|user\/playlists|playlist\/tracks|search|song\/url|lyric)$/.test(path);
+    return /^\/api\/(netease|qq|kugou)\/(login\/(qr\/(key|create|check)|status)|user\/playlists|playlist\/tracks|search|song\/url|lyric)$/.test(path);
   }
 
   window.feMonsterAndroidMusicResult = (requestId, status, rawPayload) => {
@@ -218,7 +218,7 @@
   }
 
   function providerFrom(url) {
-    const pathMatch = url.pathname.match(/^\/api\/(netease|qq|kugou|qishui)(?:\/|$)/);
+    const pathMatch = url.pathname.match(/^\/api\/(netease|qq|kugou)(?:\/|$)/);
     return pathMatch?.[1] || url.searchParams.get('provider') || 'netease';
   }
 
@@ -345,7 +345,7 @@
     if (path === '/api/visual-bridge/state') {
       return jsonResponse({ ok: true, audio: { source: 'web-audio', energy: 0, bass: 0, beat: 0 } });
     }
-    if (path === '/api/search' || /^\/api\/(netease|qq|kugou|qishui)\/search$/.test(path)) {
+    if (path === '/api/search' || /^\/api\/(netease|qq|kugou)\/search$/.test(path)) {
       return jsonResponse({
         ok: true,
         provider,
@@ -354,16 +354,13 @@
         message: '本机模式不会把搜索发送到电脑或 FE Monster 服务器。'
       });
     }
-    if (path === '/api/login/status' || /^\/api\/(netease|qq|kugou|qishui)\/login\/status$/.test(path)) {
+    if (path === '/api/login/status' || /^\/api\/(netease|qq|kugou)\/login\/status$/.test(path)) {
       return jsonResponse({ ok: true, provider, loggedIn: false, account: {}, mode: 'android-local' });
     }
-    if (/^\/api\/(netease|qq|kugou|qishui)\/login\/qr\/(key|create|check)$/.test(path)) {
+    if (/^\/api\/(netease|qq|kugou)\/login\/qr\/(key|create|check)$/.test(path)) {
       return localOnly(`${providerLabels[provider] || '音乐平台'}账号不会经过 FE Monster 服务器；本机模式暂不绑定平台账号。`, { provider });
     }
-    if (/^\/api\/qishui\/login\/phone\/(send|verify)$/.test(path)) {
-      return localOnly('Android music gateway is unavailable.', { provider });
-    }
-    if (path === '/api/user/playlists' || /^\/api\/(netease|qq|kugou|qishui)\/user\/playlists$/.test(path)) {
+    if (path === '/api/user/playlists' || /^\/api\/(netease|qq|kugou)\/user\/playlists$/.test(path)) {
       return jsonResponse({ ok: true, provider, loggedIn: false, playlists: [] });
     }
     if (path === '/api/sandbox/presets') {
@@ -493,6 +490,7 @@
     root.dataset.feRuntime = 'local';
     root.dataset.feServerState = 'local';
     document.getElementById('runtimeSettingsButton')?.setAttribute('title', 'Android 本机运行 · 不连接电脑端');
+    document.getElementById('musicApiImportPanel')?.remove();
     document.querySelectorAll([
       '.top-favorites-button',
       '.top-search-submit',

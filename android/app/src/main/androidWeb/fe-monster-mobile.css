@@ -24,6 +24,28 @@ html[data-fe-platform="android"] textarea {
   touch-action: manipulation;
 }
 
+html[data-fe-platform="android"] input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1px;
+  height: 1px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
+}
+
+html[data-fe-platform="android"] input[type="range"]::-moz-range-thumb {
+  width: 1px;
+  height: 1px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
+}
+
 html[data-fe-platform="android"] .app-shell.is-playback-page .top-search {
   opacity: 1 !important;
   pointer-events: auto !important;

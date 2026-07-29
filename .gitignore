@@ -42,6 +42,7 @@ web/reactbits/vite-dev*.log
 *.exp
 *.lib
 native/windows/build/
+native/windows/.cmake-build-*/
 native/windows/packages/
 native/windows/setup/bin/
 native/windows/setup/obj/
@@ -62,8 +63,12 @@ videos/
 .tmp/
 .media-home/
 .npm-cache/
+.tools/
 .tmp-hyperframes/
 *.blend1
+
+# Rust native audio build output
+native/rust-audio-upmix/target/
 
 # Local credential/network probe kept outside the fully local Android release
 scripts/check-android-live-music.mjs

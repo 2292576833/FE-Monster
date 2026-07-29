@@ -41,13 +41,11 @@ tasks.register("syncFeMonsterWebAssets", Sync) {
 
 tasks.register("prepareAndroidNodeGateway") {
     def sourceDir = file("src/main/nodeGateway")
-    def qishuiAdapter = file("src/main/nodeGateway/providers/qishui.cjs")
     def neteaseQrCheckPatch = file("src/main/nodeGateway/patches/netease-login-qr-check.js")
     inputs.files(
         new File(sourceDir, "main.cjs"),
         new File(sourceDir, "package.json"),
         new File(sourceDir, "package-lock.json"),
-        qishuiAdapter,
         neteaseQrCheckPatch
     )
     outputs.dir(nodeGatewayAssetsDir)
@@ -61,11 +59,6 @@ tasks.register("prepareAndroidNodeGateway") {
             from(sourceDir)
             include "main.cjs", "package.json", "package-lock.json"
             into projectDir
-        }
-        copy {
-            from(qishuiAdapter)
-            into new File(projectDir, "providers")
-            rename { "qishui.cjs" }
         }
         exec {
             workingDir projectDir
@@ -137,8 +130,8 @@ android {
         applicationId "com.femonster.mobile"
         minSdk 23
         targetSdk 35
-        versionCode 9
-        versionName "1.1.6"
+        versionCode 188
+        versionName "1.8.8"
         externalNativeBuild {
             cmake {
                 arguments "-DANDROID_STL=c++_shared"
