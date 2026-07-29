@@ -24,11 +24,15 @@ internal sealed class FeMonsterForm : Form
     private readonly ClientOptions options;
     private readonly WebView2 webView = new() { Dock = DockStyle.Fill };
     private readonly DesktopSceneHost desktopSceneHost;
+    private readonly NotifyIcon trayIcon;
+    private readonly ContextMenuStrip trayMenu;
+    private readonly Icon trayDisplayIcon;
     private CoreWebView2Environment? webEnvironment;
     private RecordingToolbarForm? recordingToolbar;
     private Rectangle restoreBounds;
     private bool fullscreen;
     private bool serverQuitRequested;
+    private bool trayResourcesDisposed;
 
     public FeMonsterForm(ClientOptions options)
     {
@@ -43,6 +47,25 @@ internal sealed class FeMonsterForm : Form
         MinimumSize = new Size(860, 560);
         BackColor = Color.Black;
         Controls.Add(webView);
+
+        trayMenu = new ContextMenuStrip();
+        trayMenu.Items.Add("显示窗口", null, (_, _) => ShowMainWindow());
+        trayMenu.Items.Add("隐藏窗口", null, (_, _) => HideMainWindow());
+        trayMenu.Items.Add(new ToolStripSeparator());
+        trayMenu.Items.Add("退出 FE Monster", null, (_, _) => Close());
+        trayDisplayIcon = CreateHighContrastTrayIcon();
+        trayIcon = new NotifyIcon
+        {
+            Text = "FE Monster",
+            Icon = trayDisplayIcon,
+            ContextMenuStrip = trayMenu,
+            Visible = true
+        };
+        trayIcon.MouseClick += (_, eventArgs) =>
+        {
+            if (eventArgs.Button == MouseButtons.Left) ShowMainWindow();
+        };
+        trayIcon.DoubleClick += (_, _) => ShowMainWindow();
     }
 
     [DllImport("user32.dll")]
@@ -50,6 +73,9 @@ internal sealed class FeMonsterForm : Form
 
     [DllImport("user32.dll")]
     private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool DestroyIcon(IntPtr handle);
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int attributeValue, int attributeSize);
@@ -63,7 +89,26 @@ internal sealed class FeMonsterForm : Form
     protected override async void OnShown(EventArgs e)
     {
         base.OnShown(e);
-        await InitializeWebViewAsync();
+        try
+        {
+            await InitializeWebViewAsync();
+        }
+        catch (Exception error)
+        {
+            StartupDiagnostics.Write(error);
+            MessageBox.Show(
+                this,
+                "FE Monster could not create its application window.\n\n" +
+                error.Message +
+                "\n\nIf Microsoft Edge WebView2 is missing, install or repair it and retry.\n\n" +
+                "Diagnostic log:\n" +
+                StartupDiagnostics.LogPath,
+                "FE Monster",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error
+            );
+            BeginInvoke(Close);
+        }
     }
 
     protected override void OnResize(EventArgs e)
@@ -80,11 +125,74 @@ internal sealed class FeMonsterForm : Form
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
+        base.OnFormClosing(e);
+        if (e.Cancel) return;
+        DisposeTrayResources();
         desktopSceneHost.Dispose();
         recordingToolbar?.Close();
         recordingToolbar = null;
         RequestServerQuitAsync().GetAwaiter().GetResult();
-        base.OnFormClosing(e);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) DisposeTrayResources();
+        base.Dispose(disposing);
+    }
+
+    private void DisposeTrayResources()
+    {
+        if (trayResourcesDisposed) return;
+        trayResourcesDisposed = true;
+        trayIcon.Visible = false;
+        trayIcon.Dispose();
+        trayMenu.Dispose();
+        trayDisplayIcon.Dispose();
+    }
+
+    private static Icon CreateHighContrastTrayIcon()
+    {
+        using Bitmap bitmap = new(32, 32, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        using Graphics graphics = Graphics.FromImage(bitmap);
+        graphics.Clear(Color.Transparent);
+        graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        using SolidBrush disc = new(Color.FromArgb(255, 20, 229, 255));
+        using Pen border = new(Color.White, 2.25f);
+        using Pen glyph = new(Color.FromArgb(255, 2, 18, 24), 3.5f)
+        {
+            StartCap = LineCap.Round,
+            EndCap = LineCap.Round
+        };
+        graphics.FillEllipse(disc, 2, 2, 28, 28);
+        graphics.DrawEllipse(border, 3, 3, 26, 26);
+        graphics.DrawLine(glyph, 11, 9, 11, 23);
+        graphics.DrawLine(glyph, 11, 10, 22, 10);
+        graphics.DrawLine(glyph, 11, 16, 19, 16);
+
+        IntPtr handle = bitmap.GetHicon();
+        try
+        {
+            return (Icon)Icon.FromHandle(handle).Clone();
+        }
+        finally
+        {
+            DestroyIcon(handle);
+        }
+    }
+
+    internal void ShowMainWindow()
+    {
+        ShowInTaskbar = true;
+        if (!Visible) Show();
+        if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+        Activate();
+        BringToFront();
+    }
+
+    private void HideMainWindow()
+    {
+        Hide();
+        ShowInTaskbar = false;
     }
 
     private async Task InitializeWebViewAsync()
@@ -92,7 +200,8 @@ internal sealed class FeMonsterForm : Form
         var userDataFolder = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "FE Monster",
-            "WebView2"
+            "WebView2",
+            "DesktopHostV2"
         );
         Directory.CreateDirectory(userDataFolder);
 
@@ -126,10 +235,12 @@ internal sealed class FeMonsterForm : Form
         try
         {
             using var document = JsonDocument.Parse(e.WebMessageAsJson);
+            if (document.RootElement.ValueKind != JsonValueKind.Object) return;
             if (!document.RootElement.TryGetProperty("type", out var type))
             {
                 return;
             }
+            if (type.ValueKind != JsonValueKind.String) return;
 
             if (string.Equals(type.GetString(), "fe-recording-toolbar", StringComparison.OrdinalIgnoreCase))
             {
@@ -358,7 +469,7 @@ internal sealed class FeMonsterForm : Form
                 break;
             case "minimize":
             case "minimise":
-                WindowState = FormWindowState.Minimized;
+                HideMainWindow();
                 break;
             case "drag":
                 BeginWindowDrag();

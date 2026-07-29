@@ -2,7 +2,11 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO.Compression;
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.Json;
 using System.Windows.Forms;
 
 namespace FeMonster.Setup;
@@ -15,12 +19,24 @@ internal static class Program
         ApplicationConfiguration.Initialize();
 
         SetupOptions options = SetupOptions.Parse(args);
+        try
+        {
+            SetupEngine.ValidatePlatform();
+        }
+        catch (Exception error)
+        {
+            SetupEngine.WriteDiagnosticLog("platform-preflight", error);
+            if (!options.Quiet) Fail(error.Message);
+            return 2;
+        }
+
         string? exePath = Environment.ProcessPath;
         if (string.IsNullOrWhiteSpace(exePath) || !File.Exists(exePath))
         {
             if (!options.Quiet) Fail("Setup executable path was not found.");
             return 1;
         }
+        SetupEngine.WriteEnvironmentDiagnostic(exePath);
 
         if (options.Quiet)
         {
@@ -265,19 +281,14 @@ internal sealed class SetupForm : Form
     {
         if (installProcess is { HasExited: false })
         {
-            DialogResult result = MessageBox.Show(
-                "Installation is still running. Close anyway?",
+            MessageBox.Show(
+                "Installation is in a protected upgrade phase and cannot be closed yet. Wait for setup to finish.",
                 "FE Monster Setup",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information
             );
-            if (result != DialogResult.Yes)
-            {
-                e.Cancel = true;
-                return;
-            }
-
-            try { installProcess.Kill(entireProcessTree: true); } catch { }
+            e.Cancel = true;
+            return;
         }
 
         logTimer.Stop();
@@ -359,6 +370,7 @@ internal sealed class SetupForm : Form
         installPathBox.Text = installDir;
 
         installButton.Enabled = false;
+        closeButton.Enabled = false;
         installPathBox.Enabled = false;
         browseButton.Enabled = false;
         openFolderButton.Enabled = false;
@@ -369,33 +381,32 @@ internal sealed class SetupForm : Form
 
         try
         {
-            tempRoot = await Task.Run(() => SetupEngine.ExtractBundle(exePath));
+            SetupEngine.ValidateInstallDirectoryBoundary(installDir);
+            tempRoot = await Task.Run(() => SetupEngine.ExtractBundle(exePath, installDir));
+            PayloadPreparation payload = await Task.Run(() => SetupEngine.PreparePayload(tempRoot));
             string installScript = Path.Combine(tempRoot, "install-fe-monster.ps1");
             if (!File.Exists(installScript))
             {
                 throw new InvalidOperationException("Installer script was not found in setup payload.");
             }
+            SetupEngine.ValidateInstallTarget(installDir, payload);
 
-            logPath = Path.Combine(installDir, "out", "install.log");
+            logPath = SetupEngine.CreateInstallerSessionLogPath();
             lastLogLength = 0;
             statusLabel.Text = "Installing FE Monster...";
             logTimer.Start();
 
-            string arguments = "-NoProfile -File " +
-                SetupEngine.QuoteArg(installScript) +
-                " -InstallDir " + SetupEngine.QuoteArg(installDir) +
-                " -NoPopup" +
-                (launchAfterInstallBox.Checked ? "" : " -NoLaunch") +
-                options.ForwardedArgumentLine;
-
-            installProcess = Process.Start(new ProcessStartInfo
-            {
-                FileName = "powershell.exe",
-                Arguments = arguments,
-                WorkingDirectory = tempRoot,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }) ?? throw new InvalidOperationException("Could not start PowerShell installer.");
+            ProcessStartInfo startInfo = SetupEngine.CreateInstallerStartInfo(
+                installScript,
+                installDir,
+                payload.Root,
+                tempRoot,
+                logPath,
+                launchAfterInstallBox.Checked,
+                options.ForwardedArgs
+            );
+            installProcess = Process.Start(startInfo) ??
+                throw new InvalidOperationException("Could not start PowerShell installer.");
 
             await Task.Run(() => installProcess.WaitForExit());
             RefreshLog(force: true);
@@ -407,6 +418,7 @@ internal sealed class SetupForm : Form
                 statusLabel.Text = "FE Monster setup completed.";
                 installButton.Text = "已完成";
                 closeButton.Text = "完成";
+                closeButton.Enabled = true;
             }
             else
             {
@@ -414,6 +426,7 @@ internal sealed class SetupForm : Form
                 statusLabel.Text = "FE Monster setup failed. Check the log below.";
                 installButton.Text = "重新安装";
                 installButton.Enabled = true;
+                closeButton.Enabled = true;
                 installPathBox.Enabled = true;
                 browseButton.Enabled = true;
                 openFolderButton.Enabled = true;
@@ -422,12 +435,14 @@ internal sealed class SetupForm : Form
         }
         catch (Exception error)
         {
+            SetupEngine.WriteDiagnosticLog("interactive-install", error);
             ExitCode = 1;
             progressBar.Style = ProgressBarStyle.Blocks;
             statusLabel.Text = "FE Monster setup failed.";
             AppendLog(error.Message);
             installButton.Text = "重新安装";
             installButton.Enabled = true;
+            closeButton.Enabled = true;
             installPathBox.Enabled = true;
             browseButton.Enabled = true;
             openFolderButton.Enabled = true;
@@ -531,12 +546,6 @@ internal sealed class SetupOptions
 
     private static string GetDefaultInstallDir()
     {
-        const string preferredDrive = @"D:\";
-        if (Directory.Exists(preferredDrive))
-        {
-            return Path.Combine(preferredDrive, "FE Monster");
-        }
-
         return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "FE Monster"
@@ -558,43 +567,114 @@ internal sealed class SetupOptions
     }
 }
 
+internal sealed record PayloadPreparation(
+    string Root,
+    long RequiredInstallBytes,
+    int MaxRelativePathLength
+);
+
 internal static class SetupEngine
 {
     private static readonly byte[] Marker = Encoding.ASCII.GetBytes("FE_MONSTER_SETUP_PAYLOAD_V1");
     private const string BundleFileName = "FE-Monster-Setup-Bundle.zip";
+    private const string SetupManifestFileName = "setup-manifest.json";
+    private const string PayloadFileName = "FE-Monster-Payload.zip";
+    private const int MinimumWindowsBuild = 17763;
+    private const int SafeLegacyPathLimit = 240;
+
+    public static string DiagnosticLogPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "FE Monster Setup",
+        "logs",
+        "installer.log"
+    );
+
+    public static void ValidatePlatform()
+    {
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, MinimumWindowsBuild))
+        {
+            throw new PlatformNotSupportedException(
+                $"FE Monster requires Windows 10 version 1809 (build {MinimumWindowsBuild}) or newer."
+            );
+        }
+        if (RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        {
+            throw new PlatformNotSupportedException("This FE Monster installer requires a Windows x64 process.");
+        }
+    }
+
+    public static void WriteEnvironmentDiagnostic(string exePath)
+    {
+        string signer = "unsigned";
+        try
+        {
+            using X509Certificate2 certificate = new(X509Certificate.CreateFromSignedFile(exePath));
+            signer = certificate.Subject;
+        }
+        catch
+        {
+        }
+        WriteDiagnosticLine(
+            "environment",
+            $"os={Environment.OSVersion.Version}; processArch={RuntimeInformation.ProcessArchitecture}; " +
+            $"osArch={RuntimeInformation.OSArchitecture}; temp={Path.GetTempPath()}; signer={signer}"
+        );
+    }
+
+    public static void WriteDiagnosticLog(string stage, Exception error)
+    {
+        WriteDiagnosticLine(stage, error.ToString());
+    }
+
+    private static void WriteDiagnosticLine(string stage, string message)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(DiagnosticLogPath)!);
+            File.AppendAllText(
+                DiagnosticLogPath,
+                $"[{DateTimeOffset.Now:O}] stage={stage} {message}\r\n",
+                Encoding.UTF8
+            );
+        }
+        catch
+        {
+        }
+    }
 
     public static int RunHeadless(string exePath, SetupOptions options)
     {
         string? tempRoot = null;
         try
         {
-            tempRoot = ExtractBundle(exePath);
+            ValidateInstallDirectoryBoundary(options.InstallDir);
+            tempRoot = ExtractBundle(exePath, options.InstallDir);
+            PayloadPreparation payload = PreparePayload(tempRoot);
             string installScript = Path.Combine(tempRoot, "install-fe-monster.ps1");
             if (!File.Exists(installScript))
             {
                 throw new InvalidOperationException("Installer script was not found in setup payload.");
             }
 
-            string arguments = "-NoProfile -File " +
-                QuoteArg(installScript) +
-                " -InstallDir " + QuoteArg(options.InstallDir) +
-                " -NoPopup" +
-                (options.LaunchAfterInstall ? "" : " -NoLaunch") +
-                options.ForwardedArgumentLine;
-
-            using Process process = Process.Start(new ProcessStartInfo
-            {
-                FileName = "powershell.exe",
-                Arguments = arguments,
-                WorkingDirectory = tempRoot,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }) ?? throw new InvalidOperationException("Could not start PowerShell installer.");
+            ValidateInstallTarget(options.InstallDir, payload);
+            string sessionLogPath = CreateInstallerSessionLogPath();
+            ProcessStartInfo startInfo = CreateInstallerStartInfo(
+                installScript,
+                options.InstallDir,
+                payload.Root,
+                tempRoot,
+                sessionLogPath,
+                options.LaunchAfterInstall,
+                options.ForwardedArgs
+            );
+            using Process process = Process.Start(startInfo) ??
+                throw new InvalidOperationException("Could not start PowerShell installer.");
             process.WaitForExit();
             return process.ExitCode;
         }
         catch (Exception error)
         {
+            WriteDiagnosticLog("headless-install", error);
             WriteHeadlessFailureLog(options.InstallDir, error);
             return 1;
         }
@@ -609,51 +689,446 @@ internal static class SetupEngine
 
     private static void WriteHeadlessFailureLog(string installDir, Exception error)
     {
+        WriteDiagnosticLine("headless-target", $"installDir={installDir}; error={error}");
+    }
+
+    public static string CreateInstallerSessionLogPath()
+    {
+        string directory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "FE Monster Setup",
+            "logs"
+        );
+        return Path.Combine(
+            directory,
+            $"install-{DateTime.Now:yyyyMMdd-HHmmss}-{Environment.ProcessId}-{Guid.NewGuid():N}.log"
+        );
+    }
+
+    public static string ExtractBundle(string exePath, string preferredInstallDir)
+    {
+        string tempRoot = CreateWritableTempRoot(preferredInstallDir, exePath);
         try
         {
-            string root = string.IsNullOrWhiteSpace(installDir)
-                ? Path.Combine(Path.GetTempPath(), "FE Monster")
-                : Path.GetFullPath(Environment.ExpandEnvironmentVariables(installDir));
-            string outDir = Path.Combine(root, "out");
-            Directory.CreateDirectory(outDir);
-            File.AppendAllText(
-                Path.Combine(outDir, "setup-headless.log"),
-                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {error}\r\n",
-                Encoding.UTF8
+            long bundleLength = GetBundleSourceLength(exePath);
+            EnsureFreeSpace(
+                tempRoot,
+                checked(bundleLength + 256L * 1024L * 1024L),
+                "temporary"
             );
+            string bundleZip = Path.Combine(tempRoot, BundleFileName);
+            if (ExtractEmbeddedResourceBundle(bundleZip))
+            {
+            }
+            else if (HasEmbeddedPayload(exePath))
+            {
+                ExtractPayload(exePath, bundleZip);
+            }
+            else
+            {
+                string? sidecarBundle = FindSidecarBundle(exePath);
+                if (!string.IsNullOrWhiteSpace(sidecarBundle))
+                {
+                    File.Copy(sidecarBundle, bundleZip, true);
+                }
+                else
+                {
+                    throw new InvalidOperationException("Setup payload was not found.");
+                }
+            }
+
+            (long bundleExtractedBytes, long payloadExtractedBytes) = InspectBundleSpaceRequirements(bundleZip);
+            EnsureFreeSpace(
+                tempRoot,
+                checked(bundleExtractedBytes + payloadExtractedBytes + 512L * 1024L * 1024L),
+                "temporary"
+            );
+            ZipFile.ExtractToDirectory(bundleZip, tempRoot, true);
+            return tempRoot;
+        }
+        catch
+        {
+            try { Directory.Delete(tempRoot, true); } catch { }
+            throw;
+        }
+    }
+
+    private static long GetBundleSourceLength(string exePath)
+    {
+        using (Stream? resource = Assembly.GetExecutingAssembly().GetManifestResourceStream(BundleFileName))
+        {
+            if (resource != null) return resource.Length;
+        }
+
+        long appendedLength = GetEmbeddedPayloadLength(exePath);
+        if (appendedLength > 0) return appendedLength;
+
+        string? sidecar = FindSidecarBundle(exePath);
+        if (!string.IsNullOrWhiteSpace(sidecar)) return new FileInfo(sidecar).Length;
+        throw new InvalidOperationException("Setup payload was not found.");
+    }
+
+    private static (long BundleExtractedBytes, long PayloadExtractedBytes) InspectBundleSpaceRequirements(
+        string bundleZip
+    )
+    {
+        using ZipArchive archive = ZipFile.OpenRead(bundleZip);
+        long bundleExtractedBytes = 0;
+        foreach (ZipArchiveEntry entry in archive.Entries)
+        {
+            bundleExtractedBytes = checked(bundleExtractedBytes + entry.Length);
+        }
+
+        ZipArchiveEntry manifestEntry = archive.Entries.FirstOrDefault(entry =>
+            string.Equals(
+                entry.FullName.Replace('\\', '/'),
+                SetupManifestFileName,
+                StringComparison.OrdinalIgnoreCase
+            )
+        ) ?? throw new InvalidDataException($"Setup payload manifest is missing: {SetupManifestFileName}");
+        using Stream manifestInput = manifestEntry.Open();
+        using JsonDocument document = JsonDocument.Parse(manifestInput);
+        long payloadExtractedBytes = document.RootElement.GetProperty("requiredInstallBytes").GetInt64();
+        if (bundleExtractedBytes <= 0 || payloadExtractedBytes <= 0)
+        {
+            throw new InvalidDataException("Setup payload disk-space metadata is invalid.");
+        }
+        return (bundleExtractedBytes, payloadExtractedBytes);
+    }
+
+    public static PayloadPreparation PreparePayload(string tempRoot)
+    {
+        string manifestPath = Path.Combine(tempRoot, SetupManifestFileName);
+        if (!File.Exists(manifestPath))
+        {
+            throw new InvalidDataException($"Setup payload manifest is missing: {SetupManifestFileName}");
+        }
+
+        using JsonDocument document = JsonDocument.Parse(File.ReadAllText(manifestPath, Encoding.UTF8));
+        JsonElement root = document.RootElement;
+        int schemaVersion = root.GetProperty("schemaVersion").GetInt32();
+        string architecture = root.GetProperty("architecture").GetString() ?? "";
+        int minimumBuild = root.GetProperty("minimumWindowsBuild").GetInt32();
+        string payloadFile = root.GetProperty("payloadFile").GetString() ?? "";
+        long expectedLength = root.GetProperty("payloadLength").GetInt64();
+        string expectedSha256 = root.GetProperty("payloadSha256").GetString() ?? "";
+        int maxRelativePathLength = root.GetProperty("maxRelativePathLength").GetInt32();
+        long requiredInstallBytes = root.GetProperty("requiredInstallBytes").GetInt64();
+        if (schemaVersion != 1 || !string.Equals(architecture, "x64", StringComparison.Ordinal) ||
+            minimumBuild != MinimumWindowsBuild || !string.Equals(payloadFile, PayloadFileName, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("Setup payload manifest is incompatible with this x64 installer.");
+        }
+
+        string payloadZip = Path.Combine(tempRoot, payloadFile);
+        if (!File.Exists(payloadZip)) throw new InvalidDataException("Setup payload archive is missing.");
+        FileInfo payloadInfo = new(payloadZip);
+        if (payloadInfo.Length != expectedLength)
+        {
+            throw new InvalidDataException(
+                $"Setup payload length mismatch (expected {expectedLength}, found {payloadInfo.Length})."
+            );
+        }
+        using SHA256 sha256 = SHA256.Create();
+        using FileStream payloadInput = File.OpenRead(payloadZip);
+        string actualSha256 = Convert.ToHexString(sha256.ComputeHash(payloadInput)).ToLowerInvariant();
+        if (!string.Equals(actualSha256, expectedSha256, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException(
+                "Setup payload SHA-256 mismatch. The download is incomplete, corrupted, or modified."
+            );
+        }
+
+        string extractRoot = Path.Combine(tempRoot, "payload");
+        Directory.CreateDirectory(extractRoot);
+        ZipFile.ExtractToDirectory(payloadZip, extractRoot, true);
+        string payloadRoot = Path.Combine(extractRoot, "FE Monster");
+        if (!Directory.Exists(payloadRoot))
+        {
+            throw new InvalidDataException("FE Monster payload root is missing after extraction.");
+        }
+        return new PayloadPreparation(payloadRoot, requiredInstallBytes, maxRelativePathLength);
+    }
+
+    public static void ValidateInstallTarget(string requestedPath, PayloadPreparation payload)
+    {
+        if (string.IsNullOrWhiteSpace(requestedPath))
+        {
+            throw new InvalidOperationException("Choose a writable FE Monster installation directory.");
+        }
+        string installDir = Path.GetFullPath(Environment.ExpandEnvironmentVariables(requestedPath));
+        string? parent = Path.GetDirectoryName(installDir);
+        if (string.IsNullOrWhiteSpace(parent))
+        {
+            throw new InvalidOperationException($"Unsafe installation directory: {installDir}");
+        }
+        ValidateDedicatedInstallDirectory(installDir);
+        Directory.CreateDirectory(installDir);
+        string probe = Path.Combine(installDir, ".fe-monster-write-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            File.WriteAllText(probe, "ok", Encoding.ASCII);
+        }
+        catch (Exception error)
+        {
+            throw new UnauthorizedAccessException(
+                $"The current user cannot write to {installDir}. Choose a folder under Local AppData.",
+                error
+            );
+        }
+        finally
+        {
+            try { File.Delete(probe); } catch { }
+        }
+
+        int longestPath = installDir.TrimEnd(Path.DirectorySeparatorChar).Length + 1 + payload.MaxRelativePathLength;
+        if (longestPath > SafeLegacyPathLimit)
+        {
+            throw new PathTooLongException(
+                $"The selected path is too deep for bundled native tools ({longestPath} characters; limit {SafeLegacyPathLimit}). " +
+                "Choose a shorter installation folder."
+            );
+        }
+        long retainedUserStateBytes = GetPreservedUserStateBytes(installDir);
+        EnsureFreeSpace(
+            installDir,
+            checked(payload.RequiredInstallBytes + retainedUserStateBytes + 256L * 1024L * 1024L),
+            "installation"
+        );
+    }
+
+    public static void ValidateInstallDirectoryBoundary(string requestedPath)
+    {
+        if (string.IsNullOrWhiteSpace(requestedPath))
+        {
+            throw new InvalidOperationException("Choose a writable FE Monster installation directory.");
+        }
+        string installDir = Path.GetFullPath(Environment.ExpandEnvironmentVariables(requestedPath));
+        ValidateDedicatedInstallDirectory(installDir);
+    }
+
+    private static long GetPreservedUserStateBytes(string installDir)
+    {
+        if (!Directory.Exists(installDir)) return 0;
+        long total = 0;
+        EnumerationOptions options = new()
+        {
+            RecurseSubdirectories = true,
+            IgnoreInaccessible = false,
+            AttributesToSkip = FileAttributes.ReparsePoint
+        };
+        foreach (string relative in new[] { "data", "WebView2", "logs" })
+        {
+            string directory = Path.Combine(installDir, relative);
+            if (!Directory.Exists(directory)) continue;
+            foreach (string file in Directory.EnumerateFiles(directory, "*", options))
+            {
+                total = checked(total + new FileInfo(file).Length);
+            }
+        }
+        string publicAccessKey = Path.Combine(installDir, "public-access.key");
+        if (File.Exists(publicAccessKey))
+        {
+            total = checked(total + new FileInfo(publicAccessKey).Length);
+        }
+        return total;
+    }
+
+    private static void ValidateDedicatedInstallDirectory(string installDir)
+    {
+        string candidate = Path.GetFullPath(installDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string? driveRoot = Path.GetPathRoot(candidate)?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (string.IsNullOrWhiteSpace(candidate) ||
+            string.IsNullOrWhiteSpace(driveRoot) ||
+            string.Equals(candidate, driveRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"Unsafe installation directory: {candidate}");
+        }
+
+        List<string> protectedDirectories = new();
+        foreach (Environment.SpecialFolder folder in new[] {
+            Environment.SpecialFolder.Windows,
+            Environment.SpecialFolder.System,
+            Environment.SpecialFolder.ProgramFiles,
+            Environment.SpecialFolder.ProgramFilesX86,
+            Environment.SpecialFolder.CommonApplicationData,
+            Environment.SpecialFolder.UserProfile,
+            Environment.SpecialFolder.Desktop,
+            Environment.SpecialFolder.MyDocuments,
+            Environment.SpecialFolder.MyPictures,
+            Environment.SpecialFolder.MyMusic,
+            Environment.SpecialFolder.MyVideos,
+            Environment.SpecialFolder.LocalApplicationData,
+            Environment.SpecialFolder.ApplicationData,
+            Environment.SpecialFolder.CommonDesktopDirectory,
+            Environment.SpecialFolder.CommonDocuments,
+            Environment.SpecialFolder.Programs,
+            Environment.SpecialFolder.CommonPrograms,
+            Environment.SpecialFolder.StartMenu,
+            Environment.SpecialFolder.CommonStartMenu
+        })
+        {
+            string path = Environment.GetFolderPath(folder);
+            if (!string.IsNullOrWhiteSpace(path)) protectedDirectories.Add(path);
+        }
+        string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrWhiteSpace(profile))
+        {
+            protectedDirectories.Add(Path.Combine(profile, "Downloads"));
+            string? profileParent = Path.GetDirectoryName(profile);
+            if (!string.IsNullOrWhiteSpace(profileParent)) protectedDirectories.Add(profileParent);
+        }
+        string? oneDrive = Environment.GetEnvironmentVariable("OneDrive");
+        if (!string.IsNullOrWhiteSpace(oneDrive)) protectedDirectories.Add(oneDrive);
+
+        foreach (string protectedDirectory in protectedDirectories.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            string normalizedProtected = Path.GetFullPath(protectedDirectory)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string candidatePrefix = candidate + Path.DirectorySeparatorChar;
+            if (string.Equals(candidate, normalizedProtected, StringComparison.OrdinalIgnoreCase) ||
+                normalizedProtected.StartsWith(candidatePrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"Unsafe installation directory: {candidate} is a system or user-data root. " +
+                    "Choose a dedicated FE Monster folder."
+                );
+            }
+        }
+
+        if (!Directory.Exists(candidate) || !Directory.EnumerateFileSystemEntries(candidate).Any()) return;
+        bool modernInstall =
+            File.Exists(Path.Combine(candidate, "payload-integrity.json")) &&
+            File.Exists(Path.Combine(candidate, "native", "windows", "build", "winforms", "FE Monster.exe"));
+        bool legacyInstall =
+            File.Exists(Path.Combine(candidate, "out", "fe-monster-java.jar")) &&
+            (File.Exists(Path.Combine(candidate, "FE Monster.vbs")) ||
+             File.Exists(Path.Combine(candidate, "run.cmd")));
+        string retainedMarker = Path.Combine(candidate, ".fe-monster-user-data");
+        bool retainedState = false;
+        if (File.Exists(retainedMarker) &&
+            string.Equals(File.ReadAllText(retainedMarker).Trim(), "schemaVersion=1", StringComparison.Ordinal))
+        {
+            HashSet<string> allowedEntries = new(StringComparer.OrdinalIgnoreCase)
+            {
+                "data",
+                "WebView2",
+                "logs",
+                "public-access.key",
+                ".fe-monster-user-data"
+            };
+            retainedState = Directory.EnumerateFileSystemEntries(candidate)
+                .All(path => allowedEntries.Contains(Path.GetFileName(path))) &&
+                (!File.Exists(Path.Combine(candidate, "data"))) &&
+                (!File.Exists(Path.Combine(candidate, "WebView2"))) &&
+                (!File.Exists(Path.Combine(candidate, "logs"))) &&
+                (!Directory.Exists(Path.Combine(candidate, "public-access.key")));
+        }
+        if (!modernInstall && !legacyInstall && !retainedState)
+        {
+            throw new InvalidOperationException(
+                $"Unsafe installation directory: {candidate} already contains unrelated files. " +
+                "Choose an empty folder or an existing FE Monster installation."
+            );
+        }
+    }
+
+    public static ProcessStartInfo CreateInstallerStartInfo(
+        string installScript,
+        string installDir,
+        string payloadRoot,
+        string workingDirectory,
+        string logPath,
+        bool launchAfterInstall,
+        IReadOnlyList<string> forwardedArgs
+    )
+    {
+        ProcessStartInfo startInfo = new()
+        {
+            FileName = "powershell.exe",
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        foreach (string argument in new[] {
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            installScript,
+            "-InstallDir",
+            installDir,
+            "-PayloadRoot",
+            payloadRoot,
+            "-LogPath",
+            logPath,
+            "-NoPopup"
+        })
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+        if (!launchAfterInstall) startInfo.ArgumentList.Add("-NoLaunch");
+        foreach (string argument in forwardedArgs) startInfo.ArgumentList.Add(argument);
+        return startInfo;
+    }
+
+    private static string CreateWritableTempRoot(string preferredInstallDir, string exePath)
+    {
+        string localFallback = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FE Monster Setup", "Temp");
+        List<string> candidateBases = new();
+        try
+        {
+            string fullInstallDir = Path.GetFullPath(Environment.ExpandEnvironmentVariables(preferredInstallDir));
+            string? existingParent = Path.GetDirectoryName(fullInstallDir);
+            while (!string.IsNullOrWhiteSpace(existingParent) && !Directory.Exists(existingParent))
+            {
+                existingParent = Path.GetDirectoryName(existingParent);
+            }
+            if (!string.IsNullOrWhiteSpace(existingParent)) candidateBases.Add(existingParent);
         }
         catch
         {
         }
+        string? setupDirectory = Path.GetDirectoryName(exePath);
+        if (!string.IsNullOrWhiteSpace(setupDirectory) && Directory.Exists(setupDirectory))
+        {
+            candidateBases.Add(setupDirectory);
+        }
+        candidateBases.Add(Path.GetTempPath());
+        candidateBases.Add(localFallback);
+
+        foreach (string candidateBase in candidateBases.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (string.IsNullOrWhiteSpace(candidateBase)) continue;
+            try
+            {
+                Directory.CreateDirectory(candidateBase);
+                string candidate = Path.Combine(candidateBase, ".fms-" + Guid.NewGuid().ToString("N").Substring(0, 12));
+                Directory.CreateDirectory(candidate);
+                string probe = Path.Combine(candidate, "write.test");
+                File.WriteAllText(probe, "ok", Encoding.ASCII);
+                File.Delete(probe);
+                return candidate;
+            }
+            catch
+            {
+            }
+        }
+        throw new IOException("No writable temporary directory is available for FE Monster setup.");
     }
 
-    public static string ExtractBundle(string exePath)
+    private static void EnsureFreeSpace(string path, long requiredBytes, string label)
     {
-        string tempRoot = Path.Combine(Path.GetTempPath(), "fe-monster-setup-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(tempRoot);
-        string bundleZip = Path.Combine(tempRoot, BundleFileName);
-        if (ExtractEmbeddedResourceBundle(bundleZip))
+        string? root = Path.GetPathRoot(Path.GetFullPath(path));
+        if (string.IsNullOrWhiteSpace(root)) return;
+        DriveInfo drive = new(root);
+        if (drive.IsReady && drive.AvailableFreeSpace < requiredBytes)
         {
+            throw new IOException(
+                $"Not enough {label} disk space on {root}. " +
+                $"Required: {requiredBytes / 1024 / 1024} MiB; available: {drive.AvailableFreeSpace / 1024 / 1024} MiB."
+            );
         }
-        else if (HasEmbeddedPayload(exePath))
-        {
-            ExtractPayload(exePath, bundleZip);
-        }
-        else
-        {
-            string? sidecarBundle = FindSidecarBundle(exePath);
-            if (!string.IsNullOrWhiteSpace(sidecarBundle))
-            {
-                File.Copy(sidecarBundle, bundleZip, true);
-            }
-            else
-            {
-                throw new InvalidOperationException("Setup payload was not found.");
-            }
-        }
-
-        ZipFile.ExtractToDirectory(bundleZip, tempRoot, true);
-        return tempRoot;
     }
 
     private static bool ExtractEmbeddedResourceBundle(string outputZip)
@@ -692,6 +1167,29 @@ internal static class SetupEngine
         catch
         {
             return false;
+        }
+    }
+
+    private static long GetEmbeddedPayloadLength(string exePath)
+    {
+        try
+        {
+            using FileStream input = File.OpenRead(exePath);
+            if (input.Length < Marker.Length + sizeof(long)) return 0;
+            input.Seek(-Marker.Length, SeekOrigin.End);
+            byte[] marker = new byte[Marker.Length];
+            ReadExactly(input, marker);
+            if (!marker.SequenceEqual(Marker)) return 0;
+            input.Seek(-(Marker.Length + sizeof(long)), SeekOrigin.End);
+            byte[] lengthBytes = new byte[sizeof(long)];
+            ReadExactly(input, lengthBytes);
+            long payloadLength = BitConverter.ToInt64(lengthBytes, 0);
+            long payloadOffset = input.Length - Marker.Length - sizeof(long) - payloadLength;
+            return payloadLength > 0 && payloadOffset >= 0 ? payloadLength : 0;
+        }
+        catch
+        {
+            return 0;
         }
     }
 

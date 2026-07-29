@@ -1,58 +1,223 @@
 param(
-  [string]$Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+  [string]$Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path,
+  [string]$ObrSourceDir = '',
+  [ValidateSet('Debug', 'Release', 'RelWithDebInfo')]
+  [string]$Configuration = 'Release',
+  [switch]$SkipProbe
 )
 
 $ErrorActionPreference = 'Stop'
 $rootPath = (Resolve-Path $Root).Path
-$source = Join-Path $rootPath 'native\windows\fe_monster_xaudio2.cpp'
-$buildDir = Join-Path $rootPath 'native\windows\build'
-$output = Join-Path $buildDir 'fe-monster-xaudio2.dll'
+$nativeSourceDir = Join-Path $rootPath 'native\windows'
+$runtimeOutputDir = Join-Path $nativeSourceDir 'build'
+$obrRevision = '478dc7c752d5eccae534635139ff0253eee3a14a'
+$obrRepository = 'https://github.com/google/obr.git'
 
-$cl = Get-Command cl.exe -ErrorAction SilentlyContinue
-if ($null -eq $cl) {
-  Write-Host 'cl.exe was not found. Run this from a Visual Studio Developer PowerShell, or install Visual Studio Build Tools with the Windows SDK.'
-  exit 1
+function Resolve-FirstCommandPath {
+  param(
+    [Parameter(Mandatory)]
+    [string]$Name,
+    [string[]]$Candidates = @()
+  )
+  $command = Get-Command $Name -ErrorAction SilentlyContinue
+  if ($null -ne $command) {
+    return $command.Source
+  }
+  foreach ($candidate in $Candidates) {
+    if (![string]::IsNullOrWhiteSpace($candidate) -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+      return (Resolve-Path -LiteralPath $candidate).Path
+    }
+  }
+  throw "$Name was not found."
 }
 
-$javac = Get-Command javac.exe -ErrorAction SilentlyContinue
-if ($null -eq $javac -and [string]::IsNullOrWhiteSpace($Env:JAVA_HOME)) {
-  Write-Host 'javac.exe or JAVA_HOME is required for JNI headers.'
-  exit 1
+$vsWhereCandidates = @(
+  (Join-Path ${Env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe')
+)
+$vsWhere = $vsWhereCandidates | Where-Object {
+  ![string]::IsNullOrWhiteSpace($_) -and (Test-Path -LiteralPath $_ -PathType Leaf)
+} | Select-Object -First 1
+
+$vsInstall = ''
+$vsMajorVersion = 0
+if ($vsWhere) {
+  $vsInstall = (& $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath).Trim()
+  $vsMajorText = (& $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property catalog_productLineVersion).Trim()
+  if (![string]::IsNullOrWhiteSpace($vsMajorText)) {
+    $vsMajorVersion = [int]$vsMajorText
+  }
+}
+if ([string]::IsNullOrWhiteSpace($vsInstall) -and ![string]::IsNullOrWhiteSpace($Env:FE_VS_INSTALL)) {
+  if (!(Test-Path -LiteralPath $Env:FE_VS_INSTALL -PathType Container)) {
+    throw "FE_VS_INSTALL does not point to a Visual Studio installation directory: $($Env:FE_VS_INSTALL)"
+  }
+  $vsInstall = (Resolve-Path -LiteralPath $Env:FE_VS_INSTALL).Path
+}
+if ($vsMajorVersion -ge 18) {
+  $cmakeGenerator = 'Visual Studio 18 2026'
+} else {
+  $cmakeGenerator = 'Visual Studio 17 2022'
+}
+$buildToolsetVersion = if ($vsMajorVersion -gt 0) { $vsMajorVersion } else { 17 }
+$cmakeBuildDir = Join-Path $nativeSourceDir ".cmake-build-xaudio2-vs$buildToolsetVersion"
+$stagingOutputDir = Join-Path $cmakeBuildDir 'runtime'
+
+$cmakeCandidates = @()
+if (![string]::IsNullOrWhiteSpace($vsInstall)) {
+  $cmakeCandidates += Join-Path $vsInstall 'Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe'
+}
+$cmake = Resolve-FirstCommandPath -Name 'cmake.exe' -Candidates $cmakeCandidates
+$git = Resolve-FirstCommandPath -Name 'git.exe'
+$workspaceCargoHome = Join-Path $rootPath '.tools\cargo'
+$workspaceRustupHome = Join-Path $rootPath '.tools\rustup'
+$workspaceCargo = Join-Path $workspaceCargoHome 'bin\cargo.exe'
+$cargo = Resolve-FirstCommandPath -Name 'cargo.exe' -Candidates @(
+  $workspaceCargo
+)
+if ((Test-Path -LiteralPath $workspaceCargo -PathType Leaf) -and
+    ([IO.Path]::GetFullPath($cargo) -eq [IO.Path]::GetFullPath($workspaceCargo))) {
+  $env:CARGO_HOME = $workspaceCargoHome
+  $env:RUSTUP_HOME = $workspaceRustupHome
 }
 
 if ([string]::IsNullOrWhiteSpace($Env:JAVA_HOME)) {
-  $javaHome = Split-Path -Parent (Split-Path -Parent $javac.Source)
+  $javac = Resolve-FirstCommandPath -Name 'javac.exe'
+  $jdkRoot = Split-Path -Parent (Split-Path -Parent $javac)
 } else {
-  $javaHome = $Env:JAVA_HOME
+  $jdkRoot = (Resolve-Path -LiteralPath $Env:JAVA_HOME).Path
+}
+$jniInclude = Join-Path $jdkRoot 'include'
+$jniWindowsInclude = Join-Path $jniInclude 'win32'
+if (!(Test-Path -LiteralPath (Join-Path $jniInclude 'jni.h') -PathType Leaf) -or
+    !(Test-Path -LiteralPath (Join-Path $jniWindowsInclude 'jni_md.h') -PathType Leaf)) {
+  throw "JNI headers were not found under $jdkRoot."
 }
 
-$jniInclude = Join-Path $javaHome 'include'
-$jniWinInclude = Join-Path $jniInclude 'win32'
-if (!(Test-Path $jniInclude) -or !(Test-Path $jniWinInclude)) {
-  Write-Host "JNI headers were not found under $javaHome."
-  exit 1
+if ([string]::IsNullOrWhiteSpace($ObrSourceDir)) {
+  $temporaryRoot = Join-Path $rootPath '.tmp'
+  if (!(Test-Path -LiteralPath $temporaryRoot -PathType Container)) {
+    New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
+  }
+  $ObrSourceDir = Join-Path $temporaryRoot "google-obr-native-$($obrRevision.Substring(0, 12))"
+  if (!(Test-Path -LiteralPath (Join-Path $ObrSourceDir '.git') -PathType Container)) {
+    if (Test-Path -LiteralPath $ObrSourceDir) {
+      throw "The intended OBR checkout path exists but is not a Git checkout: $ObrSourceDir"
+    }
+    & $git clone --filter=blob:none --no-checkout $obrRepository $ObrSourceDir
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    & $git -C $ObrSourceDir checkout --detach $obrRevision
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+  }
+} else {
+  $ObrSourceDir = (Resolve-Path -LiteralPath $ObrSourceDir).Path
 }
 
-if (!(Test-Path $buildDir)) {
-  New-Item -ItemType Directory -Path $buildDir | Out-Null
+$resolvedObrRevision = (& $git -C $ObrSourceDir rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $resolvedObrRevision -ne $obrRevision) {
+  throw "Google OBR must be checked out at pinned revision $obrRevision (found $resolvedObrRevision)."
+}
+if (!(Test-Path -LiteralPath (Join-Path $ObrSourceDir 'obr\renderer\obr_impl.cc') -PathType Leaf)) {
+  throw "The Google OBR source checkout is incomplete: $ObrSourceDir"
 }
 
-& $cl.Source `
-  /nologo `
-  /std:c++17 `
-  /EHsc `
-  /LD `
-  /I "$jniInclude" `
-  /I "$jniWinInclude" `
-  "$source" `
-  /link `
-  /OUT:"$output" `
-  ole32.lib `
-  uuid.lib `
-  xaudio2.lib
-
-if ($LASTEXITCODE -ne 0) {
-  exit $LASTEXITCODE
+foreach ($directory in @($cmakeBuildDir, $stagingOutputDir, $runtimeOutputDir)) {
+  if (!(Test-Path -LiteralPath $directory -PathType Container)) {
+    New-Item -ItemType Directory -Path $directory | Out-Null
+  }
 }
 
-Write-Host "Built $output"
+$rustManifest = Join-Path $rootPath 'native\rust-audio-upmix\Cargo.toml'
+$rustLock = Join-Path $rootPath 'native\rust-audio-upmix\Cargo.lock'
+if (!(Test-Path -LiteralPath $rustManifest -PathType Leaf) -or
+    !(Test-Path -LiteralPath $rustLock -PathType Leaf)) {
+  throw "The Rust surround-upmix crate or lockfile is missing."
+}
+$rustBuildExitCode = 0
+Push-Location (Split-Path -Parent $rustManifest)
+try {
+  # Cargo discovers .cargo/config.toml from the working directory hierarchy.
+  & $cargo build --manifest-path $rustManifest --release --locked
+  $rustBuildExitCode = $LASTEXITCODE
+} finally {
+  Pop-Location
+}
+if ($rustBuildExitCode -ne 0) { exit $rustBuildExitCode }
+$rustUpmixDll = Join-Path $rootPath 'native\rust-audio-upmix\target\release\fe_monster_upmix.dll'
+if (!(Test-Path -LiteralPath $rustUpmixDll -PathType Leaf)) {
+  throw "The Rust OxiMedia upmix DLL was not produced: $rustUpmixDll"
+}
+
+$configureArguments = @(
+  '-S', $nativeSourceDir,
+  '-B', $cmakeBuildDir,
+  '-G', $cmakeGenerator,
+  '-A', 'x64',
+  "-DOBR_SOURCE_DIR=$ObrSourceDir",
+  "-DFE_JNI_INCLUDE_DIR=$jniInclude",
+  "-DFE_JNI_WINDOWS_INCLUDE_DIR=$jniWindowsInclude",
+  "-DFE_RUNTIME_OUTPUT_DIR=$stagingOutputDir"
+)
+if (![string]::IsNullOrWhiteSpace($vsInstall)) {
+  $configureArguments += "-DCMAKE_GENERATOR_INSTANCE=$vsInstall"
+}
+
+& $cmake @configureArguments
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+& $cmake --build $cmakeBuildDir --config $Configuration --target fe_monster_xaudio2 fe_audio_probe --parallel
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+$stagedDll = Join-Path $stagingOutputDir 'fe-monster-xaudio2.dll'
+$stagedRustUpmixDll = Join-Path $stagingOutputDir 'fe_monster_upmix.dll'
+$probe = Join-Path $stagingOutputDir 'fe_audio_probe.exe'
+if (!(Test-Path -LiteralPath $stagedDll -PathType Leaf)) {
+  throw "The native audio DLL was not produced: $stagedDll"
+}
+if (!(Test-Path -LiteralPath $probe -PathType Leaf)) {
+  throw "The native audio probe was not produced: $probe"
+}
+Copy-Item -LiteralPath $rustUpmixDll -Destination $stagedRustUpmixDll -Force
+if (!(Test-Path -LiteralPath $stagedRustUpmixDll -PathType Leaf)) {
+  throw "The Rust surround upmixer was not staged: $stagedRustUpmixDll"
+}
+
+$licenseDir = Join-Path $stagingOutputDir 'licenses\google-obr'
+if (!(Test-Path -LiteralPath $licenseDir -PathType Container)) {
+  New-Item -ItemType Directory -Path $licenseDir -Force | Out-Null
+}
+Copy-Item -LiteralPath (Join-Path $ObrSourceDir 'LICENSE') -Destination (Join-Path $licenseDir 'LICENSE') -Force
+Copy-Item -LiteralPath (Join-Path $ObrSourceDir 'PATENTS') -Destination (Join-Path $licenseDir 'PATENTS') -Force
+$oximediaLicenseDir = Join-Path $stagingOutputDir 'licenses\oximedia-audiopost'
+if (!(Test-Path -LiteralPath $oximediaLicenseDir -PathType Container)) {
+  New-Item -ItemType Directory -Path $oximediaLicenseDir -Force | Out-Null
+}
+Copy-Item `
+  -LiteralPath (Join-Path $rootPath 'native\rust-audio-upmix\THIRD-PARTY-NOTICES.md') `
+  -Destination (Join-Path $oximediaLicenseDir 'THIRD-PARTY-NOTICES.md') `
+  -Force
+Copy-Item `
+  -LiteralPath (Join-Path $rootPath 'native\rust-audio-upmix\APACHE-2.0.txt') `
+  -Destination (Join-Path $oximediaLicenseDir 'APACHE-2.0.txt') `
+  -Force
+
+if (!$SkipProbe) {
+  & $probe
+  if ($LASTEXITCODE -ne 0) {
+    throw "fe_audio_probe failed with exit code $LASTEXITCODE."
+  }
+}
+
+$installedDll = Join-Path $runtimeOutputDir 'fe-monster-xaudio2.dll'
+$installedRustUpmixDll = Join-Path $runtimeOutputDir 'fe_monster_upmix.dll'
+try {
+  Copy-Item -LiteralPath $stagedDll -Destination $installedDll -Force -ErrorAction Stop
+  Copy-Item -LiteralPath $stagedRustUpmixDll -Destination $installedRustUpmixDll -Force -ErrorAction Stop
+  $verifiedDlls = @($installedDll, $installedRustUpmixDll)
+} catch {
+  $verifiedDlls = @($stagedDll, $stagedRustUpmixDll)
+  Write-Warning "The running app is using a native audio DLL. Verified replacements remain staged under $stagingOutputDir."
+}
+
+Write-Host "Built $($verifiedDlls -join ', ')"
+Write-Host "Rust upmix: oximedia-audiopost 0.2.0 (locked)"
+Write-Host "Verified Google OBR revision $obrRevision through $probe"

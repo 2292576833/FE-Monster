@@ -33,12 +33,16 @@ $publishArgs = @(
   '-r',
   'win-x64',
   '--self-contained',
-  'false',
+  'true',
   '-o',
   $publishDir,
   '--source',
   $packageRoot
 )
+
+if (Test-Path -LiteralPath $publishDir) {
+  Remove-Item -LiteralPath $publishDir -Recurse -Force
+}
 
 & $dotnetExe @publishArgs
 
@@ -46,4 +50,4 @@ if ($LASTEXITCODE -ne 0) {
   exit $LASTEXITCODE
 }
 
-Write-Host "Built $publishDir\fe-monster-client.exe"
+Write-Host "Built $publishDir\FE Monster.exe"

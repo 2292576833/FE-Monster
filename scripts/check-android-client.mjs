@@ -9,6 +9,9 @@ const webRoot = path.join(root, 'android', 'app', 'build', 'generated', 'feMonst
 const mainActivityPath = path.join(root, 'android', 'app', 'src', 'main', 'java', 'com', 'femonster', 'mobile', 'MainActivity.java');
 const manifestPath = path.join(root, 'android', 'app', 'src', 'main', 'AndroidManifest.xml');
 const buildGradlePath = path.join(root, 'android', 'app', 'build.gradle');
+const mobileRuntimePath = path.join(root, 'android', 'app', 'src', 'main', 'androidWeb', 'fe-monster-mobile-runtime.js');
+const nodeGatewayPath = path.join(root, 'android', 'app', 'src', 'main', 'nodeGateway', 'main.cjs');
+const qishuiAdapterPath = path.join(root, 'android', 'app', 'src', 'main', 'nodeGateway', 'providers', 'qishui.cjs');
 const artifactDirectory = path.join(root, 'artifacts', 'android-client-check');
 const edge = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const profile = path.join(tmpdir(), `fe-monster-android-local-check-${process.pid}`);
@@ -23,10 +26,12 @@ if (!existsSync(edge)) throw new Error(`Microsoft Edge was not found: ${edge}`);
 const mainActivity = readFileSync(mainActivityPath, 'utf8');
 const manifest = readFileSync(manifestPath, 'utf8');
 const buildGradle = readFileSync(buildGradlePath, 'utf8');
+const mobileRuntime = readFileSync(mobileRuntimePath, 'utf8');
+const nodeGateway = readFileSync(nodeGatewayPath, 'utf8');
 const nativeShellContract = {
   privateLocalOrigin: mainActivity.includes('LOCAL_APP_ORIGIN = "https://fe-monster.local/"'),
   bundledDocumentUsesLocalOrigin: mainActivity.includes('loadDataWithBaseURL(LOCAL_APP_ORIGIN, html'),
-  startsWithoutConnectionPanel: mainActivity.includes('configureWebView();\n        loadBundledClient();')
+  startsWithoutConnectionPanel: /configureWebView\(\);\r?\n\s*loadBundledClient\(\);/.test(mainActivity)
     && !mainActivity.includes('buildConnectPanel()'),
   localApiHasNativeFailClosedResponse: mainActivity.includes('localApiFallbackResponse(path)'),
   bridgeReportsLocalRuntime: mainActivity.includes('public String getRuntimeMode()')
@@ -35,7 +40,15 @@ const nativeShellContract = {
   noRemoteGatewayBuildConfig: !buildGradle.includes('DEFAULT_SERVER_URL')
     && !buildGradle.includes('PUBLIC_ACCESS_KEY')
     && !buildGradle.includes('FE_MONSTER_ANDROID_SERVER_URL'),
-  noRemoteGatewayInShell: !mainActivity.includes('frp-boy.com') && !mainActivity.includes('loadServer(')
+  noRemoteGatewayInShell: !mainActivity.includes('frp-boy.com') && !mainActivity.includes('loadServer('),
+  qishuiAdapterRemoved: !existsSync(qishuiAdapterPath),
+  qishuiGatewayRemoved: !/\bQISHUI_PORT\b|startQishui|proxyQishui|providers[\\/]+qishui\.cjs|id:\s*["']qishui["']/.test(nodeGateway)
+    && !/providers[\\/]+qishui\.cjs|qishuiAdapter/.test(buildGradle),
+  qishuiNativeRouteRemoved: !/--qishui-port|netease\|qq\|kugou\|qishui/.test(mainActivity),
+  qishuiMobileProviderRemoved: !/qishui:\s*['"]\\u6c7d\\u6c34|phoneLogin:\s*id\s*===\s*['"]qishui|netease\|qq\|kugou\|qishui/.test(mobileRuntime),
+  customAppDeepLinksBlockedFromWeb: mainActivity.includes('isAllowedBridgeExternalUri(uri)')
+    && mainActivity.includes('"https".equalsIgnoreCase(scheme) || "http".equalsIgnoreCase(scheme)')
+    && !mainActivity.includes('Intent.URI_INTENT_SCHEME')
 };
 const nativeShellFailures = Object.entries(nativeShellContract)
   .filter(([, passed]) => !passed)
@@ -155,6 +168,8 @@ function failuresFor(report) {
   if (!report.accountLoginEntry) failures.push('playback account is not the Android login entry');
   if (!report.loginDialogReachable) failures.push('music platform login dialog is suppressed in local runtime');
   if (!report.loginUsesAndroidErrorCopy) failures.push('login dialog fell back to desktop gateway instructions');
+  if (!report.qishuiProviderRemoved) failures.push('Qishui is still registered in the Android provider catalog');
+  if (!report.qishuiUiRemoved) failures.push('Qishui-only Android playback entry is still present');
   if (!report.sandboxEnabled) failures.push('local sandbox was disabled');
   if (!report.communityHidden) failures.push('server-only community UI is visible');
   if (!report.searchFourColumns) failures.push('search field does not preserve input, favorites, and submit columns');
@@ -292,6 +307,7 @@ try {
       }
       const health = await fetch('/health').then((response) => response.json());
       const runtime = await fetch('/api/app/runtime').then((response) => response.json());
+      const providers = await fetch('/api/providers').then((response) => response.json());
       await fetch('/api/player/volume?value=0.37');
       const player = await fetch('/api/player/state').then((response) => response.json());
       const search = rectOf('#topSearchForm');
@@ -336,6 +352,10 @@ try {
         loginDialogReachable,
         loginUsesAndroidErrorCopy: /\u672c\u673a\u97f3\u4e50\u767b\u5f55\u670d\u52a1/.test(loginDialogText)
           && !/127\.0\.0\.1|run\.cmd|\u5bfc\u5165\s*API/i.test(loginDialogText),
+        qishuiProviderRemoved: Array.isArray(providers.providers)
+          && providers.providers.length === 3
+          && providers.providers.every((provider) => ['netease', 'qq', 'kugou'].includes(provider.id)),
+        qishuiUiRemoved: !document.getElementById('qishuiPlaybackSourceSwitch'),
         sandboxEnabled: document.getElementById('sandboxModeButton')?.getAttribute('aria-disabled') !== 'true',
         communityHidden: !visible(document.getElementById('communityCard'))
           && !visible(document.getElementById('communityRailButton')),

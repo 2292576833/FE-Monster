@@ -16,8 +16,12 @@
 #include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <memory>
+#include <mutex>
 #include <thread>
 #include <vector>
+
+#include "audio/fe_audio_pipeline.h"
 
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "uuid.lib")
@@ -48,6 +52,15 @@ std::atomic<float> g_energy{ 0.0f };
 std::atomic<float> g_beat{ 0.0f };
 std::atomic<float> g_sample_rate{ 0.0f };
 std::array<std::atomic<float>, kLowBandCount> g_low_frequency_bands{};
+struct LowFrequencyAnalysisKernel {
+    UINT32 sample_rate = 0;
+    std::array<std::array<float, kAnalysisWindow>, kLowProbeCount> real_weights{};
+    std::array<std::array<float, kAnalysisWindow>, kLowProbeCount> imag_weights{};
+};
+std::unique_ptr<LowFrequencyAnalysisKernel> g_low_frequency_kernel;
+std::mutex g_spatial_pipeline_mutex;
+FeAudioPipelineHandle g_spatial_pipeline = nullptr;
+uint32_t g_spatial_input_channels = 0;
 
 float clamp01(float value) {
     if (!std::isfinite(value)) return 0.0f;
@@ -168,6 +181,33 @@ void decay_sample() {
     publish_sample(0.0f, 0.0f);
 }
 
+const LowFrequencyAnalysisKernel& low_frequency_kernel(UINT32 sample_rate) {
+    if (g_low_frequency_kernel && g_low_frequency_kernel->sample_rate == sample_rate) {
+        return *g_low_frequency_kernel;
+    }
+    auto kernel = std::make_unique<LowFrequencyAnalysisKernel>();
+    kernel->sample_rate = sample_rate;
+    for (size_t probe_index = 0; probe_index < kLowProbeCount; probe_index += 1) {
+        const int hz = kLowMinHz + static_cast<int>(probe_index) * kLowStepHz;
+        const double angle_step = 2.0 * kPi * static_cast<double>(hz)
+            / static_cast<double>(sample_rate);
+        for (size_t index = 0; index < kAnalysisWindow; index += 1) {
+            const double window = 0.5 - 0.5 * std::cos(
+                (2.0 * kPi * index) / static_cast<double>(kAnalysisWindow - 1)
+            );
+            const double angle = angle_step * static_cast<double>(index);
+            kernel->real_weights[probe_index][index] = static_cast<float>(
+                window * std::cos(angle)
+            );
+            kernel->imag_weights[probe_index][index] = static_cast<float>(
+                -window * std::sin(angle)
+            );
+        }
+    }
+    g_low_frequency_kernel = std::move(kernel);
+    return *g_low_frequency_kernel;
+}
+
 void analyze_window(const std::vector<float>& samples, UINT32 sample_rate) {
     if (samples.size() < kAnalysisWindow || sample_rate == 0) return;
 
@@ -175,6 +215,7 @@ void analyze_window(const std::vector<float>& samples, UINT32 sample_rate) {
     double low_sum = 0.0;
     int low_count = 0;
     std::array<float, kLowProbeCount> low_probes{};
+    const LowFrequencyAnalysisKernel& kernel = low_frequency_kernel(sample_rate);
 
     for (size_t index = 0; index < kAnalysisWindow; index += 1) {
         const double sample = samples[index];
@@ -182,16 +223,12 @@ void analyze_window(const std::vector<float>& samples, UINT32 sample_rate) {
     }
 
     for (size_t probe_index = 0; probe_index < kLowProbeCount; probe_index += 1) {
-        const int hz = kLowMinHz + static_cast<int>(probe_index) * kLowStepHz;
         double real = 0.0;
         double imag = 0.0;
-        const double angle_step = 2.0 * kPi * static_cast<double>(hz) / static_cast<double>(sample_rate);
         for (size_t index = 0; index < kAnalysisWindow; index += 1) {
-            const double window = 0.5 - 0.5 * std::cos((2.0 * kPi * index) / static_cast<double>(kAnalysisWindow - 1));
-            const double sample = samples[index] * window;
-            const double angle = angle_step * static_cast<double>(index);
-            real += sample * std::cos(angle);
-            imag -= sample * std::sin(angle);
+            const double sample = samples[index];
+            real += sample * kernel.real_weights[probe_index][index];
+            imag += sample * kernel.imag_weights[probe_index][index];
         }
         const double amplitude = std::sqrt(real * real + imag * imag) * 4.0 / static_cast<double>(kAnalysisWindow);
         low_probes[probe_index] = static_cast<float>(amplitude);
@@ -435,5 +472,175 @@ extern "C" JNIEXPORT jfloatArray JNICALL Java_com_femonster_core_NativeAudioEngi
     jfloatArray result = env->NewFloatArray(static_cast<jsize>(matrix.size()));
     if (!result) return nullptr;
     env->SetFloatArrayRegion(result, 0, static_cast<jsize>(matrix.size()), matrix.data());
+    return result;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_com_femonster_core_NativeAudioEngine_nativeConfigureSpatial(
+    JNIEnv*,
+    jclass,
+    jint sample_rate,
+    jint input_channels,
+    jint virtual_layout_channels,
+    jint upmix_algorithm,
+    jboolean muted
+) {
+    if (sample_rate < 16000 || sample_rate > 192000) return JNI_FALSE;
+    if (input_channels != 1 && input_channels != 2) return JNI_FALSE;
+    if (virtual_layout_channels != 6 && virtual_layout_channels != 8) return JNI_FALSE;
+
+    std::scoped_lock lock(g_spatial_pipeline_mutex);
+    if (g_spatial_pipeline != nullptr) {
+        fe_audio_pipeline_destroy(g_spatial_pipeline);
+        g_spatial_pipeline = nullptr;
+    }
+
+    FeAudioPipelineConfig config{};
+    config.struct_size = sizeof(config);
+    config.abi_version = FE_AUDIO_PIPELINE_ABI_VERSION;
+    config.sample_rate = static_cast<uint32_t>(sample_rate);
+    config.input_channels = static_cast<uint32_t>(input_channels);
+    config.virtual_layout_channels = static_cast<uint32_t>(virtual_layout_channels);
+    config.mode = FE_AUDIO_MODE_OBR_BINAURAL;
+    config.muted = muted == JNI_TRUE ? 1u : 0u;
+    config.max_queued_buffers = 24;
+    config.upmix_algorithm = static_cast<uint32_t>(
+        std::clamp(static_cast<int>(upmix_algorithm), 0, 3)
+    );
+
+    g_spatial_pipeline = fe_audio_pipeline_create(&config);
+    if (g_spatial_pipeline == nullptr) {
+        g_spatial_input_channels = 0;
+        return JNI_FALSE;
+    }
+    g_spatial_input_channels = static_cast<uint32_t>(input_channels);
+    return JNI_TRUE;
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_com_femonster_core_NativeAudioEngine_nativeSubmitSpatialPcm(
+    JNIEnv* env,
+    jclass,
+    jfloatArray pcm,
+    jint frame_count
+) {
+    if (pcm == nullptr || frame_count <= 0) return static_cast<jint>(E_INVALIDARG);
+    std::scoped_lock lock(g_spatial_pipeline_mutex);
+    if (g_spatial_pipeline == nullptr || g_spatial_input_channels == 0) {
+        return static_cast<jint>(E_HANDLE);
+    }
+    const jsize sample_count = env->GetArrayLength(pcm);
+    const uint64_t required_samples = static_cast<uint64_t>(frame_count)
+        * g_spatial_input_channels;
+    if (required_samples > static_cast<uint64_t>(sample_count)) {
+        return static_cast<jint>(E_INVALIDARG);
+    }
+
+    jboolean copied = JNI_FALSE;
+    jfloat* samples = env->GetFloatArrayElements(pcm, &copied);
+    if (samples == nullptr) return static_cast<jint>(E_OUTOFMEMORY);
+    const int32_t result = fe_audio_pipeline_submit(
+        g_spatial_pipeline,
+        samples,
+        static_cast<uint32_t>(frame_count)
+    );
+    env->ReleaseFloatArrayElements(pcm, samples, JNI_ABORT);
+    return static_cast<jint>(result);
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_com_femonster_core_NativeAudioEngine_nativeSubmitSpatialPcmDirect(
+    JNIEnv* env,
+    jclass,
+    jobject pcm,
+    jint frame_count
+) {
+    if (pcm == nullptr || frame_count <= 0) return static_cast<jint>(E_INVALIDARG);
+    std::scoped_lock lock(g_spatial_pipeline_mutex);
+    if (g_spatial_pipeline == nullptr || g_spatial_input_channels == 0) {
+        return static_cast<jint>(E_HANDLE);
+    }
+
+    void* address = env->GetDirectBufferAddress(pcm);
+    const jlong capacity = env->GetDirectBufferCapacity(pcm);
+    const uint64_t required_bytes = static_cast<uint64_t>(frame_count)
+        * g_spatial_input_channels
+        * sizeof(float);
+    if (address == nullptr || capacity < 0 || required_bytes > static_cast<uint64_t>(capacity)) {
+        return static_cast<jint>(E_INVALIDARG);
+    }
+
+    return static_cast<jint>(fe_audio_pipeline_submit(
+        g_spatial_pipeline,
+        static_cast<const float*>(address),
+        static_cast<uint32_t>(frame_count)
+    ));
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_com_femonster_core_NativeAudioEngine_nativeSetSpatialMuted(
+    JNIEnv*,
+    jclass,
+    jboolean muted
+) {
+    std::scoped_lock lock(g_spatial_pipeline_mutex);
+    if (g_spatial_pipeline == nullptr) return static_cast<jint>(E_HANDLE);
+    return static_cast<jint>(fe_audio_pipeline_set_muted(
+        g_spatial_pipeline,
+        muted == JNI_TRUE ? 1u : 0u
+    ));
+}
+
+extern "C" JNIEXPORT void JNICALL Java_com_femonster_core_NativeAudioEngine_nativeStopSpatial(
+    JNIEnv*,
+    jclass
+) {
+    std::scoped_lock lock(g_spatial_pipeline_mutex);
+    if (g_spatial_pipeline != nullptr) {
+        fe_audio_pipeline_destroy(g_spatial_pipeline);
+        g_spatial_pipeline = nullptr;
+    }
+    g_spatial_input_channels = 0;
+}
+
+extern "C" JNIEXPORT jdoubleArray JNICALL Java_com_femonster_core_NativeAudioEngine_nativeSpatialStatus(
+    JNIEnv* env,
+    jclass
+) {
+    constexpr size_t kStatusValueCount = 26;
+    std::array<jdouble, kStatusValueCount> values{};
+    std::scoped_lock lock(g_spatial_pipeline_mutex);
+    if (g_spatial_pipeline != nullptr) {
+        FeAudioPipelineStatus status{};
+        status.struct_size = sizeof(status);
+        status.abi_version = FE_AUDIO_PIPELINE_ABI_VERSION;
+        if (SUCCEEDED(fe_audio_pipeline_get_status(g_spatial_pipeline, &status))) {
+            values[0] = 1.0;
+            values[1] = status.running;
+            values[2] = status.renderer_ready;
+            values[3] = status.sample_rate;
+            values[4] = status.input_channels;
+            values[5] = status.renderer_input_channels;
+            values[6] = status.output_channels;
+            values[7] = status.buffers_queued;
+            values[8] = static_cast<jdouble>(status.buffers_submitted);
+            values[9] = static_cast<jdouble>(status.buffers_consumed);
+            values[10] = static_cast<jdouble>(status.frames_processed);
+            values[11] = static_cast<jdouble>(status.dropped_buffers);
+            values[12] = static_cast<jdouble>(status.obr_process_calls);
+            values[13] = static_cast<jdouble>(status.x3d_calculate_calls);
+            values[14] = static_cast<jdouble>(status.rust_upmix_process_calls);
+            values[15] = static_cast<jdouble>(status.rust_upmix_fallback_blocks);
+            values[16] = status.rust_upmix_active;
+            values[17] = status.rust_upmix_last_result;
+            values[18] = status.output_energy;
+            values[19] = status.x3d_matrix_left;
+            values[20] = status.x3d_matrix_right;
+            values[21] = status.last_hresult;
+            values[22] = static_cast<jdouble>(status.queue_underruns);
+            values[23] = static_cast<jdouble>(status.buffer_pool_exhaustions);
+            values[24] = status.voice_started;
+            values[25] = status.preroll_target_buffers;
+        }
+    }
+    jdoubleArray result = env->NewDoubleArray(static_cast<jsize>(values.size()));
+    if (!result) return nullptr;
+    env->SetDoubleArrayRegion(result, 0, static_cast<jsize>(values.size()), values.data());
     return result;
 }
