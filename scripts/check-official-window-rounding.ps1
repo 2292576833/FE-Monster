@@ -8,7 +8,7 @@ if ([string]::IsNullOrWhiteSpace($Root)) {
   $Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 }
 $rootPath = (Resolve-Path $Root).Path
-$expectedExecutable = (Resolve-Path (Join-Path $rootPath 'native\windows\build\winforms\fe-monster-client.exe')).Path
+$expectedExecutable = (Resolve-Path (Join-Path $rootPath 'native\windows\build\winforms\FE Monster.exe')).Path
 $legacyExecutable = Join-Path $rootPath 'native\windows\build\fe-monster-client.exe'
 $expectedVersion = [string](Get-Content -Raw (Join-Path $rootPath 'package.json') | ConvertFrom-Json).version
 
@@ -39,9 +39,10 @@ public static class FeOfficialWindowRoundingProbe
 }
 '@
 
-$allClients = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -ieq 'fe-monster-client.exe' })
+$allClients = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -ieq 'FE Monster.exe' })
 $officialClients = @($allClients | Where-Object { $_.ExecutablePath -ieq $expectedExecutable })
-$visibleLegacyClients = @($allClients | Where-Object {
+$legacyClients = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -ieq 'fe-monster-client.exe' })
+$visibleLegacyClients = @($legacyClients | Where-Object {
   if ($_.ExecutablePath -ine $legacyExecutable) { return $false }
   $process = Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue
   return $null -ne $process -and $process.MainWindowHandle -ne 0 -and
@@ -62,6 +63,13 @@ if ($officialClients.Count -ne 1) {
 $client = $officialClients[0]
 $runtimeProcess = Get-Process -Id $client.ProcessId -ErrorAction Stop
 $parent = Get-CimInstance Win32_Process -Filter "ProcessId = $($client.ParentProcessId)" -ErrorAction SilentlyContinue
+$backend = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+  Where-Object {
+    $_.ParentProcessId -eq $client.ProcessId -and
+    $_.Name -in @('FE Monster Backend.exe', 'javaw.exe', 'java.exe') -and
+    $_.CommandLine -match [regex]::Escape((Join-Path $rootPath 'out\fe-monster-java.jar'))
+  } |
+  Select-Object -First 1
 $windowHandle = [IntPtr]$runtimeProcess.MainWindowHandle
 $className = New-Object System.Text.StringBuilder 256
 [void][FeOfficialWindowRoundingProbe]::GetClassName($windowHandle, $className, $className.Capacity)
@@ -83,8 +91,17 @@ if ($windowHandle -ne [IntPtr]::Zero) {
   }
 }
 
-$urlMatch = [regex]::Match([string]$client.CommandLine, '--url\s+(?<url>\S+)')
-$clientUrl = if ($urlMatch.Success) { $urlMatch.Groups['url'].Value } else { '' }
+$processTreePath = Join-Path $rootPath 'out\process-tree.json'
+$processTree = if (Test-Path -LiteralPath $processTreePath) {
+  Get-Content -LiteralPath $processTreePath -Raw | ConvertFrom-Json
+} else {
+  $null
+}
+$clientUrl = if ($null -ne $processTree -and $processTree.port) {
+  "http://127.0.0.1:$($processTree.port)/?client=embedded"
+} else {
+  ''
+}
 $pageTitle = ''
 $pageHasAppShell = $false
 if (-not [string]::IsNullOrWhiteSpace($clientUrl)) {
@@ -102,8 +119,8 @@ $checks = [ordered]@{
   officialVersion = $fileVersion -like "$expectedVersion.*"
   launchedWithEmbeddedUrl = $clientUrl -match '^http://127\.0\.0\.1:\d+/\?client=embedded(?:&|$)'
   officialPageLoaded = $pageTitle -eq 'FE Monster Java' -and $pageHasAppShell
-  javaParentChain = $null -ne $parent -and $parent.Name -match '^javaw?\.exe$' -and
-    $parent.CommandLine -match [regex]::Escape((Join-Path $rootPath 'out\fe-monster-java.jar'))
+  namedMainProcess = $client.Name -ieq 'FE Monster.exe'
+  javaBackendChild = $null -ne $backend
   visibleWindow = $windowHandle -ne [IntPtr]::Zero -and
     [FeOfficialWindowRoundingProbe]::IsWindowVisible($windowHandle)
   winFormsWindowClass = $className.ToString() -like 'WindowsForms10.Window.*'
@@ -120,6 +137,7 @@ $result = [ordered]@{
   fileVersion = $fileVersion
   parentProcessId = $client.ParentProcessId
   parentName = $parent.Name
+  backendProcessId = $backend.ProcessId
   clientUrl = $clientUrl
   pageTitle = $pageTitle
   windowHandle = ('0x{0:X}' -f $windowHandle.ToInt64())

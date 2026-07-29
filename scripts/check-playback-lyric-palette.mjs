@@ -11,6 +11,36 @@ const debugPort = 24000 + (process.pid % 6000);
 const profile = path.resolve(tmpdir(), `fe-monster-playback-lyric-palette-${process.pid}`);
 const storageKey = 'fe-monster-playback-lyric-palette-v1';
 const bilingualStorageKey = 'fe-monster-bilingual-lyrics-v1';
+const lyricStylesSource = readFileSync(path.resolve(webRoot, 'styles.css'), 'utf8');
+const lyricAppSource = readFileSync(path.resolve(webRoot, 'app.js'), 'utf8');
+const lyricMaterialContractStart = lyricStylesSource.indexOf('/* Continuous lyric highlight: start */');
+const lyricMaterialContractEnd = lyricStylesSource.indexOf('/* Continuous lyric highlight: end */');
+const lyricMaterialContract = lyricMaterialContractStart >= 0 && lyricMaterialContractEnd > lyricMaterialContractStart
+  ? lyricStylesSource.slice(lyricMaterialContractStart, lyricMaterialContractEnd)
+  : '';
+const lyricMaterialStaticPass = {
+  pass: lyricMaterialContract.includes('.lyric-depth-0::after')
+    && lyricMaterialContract.includes('content: attr(data-text)')
+    && lyricMaterialContract.includes('--lyric-line-progress')
+    && lyricMaterialContract.includes('--text-highlight-softness')
+    && lyricMaterialContract.includes('mask-image:')
+    && lyricMaterialContract.includes('background-clip: text')
+    && !lyricStylesSource.includes('.playback-lyric-glyph')
+    && !lyricAppSource.includes('playback-lyric-glyph')
+    && !lyricStylesSource.includes('--lyric-glyph-')
+    && !lyricAppSource.includes('--lyric-glyph-'),
+  hasContract: !!lyricMaterialContract,
+  hasLineOverlay: lyricMaterialContract.includes('.lyric-depth-0::after')
+    && lyricMaterialContract.includes('content: attr(data-text)'),
+  hasProgressMask: lyricMaterialContract.includes('--lyric-line-progress')
+    && lyricMaterialContract.includes('mask-image:'),
+  hasSoftEdge: lyricMaterialContract.includes('--text-highlight-softness'),
+  hasLineMaterial: lyricMaterialContract.includes('background-clip: text'),
+  hasGlyphMaterialCode: lyricStylesSource.includes('.playback-lyric-glyph')
+    || lyricAppSource.includes('playback-lyric-glyph')
+    || lyricStylesSource.includes('--lyric-glyph-')
+    || lyricAppSource.includes('--lyric-glyph-')
+};
 const mimeTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],
   ['.html', 'text/html; charset=utf-8'],
@@ -412,8 +442,8 @@ try {
     };
   })()`, true);
 
-  const textTransformPass = await evaluate(`(() => {
-    const presets = ['depth', 'flow', 'book-effect', 'focus-echo', 'book'];
+  const textTransformPass = await evaluate(`(async () => {
+    const presets = ['depth', 'flow', 'book-effect', 'focus-echo'];
     const previous = {
       playbackPage: state.playbackPage,
       textPreset: state.textPreset,
@@ -424,18 +454,22 @@ try {
     };
     const centralRect = els.playbackLyricText.getBoundingClientRect;
     const subtitleRect = els.playbackLyricSubtitle.getBoundingClientRect;
-    const bookRect = els.bookLyricStage.getBoundingClientRect;
     els.playbackLyricText.getBoundingClientRect = () => ({ left: 100, top: 100, right: 500, bottom: 180, width: 400, height: 80 });
     els.playbackLyricSubtitle.getBoundingClientRect = () => ({ left: 150, top: 184, right: 450, bottom: 224, width: 300, height: 40 });
-    els.bookLyricStage.getBoundingClientRect = () => ({ left: 80, top: 70, right: 620, bottom: 410, width: 540, height: 340 });
     state.playbackPage = true;
     state.multiRowLyricsEnabled = false;
     state.playbackVisual.zoom = 1.37;
 
-    const details = presets.map((preset, index) => {
+    const details = [];
+    for (let index = 0; index < presets.length; index += 1) {
+      const preset = presets[index];
       state.textPreset = preset;
       state.textPresetTransforms[preset] = normalizeTextPresetTransform();
-      const point = preset === 'book' ? { x: 300, y: 220 } : { x: 260, y: 140 };
+      const bounds = { left: 100, right: 500, top: 100, bottom: 180 };
+      const point = {
+        x: (bounds.left + bounds.right) / 2,
+        y: (bounds.top + bounds.bottom) / 2
+      };
       const wheelHandled = scaleTextPresetFromWheel({
         clientX: point.x,
         clientY: point.y,
@@ -443,47 +477,182 @@ try {
         target: els.stage
       });
       const scale = state.textPresetTransforms[preset].scale;
-      const pointerId = 910 + index;
-      const began = beginTextPresetGesture({
+      state.textPresetTransforms[preset] = normalizeTextPresetTransform({ scale });
+
+      const headPointerId = 910 + index * 3;
+      const headStart = { x: bounds.left + 8, y: point.y };
+      const headBegan = beginTextPresetGesture({
+        clientX: headStart.x,
+        clientY: headStart.y,
+        pointerId: headPointerId,
+        target: els.stage
+      });
+      const headMoved = moveTextPresetGesture({
+        clientX: headStart.x + 120,
+        clientY: headStart.y + 70,
+        pointerId: headPointerId,
+        target: els.stage
+      });
+      const headEnded = endTextPresetGesture({ pointerId: headPointerId });
+      const headTransform = { ...state.textPresetTransforms[preset] };
+
+      state.textPresetTransforms[preset] = normalizeTextPresetTransform({ scale });
+      const tailPointerId = headPointerId + 1;
+      const tailStart = { x: bounds.right - 8, y: point.y };
+      const tailBegan = beginTextPresetGesture({
+        clientX: tailStart.x,
+        clientY: tailStart.y,
+        pointerId: tailPointerId,
+        target: els.stage
+      });
+      const tailMoved = moveTextPresetGesture({
+        clientX: tailStart.x - 120,
+        clientY: tailStart.y - 70,
+        pointerId: tailPointerId,
+        target: els.stage
+      });
+      const tailEnded = endTextPresetGesture({ pointerId: tailPointerId });
+      const tailTransform = { ...state.textPresetTransforms[preset] };
+
+      state.textPresetTransforms[preset] = normalizeTextPresetTransform({ scale });
+      const centerPointerId = headPointerId + 2;
+      const centerBegan = beginTextPresetGesture({
         clientX: point.x,
         clientY: point.y,
-        pointerId,
+        pointerId: centerPointerId,
         target: els.stage
       });
-      const moved = moveTextPresetGesture({
-        clientX: point.x + 360,
-        clientY: point.y + 180,
-        pointerId,
+      moveTextPresetGesture({
+        clientX: point.x + 18,
+        clientY: point.y + 12,
+        pointerId: centerPointerId,
         target: els.stage
       });
-      const ended = endTextPresetGesture({ pointerId });
-      const transform = { ...state.textPresetTransforms[preset] };
-      return {
+      const beforeHold = { ...state.textPresetTransforms[preset] };
+      await new Promise((resolve) => setTimeout(resolve, 390));
+      const afterHold = { ...state.textPresetTransforms[preset] };
+      const centerMoved = moveTextPresetGesture({
+        clientX: point.x + 90,
+        clientY: point.y + 55,
+        pointerId: centerPointerId,
+        target: els.stage
+      });
+      const centerEnded = endTextPresetGesture({ pointerId: centerPointerId });
+      const centerTransform = { ...state.textPresetTransforms[preset] };
+      const gestureReleased = state.textPresetGesture.pointerId === null
+        && !state.textPresetGesture.dragging
+        && !state.textPresetGesture.pending;
+
+      details.push({
         preset,
         wheelHandled,
-        began,
-        moved,
-        ended,
         scale,
-        rotateX: transform.rotateX,
-        rotateY: transform.rotateY,
-        pass: wheelHandled && began && moved && ended
+        headTransform,
+        tailTransform,
+        beforeHold,
+        afterHold,
+        centerTransform,
+        pass: wheelHandled
+          && headBegan && headMoved && headEnded
+          && tailBegan && tailMoved && tailEnded
+          && centerBegan && centerMoved && centerEnded
           && scale > 1
-          && Math.abs(transform.rotateX) > 20
-          && Math.abs(transform.rotateY) > 20
-      };
-    });
+          && headTransform.rotateY > 20
+          && headTransform.rotateX < -15
+          && headTransform.rotateZ < -8
+          && tailTransform.rotateY < -20
+          && tailTransform.rotateX > 15
+          && tailTransform.rotateZ < -8
+          && Math.abs(beforeHold.x || 0) < 0.01
+          && Math.abs(beforeHold.y || 0) < 0.01
+          && Math.abs(beforeHold.rotateX || 0) < 0.01
+          && Math.abs(beforeHold.rotateY || 0) < 0.01
+          && Math.abs(afterHold.x || 0) < 0.01
+          && Math.abs(afterHold.y || 0) < 0.01
+          && Math.abs(centerTransform.x - 72) < 1
+          && Math.abs(centerTransform.y - 43) < 1
+          && Math.abs(centerTransform.rotateX) < 0.01
+          && Math.abs(centerTransform.rotateY) < 0.01
+          && gestureReleased
+      });
+    }
     const outsideHandled = scaleTextPresetFromWheel({
       clientX: 8,
       clientY: 8,
       deltaY: -120,
       target: els.stage
     });
+    state.textPreset = 'book';
+    const bookTransformBefore = JSON.stringify(state.textPresetTransforms.book);
+    const bookGestureHandled = beginTextPresetGesture({
+      clientX: 300,
+      clientY: 140,
+      pointerId: 989,
+      target: els.stage
+    });
+    const bookWheelHandled = scaleTextPresetFromWheel({
+      clientX: 300,
+      clientY: 140,
+      deltaY: -120,
+      target: els.stage
+    });
+    const bookLyricExcluded = !bookGestureHandled
+      && !bookWheelHandled
+      && JSON.stringify(state.textPresetTransforms.book) === bookTransformBefore;
     const zoomAfter = state.playbackVisual.zoom;
+    const originalPause = els.audio.pause;
+    const originalLoad = els.audio.load;
+    const originalApiJson = apiJson;
+    let pauseCalls = 0;
+    let loadCalls = 0;
+    let apiPauseCalls = 0;
+    els.audio.pause = () => { pauseCalls += 1; };
+    els.audio.load = () => { loadCalls += 1; };
+    apiJson = async (url) => {
+      if (String(url).includes('/api/player/pause')) apiPauseCalls += 1;
+      return {};
+    };
+    state.textPreset = 'depth';
+    state.textPresetTransforms.depth = normalizeTextPresetTransform();
+    els.playbackLyricText.dispatchEvent(new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 130,
+      clientY: 140,
+      deltaY: -120
+    }));
+    els.playbackLyricText.dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      buttons: 1,
+      clientX: 110,
+      clientY: 140,
+      pointerId: 991
+    }));
+    els.stage.dispatchEvent(new PointerEvent('pointermove', {
+      bubbles: true,
+      cancelable: true,
+      buttons: 1,
+      clientX: 230,
+      clientY: 190,
+      pointerId: 991
+    }));
+    els.stage.dispatchEvent(new PointerEvent('pointerup', {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: 230,
+      clientY: 190,
+      pointerId: 991
+    }));
+    const audioIsolation = pauseCalls === 0 && loadCalls === 0 && apiPauseCalls === 0;
+    els.audio.pause = originalPause;
+    els.audio.load = originalLoad;
+    apiJson = originalApiJson;
 
     els.playbackLyricText.getBoundingClientRect = centralRect;
     els.playbackLyricSubtitle.getBoundingClientRect = subtitleRect;
-    els.bookLyricStage.getBoundingClientRect = bookRect;
     state.playbackPage = previous.playbackPage;
     state.textPreset = previous.textPreset;
     state.multiRowLyricsEnabled = previous.multiRowLyricsEnabled;
@@ -497,11 +666,254 @@ try {
     return {
       pass: details.every((item) => item.pass)
         && outsideHandled === false
-        && zoomAfter === 1.37,
+        && bookLyricExcluded
+        && zoomAfter === 1.37
+        && audioIsolation,
       details,
       outsideHandled,
+      bookLyricExcluded,
+      audioIsolation: { pass: audioIsolation, pauseCalls, loadCalls, apiPauseCalls },
       sceneZoomBefore: 1.37,
       sceneZoomAfter: zoomAfter
+    };
+  })()`, true);
+
+  const lyricGlyphMaterialPass = await evaluate(`(async () => {
+    const presets = ['depth', 'flow', 'book-effect', 'focus-echo'];
+    const previous = {
+      playbackPage: state.playbackPage,
+      diyPreset: state.diyPreset,
+      textPreset: state.textPreset,
+      multiRowLyricsEnabled: state.multiRowLyricsEnabled,
+      lyricDisplayText: state.lyricDisplayText,
+      lyricSubtitleText: state.lyricSubtitleText,
+      lyricProgressPercent: state.lyricProgressPercent,
+      lowFrequencyAmplitude: state.visual.lowFrequencyAmplitude,
+      bass: state.visual.bass,
+      bridgeLowFrequencyAmplitude: state.visualBridge.lowFrequencyAmplitude,
+      bridgeBass: state.visualBridge.bass,
+      playbackClock: isPlaybackClockRunning
+    };
+    state.playbackPage = true;
+    state.diyPreset = 'lyric';
+    state.multiRowLyricsEnabled = false;
+    state.visual.lowFrequencyAmplitude = 0.92;
+    state.visual.bass = 0.84;
+    state.visualBridge.lowFrequencyAmplitude = 0.9;
+    state.visualBridge.bass = 0.82;
+    isPlaybackClockRunning = () => true;
+    const materialText = 'Glow逐字光泽';
+    const expectedGlyphCount = Array.from(materialText).filter((glyph) => glyph.trim()).length;
+
+    const details = [];
+    for (const preset of presets) {
+      setTextPreset(preset);
+      setPlaybackLyricLine(materialText, '', 0.58, 12);
+      updatePlaybackSceneMotion();
+      const glyphs = Array.from(
+        els.playbackLyricText.querySelectorAll('.playback-lyric-glyph:not(.playback-lyric-glyph--space)')
+      );
+      glyphs.forEach((glyph) => {
+        glyph.style.transition = 'none';
+      });
+      updatePlaybackSceneMotion();
+      const glyphStyle = glyphs[0] ? getComputedStyle(glyphs[0]) : null;
+      const highlightRgb = getComputedStyle(els.playbackLyricScene)
+        .getPropertyValue('--lyric-highlight-rgb')
+        .split(',')
+        .map((channel) => channel.trim())
+        .join(', ');
+      const activeGlyphShadows = glyphs.slice(0, 4).map((glyph) => getComputedStyle(glyph).textShadow);
+      const rigStyle = getComputedStyle(els.playbackLyricRig);
+      const coreStyle = getComputedStyle(els.playbackLyricCore);
+      const layerStyle = getComputedStyle(els.playbackLyricText);
+      const rigHalo = getComputedStyle(els.playbackLyricRig, '::after');
+      const coreBefore = getComputedStyle(els.playbackLyricCore, '::before');
+      const coreAfter = getComputedStyle(els.playbackLyricCore, '::after');
+      const lineHalo = getComputedStyle(els.playbackLyricText, '::after');
+      const alpha = Number.parseFloat(
+        els.playbackLyricScene.style.getPropertyValue('--text-bass-glow-alpha') || '0'
+      );
+      details.push({
+        preset,
+        alpha,
+        glyphCount: glyphs.length,
+        glyphTextShadow: glyphStyle?.textShadow || '',
+        glyphBackgroundImage: glyphStyle?.backgroundImage || '',
+        glyphBackgroundClip: glyphStyle?.webkitBackgroundClip || glyphStyle?.backgroundClip || '',
+        highlightRgb,
+        distinctGlyphShadows: new Set(activeGlyphShadows).size,
+        rig: {
+          filter: rigStyle.filter,
+          boxShadow: rigStyle.boxShadow,
+          haloContent: rigHalo.content,
+          haloDisplay: rigHalo.display
+        },
+        core: {
+          filter: coreStyle.filter,
+          boxShadow: coreStyle.boxShadow,
+          beforeContent: coreBefore.content,
+          beforeDisplay: coreBefore.display,
+          afterContent: coreAfter.content,
+          afterDisplay: coreAfter.display
+        },
+        layer: {
+          filter: layerStyle.filter,
+          boxShadow: layerStyle.boxShadow,
+          textShadow: layerStyle.textShadow,
+          haloContent: lineHalo.content,
+          haloDisplay: lineHalo.display
+        },
+        pass: alpha > 0.35
+          && glyphs.length === expectedGlyphCount
+          && glyphStyle
+          && glyphStyle.textShadow !== 'none'
+          && glyphStyle.textShadow.includes(highlightRgb)
+          && glyphStyle.backgroundImage.includes('linear-gradient')
+          && (glyphStyle.webkitBackgroundClip === 'text' || glyphStyle.backgroundClip === 'text')
+          && new Set(activeGlyphShadows).size > 1
+          && !rigStyle.filter.includes('drop-shadow')
+          && !coreStyle.filter.includes('drop-shadow')
+          && !layerStyle.filter.includes('drop-shadow')
+          && rigStyle.boxShadow === 'none'
+          && coreStyle.boxShadow === 'none'
+          && layerStyle.boxShadow === 'none'
+          && layerStyle.textShadow === 'none'
+          && (rigHalo.content === 'none' || rigHalo.display === 'none')
+          && (coreBefore.content === 'none' || coreBefore.display === 'none')
+          && (coreAfter.content === 'none' || coreAfter.display === 'none')
+          && (lineHalo.content === 'none' || lineHalo.display === 'none')
+      });
+    }
+
+    setTextPreset('depth');
+    setPlaybackLyricLine('逐字低频散光测试', '', 0.62, 12);
+    isPlaybackClockRunning = () => true;
+    Array.from(els.playbackLyricText.querySelectorAll('.playback-lyric-glyph')).forEach((glyph) => {
+      glyph.style.transition = 'none';
+    });
+    updatePlaybackSceneMotion();
+    const bassGlyph = els.playbackLyricText.querySelector(
+      '.playback-lyric-glyph:not(.playback-lyric-glyph--space)'
+    );
+    const activeBassShadow = bassGlyph ? getComputedStyle(bassGlyph).textShadow : '';
+    const activeBassAlpha = Number.parseFloat(
+      els.playbackLyricScene.style.getPropertyValue('--text-bass-glow-alpha') || '0'
+    );
+
+    isPlaybackClockRunning = () => false;
+    updatePlaybackSceneMotion();
+    const stoppedBassShadow = bassGlyph ? getComputedStyle(bassGlyph).textShadow : '';
+    const stoppedAlpha = Number.parseFloat(
+      els.playbackLyricScene.style.getPropertyValue('--text-bass-glow-alpha') || '0'
+    );
+
+    setTextPreset('book');
+    setPlaybackLyricLine('书页逻辑保持独立', '', 0.4, 12);
+    updatePlaybackSceneMotion();
+    const bookAlpha = Number.parseFloat(
+      els.playbackLyricScene.style.getPropertyValue('--text-bass-glow-alpha') || '0'
+    );
+    const bookPlaybackGlyphCount = els.playbackLyricText.querySelectorAll('.playback-lyric-glyph').length;
+
+    isPlaybackClockRunning = previous.playbackClock;
+    state.playbackPage = previous.playbackPage;
+    state.multiRowLyricsEnabled = previous.multiRowLyricsEnabled;
+    state.visual.lowFrequencyAmplitude = previous.lowFrequencyAmplitude;
+    state.visual.bass = previous.bass;
+    state.visualBridge.lowFrequencyAmplitude = previous.bridgeLowFrequencyAmplitude;
+    state.visualBridge.bass = previous.bridgeBass;
+    setTextPreset(previous.textPreset);
+    setPlaybackLyricLine(
+      previous.lyricDisplayText,
+      previous.lyricSubtitleText,
+      Math.max(0, previous.lyricProgressPercent) / 100,
+      Number.NaN
+    );
+
+    return {
+      pass: details.every((item) => item.pass)
+        && activeBassAlpha > 0.35
+        && stoppedAlpha === 0
+        && activeBassShadow !== stoppedBassShadow
+        && stoppedBassShadow !== 'none'
+        && bookAlpha === 0
+        && bookPlaybackGlyphCount === 0,
+      details,
+      activeBassAlpha,
+      activeBassShadow,
+      stoppedAlpha,
+      stoppedBassShadow,
+      bookAlpha,
+      bookPlaybackGlyphCount
+    };
+  })()`, true);
+
+  const lyricRollingHighlightPass = await evaluate(`(() => {
+    const presets = ['depth', 'flow', 'book-effect', 'focus-echo'];
+    const previous = {
+      playbackPage: state.playbackPage,
+      diyPreset: state.diyPreset,
+      textPreset: state.textPreset,
+      multiRowLyricsEnabled: state.multiRowLyricsEnabled,
+      lyricDisplayText: state.lyricDisplayText,
+      lyricSubtitleText: state.lyricSubtitleText,
+      lyricProgressPercent: state.lyricProgressPercent
+    };
+    state.playbackPage = true;
+    state.diyPreset = 'lyric';
+    state.multiRowLyricsEnabled = false;
+    const details = presets.map((preset) => {
+      setTextPreset(preset);
+      state.lyricDisplayText = '';
+      setPlaybackLyricLine('整行滚动高亮测试', '同步翻译', 0.2, 12);
+      const layer = els.playbackLyricText;
+      const atTwenty = getComputedStyle(layer, '::after');
+      const firstMask = atTwenty.maskImage || atTwenty.webkitMaskImage || '';
+      const firstProgress = els.playbackLyricScene.style.getPropertyValue('--lyric-line-progress').trim();
+      setPlaybackLyricLine('整行滚动高亮测试', '同步翻译', 0.75, 12.5);
+      const atSeventyFive = getComputedStyle(layer, '::after');
+      const secondMask = atSeventyFive.maskImage || atSeventyFive.webkitMaskImage || '';
+      const secondProgress = els.playbackLyricScene.style.getPropertyValue('--lyric-line-progress').trim();
+      const subtitleMaskStyle = getComputedStyle(els.playbackLyricSubtitle, '::after');
+      const subtitleMask = subtitleMaskStyle.maskImage || subtitleMaskStyle.webkitMaskImage || '';
+      const glyphCount = layer.querySelectorAll('.playback-lyric-glyph').length;
+      return {
+        preset,
+        glyphCount,
+        firstProgress,
+        secondProgress,
+        firstMask,
+        secondMask,
+        subtitleMask,
+        backgroundImage: atSeventyFive.backgroundImage,
+        backgroundClip: atSeventyFive.webkitBackgroundClip || atSeventyFive.backgroundClip,
+        pass: glyphCount === 0
+          && firstProgress === '20.00%'
+          && secondProgress === '75.00%'
+          && firstMask.includes('linear-gradient')
+          && secondMask.includes('linear-gradient')
+          && firstMask !== secondMask
+          && subtitleMask.includes('linear-gradient')
+          && atSeventyFive.backgroundImage.includes('linear-gradient')
+          && (atSeventyFive.webkitBackgroundClip === 'text' || atSeventyFive.backgroundClip === 'text')
+      };
+    });
+
+    state.playbackPage = previous.playbackPage;
+    state.diyPreset = previous.diyPreset;
+    state.multiRowLyricsEnabled = previous.multiRowLyricsEnabled;
+    setTextPreset(previous.textPreset);
+    state.lyricDisplayText = '';
+    setPlaybackLyricLine(
+      previous.lyricDisplayText,
+      previous.lyricSubtitleText,
+      Math.max(0, previous.lyricProgressPercent) / 100,
+      Number.NaN
+    );
+    return {
+      pass: details.every((item) => item.pass),
+      details
     };
   })()`, true);
 
@@ -555,9 +967,15 @@ try {
     const independentFromMainPalette = JSON.stringify(state.textPalettePreferences) === mainPreferencesBefore
       && mainScene.style.getPropertyValue('--lyric-primary') === mainColorBefore;
 
-    setTextPreset('focus-echo');
+    setTextPreset('depth');
+    setTextComposerSetting('lyricsEnabled', true);
+    setTextComposerSetting('echoLayers', 3);
+    setTextComposerSetting('echoSpacing', 22);
+    setPlaybackLyricLine('聚焦回声滚动高亮', '', 0.56, 12);
     const scene = document.getElementById('playbackLyricScene');
     scene.classList.remove('is-focus-echo-entering');
+    const focusHighlightStyle = getComputedStyle(els.playbackLyricText, '::after');
+    const focusHighlightMask = focusHighlightStyle.maskImage || focusHighlightStyle.webkitMaskImage || '';
     const depths = [0, 1, 2, 3].map((depth) => {
       const element = document.querySelector('.playback-lyric-layer.lyric-depth-' + depth);
       if (element) element.style.animation = 'none';
@@ -588,11 +1006,13 @@ try {
         && normalStyle.textShadow !== 'none'
         && currentStyle.opacity === '1'
         && hotStyle.color !== normalStyle.color,
-      focusEchoVisible: depths[0].shadow !== 'none'
-        && (depths[0].shadow.match(/rgba?\\(/g) || []).length >= 4
-        && depths.slice(1).every((depth) => depth.display !== 'none' && depth.filter.includes('blur'))
-        && depths[1].opacity > depths[2].opacity
-        && depths[2].opacity > depths[3].opacity
+      parameterizedEchoVisible: state.textPreset === 'depth'
+        && state.textComposerSettings.echoLayers === 3
+        && state.textComposerSettings.echoSpacing === 22
+        && els.playbackLyricText.querySelectorAll('.playback-lyric-glyph').length === 0
+        && focusHighlightMask.includes('linear-gradient')
+        && focusHighlightStyle.backgroundImage.includes('linear-gradient')
+        && scene.querySelectorAll('.is-text-composer-layer-visible').length === 3
     };
     setPlaybackLyricPalettePreference('manual', '#ffadc9');
     return {
@@ -616,8 +1036,10 @@ try {
     };
   })()`, true);
 
+  const timeOriginBeforeReload = await evaluate('performance.timeOrigin');
   await command('Page.reload', { ignoreCache: true });
-  await waitFor(`document.readyState === 'complete'
+  await waitFor(`performance.timeOrigin !== ${JSON.stringify(timeOriginBeforeReload)}
+    && document.readyState === 'complete'
     && state.playbackLyricPalettePreference
     && document.getElementById('playbackLyricPaletteCustomInput')`);
   const reloadPass = await evaluate(`(() => {
@@ -643,17 +1065,237 @@ try {
     };
   })()`, true);
 
+  const lyricContinuityPass = await evaluate(`(() => {
+    if (typeof syncPlaybackLyricSubtitleLayout !== 'function') {
+      return { pass: false, subtitleLayoutFunctionPresent: false };
+    }
+
+    const timedLine = {
+      time: 1,
+      endTime: 3,
+      text: 'AB',
+      glyphTimings: [
+        { char: 'A', start: 1, end: 1.3 },
+        { char: 'B', start: 2, end: 2.3 }
+      ]
+    };
+    const gapProgress = [1.42, 1.7, 1.94]
+      .map((time) => lyricProgressForLineAtTime(timedLine, time, 3));
+    const resumedProgress = lyricProgressForLineAtTime(timedLine, 2.15, 3);
+    const autoLine = { time: 4, autoVocalEndTime: 5.2, text: 'pause here' };
+    const autoTailStart = lyricProgressForLineAtTime(autoLine, 5.2, 8);
+    const autoTailEnd = lyricProgressForLineAtTime(autoLine, 7.6, 8);
+
+    const previous = {
+      playbackPage: state.playbackPage,
+      diyPreset: state.diyPreset,
+      textPreset: state.textPreset,
+      currentSong: state.currentSong,
+      lyricLines: state.lyricLines,
+      lyricIndex: state.lyricIndex,
+      lyricSignature: state.lyricSignature,
+      multiRowLyricsEnabled: state.multiRowLyricsEnabled,
+      bilingualLyricsEnabled: state.bilingualLyricsEnabled
+    };
+    state.playbackPage = true;
+    els.appShell.classList.add('is-playback-page');
+    els.playbackLyricScene.hidden = false;
+    setTextPreset('depth');
+    setTextComposerSetting('lyricsEnabled', true);
+    setBilingualLyricsEnabled(true);
+    state.currentSong = { id: 'lyric-continuity', title: 'Lyric continuity', artist: 'QA' };
+    state.lyricLines = Array.from({ length: 9 }, (_, index) => ({
+      time: index * 2,
+      text: 'Main lyric ' + index,
+      translationText: '中文字幕 ' + index
+    }));
+    state.lyricSignature = 'lyric-continuity|9';
+    state.lyricIndex = 2;
+    setMultiRowLyricsEnabled(true);
+    renderMultiRowLyrics(true);
+    const stableBefore = els.multiRowLyricList.querySelector('[data-multi-row-lyric-index="2"]');
+    state.lyricIndex = 3;
+    state.lyricProgressPercent = 36;
+    renderMultiRowLyrics();
+    const stableAfter = els.multiRowLyricList.querySelector('[data-multi-row-lyric-index="2"]');
+    const currentRow = els.multiRowLyricList.querySelector('.multi-row-lyric-line.is-current');
+    const multiRowProgress = currentRow?.style.getPropertyValue('--multi-row-progress') || '';
+
+    setPlaybackLyricLine('Main lyric', '更大的中文字幕', 0.42, 1.5);
+    syncPlaybackLyricSubtitleLayout();
+    const mainRect = els.playbackLyricText.getBoundingClientRect();
+    const subtitleRect = els.playbackLyricSubtitle.getBoundingClientRect();
+    const subtitleStyle = getComputedStyle(els.playbackLyricSubtitle);
+    const subtitleGap = subtitleRect.top - mainRect.bottom;
+    const subtitleFontSize = Number.parseFloat(subtitleStyle.fontSize);
+    const multiRowEnabledDuringCheck = state.multiRowLyricsEnabled;
+
+    setMultiRowLyricsEnabled(previous.multiRowLyricsEnabled);
+    setBilingualLyricsEnabled(previous.bilingualLyricsEnabled);
+    state.currentSong = previous.currentSong;
+    state.lyricLines = previous.lyricLines;
+    state.lyricIndex = previous.lyricIndex;
+    state.lyricSignature = previous.lyricSignature;
+    state.diyPreset = previous.diyPreset;
+    setTextPreset(previous.textPreset);
+    state.playbackPage = previous.playbackPage;
+    els.appShell.classList.toggle('is-playback-page', previous.playbackPage);
+
+    const timedGapFreezes = Math.max(...gapProgress) - Math.min(...gapProgress) < 0.0001;
+    const checks = {
+      timedGapFreezes,
+      timedProgressResumes: resumedProgress > gapProgress[0],
+      inferredTailFreezes: Math.abs(autoTailStart - autoTailEnd) < 0.0001,
+      multiRowNodesReused: !!stableBefore && stableBefore === stableAfter,
+      multiRowProgressApplied: !!currentRow
+        && Math.abs(Number.parseFloat(multiRowProgress) - 36) < 0.001,
+      subtitleClose: subtitleGap >= 1 && subtitleGap <= 12,
+      subtitleLarge: subtitleFontSize >= 28
+    };
+    return {
+      pass: Object.values(checks).every(Boolean),
+      checks,
+      gapProgress,
+      resumedProgress,
+      autoTailStart,
+      autoTailEnd,
+      multiRowProgress,
+      multiRowCurrentIndex: currentRow?.dataset.multiRowLyricIndex || '',
+      multiRowEnabledDuringCheck,
+      subtitleGap,
+      subtitleFontSize
+    };
+  })()`, true);
+
+  const qishuiLyricClockPass = await evaluate(`(async () => {
+    const card = els.qishuiPlaybackCard;
+    const list = els.qishuiPlaybackLyricPage;
+    const laterButton = els.qishuiPlaybackLyricLaterButton;
+    const earlierButton = els.qishuiPlaybackLyricEarlierButton;
+    if (
+      !card
+      || !list
+      || !laterButton
+      || !earlierButton
+      || typeof syncQishuiLyricTransition !== 'function'
+    ) {
+      return { pass: false, ready: false };
+    }
+
+    const previous = {
+      cardHidden: card.hidden,
+      hasCardClass: els.appShell.classList.contains('has-qishui-playback-card'),
+      currentSong: state.currentSong,
+      lyricLines: state.lyricLines,
+      lyricSignature: state.lyricSignature,
+      cardSignature: state.qishuiPlaybackCard.lyricSignature,
+      bookIndex: state.qishuiPlaybackCard.lyricBookIndex,
+      lastIndex: state.qishuiPlaybackCard.lastLyricIndex
+    };
+
+    card.hidden = false;
+    els.appShell.classList.add('has-qishui-playback-card');
+    state.currentSong = {
+      id: 'qishui-clock-transition',
+      title: 'Clock transition',
+      artist: 'QA',
+      provider: 'netease'
+    };
+    state.lyricLines = Array.from({ length: 9 }, (_, index) => ({
+      time: index,
+      text: index === 1
+        ? 'A long playback-card lyric that wraps naturally across two lines'
+        : 'Playback card lyric ' + index,
+      translationText: 'Translated playback lyric ' + index
+    }));
+    state.lyricSignature = 'qishui-clock-transition|9';
+    state.qishuiPlaybackCard.lyricSignature = '';
+    state.qishuiPlaybackCard.lyricBookIndex = -2;
+    state.qishuiPlaybackCard.lastLyricIndex = -1;
+    state.qishuiPlaybackCard.lyricBookArrivedIndex = -2;
+    resetBookLyricScrollState({ store: state.qishuiPlaybackCard });
+
+    updateQishuiPlaybackLyrics('', '', 0.5, { playbackRunning: true });
+    const stableLine = list.querySelector('[data-book-lyric-index="1"]');
+    updateQishuiPlaybackLyrics('', '', 0.9, { playbackRunning: true });
+    const transition = state.qishuiPlaybackCard.lyricTransition;
+    const animation = transition?.animations?.[0]?.animation || null;
+    const frozenAnimationAt = Number(animation?.currentTime) || 0;
+    const frozenScrollAt = Number(list.scrollTop) || 0;
+
+    await new Promise((resolve) => setTimeout(resolve, 140));
+    updateQishuiPlaybackLyrics('', '', 0.9, { playbackRunning: true });
+    const frozenAnimationAfterWallTime = Number(animation?.currentTime) || 0;
+    const frozenScrollAfterWallTime = Number(list.scrollTop) || 0;
+
+    updateQishuiPlaybackLyrics('', '', 0.98, { playbackRunning: true });
+    const progressedAnimationAt = Number(animation?.currentTime) || 0;
+    const stableLineAfter = list.querySelector('[data-book-lyric-index="1"]');
+    const timeRow = laterButton.parentElement;
+    const buttonStyle = getComputedStyle(laterButton);
+    const timeRowRect = timeRow.getBoundingClientRect();
+    const buttonRect = laterButton.getBoundingClientRect();
+
+    const checks = {
+      transitionCreated: !!transition && !!animation,
+      wallTimeCannotAdvanceTransition: Math.abs(frozenAnimationAfterWallTime - frozenAnimationAt) < 0.01,
+      wallTimeCannotAdvanceScroll: Math.abs(frozenScrollAfterWallTime - frozenScrollAt) < 0.01,
+      mediaTimeAdvancesTransition: progressedAnimationAt > frozenAnimationAfterWallTime + 20,
+      lyricNodesReused: !!stableLine && stableLine === stableLineAfter,
+      controlsAreDirectSiblings: laterButton.parentElement === earlierButton.parentElement
+        && timeRow?.classList.contains('qishui-playback-times')
+        && !timeRow.querySelector('.qishui-playback-lyric-clock'),
+      controlsUseGlassSurface: laterButton.matches('[data-glass-surface].glass-surface')
+        && earlierButton.matches('[data-glass-surface].glass-surface')
+        && buttonStyle.backdropFilter !== 'none',
+      controlsDoNotGrowTimeRow: buttonRect.height >= 20 && timeRowRect.height < buttonRect.height
+    };
+
+    disposeQishuiLyricTransition();
+    card.hidden = previous.cardHidden;
+    els.appShell.classList.toggle('has-qishui-playback-card', previous.hasCardClass);
+    state.currentSong = previous.currentSong;
+    state.lyricLines = previous.lyricLines;
+    state.lyricSignature = previous.lyricSignature;
+    state.qishuiPlaybackCard.lyricSignature = previous.cardSignature;
+    state.qishuiPlaybackCard.lyricBookIndex = previous.bookIndex;
+    state.qishuiPlaybackCard.lastLyricIndex = previous.lastIndex;
+
+    return {
+      pass: Object.values(checks).every(Boolean),
+      checks,
+      frozenAnimationAt,
+      frozenAnimationAfterWallTime,
+      progressedAnimationAt,
+      frozenScrollAt,
+      frozenScrollAfterWallTime,
+      timeRowHeight: timeRowRect.height,
+      buttonHeight: buttonRect.height,
+      buttonBackdropFilter: buttonStyle.backdropFilter
+    };
+  })()`, true);
+
   const result = {
-    pass: bilingualPass.pass === true
+    pass: lyricMaterialStaticPass.pass === true
+      && bilingualPass.pass === true
       && bilingualUiPass.pass === true
       && textTransformPass.pass === true
+      && lyricGlyphMaterialPass.pass === false
+      && lyricRollingHighlightPass.pass === true
       && firstPass.pass === true
-      && reloadPass.pass === true,
+      && reloadPass.pass === true
+      && lyricContinuityPass.pass === true
+      && qishuiLyricClockPass.pass === true,
+    lyricMaterialStaticPass,
     bilingualPass,
     bilingualUiPass,
     textTransformPass,
+    glyphLocalMaterialAbsent: lyricGlyphMaterialPass.pass === false,
+    lyricRollingHighlightPass,
     firstPass,
-    reloadPass
+    reloadPass,
+    lyricContinuityPass,
+    qishuiLyricClockPass
   };
   console.log(JSON.stringify(result, null, 2));
   if (!result.pass) process.exitCode = 1;

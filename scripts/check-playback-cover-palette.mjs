@@ -92,7 +92,7 @@ try {
   await waitFor(`document.readyState === 'complete'
     && typeof refreshPlayerState === 'function'
     && state.playbackVisual.particles.length > 0
-    && document.getElementById('diyNoTextPreset')?.classList.contains('is-active')`);
+    && document.getElementById('diyLyricPreset')?.classList.contains('is-active')`);
   await evaluate(`(async () => {
     const boot = document.getElementById('bootScreen');
     if (boot) boot.hidden = true;
@@ -114,8 +114,8 @@ try {
     const defaultWallpaperPass = state.playbackPage
       && state.diyPage === 'wallpaper'
       && state.diyPreset === 'wallpaper'
-      && state.textPreset === 'none'
-      && lyricScene?.hidden
+      && state.textPreset === 'depth'
+      && !lyricScene?.hidden
       && !cardLyrics?.hidden
       && getComputedStyle(cardLyrics).display !== 'none';
     const mainParticleBallRemovedPass = state.particles.length === 0
@@ -143,8 +143,8 @@ try {
     const wallpaperHomeNavigationPass = state.playbackPage
       && state.diyPage === 'wallpaper'
       && state.diyPreset === 'wallpaper'
-      && state.textPreset === 'none'
-      && lyricScene?.hidden
+      && state.textPreset === 'depth'
+      && !lyricScene?.hidden
       && !cardLyrics?.hidden
       && getComputedStyle(cardLyrics).display !== 'none';
     qualityButton?.click();

@@ -1,15 +1,21 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
-import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "..");
 const webRoot = path.join(root, "web");
 const edge = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
-const profile = path.join(tmpdir(), `fe-monster-preset-performance-${process.pid}`);
-const debugPort = 17000 + (process.pid % 12000);
+const testTempRoot = path.join(root, ".tmp");
+mkdirSync(testTempRoot, { recursive: true });
+const profile = path.join(testTempRoot, `fe-monster-preset-performance-${process.pid}`);
+const debugPort = 17000 + Math.floor(Math.random() * 12000);
+const sonicScreenshotArgument = process.argv.find((argument) => argument.startsWith("--capture-sonic="));
+const sonicScreenshotPath = sonicScreenshotArgument
+  ? path.resolve(root, sonicScreenshotArgument.slice("--capture-sonic=".length))
+  : "";
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+const stylesSource = readFileSync(path.join(webRoot, "styles.css"), "utf8").replace(/\r\n/g, "\n");
 
 if (!existsSync(path.join(webRoot, "index.html"))) throw new Error(`Web client not found: ${webRoot}`);
 if (!existsSync(edge)) throw new Error(`Microsoft Edge not found: ${edge}`);
@@ -142,7 +148,8 @@ function metricMap(payload) {
 
 try {
   const targets = await retryJson(`http://127.0.0.1:${debugPort}/json`);
-  const target = targets.find((item) => item.type === "page");
+  const target = targets.find((item) => item.type === "page" && item.url === "about:blank")
+    || targets.find((item) => item.type === "page");
   if (!target?.webSocketDebuggerUrl) throw new Error("No Edge page target was found");
   socket = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => {
@@ -408,7 +415,6 @@ try {
       communityServerUrl: state.community.serverUrl,
       selectedFriendId: state.community.selectedFriendId,
       messageDialogHidden: els.communityMessageDialog?.hidden,
-      loginQrKey: state.loginQrKey,
       updateProgressId: state.update.progressId,
       eventSource: window.EventSource
     };
@@ -425,7 +431,6 @@ try {
     state.currentSong = { id: 'PERF-SONG', title: 'Performance fixture' };
     state.playlistsLoading = false;
     state.community.loading = false;
-    state.loginQrKey = 'PERF-QR';
     state.update.progressId = 'PERF-UPDATE';
     if (els.communityMessageDialog) els.communityMessageDialog.hidden = false;
 
@@ -442,7 +447,6 @@ try {
       refreshCommunityListenState(),
       reportCommunityListening(true),
       refreshCommunityMessages(),
-      checkLoginQr(),
       pollClientUpdateProgress(),
       loadPlaybackLyrics(state.currentSong)
     ]);
@@ -471,7 +475,6 @@ try {
     state.community.serverUrl = original.communityServerUrl;
     state.community.selectedFriendId = original.selectedFriendId;
     if (els.communityMessageDialog) els.communityMessageDialog.hidden = original.messageDialogHidden;
-    state.loginQrKey = original.loginQrKey;
     state.update.progressId = original.updateProgressId;
     setDiyPreset('lyric');
     await wait(260);
@@ -1401,7 +1404,188 @@ try {
     }
     const nativeRefresh = playbackPresetsUseNativeRefresh();
     const sonicInstanceCount = topo.count;
-    const sonicContextLost = topo.renderer.getContext().isContextLost();
+    const sonicGl = topo.renderer.getContext();
+    const sonicContextLost = sonicGl.isContextLost();
+    const sampleSonicPixels = () => {
+      const previousRenderTarget = topo.renderer.getRenderTarget?.() || null;
+      topo.renderer.setRenderTarget(null);
+      topo.renderer.render(topo.scene, topo.camera);
+      const width = sonicGl.drawingBufferWidth;
+      const height = sonicGl.drawingBufferHeight;
+      const pixels = new Uint8Array(width * height * 4);
+      sonicGl.readPixels(0, 0, width, height, sonicGl.RGBA, sonicGl.UNSIGNED_BYTE, pixels);
+      if (previousRenderTarget) topo.renderer.setRenderTarget(previousRenderTarget);
+      let samples = 0;
+      let luminanceSum = 0;
+      let luminanceSquared = 0;
+      let highlights = 0;
+      let clippedHighlights = 0;
+      let shadows = 0;
+      let midtones = 0;
+      let neighborContrast = 0;
+      const pixelStep = Math.max(2, Math.floor(Math.min(width, height) / 160));
+      for (let y = 0; y < height; y += pixelStep) {
+        for (let x = 0; x < width; x += pixelStep) {
+          const pixelIndex = (y * width + x) * 4;
+          const luminance = (
+            pixels[pixelIndex] * 0.2126
+            + pixels[pixelIndex + 1] * 0.7152
+            + pixels[pixelIndex + 2] * 0.0722
+          ) / 255;
+          samples += 1;
+          luminanceSum += luminance;
+          luminanceSquared += luminance * luminance;
+          if (luminance >= 0.9) highlights += 1;
+          if (luminance >= 0.985) clippedHighlights += 1;
+          if (luminance <= 0.09) shadows += 1;
+          if (luminance >= 0.18 && luminance <= 0.78) midtones += 1;
+          if (x + pixelStep < width) {
+            const neighborIndex = pixelIndex + pixelStep * 4;
+            const neighborLuminance = (
+              pixels[neighborIndex] * 0.2126
+              + pixels[neighborIndex + 1] * 0.7152
+              + pixels[neighborIndex + 2] * 0.0722
+            ) / 255;
+            neighborContrast += Math.abs(luminance - neighborLuminance);
+          }
+        }
+      }
+      const luminanceMean = luminanceSum / Math.max(1, samples);
+      return {
+        sampleCount: samples,
+        luminanceMean,
+        luminanceStdDev: Math.sqrt(Math.max(
+          0,
+          luminanceSquared / Math.max(1, samples) - luminanceMean * luminanceMean
+        )),
+        highlightRatio: highlights / Math.max(1, samples),
+        clippedHighlightRatio: clippedHighlights / Math.max(1, samples),
+        shadowRatio: shadows / Math.max(1, samples),
+        midtoneRatio: midtones / Math.max(1, samples),
+        localContrast: neighborContrast / Math.max(1, samples)
+      };
+    };
+    const sonicDefaultPixelMetrics = sampleSonicPixels();
+    const pixelProbeSettings = { ...topo.settings };
+    const sampleOptics = () => ({
+      groundColor: topo.tyndallGroundSheenMaterial?.uniforms?.uReflectionColor?.value?.getHexString?.() || '',
+      wallColor: topo.tyndallWallBounceMaterial?.uniforms?.uReflectionColor?.value?.getHexString?.() || '',
+      columnColor: topo.uniforms?.uTyndallBounceColor?.value?.getHexString?.() || '',
+      groundIntensity: Number(topo.tyndallGroundSheenMaterial?.uniforms?.uIntensity?.value) || 0,
+      wallIntensity: Number(topo.tyndallWallBounceMaterial?.uniforms?.uIntensity?.value) || 0,
+      columnIntensity: Number(topo.uniforms?.uTyndallReceiverBounce?.value) || 0
+    });
+    topo.settings = { ...topo.settings, tyndallTone: 'warm', tyndallIntensity: 0.4, mistReflectance: 0 };
+    applySonicTopographySettings({ persist: false, sync: false, renderConfig: false });
+    const warmLowReflectance = sampleOptics();
+    topo.settings = { ...topo.settings, mistReflectance: 1.5 };
+    applySonicTopographySettings({ persist: false, sync: false, renderConfig: false });
+    const warmHighReflectance = sampleOptics();
+    topo.settings = { ...topo.settings, tyndallTone: 'cold' };
+    applySonicTopographySettings({ persist: false, sync: false, renderConfig: false });
+    const coldHighReflectance = sampleOptics();
+    const sonicOpticsCoupling = {
+      warmLowReflectance,
+      warmHighReflectance,
+      coldHighReflectance,
+      temperatureChangesAllReceivers: warmHighReflectance.groundColor !== coldHighReflectance.groundColor
+        && warmHighReflectance.wallColor !== coldHighReflectance.wallColor
+        && warmHighReflectance.columnColor !== coldHighReflectance.columnColor,
+      reflectanceRaisesReceiverEnergy: warmHighReflectance.groundIntensity > warmLowReflectance.groundIntensity
+        && warmHighReflectance.wallIntensity > warmLowReflectance.wallIntensity
+        && warmHighReflectance.columnIntensity > warmLowReflectance.columnIntensity
+    };
+    topo.settings = {
+      ...pixelProbeSettings,
+      fogDensity: 0.8,
+      fogGlow: 1.5,
+      mistReflectance: 1.5,
+      mistEmission: 0.6,
+      tyndallIntensity: 1.5,
+      tyndallSpread: 1.5,
+      brightness: 1,
+      exposure: 0
+    };
+    applySonicTopographySettings({ persist: false, sync: false, renderConfig: false });
+    for (let frame = 0; frame < 45; frame += 1) {
+      topo.lastMotionAt = performance.now() - 16;
+      topo.lastRenderAt = 0;
+      updateSonicTopographyMotion();
+    }
+    const sonicStressPixelMetrics = sampleSonicPixels();
+    topo.settings = pixelProbeSettings;
+    applySonicTopographySettings({ persist: false, sync: true, renderConfig: false });
+    topo.lastMotionAt = performance.now() - 16;
+    topo.lastRenderAt = 0;
+    updateSonicTopographyMotion();
+    const sonicPixelMetrics = {
+      defaults: sonicDefaultPixelMetrics,
+      raisedAtmosphere: sonicStressPixelMetrics
+    };
+    const sonicAtmosphereDiagnostics = typeof sonicAtmosphereRuntimeSnapshot === 'function'
+      ? sonicAtmosphereRuntimeSnapshot()
+      : {};
+    const sonicAtmosphere = {
+      ...sonicAtmosphereDiagnostics,
+      mistLayerCount: topo.fogLayers?.length || 0,
+      beamCount: topo.tyndallBeams?.length || 0,
+      haloCount: topo.tyndallHalos?.length || 0,
+      shaderMaterials: topo.tyndallBeams?.every((beam) => beam.material?.isShaderMaterial === true)
+        && topo.tyndallHalos?.every((halo) => halo.material?.isShaderMaterial === true),
+      pixelMetrics: sonicPixelMetrics,
+      opticsCoupling: sonicOpticsCoupling,
+      programsRunnable: (topo.renderer.info?.programs || []).every((program) => program?.diagnostics?.runnable !== false),
+      glError: sonicGl.getError()
+    };
+    openPlaybackDiyPanel('preset');
+    await wait(260);
+    const sceneSettingsGroup = document.querySelector('#scenePresetSettingsGroup');
+    const sceneWallpaperControl = document.querySelector('#sceneWallpaperControl');
+    const sceneWallpaperActions = Array.from(
+      sceneWallpaperControl?.querySelectorAll('.scene-wallpaper-actions button') || []
+    );
+    const settingsRect = sceneSettingsGroup?.getBoundingClientRect();
+    const wallpaperRect = sceneWallpaperControl?.getBoundingClientRect();
+    const sonicPanelRect = sonicPanel?.getBoundingClientRect();
+    const actionMetrics = sceneWallpaperActions.map((button) => {
+      const rect = button.getBoundingClientRect();
+      return {
+        id: button.id,
+        width: rect.width,
+        clientWidth: button.clientWidth,
+        scrollWidth: button.scrollWidth,
+        insideWallpaper: !!wallpaperRect
+          && rect.left >= wallpaperRect.left - 1
+          && rect.right <= wallpaperRect.right + 1
+      };
+    });
+    const sonicSceneControls = {
+      groupVisible: !!sceneSettingsGroup
+        && sceneSettingsGroup.hidden === false
+        && getComputedStyle(sceneSettingsGroup).display !== 'none',
+      title: document.querySelector('#scenePresetSettingsTitle')?.textContent?.trim() || '',
+      meta: document.querySelector('#scenePresetSettingsMeta')?.textContent?.trim() || '',
+      sonicVisible: !!sonicPanel && sonicPanel.hidden === false,
+      wallpaperVisible: !!sceneWallpaperControl && sceneWallpaperControl.hidden === false,
+      foreignControlsHidden: [
+        '#diyCoverParticleControl',
+        '#diyCubeIntensityControl',
+        '#freeCubePresetControls',
+        '#chladniPresetControls',
+        '#stormPresetLightingQuickControls'
+      ].every((selector) => document.querySelector(selector)?.hidden === true),
+      wallpaperBeforeSonic: !!settingsRect && !!wallpaperRect && !!sonicPanelRect
+        && wallpaperRect.top >= settingsRect.top
+        && wallpaperRect.top < sonicPanelRect.top,
+      actionsComplete: actionMetrics.length === 3
+        && actionMetrics.every((metric) => (
+          metric.clientWidth >= 48
+          && metric.scrollWidth <= metric.clientWidth + 1
+          && metric.insideWallpaper
+        )),
+      actionMetrics
+    };
+    if (state.diyOpen) setDiyOpen(false);
     setDiyPreset('lyric');
     sonicControls.panelHiddenOutsideTopography = !!sonicPanel && sonicPanel.hidden === true;
     const lyricNativeRefresh = playbackPresetsUseNativeRefresh();
@@ -1435,7 +1619,9 @@ try {
       inactiveProjectilesStayFrozen,
       sonicCamera,
       sonicControls,
+      sonicSceneControls,
       sonicEffects,
+      sonicAtmosphere,
       bassColumns,
       contextLost: sonicContextLost
     };
@@ -1776,19 +1962,24 @@ try {
       enginePlaying: cover.enginePlaying,
       engineVisible: cover.engineVisible,
       motionAmplitude: cover.motionAmplitude,
+      floatSpeed: cover.floatSpeed,
       waveTime: cover.waveTime,
-      shockAge: cover.shockAge,
-      shockStrength: cover.shockStrength,
-      shockCooldown: cover.shockCooldown,
-      shockArmed: cover.shockArmed,
-      lastShockDrive: cover.lastShockDrive,
-      lastBassInput: cover.lastBassInput,
+      motionGate: cover.motionGate,
+      wholeJump: cover.wholeJump,
+      coverParticlePreferences: window.localStorage.getItem('fe-monster-cover-particle-v1'),
       visualAudio: {
         lowFrequencyAmplitude: state.visual.lowFrequencyAmplitude,
+        subBass: state.visual.subBass,
         bass: state.visual.bass,
+        lowMid: state.visual.lowMid,
         energy: state.visual.energy,
         beat: state.visual.beat,
         fluxPulse: state.visual.fluxPulse
+      },
+      visualBridgeAudio: {
+        lowFrequencyAmplitude: state.visualBridge.lowFrequencyAmplitude,
+        subBass: state.visualBridge.subBass,
+        bass: state.visualBridge.bass
       },
       playerClock: { ...state.playerClock }
     };
@@ -1806,6 +1997,22 @@ try {
       cover.enginePromise = null;
       cover.enginePlaying = false;
       cover.engineVisible = false;
+      cover.motionGate = 0;
+      cover.wholeJump = 0;
+      Object.assign(state.visual, {
+        lowFrequencyAmplitude: 0,
+        subBass: 0,
+        bass: 0,
+        lowMid: 0,
+        energy: 0,
+        beat: 0,
+        fluxPulse: 0
+      });
+      Object.assign(state.visualBridge, {
+        lowFrequencyAmplitude: 0,
+        subBass: 0,
+        bass: 0
+      });
 
       enterPresetPlaybackPage('cover-particles');
       requestOrbFrame();
@@ -1816,57 +2023,48 @@ try {
       await wait(160);
       const playWhilePaused = playCalls;
       const waveTimeBeforePlayback = cover.waveTime;
+      const motionGateBeforePlayback = cover.motionGate;
+      const particlesBeforeZeroLowMotion = cover.particles;
+      const geometryBeforeZeroLowMotion = cover.gpuGeometry;
+      const zeroLowStageRect = els.stage.getBoundingClientRect();
+      const zeroLowWidth = Math.max(1, Math.round(zeroLowStageRect.width));
+      const zeroLowHeight = Math.max(1, Math.round(zeroLowStageRect.height));
+      const zeroLowDpr = window.devicePixelRatio || 1;
 
       state.playerClock.playing = true;
       state.playerClock.updatedAt = performance.now();
       updatePlayState();
-      await wait(80);
+      const zeroLowGateRise = [];
+      for (let index = 0; index < 6; index += 1) {
+        drawCoverParticleScene(zeroLowWidth, zeroLowHeight, zeroLowDpr);
+        zeroLowGateRise.push(cover.motionGate);
+        await wait(24);
+      }
       const playAfterPlaybackStart = playCalls;
       const waveTimeAfterPlaybackStart = cover.waveTime;
+      const zeroLowFrequencyMotion = {
+        visualInputsAreZero: state.visual.lowFrequencyAmplitude === 0
+          && state.visual.subBass === 0
+          && state.visual.bass === 0
+          && state.visual.lowMid === 0
+          && state.visual.beat === 0
+          && state.visual.fluxPulse === 0,
+        waveTimeBefore: waveTimeBeforePlayback,
+        waveTimeAfter: waveTimeAfterPlaybackStart,
+        gateBefore: motionGateBeforePlayback,
+        gateRise: zeroLowGateRise,
+        uniformGate: cover.gpuMaterial?.uniforms?.uAudioActive?.value,
+        wholeJump: cover.wholeJump,
+        wholeJumpUniform: cover.gpuMaterial?.uniforms?.uWholeJump?.value,
+        particlesStable: cover.particles === particlesBeforeZeroLowMotion,
+        geometryStable: cover.gpuGeometry === geometryBeforeZeroLowMotion
+      };
 
       updateCoverParticleVisibility();
       updateCoverParticleVisibility();
       await wait(120);
       const playAfterRepeatedVisible = playCalls;
-      Object.assign(state.visual, {
-        lowFrequencyAmplitude: 0,
-        bass: 0,
-        energy: 0,
-        beat: 0,
-        fluxPulse: 0
-      });
-      await wait(80);
-      cover.shockCooldown = 0;
-      cover.shockArmed = true;
-      cover.lastShockDrive = 0;
-      cover.lastBassInput = 0;
-      const particlesBeforeShock = cover.particles;
-      const geometryBeforeShock = cover.gpuGeometry;
-      Object.assign(state.visual, {
-        lowFrequencyAmplitude: 0.94,
-        bass: 0.88,
-        energy: 0.72,
-        beat: 0.9,
-        fluxPulse: 0.52
-      });
-      const shockStageRect = els.stage.getBoundingClientRect();
-      drawCoverParticleScene(
-        Math.max(1, Math.round(shockStageRect.width)),
-        Math.max(1, Math.round(shockStageRect.height)),
-        window.devicePixelRatio || 1
-      );
-      requestOrbFrame();
-      await wait(80);
-      const shockOnset = {
-        strength: cover.shockStrength,
-        progress: cover.shockAge / COVER_PARTICLE_SHOCK_DURATION_SECONDS,
-        uniformStrength: cover.gpuMaterial?.uniforms?.uShockStrength?.value,
-        uniformProgress: cover.gpuMaterial?.uniforms?.uShockProgress?.value,
-        particlesStable: cover.particles === particlesBeforeShock,
-        geometryStable: cover.gpuGeometry === geometryBeforeShock
-      };
       Object.assign(state.visual, original.visualAudio);
-      resetCoverParticleShock();
 
       const motionRange = document.querySelector('#diyCoverParticleMotionRange');
       const particlesBeforeMotionInput = cover.particles;
@@ -1898,6 +2096,83 @@ try {
         motionRange.dispatchEvent(new Event('input', { bubbles: true }));
       }
 
+      const floatSpeedRange = document.querySelector('#diyCoverParticleFloatSpeedRange');
+      const particlesBeforeFloatSpeedInput = cover.particles;
+      const geometryBeforeFloatSpeedInput = cover.gpuGeometry;
+      const floatSpeedUniforms = [];
+      for (const percent of [25, 100, 200]) {
+        if (floatSpeedRange) {
+          floatSpeedRange.value = String(percent);
+          floatSpeedRange.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        drawCoverParticleScene(zeroLowWidth, zeroLowHeight, zeroLowDpr);
+        floatSpeedUniforms.push(Number(cover.gpuMaterial?.uniforms?.uFloatSpeed?.value));
+      }
+      let persistedFloatSpeed = Number.NaN;
+      try {
+        persistedFloatSpeed = Number(
+          JSON.parse(window.localStorage.getItem('fe-monster-cover-particle-v1') || '{}').floatSpeed
+        );
+      } catch (error) {}
+      const floatSpeedControl = {
+        available: !!floatSpeedRange,
+        min: floatSpeedRange?.min,
+        max: floatSpeedRange?.max,
+        step: floatSpeedRange?.step,
+        stateSpeed: cover.floatSpeed,
+        output: document.querySelector('#diyCoverParticleFloatSpeedValue')?.textContent,
+        runtimeValue: builtinDiyPresetConfiguration().runtimeControls?.coverFloatSpeed,
+        persistedFloatSpeed,
+        floatSpeedUniforms,
+        particlesStable: cover.particles === particlesBeforeFloatSpeedInput,
+        geometryStable: cover.gpuGeometry === geometryBeforeFloatSpeedInput
+      };
+      if (floatSpeedRange) {
+        floatSpeedRange.value = String(Math.round(original.floatSpeed * 100));
+        floatSpeedRange.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+
+      cover.wholeJump = 0;
+      Object.assign(state.visual, {
+        lowFrequencyAmplitude: 0.86,
+        subBass: 0.78,
+        bass: 0.82,
+        lowMid: 0,
+        energy: 0.7,
+        beat: 0,
+        fluxPulse: 0
+      });
+      const wholeJumpAttack = [];
+      for (let index = 0; index < 8; index += 1) {
+        updateCoverParticleMotionEnvelope(true, RENDER_PROFILE.targetFrameMs);
+        wholeJumpAttack.push(cover.wholeJump);
+      }
+      drawCoverParticleScene(zeroLowWidth, zeroLowHeight, zeroLowDpr);
+      const wholeJumpUniformAtPeak = Number(cover.gpuMaterial?.uniforms?.uWholeJump?.value);
+      Object.assign(state.visual, {
+        lowFrequencyAmplitude: 0,
+        subBass: 0,
+        bass: 0,
+        lowMid: 0,
+        energy: 0,
+        beat: 0,
+        fluxPulse: 0
+      });
+      const wholeJumpRelease = [];
+      for (let index = 0; index < 64; index += 1) {
+        updateCoverParticleMotionEnvelope(true, RENDER_PROFILE.targetFrameMs);
+        wholeJumpRelease.push(cover.wholeJump);
+      }
+      drawCoverParticleScene(zeroLowWidth, zeroLowHeight, zeroLowDpr);
+      const wholeCoverJump = {
+        attack: wholeJumpAttack,
+        release: wholeJumpRelease,
+        peakUniform: wholeJumpUniformAtPeak,
+        releasedUniform: Number(cover.gpuMaterial?.uniforms?.uWholeJump?.value),
+        particlesStable: cover.particles === particlesBeforeFloatSpeedInput,
+        geometryStable: cover.gpuGeometry === geometryBeforeFloatSpeedInput
+      };
+
       if (cover.gpuRenderer) {
         originalGpuSetSize = cover.gpuRenderer.setSize;
         cover.gpuRenderer.setSize = function (...args) {
@@ -1910,28 +2185,41 @@ try {
       }
 
       const waveTimeBeforePause = cover.waveTime;
-      cover.shockAge = 0.08;
-      cover.shockStrength = 0.9;
-      cover.shockCooldown = 0.12;
-      cover.shockArmed = true;
-      cover.lastShockDrive = 0.8;
-      cover.lastBassInput = 0.7;
+      const motionGateBeforePause = cover.motionGate;
+      Object.assign(state.visual, {
+        lowFrequencyAmplitude: 0.9,
+        subBass: 0.82,
+        bass: 0.86
+      });
+      for (let index = 0; index < 8; index += 1) {
+        updateCoverParticleMotionEnvelope(true, RENDER_PROFILE.targetFrameMs);
+      }
+      drawCoverParticleScene(zeroLowWidth, zeroLowHeight, zeroLowDpr);
+      const wholeJumpBeforePause = cover.wholeJump;
       state.playerClock.playing = false;
       state.playerClock.updatedAt = performance.now();
       updatePlayState();
-      await wait(80);
       const pauseAfterPlaybackPause = pauseCalls;
       const pausedWaveTimeStart = cover.waveTime;
-      const shockAfterPlaybackPause = {
-        age: cover.shockAge,
-        strength: cover.shockStrength,
-        cooldown: cover.shockCooldown,
-        armed: cover.shockArmed,
-        lastDrive: cover.lastShockDrive,
-        lastBass: cover.lastBassInput
-      };
-      await wait(80);
+      const motionGateRelease = [];
+      const wholeJumpPauseRelease = [];
+      for (let index = 0; index < 64; index += 1) {
+        updateCoverParticleMotionEnvelope(false, RENDER_PROFILE.targetFrameMs);
+        motionGateRelease.push(cover.motionGate);
+        wholeJumpPauseRelease.push(cover.wholeJump);
+      }
+      drawCoverParticleScene(zeroLowWidth, zeroLowHeight, zeroLowDpr);
       const pausedWaveTimeEnd = cover.waveTime;
+      const smoothPauseGate = {
+        beforePause: motionGateBeforePause,
+        release: motionGateRelease,
+        afterRelease: cover.motionGate,
+        uniformGate: cover.gpuMaterial?.uniforms?.uAudioActive?.value,
+        wholeJumpBeforePause,
+        wholeJumpRelease: wholeJumpPauseRelease,
+        wholeJumpAfterRelease: cover.wholeJump,
+        wholeJumpUniform: cover.gpuMaterial?.uniforms?.uWholeJump?.value
+      };
 
       setDiyPreset('lyric');
       await wait(80);
@@ -1968,9 +2256,11 @@ try {
           pausedEnd: pausedWaveTimeEnd,
           afterResume: waveTimeAfterResume
         },
-        shockOnset,
-        shockAfterPlaybackPause,
-        motionControl
+        zeroLowFrequencyMotion,
+        smoothPauseGate,
+        motionControl,
+        floatSpeedControl,
+        wholeCoverJump
       };
     } finally {
       if (originalGpuSetSize && cover.gpuRenderer) cover.gpuRenderer.setSize = originalGpuSetSize;
@@ -1981,14 +2271,17 @@ try {
       cover.enginePlaying = original.enginePlaying;
       cover.engineVisible = original.engineVisible;
       cover.motionAmplitude = original.motionAmplitude;
+      cover.floatSpeed = original.floatSpeed;
       cover.waveTime = original.waveTime;
-      cover.shockAge = original.shockAge;
-      cover.shockStrength = original.shockStrength;
-      cover.shockCooldown = original.shockCooldown;
-      cover.shockArmed = original.shockArmed;
-      cover.lastShockDrive = original.lastShockDrive;
-      cover.lastBassInput = original.lastBassInput;
+      cover.motionGate = original.motionGate;
+      cover.wholeJump = original.wholeJump;
+      if (original.coverParticlePreferences === null) {
+        window.localStorage.removeItem('fe-monster-cover-particle-v1');
+      } else {
+        window.localStorage.setItem('fe-monster-cover-particle-v1', original.coverParticlePreferences);
+      }
       Object.assign(state.visual, original.visualAudio);
+      Object.assign(state.visualBridge, original.visualBridgeAudio);
       Object.assign(state.playerClock, original.playerClock);
       updateCoverParticleBackgroundMode();
     }
@@ -2020,13 +2313,7 @@ try {
       imageSignature: cover.imageSignature,
       sampleSignature: cover.sampleSignature,
       particles: cover.particles,
-      gpuSignature: cover.gpuSignature,
-      shockAge: cover.shockAge,
-      shockStrength: cover.shockStrength,
-      shockCooldown: cover.shockCooldown,
-      shockArmed: cover.shockArmed,
-      lastShockDrive: cover.lastShockDrive,
-      lastBassInput: cover.lastBassInput
+      gpuSignature: cover.gpuSignature
     };
     const originalRandom = Math.random;
     const chladniRefs = {
@@ -2125,41 +2412,90 @@ try {
       const gpuRenderSource = String(drawCoverParticleSceneGpu);
       const gpuGeometrySource = String(rebuildCoverParticleGpuGeometry);
       const cpuRenderSource = String(drawCoverParticleScene);
+      const motionEnvelopeSource = String(updateCoverParticleMotionEnvelope);
+      const canvasSyncSource = String(syncCoverParticleCanvas);
+      const wallpaperSource = String(setCoverParticleWallpaper);
       const enginePlaySource = String(playCoverParticleEngine);
       const enginePauseSource = String(pauseCoverParticleEngine);
       const playStateSource = String(updatePlayState);
       const motionScaleSource = String(coverParticleMotionScale);
       const motionBehavior = {
-        pausedDepthFlat: vertexShader.includes('position.z * uAudioActive')
-          && cpuRenderSource.includes('particle.z * (audioActive ? 1 : 0)'),
-        playbackSignedParticleWave: vertexShader.includes('float naturalWave = mix(baseNaturalWave, lowFrequencyWave, lowSegmentMix)')
-          && vertexShader.includes('float waveDepth = uAudioActive * naturalWave')
-          && cpuRenderSource.includes('const naturalWave = baseNaturalWave * (1 - lowSegmentMix)')
-          && cpuRenderSource.includes('const waveDepth = audioGate * naturalWave'),
-        twoHundredSegmentLowWave: vertexShader.includes('segmentProgress * 6.28318530718 * 200.0')
-          && vertexShader.includes('float lowSegmentMix = clamp(lowDrive * 0.72, 0.0, 0.68)')
-          && cpuRenderSource.includes('segmentProgress * Math.PI * 2 * COVER_PARTICLE_LOW_WAVE_SEGMENTS')
-          && cpuRenderSource.includes('const lowSegmentMix = clamp(lowDrive * 0.72, 0, 0.68)'),
-        twelveSegmentMacroWave: vertexShader.includes(
-          'segmentProgress * 6.28318530718 * 12.0'
-        )
-          && vertexShader.includes('float macroWaveDepth = uAudioActive * macroWave * lowDrive')
+        baseReliefRemains: vertexShader.includes('vec3(position.xy, position.z)')
           && cpuRenderSource.includes(
-            'segmentProgress * Math.PI * 2 * COVER_PARTICLE_MACRO_WAVE_SEGMENTS'
+            'const sourceZ = particle.z + depthLayerOffset + dynamicDepth'
+          )
+          && !vertexShader.includes('position.z * uAudioActive')
+          && !cpuRenderSource.includes('particle.z * audioGate'),
+        playbackNaturalFloat: vertexShader.includes(
+          'float naturalFloat = particleFloat * 0.64 + baseNaturalWave * 0.28 + microWave * 0.08'
+        )
+          && vertexShader.includes('float waveDepth = uAudioActive * naturalFloat')
+          && cpuRenderSource.includes(
+            'const naturalFloat = particleFloat * 0.64 + baseNaturalWave * 0.28 + microWave * 0.08'
+          )
+          && cpuRenderSource.includes('const waveDepth = audioGate * naturalFloat'),
+        twoHundredSegmentMicroWave: vertexShader.includes(
+          'segmentProgress * 6.28318530718 * 200.0'
+        )
+          && vertexShader.includes('float microWave = sin(')
+          && cpuRenderSource.includes('const microWave = Math.sin(')
+          && cpuRenderSource.includes('particle.cpuMicroPhase - sheetTime * 0.34'),
+        signedPerParticleFloat: vertexShader.includes('attribute float aFloatPhase')
+          && vertexShader.includes('attribute float aFloatRate')
+          && vertexShader.includes('float particleFloatTime = uTime * uFloatSpeed')
+          && vertexShader.includes('sin(particleFloatTime * aFloatRate + aFloatPhase)')
+          && gpuGeometrySource.includes("geometry.setAttribute('aFloatPhase'")
+          && gpuGeometrySource.includes("geometry.setAttribute('aFloatRate'")
+          && cpuRenderSource.includes(
+            'const particleFloatTime = cover.waveTime * coverParticleFloatSpeedScale()'
           )
           && cpuRenderSource.includes(
-            'const macroWaveDepth = audioGate * macroWave * lowDrive'
+            'Math.sin(particleFloatTime * particle.floatRate + particle.floatPhase)'
           ),
-        beatOnsetShockwave: vertexShader.includes('uniform float uShockProgress')
-          && vertexShader.includes('uniform float uShockStrength')
-          && vertexShader.includes('float shockRadius = mix(0.02, 1.04, uShockProgress)')
-          && vertexShader.includes('uShockStrength * 0.028 * uMotionScale')
-          && gpuRenderSource.includes('uniforms.uShockProgress.value = shockProgress')
-          && gpuRenderSource.includes('uniforms.uShockStrength.value = shockStrength')
-          && cpuRenderSource.includes('shockDrive > 0.22')
-          && cpuRenderSource.includes('shockRise > 0.035')
-          && cpuRenderSource.includes('cover.shockCooldown = 0.16')
-          && enginePauseSource.includes('resetCoverParticleShock()'),
+        naturalFloatIndependentOfLowFrequency: !vertexShader.includes('uBass')
+          && !vertexShader.includes('uBeat')
+          && !vertexShader.includes('uShock')
+          && !vertexShader.includes('naturalFloat * uWholeJump')
+          && !cpuRenderSource.includes('naturalFloat * wholeJump')
+          && !gpuRenderSource.includes('shock')
+          && !motionEnvelopeSource.includes('shock')
+          && !cpuRenderSource.includes('shock')
+          && !cpuRenderSource.includes('macroWave')
+          && !enginePauseSource.includes('resetCoverParticleShock'),
+        smoothLowFrequencyWholeCoverJump: vertexShader.includes('uniform float uWholeJump')
+          && vertexShader.includes(
+            'float wholeJumpOffset = uWholeJump * 0.052 * uMotionScale'
+          )
+          && vertexShader.includes('source.z += wholeJumpOffset')
+          && !vertexShader.includes('source.y += wholeJumpOffset')
+          && gpuRenderSource.includes('uniforms.uWholeJump.value = cover.wholeJump')
+          && motionEnvelopeSource.includes('const lowFrequencyTarget = audioActive')
+          && motionEnvelopeSource.includes('const wholeJumpTarget = audioActive')
+          && motionEnvelopeSource.includes(
+            'wholeJumpTarget > cover.wholeJump ? 72 : 280'
+          )
+          && motionEnvelopeSource.includes(
+            'cover.wholeJump += (wholeJumpTarget - cover.wholeJump) * wholeJumpRate'
+          )
+          && cpuRenderSource.includes(
+            'const wholeJumpOffset = cover.wholeJump * 0.052 * motionScale'
+          )
+          && cpuRenderSource.includes(
+            'const sourceY = particle.y + particle.bumpDriftY * lateralWave'
+          )
+          && cpuRenderSource.includes(
+            'const sourceZ = particle.z + depthLayerOffset + dynamicDepth + wholeJumpOffset'
+          ),
+        floatSpeedGpuCpuParity: vertexShader.includes('uniform float uFloatSpeed')
+          && vertexShader.includes('float sheetTime = uTime')
+          && vertexShader.includes('float particleFloatTime = uTime * uFloatSpeed')
+          && gpuRenderSource.includes(
+            'uniforms.uFloatSpeed.value = coverParticleFloatSpeedScale()'
+          )
+          && cpuRenderSource.includes('const sheetTime = cover.waveTime')
+          && cpuRenderSource.includes(
+            'const particleFloatTime = cover.waveTime * coverParticleFloatSpeedScale()'
+          ),
         reliefThreeLayerDepth: vertexShader.includes(
           'float backLayer = 1.0 - smoothstep(0.22, 0.34, relief)'
         )
@@ -2172,65 +2508,77 @@ try {
           && cpuRenderSource.includes('const depthLayerScale = 1 + depthLayer * 0.09 * depthLayerMotion')
           && !gpuGeometrySource.includes('aDepthLayer'),
         cinematicDepthBounded: vertexShader.includes(
-          'clamp(waveDepth + macroWaveDepth + shockDepth, -0.070, 0.070)'
+          'float dynamicDepth = clamp(waveDepth, -0.050, 0.050)'
         )
           && cpuRenderSource.includes(
-            'clamp(waveDepth + macroWaveDepth + shockDepth, -0.07, 0.07)'
+            'const dynamicDepth = clamp(waveDepth, -0.05, 0.05)'
           ),
-        reducedMotionCinematicFallback: cpuRenderSource.includes('if (!reducedMotion')
-          && cpuRenderSource.includes(
-            'const shockStrength = audioActive && !reducedMotion ? cover.shockStrength : 0'
-          )
-          && motionScaleSource.includes('(reducedMotion ? 0.35 : 1)'),
+        reducedMotionScaleFallback: motionScaleSource.includes('(reducedMotion ? 0.35 : 1)'),
         smoothClockedWavePhase: vertexShader.includes('float sheetTime = uTime;')
           && gpuRenderSource.includes('uniforms.uTime.value = waveTime')
-          && cpuRenderSource.includes('cover.waveTime += envelopeStepSeconds')
-          && cpuRenderSource.includes('const sheetTime = cover.waveTime'),
-        randomPerParticleLowCycles: vertexShader.includes('attribute float aLowCyclePhase')
-          && vertexShader.includes('attribute float aLowCycleRate')
-          && vertexShader.includes('sin(sheetTime * aLowCycleRate + aLowCyclePhase)')
-          && vertexShader.includes('float randomCycleMix = clamp(uBass * 1.08, 0.0, 0.78)')
-          && gpuGeometrySource.includes("geometry.setAttribute('aLowCyclePhase'")
-          && gpuGeometrySource.includes("geometry.setAttribute('aLowCycleRate'")
-          && cpuRenderSource.includes('Math.sin(sheetTime * particle.lowCycleRate + particle.lowCyclePhase)')
-          && cpuRenderSource.includes('const randomCycleMix = clamp(bass * 1.08, 0, 0.78)')
-          && cpuRenderSource.includes('const lowFrequencyWave = lowSegmentWave * (1 - randomCycleMix)'),
+          && motionEnvelopeSource.includes(
+            'if (audioActive) cover.waveTime += envelopeStepMs / 1000 * 0.72'
+          )
+          && cpuRenderSource.includes(
+            'const sheetTime = cover.waveTime'
+          ),
         audioGateUniform: vertexShader.includes('uniform float uAudioActive')
-          && gpuRenderSource.includes('uniforms.uAudioActive.value = audioActive ? 1 : 0'),
+          && gpuRenderSource.includes('uniforms.uAudioActive.value = motionGate'),
+        smoothAudioGate: cpuRenderSource.includes(
+          'updateCoverParticleMotionEnvelope(audioActive, envelopeStepMs)'
+        )
+          && motionEnvelopeSource.includes(
+            'const gateRate = 1 - Math.exp(-envelopeStepMs / (gateTarget > cover.motionGate ? 260 : 420))'
+        )
+          && motionEnvelopeSource.includes(
+            'cover.motionGate += (gateTarget - cover.motionGate) * gateRate'
+          ),
         playbackClockGate: cpuRenderSource.includes('const audioActive = isPlaybackClockRunning()'),
         backgroundMotionGate: enginePlaySource.includes('!isPlaybackClockRunning()')
           && playStateSource.includes('if (isPlaybackClockRunning()) playCoverParticleEngine()'),
+        stableCpuFallbackHotPath: canvasSyncSource.includes(
+          'const frame = state.coverParticle.renderFrame'
+        )
+          && canvasSyncSource.includes(
+            'if (canvas.style.width !== cssWidthStyle) canvas.style.width = cssWidthStyle'
+          )
+          && cpuRenderSource.includes('particle.cpuRadialPhase')
+          && cpuRenderSource.includes('particle.cpuMicroPhase')
+          && cpuRenderSource.includes('context.fillStyle = particle.colorCss')
+          && !cpuRenderSource.includes(
+            'context.fillStyle = ' + String.fromCharCode(96) + 'rgba('
+          ),
+        decodedWallpaperFrameUploadsOnce: wallpaperSource.includes(
+          "const supportsVideoFrames = typeof video.requestVideoFrameCallback === 'function'"
+        )
+          && wallpaperSource.includes('if (supportsVideoFrames)')
+          && wallpaperSource.includes('} else {')
+          && wallpaperSource.split(
+            "video.addEventListener('timeupdate', drawCoverParticleWallpaper)"
+          ).length === 2,
         noPositiveOnlyLift: !vertexShader.includes('sheetLift')
           && !vertexShader.includes('pulseLift')
           && !cpuRenderSource.includes('sheetLift')
-          && !cpuRenderSource.includes('pulseLift'),
-        wholeLowFrequencyPulse: cpuRenderSource.includes('const wholePulse = audioActive')
-          && cpuRenderSource.includes('Math.pow(cover.bass, 1.1)')
+          && !cpuRenderSource.includes('pulseLift')
       };
       const sampleWaveDepth = (particle, time, audioGate = 1) => {
-        const bass = 0.6;
-        const energy = 0.4;
-        const beat = 0.35;
-        const sheetTime = time * (0.68 + bass * 0.54 + beat * 0.12);
+        const sheetTime = time;
         const waveA = Math.sin(sheetTime + particle.wavePhase);
         const waveB = Math.sin(sheetTime * 0.73 + particle.wavePhase * 1.31 + particle.x * 5.2);
         const waveC = Math.sin(sheetTime * 1.17 - particle.wavePhase * 0.89 + particle.y * 6.6);
         const radialWave = Math.sin(Math.hypot(particle.x, particle.y) * 14 - sheetTime * 1.28 + particle.wavePhase * 0.18);
-        const lowDrive = Math.max(0, Math.min(1.25, bass * 0.82 + energy * 0.22));
         const baseNaturalWave = waveA * 0.42 + waveB * 0.28 + waveC * 0.2 + radialWave * 0.1;
         const segmentProgress = Math.max(0, Math.min(1, (particle.x + 0.64) / 1.28));
-        const lowSegmentWave = Math.sin(
-          segmentProgress * Math.PI * 2 * COVER_PARTICLE_LOW_WAVE_SEGMENTS
+        const microWave = Math.sin(
+          segmentProgress * Math.PI * 2 * COVER_PARTICLE_MICRO_WAVE_SEGMENTS
             + particle.y * 0.65
-            - sheetTime * 0.56
+            - sheetTime * 0.34
         );
-        const lowSegmentMix = Math.max(0, Math.min(0.68, lowDrive * 0.72));
-        const randomParticleCycle = Math.sin(sheetTime * particle.lowCycleRate + particle.lowCyclePhase);
-        const randomCycleMix = Math.max(0, Math.min(0.78, bass * 1.08));
-        const lowFrequencyWave = lowSegmentWave * (1 - randomCycleMix)
-          + randomParticleCycle * randomCycleMix;
-        const naturalWave = baseNaturalWave * (1 - lowSegmentMix) + lowFrequencyWave * lowSegmentMix;
-        return audioGate * naturalWave * (0.01 + lowDrive * 0.014 + beat * 0.004) * particle.waveStrength;
+        const relief = Math.max(0, Math.min(1, (particle.z + 0.04) / 0.14));
+        const particleFloat = Math.sin(sheetTime * particle.floatRate + particle.floatPhase);
+        const naturalFloat = particleFloat * 0.64 + baseNaturalWave * 0.28 + microWave * 0.08;
+        return audioGate * naturalFloat
+          * (0.016 + relief * 0.008) * particle.waveStrength;
       };
       let moving = 0;
       let forward = 0;
@@ -2260,7 +2608,7 @@ try {
       for (let index = 1; index <= segmentSamples; index += 1) {
         const progress = index / segmentSamples;
         const segmentWave = Math.sin(
-          progress * Math.PI * 2 * COVER_PARTICLE_LOW_WAVE_SEGMENTS + 0.37
+          progress * Math.PI * 2 * COVER_PARTICLE_MICRO_WAVE_SEGMENTS + 0.37
         );
         if ((previousSegmentWave < 0 && segmentWave >= 0) || (previousSegmentWave >= 0 && segmentWave < 0)) {
           segmentCrossings += 1;
@@ -2270,30 +2618,13 @@ try {
       const horizontalSamples = new Set(
         cover.particles.map((particle) => Number(particle.x.toFixed(6)))
       ).size;
-      const lowWaveSegments = {
-        target: COVER_PARTICLE_LOW_WAVE_SEGMENTS,
+      const microWaveSegments = {
+        target: COVER_PARTICLE_MICRO_WAVE_SEGMENTS,
         measured: segmentCrossings / 2,
-        phaseSpan: Math.PI * 2 * COVER_PARTICLE_LOW_WAVE_SEGMENTS,
+        phaseSpan: Math.PI * 2 * COVER_PARTICLE_MICRO_WAVE_SEGMENTS,
         horizontalSamples,
-        samplesPerSegment: horizontalSamples / COVER_PARTICLE_LOW_WAVE_SEGMENTS
-      };
-      let macroCrossings = 0;
-      let previousMacroWave = Math.sin(0.37);
-      for (let index = 1; index <= segmentSamples; index += 1) {
-        const progress = index / segmentSamples;
-        const macroWave = Math.sin(
-          progress * Math.PI * 2 * COVER_PARTICLE_MACRO_WAVE_SEGMENTS + 0.37
-        );
-        if ((previousMacroWave < 0 && macroWave >= 0)
-            || (previousMacroWave >= 0 && macroWave < 0)) {
-          macroCrossings += 1;
-        }
-        previousMacroWave = macroWave;
-      }
-      const macroWaveSegments = {
-        target: COVER_PARTICLE_MACRO_WAVE_SEGMENTS,
-        measured: macroCrossings / 2,
-        phaseSpan: Math.PI * 2 * COVER_PARTICLE_MACRO_WAVE_SEGMENTS
+        samplesPerSegment: horizontalSamples / COVER_PARTICLE_MICRO_WAVE_SEGMENTS,
+        contribution: 0.08
       };
       const depthLayers = { back: 0, middle: 0, front: 0 };
       for (const particle of cover.particles) {
@@ -2307,26 +2638,6 @@ try {
       }
       depthLayers.offset = 0.018;
       depthLayers.sizeScale = 0.09;
-      const shockDuration = COVER_PARTICLE_SHOCK_DURATION_SECONDS;
-      const shockProgressSample = 0.5;
-      const shockRadiusSample = 0.02 + (1.04 - 0.02) * shockProgressSample;
-      const sampleShockDepth = (normalizedRadius, audioGate = 1) => {
-        const shockRing = 1 - smoothstep(
-          0.028,
-          0.1,
-          Math.abs(normalizedRadius - shockRadiusSample)
-        );
-        const shockFade = 1 - smoothstep(0, 1, shockProgressSample);
-        return audioGate * shockRing * shockFade * 0.028;
-      };
-      const shockProfile = {
-        duration: shockDuration,
-        midpointRadius: shockRadiusSample,
-        crestDepth: sampleShockDepth(shockRadiusSample),
-        centerDepth: sampleShockDepth(0),
-        outsideDepth: sampleShockDepth(1.3),
-        pausedDepth: sampleShockDepth(shockRadiusSample, 0)
-      };
       let positiveRates = 0;
       let negativeRates = 0;
       let instantaneousForward = 0;
@@ -2334,21 +2645,21 @@ try {
       let minAbsoluteRate = Infinity;
       let maxAbsoluteRate = 0;
       const uniquePhases = new Set();
-      const cycleSheetTime = 1.4 * (0.68 + 0.6 * 0.54 + 0.35 * 0.12);
+      const cycleSheetTime = 1.4;
       for (const particle of cover.particles) {
-        if (particle.lowCycleRate > 0) positiveRates += 1;
-        else if (particle.lowCycleRate < 0) negativeRates += 1;
+        if (particle.floatRate > 0) positiveRates += 1;
+        else if (particle.floatRate < 0) negativeRates += 1;
         const cyclePosition = Math.sin(
-          cycleSheetTime * particle.lowCycleRate + particle.lowCyclePhase
+          cycleSheetTime * particle.floatRate + particle.floatPhase
         );
         if (cyclePosition > 0) instantaneousForward += 1;
         else if (cyclePosition < 0) instantaneousBackward += 1;
-        const absoluteRate = Math.abs(particle.lowCycleRate);
+        const absoluteRate = Math.abs(particle.floatRate);
         minAbsoluteRate = Math.min(minAbsoluteRate, absoluteRate);
         maxAbsoluteRate = Math.max(maxAbsoluteRate, absoluteRate);
-        uniquePhases.add(Math.round(particle.lowCyclePhase * 10000));
+        uniquePhases.add(Math.round(particle.floatPhase * 10000));
       }
-      const randomLowCycles = {
+      const randomFloatCycles = {
         positiveRateRatio: positiveRates / Math.max(1, cover.particles.length),
         negativeRateRatio: negativeRates / Math.max(1, cover.particles.length),
         forwardRatio: instantaneousForward / Math.max(1, cover.particles.length),
@@ -2367,11 +2678,9 @@ try {
         gpuDepthOcclusion,
         motionBehavior,
         waveMotion,
-        lowWaveSegments,
-        macroWaveSegments,
+        microWaveSegments,
         depthLayers,
-        shockProfile,
-        randomLowCycles,
+        randomFloatCycles,
         chladniUnchanged: state.chladni === chladniRefs.root
           && state.chladni.runtime === chladniRefs.runtime
           && state.chladni.palette === chladniRefs.palette
@@ -2385,12 +2694,6 @@ try {
       cover.sampleSignature = originalCover.sampleSignature;
       cover.particles = originalCover.particles;
       cover.gpuSignature = originalCover.gpuSignature;
-      cover.shockAge = originalCover.shockAge;
-      cover.shockStrength = originalCover.shockStrength;
-      cover.shockCooldown = originalCover.shockCooldown;
-      cover.shockArmed = originalCover.shockArmed;
-      cover.lastShockDrive = originalCover.lastShockDrive;
-      cover.lastBassInput = originalCover.lastBassInput;
     }
     return result;
   })()`);
@@ -2462,7 +2765,15 @@ try {
   const taskDurationMs = Math.max(0, ((metricsAfter.TaskDuration || 0) - (metricsBefore.TaskDuration || 0)) * 1000);
   const scriptDurationMs = Math.max(0, ((metricsAfter.ScriptDuration || 0) - (metricsBefore.ScriptDuration || 0)) * 1000);
   const sonicGridMinimum = ({ high: 184, balanced: 156, economy: 124, mobile: 84 })[sonicRefresh.renderTier] || 64;
+  const entranceMotionContract = {
+    chladniOneShot: /\.chladni-canvas\s*\{[^}]*animation:\s*chladniSceneEntrance\s+560ms\s+cubic-bezier\(0\.16,\s*1,\s*0\.3,\s*1\)\s+both;/.test(stylesSource),
+    coverOneShot: /\.app-shell\.is-playback-page\.has-cover-particle-scene\s+\.cover-particle-rig\s*\{[^}]*animation:\s*coverParticleSceneEntrance\s+620ms\s+cubic-bezier\(0\.16,\s*1,\s*0\.3,\s*1\)\s+both;/.test(stylesSource),
+    chladniKeyframesUseCompositorProperties: /@keyframes\s+chladniSceneEntrance\s*\{[\s\S]*?opacity:\s*0;[\s\S]*?transform:\s*translate3d\([\s\S]*?100%\s*\{[\s\S]*?opacity:\s*1;[\s\S]*?transform:\s*translate3d\(0,\s*0,\s*0\)\s*scale\(1\);[\s\S]*?\}/.test(stylesSource),
+    coverKeyframesUseCompositorProperties: /@keyframes\s+coverParticleSceneEntrance\s*\{[\s\S]*?opacity:\s*0;[\s\S]*?transform:\s*translate3d\([\s\S]*?100%\s*\{[\s\S]*?opacity:\s*1;[\s\S]*?transform:\s*translate3d\(0,\s*0,\s*0\)\s*scale\(1\);[\s\S]*?\}/.test(stylesSource),
+    reducedMotionDisablesBoth: /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\.chladni-canvas,\s*\.cover-particle-rig\s*\{\s*animation:\s*none\s*!important;\s*\}/.test(stylesSource)
+  };
   const checks = {
+    coverAndChladniEntranceMotion: Object.values(entranceMotionContract).every(Boolean),
     presetStarted: setup.active === true && setup.canvasCount === 1,
     playbackPresetsTrackNativeRefresh: activeSample.nativeRefresh === true
       && activeSample.renderToRafRatio >= 0.9,
@@ -2569,21 +2880,44 @@ try {
       ) <= 1e-9
       && coverParticleLifecycle.wavePhase?.afterResume
         > coverParticleLifecycle.wavePhase?.pausedEnd,
-    coverParticleShockResetsWhenPlaybackStops: coverParticleLifecycle.shockAfterPlaybackPause?.age
-        === 0.36
-      && coverParticleLifecycle.shockAfterPlaybackPause?.strength === 0
-      && coverParticleLifecycle.shockAfterPlaybackPause?.cooldown === 0
-      && coverParticleLifecycle.shockAfterPlaybackPause?.armed === false
-      && coverParticleLifecycle.shockAfterPlaybackPause?.lastDrive === 0
-      && coverParticleLifecycle.shockAfterPlaybackPause?.lastBass === 0,
-    coverParticleBeatOnsetTriggersShock: coverParticleLifecycle.shockOnset?.strength > 0.2
-      && coverParticleLifecycle.shockOnset?.progress > 0
-      && coverParticleLifecycle.shockOnset?.progress < 1
-      && coverParticleLifecycle.shockOnset?.uniformStrength > 0.2
-      && coverParticleLifecycle.shockOnset?.uniformProgress > 0
-      && coverParticleLifecycle.shockOnset?.uniformProgress < 1
-      && coverParticleLifecycle.shockOnset?.particlesStable === true
-      && coverParticleLifecycle.shockOnset?.geometryStable === true,
+    coverParticleFloatsWithZeroLowFrequencyInput: coverParticleLifecycle.zeroLowFrequencyMotion?.visualInputsAreZero === true
+      && coverParticleLifecycle.zeroLowFrequencyMotion?.waveTimeAfter
+        > coverParticleLifecycle.zeroLowFrequencyMotion?.waveTimeBefore
+      && coverParticleLifecycle.zeroLowFrequencyMotion?.gateBefore === 0
+      && coverParticleLifecycle.zeroLowFrequencyMotion?.gateRise?.length === 6
+      && coverParticleLifecycle.zeroLowFrequencyMotion.gateRise[0] > 0
+      && coverParticleLifecycle.zeroLowFrequencyMotion.gateRise.every(
+        (value, index, values) => value > 0
+          && value <= 1
+          && (index === 0 || value >= values[index - 1])
+      )
+      && coverParticleLifecycle.zeroLowFrequencyMotion?.uniformGate > 0
+      && coverParticleLifecycle.zeroLowFrequencyMotion?.wholeJump === 0
+      && coverParticleLifecycle.zeroLowFrequencyMotion?.wholeJumpUniform === 0
+      && coverParticleLifecycle.zeroLowFrequencyMotion?.particlesStable === true
+      && coverParticleLifecycle.zeroLowFrequencyMotion?.geometryStable === true,
+    coverParticleGateReleasesSmoothlyOnPause: coverParticleLifecycle.smoothPauseGate?.beforePause > 0
+      && coverParticleLifecycle.smoothPauseGate?.release?.length === 64
+      && coverParticleLifecycle.smoothPauseGate.release.every(
+        (value, index, values) => value >= 0
+          && value <= 1
+          && (index === 0 || value <= values[index - 1])
+      )
+      && coverParticleLifecycle.smoothPauseGate?.afterRelease
+        < coverParticleLifecycle.smoothPauseGate?.beforePause
+      && Math.abs(
+        coverParticleLifecycle.smoothPauseGate?.uniformGate
+          - coverParticleLifecycle.smoothPauseGate?.afterRelease
+      ) <= 1e-7
+      && coverParticleLifecycle.smoothPauseGate?.wholeJumpBeforePause > 0
+      && coverParticleLifecycle.smoothPauseGate?.wholeJumpRelease?.length === 64
+      && coverParticleLifecycle.smoothPauseGate.wholeJumpRelease.every(
+        (value, index, values) => value >= 0
+          && value <= 1
+          && (index === 0 || value <= values[index - 1])
+      )
+      && coverParticleLifecycle.smoothPauseGate?.wholeJumpAfterRelease === 0
+      && coverParticleLifecycle.smoothPauseGate?.wholeJumpUniform === 0,
     coverParticleMotionControlIsRealtime: coverParticleLifecycle.motionControl?.available === true
       && coverParticleLifecycle.motionControl.min === '0'
       && coverParticleLifecycle.motionControl.max === '200'
@@ -2599,6 +2933,39 @@ try {
       ) <= 1e-7
       && coverParticleLifecycle.motionControl.particlesStable === true
       && coverParticleLifecycle.motionControl.geometryStable === true,
+    coverParticleFloatSpeedControlIsRealtimeAndPersistent:
+      coverParticleLifecycle.floatSpeedControl?.available === true
+      && coverParticleLifecycle.floatSpeedControl.min === '25'
+      && coverParticleLifecycle.floatSpeedControl.max === '200'
+      && coverParticleLifecycle.floatSpeedControl.step === '1'
+      && coverParticleLifecycle.floatSpeedControl.stateSpeed === 2
+      && coverParticleLifecycle.floatSpeedControl.output === '200%'
+      && coverParticleLifecycle.floatSpeedControl.runtimeValue === '200%'
+      && coverParticleLifecycle.floatSpeedControl.persistedFloatSpeed === 2
+      && coverParticleLifecycle.floatSpeedControl.floatSpeedUniforms[0] === 0.25
+      && coverParticleLifecycle.floatSpeedControl.floatSpeedUniforms[1] === 1
+      && coverParticleLifecycle.floatSpeedControl.floatSpeedUniforms[2] === 2
+      && coverParticleLifecycle.floatSpeedControl.particlesStable === true
+      && coverParticleLifecycle.floatSpeedControl.geometryStable === true,
+    coverParticleWholeCoverJumpUsesSmoothLowFrequencyEnvelope:
+      coverParticleLifecycle.wholeCoverJump?.attack?.length === 8
+      && coverParticleLifecycle.wholeCoverJump.attack[0] > 0
+      && coverParticleLifecycle.wholeCoverJump.attack.every(
+        (value, index, values) => value >= 0
+          && value <= 1
+          && (index === 0 || value >= values[index - 1])
+      )
+      && coverParticleLifecycle.wholeCoverJump?.peakUniform > 0
+      && coverParticleLifecycle.wholeCoverJump?.release?.length === 64
+      && coverParticleLifecycle.wholeCoverJump.release.every(
+        (value, index, values) => value >= 0
+          && value <= 1
+          && (index === 0 || value <= values[index - 1])
+      )
+      && coverParticleLifecycle.wholeCoverJump.release.at(-1) === 0
+      && coverParticleLifecycle.wholeCoverJump.releasedUniform === 0
+      && coverParticleLifecycle.wholeCoverJump.particlesStable === true
+      && coverParticleLifecycle.wholeCoverJump.geometryStable === true,
     coverParticleMatchesReferenceSampling: coverParticleDepthMapping.first.count === 512 * 256
       && coverParticleDepthMapping.first.minSize >= 0.82
       && coverParticleDepthMapping.first.maxSize <= 0.94
@@ -2610,35 +2977,24 @@ try {
       && coverParticleDepthMapping.waveMotion?.forwardRatio >= 0.35
       && coverParticleDepthMapping.waveMotion?.backwardRatio >= 0.35
       && coverParticleDepthMapping.waveMotion?.signedBias <= 0.08,
-    coverParticleUsesTwoHundredLowWaveSegments: coverParticleDepthMapping.lowWaveSegments?.target === 200
-      && coverParticleDepthMapping.lowWaveSegments?.measured === 200
-      && Math.abs(coverParticleDepthMapping.lowWaveSegments.phaseSpan - Math.PI * 400) <= 1e-9
-      && coverParticleDepthMapping.lowWaveSegments?.horizontalSamples === 512
-      && coverParticleDepthMapping.lowWaveSegments?.samplesPerSegment >= 2.5,
-    coverParticleUsesTwelveSegmentMacroWave: coverParticleDepthMapping.macroWaveSegments?.target === 12
-      && coverParticleDepthMapping.macroWaveSegments?.measured === 12
-      && Math.abs(
-        coverParticleDepthMapping.macroWaveSegments.phaseSpan - Math.PI * 24
-      ) <= 1e-9,
+    coverParticleUsesTwoHundredMicroWaveSegments: coverParticleDepthMapping.microWaveSegments?.target === 200
+      && coverParticleDepthMapping.microWaveSegments?.measured === 200
+      && Math.abs(coverParticleDepthMapping.microWaveSegments.phaseSpan - Math.PI * 400) <= 1e-9
+      && coverParticleDepthMapping.microWaveSegments?.horizontalSamples === 512
+      && coverParticleDepthMapping.microWaveSegments?.samplesPerSegment >= 2.5
+      && coverParticleDepthMapping.microWaveSegments?.contribution === 0.08,
     coverParticleUsesReliefThreeLayerDepth: coverParticleDepthMapping.depthLayers?.back > 1000
       && coverParticleDepthMapping.depthLayers?.middle > 1000
       && coverParticleDepthMapping.depthLayers?.front > 1000
       && coverParticleDepthMapping.depthLayers?.offset === 0.018
       && coverParticleDepthMapping.depthLayers?.sizeScale === 0.09,
-    coverParticleBeatShockwaveIsBounded: coverParticleDepthMapping.shockProfile?.duration === 0.36
-      && coverParticleDepthMapping.shockProfile?.midpointRadius > 0.5
-      && coverParticleDepthMapping.shockProfile?.crestDepth >= 0.013
-      && coverParticleDepthMapping.shockProfile?.crestDepth <= 0.0141
-      && coverParticleDepthMapping.shockProfile?.centerDepth <= 1e-9
-      && coverParticleDepthMapping.shockProfile?.outsideDepth <= 1e-9
-      && coverParticleDepthMapping.shockProfile?.pausedDepth <= 1e-9,
-    coverParticleRandomLowCyclesRunBothWays: coverParticleDepthMapping.randomLowCycles?.positiveRateRatio >= 0.45
-      && coverParticleDepthMapping.randomLowCycles?.negativeRateRatio >= 0.45
-      && coverParticleDepthMapping.randomLowCycles?.forwardRatio >= 0.45
-      && coverParticleDepthMapping.randomLowCycles?.backwardRatio >= 0.45
-      && coverParticleDepthMapping.randomLowCycles?.minAbsoluteRate >= 0.58
-      && coverParticleDepthMapping.randomLowCycles?.maxAbsoluteRate <= 1.26
-      && coverParticleDepthMapping.randomLowCycles?.uniquePhaseCount >= 1000,
+    coverParticleRandomFloatCyclesRunBothWays: coverParticleDepthMapping.randomFloatCycles?.positiveRateRatio >= 0.45
+      && coverParticleDepthMapping.randomFloatCycles?.negativeRateRatio >= 0.45
+      && coverParticleDepthMapping.randomFloatCycles?.forwardRatio >= 0.45
+      && coverParticleDepthMapping.randomFloatCycles?.backwardRatio >= 0.45
+      && coverParticleDepthMapping.randomFloatCycles?.minAbsoluteRate >= 0.42
+      && coverParticleDepthMapping.randomFloatCycles?.maxAbsoluteRate <= 0.96
+      && coverParticleDepthMapping.randomFloatCycles?.uniquePhaseCount >= 1000,
     coverBrightnessMapsToStable3dDepth: coverParticleDepthMapping.first.bands.dark.count > 1000
       && coverParticleDepthMapping.first.bands.mid.count > 1000
       && coverParticleDepthMapping.first.bands.bright.count > 1000
@@ -2669,7 +3025,9 @@ try {
       && sonicRefresh.layoutReads <= 3,
     nativePresetRenderAvoidsRedundantTargets: sonicRefresh.renderTargetSwitches === 0,
     sonicAvoidsUnusedSceneStyleWrites: sonicRefresh.sceneStyleWrites === 0,
-    playbackSceneAvoidsRedundantStyleWrites: sonicRefresh.playbackStyleWrites === 0,
+    playbackSceneAvoidsRedundantStyleWrites: Object.values(
+      sonicRefresh.playbackStyleProperties || {}
+    ).every((count) => Number(count) <= 1),
     sonicSkipsIdleProjectileUploads: sonicRefresh.meteorMatrixUploadDelta === 0
       && sonicRefresh.particleMatrixUploadDelta === 0
       && sonicRefresh.starfieldPositionUploadDelta === 0,
@@ -2682,6 +3040,22 @@ try {
       && sonicRefresh.sonicCamera?.radius >= 155
       && sonicRefresh.sonicEffects?.starfieldParticleCount >= 3600
       && sonicRefresh.sonicEffects?.starfieldVisibleWhenEnabled === true,
+    sonicAtmosphereKeepsHighlightsAndContrast: (() => {
+      const defaults = sonicRefresh.sonicAtmosphere?.pixelMetrics?.defaults || {};
+      const raised = sonicRefresh.sonicAtmosphere?.pixelMetrics?.raisedAtmosphere || {};
+      return sonicRefresh.sonicAtmosphere?.groundReceiverCount === 1
+        && sonicRefresh.sonicAtmosphere?.groundUsesDirectionalSheen === true
+        && sonicRefresh.sonicAtmosphere?.groundHasNoSpotGeometry === true
+        && sonicRefresh.sonicAtmosphere?.opticsCoupling?.temperatureChangesAllReceivers === true
+        && sonicRefresh.sonicAtmosphere?.opticsCoupling?.reflectanceRaisesReceiverEnergy === true
+        && raised.clippedHighlightRatio <= 0.005
+        && raised.highlightRatio <= 0.02
+        && raised.shadowRatio >= 0.45
+        && raised.localContrast >= 0.006
+        && raised.luminanceStdDev >= defaults.luminanceStdDev * 0.95
+        && raised.midtoneRatio >= defaults.midtoneRatio + 0.015
+        && raised.luminanceMean <= 0.18;
+    })(),
     sonicControlsPersistAndReachShader: sonicRefresh.sonicControls?.panelVisibleInTopography === true
       && sonicRefresh.sonicControls?.panelHiddenOutsideTopography === true
       && sonicRefresh.sonicControls?.complete === true
@@ -2704,6 +3078,14 @@ try {
       && sonicRefresh.sonicControls?.appliesSettings === true
       && Object.values(sonicRefresh.sonicControls?.shaderUniforms || {}).every(Boolean)
       && sonicRefresh.sonicControls?.smoothingAffectsEnvelope === true,
+    sonicSceneControlsStayWithSonicOnly: sonicRefresh.sonicSceneControls?.groupVisible === true
+      && sonicRefresh.sonicSceneControls?.title.startsWith('Sonic')
+      && sonicRefresh.sonicSceneControls?.meta.includes('Sonic')
+      && sonicRefresh.sonicSceneControls?.sonicVisible === true
+      && sonicRefresh.sonicSceneControls?.wallpaperVisible === true
+      && sonicRefresh.sonicSceneControls?.foreignControlsHidden === true
+      && sonicRefresh.sonicSceneControls?.wallpaperBeforeSonic === true
+      && sonicRefresh.sonicSceneControls?.actionsComplete === true,
     sonicEffectsRespondToControls: sonicRefresh.sonicEffects?.threeIndependentColumnColors === true
       && sonicRefresh.sonicEffects?.preferencesPersist === true
       && sonicRefresh.sonicEffects?.fountainDisabledStaysIdle === true
@@ -2749,6 +3131,77 @@ try {
       && sonicRefresh.bassColumns?.activeLowFrequencyReachedUniforms === true
       && sonicRefresh.bassColumns?.pausedUniformsZero === true
   };
+  let sonicScreenshot = null;
+  if (sonicScreenshotPath) {
+    const screenshotState = await evaluate(`(async () => {
+      const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+      enterPresetPlaybackPage('topography');
+      requestOrbFrame();
+      const startedAt = performance.now();
+      while (!state.sonicTopography?.renderer && performance.now() - startedAt < 8000) await wait(80);
+      const topo = state.sonicTopography;
+      if (!topo?.renderer) throw new Error('Sonic renderer did not start for screenshot');
+      const wallpaperSvg = [
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">',
+        '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">',
+        '<stop offset="0" stop-color="#081426"/><stop offset="0.5" stop-color="#214b63"/>',
+        '<stop offset="1" stop-color="#bb5f45"/></linearGradient></defs>',
+        '<rect width="1600" height="900" fill="url(#g)"/>',
+        '<circle cx="170" cy="160" r="82" fill="#ffe7a3" opacity=".88"/>',
+        '<path d="M0 690 Q360 580 720 680 T1440 660 T1600 650" fill="none" stroke="#78e3ff" stroke-width="12" opacity=".7"/>',
+        '<text x="800" y="825" text-anchor="middle" fill="white" font-size="46" font-family="sans-serif">SONIC WALLPAPER QA</text>',
+        '</svg>'
+      ].join('');
+      setSonicWallpaperSurface({
+        enabled: true,
+        url: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(wallpaperSvg),
+        mediaKind: 'image',
+        opacity: 1
+      });
+      const wallpaperStartedAt = performance.now();
+      while (!topo.wallpaperTexture && performance.now() - wallpaperStartedAt < 4000) await wait(40);
+      topo.settings = {
+        ...topo.settings,
+        fogDensity: 0.42,
+        fogGlow: 0.58,
+        mistReflectance: 0.72,
+        mistEmission: 0.18,
+        tyndallIntensity: 0.82,
+        tyndallSpread: 0.56,
+        brightness: 1,
+        exposure: 0
+      };
+      applySonicTopographySettings({ persist: false, sync: false, renderConfig: false });
+      for (let frame = 0; frame < 45; frame += 1) {
+        topo.lastMotionAt = performance.now() - 16;
+        topo.lastRenderAt = 0;
+        updateSonicTopographyMotion();
+      }
+      await wait(320);
+      const surface = topo.wallpaperSurface;
+      const distance = Number(surface?.userData?.distance) || 0;
+      const visibleHeight = 2 * Math.tan(topo.camera.fov * Math.PI / 360) * distance;
+      const visibleWidth = visibleHeight * Math.max(0.1, topo.camera.aspect || 1);
+      return {
+        ...sonicAtmosphereRuntimeSnapshot(),
+        wallpaper: {
+          enabled: surface?.visible === true,
+          loaded: !!topo.wallpaperTexture,
+          surface: surface?.userData?.surface || '',
+          cameraAnchored: surface?.parent === topo.camera,
+          fullViewport: surface?.scale?.x * 2 >= visibleWidth
+            && surface?.scale?.y * 2 >= visibleHeight
+        }
+      };
+    })()`);
+    const screenshotPayload = await command('Page.captureScreenshot', {
+      format: 'png',
+      fromSurface: true,
+      captureBeyondViewport: false
+    });
+    writeFileSync(sonicScreenshotPath, Buffer.from(screenshotPayload.data, 'base64'));
+    sonicScreenshot = { path: sonicScreenshotPath, ...screenshotState };
+  }
   const result = {
     pass: Object.values(checks).every(Boolean),
     checks,
@@ -2800,6 +3253,7 @@ try {
       spectrumFps: Number(sonicRefresh.spectrumFps.toFixed(1)),
       renderToRafRatio: Number(sonicRefresh.renderToRafRatio.toFixed(3))
     },
+    sonicScreenshot,
     browserErrors
   };
   console.log(JSON.stringify(result, null, 2));
