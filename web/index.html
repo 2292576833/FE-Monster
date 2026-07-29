@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="referrer" content="no-referrer" />
     <title>FE Monster Java</title>
+    <link rel="icon" type="image/png" sizes="64x64" href="/assets/fe-monster-favicon.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/assets/fe-monster-app-icon.png" />
     <script>
       const clientMode = new URLSearchParams(window.location.search).get('client');
       if (clientMode === 'embedded' || clientMode === 'desktop-scene') {
@@ -16,7 +18,7 @@
     <link rel="stylesheet" href="/components/BorderGlow.css?v=20260705-button-border-glow-fix" />
     <link rel="stylesheet" href="border-glow-buttons.css?v=20260705-button-border-glow-fix" />
   <link rel="stylesheet" href="text-fonts.css?v=20260721-licensed-fonts-1" />
-  <link rel="stylesheet" href="styles.css?v=20260724-lyric-transform-multirow-1" />
+    <link rel="stylesheet" href="styles.css?v=20260728-liquid-switch-cursor-matte-1" />
   <link rel="stylesheet" href="rhythm-game.css?v=20260716-rhythm-game-2" />
     <link rel="stylesheet" href="black-gold-buttons.css?v=20260714-black-react-bits-glass-16" />
   </head>
@@ -46,11 +48,11 @@
 
       <section class="runtime-settings-panel" id="runtimeSettingsPanel" aria-label="Runtime settings" hidden>
         <label class="runtime-toggle">
-          <input id="gpuAccelerationToggle" type="checkbox" />
+          <input class="ui-switch" id="gpuAccelerationToggle" type="checkbox" role="switch" />
           <span>GPU</span>
         </label>
         <label class="runtime-toggle">
-          <input id="directX11Toggle" type="checkbox" />
+          <input class="ui-switch" id="directX11Toggle" type="checkbox" role="switch" />
           <span>DirectX11</span>
         </label>
         <div class="runtime-render-technology" aria-live="polite">
@@ -60,7 +62,7 @@
           <div class="runtime-preset-fsr" role="group" aria-label="场景预设 FSR 设置">
             <label class="runtime-preset-fsr-toggle" for="presetFsrToggle">
               <span>仅用于场景预设</span>
-              <input id="presetFsrToggle" type="checkbox" />
+              <input class="ui-switch" id="presetFsrToggle" type="checkbox" role="switch" />
             </label>
             <label class="runtime-preset-fsr-mode" for="presetFsrVersion">
               <span>版本</span>
@@ -92,16 +94,16 @@
           <input id="renderClarityRange" type="range" min="50" max="125" step="5" value="100" aria-describedby="renderClarityDetail" />
           <label class="runtime-clarity-auto">
             <span>根据当前电脑自动匹配</span>
-            <input id="renderClarityAutoToggle" type="checkbox" checked />
+            <input class="ui-switch" id="renderClarityAutoToggle" type="checkbox" role="switch" checked />
           </label>
           <small id="renderClarityDetail">正在检测屏幕刷新率与实时帧性能</small>
         </div>
         <label class="runtime-toggle">
-          <input id="xAudio2Toggle" type="checkbox" />
+          <input class="ui-switch" id="xAudio2Toggle" type="checkbox" role="switch" />
           <span>XAudio2</span>
         </label>
         <label class="runtime-toggle">
-          <input id="x3DAudioToggle" type="checkbox" />
+          <input class="ui-switch" id="x3DAudioToggle" type="checkbox" role="switch" />
           <span>X3DAudio</span>
         </label>
         <label class="runtime-toggle runtime-toggle--gesture">
@@ -109,12 +111,75 @@
             <strong>手势操作</strong>
             <small id="gestureControlStatus">摄像头关闭</small>
           </span>
-          <input id="gestureControlToggle" type="checkbox" />
+          <input class="ui-switch" id="gestureControlToggle" type="checkbox" role="switch" />
         </label>
         <div class="runtime-camera-source" role="group" aria-label="手势输入来源">
           <button class="runtime-camera-source-button is-active" id="gestureWebcamButton" type="button" data-gesture-camera-source="webcam" aria-pressed="true">摄像头</button>
           <button class="runtime-camera-source-button" id="gestureCameraButton" type="button" data-gesture-camera-source="camera" aria-pressed="false">相机</button>
         </div>
+        <details class="runtime-settings-group runtime-cursor-settings" id="runtimeCursorSettingsGroup">
+          <summary>
+            <span>鼠标光标</span>
+            <small>皮肤、移入与尾迹</small>
+          </summary>
+          <div class="runtime-settings-group-content">
+            <label class="runtime-cursor-field" for="cursorSkinSelect">
+              <span>鼠标皮肤</span>
+              <select id="cursorSkinSelect">
+                <option value="system">系统自动</option>
+                <option value="glass">玻璃箭头</option>
+                <option value="ether">液态紫焰</option>
+                <option value="frost">冰蓝准星</option>
+                <option value="stardust">星尘指针</option>
+                <option value="pixel">像素白</option>
+                <option value="gold">鎏金锐角</option>
+              </select>
+            </label>
+            <label class="runtime-cursor-field" for="cursorMotionSelect">
+              <span>鼠标移入动效</span>
+              <select id="cursorMotionSelect">
+                <option value="off">关闭</option>
+                <option value="lift">柔和上浮</option>
+                <option value="magnetic">磁性跟随</option>
+                <option value="glow">光晕</option>
+              </select>
+            </label>
+            <label class="runtime-cursor-field" for="cursorTrailSelect">
+              <span>鼠标尾迹</span>
+              <select id="cursorTrailSelect">
+                <option value="off">关闭</option>
+                <option value="glow">柔光轨迹</option>
+                <option value="comet">流星拖尾</option>
+                <option value="stardust">星尘粒子</option>
+                <option value="ribbon">双层丝带</option>
+                <option value="prism">棱镜彩光</option>
+              </select>
+            </label>
+            <div class="runtime-cursor-import">
+              <button class="runtime-cursor-import-button" id="cursorImportButton" type="button">
+                导入本地光标
+              </button>
+              <input
+                id="cursorImportInput"
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                hidden
+              />
+              <small>支持 PNG、JPG/JPEG、WebP、GIF；GIF 会使用静态首帧。最大 4 MB、2048 × 2048。</small>
+            </div>
+            <div
+              class="runtime-cursor-preview"
+              id="cursorPreferencePreview"
+              tabindex="0"
+              role="img"
+              aria-label="当前鼠标光标与移入动效预览"
+              aria-describedby="cursorPreferenceStatus"
+            >
+              <span>移到这里预览</span>
+              <small id="cursorPreferenceStatus" aria-live="polite">自动 · 关闭</small>
+            </div>
+          </div>
+        </details>
         <button class="runtime-action-button runtime-recording-button" id="runtimeRecordingButton" type="button">录制</button>
         <div class="runtime-low-frequency" aria-label="20Hz 到 150Hz 低频振幅">
           <div class="runtime-low-frequency-head">
@@ -242,7 +307,7 @@
           <span class="glass-surface__content">场景预设</span>
         </button>
         <button class="diy-page-tab glass-surface" id="diyTextModeButton" type="button" aria-pressed="false" aria-controls="diyTextPage" style="--diy-menu-index: 1">
-          <span class="glass-surface__content">文字预设</span>
+          <span class="glass-surface__content">歌词效果</span>
         </button>
         <button class="diy-page-tab glass-surface" id="diyWallpaperModeButton" type="button" aria-pressed="false" aria-controls="diyWallpaperPage" style="--diy-menu-index: 2">
           <span class="glass-surface__content">壁纸模式</span>
@@ -414,7 +479,7 @@
 
               <div class="sandbox-toggle-row">
                 <span><strong>360° 旋转</strong><small>允许用户从任意角度查看</small></span>
-                <label class="sandbox-switch"><input id="sandboxRotationToggle" type="checkbox" checked /><span></span></label>
+                <label class="sandbox-switch"><input class="ui-switch" id="sandboxRotationToggle" type="checkbox" role="switch" aria-label="360° 旋转" checked /><span></span></label>
               </div>
 
               <div class="sandbox-form-row sandbox-form-row--split">
@@ -855,6 +920,7 @@
         </section>
         <section class="cover-particle-scene" id="coverParticleScene" aria-label="&#31890;&#23376;&#23553;&#38754;" hidden>
           <div class="cover-particle-rig" id="coverParticleRig" aria-hidden="true">
+            <canvas class="cover-particle-wallpaper-canvas" id="coverParticleWallpaperCanvas"></canvas>
             <div class="cover-particle-engine" id="coverParticleEngine"></div>
             <canvas class="cover-particle-canvas" id="coverParticleCanvas"></canvas>
           </div>
@@ -884,7 +950,7 @@
           <div class="multi-row-lyric-stage" id="multiRowLyricStage" aria-hidden="true">
             <div class="multi-row-lyric-list" id="multiRowLyricList"></div>
           </div>
-          <div class="playback-lyric-rig" id="playbackLyricRig" aria-live="polite">
+          <div class="playback-lyric-rig" id="playbackLyricRig" data-lyric-shared-axis="true" aria-live="polite">
             <div class="playback-lyric-core" id="playbackLyricCore">
               <div class="blur-lyric-mount" id="blurLyricMount" aria-hidden="true"></div>
               <span class="playback-lyric-layer lyric-depth-5" id="playbackLyricDepth5"></span>
@@ -894,8 +960,8 @@
               <span class="playback-lyric-layer lyric-depth-1" id="playbackLyricDepth1"></span>
               <span class="playback-lyric-layer lyric-depth-0" id="playbackLyricText"></span>
               <span class="playback-lyric-layer lyric-back" id="playbackLyricBack"></span>
+              <div class="playback-lyric-subtitle" id="playbackLyricSubtitle"></div>
             </div>
-            <div class="playback-lyric-subtitle" id="playbackLyricSubtitle"></div>
           </div>
         </section>
         <section class="qishui-playback-card" id="qishuiPlaybackCard" aria-label="音乐悬浮播放页" hidden>
@@ -1059,6 +1125,44 @@
                 />
                 <span class="qishui-playback-times">
                   <time id="qishuiPlaybackCurrentTime">00:00</time>
+                  <button
+                    class="qishui-playback-lyric-adjust qishui-playback-lyric-adjust--minus glass-surface glass-surface--fallback"
+                    id="qishuiPlaybackLyricLaterButton"
+                    data-glass-surface
+                    data-glass-radius="8"
+                    data-glass-brightness="50"
+                    data-glass-opacity="0.9"
+                    data-glass-blur="7"
+                    data-glass-displace="0.12"
+                    data-glass-background-opacity="0.035"
+                    data-glass-saturation="1.14"
+                    data-glass-distortion-scale="-72"
+                    data-glass-red-offset="-2"
+                    data-glass-green-offset="4"
+                    data-glass-blue-offset="10"
+                    type="button"
+                    aria-label="&#27468;&#35789;&#24310;&#21518; 0.1 &#31186;"
+                    title="&#27468;&#35789;&#24310;&#21518; 0.1 &#31186;"
+                  ><span class="glass-surface__content">-0.1</span></button>
+                  <button
+                    class="qishui-playback-lyric-adjust qishui-playback-lyric-adjust--plus glass-surface glass-surface--fallback"
+                    id="qishuiPlaybackLyricEarlierButton"
+                    data-glass-surface
+                    data-glass-radius="8"
+                    data-glass-brightness="50"
+                    data-glass-opacity="0.9"
+                    data-glass-blur="7"
+                    data-glass-displace="0.12"
+                    data-glass-background-opacity="0.035"
+                    data-glass-saturation="1.14"
+                    data-glass-distortion-scale="-72"
+                    data-glass-red-offset="-2"
+                    data-glass-green-offset="4"
+                    data-glass-blue-offset="10"
+                    type="button"
+                    aria-label="&#27468;&#35789;&#25552;&#21069; 0.1 &#31186;"
+                    title="&#27468;&#35789;&#25552;&#21069; 0.1 &#31186;"
+                  ><span class="glass-surface__content">+0.1</span></button>
                   <time id="qishuiPlaybackTotalTime">00:00</time>
                 </span>
               </div>
@@ -1266,7 +1370,7 @@
               </button>
               <button class="diy-preset-card" id="diyCoverParticlesPreset" type="button" data-preset="cover-particles">
                 <strong>&#31890;&#23376;&#23553;&#38754;</strong>
-                <small>&#20302;&#39057;&#27874;&#28010;</small>
+                <small>平滑纵深漂浮</small>
               </button>
               <button class="diy-preset-card" id="diyBookLyricPreset" type="button" data-preset="book">
                 <strong>书页歌词</strong>
@@ -1278,31 +1382,6 @@
             <button class="diy-preset-group-label diy-preset-group-toggle" id="diySandboxPresetToggle" type="button" aria-expanded="false" aria-controls="diySandboxPresetList">我的场景预设</button>
             <div class="diy-preset-options diy-preset-options--sandbox" id="diySandboxPresetList" hidden></div>
           </div>
-          <div class="diy-preset-group diy-preset-group--inline-text" data-inline-text-presets>
-            <span class="diy-preset-group-label">&#25991;&#23383;&#39044;&#35774;</span>
-            <div class="diy-preset-options diy-preset-options--text">
-              <button class="diy-preset-card is-active" type="button" data-text-preset="none">
-                <strong>关闭歌词</strong>
-                <small>纯净画面</small>
-              </button>
-              <button class="diy-preset-card" type="button" data-text-preset="depth">
-                <strong>3D&#27468;&#35789;</strong>
-                <small>&#23553;&#38754;&#21462;&#33394;</small>
-              </button>
-              <button class="diy-preset-card" type="button" data-text-preset="flow">
-                <strong>&#27969;&#21160;&#25991;&#23383;</strong>
-                <small>&#36880;&#23383;&#26174;&#24433;</small>
-              </button>
-              <button class="diy-preset-card" type="button" data-text-preset="book-effect">
-                <strong>&#20070;&#39029;&#25928;&#26524;</strong>
-                <small>&#29420;&#31435;&#23383;&#20809;&#26248;</small>
-              </button>
-              <button class="diy-preset-card" type="button" data-text-preset="focus-echo">
-                <strong>&#28966;&#28857;&#22238;&#22768;</strong>
-                <small>&#26263;&#24433;&#25910;&#26463;&#23435;&#20307;</small>
-              </button>
-            </div>
-          </div>
           <div class="diy-spectrum" hidden>
             <span>低频</span>
             <div class="diy-spectrum-track" aria-hidden="true">
@@ -1310,106 +1389,176 @@
             </div>
             <strong id="spectrumStatus">待机</strong>
           </div>
-          <div class="diy-control diy-control--cover-particle-background" id="diyCoverParticleControl" data-diy-preset-control="cover-particles" hidden>
-            <label class="diy-toggle" for="diyCoverParticleBackgroundToggle">
-              <span>&#32972;&#26223;</span>
-              <input id="diyCoverParticleBackgroundToggle" type="checkbox" aria-label="&#32972;&#26223;" checked />
-            </label>
-            <span id="diyCoverParticleBackgroundValue">ON</span>
-            <label for="diyCoverParticleMotionRange">&#31890;&#23376;&#24459;&#21160;</label>
-            <span id="diyCoverParticleMotionValue">80%</span>
-            <input id="diyCoverParticleMotionRange" type="range" min="0" max="200" step="1" value="80" aria-label="&#31890;&#23376;&#24459;&#21160;&#24133;&#24230;" aria-valuetext="80%" />
-          </div>
-          <section class="sonic-preset-controls" id="sonicPresetControls" data-diy-preset-control="topography" aria-label="Sonic 预设参数" hidden>
-            <header class="sonic-preset-controls__head">
+          <details class="scene-preset-settings" id="scenePresetSettingsGroup" open hidden>
+            <summary>
               <span>
-                <strong>Sonic 参数</strong>
-                <small id="sonicPaletteMode">颜色跟随封面</small>
+                <strong id="scenePresetSettingsTitle">场景专属功能</strong>
+                <small id="scenePresetSettingsMeta">当前场景的开关与参数</small>
               </span>
-              <button id="sonicFollowCoverButton" type="button">跟随封面</button>
-            </header>
-            <div class="sonic-color-controls" role="group" aria-label="音柱颜色">
-              <label for="sonicCenterColorInput">
-                <span>核心音柱</span>
-                <input id="sonicCenterColorInput" type="color" value="#ffffff" aria-label="核心音柱颜色" />
-              </label>
-              <label for="sonicCoreColorInput">
-                <span>中间音柱</span>
-                <input id="sonicCoreColorInput" type="color" value="#ffffff" aria-label="中间音柱颜色" />
-              </label>
-              <label for="sonicOuterColorInput">
-                <span>外围音柱</span>
-                <input id="sonicOuterColorInput" type="color" value="#83e4ff" aria-label="外围音柱颜色" />
-              </label>
-            </div>
-            <div class="sonic-effect-controls" role="group" aria-label="Sonic 粒子效果">
-              <label class="sonic-effect-toggle" for="sonicFountainToggle">
-                <span>粒子喷泉</span>
-                <input id="sonicFountainToggle" type="checkbox" role="switch" aria-label="粒子喷泉" />
-              </label>
-              <label class="sonic-effect-color" for="sonicFountainColorInput">
-                <span>喷泉颜色</span>
-                <input id="sonicFountainColorInput" type="color" value="#ffffff" aria-label="粒子喷泉颜色" />
-              </label>
-              <label class="sonic-effect-toggle" for="sonicStarfieldToggle">
-                <span>星空粒子</span>
-                <input id="sonicStarfieldToggle" type="checkbox" role="switch" aria-label="星空粒子" />
-              </label>
-              <label class="sonic-effect-color" for="sonicStarfieldColorInput">
-                <span>星空颜色</span>
-                <input id="sonicStarfieldColorInput" type="color" value="#dff7ff" aria-label="星空粒子颜色" />
-              </label>
-            </div>
-            <div class="sonic-range-control">
-              <label for="sonicBrightnessRange">亮度 <output id="sonicBrightnessValue" for="sonicBrightnessRange">100%</output></label>
-              <input id="sonicBrightnessRange" type="range" min="40" max="200" step="1" value="100" aria-valuetext="100%" />
-            </div>
-            <div class="sonic-range-control">
-              <label for="sonicExposureRange">曝光 <output id="sonicExposureValue" for="sonicExposureRange">0.00 EV</output></label>
-              <input id="sonicExposureRange" type="range" min="-150" max="150" step="5" value="0" aria-valuetext="0.00 EV" />
-            </div>
-            <div class="sonic-range-control">
-              <label for="sonicColumnHeightRange">音柱高度 <output id="sonicColumnHeightValue" for="sonicColumnHeightRange">100%</output></label>
-              <input id="sonicColumnHeightRange" type="range" min="50" max="250" step="1" value="100" aria-valuetext="100%" />
-            </div>
-            <div class="sonic-range-control">
-              <label for="sonicFovRange">广角视野 <output id="sonicFovValue" for="sonicFovRange">44°</output></label>
-              <input id="sonicFovRange" type="range" min="42" max="68" step="1" value="44" aria-valuetext="44°" />
-            </div>
-            <div class="sonic-range-control">
-              <label for="sonicSmoothingRange">升降丝滑度 <output id="sonicSmoothingValue" for="sonicSmoothingRange">100%</output></label>
-              <input id="sonicSmoothingRange" type="range" min="50" max="200" step="1" value="100" aria-valuetext="100%" />
-            </div>
+            </summary>
+            <div class="scene-preset-settings__content" id="scenePresetSettingsContent">
+          <section id="diyCoverParticleControl" data-diy-preset-control="cover-particles" hidden>
+            <details class="scene-feature-group" id="coverParticleBackgroundFeatureGroup" data-scene-feature-preset="cover-particles" open>
+              <summary><strong>背景</strong><small>柔光背景显示</small></summary>
+              <div class="scene-feature-group__content diy-control diy-control--cover-particle-background">
+                <label class="diy-toggle" for="diyCoverParticleBackgroundToggle">
+                  <span>&#32972;&#26223;</span>
+                  <input class="ui-switch" id="diyCoverParticleBackgroundToggle" type="checkbox" role="switch" aria-label="&#32972;&#26223;" checked />
+                </label>
+                <span id="diyCoverParticleBackgroundValue">ON</span>
+              </div>
+            </details>
+            <details class="scene-feature-group" id="coverParticleMotionFeatureGroup" data-scene-feature-preset="cover-particles" open>
+              <summary><strong>粒子浮动</strong><small>纵深律动与速度</small></summary>
+              <div class="scene-feature-group__content diy-control diy-control--cover-particle-background">
+                <label for="diyCoverParticleMotionRange">&#31890;&#23376;&#24459;&#21160;</label>
+                <span id="diyCoverParticleMotionValue">80%</span>
+                <input id="diyCoverParticleMotionRange" type="range" min="0" max="200" step="1" value="80" aria-label="&#31890;&#23376;&#24459;&#21160;&#24133;&#24230;" aria-valuetext="80%" />
+                <label for="diyCoverParticleFloatSpeedRange">&#28014;&#21160;&#36895;&#24230;</label>
+                <span id="diyCoverParticleFloatSpeedValue">100%</span>
+                <input id="diyCoverParticleFloatSpeedRange" type="range" min="25" max="200" step="1" value="100" aria-label="&#31890;&#23376;&#28014;&#21160;&#36895;&#24230;" aria-valuetext="100%" />
+              </div>
+            </details>
           </section>
-          <div class="diy-control" id="diyCubeIntensityControl" data-diy-preset-control="cube" hidden>
-            <label for="cubeIntensityRange">魔方强度</label>
-            <input id="cubeIntensityRange" type="range" min="40" max="180" value="110" />
-            <span id="cubeIntensityValue">110%</span>
-          </div>
-          <div class="free-cube-preset-controls" id="freeCubePresetControls" role="group" aria-label="自由方块样式与背景" hidden>
-            <span>自由方块</span>
-            <div>
-              <button id="freeCubeHeartButton" type="button" aria-pressed="false">心动</button>
-              <button class="is-active" id="freeCubeBackgroundButton" type="button" aria-pressed="true">背景</button>
+          <section class="sonic-preset-controls" id="sonicPresetControls" data-diy-preset-control="topography" aria-label="Sonic 预设参数" hidden>
+            <details class="scene-feature-group" id="sonicColumnsFeatureGroup" data-scene-feature-preset="topography" open>
+              <summary><strong>音柱</strong><small>颜色、高度与镜头</small></summary>
+              <div class="scene-feature-group__content">
+                <header class="sonic-preset-controls__head">
+                  <span><strong>Sonic 音柱</strong><small id="sonicPaletteMode">颜色跟随封面</small></span>
+                  <button id="sonicFollowCoverButton" type="button">跟随封面</button>
+                </header>
+                <div class="sonic-color-controls" role="group" aria-label="音柱颜色">
+                  <label for="sonicCenterColorInput"><span>核心音柱</span><input id="sonicCenterColorInput" type="color" value="#ffffff" aria-label="核心音柱颜色" /></label>
+                  <label for="sonicCoreColorInput"><span>中间音柱</span><input id="sonicCoreColorInput" type="color" value="#ffffff" aria-label="中间音柱颜色" /></label>
+                  <label for="sonicOuterColorInput"><span>外围音柱</span><input id="sonicOuterColorInput" type="color" value="#83e4ff" aria-label="外围音柱颜色" /></label>
+                </div>
+                <div class="sonic-range-control"><label for="sonicBrightnessRange">亮度 <output id="sonicBrightnessValue" for="sonicBrightnessRange">100%</output></label><input id="sonicBrightnessRange" type="range" min="40" max="200" step="1" value="100" aria-valuetext="100%" /></div>
+                <div class="sonic-range-control"><label for="sonicExposureRange">曝光 <output id="sonicExposureValue" for="sonicExposureRange">0.00 EV</output></label><input id="sonicExposureRange" type="range" min="-150" max="150" step="5" value="0" aria-valuetext="0.00 EV" /></div>
+                <div class="sonic-range-control"><label for="sonicColumnHeightRange">音柱高度 <output id="sonicColumnHeightValue" for="sonicColumnHeightRange">100%</output></label><input id="sonicColumnHeightRange" type="range" min="50" max="250" step="1" value="100" aria-valuetext="100%" /></div>
+                <div class="sonic-range-control"><label for="sonicFovRange">广角视野 <output id="sonicFovValue" for="sonicFovRange">44°</output></label><input id="sonicFovRange" type="range" min="42" max="68" step="1" value="44" aria-valuetext="44°" /></div>
+                <div class="sonic-range-control"><label for="sonicSmoothingRange">升降丝滑度 <output id="sonicSmoothingValue" for="sonicSmoothingRange">100%</output></label><input id="sonicSmoothingRange" type="range" min="50" max="200" step="1" value="100" aria-valuetext="100%" /></div>
+              </div>
+            </details>
+            <details class="scene-feature-group" id="sonicGroundFeatureGroup" data-scene-feature-preset="topography">
+              <summary><strong>全部地面浮动</strong><small>错落节奏隆起</small></summary>
+              <div class="scene-feature-group__content sonic-effect-controls">
+                <label class="sonic-effect-toggle" for="sonicAllGroundFloatToggle"><span>全部地面浮动</span><input class="ui-switch" id="sonicAllGroundFloatToggle" type="checkbox" role="switch" aria-label="全部地面浮动" /></label>
+              </div>
+            </details>
+            <details class="scene-feature-group" id="sonicFountainFeatureGroup" data-scene-feature-preset="topography">
+              <summary><strong>粒子喷泉</strong><small>开关与颜色</small></summary>
+              <div class="scene-feature-group__content sonic-effect-controls">
+                <label class="sonic-effect-toggle" for="sonicFountainToggle"><span>粒子喷泉</span><input class="ui-switch" id="sonicFountainToggle" type="checkbox" role="switch" aria-label="粒子喷泉" /></label>
+                <label class="sonic-effect-color" for="sonicFountainColorInput"><span>喷泉颜色</span><input id="sonicFountainColorInput" type="color" value="#ffffff" aria-label="粒子喷泉颜色" /></label>
+              </div>
+            </details>
+            <details class="scene-feature-group" id="sonicSkyFeatureGroup" data-scene-feature-preset="topography">
+              <summary><strong>星空与星河</strong><small>粒子、颜色与强度</small></summary>
+              <div class="scene-feature-group__content sonic-effect-controls">
+                <label class="sonic-effect-toggle" for="sonicStarfieldToggle"><span>星空粒子</span><input class="ui-switch" id="sonicStarfieldToggle" type="checkbox" role="switch" aria-label="星空粒子" /></label>
+                <label class="sonic-effect-color" for="sonicStarfieldColorInput"><span>星空颜色</span><input id="sonicStarfieldColorInput" type="color" value="#dff7ff" aria-label="星空粒子颜色" /></label>
+                <label class="sonic-effect-toggle" for="sonicGalaxyToggle"><span>星河粒子</span><input class="ui-switch" id="sonicGalaxyToggle" type="checkbox" role="switch" aria-label="星河粒子" checked /></label>
+                <label class="sonic-effect-color" for="sonicGalaxyColorInput"><span>星河颜色</span><input id="sonicGalaxyColorInput" type="color" value="#a8d8ff" aria-label="星河颜色" /></label>
+                <div class="sonic-range-control"><label for="sonicGalaxyIntensityRange">星河强度 <output id="sonicGalaxyIntensityValue" for="sonicGalaxyIntensityRange">52%</output></label><input id="sonicGalaxyIntensityRange" type="range" min="0" max="150" step="1" value="52" aria-valuetext="52%" /></div>
+              </div>
+            </details>
+            <details class="scene-feature-group" id="sonicAtmosphereFeatureGroup" data-scene-feature-preset="topography">
+              <summary><strong>水雾与丁达尔</strong><small>柔光、散射与反射</small></summary>
+              <div class="scene-feature-group__content sonic-effect-controls">
+                <label class="sonic-effect-toggle" for="sonicAtmosphereToggle"><span>水雾光束</span><input class="ui-switch" id="sonicAtmosphereToggle" type="checkbox" role="switch" aria-label="水雾光束" checked /></label>
+                <label class="sonic-effect-select" for="sonicTyndallToneSelect"><span>太阳光色温</span><select id="sonicTyndallToneSelect" aria-label="太阳光色温"><option value="normal">正常光</option><option value="cold">冷光</option><option value="warm">暖光</option></select></label>
+                <div class="sonic-range-control"><label for="sonicFogDensityRange">水雾浓度 <output id="sonicFogDensityValue" for="sonicFogDensityRange">24%</output></label><input id="sonicFogDensityRange" type="range" min="0" max="80" step="1" value="24" aria-valuetext="24%" /></div>
+                <div class="sonic-range-control"><label for="sonicFogSpeedRange">水雾流速 <output id="sonicFogSpeedValue" for="sonicFogSpeedRange">28%</output></label><input id="sonicFogSpeedRange" type="range" min="0" max="150" step="1" value="28" aria-valuetext="28%" /></div>
+                <div class="sonic-range-control"><label for="sonicFogGlowRange">水雾散射 <output id="sonicFogGlowValue" for="sonicFogGlowRange">32%</output></label><input id="sonicFogGlowRange" type="range" min="0" max="150" step="1" value="32" aria-valuetext="32%" /></div>
+                <div class="sonic-range-control"><label for="sonicMistReflectanceRange">水雾反射率 <output id="sonicMistReflectanceValue" for="sonicMistReflectanceRange">34%</output></label><input id="sonicMistReflectanceRange" type="range" min="0" max="150" step="1" value="34" aria-valuetext="34%" /></div>
+                <div class="sonic-range-control"><label for="sonicMistEmissionRange">水雾自发光 <output id="sonicMistEmissionValue" for="sonicMistEmissionRange">12%</output></label><input id="sonicMistEmissionRange" type="range" min="0" max="100" step="1" value="12" aria-valuetext="12%" /></div>
+                <div class="sonic-range-control"><label for="sonicTyndallIntensityRange">光束强度 <output id="sonicTyndallIntensityValue" for="sonicTyndallIntensityRange">42%</output></label><input id="sonicTyndallIntensityRange" type="range" min="0" max="150" step="1" value="42" aria-valuetext="42%" /></div>
+                <div class="sonic-range-control"><label for="sonicTyndallSpreadRange">光束扩散 <output id="sonicTyndallSpreadValue" for="sonicTyndallSpreadRange">46%</output></label><input id="sonicTyndallSpreadRange" type="range" min="10" max="150" step="1" value="46" aria-valuetext="46%" /></div>
+              </div>
+            </details>
+            <details class="scene-feature-group" id="sonicCoverBackgroundFeatureGroup" data-scene-feature-preset="topography">
+              <summary><strong>封面三色背景</strong><small>开关与混合</small></summary>
+              <div class="scene-feature-group__content sonic-effect-controls">
+                <label class="sonic-effect-toggle" for="sonicCoverBackgroundToggle"><span>封面三色背景</span><input class="ui-switch" id="sonicCoverBackgroundToggle" type="checkbox" role="switch" aria-label="封面三色背景" checked /></label>
+                <div class="sonic-range-control"><label for="sonicCoverBackgroundMixRange">封面背景混合 <output id="sonicCoverBackgroundMixValue" for="sonicCoverBackgroundMixRange">62%</output></label><input id="sonicCoverBackgroundMixRange" type="range" min="0" max="100" step="1" value="62" aria-valuetext="62%" /></div>
+              </div>
+            </details>
+          </section>
+          <details class="scene-feature-group" id="cubeIntensityFeatureGroup" data-scene-feature-preset="cube" open hidden>
+            <summary><strong>动态魔方</strong><small>音频响应强度</small></summary>
+            <div class="scene-feature-group__content diy-control" id="diyCubeIntensityControl" data-diy-preset-control="cube">
+              <label for="cubeIntensityRange">魔方强度</label>
+              <input id="cubeIntensityRange" type="range" min="40" max="180" value="110" />
+              <span id="cubeIntensityValue">110%</span>
             </div>
-          </div>
-          <div class="free-cube-preset-controls chladni-preset-controls" id="chladniPresetControls" role="group" aria-label="克拉尼平面与3D六面切换" hidden>
-            <span>克拉尼形态</span>
-            <div>
-              <button id="chladniPlaneButton" type="button" aria-pressed="false">平面</button>
-              <button class="is-active" id="chladniCubeButton" type="button" aria-pressed="true">3D六面</button>
+          </details>
+          <details class="scene-feature-group" id="freeCubeModeFeatureGroup" data-scene-feature-preset="free-cube" open hidden>
+            <summary><strong>自由方块</strong><small>心动与背景模式</small></summary>
+            <div class="scene-feature-group__content free-cube-preset-controls" id="freeCubePresetControls" role="group" aria-label="自由方块样式与背景">
+              <span>自由方块</span>
+              <div>
+                <button id="freeCubeHeartButton" type="button" aria-pressed="false">心动</button>
+                <button class="is-active" id="freeCubeBackgroundButton" type="button" aria-pressed="true">背景</button>
+              </div>
             </div>
-          </div>
-          <div class="storm-preset-lighting-quick" id="stormPresetLightingQuickControls" role="group" aria-label="风暴海域光照与天气切换" hidden>
-            <span>光照与天气</span>
-            <div>
-              <button class="is-active" type="button" data-storm-lighting-mode="realtime" aria-pressed="true">实时</button>
-              <button type="button" data-storm-lighting-mode="day" aria-pressed="false">白天</button>
-              <button type="button" data-storm-lighting-mode="sunset" aria-pressed="false">黄昏</button>
-              <button type="button" data-storm-lighting-mode="evening" aria-pressed="false">傍晚</button>
-              <button type="button" data-storm-weather-mode="thunderstorm" aria-pressed="false" aria-label="雷暴天气">雷暴</button>
+          </details>
+          <details class="scene-feature-group" id="chladniFormFeatureGroup" data-scene-feature-preset="chladni" open hidden>
+            <summary><strong>克拉尼形态</strong><small>平面与 3D 六面</small></summary>
+            <div class="scene-feature-group__content free-cube-preset-controls chladni-preset-controls" id="chladniPresetControls" role="group" aria-label="克拉尼平面与3D六面切换">
+              <span>克拉尼形态</span>
+              <div>
+                <button id="chladniPlaneButton" type="button" aria-pressed="false">平面</button>
+                <button class="is-active" id="chladniCubeButton" type="button" aria-pressed="true">3D六面</button>
+              </div>
             </div>
-          </div>
+          </details>
+          <details class="scene-feature-group" id="sceneWallpaperFeatureGroup" data-scene-feature-preset="topography,cover-particles,chladni" open hidden>
+            <summary><strong>场景壁纸</strong><small>柔光、导入与 Wallpaper Engine</small></summary>
+            <section class="scene-feature-group__content scene-wallpaper-control glass-surface" id="sceneWallpaperControl" data-scene-wallpaper-preset="" aria-label="场景壁纸">
+            <header class="scene-wallpaper-control__head">
+              <span>
+                <strong>场景壁纸</strong>
+                <small id="sceneWallpaperStatus">未添加壁纸</small>
+              </span>
+              <label class="scene-wallpaper-switch" for="sceneWallpaperEnabledToggle">
+                <span>启用</span>
+                <input class="ui-switch" id="sceneWallpaperEnabledToggle" type="checkbox" role="switch" aria-label="启用场景壁纸" />
+              </label>
+            </header>
+            <label class="scene-wallpaper-select-row" for="sceneWallpaperSelect">
+              <span>选择壁纸</span>
+              <select id="sceneWallpaperSelect" aria-label="选择场景壁纸">
+                <option value="soft-glow">柔光背景</option>
+              </select>
+            </label>
+            <div class="scene-wallpaper-actions">
+              <button id="sceneWallpaperImportButton" type="button">导入壁纸</button>
+              <button id="sceneWallpaperUseCurrentButton" type="button">使用当前</button>
+              <button id="sceneWallpaperRemoveButton" type="button">移除</button>
+              <input id="sceneWallpaperImportInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime" multiple hidden />
+            </div>
+            <div class="scene-wallpaper-range">
+              <label for="sceneWallpaperOpacityRange">壁纸透明度 <output id="sceneWallpaperOpacityValue" for="sceneWallpaperOpacityRange">68%</output></label>
+              <input id="sceneWallpaperOpacityRange" type="range" min="10" max="100" step="1" value="68" aria-valuetext="68%" />
+            </div>
+            </section>
+          </details>
+          <details class="scene-feature-group" id="stormLightingFeatureGroup" data-scene-feature-preset="storm-ocean" open hidden>
+            <summary><strong>光照与天气</strong><small>风暴海域专属</small></summary>
+            <div class="scene-feature-group__content storm-preset-lighting-quick" id="stormPresetLightingQuickControls" role="group" aria-label="风暴海域光照与天气切换">
+              <span>光照与天气</span>
+              <div>
+                <button class="is-active" type="button" data-storm-lighting-mode="realtime" aria-pressed="true">实时</button>
+                <button type="button" data-storm-lighting-mode="day" aria-pressed="false">白天</button>
+                <button type="button" data-storm-lighting-mode="sunset" aria-pressed="false">黄昏</button>
+                <button type="button" data-storm-lighting-mode="evening" aria-pressed="false">傍晚</button>
+                <button type="button" data-storm-weather-mode="thunderstorm" aria-pressed="false" aria-label="雷暴天气">雷暴</button>
+              </div>
+            </div>
+          </details>
+            </div>
+          </details>
           <section class="diy-selected-preset-config" id="diySelectedPresetConfig" aria-live="polite" hidden>
             <header>
               <strong id="diySelectedPresetConfigTitle">当前预设配置</strong>
@@ -1418,138 +1567,317 @@
             <div class="diy-selected-preset-config-list" id="diySelectedPresetConfigList"></div>
           </section>
         </section>
-        <section class="diy-text-page" id="diyTextPage" aria-label="文字预设" hidden>
-          <div class="diy-preset-group diy-preset-group--text">
-            <span class="diy-preset-group-label">文字预设</span>
-            <div class="diy-preset-options diy-preset-options--text">
-              <button class="diy-preset-card is-active" id="diyNoTextPreset" type="button" data-text-preset="none">
-                <strong>关闭歌词</strong>
-                <small>纯净画面</small>
+        <section class="diy-text-page" id="diyTextPage" aria-label="歌词效果" hidden>
+          <div class="diy-preset-group diy-preset-group--text-modes">
+            <span class="diy-preset-group-label">歌词卡片</span>
+            <div class="diy-preset-options diy-preset-options--text" role="group" aria-label="歌词卡片样式">
+              <button class="diy-preset-card is-active" id="diyLyricPreset" type="button" data-text-preset="depth" aria-pressed="true">
+                <strong>普通歌词</strong>
+                <small>滚动高亮 · 可调参数</small>
               </button>
-              <button class="diy-preset-card" id="diyLyricPreset" type="button" data-text-preset="depth">
-                <strong>3D歌词</strong>
-                <small>封面取色</small>
-              </button>
-              <button class="diy-preset-card" id="diyFlowTextPreset" type="button" data-text-preset="flow">
-                <strong>流动文字</strong>
-                <small>逐字显影</small>
-              </button>
-              <button class="diy-preset-card" id="diyBookEffectTextPreset" type="button" data-text-preset="book-effect">
-                <strong>&#20070;&#39029;&#25928;&#26524;</strong>
-                <small>&#29420;&#31435;&#23383;&#20809;&#26248;</small>
-              </button>
-              <button class="diy-preset-card" id="diyFocusEchoTextPreset" type="button" data-text-preset="focus-echo">
-                <strong>&#28966;&#28857;&#22238;&#22768;</strong>
-                <small>&#26263;&#24433;&#25910;&#26463;&#23435;&#20307;</small>
+              <button class="diy-preset-card" id="diyFocusEchoTextPreset" type="button" data-text-preset="focus-echo" aria-pressed="false">
+                <strong>焦点回声</strong>
+                <small>纯净回声 · 无故障模糊</small>
               </button>
             </div>
           </div>
-          <section class="diy-text-font" id="textFontControl" aria-labelledby="textFontTitle">
-            <header class="diy-text-font-head">
-              <strong id="textFontTitle">字体选择</strong>
-              <output id="textFontStatus">系统字体</output>
+          <fieldset class="diy-text-composer" id="textComposerControl" aria-labelledby="textComposerTitle">
+            <legend id="textComposerTitle">文字效果参数</legend>
+            <header class="diy-text-composer-head">
+              <span aria-hidden="true">
+                <strong>分层文字控制</strong>
+                <small>按功能分层调节，不混入无关设置</small>
+              </span>
+              <button id="textComposerResetButton" type="button">复位为 3D</button>
             </header>
-            <label class="diy-text-font-field" for="textFontSelect">
-              <span class="sr-only">选择歌词字体</span>
-              <select id="textFontSelect" aria-describedby="textFontAvailability"></select>
-            </label>
-            <output class="diy-text-font-preview" id="textFontPreview" aria-hidden="true">此刻，听见光的回声</output>
-            <small id="textFontAvailability">跟随当前设备的系统字体</small>
-          </section>
-          <section class="diy-text-palette" id="textPaletteControl" aria-labelledby="textPaletteTitle">
-            <header class="diy-text-palette-head">
-              <strong id="textPaletteTitle">&#25991;&#23383;&#35843;&#33394;</strong>
-              <output id="textPaletteStatus">&#23553;&#38754;&#33258;&#21160;</output>
-            </header>
-            <button class="diy-text-palette-auto is-active" id="textPaletteAutoButton" type="button" aria-pressed="true">
-              <i aria-hidden="true"></i>
-              <span>&#23553;&#38754;&#33258;&#21160;</span>
-            </button>
-            <div class="diy-text-palette-actions">
-              <div class="diy-text-palette-swatches" role="group" aria-label="&#24120;&#29992;&#25991;&#23383;&#39068;&#33394;">
-                <button type="button" data-text-palette-color="#eafbff" style="--text-swatch: #eafbff" aria-label="&#20912;&#30333;"></button>
-                <button type="button" data-text-palette-color="#a8dde8" style="--text-swatch: #a8dde8" aria-label="&#38654;&#34013;"></button>
-                <button type="button" data-text-palette-color="#56d9f2" style="--text-swatch: #56d9f2" aria-label="&#20809;&#38738;"></button>
-                <button type="button" data-text-palette-color="#64e7c3" style="--text-swatch: #64e7c3" aria-label="&#34028;&#33655;"></button>
-                <button type="button" data-text-palette-color="#bfadff" style="--text-swatch: #bfadff" aria-label="&#38654;&#32043;"></button>
-                <button type="button" data-text-palette-color="#ffadc9" style="--text-swatch: #ffadc9" aria-label="&#26580;&#31881;"></button>
-                <button type="button" data-text-palette-color="#ffbc72" style="--text-swatch: #ffbc72" aria-label="&#26262;&#27225;"></button>
-                <button type="button" data-text-palette-color="#ffe16b" style="--text-swatch: #ffe16b" aria-label="&#26376;&#40644;"></button>
+            <details class="diy-text-settings-group" id="textBasicSettingsGroup" open>
+              <summary>
+                <span>基础排版</span>
+                <small>布局、字体与空间质感</small>
+              </summary>
+              <div class="diy-text-settings-content">
+                <div class="diy-text-composer-grid">
+                  <div class="diy-text-composer-field diy-text-composer-field--wide">
+                    <label for="textLayoutMode">布局模式</label>
+                    <output id="textLayoutModeValue" for="textLayoutMode">单排</output>
+                    <select id="textLayoutMode" data-text-composer-setting="layoutMode">
+                      <option value="single" selected>单排</option>
+                      <option value="multi">多排</option>
+                    </select>
+                  </div>
+                  <div class="diy-text-composer-field">
+                    <label for="textDepth">景深</label>
+                    <output id="textDepthValue" for="textDepth">72%</output>
+                    <input id="textDepth" data-text-composer-setting="depth" type="range" min="0" max="100" step="1" value="72" />
+                  </div>
+                  <div class="diy-text-composer-field">
+                    <label for="textUnsungBlur">未唱模糊</label>
+                    <output id="textUnsungBlurValue" for="textUnsungBlur">1.5px</output>
+                    <input id="textUnsungBlur" data-text-composer-setting="unsungBlur" type="range" min="0" max="12" step="0.5" value="1.5" />
+                  </div>
+                  <div class="diy-text-composer-field diy-text-composer-field--wide">
+                    <label for="textLetterSpacing">字距</label>
+                    <output id="textLetterSpacingValue" for="textLetterSpacing">1px</output>
+                    <input id="textLetterSpacing" data-text-composer-setting="letterSpacing" type="range" min="-2" max="12" step="0.5" value="1" />
+                  </div>
+                </div>
+                <section class="diy-text-font" id="textFontControl" aria-labelledby="textFontTitle">
+                  <header class="diy-text-font-head">
+                    <strong id="textFontTitle">字体选择</strong>
+                    <output id="textFontStatus">系统字体</output>
+                  </header>
+                  <label class="diy-text-font-field" for="textFontSelect">
+                    <span class="sr-only">选择歌词字体</span>
+                    <select id="textFontSelect" aria-describedby="textFontAvailability"></select>
+                  </label>
+                  <output class="diy-text-font-preview" id="textFontPreview" aria-hidden="true">此刻，听见光的回声</output>
+                  <small id="textFontAvailability">跟随当前设备的系统字体</small>
+                </section>
               </div>
-              <label class="diy-text-palette-custom" for="textPaletteCustomInput">
-                <input id="textPaletteCustomInput" type="color" value="#eafbff" aria-label="&#33258;&#23450;&#20041;&#25991;&#23383;&#39068;&#33394;" />
-                <span>&#33258;&#23450;&#20041;</span>
-              </label>
-              <button class="diy-text-palette-reset" id="textPaletteResetButton" type="button">&#24674;&#22797;&#33258;&#21160;</button>
-            </div>
-          </section>
-          <section
-            class="diy-text-palette diy-text-palette--playback"
-            id="playbackLyricPaletteControl"
-            aria-labelledby="playbackLyricPaletteTitle"
-          >
-            <header class="diy-text-palette-head">
-              <strong id="playbackLyricPaletteTitle">新播放栏歌词</strong>
-              <output id="playbackLyricPaletteStatus">封面自动</output>
-            </header>
-            <button
-              class="diy-text-palette-auto is-active"
-              id="playbackLyricPaletteAutoButton"
-              type="button"
-              aria-pressed="true"
-            >
-              <i aria-hidden="true"></i>
-              <span>封面自动</span>
-            </button>
-            <div class="diy-text-palette-actions">
-              <div class="diy-text-palette-swatches" role="group" aria-label="新播放栏歌词常用颜色">
-                <button type="button" data-playback-lyric-palette-color="#eafbff" style="--text-swatch: #eafbff" aria-label="冰白"></button>
-                <button type="button" data-playback-lyric-palette-color="#a8dde8" style="--text-swatch: #a8dde8" aria-label="雾蓝"></button>
-                <button type="button" data-playback-lyric-palette-color="#56d9f2" style="--text-swatch: #56d9f2" aria-label="光青"></button>
-                <button type="button" data-playback-lyric-palette-color="#64e7c3" style="--text-swatch: #64e7c3" aria-label="薄荷"></button>
-                <button type="button" data-playback-lyric-palette-color="#bfadff" style="--text-swatch: #bfadff" aria-label="雾紫"></button>
-                <button type="button" data-playback-lyric-palette-color="#ffadc9" style="--text-swatch: #ffadc9" aria-label="柔粉"></button>
-                <button type="button" data-playback-lyric-palette-color="#ffbc72" style="--text-swatch: #ffbc72" aria-label="暖橙"></button>
-                <button type="button" data-playback-lyric-palette-color="#ffe16b" style="--text-swatch: #ffe16b" aria-label="月黄"></button>
+            </details>
+
+            <details class="diy-text-settings-group" id="textTranslationSettingsGroup" open>
+              <summary>
+                <span>显示翻译</span>
+                <small>双语、多排与译文排版</small>
+              </summary>
+              <div class="diy-text-settings-content">
+                <div class="diy-control diy-control--bilingual-lyrics">
+                  <label class="diy-toggle" for="bilingualLyricsToggle">
+                    <span>显示双语歌词</span>
+                    <input
+                      class="ui-switch"
+                      id="bilingualLyricsToggle"
+                      type="checkbox"
+                      role="switch"
+                      aria-label="显示原文和翻译字幕"
+                      checked
+                    />
+                  </label>
+                  <output id="bilingualLyricsValue" for="bilingualLyricsToggle">ON</output>
+                </div>
+                <div class="diy-text-composer-grid">
+                  <div class="diy-text-composer-field">
+                    <label for="multiRowLineCount">多排歌词行数</label>
+                    <output id="multiRowLineCountValue" for="multiRowLineCount">7 行</output>
+                    <input id="multiRowLineCount" data-text-composer-setting="multiRowLineCount" data-text-translation-setting="lineCount" type="range" min="3" max="11" step="2" value="7" />
+                  </div>
+                  <div class="diy-text-composer-field">
+                    <label for="translationFontSize">译文字号</label>
+                    <output id="translationFontSizeValue" for="translationFontSize">72%</output>
+                    <input id="translationFontSize" data-text-composer-setting="translationFontSize" data-text-translation-setting="fontSize" type="range" min="50" max="100" step="1" value="72" />
+                  </div>
+                  <div class="diy-text-composer-field">
+                    <label for="translationGap">译文间距</label>
+                    <output id="translationGapValue" for="translationGap">4px</output>
+                    <input id="translationGap" data-text-composer-setting="translationGap" data-text-translation-setting="gap" type="range" min="0" max="24" step="1" value="4" />
+                  </div>
+                  <div class="diy-text-composer-field">
+                    <label for="translationOpacity">译文透明度</label>
+                    <output id="translationOpacityValue" for="translationOpacity">88%</output>
+                    <input id="translationOpacity" data-text-composer-setting="translationOpacity" data-text-translation-setting="opacity" type="range" min="30" max="100" step="1" value="88" />
+                  </div>
+                </div>
               </div>
-              <label class="diy-text-palette-custom" for="playbackLyricPaletteCustomInput">
-                <input
-                  id="playbackLyricPaletteCustomInput"
-                  type="color"
-                  value="#eafbff"
-                  aria-label="自定义新播放栏歌词颜色"
-                />
-                <span>自定义</span>
-              </label>
-              <button
-                class="diy-text-palette-reset"
-                id="playbackLyricPaletteResetButton"
-                type="button"
-              >恢复自动</button>
-            </div>
-          </section>
-          <div class="diy-control diy-control--bilingual-lyrics">
-            <label class="diy-toggle" for="bilingualLyricsToggle">
-              <span>&#21452;&#35821;&#23383;&#24149;</span>
-              <input
-                id="bilingualLyricsToggle"
-                type="checkbox"
-                aria-label="&#26174;&#31034;&#21407;&#25991;&#21644;&#32763;&#35793;&#23383;&#24149;"
-                checked
-              />
-            </label>
-            <span id="bilingualLyricsValue">ON</span>
-          </div>
-          <div class="diy-control">
-            <label for="lyricBrightnessRange">歌词亮度</label>
-            <input id="lyricBrightnessRange" type="range" min="60" max="180" value="112" />
-            <span id="lyricBrightnessValue">112%</span>
-          </div>
-          <div class="diy-control">
-            <label for="lyricSpeedRange">跳动速度</label>
-            <input id="lyricSpeedRange" type="range" min="60" max="180" value="100" />
-            <span id="lyricSpeedValue">100%</span>
-          </div>
+            </details>
+
+            <details class="diy-text-settings-group" id="textColorEffectsGroup">
+              <summary>
+                <span>颜色光效</span>
+                <small>文字调色、亮度与高光质感</small>
+              </summary>
+              <div class="diy-text-settings-content">
+                <div class="diy-text-composer-grid">
+                  <div class="diy-text-composer-field">
+                    <label for="textHighlightIntensity">高亮强度</label>
+                    <output id="textHighlightIntensityValue" for="textHighlightIntensity">88%</output>
+                    <input id="textHighlightIntensity" data-text-composer-setting="highlightIntensity" type="range" min="0" max="100" step="1" value="88" />
+                  </div>
+                  <div class="diy-text-composer-field">
+                    <label for="textHighlightSoftness">高亮柔边</label>
+                    <output id="textHighlightSoftnessValue" for="textHighlightSoftness">3%</output>
+                    <input id="textHighlightSoftness" data-text-composer-setting="highlightSoftness" type="range" min="0" max="12" step="0.5" value="3" />
+                  </div>
+                  <div class="diy-text-composer-field">
+                    <label for="textGloss">光泽 / 反射</label>
+                    <output id="textGlossValue" for="textGloss">62%</output>
+                    <input id="textGloss" data-text-composer-setting="gloss" type="range" min="0" max="100" step="1" value="62" />
+                  </div>
+                  <div class="diy-text-composer-field">
+                    <label for="textLowBassGlow">低频整行散光</label>
+                    <output id="textLowBassGlowValue" for="textLowBassGlow">75%</output>
+                    <input id="textLowBassGlow" data-text-composer-setting="lowBassGlow" type="range" min="0" max="100" step="1" value="75" />
+                  </div>
+                  <div class="diy-text-composer-field diy-text-composer-field--wide">
+                    <label for="lyricBrightnessRange">歌词亮度</label>
+                    <output id="lyricBrightnessValue" for="lyricBrightnessRange">112%</output>
+                    <input id="lyricBrightnessRange" type="range" min="60" max="180" value="112" />
+                  </div>
+                </div>
+                <section class="diy-text-palette" id="textPaletteControl" aria-labelledby="textPaletteTitle">
+                  <header class="diy-text-palette-head">
+                    <strong id="textPaletteTitle">文字调色</strong>
+                    <output id="textPaletteStatus">封面自动</output>
+                  </header>
+                  <button class="diy-text-palette-auto is-active" id="textPaletteAutoButton" type="button" aria-pressed="true">
+                    <i aria-hidden="true"></i>
+                    <span>封面自动</span>
+                  </button>
+                  <div class="diy-text-palette-actions">
+                    <div class="diy-text-palette-swatches" role="group" aria-label="常用文字颜色">
+                      <button type="button" data-text-palette-color="#eafbff" style="--text-swatch: #eafbff" aria-label="冰白"></button>
+                      <button type="button" data-text-palette-color="#a8dde8" style="--text-swatch: #a8dde8" aria-label="雾蓝"></button>
+                      <button type="button" data-text-palette-color="#56d9f2" style="--text-swatch: #56d9f2" aria-label="光青"></button>
+                      <button type="button" data-text-palette-color="#64e7c3" style="--text-swatch: #64e7c3" aria-label="薄荷"></button>
+                      <button type="button" data-text-palette-color="#bfadff" style="--text-swatch: #bfadff" aria-label="雾紫"></button>
+                      <button type="button" data-text-palette-color="#ffadc9" style="--text-swatch: #ffadc9" aria-label="柔粉"></button>
+                      <button type="button" data-text-palette-color="#ffbc72" style="--text-swatch: #ffbc72" aria-label="暖橙"></button>
+                      <button type="button" data-text-palette-color="#ffe16b" style="--text-swatch: #ffe16b" aria-label="月黄"></button>
+                    </div>
+                    <label class="diy-text-palette-custom" for="textPaletteCustomInput">
+                      <input id="textPaletteCustomInput" type="color" value="#eafbff" aria-label="自定义文字颜色" />
+                      <span>自定义</span>
+                    </label>
+                    <button class="diy-text-palette-reset" id="textPaletteResetButton" type="button">恢复自动</button>
+                  </div>
+                </section>
+                <section
+                  class="diy-text-palette diy-text-palette--playback"
+                  id="playbackLyricPaletteControl"
+                  aria-labelledby="playbackLyricPaletteTitle"
+                >
+                  <header class="diy-text-palette-head">
+                    <strong id="playbackLyricPaletteTitle">新播放栏歌词</strong>
+                    <output id="playbackLyricPaletteStatus">封面自动</output>
+                  </header>
+                  <button
+                    class="diy-text-palette-auto is-active"
+                    id="playbackLyricPaletteAutoButton"
+                    type="button"
+                    aria-pressed="true"
+                  >
+                    <i aria-hidden="true"></i>
+                    <span>封面自动</span>
+                  </button>
+                  <div class="diy-text-palette-actions">
+                    <div class="diy-text-palette-swatches" role="group" aria-label="新播放栏歌词常用颜色">
+                      <button type="button" data-playback-lyric-palette-color="#eafbff" style="--text-swatch: #eafbff" aria-label="冰白"></button>
+                      <button type="button" data-playback-lyric-palette-color="#a8dde8" style="--text-swatch: #a8dde8" aria-label="雾蓝"></button>
+                      <button type="button" data-playback-lyric-palette-color="#56d9f2" style="--text-swatch: #56d9f2" aria-label="光青"></button>
+                      <button type="button" data-playback-lyric-palette-color="#64e7c3" style="--text-swatch: #64e7c3" aria-label="薄荷"></button>
+                      <button type="button" data-playback-lyric-palette-color="#bfadff" style="--text-swatch: #bfadff" aria-label="雾紫"></button>
+                      <button type="button" data-playback-lyric-palette-color="#ffadc9" style="--text-swatch: #ffadc9" aria-label="柔粉"></button>
+                      <button type="button" data-playback-lyric-palette-color="#ffbc72" style="--text-swatch: #ffbc72" aria-label="暖橙"></button>
+                      <button type="button" data-playback-lyric-palette-color="#ffe16b" style="--text-swatch: #ffe16b" aria-label="月黄"></button>
+                    </div>
+                    <label class="diy-text-palette-custom" for="playbackLyricPaletteCustomInput">
+                      <input
+                        id="playbackLyricPaletteCustomInput"
+                        type="color"
+                        value="#eafbff"
+                        aria-label="自定义新播放栏歌词颜色"
+                      />
+                      <span>自定义</span>
+                    </label>
+                    <button
+                      class="diy-text-palette-reset"
+                      id="playbackLyricPaletteResetButton"
+                      type="button"
+                    >恢复自动</button>
+                  </div>
+                </section>
+              </div>
+            </details>
+
+            <details class="diy-text-settings-group" id="textAnimationSettingsGroup">
+              <summary>
+                <span>歌词动画</span>
+                <small>流动、回声、跳动与故障切片</small>
+              </summary>
+              <div class="diy-text-settings-content">
+                <div class="diy-control diy-control--lyrics-visible">
+                  <label class="diy-toggle" for="textLyricsToggle">
+                    <span>显示歌词</span>
+                    <input class="ui-switch" id="textLyricsToggle" data-text-composer-setting="lyricsEnabled" type="checkbox" role="switch" checked />
+                  </label>
+                  <output id="textLyricsValue" for="textLyricsToggle">ON</output>
+                </div>
+                <div class="diy-text-composer-grid">
+                  <div class="diy-text-composer-field">
+                    <label for="textFlowIntensity">流动强度</label>
+                    <output id="textFlowIntensityValue" for="textFlowIntensity">24%</output>
+                    <input id="textFlowIntensity" data-text-composer-setting="flowIntensity" type="range" min="0" max="100" step="1" value="24" />
+                  </div>
+                  <div class="diy-text-composer-field" data-focus-echo-only hidden>
+                    <label for="textEchoLayers">回声层数</label>
+                    <output id="textEchoLayersValue" for="textEchoLayers">5 层</output>
+                    <input id="textEchoLayers" data-text-composer-setting="echoLayers" type="range" min="0" max="5" step="1" value="5" />
+                  </div>
+                  <div class="diy-text-composer-field" data-focus-echo-only hidden>
+                    <label for="textEchoSpacing">回声间距</label>
+                    <output id="textEchoSpacingValue" for="textEchoSpacing">8px</output>
+                    <input id="textEchoSpacing" data-text-composer-setting="echoSpacing" type="range" min="0" max="48" step="1" value="8" />
+                  </div>
+                  <div class="diy-text-composer-field">
+                    <label for="lyricSpeedRange">跳动速度</label>
+                    <output id="lyricSpeedValue" for="lyricSpeedRange">100%</output>
+                    <input id="lyricSpeedRange" type="range" min="60" max="180" value="100" />
+                  </div>
+                </div>
+                <section class="diy-text-glitch-control" id="textGlitchControl" aria-labelledby="textGlitchTitle">
+                  <header class="diy-text-glitch-head">
+                    <span>
+                      <strong id="textGlitchTitle">故障效果</strong>
+                      <small id="textGlitchDescription">仅控制 RGB 分离与切片抖动</small>
+                    </span>
+                    <span class="diy-text-glitch-sample" data-text="GLITCH" aria-hidden="true">GLITCH</span>
+                  </header>
+                  <div class="diy-control diy-control--glitch-toggle">
+                    <label class="diy-toggle" for="textGlitchToggle">
+                      <span>启用故障效果</span>
+                      <input
+                        class="ui-switch"
+                        id="textGlitchToggle"
+                        data-text-composer-setting="glitchEnabled"
+                        data-text-glitch-setting="enabled"
+                        type="checkbox"
+                        role="switch"
+                        aria-describedby="textGlitchDescription"
+                      />
+                    </label>
+                    <output id="textGlitchValue" for="textGlitchToggle">OFF</output>
+                  </div>
+                  <div class="diy-text-composer-grid">
+                    <div class="diy-text-composer-field">
+                      <label for="textGlitchSpeed">故障速度</label>
+                      <output id="textGlitchSpeedValue" for="textGlitchSpeed">1.2×</output>
+                      <input id="textGlitchSpeed" data-text-composer-setting="glitchSpeed" data-text-glitch-setting="speed" type="range" min="0.2" max="3" step="0.1" value="1.2" />
+                    </div>
+                    <div class="diy-text-composer-field">
+                      <label for="textGlitchRgbOffset">RGB 分离强度</label>
+                      <output id="textGlitchRgbOffsetValue" for="textGlitchRgbOffset">6px</output>
+                      <input id="textGlitchRgbOffset" data-text-composer-setting="glitchRgbOffset" data-text-glitch-setting="rgbOffset" type="range" min="0" max="20" step="1" value="6" />
+                    </div>
+                    <div class="diy-text-composer-field diy-text-composer-field--wide">
+                      <label for="textGlitchSliceDensity">切片密度</label>
+                      <output id="textGlitchSliceDensityValue" for="textGlitchSliceDensity">8 片</output>
+                      <input id="textGlitchSliceDensity" data-text-composer-setting="glitchSliceDensity" data-text-glitch-setting="sliceDensity" type="range" min="2" max="20" step="1" value="8" />
+                    </div>
+                    <div class="diy-text-composer-field">
+                      <label for="textGlitchBeatSensitivity">鼓点灵敏度</label>
+                      <output id="textGlitchBeatSensitivityValue" for="textGlitchBeatSensitivity">56%</output>
+                      <input id="textGlitchBeatSensitivity" data-text-composer-setting="glitchBeatSensitivity" data-text-glitch-setting="beatSensitivity" type="range" min="20" max="95" step="1" value="56" />
+                    </div>
+                    <div class="diy-text-composer-field">
+                      <label for="textGlitchBeatDuration">鼓点闪烁时长</label>
+                      <output id="textGlitchBeatDurationValue" for="textGlitchBeatDuration">180ms</output>
+                      <input id="textGlitchBeatDuration" data-text-composer-setting="glitchBeatDuration" data-text-glitch-setting="beatDuration" type="range" min="80" max="420" step="10" value="180" />
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </details>
+          </fieldset>
         </section>
         <section class="diy-wallpaper-page" id="diyWallpaperPage" aria-label="壁纸模式" hidden>
           <div class="diy-wallpaper-mode-tabs" role="tablist" aria-label="壁纸来源">
@@ -1589,31 +1917,6 @@
             <label for="wallpaperScaleRange">壁纸缩放</label>
             <input id="wallpaperScaleRange" type="range" min="70" max="100" value="100" />
             <span id="wallpaperScaleValue">100%</span>
-          </div>
-          <div class="diy-preset-group diy-preset-group--inline-text diy-preset-group--wallpaper-text" data-inline-text-presets>
-            <span class="diy-preset-group-label">&#25991;&#23383;&#39044;&#35774;</span>
-            <div class="diy-preset-options diy-preset-options--text">
-              <button class="diy-preset-card is-active" type="button" data-text-preset="none">
-                <strong>关闭歌词</strong>
-                <small>纯净画面</small>
-              </button>
-              <button class="diy-preset-card" type="button" data-text-preset="depth">
-                <strong>3D&#27468;&#35789;</strong>
-                <small>&#23553;&#38754;&#21462;&#33394;</small>
-              </button>
-              <button class="diy-preset-card" type="button" data-text-preset="flow">
-                <strong>&#27969;&#21160;&#25991;&#23383;</strong>
-                <small>&#36880;&#23383;&#26174;&#24433;</small>
-              </button>
-              <button class="diy-preset-card" type="button" data-text-preset="book-effect">
-                <strong>&#20070;&#39029;&#25928;&#26524;</strong>
-                <small>&#29420;&#31435;&#23383;&#20809;&#26248;</small>
-              </button>
-              <button class="diy-preset-card" type="button" data-text-preset="focus-echo">
-                <strong>&#28966;&#28857;&#22238;&#22768;</strong>
-                <small>&#26263;&#24433;&#25910;&#26463;&#23435;&#20307;</small>
-              </button>
-            </div>
           </div>
         </section>
       </aside>
@@ -1657,7 +1960,7 @@
             <input id="recordingBitrateInput" type="number" min="12" max="80" step="1" value="36" />
           </label>
           <label class="recording-audio-toggle">
-            <input id="recordingAudioToggle" type="checkbox" />
+            <input class="ui-switch" id="recordingAudioToggle" type="checkbox" role="switch" />
             <span>包含程序音频</span>
           </label>
         </div>
@@ -1706,7 +2009,7 @@
           <header class="login-panel-head">
             <div>
               <strong id="neteaseLoginTitle">音乐账号登录</strong>
-              <span id="loginProviderSubtitle">选择平台后使用对应 App 扫码确认</span>
+              <span id="loginProviderSubtitle">选择平台后在官方音乐网站完成登录</span>
             </div>
             <button class="login-close-button" id="neteaseLoginClose" type="button" aria-label="关闭登录弹窗"></button>
           </header>
@@ -1722,24 +2025,101 @@
             <input id="musicApiImportInput" type="file" accept=".json,.feapi,.zip,application/json,application/zip" hidden />
           </div>
 
-          <div class="qr-login-stage" id="qrLoginStage">
-            <div class="qr-code-shell" id="neteaseQrShell">
-              <img id="neteaseQrImage" alt="网易云登录二维码" />
-              <span id="neteaseQrPlaceholder">生成二维码</span>
+          <div class="browser-login-stage" id="browserLoginStage">
+            <div class="browser-login-mark" aria-hidden="true">
+              <span></span>
             </div>
-            <p class="qr-login-status" id="neteaseQrStatus">点击右上角按钮开始登录</p>
-            <div class="login-method-actions">
-              <button class="qr-refresh-button" id="neteaseQrRefresh" type="button">刷新二维码</button>
-              <button class="official-browser-login-button" id="officialBrowserLoginButton" type="button">官方浏览器登录</button>
+            <p class="browser-login-copy" id="browserLoginCopy">将在独立窗口打开对应音乐平台官网，使用官网提供的扫码方式登录。</p>
+            <form class="qishui-openapi-login" id="qishuiOpenApiLoginPanel" autocomplete="off" hidden>
+              <label>
+                <span>官方 OpenAPI access_token</span>
+                <input
+                  id="qishuiAccessToken"
+                  name="accessToken"
+                  type="password"
+                  inputmode="text"
+                  autocomplete="off"
+                  spellcheck="false"
+                  maxlength="4096"
+                  required
+                />
+              </label>
+              <label>
+                <span>open_id（可选）</span>
+                <input
+                  id="qishuiOpenId"
+                  name="openId"
+                  type="text"
+                  autocomplete="off"
+                  spellcheck="false"
+                  maxlength="256"
+                />
+              </label>
+              <label>
+                <span>client_key（可选，用于官方续期）</span>
+                <input
+                  id="qishuiClientKey"
+                  name="clientKey"
+                  type="text"
+                  autocomplete="off"
+                  spellcheck="false"
+                  maxlength="256"
+                />
+              </label>
+              <label>
+                <span>refresh_token（可选，用于官方续期）</span>
+                <input
+                  id="qishuiRefreshToken"
+                  name="refreshToken"
+                  type="password"
+                  autocomplete="off"
+                  spellcheck="false"
+                  maxlength="4096"
+                />
+              </label>
+              <small>
+                仅接受开发者自己的抖音开放平台授权，需具备
+                <code>luna.openapi.platform.play_core</code> scope。提供续期参数后，
+                access_token 过期时会调用官方 OAuth 刷新接口一次；撤权或 refresh_token
+                过期仍需重新授权。
+              </small>
+              <div class="qishui-local-adapter">
+                <div class="qishui-local-profile" id="qishuiLocalProfile" hidden>
+                  <span class="qishui-local-profile__avatar" aria-hidden="true">
+                    <img id="qishuiLocalProfileAvatar" alt="" />
+                    <b>汽</b>
+                  </span>
+                  <span class="qishui-local-profile__copy">
+                    <strong id="qishuiLocalProfileName">汽水音乐用户</strong>
+                    <small id="qishuiLocalProfileMeta">本地客户端公开资料</small>
+                  </span>
+                </div>
+                <div class="qishui-local-collections" id="qishuiLocalCollections" aria-live="polite" hidden></div>
+                <span id="qishuiLocalClientStatus" role="status" aria-live="polite">
+                  正在只读检测本地 SodaMusic 客户端…
+                </span>
+                <button class="official-browser-login-button is-secondary" id="qishuiLibraryImportButton" type="button">
+                  导入可见歌单元数据
+                </button>
+                <input
+                  id="qishuiLibraryImportInput"
+                  type="file"
+                  accept=".json,application/json"
+                  hidden
+                />
+                <small>
+                  会只读解析固定位置的 LUNA 播放队列缓存，并仅保留标题、歌手、专辑、
+                  时长、封面与官方 ID；也可手动导入同类歌单元数据。Cookie、token、
+                  session、码率、试听信息和音源 URL 均不会提取。
+                </small>
+              </div>
+              <button class="official-browser-login-button" id="qishuiLoginSubmit" type="submit">验证并保存授权</button>
+            </form>
+            <div class="browser-login-actions">
+              <button class="official-browser-login-button" id="officialBrowserLoginButton" type="button">打开官方扫码登录</button>
+              <button class="official-browser-login-button is-secondary" id="officialBrowserSwitchAccountButton" type="button">切换账号</button>
             </div>
             <p class="official-browser-login-status" id="officialBrowserLoginStatus" role="status" aria-live="polite" hidden></p>
-            <div class="android-login-workflow" id="androidLoginWorkflow" hidden>
-              <p id="androidQrHelp">保存二维码后，在音乐 App 的扫一扫中从相册选择。</p>
-              <div class="android-login-actions">
-                <button id="androidQrSaveButton" type="button" disabled>保存二维码</button>
-                <button id="androidMusicAppButton" type="button">打开音乐 App</button>
-              </div>
-            </div>
             <div class="login-community-strip" id="loginCommunityStrip" hidden>
               <span id="loginCommunityName">登录后生成社区 ID</span>
               <strong id="loginCommunityId">FE ID --------</strong>
@@ -1770,15 +2150,17 @@
     </section>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <audio id="audio" preload="metadata"></audio>
+    <audio id="audio" preload="auto"></audio>
     <script src="vendor/three.r128.min.js?v=20260701-main-blue-orb"></script>
+    <script src="liquid-ether-switches.js?v=20260728-interactive-liquid-switches-1"></script>
     <script type="module" src="client-runtime-loader.js?v=20260713-platform-split-3"></script>
     <script src="render-quality.js?v=20260718-preset-fsr-versions-1"></script>
     <script src="storm-ocean-runtime.js?v=20260718-fine-waves-120"></script>
     <script src="free-cube-runtime.js?v=20260718-material-clarity-2"></script>
     <script src="void-prism-runtime.js?v=20260721-text-fonts-1"></script>
     <script src="chladni-runtime.js?v=20260723-chladni-low-bass-jump-2"></script>
-    <script src="app.js?v=20260724-lyric-transform-multirow-1"></script>
+    <script src="app.js?v=20260728-cursor-skins-trails-1"></script>
+    <script src="cursor-trails.js?v=20260728-cursor-skins-trails-1"></script>
     <script src="rhythm-game.js?v=20260718-rhythm-game-orbit-lock-1"></script>
   </body>
 </html>

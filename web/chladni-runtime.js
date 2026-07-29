@@ -350,6 +350,180 @@
     return true;
   }
 
+  function createWallpaperSurface(THREE) {
+    const geometry = new THREE.PlaneGeometry(2, 2, 64, 36);
+    const positions = geometry.getAttribute('position');
+    for (let index = 0; index < positions.count; index += 1) {
+      const x = positions.getX(index);
+      const y = positions.getY(index);
+      positions.setZ(index, -(x * x * 0.075 + y * y * 0.016));
+    }
+    positions.needsUpdate = true;
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      map: null,
+      transparent: true,
+      opacity: 0,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.FrontSide,
+      toneMapped: false,
+      fog: false
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = 'ChladniCameraConcaveFullscreenWallpaper';
+    mesh.position.set(0, 0, -118);
+    mesh.userData.distance = 118;
+    mesh.userData.overscan = 1.1;
+    mesh.userData.surface = 'camera-concave-fullscreen';
+    mesh.renderOrder = -120;
+    mesh.visible = false;
+    mesh.frustumCulled = false;
+    return mesh;
+  }
+
+  function fitWallpaperSurface(runtime) {
+    const mesh = runtime?.wallpaperMesh;
+    const camera = runtime?.camera;
+    if (!mesh || !camera) return false;
+    const distance = Number(mesh.userData?.distance) || 118;
+    const overscan = Number(mesh.userData?.overscan) || 1.1;
+    const visibleHeight = 2 * Math.tan(camera.fov * PI / 360) * distance;
+    const visibleWidth = visibleHeight * Math.max(0.1, camera.aspect || 1);
+    mesh.position.set(0, 0, -distance);
+    mesh.scale.set(visibleWidth * 0.5 * overscan, visibleHeight * 0.5 * overscan, distance * 0.26);
+    return true;
+  }
+
+  function fitWallpaperTexture(runtime, texture = runtime?.wallpaperTexture) {
+    if (!runtime?.camera || !texture?.repeat?.set || !texture?.offset?.set) return false;
+    const source = texture.image || texture.source?.data || null;
+    const width = Number(source?.naturalWidth || source?.videoWidth || source?.width) || 0;
+    const height = Number(source?.naturalHeight || source?.videoHeight || source?.height) || 0;
+    if (!width || !height) return false;
+    const sourceAspect = width / height;
+    const viewportAspect = Math.max(0.1, runtime.camera.aspect || 1);
+    let repeatX = 1;
+    let repeatY = 1;
+    if (sourceAspect > viewportAspect) repeatX = viewportAspect / sourceAspect;
+    else repeatY = sourceAspect / viewportAspect;
+    texture.repeat.set(repeatX, repeatY);
+    texture.offset.set((1 - repeatX) * 0.5, (1 - repeatY) * 0.5);
+    texture.needsUpdate = true;
+    return true;
+  }
+
+  function disposeWallpaper(runtime) {
+    if (!runtime) return;
+    runtime.wallpaperRequestId = (runtime.wallpaperRequestId || 0) + 1;
+    if (runtime.wallpaperVideo) {
+      runtime.wallpaperVideo.pause?.();
+      runtime.wallpaperVideo.removeAttribute?.('src');
+      runtime.wallpaperVideo.load?.();
+      runtime.wallpaperVideo = null;
+    }
+    runtime.wallpaperTexture?.dispose?.();
+    runtime.wallpaperTexture = null;
+    runtime.wallpaperSignature = '';
+    if (runtime.wallpaperMesh?.material) {
+      runtime.wallpaperMesh.material.map = null;
+      runtime.wallpaperMesh.material.opacity = 0;
+      runtime.wallpaperMesh.material.needsUpdate = true;
+    }
+    if (runtime.wallpaperMesh) runtime.wallpaperMesh.visible = false;
+  }
+
+  function setWallpaper(runtime, request) {
+    if (!runtime || runtime.disposed || !runtime.wallpaperMesh) return false;
+    const config = request && typeof request === 'object' ? request : {};
+    const enabled = config.enabled === true;
+    const url = String(config.url || '').trim();
+    const mediaKind = config.mediaKind === 'video' ? 'video' : 'image';
+    const opacity = clamp(config.opacity || 0.68, 0.1, 1);
+    const signature = enabled && url ? `${mediaKind}:${url}` : '';
+    runtime.wallpaperMesh.material.opacity = opacity;
+    if (!signature) {
+      disposeWallpaper(runtime);
+      return true;
+    }
+    if (signature === runtime.wallpaperSignature) {
+      if (runtime.wallpaperTexture) runtime.wallpaperMesh.visible = true;
+      return true;
+    }
+
+    const requestId = (runtime.wallpaperRequestId || 0) + 1;
+    runtime.wallpaperRequestId = requestId;
+    runtime.wallpaperSignature = signature;
+    runtime.wallpaperMesh.visible = false;
+    runtime.wallpaperMesh.material.map = null;
+    if (runtime.wallpaperVideo) {
+      runtime.wallpaperVideo.pause?.();
+      runtime.wallpaperVideo.removeAttribute?.('src');
+      runtime.wallpaperVideo.load?.();
+      runtime.wallpaperVideo = null;
+    }
+    runtime.wallpaperTexture?.dispose?.();
+    runtime.wallpaperTexture = null;
+    const applyTexture = (texture) => {
+      if (runtime.disposed || runtime.wallpaperRequestId !== requestId || runtime.wallpaperSignature !== signature) {
+        texture.dispose?.();
+        return false;
+      }
+      runtime.wallpaperTexture?.dispose?.();
+      runtime.wallpaperTexture = texture;
+      if ('colorSpace' in texture && runtime.THREE.SRGBColorSpace) texture.colorSpace = runtime.THREE.SRGBColorSpace;
+      else if ('encoding' in texture && runtime.THREE.sRGBEncoding !== undefined) texture.encoding = runtime.THREE.sRGBEncoding;
+      texture.wrapS = runtime.THREE.ClampToEdgeWrapping;
+      texture.wrapT = runtime.THREE.ClampToEdgeWrapping;
+      fitWallpaperTexture(runtime, texture);
+      texture.needsUpdate = true;
+      runtime.wallpaperMesh.material.map = texture;
+      runtime.wallpaperMesh.material.needsUpdate = true;
+      runtime.wallpaperMesh.visible = true;
+      return true;
+    };
+    const failTexture = () => {
+      if (runtime.wallpaperRequestId !== requestId) return;
+      runtime.wallpaperSignature = '';
+      runtime.wallpaperMesh.visible = false;
+    };
+
+    if (mediaKind === 'video') {
+      const video = document.createElement('video');
+      video.crossOrigin = 'anonymous';
+      video.preload = 'auto';
+      video.muted = true;
+      video.defaultMuted = true;
+      video.loop = true;
+      video.playsInline = true;
+      const texture = new runtime.THREE.VideoTexture(video);
+      texture.minFilter = runtime.THREE.LinearFilter;
+      texture.magFilter = runtime.THREE.LinearFilter;
+      runtime.wallpaperVideo = video;
+      video.addEventListener('loadeddata', () => {
+        if (!applyTexture(texture)) return;
+        video.play().catch(() => {});
+      }, { once: true });
+      video.addEventListener('error', () => {
+        texture.dispose?.();
+        if (runtime.wallpaperVideo === video) runtime.wallpaperVideo = null;
+        failTexture();
+      }, { once: true });
+      video.src = url;
+      video.load();
+      video.play().catch(() => {});
+      return true;
+    }
+
+    new runtime.THREE.TextureLoader().load(
+      url,
+      applyTexture,
+      undefined,
+      failTexture
+    );
+    return true;
+  }
+
   function resize(runtime, pixelRatio) {
     if (!runtime || runtime.disposed) return false;
     const rect = runtime.host.getBoundingClientRect();
@@ -369,6 +543,8 @@
     else runtime.renderer.setSize(width, height, false);
     runtime.camera.aspect = width / Math.max(1, height);
     runtime.camera.updateProjectionMatrix();
+    fitWallpaperSurface(runtime);
+    fitWallpaperTexture(runtime);
     runtime.materials.forEach((material) => {
       material.uniforms.uPixelRatio.value = nextPixelRatio;
     });
@@ -559,6 +735,9 @@
     const group = new THREE.Group();
     group.name = 'ChladniSixFaceParticleSculpture';
     scene.add(group);
+    scene.add(camera);
+    const wallpaperMesh = createWallpaperSurface(THREE);
+    camera.add(wallpaperMesh);
 
     const requestedParticleCount = Math.round(clamp(
       config.particleCount || DEFAULT_PARTICLE_COUNT,
@@ -611,6 +790,11 @@
       scene,
       camera,
       group,
+      wallpaperMesh,
+      wallpaperTexture: null,
+      wallpaperVideo: null,
+      wallpaperSignature: '',
+      wallpaperRequestId: 0,
       points: faces[0],
       faces,
       faceMaterials,
@@ -661,6 +845,7 @@
 
     setMode(runtime, runtime.displayMode);
     applyPalette(runtime, palette);
+    setWallpaper(runtime, config.wallpaper);
     resize(runtime, config.pixelRatio);
     if (config.renderQuality) setRenderQuality(runtime, config.renderQuality);
     update(runtime, {
@@ -736,6 +921,28 @@
       modeBlend: Number(runtime.modeBlend.toFixed(4)),
       morphing: runtime.morphing,
       autoRotation: true,
+      wallpaper: {
+        enabled: !!runtime.wallpaperMesh?.visible,
+        loaded: !!runtime.wallpaperTexture,
+        mediaKind: runtime.wallpaperVideo ? 'video' : 'image',
+        opacity: Number(runtime.wallpaperMesh?.material?.opacity || 0),
+        renderOrder: Number(runtime.wallpaperMesh?.renderOrder || 0),
+        depthTest: runtime.wallpaperMesh?.material?.depthTest !== true,
+        depthWrite: runtime.wallpaperMesh?.material?.depthWrite === true,
+        surface: runtime.wallpaperMesh?.userData?.surface || '',
+        cameraAnchored: runtime.wallpaperMesh?.parent === runtime.camera,
+        fullViewport: (() => {
+          const distance = Number(runtime.wallpaperMesh?.userData?.distance) || 0;
+          if (!distance) return false;
+          const visibleHeight = 2 * Math.tan(runtime.camera.fov * PI / 360) * distance;
+          const visibleWidth = visibleHeight * Math.max(0.1, runtime.camera.aspect || 1);
+          return runtime.wallpaperMesh.scale.x * 2 >= visibleWidth
+            && runtime.wallpaperMesh.scale.y * 2 >= visibleHeight;
+        })()
+      },
+      supportObjectCount: runtime.group.children.filter((child) => (
+        child !== runtime.planePoints && !runtime.faces.includes(child)
+      )).length,
       mouseOrbitEnabled: false,
       planeViewAzimuthDegrees: 45,
       planeViewElevationDegrees: 45,
@@ -770,6 +977,9 @@
   function dispose(runtime) {
     if (!runtime || runtime.disposed) return false;
     runtime.disposed = true;
+    disposeWallpaper(runtime);
+    runtime.wallpaperMesh?.geometry?.dispose?.();
+    runtime.wallpaperMesh?.material?.dispose?.();
     try { runtime.renderQuality?.dispose?.(); } catch (error) {}
     runtime.renderQuality = null;
     runtime.geometry.dispose();
@@ -791,6 +1001,7 @@
     resize,
     setPalette: applyPalette,
     setMode,
+    setWallpaper,
     setRenderQuality,
     diagnostics,
     dispose
