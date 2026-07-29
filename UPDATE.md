@@ -1,62 +1,46 @@
-# FE Monster 1.1.6
+# FE Monster 1.8.8
 
-Release date: 2026-07-24
+发布日期：2026-07-29
 
-## 更新内容
+## 重点更新
 
-- 所有文字预设支持鼠标悬停滚轮独立缩放、拖动 360° 调整文字角度；Shift+拖动仍可在克拉尼场景中平移文字，双击文字恢复默认变换。
-- 新播放栏新增双语歌词独立开关与多排歌词“多/单”切换；中文字幕更靠近主歌词并跟随主歌词调色板，多排模式只渲染当前附近歌词，未播放句子保持柔和模糊。
-- 修复酷狗音乐歌单与播放地址解析，增强网易云、QQ、酷狗和汽水音乐的扫码登录、会话恢复与连接稳定性。
-- 平台 API 改为用户导入插件模式；登录页会自动识别已导入平台，只保留扫码及官方浏览器登录入口。
-- Google OBR 空间音频支持开关、5.1/7.1 布局与稳定重连；关闭空间音频后，播放链路会直接绕过 OBR。
-- 一起听同步当前歌曲、播放状态和进度，自动跳过无音源或无权限歌曲，并改进关闭、左侧收起与服务器重连。
-- 一起听弹幕使用玻璃气泡，支持鼠标排斥、随机漂浮和 3 秒自动消失。
-- Sonic 增加分层音柱、核心/外围独立配色、喷泉粒子、星空粒子、亮度与曝光调节，并改善低频响应和相机视角。
-- 粒子封面改为更平滑的 200 段低频波动，增加粒子数量、局部隆起、景深与双语歌词同步高亮。
-- 优化歌单滚动、UI 隐藏动画、社区连接、固定画质下的 CPU/内存使用与桌面场景映射。
-- 修复桌面窗口大圆角边缘、壁纸引擎/网页壁纸导入及播放栏玻璃材质布局。
+- 修复正常播放过程中偶发无声、进度停顿的问题，统一音频缓冲、代理续流、XAudio2 / X3DAudio / OBR 状态切换与歌词时钟。
+- 空间音频关闭时完全绕过 OBR；开启时支持 5.1 / 7.1 上混与双耳渲染，并加强异常回退和连接稳定性。
+- 3D 主歌词与双语字幕使用同一局部坐标轴，拖动、旋转、缩放和多排换行更平滑；新增 ±0.1 秒歌词校准。
+- 恢复焦点回声与普通歌词卡片，完善故障、散光、滚动高亮、双语字幕和文字参数分层。
+- Sonic 改进核心/中间/外围音柱层次、全地面节奏浮动、星空与星河粒子、粒子喷泉、水雾和柔和丁达尔光。
+- 粒子封面加入独立粒子前后浮动速度、低频整体前后跳动和入场动画；克拉尼增强低频整体响应与壁纸曲面。
+- 场景、文字和壁纸参数按预设专属层级整理，支持场景壁纸、Wallpaper Engine 实时壁纸和柔光背景切回。
+- 社区一起听增强自动同步、断线恢复、历史消息去重、无音源跳过和三秒玻璃弹幕。
+- 网易云、QQ、酷狗与汽水音乐继续采用用户导入 API 插件模式；完善酷狗歌单/歌词/播放与汽水游客搜索回退。
+- Windows 源文件启动、后台托盘、窗口圆角、任务栏图标和启动错误诊断均已更新。
 
 ## Windows 安装包
 
-- Windows x64 单文件安装包：`FE-Monster-Setup-1.1.6.exe`。
-- 默认安装到 `D:\FE Monster`；没有 D 盘时回退到当前用户的本地应用目录，也可在安装器中手动修改。
-- 保留完整场景、字体、粒子和画质资源；仅移除 Python 测试、缓存和构建开发文件，并压缩安装器运行时以减小体积。
-- 安装包包含应用所需的离线载荷与 Node.js 运行时，但不再内嵌任何音乐平台 API 实现。
-- 当前安装包未做 Authenticode 代码签名，Windows SmartScreen 或杀毒软件可能显示未知发布者提示。
+- 推荐联网版：`FE-Monster-Setup-1.8.8.exe`（437.58 MiB）
+  - SHA-256：`f934b536d12edd3ed2232649fa15e0b524bb1cf5c6d737592a27d9923d1fa15a`
+- 离线完整包：`FE-Monster-Setup-1.8.8-Offline.exe`（631.91 MiB）
+  - SHA-256：`4b1e02ac8565e428fc40bc60331dc6fc650fe879e2d64d8c69f80322156975a2`
+- 系统：Windows 10 / 11 x64
+- 两种安装器都包含应用所需的 Java、Node.js、Python 手势依赖和原生音频组件，软件功能与画质完全相同。
+- 推荐联网版不再重复携带约 194 MiB 的 WebView2 离线安装器；电脑缺少 WebView2 时会使用 winget 或微软官方签名引导程序补装。无网络的新电脑请使用 `Offline` 完整包。
+- 为缩小体积，只保留运行时实际使用的 ReactBits 组件资源，并剔除测试、调试、缓存和开发文件；场景画质、字体、粒子密度与帧率策略不降低。
+- `components` 目录不能整包删除：玻璃表面、按钮光边和歌词动画仍会直接加载其中的 4 个运行时文件；这些文件合计约 16 KiB，不是安装包体积来源。
+- 当前安装包未配置 Authenticode 代码签名，Windows SmartScreen 可能提示未知发布者。请只从本仓库 Release 或官方下载页获取。
 
 ## API 插件
 
-Release 附件提供四个可独立导入的 ZIP：
+Release 同时提供以下可独立导入的 ZIP，以及包含全部平台插件的 `plugins.zip`：
 
 - 网易云音乐：`FE-Monster-Netease-API-Plugin-4.32.0.zip`
 - QQ 音乐：`FE-Monster-QQ-API-Plugin-2.4.0.zip`
-- 酷狗音乐：`FE-Monster-Kugou-API-Plugin-1.5.1.zip`
-- 汽水音乐：`FE-Monster-Qishui-API-Plugin-1.0.0.zip`
+- 酷狗音乐：`FE-Monster-Kugou-API-Plugin-2.0.1.zip`
+- 汽水音乐：`FE-Monster-Qishui-OpenAPI-Plugin-3.1.0.zip`
 
-在 FE Monster 登录页点击“导入 API 插件”，选择对应 ZIP。插件服务只监听本机回环地址；登录与播放能力仍受平台账号、版权、地区和上游接口可用性限制。请仅导入你信任的插件包，并遵守平台条款和当地法律。
+`plugins.zip` 是汇总下载包，需先解压，再在 FE Monster 登录页导入对应平台的单独 ZIP。插件不会绕过会员、版权、地区或账号权限。
 
-默认本机端口分别为：网易云 `127.0.0.1:3010`、QQ `127.0.0.1:3011`、酷狗 `127.0.0.1:3012`、汽水 `127.0.0.1:3013`。ZIP 不需要手动解压；导入后登录页会自动显示对应平台切换按键，再选择扫码或官方浏览器登录。
+## 校验
 
-## SHA-256
+安装包与插件的 SHA-256 以 GitHub Release 同名 `.sha256` 文件及 Release 说明为准。
 
-| Release 附件 | SHA-256 |
-| --- | --- |
-| `FE-Monster-Setup-1.1.6.exe` | `6254EDAFEB224CA2DE3FFD3EA23D9F41080BB59F4C17E327AD685F6393F19BE4` |
-| `FE-Monster-Netease-API-Plugin-4.32.0.zip` | `37E485DECBD8664FE5EE8BBE5DA3329420A6000F4F564072546C897E3D1F2284` |
-| `FE-Monster-QQ-API-Plugin-2.4.0.zip` | `7309D51F065045FE4CB1119874B93822F2B04A37565DF0F778A13D86CA9D9EBF` |
-| `FE-Monster-Kugou-API-Plugin-1.5.1.zip` | `F3EBCCDB28F163CD16791AF1B8454BEBB6BE3511D166E0137BC745BFFFBA7213` |
-| `FE-Monster-Qishui-API-Plugin-1.0.0.zip` | `C64438BA128EBC973CB8414B1A9F4C5DACE1C6F9F8426572E5D232FC4A3D1F01` |
-
-## 验证
-
-```powershell
-cmd /c build.cmd
-node --check web/app.js
-node scripts/check-music-api-import.mjs
-node scripts/check-kugou-plugin-playback.mjs
-node scripts/check-google-obr-runtime.mjs
-node scripts/check-community-listen-playback.mjs
-node scripts/check-fixed-quality-performance.mjs
-powershell -NoProfile -File scripts\build-winforms-client.ps1 -Root .
-powershell -NoProfile -File scripts\build-installer.ps1 -EmbedPayload -AllowEmbeddedPayload
-```
+发布前执行 Java、WinForms、原生音频、音乐插件、网页场景、安装器契约、全新静默安装和下载页生产构建验证。

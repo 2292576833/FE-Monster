@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <defs>
+    <radialGradient id="frost" cx="0" cy="0" r="1" gradientTransform="translate(16 16) rotate(90) scale(11)">
+      <stop stop-color="#ffffff"/>
+      <stop offset="0.34" stop-color="#bff5ff" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#4bc9ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="16" cy="16" r="11" fill="url(#frost)"/>
+  <circle cx="16" cy="16" r="5.5" fill="none" stroke="#dffaff" stroke-width="1.2"/>
+  <circle cx="16" cy="16" r="1.7" fill="#ffffff" stroke="#74dbff"/>
+  <path d="M16 2v8M16 22v8M2 16h8M22 16h8" stroke="#e9fcff" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="m7.4 7.4 3.2 3.2m10.8 10.8 3.2 3.2m0-17.2-3.2 3.2M10.6 21.4l-3.2 3.2" stroke="#67d7ff" stroke-width="1" stroke-linecap="round"/>
+</svg>

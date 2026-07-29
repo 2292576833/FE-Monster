@@ -1,9 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const DESKTOP_SCENE_CLIENT = URL_PARAMS.get('client') === 'desktop-scene';
-const OFFICIAL_BROWSER_LOGIN_PROVIDER = (URL_PARAMS.get('official-login') || '').trim().toLowerCase();
-const OFFICIAL_BROWSER_LOGIN_MODE = ['netease', 'qq', 'kugou', 'qishui'].includes(OFFICIAL_BROWSER_LOGIN_PROVIDER);
-document.documentElement.classList.toggle('official-browser-login-mode', OFFICIAL_BROWSER_LOGIN_MODE);
 const desktopSceneRuntime = {
   enabled: DESKTOP_SCENE_CLIENT,
   pending: false,
@@ -147,6 +144,13 @@ const els = {
   gestureControlStatus: $('#gestureControlStatus'),
   gestureWebcamButton: $('#gestureWebcamButton'),
   gestureCameraButton: $('#gestureCameraButton'),
+  cursorSkinSelect: $('#cursorSkinSelect'),
+  cursorImportButton: $('#cursorImportButton'),
+  cursorImportInput: $('#cursorImportInput'),
+  cursorMotionSelect: $('#cursorMotionSelect'),
+  cursorTrailSelect: $('#cursorTrailSelect'),
+  cursorPreferencePreview: $('#cursorPreferencePreview'),
+  cursorPreferenceStatus: $('#cursorPreferenceStatus'),
   lowFrequencyGraph: $('#lowFrequencyGraph'),
   lowFrequencyValue: $('#lowFrequencyValue'),
   runtimeRecordingButton: $('#runtimeRecordingButton'),
@@ -252,6 +256,49 @@ const els = {
   diyFlowTextPreset: $('#diyFlowTextPreset'),
   diyBookEffectTextPreset: $('#diyBookEffectTextPreset'),
   diyFocusEchoTextPreset: $('#diyFocusEchoTextPreset'),
+  diyGlitchTextPreset: $('#diyGlitchTextPreset'),
+  textComposerControl: $('#textComposerControl'),
+  textComposerResetButton: $('#textComposerResetButton'),
+  textTranslationSettingsGroup: $('#textTranslationSettingsGroup'),
+  textColorEffectsGroup: $('#textColorEffectsGroup'),
+  textAnimationSettingsGroup: $('#textAnimationSettingsGroup'),
+  textLyricsToggle: $('#textLyricsToggle'),
+  textLyricsValue: $('#textLyricsValue'),
+  textLayoutMode: $('#textLayoutMode'),
+  textLayoutModeValue: $('#textLayoutModeValue'),
+  textFlowIntensity: $('#textFlowIntensity'),
+  textFlowIntensityValue: $('#textFlowIntensityValue'),
+  textEchoLayers: $('#textEchoLayers'),
+  textEchoLayersValue: $('#textEchoLayersValue'),
+  textEchoSpacing: $('#textEchoSpacing'),
+  textEchoSpacingValue: $('#textEchoSpacingValue'),
+  textDepth: $('#textDepth'),
+  textDepthValue: $('#textDepthValue'),
+  textHighlightIntensity: $('#textHighlightIntensity'),
+  textHighlightIntensityValue: $('#textHighlightIntensityValue'),
+  textHighlightSoftness: $('#textHighlightSoftness'),
+  textHighlightSoftnessValue: $('#textHighlightSoftnessValue'),
+  textGloss: $('#textGloss'),
+  textGlossValue: $('#textGlossValue'),
+  textUnsungBlur: $('#textUnsungBlur'),
+  textUnsungBlurValue: $('#textUnsungBlurValue'),
+  textLetterSpacing: $('#textLetterSpacing'),
+  textLetterSpacingValue: $('#textLetterSpacingValue'),
+  textLowBassGlow: $('#textLowBassGlow'),
+  textLowBassGlowValue: $('#textLowBassGlowValue'),
+  textGlitchControl: $('#textGlitchControl'),
+  textGlitchToggle: $('#textGlitchToggle'),
+  textGlitchValue: $('#textGlitchValue'),
+  textGlitchSpeed: $('#textGlitchSpeed'),
+  textGlitchSpeedValue: $('#textGlitchSpeedValue'),
+  textGlitchRgbOffset: $('#textGlitchRgbOffset'),
+  textGlitchRgbOffsetValue: $('#textGlitchRgbOffsetValue'),
+  textGlitchSliceDensity: $('#textGlitchSliceDensity'),
+  textGlitchSliceDensityValue: $('#textGlitchSliceDensityValue'),
+  textGlitchBeatSensitivity: $('#textGlitchBeatSensitivity'),
+  textGlitchBeatSensitivityValue: $('#textGlitchBeatSensitivityValue'),
+  textGlitchBeatDuration: $('#textGlitchBeatDuration'),
+  textGlitchBeatDurationValue: $('#textGlitchBeatDurationValue'),
   textFontControl: $('#textFontControl'),
   textFontSelect: $('#textFontSelect'),
   textFontStatus: $('#textFontStatus'),
@@ -269,6 +316,14 @@ const els = {
   playbackLyricPaletteResetButton: $('#playbackLyricPaletteResetButton'),
   bilingualLyricsToggle: $('#bilingualLyricsToggle'),
   bilingualLyricsValue: $('#bilingualLyricsValue'),
+  multiRowLineCount: $('#multiRowLineCount'),
+  multiRowLineCountValue: $('#multiRowLineCountValue'),
+  translationFontSize: $('#translationFontSize'),
+  translationFontSizeValue: $('#translationFontSizeValue'),
+  translationGap: $('#translationGap'),
+  translationGapValue: $('#translationGapValue'),
+  translationOpacity: $('#translationOpacity'),
+  translationOpacityValue: $('#translationOpacityValue'),
   diySceneNonePreset: $('#diySceneNonePreset'),
   diyScenePresetList: $('#diyScenePresetList'),
   diyCubePreset: $('#diyCubePreset'),
@@ -283,16 +338,55 @@ const els = {
   diyCoverParticleBackgroundValue: $('#diyCoverParticleBackgroundValue'),
   diyCoverParticleMotionRange: $('#diyCoverParticleMotionRange'),
   diyCoverParticleMotionValue: $('#diyCoverParticleMotionValue'),
+  diyCoverParticleFloatSpeedRange: $('#diyCoverParticleFloatSpeedRange'),
+  diyCoverParticleFloatSpeedValue: $('#diyCoverParticleFloatSpeedValue'),
+  scenePresetSettingsGroup: $('#scenePresetSettingsGroup'),
+  scenePresetSettingsTitle: $('#scenePresetSettingsTitle'),
+  scenePresetSettingsMeta: $('#scenePresetSettingsMeta'),
+  sceneWallpaperControl: $('#sceneWallpaperControl'),
+  sceneWallpaperStatus: $('#sceneWallpaperStatus'),
+  sceneWallpaperEnabledToggle: $('#sceneWallpaperEnabledToggle'),
+  sceneWallpaperSelect: $('#sceneWallpaperSelect'),
+  sceneWallpaperImportButton: $('#sceneWallpaperImportButton'),
+  sceneWallpaperImportInput: $('#sceneWallpaperImportInput'),
+  sceneWallpaperUseCurrentButton: $('#sceneWallpaperUseCurrentButton'),
+  sceneWallpaperRemoveButton: $('#sceneWallpaperRemoveButton'),
+  sceneWallpaperOpacityRange: $('#sceneWallpaperOpacityRange'),
+  sceneWallpaperOpacityValue: $('#sceneWallpaperOpacityValue'),
   diyBookLyricPreset: $('#diyBookLyricPreset'),
   diyCubeIntensityControl: $('#diyCubeIntensityControl'),
   sonicPresetControls: $('#sonicPresetControls'),
   sonicCenterColorInput: $('#sonicCenterColorInput'),
   sonicCoreColorInput: $('#sonicCoreColorInput'),
   sonicOuterColorInput: $('#sonicOuterColorInput'),
+  sonicAllGroundFloatToggle: $('#sonicAllGroundFloatToggle'),
   sonicFountainToggle: $('#sonicFountainToggle'),
   sonicFountainColorInput: $('#sonicFountainColorInput'),
   sonicStarfieldToggle: $('#sonicStarfieldToggle'),
   sonicStarfieldColorInput: $('#sonicStarfieldColorInput'),
+  sonicGalaxyToggle: $('#sonicGalaxyToggle'),
+  sonicGalaxyColorInput: $('#sonicGalaxyColorInput'),
+  sonicGalaxyIntensityRange: $('#sonicGalaxyIntensityRange'),
+  sonicGalaxyIntensityValue: $('#sonicGalaxyIntensityValue'),
+  sonicAtmosphereToggle: $('#sonicAtmosphereToggle'),
+  sonicFogDensityRange: $('#sonicFogDensityRange'),
+  sonicFogDensityValue: $('#sonicFogDensityValue'),
+  sonicFogSpeedRange: $('#sonicFogSpeedRange'),
+  sonicFogSpeedValue: $('#sonicFogSpeedValue'),
+  sonicFogGlowRange: $('#sonicFogGlowRange'),
+  sonicFogGlowValue: $('#sonicFogGlowValue'),
+  sonicTyndallToneSelect: $('#sonicTyndallToneSelect'),
+  sonicTyndallIntensityRange: $('#sonicTyndallIntensityRange'),
+  sonicTyndallIntensityValue: $('#sonicTyndallIntensityValue'),
+  sonicTyndallSpreadRange: $('#sonicTyndallSpreadRange'),
+  sonicTyndallSpreadValue: $('#sonicTyndallSpreadValue'),
+  sonicMistReflectanceRange: $('#sonicMistReflectanceRange'),
+  sonicMistReflectanceValue: $('#sonicMistReflectanceValue'),
+  sonicMistEmissionRange: $('#sonicMistEmissionRange'),
+  sonicMistEmissionValue: $('#sonicMistEmissionValue'),
+  sonicCoverBackgroundToggle: $('#sonicCoverBackgroundToggle'),
+  sonicCoverBackgroundMixRange: $('#sonicCoverBackgroundMixRange'),
+  sonicCoverBackgroundMixValue: $('#sonicCoverBackgroundMixValue'),
   sonicPaletteMode: $('#sonicPaletteMode'),
   sonicFollowCoverButton: $('#sonicFollowCoverButton'),
   sonicBrightnessRange: $('#sonicBrightnessRange'),
@@ -361,21 +455,27 @@ const els = {
   musicApiImportInput: $('#musicApiImportInput'),
   musicApiImportStatus: $('#musicApiImportStatus'),
   loginClose: $('#neteaseLoginClose'),
-  loginRefresh: $('#neteaseQrRefresh'),
   officialBrowserLoginButton: $('#officialBrowserLoginButton'),
+  officialBrowserSwitchAccountButton: $('#officialBrowserSwitchAccountButton'),
   officialBrowserLoginStatus: $('#officialBrowserLoginStatus'),
+  browserLoginCopy: $('#browserLoginCopy'),
+  qishuiOpenApiLoginPanel: $('#qishuiOpenApiLoginPanel'),
+  qishuiAccessToken: $('#qishuiAccessToken'),
+  qishuiOpenId: $('#qishuiOpenId'),
+  qishuiClientKey: $('#qishuiClientKey'),
+  qishuiRefreshToken: $('#qishuiRefreshToken'),
+  qishuiLocalProfile: $('#qishuiLocalProfile'),
+  qishuiLocalProfileAvatar: $('#qishuiLocalProfileAvatar'),
+  qishuiLocalProfileName: $('#qishuiLocalProfileName'),
+  qishuiLocalProfileMeta: $('#qishuiLocalProfileMeta'),
+  qishuiLocalCollections: $('#qishuiLocalCollections'),
+  qishuiLocalClientStatus: $('#qishuiLocalClientStatus'),
+  qishuiLibraryImportButton: $('#qishuiLibraryImportButton'),
+  qishuiLibraryImportInput: $('#qishuiLibraryImportInput'),
+  qishuiLoginSubmit: $('#qishuiLoginSubmit'),
   loginCommunityStrip: $('#loginCommunityStrip'),
   loginCommunityName: $('#loginCommunityName'),
   loginCommunityId: $('#loginCommunityId'),
-  qrShell: $('#neteaseQrShell'),
-  qrImage: $('#neteaseQrImage'),
-  qrPlaceholder: $('#neteaseQrPlaceholder'),
-  qrStatus: $('#neteaseQrStatus'),
-  qrLoginStage: $('#qrLoginStage'),
-  androidLoginWorkflow: $('#androidLoginWorkflow'),
-  androidQrHelp: $('#androidQrHelp'),
-  androidQrSaveButton: $('#androidQrSaveButton'),
-  androidMusicAppButton: $('#androidMusicAppButton'),
   playlistOrbit: $('#orbPlaylists'),
   playlistCards: $('#orbPlaylistCards'),
   playlistStatus: $('#orbPlaylistStatus'),
@@ -408,6 +508,7 @@ const els = {
   chladniCore: $('#chladniCore'),
   coverParticleScene: $('#coverParticleScene'),
   coverParticleRig: $('#coverParticleRig'),
+  coverParticleWallpaperCanvas: $('#coverParticleWallpaperCanvas'),
   coverParticleEngine: $('#coverParticleEngine'),
   coverParticleCanvas: $('#coverParticleCanvas'),
   sandboxPlaybackScene: $('#sandboxPlaybackScene'),
@@ -465,6 +566,8 @@ const els = {
   qishuiPlaybackQualityMenu: $('#qishuiPlaybackQualityMenu'),
   qishuiPlaybackProgressRange: $('#qishuiPlaybackProgressRange'),
   qishuiPlaybackCurrentTime: $('#qishuiPlaybackCurrentTime'),
+  qishuiPlaybackLyricEarlierButton: $('#qishuiPlaybackLyricEarlierButton'),
+  qishuiPlaybackLyricLaterButton: $('#qishuiPlaybackLyricLaterButton'),
   qishuiPlaybackTotalTime: $('#qishuiPlaybackTotalTime'),
   qishuiPlaybackPreviousButton: $('#qishuiPlaybackPreviousButton'),
   qishuiPlaybackPlayButton: $('#qishuiPlaybackPlayButton'),
@@ -497,11 +600,10 @@ const RENDER_PROFILE = detectRenderProfile();
 document.documentElement.dataset.renderTier = RENDER_PROFILE.tier;
 const PLAYBACK_REST_YAW = 0.22;
 const PLAYBACK_REST_PITCH = -0.16;
-const COVER_PARTICLE_MACRO_WAVE_SEGMENTS = 12;
-const COVER_PARTICLE_LOW_WAVE_SEGMENTS = 200;
-const COVER_PARTICLE_SHOCK_DURATION_SECONDS = 0.36;
+const COVER_PARTICLE_MICRO_WAVE_SEGMENTS = 200;
 const PLAYLIST_SONG_RENDER_RADIUS = 5;
 const PLAYLIST_SONG_RENDER_BUFFER = 2;
+const PLAYLIST_COVER_HYDRATION_RADIUS = 3;
 const LOCAL_PLAYLIST_ID = 'local-import';
 const LOCAL_AUDIO_EXTENSIONS = new Set([
   'mp3', 'flac', 'wav', 'wave', 'm4a', 'aac', 'ogg', 'oga', 'opus', 'webm', 'mp4', 'mka',
@@ -516,7 +618,7 @@ const DYNAMIC_CUBE_RADIUS = ((DYNAMIC_CUBE_GRID - 1) * DYNAMIC_CUBE_GAP) / 2;
 const DYNAMIC_CUBE_EXTENT = DYNAMIC_CUBE_RADIUS * 2 + DYNAMIC_CUBE_SIZE;
 const SONIC_TOPOGRAPHY_GRID = RENDER_PROFILE.topographyGrid;
 const SONIC_TOPOGRAPHY_SPACING = 0.98;
-const SONIC_TOPOGRAPHY_SIZE = 0.91;
+const SONIC_TOPOGRAPHY_SIZE = 0.78;
 const SONIC_TOPOGRAPHY_HALF = (SONIC_TOPOGRAPHY_GRID * SONIC_TOPOGRAPHY_SPACING) / 2;
 const SONIC_LOW_FREQUENCY_BAND_COUNT = 512;
 const SONIC_LOW_FREQUENCY_MIN_HZ = 20;
@@ -537,13 +639,22 @@ const SONIC_BASS_COLUMN_RELEASE_SECONDS = 0.22;
 const SONIC_TOPOGRAPHY_RIPPLES = 10;
 const SONIC_TOPOGRAPHY_METEORS = reducedMotion ? Math.min(10, RENDER_PROFILE.topographyMeteors) : RENDER_PROFILE.topographyMeteors;
 const SONIC_TOPOGRAPHY_PARTICLES = 640;
-const SONIC_STARFIELD_PARTICLES = 3600;
+const SONIC_STARFIELD_PARTICLES = 7200;
 const SONIC_STARFIELD_LAYERS = Object.freeze([
-  Object.freeze({ name: 'near', count: 900, minRadiusScale: 0.6, maxRadiusScale: 0.78, brightness: 1, drift: 4.8 }),
-  Object.freeze({ name: 'middle', count: 1200, minRadiusScale: 0.84, maxRadiusScale: 1.02, brightness: 0.68, drift: 3.6 }),
-  Object.freeze({ name: 'far', count: 1500, minRadiusScale: 1.08, maxRadiusScale: 1.36, brightness: 0.42, drift: 2.6 })
+  Object.freeze({ name: 'near', count: 1800, minRadiusScale: 0.6, maxRadiusScale: 0.78, brightness: 1, drift: 4.8 }),
+  Object.freeze({ name: 'middle', count: 2400, minRadiusScale: 0.84, maxRadiusScale: 1.02, brightness: 0.68, drift: 3.6 }),
+  Object.freeze({ name: 'far', count: 3000, minRadiusScale: 1.08, maxRadiusScale: 1.36, brightness: 0.42, drift: 2.6 })
 ]);
-const SONIC_TOPOGRAPHY_CAMERA = Object.freeze({ x: 98, y: 68, z: 98, fov: 44 });
+const SONIC_GALAXY_PARTICLES = 5200;
+const SONIC_WATER_MIST_LAYER_COUNT = 8;
+const SONIC_TYNDALL_BEAM_COUNT = 9;
+// One shared optical budget keeps the beam, halo, mist and bounced-light
+// receivers from flattening the scene when all controls are raised together.
+const SONIC_TYNDALL_TOTAL_ENERGY_CAP = 0.18;
+// Keep Sonic close, but use a lower viewing elevation and look slightly above
+// the terrain centre. This leaves the scene in the lower part of the frame so
+// a selected wallpaper remains visible instead of being covered by the floor.
+const SONIC_TOPOGRAPHY_CAMERA = Object.freeze({ x: 102, y: 48, z: 102, fov: 44, targetY: 8 });
 const BOOT_LOGO_TEXT = 'FE moster';
 const MUSIC_PROVIDERS = {
   netease: {
@@ -553,8 +664,7 @@ const MUSIC_PROVIDERS = {
     apiUrl: 'http://127.0.0.1:3010',
     setup: '\u8bf7\u5728\u767b\u5f55\u9875\u5bfc\u5165\u7f51\u6613\u4e91 API \u63d2\u4ef6',
     enabled: false,
-    configured: false,
-    loginQr: true
+    configured: false
   },
   qq: {
     id: 'qq',
@@ -563,8 +673,7 @@ const MUSIC_PROVIDERS = {
     apiUrl: 'http://127.0.0.1:3011',
     setup: '\u8bf7\u5728\u767b\u5f55\u9875\u5bfc\u5165 QQ\u97f3\u4e50 API \u63d2\u4ef6',
     enabled: false,
-    configured: false,
-    loginQr: true
+    configured: false
   },
   kugou: {
     id: 'kugou',
@@ -573,25 +682,19 @@ const MUSIC_PROVIDERS = {
     apiUrl: 'http://127.0.0.1:3012',
     setup: '\u8bf7\u5728\u767b\u5f55\u9875\u5bfc\u5165\u9177\u72d7\u97f3\u4e50 API \u63d2\u4ef6',
     enabled: false,
-    configured: false,
-    loginQr: true
+    configured: false
   },
   qishui: {
     id: 'qishui',
     label: '\u6c7d\u6c34\u97f3\u4e50',
-    appName: '\u6c7d\u6c34\u97f3\u4e50 App',
+    appName: '\u6c7d\u6c34\u97f3\u4e50 OpenAPI',
     apiUrl: 'http://127.0.0.1:3013',
-    setup: '\u8bf7\u5728\u767b\u5f55\u9875\u5bfc\u5165\u6c7d\u6c34\u97f3\u4e50 API \u63d2\u4ef6',
+    setup: '\u8bf7\u5bfc\u5165\u6c7d\u6c34\u97f3\u4e50 OpenAPI \u63d2\u4ef6',
     enabled: false,
-    configured: false,
-    loginQr: false
+    configured: false
   }
 };
-const ANDROID_MUSIC_APP_URIS = Object.freeze({
-  netease: 'orpheus://',
-  qq: 'qqmusic://',
-  kugou: 'kugou://'
-});
+const OFFICIAL_BROWSER_LOGIN_PROVIDERS = new Set(['netease', 'qq', 'kugou']);
 const PLAYBACK_QUALITY_OPTIONS = {
   netease: [
     { id: 'standard', label: '标准', short: 'STD', vip: false },
@@ -611,7 +714,7 @@ const PLAYBACK_QUALITY_OPTIONS = {
     { id: 'flac', label: '无损', short: 'SQ', vip: true }
   ],
   qishui: [
-    { id: 'standard', label: '\u6807\u51c6', short: 'STD', vip: false }
+    { id: 'full', label: '官方完整音源', short: 'FULL', vip: false }
   ]
 };
 const PLAYBACK_QUALITY_PREFS_KEY = 'fe-monster-playback-quality-prefs-v1';
@@ -620,36 +723,203 @@ const PRESET_FSR_PREFS_KEY = 'fe-monster-preset-fsr-v1';
 const TEXT_PALETTE_PREFS_KEY = 'fe-monster-text-preset-palettes-v1';
 const TEXT_FONT_PREFS_KEY = 'fe-monster-text-preset-fonts-v1';
 const TEXT_TRANSFORM_PREFS_KEY = 'fe-monster-text-preset-transforms-v1';
+const TEXT_COMPOSER_PREFS_KEY = 'fe-monster-text-composer-v1';
 const PLAYBACK_LYRIC_PALETTE_PREFS_KEY = 'fe-monster-playback-lyric-palette-v1';
 const BILINGUAL_LYRICS_PREFS_KEY = 'fe-monster-bilingual-lyrics-v1';
 const MULTI_ROW_LYRICS_PREFS_KEY = 'fe-monster-multi-row-lyrics-v1';
+const LYRIC_CLOCK_OFFSET_PREFERENCE_KEY = 'fe-monster-lyric-clock-offset-v1';
 const SONIC_SETTINGS_PREFS_KEY = 'fe-monster-sonic-settings-v1';
-const SONIC_CAMERA_FRAMING_VERSION = 3;
+const COVER_PARTICLE_PREFS_KEY = 'fe-monster-cover-particle-v1';
+const CURSOR_PREFERENCES_KEY = 'fe-monster-cursor-preferences-v1';
+const MAX_CURSOR_IMPORT_BYTES = 4 * 1024 * 1024;
+const MAX_CURSOR_SOURCE_DIMENSION = 2048;
+const USER_CURSOR_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const CURSOR_MOTION_EFFECTS = Object.freeze(['off', 'lift', 'magnetic', 'glow']);
+const CURSOR_MOTION_LABELS = Object.freeze({
+  off: '关闭',
+  lift: '柔和上浮',
+  magnetic: '磁性跟随',
+  glow: '光晕'
+});
+const CURSOR_SKINS = Object.freeze({
+  system: Object.freeze({ label: '系统自动', url: '', hotspot: '' }),
+  glass: Object.freeze({ label: '玻璃箭头', url: 'assets/cursors/glass-arrow.svg', hotspot: '3 2' }),
+  ether: Object.freeze({ label: '液态紫焰', url: 'assets/cursors/ether-arrow.svg', hotspot: '3 2' }),
+  frost: Object.freeze({ label: '冰蓝准星', url: 'assets/cursors/frost-crosshair.svg', hotspot: '16 16' }),
+  stardust: Object.freeze({ label: '星尘指针', url: 'assets/cursors/stardust-arrow.svg', hotspot: '3 2' }),
+  pixel: Object.freeze({ label: '像素白', url: 'assets/cursors/pixel-arrow.svg', hotspot: '2 2' }),
+  gold: Object.freeze({ label: '鎏金锐角', url: 'assets/cursors/gold-arrow.svg', hotspot: '3 2' })
+});
+const CURSOR_TRAIL_EFFECTS = Object.freeze(['off', 'glow', 'comet', 'stardust', 'ribbon', 'prism']);
+const CURSOR_TRAIL_LABELS = Object.freeze({
+  off: '关闭',
+  glow: '柔光轨迹',
+  comet: '流星拖尾',
+  stardust: '星尘粒子',
+  ribbon: '双层丝带',
+  prism: '棱镜彩光'
+});
+const CURSOR_MOTION_TARGET_SELECTOR = [
+  'button:not(:disabled)',
+  'a[href]',
+  'select:not(:disabled)',
+  'summary',
+  '[role="button"]:not([aria-disabled="true"])',
+  '.runtime-cursor-preview'
+].join(',');
+const SONIC_CAMERA_FRAMING_VERSION = 4;
 const GOOGLE_OBR_PREFS_KEY = 'fe-monster-google-obr-spatial-audio-v1';
 const GOOGLE_OBR_BACKEND = 'google-obr-official';
+const GOOGLE_OBR_NATIVE_BACKEND = 'native-rust-x3d-obr-xaudio2';
 const GOOGLE_OBR_REVISION = '478dc7c752d5eccae534635139ff0253eee3a14a';
 const GOOGLE_OBR_WORKLET_URL = 'vendor/google-obr/obr-worklet.js?v=478dc7c752d5-surround2';
+const GOOGLE_OBR_NATIVE_WORKLET_URL = 'vendor/native-spatial/native-pcm-worklet.js?v=20260728-direct-4096-1';
+const GOOGLE_OBR_NATIVE_TRANSPORT_FRAMES = 4096;
+const GOOGLE_OBR_NATIVE_RENDER_FRAMES = 256;
 const GOOGLE_OBR_CHANNEL_LAYOUTS = Object.freeze({
   stereo: Object.freeze({ id: 'stereo', label: '2.0', channels: 2 }),
   '5.1': Object.freeze({ id: '5.1', label: '5.1', channels: 6 }),
   '7.1': Object.freeze({ id: '7.1', label: '7.1', channels: 8 })
 });
 const GOOGLE_OBR_RECOVERY_DELAYS = Object.freeze([250, 800, 2000, 5000, 10000]);
+const AUDIO_PLAYBACK_UX_FREEZE_LIMIT_MS = 650;
+const AUDIO_PLAYBACK_STALL_TIMEOUT_MS = 450;
+const AUDIO_PLAYBACK_STALL_HINT_TIMEOUT_MS = 350;
+const AUDIO_PLAYBACK_RECOVERY_RETRY_MS = 7000;
+const AUDIO_PLAYBACK_ADVANCE_EPSILON_SECONDS = 0.035;
+const AUDIO_PLAYBACK_START_BUFFER_SECONDS = 6;
+const AUDIO_PLAYBACK_START_BUFFER_TIMEOUT_MS = 2400;
+const DEFAULT_TEXT_PRESET = 'depth';
+const DEFAULT_TEXT_COMPOSER_SETTINGS = Object.freeze({
+  lyricsEnabled: true,
+  layoutMode: 'single',
+  flowIntensity: 24,
+  echoLayers: 5,
+  echoSpacing: 8,
+  depth: 72,
+  highlightIntensity: 88,
+  highlightSoftness: 3,
+  gloss: 62,
+  unsungBlur: 1.5,
+  letterSpacing: 1,
+  lowBassGlow: 75,
+  glitchEnabled: false,
+  glitchSpeed: 1.2,
+  glitchRgbOffset: 6,
+  glitchSliceDensity: 8,
+  glitchBeatSensitivity: 56,
+  glitchBeatDuration: 180,
+  multiRowLineCount: 7,
+  translationFontSize: 72,
+  translationGap: 4,
+  translationOpacity: 88
+});
+const TEXT_TRANSLATION_SETTING_KEYS = Object.freeze([
+  'multiRowLineCount',
+  'translationFontSize',
+  'translationGap',
+  'translationOpacity'
+]);
+const TEXT_GLITCH_TUNING_SETTING_KEYS = Object.freeze([
+  'glitchSpeed',
+  'glitchRgbOffset',
+  'glitchSliceDensity',
+  'glitchBeatSensitivity',
+  'glitchBeatDuration'
+]);
+const TEXT_GLITCH_BEAT_CLASSES = Object.freeze([
+  'is-text-glitch-beat-a',
+  'is-text-glitch-beat-b'
+]);
+const TEXT_COMPOSER_TEMPLATE_SETTINGS = Object.freeze({
+  depth: DEFAULT_TEXT_COMPOSER_SETTINGS,
+  flow: Object.freeze({
+    ...DEFAULT_TEXT_COMPOSER_SETTINGS,
+    flowIntensity: 92,
+    echoSpacing: 18,
+    depth: 58,
+    highlightIntensity: 100,
+    highlightSoftness: 6,
+    gloss: 78,
+    unsungBlur: 3,
+    letterSpacing: 2,
+    lowBassGlow: 70
+  }),
+  'book-effect': Object.freeze({
+    ...DEFAULT_TEXT_COMPOSER_SETTINGS,
+    layoutMode: 'book',
+    flowIntensity: 56,
+    echoLayers: 1,
+    echoSpacing: 4,
+    depth: 78,
+    highlightIntensity: 92,
+    highlightSoftness: 2,
+    gloss: 86,
+    unsungBlur: 2,
+    letterSpacing: 1.5,
+    lowBassGlow: 55
+  }),
+  'focus-echo': Object.freeze({
+    ...DEFAULT_TEXT_COMPOSER_SETTINGS,
+    flowIntensity: 38,
+    echoLayers: 3,
+    echoSpacing: 22,
+    depth: 90,
+    highlightIntensity: 82,
+    highlightSoftness: 7,
+    gloss: 42,
+    unsungBlur: 0,
+    letterSpacing: 2.5,
+    lowBassGlow: 88,
+    glitchEnabled: false
+  }),
+  glitch: Object.freeze({
+    ...DEFAULT_TEXT_COMPOSER_SETTINGS,
+    flowIntensity: 52,
+    echoLayers: 2,
+    echoSpacing: 10,
+    depth: 68,
+    highlightIntensity: 94,
+    highlightSoftness: 2,
+    gloss: 74,
+    unsungBlur: 2,
+    letterSpacing: 1.5,
+    lowBassGlow: 62,
+    glitchEnabled: true
+  })
+});
 const DEFAULT_SONIC_SETTINGS = Object.freeze({
   centerColor: null,
   coreColor: null,
   outerColor: null,
+  allGroundFloatEnabled: false,
   fountainEnabled: false,
   fountainColor: '#ffffff',
-  starfieldEnabled: false,
+  starfieldEnabled: true,
   starfieldColor: '#dff7ff',
+  galaxyEnabled: true,
+  galaxyColor: '#a8d8ff',
+  galaxyIntensity: 0.52,
+  atmosphereEnabled: true,
+  fogEnabled: true,
+  fogDensity: 0.24,
+  fogSpeed: 0.28,
+  fogGlow: 0.32,
+  mistReflectance: 0.34,
+  mistEmission: 0.12,
+  tyndallEnabled: true,
+  tyndallTone: 'normal',
+  tyndallIntensity: 0.42,
+  tyndallSpread: 0.46,
+  coverBackgroundEnabled: true,
+  coverBackgroundMix: 0.62,
   brightness: 1,
   exposure: 0,
   columnHeight: 1,
   fov: SONIC_TOPOGRAPHY_CAMERA.fov,
   smoothing: 1
 });
-const TEXT_PALETTE_PRESET_IDS = Object.freeze(['depth', 'flow', 'book-effect', 'focus-echo', 'book']);
+const TEXT_PALETTE_PRESET_IDS = Object.freeze(['depth', 'flow', 'book-effect', 'focus-echo', 'glitch', 'book']);
 const TEXT_PALETTE_DEFAULT_COLOR = '#eafbff';
 const TEXT_FONT_DEFAULT_ID = 'system';
 const TEXT_FONT_FALLBACKS = Object.freeze({
@@ -908,6 +1178,8 @@ function normalizeTextPresetTransform(source = {}) {
     return ((numeric + 180) % 360 + 360) % 360 - 180;
   };
   return {
+    x: bounded(source?.x, 0, -1200, 1200),
+    y: bounded(source?.y, 0, -800, 800),
     rotateX: rotation(source?.rotateX),
     rotateY: rotation(source?.rotateY),
     rotateZ: rotation(source?.rotateZ),
@@ -930,6 +1202,68 @@ function loadTextPresetTransforms() {
 }
 
 const INITIAL_TEXT_PRESET_TRANSFORMS = loadTextPresetTransforms();
+
+function normalizeTextComposerSettings(source = {}) {
+  const bounded = (key, minimum, maximum, step = 1) => {
+    const fallback = DEFAULT_TEXT_COMPOSER_SETTINGS[key];
+    const numeric = Number(source?.[key]);
+    const safe = Number.isFinite(numeric) ? numeric : fallback;
+    return Number((Math.round(clamp(safe, minimum, maximum) / step) * step).toFixed(2));
+  };
+  const odd = (key, minimum, maximum) => {
+    const value = Math.round(bounded(key, minimum, maximum));
+    const normalized = value % 2 === 0 ? value + 1 : value;
+    return clamp(normalized, minimum, maximum);
+  };
+  return {
+    lyricsEnabled: source?.lyricsEnabled !== false,
+    layoutMode: ['single', 'multi'].includes(source?.layoutMode)
+      ? source.layoutMode
+      : DEFAULT_TEXT_COMPOSER_SETTINGS.layoutMode,
+    flowIntensity: bounded('flowIntensity', 0, 100),
+    echoLayers: bounded('echoLayers', 0, 5),
+    echoSpacing: bounded('echoSpacing', 0, 48),
+    depth: bounded('depth', 0, 100),
+    highlightIntensity: bounded('highlightIntensity', 0, 100),
+    highlightSoftness: bounded('highlightSoftness', 0, 12, 0.5),
+    gloss: bounded('gloss', 0, 100),
+    unsungBlur: bounded('unsungBlur', 0, 12, 0.5),
+    letterSpacing: bounded('letterSpacing', -2, 12, 0.5),
+    lowBassGlow: bounded('lowBassGlow', 0, 100),
+    glitchEnabled: source?.glitchEnabled === true,
+    glitchSpeed: bounded('glitchSpeed', 0.2, 3, 0.1),
+    glitchRgbOffset: bounded('glitchRgbOffset', 0, 20),
+    glitchSliceDensity: bounded('glitchSliceDensity', 2, 20),
+    glitchBeatSensitivity: bounded('glitchBeatSensitivity', 20, 95),
+    glitchBeatDuration: bounded('glitchBeatDuration', 80, 420, 10),
+    multiRowLineCount: odd('multiRowLineCount', 3, 11),
+    translationFontSize: bounded('translationFontSize', 50, 100),
+    translationGap: bounded('translationGap', 0, 24),
+    translationOpacity: bounded('translationOpacity', 30, 100)
+  };
+}
+
+function loadTextComposerSettings() {
+  let serialized = null;
+  try {
+    serialized = window.localStorage.getItem(TEXT_COMPOSER_PREFS_KEY);
+  } catch (error) {
+    return normalizeTextComposerSettings();
+  }
+  if (serialized === null) {
+    return normalizeTextComposerSettings({
+      layoutMode: loadMultiRowLyricsPreference() ? 'multi' : DEFAULT_TEXT_COMPOSER_SETTINGS.layoutMode
+    });
+  }
+  try {
+    const stored = JSON.parse(serialized || '{}');
+    return normalizeTextComposerSettings(stored?.settings || stored);
+  } catch (error) {
+    return normalizeTextComposerSettings();
+  }
+}
+
+const INITIAL_TEXT_COMPOSER_SETTINGS = loadTextComposerSettings();
 
 function loadPlaybackLyricPalettePreference() {
   try {
@@ -965,6 +1299,35 @@ function loadMultiRowLyricsPreference() {
 }
 
 const INITIAL_MULTI_ROW_LYRICS_ENABLED = loadMultiRowLyricsPreference();
+
+const LYRIC_CLOCK_OFFSET_MIN_SECONDS = -3;
+const LYRIC_CLOCK_OFFSET_MAX_SECONDS = 3;
+const LYRIC_CLOCK_OFFSET_STEP_SECONDS = 0.1;
+const LYRIC_AUDIO_OUTPUT_LATENCY_MAX_SECONDS = 0.35;
+
+function normalizeLyricClockOffsetSeconds(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  const bounded = clamp(
+    numeric,
+    LYRIC_CLOCK_OFFSET_MIN_SECONDS,
+    LYRIC_CLOCK_OFFSET_MAX_SECONDS
+  );
+  return Math.round(bounded / LYRIC_CLOCK_OFFSET_STEP_SECONDS) * LYRIC_CLOCK_OFFSET_STEP_SECONDS;
+}
+
+function loadLyricClockOffsetPreference() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(LYRIC_CLOCK_OFFSET_PREFERENCE_KEY) || '{}');
+    return normalizeLyricClockOffsetSeconds(
+      typeof stored === 'number' ? stored : stored?.offsetSeconds
+    );
+  } catch (error) {
+    return 0;
+  }
+}
+
+const INITIAL_LYRIC_CLOCK_OFFSET_SECONDS = loadLyricClockOffsetPreference();
 
 function loadGoogleObrPreference() {
   try {
@@ -1006,14 +1369,35 @@ function normalizeSonicSettings(source = {}) {
     const numeric = Number(value);
     return clamp(Number.isFinite(numeric) ? numeric : fallback, minimum, maximum);
   };
+  const legacyAtmosphereEnabled = source?.fogEnabled !== false || source?.tyndallEnabled !== false;
+  const atmosphereEnabled = typeof source?.atmosphereEnabled === 'boolean'
+    ? source.atmosphereEnabled
+    : legacyAtmosphereEnabled;
   return {
     centerColor: normalizeOptionalColor(source?.centerColor),
     coreColor: normalizeOptionalColor(source?.coreColor),
     outerColor: normalizeOptionalColor(source?.outerColor),
+    allGroundFloatEnabled: source?.allGroundFloatEnabled === true,
     fountainEnabled: source?.fountainEnabled === true,
     fountainColor: normalizeColor(source?.fountainColor, DEFAULT_SONIC_SETTINGS.fountainColor),
-    starfieldEnabled: source?.starfieldEnabled === true,
+    starfieldEnabled: source?.starfieldEnabled !== false,
     starfieldColor: normalizeColor(source?.starfieldColor, DEFAULT_SONIC_SETTINGS.starfieldColor),
+    galaxyEnabled: source?.galaxyEnabled !== false,
+    galaxyColor: normalizeColor(source?.galaxyColor, DEFAULT_SONIC_SETTINGS.galaxyColor),
+    galaxyIntensity: bounded(source?.galaxyIntensity, DEFAULT_SONIC_SETTINGS.galaxyIntensity, 0, 1.5),
+    atmosphereEnabled,
+    fogEnabled: atmosphereEnabled,
+    fogDensity: bounded(source?.fogDensity, DEFAULT_SONIC_SETTINGS.fogDensity, 0, 0.8),
+    fogSpeed: bounded(source?.fogSpeed, DEFAULT_SONIC_SETTINGS.fogSpeed, 0, 1.5),
+    fogGlow: bounded(source?.fogGlow, DEFAULT_SONIC_SETTINGS.fogGlow, 0, 1.5),
+    mistReflectance: bounded(source?.mistReflectance, DEFAULT_SONIC_SETTINGS.mistReflectance, 0, 1.5),
+    mistEmission: bounded(source?.mistEmission, DEFAULT_SONIC_SETTINGS.mistEmission, 0, 1),
+    tyndallEnabled: atmosphereEnabled,
+    tyndallTone: ['normal', 'cold', 'warm'].includes(source?.tyndallTone) ? source.tyndallTone : DEFAULT_SONIC_SETTINGS.tyndallTone,
+    tyndallIntensity: bounded(source?.tyndallIntensity, DEFAULT_SONIC_SETTINGS.tyndallIntensity, 0, 1.5),
+    tyndallSpread: bounded(source?.tyndallSpread, DEFAULT_SONIC_SETTINGS.tyndallSpread, 0.1, 1.5),
+    coverBackgroundEnabled: source?.coverBackgroundEnabled !== false,
+    coverBackgroundMix: bounded(source?.coverBackgroundMix, DEFAULT_SONIC_SETTINGS.coverBackgroundMix, 0, 1),
     brightness: bounded(source?.brightness, DEFAULT_SONIC_SETTINGS.brightness, 0.4, 2),
     exposure: bounded(source?.exposure, DEFAULT_SONIC_SETTINGS.exposure, -1.5, 1.5),
     columnHeight: bounded(source?.columnHeight, DEFAULT_SONIC_SETTINGS.columnHeight, 0.5, 2.5),
@@ -1036,14 +1420,55 @@ function loadSonicSettingsPreferences() {
 }
 
 const INITIAL_SONIC_SETTINGS = loadSonicSettingsPreferences();
+
+function normalizeCoverParticleFloatSpeed(value, fallback = 1) {
+  const numeric = Number(value);
+  return clamp(Number.isFinite(numeric) ? numeric : fallback, 0.25, 2);
+}
+
+function normalizeCoverParticlePreferences(source = {}) {
+  const motionAmplitude = Number(source?.motionAmplitude);
+  return {
+    backgroundEnabled: source?.backgroundEnabled !== false,
+    motionAmplitude: clamp(Number.isFinite(motionAmplitude) ? motionAmplitude : 0.8, 0, 2),
+    floatSpeed: normalizeCoverParticleFloatSpeed(source?.floatSpeed)
+  };
+}
+
+function loadCoverParticlePreferences() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(COVER_PARTICLE_PREFS_KEY) || '{}');
+    return normalizeCoverParticlePreferences(stored);
+  } catch (error) {
+    return normalizeCoverParticlePreferences();
+  }
+}
+
+const INITIAL_COVER_PARTICLE_PREFERENCES = loadCoverParticlePreferences();
+
+function saveCoverParticlePreferences() {
+  try {
+    window.localStorage.setItem(COVER_PARTICLE_PREFS_KEY, JSON.stringify({
+      backgroundEnabled: !!state.coverParticle.backgroundEnabled,
+      motionAmplitude: clamp(Number(state.coverParticle.motionAmplitude) || 0, 0, 2),
+      floatSpeed: normalizeCoverParticleFloatSpeed(state.coverParticle.floatSpeed)
+    }));
+  } catch (error) {}
+}
+
 const FAVORITE_SONGS_KEY = 'fe-monster-favorite-songs-v1';
 const SEARCH_SUGGESTION_CACHE_MS = 60 * 1000;
+const QISHUI_GUEST_MATCH_CACHE_MS = 10 * 60 * 1000;
+const QISHUI_GUEST_FALLBACK_PROVIDERS = Object.freeze(['netease', 'qq', 'kugou']);
 const PLAYLIST_FAVORITE_CACHE_MS = 60 * 1000;
 const COMMUNITY_BIO_KEY = 'fe-monster-community-bio-v1';
 const COMMUNITY_MESSAGE_DND_KEY = 'fe-monster-community-message-dnd-v1';
 const COMMUNITY_CARD_COLLAPSED_KEY = 'fe-monster-community-card-collapsed-v1';
 const COMMUNITY_FAVORITE_LISTEN_KEY = 'fe-monster-community-favorite-listen-v1';
 const COMMUNITY_LISTENING_STATS_KEY = 'fe-monster-community-listening-stats-v1';
+const COMMUNITY_HISTORY_LEDGER_KEY = 'fe-monster-community-history-ledger-v1';
+const COMMUNITY_HISTORY_IDENTITY_LIMIT = 6;
+const COMMUNITY_HISTORY_SEEN_LIMIT = 512;
 const COMMUNITY_API_RETRY_DELAYS = Object.freeze([120, 320, 700, 1400]);
 const COMMUNITY_API_TIMEOUT_MS = 8000;
 const COMMUNITY_EVENT_STALE_MS = 35000;
@@ -1557,6 +1982,24 @@ const state = {
     updatedAt: 0,
     playing: false
   },
+  playerStateSync: {
+    requestId: 0
+  },
+  audioPositionSync: {
+    rateResetTimer: 0
+  },
+  audioPlaybackContinuity: {
+    lastMediaTime: Number.NaN,
+    lastAdvanceAt: 0,
+    stallHintAt: 0,
+    softRecoveryAt: 0,
+    retryAfter: 0,
+    recoveryPromise: null,
+    recovering: false,
+    playingIntent: false,
+    sourceGeneration: 0,
+    pendingLoadGeneration: 0
+  },
   favoriteDirectories: loadFavoriteDirectories(),
   favoriteLibrary: {
     open: false,
@@ -1580,6 +2023,10 @@ const state = {
     loading: false,
     abortController: null,
     cache: new Map()
+  },
+  qishuiGuestMatches: {
+    cache: new Map(),
+    requests: new Map()
   },
   userPlaylists: [],
   recommendedPlaylists: [],
@@ -1641,24 +2088,36 @@ const state = {
   diyPage: 'wallpaper',
   diyPreset: 'wallpaper',
   scenePreset: 'lyric',
-  textPreset: 'none',
-  lastSelectableTextPreset: 'none',
+  textPreset: DEFAULT_TEXT_PRESET,
+  lastSelectableTextPreset: DEFAULT_TEXT_PRESET,
   textPalettePreferences: INITIAL_TEXT_PALETTE_PREFERENCES,
   textFontPreferences: INITIAL_TEXT_FONT_PREFERENCES,
   textFontAvailability: {},
   textFontStack: '',
   textPresetTransforms: INITIAL_TEXT_PRESET_TRANSFORMS,
+  textComposerSettings: INITIAL_TEXT_COMPOSER_SETTINGS,
   textPresetGesture: {
     dragging: false,
+    pending: false,
+    mode: '',
+    zone: 'middle',
     pointerId: null,
     startX: 0,
     startY: 0,
+    lastX: 0,
+    lastY: 0,
+    startOffsetX: 0,
+    startOffsetY: 0,
     startRotateX: 0,
-    startRotateY: 0
+    startRotateY: 0,
+    startRotateZ: 0,
+    holdTimer: 0,
+    suppressClickUntil: 0
   },
   playbackLyricPalettePreference: INITIAL_PLAYBACK_LYRIC_PALETTE_PREFERENCE,
   bilingualLyricsEnabled: INITIAL_BILINGUAL_LYRICS_ENABLED,
   multiRowLyricsEnabled: INITIAL_MULTI_ROW_LYRICS_ENABLED,
+  lyricClockOffsetSeconds: INITIAL_LYRIC_CLOCK_OFFSET_SECONDS,
   multiRowLyricSignature: '',
   lyricBrightness: 1.12,
   lyricSpeed: 1,
@@ -1677,6 +2136,13 @@ const state = {
   wallpaperNativeActivationId: '',
   wallpaperNativeActivationPending: '',
   wallpaperLoading: false,
+  sceneWallpaperCatalogLoading: false,
+  wallpaperEngineCatalogLoaded: false,
+  sceneWallpaperSettings: {
+    'cover-particles': { enabled: false, wallpaperId: '', wallpaperUrl: '', wallpaperName: '', opacity: 1 },
+    topography: { enabled: false, wallpaperId: '', wallpaperUrl: '', wallpaperName: '', opacity: 1 },
+    chladni: { enabled: false, wallpaperId: '', wallpaperUrl: '', wallpaperName: '', opacity: 1 }
+  },
   sandbox: {
     open: false,
     playbackPresetId: '',
@@ -1724,6 +2190,7 @@ const state = {
     yaw: 0.68,
     pitch: 0.72,
     distance: 10.5,
+    playbackCameraViewSignature: '',
     animationFrame: 0,
     lastFrameAt: 0,
     renderRequested: false,
@@ -1746,7 +2213,6 @@ const state = {
   lyricDisplayText: '',
   lyricSubtitleText: '',
   lyricProgressPercent: -1,
-  lyricGlyphRenderMode: '',
   lyricTimingScale: 1,
   lyricFrameTime: -1,
   lyricFramePreset: '',
@@ -1756,8 +2222,6 @@ const state = {
   lyricBookScrollFrameAt: 0,
   lyricBookLayoutVersion: 0,
   lyricBookFitFrame: 0,
-  lyricPlaybackGlyphs: [],
-  lyricPlaybackGlyphCount: 0,
   playbackVisual: {
     dragging: false,
     pointerId: null,
@@ -1771,12 +2235,16 @@ const state = {
     mouseX: 0.5,
     mouseY: 0.5,
     lyricPulse: 0,
+    glitchBeatArmed: true,
+    glitchBeatLastAt: -Infinity,
+    glitchBeatVariant: 0,
     coverSignature: '',
     palette: null,
     quality: RENDER_PROFILE.playbackQualityMax,
     lastFrameTime: 0,
     lastMotionAt: 0,
     frameStep: 1,
+    lastLyricRasterScale: Number.NaN,
     spriteDpr: 0,
     particleSprites: [],
     particles: []
@@ -1792,19 +2260,20 @@ const state = {
     sampleSignature: '',
     palette: null,
     particles: [],
-    bass: 0,
     energy: 0,
-    beat: 0,
     waveTime: 0,
-    shockAge: COVER_PARTICLE_SHOCK_DURATION_SECONDS,
-    shockStrength: 0,
-    shockCooldown: 0,
-    shockArmed: true,
-    lastShockDrive: 0,
-    lastBassInput: 0,
+    motionGate: 0,
+    wholeJump: 0,
     lastWidth: 0,
     lastHeight: 0,
     lastDpr: 0,
+    renderFrame: { canvas: null, cssWidth: 0, cssHeight: 0, width: 0, height: 0 },
+    fallbackGlowContext: null,
+    fallbackGlowWidth: 0,
+    fallbackGlowHeight: 0,
+    fallbackGlowCoverSize: 0,
+    fallbackGlowBase: null,
+    fallbackGlowEnergy: null,
     gpuRenderer: null,
     gpuScene: null,
     gpuCamera: null,
@@ -1815,8 +2284,14 @@ const state = {
     gpuFailed: false,
     gpuWidth: 0,
     gpuHeight: 0,
-    backgroundEnabled: true,
-    motionAmplitude: 0.8
+    wallpaperImage: null,
+    wallpaperVideo: null,
+    wallpaperRequestId: 0,
+    wallpaperSignature: '',
+    wallpaperDrawSignature: '',
+    backgroundEnabled: INITIAL_COVER_PARTICLE_PREFERENCES.backgroundEnabled,
+    motionAmplitude: INITIAL_COVER_PARTICLE_PREFERENCES.motionAmplitude,
+    floatSpeed: INITIAL_COVER_PARTICLE_PREFERENCES.floatSpeed
   },
   bookEffectTransform: {
     x: 0,
@@ -1882,6 +2357,13 @@ const state = {
   loginLoggedIn: false,
   appWindowFullscreen: false,
   runtimeSettingsOpen: false,
+  cursorPreferences: {
+    skin: 'glass',
+    motion: 'off',
+    trail: 'off'
+  },
+  userCursors: [],
+  cursorImporting: false,
   recording: {
     stream: null,
     recorder: null,
@@ -1924,15 +2406,12 @@ const state = {
   loginStatusByProvider: {},
   loginStatusRetryTimers: {},
   loginStatusRetryAttempts: {},
-  loginQrKey: '',
-  loginQrTimer: 0,
-  loginQrLoading: false,
   officialBrowserLoginSession: '',
   officialBrowserLoginProvider: '',
   officialBrowserLoginTimer: 0,
   officialBrowserLoginLoading: false,
+  officialBrowserSwitching: false,
   musicApiImporting: false,
-  loginQrRequestId: 0,
   qishuiPlaybackCard: {
     wheelDelta: 0,
     switching: false,
@@ -1949,13 +2428,17 @@ const state = {
     lyricBookArrivedIndex: -2,
     lyricBookScrollTarget: Number.NaN,
     lyricBookScrollFrameAt: 0,
+    lyricBookScrollClockTime: Number.NaN,
     lyricBookLayoutVersion: 0,
     lyricBookLayoutFrame: 0,
+    lyricTransition: null,
     progressDragging: false,
     seekRequestId: 0,
     seekPending: false,
     pendingSeekTarget: null,
-    pendingAudioSeekTarget: null
+    pendingAudioSeekTarget: null,
+    seekHandoffTarget: null,
+    seekHandoffStartedAt: 0
   },
   community: {
     profile: null,
@@ -1974,15 +2457,20 @@ const state = {
     eventConnected: false,
     eventLastActivityAt: 0,
     eventHeartbeatTimer: 0,
-    eventSeenSeqs: new Set(),
-    eventSeenOrder: [],
+    eventSeenKeys: new Set(),
+    eventSeenKeyOrder: [],
+    eventHistoryIdentity: '',
+    eventHydrationStartedAt: 0,
+    eventHistoryBefore: 0,
+    eventHistoryCalibrated: false,
     selectedFriendId: '',
     messages: [],
     messageTimer: 0,
     messageBubbleTimer: 0,
     messageBubbleMuted: loadCommunityMessageDnd(),
     messageBubbles: [],
-    messageBubbleSeenKeys: {},
+    messageBubbleSeenKeys: new Set(),
+    messageBubbleSeenOrder: [],
     messageBubbleSeenReady: false,
     broadcastLatest: null,
     broadcastSeenKey: '',
@@ -2078,6 +2566,10 @@ const state = {
     bass: 0,
     lowFrequencyAmplitude: 0,
     lowFrequencyBands: new Float32Array(SONIC_LOW_FREQUENCY_BAND_COUNT),
+    lowFrequencyBinLower: new Uint16Array(SONIC_LOW_FREQUENCY_BAND_COUNT),
+    lowFrequencyBinMix: new Float64Array(SONIC_LOW_FREQUENCY_BAND_COUNT),
+    lowFrequencyLookupDataLength: 0,
+    lowFrequencyLookupSampleRate: 0,
     beat: 0,
     mid: 0,
     treble: 0,
@@ -2115,6 +2607,7 @@ const state = {
     audioSpatialBackend: 'x3daudio',
     audioDecoder: 'media-foundation',
     nativeAudioActive: false,
+    nativeAudio: {},
     settings: {
       gpuAcceleration: true,
       directX11: true,
@@ -2155,7 +2648,13 @@ const state = {
     operationId: 0,
     recoveryTimer: 0,
     recoveryAttempt: 0,
-    previousRuntimeBackend: ''
+    previousRuntimeBackend: '',
+    nativeFallback: false,
+    nativeError: '',
+    nativeHealthRequest: null,
+    nativeQueueUnderruns: 0,
+    nativeBuffersQueued: 0,
+    nativeOutputLatencySeconds: 0
   },
   audioAnalysis: {
     context: null,
@@ -2238,7 +2737,10 @@ const state = {
   voidPrism: {
     runtime: null,
     frame: {},
-    lastDiagnostics: null
+    lastDiagnostics: null,
+    lastLyricText: '',
+    lastLyricSubtitle: '',
+    lastLyricFontStack: ''
   },
   chladni: {
     runtime: null,
@@ -2266,6 +2768,33 @@ const state = {
     particleMaterial: null,
     starfield: null,
     starfieldMaterial: null,
+    galaxy: null,
+    galaxyMaterial: null,
+    fogGroup: null,
+    fogLayers: [],
+    ambientLight: null,
+    keyLight: null,
+    tyndallLight: null,
+    tyndallLightTarget: null,
+    tyndallBeams: [],
+    tyndallHalos: [],
+    tyndallGroundSheen: null,
+    tyndallGroundSheenMaterial: null,
+    tyndallColumnReceivers: [],
+    tyndallWallBounce: null,
+    tyndallWallBounceMaterial: null,
+    sonicHighlightShoulder: 0,
+    mistBlackLiftGuard: 1,
+    background: null,
+    backgroundMaterial: null,
+    wallpaperSurface: null,
+    wallpaperTexture: null,
+    wallpaperVideo: null,
+    wallpaperRequestId: 0,
+    wallpaperSignature: '',
+    backgroundTargetColors: [],
+    atmosphereColor: null,
+    starfieldAudio: 0,
     dummy: null,
     palette: null,
     theme: null,
@@ -2353,6 +2882,9 @@ const state = {
     lastPaintAt: 0,
     lastSpectrumAt: 0,
     animationFrame: 0,
+    context: null,
+    canvasMetrics: { width: 0, height: 0 },
+    resizeObserver: null,
     coveredCanvasKey: '',
     reducedMotion
   }
@@ -3067,6 +3599,294 @@ function initRenderCapabilityBridge() {
   bridge.postMessage({ type: 'fe-render-capabilities', action: 'query', requestId });
 }
 
+function normalizeCursorPreferences(source = {}) {
+  const requestedSkin = typeof source.skin === 'string' ? source.skin.trim().toLowerCase() : '';
+  const skin = Object.prototype.hasOwnProperty.call(CURSOR_SKINS, requestedSkin)
+    || /^user:[0-9a-f-]{36}$/.test(requestedSkin)
+    ? requestedSkin
+    : 'glass';
+  const motion = CURSOR_MOTION_EFFECTS.includes(source.motion) ? source.motion : 'off';
+  const trail = CURSOR_TRAIL_EFFECTS.includes(source.trail) ? source.trail : 'off';
+  return { skin, motion, trail };
+}
+
+function loadCursorPreferences() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(CURSOR_PREFERENCES_KEY) || 'null');
+    return normalizeCursorPreferences(stored || {});
+  } catch (error) {
+    return normalizeCursorPreferences();
+  }
+}
+
+function saveCursorPreferences(preferences = state.cursorPreferences) {
+  try {
+    localStorage.setItem(CURSOR_PREFERENCES_KEY, JSON.stringify(normalizeCursorPreferences(preferences)));
+  } catch (error) {
+    // Private browsing or a locked WebView profile can make localStorage unavailable.
+  }
+}
+
+let activeCursorMagnetTarget = null;
+let cursorMagnetFrame = 0;
+let cursorMagnetPoint = null;
+let cursorMagnetReleaseTimer = 0;
+
+function cursorMagnetAvailable(event) {
+  return state.cursorPreferences.motion === 'magnetic'
+    && event?.pointerType !== 'touch'
+    && window.matchMedia('(any-hover: hover) and (any-pointer: fine)').matches
+    && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function renderCursorMagnet() {
+  cursorMagnetFrame = 0;
+  const target = activeCursorMagnetTarget;
+  const point = cursorMagnetPoint;
+  if (!target?.isConnected || !point) return;
+  const rect = target.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  const x = Math.max(-3.5, Math.min(3.5, ((point.x - rect.left) / rect.width - 0.5) * 7));
+  const y = Math.max(-3, Math.min(3, ((point.y - rect.top) / rect.height - 0.5) * 6));
+  target.style.setProperty('--cursor-magnet-x', `${x.toFixed(2)}px`);
+  target.style.setProperty('--cursor-magnet-y', `${y.toFixed(2)}px`);
+}
+
+function handleCursorMagnetMove(event) {
+  if (!cursorMagnetAvailable(event) || event.currentTarget !== activeCursorMagnetTarget) return;
+  cursorMagnetPoint = { x: event.clientX, y: event.clientY };
+  if (!cursorMagnetFrame) cursorMagnetFrame = requestAnimationFrame(renderCursorMagnet);
+}
+
+function deactivateCursorMagnet(target = activeCursorMagnetTarget) {
+  if (!target) return;
+  target.removeEventListener('pointermove', handleCursorMagnetMove);
+  target.removeEventListener('pointerleave', handleCursorMagnetLeave);
+  target.removeEventListener('pointercancel', handleCursorMagnetLeave);
+  target.style.setProperty('--cursor-magnet-x', '0px');
+  target.style.setProperty('--cursor-magnet-y', '0px');
+  if (cursorMagnetFrame) cancelAnimationFrame(cursorMagnetFrame);
+  cursorMagnetFrame = 0;
+  cursorMagnetPoint = null;
+  if (activeCursorMagnetTarget === target) activeCursorMagnetTarget = null;
+  window.clearTimeout(cursorMagnetReleaseTimer);
+  cursorMagnetReleaseTimer = window.setTimeout(() => {
+    target.classList.remove('is-cursor-magnetic');
+    target.style.removeProperty('--cursor-magnet-x');
+    target.style.removeProperty('--cursor-magnet-y');
+  }, 190);
+}
+
+function handleCursorMagnetLeave(event) {
+  deactivateCursorMagnet(event.currentTarget);
+}
+
+function activateCursorMagnet(target) {
+  if (!target || target === activeCursorMagnetTarget) return;
+  deactivateCursorMagnet();
+  window.clearTimeout(cursorMagnetReleaseTimer);
+  activeCursorMagnetTarget = target;
+  target.classList.add('is-cursor-magnetic');
+  target.addEventListener('pointermove', handleCursorMagnetMove, { passive: true });
+  target.addEventListener('pointerleave', handleCursorMagnetLeave, { passive: true });
+  target.addEventListener('pointercancel', handleCursorMagnetLeave, { passive: true });
+}
+
+function handleCursorMotionPointerOver(event) {
+  if (!cursorMagnetAvailable(event) || !(event.target instanceof Element)) return;
+  activateCursorMagnet(event.target.closest(CURSOR_MOTION_TARGET_SELECTOR));
+}
+
+function initCursorMotionRuntime() {
+  document.addEventListener('pointerover', handleCursorMotionPointerOver, { passive: true });
+}
+
+function userCursorIdFromSkin(skin) {
+  if (typeof skin !== 'string' || !skin.startsWith('user:')) return '';
+  const id = skin.slice('user:'.length).toLowerCase();
+  return USER_CURSOR_ID_PATTERN.test(id) ? id : '';
+}
+
+function userCursorDefinition(skin) {
+  const id = userCursorIdFromSkin(skin);
+  if (!id) return null;
+  const cursor = state.userCursors.find((entry) => entry.id === id);
+  if (!cursor) return null;
+  return {
+    label: cursor.name,
+    url: `/api/user-cursors/file?${query({ id })}`,
+    hotspot: '4 4'
+  };
+}
+
+function cursorDefinition(skin) {
+  if (skin === 'system') return CURSOR_SKINS.system;
+  return CURSOR_SKINS[skin] || userCursorDefinition(skin);
+}
+
+function syncUserCursorOptions() {
+  if (!els.cursorSkinSelect) return;
+  for (const option of els.cursorSkinSelect.querySelectorAll('option[data-user-cursor]')) option.remove();
+  for (const cursor of state.userCursors) {
+    const option = document.createElement('option');
+    option.value = `user:${cursor.id}`;
+    option.textContent = cursor.name;
+    option.dataset.userCursor = cursor.id;
+    els.cursorSkinSelect.append(option);
+  }
+}
+
+async function refreshUserCursors() {
+  try {
+    const payload = await apiJson('/api/user-cursors');
+    const seen = new Set();
+    state.userCursors = (Array.isArray(payload.cursors) ? payload.cursors : [])
+      .map((cursor) => {
+        const id = safeText(cursor?.id, '').toLowerCase();
+        if (!USER_CURSOR_ID_PATTERN.test(id) || seen.has(id)) return null;
+        seen.add(id);
+        return {
+          id,
+          name: safeText(cursor?.name, `自定义光标 ${id.slice(0, 6)}`)
+        };
+      })
+      .filter(Boolean);
+    syncUserCursorOptions();
+    applyCursorPreferences();
+    return state.userCursors;
+  } catch (error) {
+    state.userCursors = [];
+    syncUserCursorOptions();
+    applyCursorPreferences();
+    return [];
+  }
+}
+
+async function normalizeCursorImport(file) {
+  const allowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+  if (!(file instanceof Blob) || !allowedTypes.has(String(file.type || '').toLowerCase())) {
+    throw new Error('请选择 PNG、JPG/JPEG、WebP 或 GIF 图片');
+  }
+  if (!file.size || file.size > MAX_CURSOR_IMPORT_BYTES) {
+    throw new Error('光标图片不能超过 4 MB');
+  }
+  if (typeof createImageBitmap !== 'function') {
+    throw new Error('当前 WebView 不支持导入自定义光标');
+  }
+
+  const bitmap = await createImageBitmap(file);
+  try {
+    if (
+      bitmap.width < 1
+      || bitmap.height < 1
+      || bitmap.width > MAX_CURSOR_SOURCE_DIMENSION
+      || bitmap.height > MAX_CURSOR_SOURCE_DIMENSION
+    ) {
+      throw new Error('光标图片尺寸需在 1 × 1 到 2048 × 2048 之间');
+    }
+    const targetSize = 64;
+    const scale = Math.min(targetSize / bitmap.width, targetSize / bitmap.height, 1);
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d', { alpha: true, colorSpace: 'srgb' });
+    if (!context) throw new Error('无法创建光标图像画布');
+    context.clearRect(0, 0, width, height);
+    context.drawImage(bitmap, 0, 0, width, height);
+    const normalizedPng = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    if (!normalizedPng) throw new Error('光标图像转换失败');
+    return normalizedPng;
+  } finally {
+    bitmap.close?.();
+  }
+}
+
+async function importUserCursor(file) {
+  if (!file || state.cursorImporting) return;
+  state.cursorImporting = true;
+  if (els.cursorImportButton) {
+    els.cursorImportButton.disabled = true;
+    els.cursorImportButton.textContent = '正在导入…';
+  }
+  try {
+    const normalizedPng = await normalizeCursorImport(file);
+    const payload = await apiJson(`/api/user-cursors/import?${query({ name: file.name || 'cursor.png' })}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'image/png',
+        'X-FE-Monster-Cursor': '1'
+      },
+      body: normalizedPng
+    });
+    const id = safeText(payload.cursor?.id, '').toLowerCase();
+    if (!USER_CURSOR_ID_PATTERN.test(id)) throw new Error('光标服务返回了无效标识');
+    await refreshUserCursors();
+    setCursorPreferences({ skin: `user:${id}` });
+    const usedStaticGifFrame = String(file.type || '').toLowerCase() === 'image/gif';
+    toast(usedStaticGifFrame ? '光标已导入；GIF 使用静态首帧' : '自定义光标已导入');
+  } catch (error) {
+    toast(error.message || '自定义光标导入失败');
+  } finally {
+    state.cursorImporting = false;
+    if (els.cursorImportButton) {
+      els.cursorImportButton.disabled = false;
+      els.cursorImportButton.textContent = '导入本地光标';
+    }
+    if (els.cursorImportInput) els.cursorImportInput.value = '';
+  }
+}
+
+function applyCursorPreferences() {
+  const preferences = normalizeCursorPreferences(state.cursorPreferences);
+  state.cursorPreferences = preferences;
+  if (preferences.motion !== 'magnetic') deactivateCursorMagnet();
+  const requestedUserCursor = Boolean(userCursorIdFromSkin(preferences.skin));
+  const skin = cursorDefinition(preferences.skin) || CURSOR_SKINS.system;
+  const skinCursor = skin.url
+    ? `url("${skin.url}") ${skin.hotspot}, default`
+    : 'auto';
+  const pointerCursor = skin.url
+    ? `url("${skin.url}") ${skin.hotspot}, pointer`
+    : 'pointer';
+  document.documentElement.dataset.feCursorSkin = preferences.skin;
+  document.documentElement.dataset.feCursorMotion = preferences.motion;
+  document.documentElement.dataset.feCursorTrail = preferences.trail;
+  document.documentElement.style.setProperty('--fe-cursor-skin-default', skinCursor);
+  document.documentElement.style.setProperty('--fe-cursor-skin-pointer', pointerCursor);
+  if (els.cursorSkinSelect) els.cursorSkinSelect.value = preferences.skin;
+  if (els.cursorMotionSelect) els.cursorMotionSelect.value = preferences.motion;
+  if (els.cursorTrailSelect) els.cursorTrailSelect.value = preferences.trail;
+  if (els.cursorPreferencePreview) {
+    els.cursorPreferencePreview.style.cursor = skinCursor;
+    els.cursorPreferencePreview.dataset.cursorMotionPreview = preferences.motion;
+  }
+  if (els.cursorPreferenceStatus) {
+    const label = requestedUserCursor && !userCursorDefinition(preferences.skin)
+      ? '自定义光标暂不可用，已回退系统光标'
+      : skin.label;
+    els.cursorPreferenceStatus.textContent = `${label} · ${CURSOR_MOTION_LABELS[preferences.motion]} · ${CURSOR_TRAIL_LABELS[preferences.trail]}`;
+  }
+  document.dispatchEvent(new CustomEvent('fe-cursor-preferences-changed', {
+    detail: { ...preferences, skinCursor }
+  }));
+}
+
+function setCursorPreferences(patch, { persist = true } = {}) {
+  state.cursorPreferences = normalizeCursorPreferences({
+    ...state.cursorPreferences,
+    ...patch
+  });
+  applyCursorPreferences();
+  if (persist) saveCursorPreferences();
+}
+
+function initCursorPreferences() {
+  state.cursorPreferences = loadCursorPreferences();
+  applyCursorPreferences();
+}
+
 function setGestureStatusText(message, detail = '') {
   if (!els.gestureControlStatus) return;
   els.gestureControlStatus.textContent = message;
@@ -3165,6 +3985,7 @@ async function refreshClientRuntime() {
     }
     state.clientRuntime.audioDecoder = runtime.audioDecoder || state.clientRuntime.audioDecoder;
     state.clientRuntime.nativeAudioActive = nativeAudio.active === true;
+    state.clientRuntime.nativeAudio = nativeAudio;
     Object.assign(state.clientRuntime.settings, {
       gpuAcceleration: settings.gpuAcceleration !== false,
       directX11: settings.directX11 !== false,
@@ -3800,6 +4621,9 @@ function songParams(song, options = {}) {
     cover: song.cover,
     duration: song.duration || 0,
     provider: song.provider || 'netease',
+    sourceRef: song.sourceRef && typeof song.sourceRef === 'object'
+      ? JSON.stringify(song.sourceRef)
+      : '',
     quality: options.quality
   });
 }
@@ -3846,6 +4670,21 @@ function isFreeCubePreset(preset = state.diyPreset) {
 
 function isVoidPrismPreset(preset = state.diyPreset) {
   return preset === 'void-prism';
+}
+
+const PLAYBACK_ORBIT_PRESETS = new Set([
+  'cube',
+  'free-cubes',
+  'void-prism',
+  'topography',
+  'cover-particles'
+]);
+
+function playbackSceneSupportsOrbit(preset = state.diyPreset) {
+  if (preset === 'sandbox-scene') {
+    return sandboxPlaybackActive() && !isStormOceanPreset(activeDiyScenePreset());
+  }
+  return PLAYBACK_ORBIT_PRESETS.has(preset);
 }
 
 function normalizeDiyPreset(preset) {
@@ -3985,6 +4824,50 @@ function browserAudioUrl(url) {
 const WALLPAPER_PREFS_KEY = 'fe-monster-wallpaper-prefs';
 const WALLPAPER_PREFS_VERSION = 6;
 const WALLPAPER_FIT_MODES = new Set(['fill', 'fit', 'stretch', 'center', 'tile']);
+const SCENE_WALLPAPER_PRESETS = Object.freeze(['cover-particles', 'topography', 'chladni']);
+const SCENE_WALLPAPER_SOFT_GLOW_ID = 'soft-glow';
+const SCENE_WALLPAPER_PREFS_KEY = 'fe-monster-scene-wallpaper-prefs';
+const SCENE_WALLPAPER_PREFS_VERSION = 3;
+const COVER_PARTICLE_WALLPAPER_SEGMENTS = 96;
+
+function normalizeSceneWallpaperSetting(value) {
+  const source = value && typeof value === 'object' ? value : {};
+  const opacity = Number(source.opacity);
+  return {
+    enabled: source.enabled === true,
+    wallpaperId: safeText(source.wallpaperId, ''),
+    wallpaperUrl: safeText(source.wallpaperUrl, ''),
+    wallpaperName: safeText(source.wallpaperName, ''),
+    mediaKind: source.mediaKind === 'video' ? 'video' : 'image',
+    opacity: clamp(Number.isFinite(opacity) ? opacity : 1, 0.1, 1)
+  };
+}
+
+function normalizeSceneWallpaperSettings(settings) {
+  const source = settings && typeof settings === 'object' ? settings : {};
+  return Object.fromEntries(SCENE_WALLPAPER_PRESETS.map((preset) => (
+    [preset, normalizeSceneWallpaperSetting(source[preset])]
+  )));
+}
+
+function loadSceneWallpaperPrefs() {
+  try {
+    const prefs = JSON.parse(window.localStorage.getItem(SCENE_WALLPAPER_PREFS_KEY) || '{}');
+    state.sceneWallpaperSettings = normalizeSceneWallpaperSettings(prefs.presets);
+  } catch (error) {
+    state.sceneWallpaperSettings = normalizeSceneWallpaperSettings(state.sceneWallpaperSettings);
+  }
+}
+
+function saveSceneWallpaperPrefs() {
+  try {
+    window.localStorage.setItem(SCENE_WALLPAPER_PREFS_KEY, JSON.stringify({
+      version: SCENE_WALLPAPER_PREFS_VERSION,
+      presets: normalizeSceneWallpaperSettings(state.sceneWallpaperSettings)
+    }));
+  } catch (error) {
+  }
+}
 
 function normalizeWallpaperFitMode(mode) {
   return WALLPAPER_FIT_MODES.has(mode) ? mode : 'fill';
@@ -4022,21 +4905,41 @@ function loadWallpaperPrefs() {
   }
 }
 
-function saveWallpaperPrefs() {
-  try {
-    window.localStorage.setItem(WALLPAPER_PREFS_KEY, JSON.stringify({
-      version: WALLPAPER_PREFS_VERSION,
-      activeWallpaperId: state.activeWallpaperId,
-      activeWallpaperIds: state.activeWallpaperIds,
-      opacity: state.wallpaperOpacity,
-      brightness: state.wallpaperBrightness,
-      blur: state.wallpaperBlur,
-      scale: state.wallpaperScale,
-      fitMode: state.wallpaperFitMode,
-      source: state.wallpaperSource
-    }));
-  } catch (error) {
+const VISUAL_PREFERENCE_SAVE_DEBOUNCE_MS = 160;
+let wallpaperPreferenceSaveTimer = 0;
+
+function saveWallpaperPrefs({ immediate = false } = {}) {
+  window.clearTimeout(wallpaperPreferenceSaveTimer);
+  wallpaperPreferenceSaveTimer = 0;
+  const commit = () => {
+    wallpaperPreferenceSaveTimer = 0;
+    try {
+      window.localStorage.setItem(WALLPAPER_PREFS_KEY, JSON.stringify({
+        version: WALLPAPER_PREFS_VERSION,
+        activeWallpaperId: state.activeWallpaperId,
+        activeWallpaperIds: state.activeWallpaperIds,
+        opacity: state.wallpaperOpacity,
+        brightness: state.wallpaperBrightness,
+        blur: state.wallpaperBlur,
+        scale: state.wallpaperScale,
+        fitMode: state.wallpaperFitMode,
+        source: state.wallpaperSource
+      }));
+    } catch (error) {
+    }
+  };
+  if (immediate) {
+    commit();
+    return;
   }
+  wallpaperPreferenceSaveTimer = window.setTimeout(
+    commit,
+    VISUAL_PREFERENCE_SAVE_DEBOUNCE_MS
+  );
+}
+
+function flushWallpaperPrefs() {
+  if (wallpaperPreferenceSaveTimer) saveWallpaperPrefs({ immediate: true });
 }
 
 function resetSpectrumForSong(song = state.currentSong) {
@@ -4207,13 +5110,344 @@ function ensureDryAudioOutput(analysis) {
   return analysis.dryGain;
 }
 
+function canUseNativeGoogleObr(channelLayout = state.obrSpatialAudio.channelLayout) {
+  const layout = normalizeGoogleObrChannelLayout(channelLayout);
+  const nativeAudio = state.clientRuntime.nativeAudio || {};
+  let streamingUpload = false;
+  try {
+    const request = new Request(window.location.href, {
+      method: 'POST',
+      body: new ReadableStream(),
+      duplex: 'half'
+    });
+    streamingUpload = request.body != null;
+  } catch (error) {
+  }
+  return (
+    layout !== 'stereo'
+    && state.obrSpatialAudio.nativeFallback !== true
+    && state.clientRuntime.nativeAudioActive
+    && state.clientRuntime.settings.xAudio2
+    && nativeAudio.spatialStreaming === true
+    && streamingUpload
+    && typeof ReadableStream === 'function'
+    && typeof AudioWorkletNode === 'function'
+  );
+}
+
+function nativeSpatialRequest(path) {
+  return apiJson(path, {
+    method: 'POST',
+    headers: { 'X-FE-Monster-Audio': '1' }
+  });
+}
+
+async function createNativeGoogleObrGraph(analysis) {
+  if (!analysis.context?.audioWorklet || typeof AudioWorkletNode !== 'function') {
+    throw new Error('当前播放内核不支持原生 PCM AudioWorklet');
+  }
+  const channelLayout = normalizeGoogleObrChannelLayout(state.obrSpatialAudio.channelLayout);
+  const layoutChannels = GOOGLE_OBR_CHANNEL_LAYOUTS[channelLayout]?.channels || 0;
+  if (layoutChannels !== 6 && layoutChannels !== 8) {
+    throw new Error('Rust 上混只用于 5.1 或 7.1 空间音频');
+  }
+
+  const sampleRate = Math.round(Number(analysis.context.sampleRate) || 48000);
+  const startParams = new URLSearchParams({
+    sampleRate: String(sampleRate),
+    inputChannels: '2',
+    layoutChannels: String(layoutChannels),
+    algorithm: '2'
+  });
+  const start = await nativeSpatialRequest(`/api/audio/spatial/start?${startParams}`);
+  if (!start?.ok || !Number(start.session)) {
+    throw new Error(safeText(start?.error, '原生空间音频链路初始化失败'));
+  }
+  const session = Number(start.session);
+  if (start.rustUpmixActive !== true) {
+    await nativeSpatialRequest(`/api/audio/spatial/stop?session=${encodeURIComponent(session)}`).catch(() => {});
+    throw new Error('OxiMedia Rust 上混动态库未加载');
+  }
+
+  try {
+    await analysis.context.audioWorklet.addModule(GOOGLE_OBR_NATIVE_WORKLET_URL);
+    const node = new AudioWorkletNode(analysis.context, 'fe-native-pcm-bridge', {
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      outputChannelCount: [2],
+      channelCount: 2,
+      channelCountMode: 'explicit',
+      channelInterpretation: 'speakers'
+    });
+    const wetGain = analysis.context.createGain();
+    wetGain.gain.value = 0;
+    const streamAbort = new AbortController();
+    let streamController = null;
+    const streamBody = new ReadableStream({
+      start(controller) {
+        streamController = controller;
+      }
+    });
+    const graph = {
+      context: analysis.context,
+      inputNode: analysis.analyser,
+      node,
+      dryGain: ensureDryAudioOutput(analysis),
+      wetGain,
+      backend: GOOGLE_OBR_NATIVE_BACKEND,
+      revision: GOOGLE_OBR_REVISION,
+      channelLayout,
+      inputChannelCount: layoutChannels,
+      ready: true,
+      processedBlocks: 0,
+      pendingProcess: null,
+      disableTimer: 0,
+      connected: true,
+      nativeStream: true,
+      session,
+      streamController,
+      streamAbort,
+      disposed: false,
+      inputRms: 0,
+      outputRms: 0,
+      nativeQueueUnderruns: 0,
+      nativeBuffersQueued: 0,
+      nativeOutputLatencySeconds: 0,
+      nativeClockOriginMediaTime: Number(els.audio?.currentTime) || 0,
+      nativeClockOriginConsumedFrames: 0,
+      nativeLastMediaTime: Number(els.audio?.currentTime) || 0
+    };
+
+    node.port.onmessage = (event) => {
+      const message = event.data || {};
+      if (message.type === 'pcm') {
+        if (graph.disposed || !graph.streamController || !(message.pcm instanceof Float32Array)) return;
+        try {
+          const pcm = message.pcm;
+          graph.streamController.enqueue(
+            new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength)
+          );
+          graph.processedBlocks = Math.max(graph.processedBlocks, Number(message.blocks) || 0);
+          graph.inputRms = Number(message.inputRms) || graph.inputRms;
+          state.obrSpatialAudio.processedBlocks = graph.processedBlocks;
+          state.obrSpatialAudio.inputRms = graph.inputRms;
+        } catch (error) {
+          if (!graph.disposed && state.obrSpatialAudio.requested) {
+            failGoogleObr(error, { announce: false, graph });
+          }
+        }
+        return;
+      }
+      if (message.type === 'metrics') {
+        graph.processedBlocks = Math.max(graph.processedBlocks, Number(message.processedBlocks) || 0);
+        graph.inputRms = Number(message.inputRms) || graph.inputRms;
+        state.obrSpatialAudio.processedBlocks = graph.processedBlocks;
+        state.obrSpatialAudio.inputRms = graph.inputRms;
+        if (state.obrSpatialAudio.enabled) syncGoogleObrToggle();
+      }
+    };
+    node.onprocessorerror = () => {
+      if (!graph.disposed && state.obrSpatialAudio.requested) {
+        failGoogleObr(new Error('原生 PCM AudioWorklet 已停止'), {
+          announce: false,
+          graph
+        });
+      }
+    };
+
+    analysis.analyser.connect(node);
+    node.connect(wetGain);
+    wetGain.connect(analysis.context.destination);
+    const streamParams = new URLSearchParams({
+      session: String(session),
+      inputChannels: '2'
+    });
+    graph.streamPromise = fetch(`/api/audio/spatial/stream?${streamParams}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'X-FE-Monster-Audio': '1'
+      },
+      body: streamBody,
+      duplex: 'half',
+      signal: streamAbort.signal
+    }).then(async (response) => {
+      if (response.ok || graph.disposed) return;
+      let message = `原生 PCM 流失败：HTTP ${response.status}`;
+      try {
+        const payload = await response.json();
+        message = safeText(payload?.error, message);
+      } catch (error) {
+      }
+      throw new Error(message);
+    }).catch((error) => {
+      if (graph.disposed || error?.name === 'AbortError') return;
+      if (state.obrSpatialAudio.requested) {
+        failGoogleObr(error, { announce: false, graph });
+      }
+    });
+    return graph;
+  } catch (error) {
+    await nativeSpatialRequest(`/api/audio/spatial/stop?session=${encodeURIComponent(session)}`).catch(() => {});
+    throw error;
+  }
+}
+
+async function waitForNativeGoogleObrPreroll(graph) {
+  const startedAt = performance.now();
+  const renderBlocksPerTransport = Math.ceil(
+    GOOGLE_OBR_NATIVE_TRANSPORT_FRAMES / GOOGLE_OBR_NATIVE_RENDER_FRAMES
+  );
+  while (!graph.disposed && performance.now() - startedAt < 5000) {
+    const status = await apiJson('/api/audio/spatial/status');
+    if (!status?.active || Number(status.session) !== Number(graph.session)) {
+      throw new Error('原生空间音频会话已中断');
+    }
+    if (
+      Number(status.droppedBuffers) > 0
+      || Number(status.bufferPoolExhaustions) > 0
+      || Number(status.queueUnderruns) > 0
+      || Number(status.lastResult) < 0
+    ) {
+      throw new Error(`原生空间音频队列异常：${Number(status.lastResult) || 'dropped'}`);
+    }
+    const processed = Number(status.obrProcessCalls) || 0;
+    const rustCalls = Number(status.rustUpmixProcessCalls) || 0;
+    if (
+      status.voiceStarted === true
+      && Number(status.buffersQueued) > 0
+      && processed >= renderBlocksPerTransport
+      && rustCalls >= 1
+    ) {
+      graph.outputRms = Number(status.outputEnergy) || 0;
+      updateNativeGoogleObrMetrics(graph, status);
+      state.obrSpatialAudio.outputRms = graph.outputRms;
+      return status;
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 25));
+  }
+  throw new Error('原生 Rust/X3DAudio/OBR 链路未收到实时 PCM');
+}
+
+function updateNativeGoogleObrMetrics(graph, status = {}) {
+  if (!graph?.nativeStream || graph.disposed) return 0;
+  const spatial = state.obrSpatialAudio;
+  const sampleRate = Math.max(
+    1,
+    Number(status.sampleRate) || Number(graph.context?.sampleRate) || 48000
+  );
+  const buffersQueued = Math.max(0, Number(status.buffersQueued) || 0);
+  const buffersConsumed = Math.max(0, Number(status.buffersConsumed) || 0);
+  const consumedFrames = buffersConsumed * GOOGLE_OBR_NATIVE_RENDER_FRAMES;
+  const mediaTime = Math.max(0, Number(els.audio?.currentTime) || 0);
+  const previousMediaTime = Number(graph.nativeLastMediaTime);
+  const mediaClockJumped = Number.isFinite(previousMediaTime)
+    && Math.abs(mediaTime - previousMediaTime) > 1;
+  const fallbackLatency = clamp(
+    (
+      Math.max(1, Number(status.prerollTargetBuffers) || 1)
+      * GOOGLE_OBR_NATIVE_RENDER_FRAMES
+    ) / sampleRate,
+    0,
+    LYRIC_AUDIO_OUTPUT_LATENCY_MAX_SECONDS
+  );
+
+  if (
+    !Number.isFinite(Number(graph.nativeClockOriginMediaTime))
+    || !Number.isFinite(Number(graph.nativeClockOriginConsumedFrames))
+  ) {
+    graph.nativeClockOriginMediaTime = mediaTime;
+    graph.nativeClockOriginConsumedFrames = consumedFrames;
+  } else if (mediaClockJumped) {
+    const preservedLatency = Math.max(
+      0,
+      Number(graph.nativeOutputLatencySeconds) || fallbackLatency
+    );
+    graph.nativeClockOriginMediaTime = mediaTime - preservedLatency;
+    graph.nativeClockOriginConsumedFrames = consumedFrames;
+  }
+
+  const measuredLatency = (
+    mediaTime - Number(graph.nativeClockOriginMediaTime)
+  ) - (
+    consumedFrames - Number(graph.nativeClockOriginConsumedFrames)
+  ) / sampleRate;
+  const outputLatency = clamp(
+    Number.isFinite(measuredLatency) && measuredLatency >= 0
+      ? measuredLatency
+      : Number(graph.nativeOutputLatencySeconds) || fallbackLatency,
+    0,
+    LYRIC_AUDIO_OUTPUT_LATENCY_MAX_SECONDS
+  );
+
+  graph.nativeLastMediaTime = mediaTime;
+  graph.nativeBuffersQueued = buffersQueued;
+  graph.nativeQueueUnderruns = Math.max(0, Number(status.queueUnderruns) || 0);
+  graph.nativeOutputLatencySeconds = outputLatency;
+  spatial.nativeBuffersQueued = buffersQueued;
+  spatial.nativeQueueUnderruns = graph.nativeQueueUnderruns;
+  spatial.nativeOutputLatencySeconds = outputLatency;
+  return outputLatency;
+}
+
+function refreshNativeGoogleObrHealth() {
+  const spatial = state.obrSpatialAudio;
+  const graph = spatial.graph;
+  if (
+    document.hidden
+    || !spatial.requested
+    || !spatial.enabled
+    || !graph?.nativeStream
+    || graph.disposed
+  ) {
+    return Promise.resolve(null);
+  }
+  if (spatial.nativeHealthRequest) return spatial.nativeHealthRequest;
+
+  const previousUnderruns = Math.max(0, Number(graph.nativeQueueUnderruns) || 0);
+  const request = apiJson('/api/audio/spatial/status')
+    .then((status) => {
+      if (
+        spatial.graph !== graph
+        || graph.disposed
+        || !spatial.requested
+        || !spatial.enabled
+      ) {
+        return null;
+      }
+      if (!status?.active || Number(status.session) !== Number(graph.session)) {
+        failGoogleObr(new Error('Native OBR session stopped'), { announce: false, graph });
+        return status;
+      }
+
+      updateNativeGoogleObrMetrics(graph, status);
+      const underruns = Math.max(0, Number(status.queueUnderruns) || 0);
+      const unhealthy = Number(status.droppedBuffers) > 0
+        || Number(status.bufferPoolExhaustions) > 0
+        || Number(status.lastResult) < 0;
+      if (underruns > previousUnderruns || unhealthy) {
+        const reason = underruns > previousUnderruns
+          ? `Native XAudio2 queue underrun ${previousUnderruns} -> ${underruns}`
+          : 'Native OBR queue reported a render failure';
+        failGoogleObr(new Error(reason), { announce: false, graph });
+      }
+      return status;
+    })
+    .catch(() => null)
+    .finally(() => {
+      if (spatial.nativeHealthRequest === request) spatial.nativeHealthRequest = null;
+    });
+  spatial.nativeHealthRequest = request;
+  return request;
+}
+
 function setGoogleObrRuntimeBackend(active) {
   const spatial = state.obrSpatialAudio;
   if (active) {
     if (!spatial.previousRuntimeBackend) {
       spatial.previousRuntimeBackend = state.clientRuntime.audioSpatialBackend || 'x3daudio';
     }
-    state.clientRuntime.audioSpatialBackend = GOOGLE_OBR_BACKEND;
+    state.clientRuntime.audioSpatialBackend = spatial.graph?.backend || GOOGLE_OBR_BACKEND;
   } else if (spatial.previousRuntimeBackend) {
     state.clientRuntime.audioSpatialBackend = spatial.previousRuntimeBackend;
     spatial.previousRuntimeBackend = '';
@@ -4227,10 +5461,67 @@ function clearGoogleObrRecovery() {
   spatial.recoveryTimer = 0;
 }
 
+function connectOfficialGoogleObrGraph(graph) {
+  if (!graph || graph.connected) return;
+  graph.inputNode.connect(graph.node);
+  graph.node.connect(graph.wetGain);
+  graph.wetGain.connect(graph.context.destination);
+  graph.connected = true;
+}
+
+function disconnectOfficialGoogleObrGraph(graph) {
+  if (!graph || !graph.connected) return;
+  try { graph.inputNode.disconnect(graph.node); } catch (error) {}
+  try { graph.node.disconnect(graph.wetGain); } catch (error) {}
+  try { graph.wetGain.disconnect(graph.context.destination); } catch (error) {}
+  graph.connected = false;
+}
+
 function disposeOfficialGoogleObrGraph(graph = state.obrSpatialAudio.graph) {
   if (!graph) return;
   window.clearTimeout(graph.disableTimer);
   graph.disableTimer = 0;
+  // Keep the dry path audible while a failed/reconfigured OBR graph is rebuilt.
+  // The dry gain is owned by the shared analyser graph and remains connected
+  // after the wet worklet is disposed.
+  const now = Number(graph.context?.currentTime) || 0;
+  const dryGain = graph.dryGain?.gain;
+  const wetGain = graph.wetGain?.gain;
+  try {
+    dryGain?.cancelScheduledValues(now);
+    wetGain?.cancelScheduledValues(now);
+    if (dryGain) dryGain.value = 1;
+    if (wetGain) wetGain.value = 0;
+  } catch (error) {
+    if (dryGain) dryGain.value = 1;
+    if (wetGain) wetGain.value = 0;
+  }
+  if (graph.nativeStream) {
+    graph.disposed = true;
+    if (graph.pendingProcess) {
+      const pending = graph.pendingProcess;
+      graph.pendingProcess = null;
+      window.clearTimeout(pending.timeout);
+      pending.reject(new Error('原生空间音频链路已重建'));
+    }
+    try { graph.node.port.postMessage({ type: 'set-enabled', enabled: false }); } catch (error) {}
+    disconnectOfficialGoogleObrGraph(graph);
+    try { graph.streamController?.close(); } catch (error) {}
+    graph.streamAbort?.abort();
+    nativeSpatialRequest(
+      `/api/audio/spatial/stop?session=${encodeURIComponent(graph.session)}`
+    ).catch(() => {});
+    try { graph.node.port.close(); } catch (error) {}
+    graph.node.onprocessorerror = null;
+    graph.ready = false;
+    if (state.obrSpatialAudio.graph === graph) {
+      state.obrSpatialAudio.graph = null;
+      state.obrSpatialAudio.nativeBuffersQueued = 0;
+      state.obrSpatialAudio.nativeQueueUnderruns = 0;
+      state.obrSpatialAudio.nativeOutputLatencySeconds = 0;
+    }
+    return;
+  }
   if (graph.pendingProcess) {
     const pending = graph.pendingProcess;
     graph.pendingProcess = null;
@@ -4238,8 +5529,7 @@ function disposeOfficialGoogleObrGraph(graph = state.obrSpatialAudio.graph) {
     pending.reject(new Error('Google OBR 音频链路已重建'));
   }
   try { graph.node.port.postMessage({ type: 'set-enabled', enabled: false }); } catch (error) {}
-  try { graph.node.disconnect(); } catch (error) {}
-  try { graph.wetGain.disconnect(); } catch (error) {}
+  disconnectOfficialGoogleObrGraph(graph);
   try { graph.node.port.close(); } catch (error) {}
   graph.node.onprocessorerror = null;
   graph.ready = false;
@@ -4270,12 +5560,16 @@ function scheduleGoogleObrRecovery() {
 function failGoogleObr(error, options = {}) {
   const spatial = state.obrSpatialAudio;
   const message = safeText(error && error.message ? error.message : error, '官方内核加载失败');
+  if (options.graph?.nativeStream) {
+    spatial.nativeFallback = true;
+    spatial.nativeError = message;
+  }
   if (options.graph) disposeOfficialGoogleObrGraph(options.graph);
   spatial.enabled = false;
   spatial.loading = false;
   spatial.requested = true;
   spatial.error = message;
-  if (![GOOGLE_OBR_BACKEND, 'capture-stream-unsupported'].includes(spatial.backend)) {
+  if (![GOOGLE_OBR_BACKEND, GOOGLE_OBR_NATIVE_BACKEND, 'capture-stream-unsupported'].includes(spatial.backend)) {
     spatial.backend = 'unavailable';
   }
   saveGoogleObrPreference(true);
@@ -4315,6 +5609,7 @@ async function createOfficialGoogleObrGraph(analysis) {
 
   const graph = {
     context: analysis.context,
+    inputNode: analysis.analyser,
     node,
     dryGain: ensureDryAudioOutput(analysis),
     wetGain,
@@ -4325,7 +5620,8 @@ async function createOfficialGoogleObrGraph(analysis) {
     ready: false,
     processedBlocks: 0,
     pendingProcess: null,
-    disableTimer: 0
+    disableTimer: 0,
+    connected: true
   };
 
   await new Promise((resolve, reject) => {
@@ -4408,7 +5704,18 @@ async function ensureOfficialGoogleObrGraph(analysis = state.audioAnalysis) {
   if (spatial.graph?.ready && spatial.graph.channelLayout === channelLayout) return spatial.graph;
   if (spatial.graph?.ready) disposeOfficialGoogleObrGraph(spatial.graph);
   if (spatial.graphPromise) return spatial.graphPromise;
-  spatial.graphPromise = createOfficialGoogleObrGraph(analysis)
+  const createPreferredGraph = async () => {
+    if (canUseNativeGoogleObr(channelLayout)) {
+      try {
+        return await createNativeGoogleObrGraph(analysis);
+      } catch (error) {
+        spatial.nativeError = safeText(error?.message, '原生空间音频链路不可用');
+        spatial.nativeFallback = true;
+      }
+    }
+    return createOfficialGoogleObrGraph(analysis);
+  };
+  spatial.graphPromise = createPreferredGraph()
     .then((graph) => {
       spatial.graph = graph;
       spatial.backend = graph.backend;
@@ -4423,6 +5730,7 @@ async function ensureOfficialGoogleObrGraph(analysis = state.audioAnalysis) {
 }
 
 function waitForGoogleObrProcessedBlock(graph) {
+  if (graph.nativeStream) return waitForNativeGoogleObrPreroll(graph);
   if (graph.pendingProcess) return graph.pendingProcess.promise;
   const afterBlock = graph.processedBlocks;
   let resolvePending;
@@ -4462,12 +5770,21 @@ async function activateOfficialGoogleObr(options = {}) {
     const graph = await ensureOfficialGoogleObrGraph(analysis);
     window.clearTimeout(graph.disableTimer);
     graph.disableTimer = 0;
+    connectOfficialGoogleObrGraph(graph);
     const processed = waitForGoogleObrProcessedBlock(graph);
     graph.node.port.postMessage({ type: 'set-enabled', enabled: true });
     await processed;
     if (!spatial.requested || operationId !== spatial.operationId) {
       graph.node.port.postMessage({ type: 'set-enabled', enabled: false });
       return false;
+    }
+    if (graph.nativeStream) {
+      const nativeActivation = await nativeSpatialRequest(
+        `/api/audio/spatial/activate?session=${encodeURIComponent(graph.session)}`
+      );
+      if (!nativeActivation?.ok) {
+        throw new Error(safeText(nativeActivation?.error, 'XAudio2 原生输出无法解除静音'));
+      }
     }
     setAudioParamSmoothly(graph.dryGain.gain, 0, graph.context);
     setAudioParamSmoothly(graph.wetGain.gain, 1, graph.context);
@@ -4518,7 +5835,12 @@ async function setGoogleObrSpatialAudioEnabled(enabled, options = {}) {
       setAudioParamSmoothly(graph.wetGain.gain, 0, graph.context);
       graph.disableTimer = window.setTimeout(() => {
         graph.disableTimer = 0;
+        if (graph.nativeStream) {
+          disposeOfficialGoogleObrGraph(graph);
+          return;
+        }
         graph.node.port.postMessage({ type: 'set-enabled', enabled: false });
+        disconnectOfficialGoogleObrGraph(graph);
       }, 70);
     }
     syncGoogleObrToggle();
@@ -4668,19 +5990,6 @@ function rmsFrequencyBand(data, analyser, fromHz, toHz) {
   return clamp(Math.sqrt(sumSquares / Math.max(1, to - from)), 0, 1);
 }
 
-function sampleFrequencyAmplitude(data, analyser, frequencyHz) {
-  if (!data || !data.length) return 0;
-  const sampleRate = analyser && analyser.context && analyser.context.sampleRate
-    ? analyser.context.sampleRate
-    : state.audioAnalysis.sampleRate || 44100;
-  const nyquist = sampleRate / 2;
-  const binPosition = clamp((frequencyHz / nyquist) * data.length, 0, data.length - 1);
-  const lowerIndex = Math.floor(binPosition);
-  const upperIndex = Math.min(data.length - 1, lowerIndex + 1);
-  const mix = binPosition - lowerIndex;
-  return clamp(((data[lowerIndex] || 0) + ((data[upperIndex] || 0) - (data[lowerIndex] || 0)) * mix) / 255, 0, 1);
-}
-
 function updateAudioSpectrum() {
   const analysis = state.audioAnalysis;
   if (state.clientRuntime.nativeAudioActive && state.clientRuntime.settings.xAudio2) {
@@ -4704,22 +6013,22 @@ function updateAudioSpectrum() {
 
   const data = analysis.data;
   const scaleBin = data.length / 512;
-  const bin = (value) => clamp(Math.floor(value * scaleBin), 0, data.length - 1);
-  const subBassEnd = bin(1);
-  const bassStart = bin(2);
-  const bassEnd = bin(3);
-  const lowMidStart = bin(4);
-  const lowMidEnd = bin(7);
-  const midStart = bin(8);
-  const midEnd = bin(18);
-  const highMidStart = bin(19);
-  const highMidEnd = bin(46);
-  const presenceStart = bin(47);
-  const presenceEnd = bin(93);
-  const brillianceStart = bin(94);
-  const brillianceEnd = bin(186);
-  const airStart = bin(187);
-  const airEnd = bin(372);
+  const lastDataIndex = data.length - 1;
+  const subBassEnd = clamp(Math.floor(scaleBin), 0, lastDataIndex);
+  const bassStart = clamp(Math.floor(2 * scaleBin), 0, lastDataIndex);
+  const bassEnd = clamp(Math.floor(3 * scaleBin), 0, lastDataIndex);
+  const lowMidStart = clamp(Math.floor(4 * scaleBin), 0, lastDataIndex);
+  const lowMidEnd = clamp(Math.floor(7 * scaleBin), 0, lastDataIndex);
+  const midStart = clamp(Math.floor(8 * scaleBin), 0, lastDataIndex);
+  const midEnd = clamp(Math.floor(18 * scaleBin), 0, lastDataIndex);
+  const highMidStart = clamp(Math.floor(19 * scaleBin), 0, lastDataIndex);
+  const highMidEnd = clamp(Math.floor(46 * scaleBin), 0, lastDataIndex);
+  const presenceStart = clamp(Math.floor(47 * scaleBin), 0, lastDataIndex);
+  const presenceEnd = clamp(Math.floor(93 * scaleBin), 0, lastDataIndex);
+  const brillianceStart = clamp(Math.floor(94 * scaleBin), 0, lastDataIndex);
+  const brillianceEnd = clamp(Math.floor(186 * scaleBin), 0, lastDataIndex);
+  const airStart = clamp(Math.floor(187 * scaleBin), 0, lastDataIndex);
+  const airEnd = clamp(Math.floor(372 * scaleBin), 0, lastDataIndex);
   let subBassSum = 0;
   let subBassCount = 0;
   let bassSum = 0;
@@ -4743,10 +6052,10 @@ function updateAudioSpectrum() {
   let jumpVolatilitySum = 0;
   let fluxPulseRaw = 0;
   let fluxMeteorRaw = 0;
-  const pulseStart = bin(0);
-  const pulseEnd = bin(16);
-  const meteorStart = bin(159);
-  const meteorEnd = bin(174);
+  const pulseStart = 0;
+  const pulseEnd = clamp(Math.floor(16 * scaleBin), 0, lastDataIndex);
+  const meteorStart = clamp(Math.floor(159 * scaleBin), 0, lastDataIndex);
+  const meteorEnd = clamp(Math.floor(174 * scaleBin), 0, lastDataIndex);
 
   for (let index = 0; index < data.length; index += 1) {
     const value = (data[index] || 0) / 255;
@@ -4812,16 +6121,16 @@ function updateAudioSpectrum() {
   analysis.previousBrightness = brightnessRaw;
   const smoothnessRaw = Math.max(0, 1 - (jumpVolatilitySum / Math.max(1, data.length)) * 2);
   const activeThreshold = energyRaw * 1.5;
-  const densityRaw = [
-    subBassRaw,
-    bassOnlyRaw,
-    lowMidRaw,
-    midOnlyRaw,
-    highMidRaw,
-    presenceRaw,
-    brillianceRaw,
-    airRaw
-  ].filter((value) => value > activeThreshold).length / 8;
+  let activeBandCount = 0;
+  if (subBassRaw > activeThreshold) activeBandCount += 1;
+  if (bassOnlyRaw > activeThreshold) activeBandCount += 1;
+  if (lowMidRaw > activeThreshold) activeBandCount += 1;
+  if (midOnlyRaw > activeThreshold) activeBandCount += 1;
+  if (highMidRaw > activeThreshold) activeBandCount += 1;
+  if (presenceRaw > activeThreshold) activeBandCount += 1;
+  if (brillianceRaw > activeThreshold) activeBandCount += 1;
+  if (airRaw > activeThreshold) activeBandCount += 1;
+  const densityRaw = activeBandCount / 8;
   const spectralCentroidRaw = centroidDen > 0 ? centroidNum / centroidDen : 0;
   const active = bassRaw > 0.012 || midRaw > 0.012 || trebleRaw > 0.012;
 
@@ -4846,11 +6155,36 @@ function updateAudioSpectrum() {
   analysis.bass += (bassRaw - analysis.bass) * dt;
   const lowFrequencyRate = lowFrequencyRaw > analysis.lowFrequencyAmplitude ? 0.34 : 0.075;
   analysis.lowFrequencyAmplitude += (lowFrequencyRaw - analysis.lowFrequencyAmplitude) * lowFrequencyRate;
+  const spectrumSampleRate = analysis.analyser.context?.sampleRate || analysis.sampleRate || 44100;
+  const spectrumNyquist = spectrumSampleRate / 2;
+  const lowFrequencyBandDivisor = Math.max(1, SONIC_LOW_FREQUENCY_BAND_COUNT - 1);
+  const lowFrequencySpan = SONIC_LOW_FREQUENCY_MAX_HZ - SONIC_LOW_FREQUENCY_MIN_HZ;
+  if (
+    analysis.lowFrequencyLookupDataLength !== data.length
+    || analysis.lowFrequencyLookupSampleRate !== spectrumSampleRate
+  ) {
+    analysis.lowFrequencyLookupDataLength = data.length;
+    analysis.lowFrequencyLookupSampleRate = spectrumSampleRate;
+    for (let index = 0; index < SONIC_LOW_FREQUENCY_BAND_COUNT; index += 1) {
+      const progress = index / lowFrequencyBandDivisor;
+      const frequencyHz = SONIC_LOW_FREQUENCY_MIN_HZ + lowFrequencySpan * progress;
+      const binPosition = clamp((frequencyHz / spectrumNyquist) * data.length, 0, lastDataIndex);
+      const lowerIndex = Math.floor(binPosition);
+      analysis.lowFrequencyBinLower[index] = lowerIndex;
+      analysis.lowFrequencyBinMix[index] = binPosition - lowerIndex;
+    }
+  }
+  const lowFrequencyBinLower = analysis.lowFrequencyBinLower;
+  const lowFrequencyBinMix = analysis.lowFrequencyBinMix;
   for (let index = 0; index < SONIC_LOW_FREQUENCY_BAND_COUNT; index += 1) {
-    const progress = index / Math.max(1, SONIC_LOW_FREQUENCY_BAND_COUNT - 1);
-    const frequencyHz = SONIC_LOW_FREQUENCY_MIN_HZ
-      + (SONIC_LOW_FREQUENCY_MAX_HZ - SONIC_LOW_FREQUENCY_MIN_HZ) * progress;
-    const rawAmplitude = sampleFrequencyAmplitude(data, analysis.analyser, frequencyHz);
+    const lowerIndex = lowFrequencyBinLower[index];
+    const upperIndex = Math.min(lastDataIndex, lowerIndex + 1);
+    const mix = lowFrequencyBinMix[index];
+    const rawAmplitude = clamp(
+      ((data[lowerIndex] || 0) + ((data[upperIndex] || 0) - (data[lowerIndex] || 0)) * mix) / 255,
+      0,
+      1
+    );
     const targetAmplitude = clamp(rawAmplitude * 1.55, 0, 1);
     const currentAmplitude = analysis.lowFrequencyBands[index] || 0;
     const response = targetAmplitude > currentAmplitude ? 0.34 : 0.075;
@@ -5397,14 +6731,20 @@ function clearFreeCubeBassPreview() {
 
 function buildVoidPrism() {
   if (!els.voidPrismCore || state.voidPrism.runtime || !window.FeVoidPrismRuntime || !window.THREE) return;
+  const lyric = state.lyricDisplayText || playbackLyricText();
+  const subtitle = state.lyricSubtitleText || playbackLyricSubtitle();
+  const fontFamily = activeTextFontFamilyStack();
   state.voidPrism.runtime = window.FeVoidPrismRuntime.create(els.voidPrismCore, {
-    lyric: state.lyricDisplayText || playbackLyricText(),
-    subtitle: state.lyricSubtitleText || playbackLyricSubtitle(),
+    lyric,
+    subtitle,
     palette: fallbackLyricPalette(state.currentSong),
-    fontFamily: activeTextFontFamilyStack(),
+    fontFamily,
     pixelRatio: renderPixelRatio('webgl'),
     createRenderer: (options) => createDirectX11Renderer(window.THREE, options)
   });
+  state.voidPrism.lastLyricText = lyric;
+  state.voidPrism.lastLyricSubtitle = subtitle;
+  state.voidPrism.lastLyricFontStack = fontFamily;
 }
 
 function disposeVoidPrism() {
@@ -5417,6 +6757,9 @@ function disposeVoidPrism() {
     ...window.FeVoidPrismRuntime.diagnostics(runtime)
   };
   state.voidPrism.runtime = null;
+  state.voidPrism.lastLyricText = '';
+  state.voidPrism.lastLyricSubtitle = '';
+  state.voidPrism.lastLyricFontStack = '';
 }
 
 function resizeVoidPrismRenderer() {
@@ -5436,13 +6779,19 @@ function updateVoidPrismMotion() {
   const runtime = state.voidPrism.runtime;
   if (!state.playbackPage || !isVoidPrismPreset() || !runtime || !window.FeVoidPrismRuntime) return;
   const playing = !!els.audio && !els.audio.paused;
-  window.FeVoidPrismRuntime.setLyric(
-    runtime,
-    state.lyricDisplayText || playbackLyricText(),
-    state.lyricSubtitleText || playbackLyricSubtitle(),
-    undefined,
-    activeTextFontFamilyStack()
-  );
+  const lyric = state.lyricDisplayText || playbackLyricText();
+  const subtitle = state.lyricSubtitleText || playbackLyricSubtitle();
+  const fontFamily = activeTextFontFamilyStack();
+  if (
+    lyric !== state.voidPrism.lastLyricText
+    || subtitle !== state.voidPrism.lastLyricSubtitle
+    || fontFamily !== state.voidPrism.lastLyricFontStack
+  ) {
+    window.FeVoidPrismRuntime.setLyric(runtime, lyric, subtitle, undefined, fontFamily);
+    state.voidPrism.lastLyricText = lyric;
+    state.voidPrism.lastLyricSubtitle = subtitle;
+    state.voidPrism.lastLyricFontStack = fontFamily;
+  }
   const frame = state.voidPrism.frame;
   frame.now = performance.now();
   frame.bass = playing ? Math.max(Number(state.visual.lowFrequencyAmplitude) || 0, Number(state.visual.bass) || 0) : 0;
@@ -5529,6 +6878,7 @@ function buildChladni() {
     pixelRatio: renderPixelRatio('webgl'),
     createRenderer: (options) => createDirectX11Renderer(window.THREE, options)
   });
+  syncSceneWallpaperSurface('chladni');
   syncChladniModeControls();
 }
 
@@ -5685,8 +7035,14 @@ function createSonicTopographyMaterial(THREE, theme) {
     uSonicBrightness: { value: DEFAULT_SONIC_SETTINGS.brightness },
     uSonicExposure: { value: DEFAULT_SONIC_SETTINGS.exposure },
     uColumnHeightScale: { value: DEFAULT_SONIC_SETTINGS.columnHeight },
+    uAllGroundFloat: { value: DEFAULT_SONIC_SETTINGS.allGroundFloatEnabled ? 1 : 0 },
     uRippleColor: { value: theme.uRippleColor.clone() },
-    uGlowIntensity: { value: theme.uGlowIntensity }
+    uGlowIntensity: { value: theme.uGlowIntensity },
+    uTyndallBounceColor: { value: new THREE.Color(0xf4fbff) },
+    uTyndallReceiverBounce: { value: 0 },
+    uAtmosphereDaylightFill: { value: 0 },
+    uTyndallLightDirection: { value: new THREE.Vector2(72, -48).normalize() },
+    uTyndallGoboPhase: { value: 0 }
   };
 
   const vertexShader = `
@@ -5704,6 +7060,7 @@ function createSonicTopographyMaterial(THREE, theme) {
     uniform float uAudioPulse;
     uniform float uIdleBreath;
     uniform float uColumnHeightScale;
+    uniform float uAllGroundFloat;
     attribute float aBassColumnBand;
 
     struct Ripple {
@@ -5882,7 +7239,38 @@ function createSonicTopographyMaterial(THREE, theme) {
       }
       audioElevation *= globalFalloff;
 
-      float elevation = idleElevation + audioElevation;
+      // A four-colour lattice gives the field more depth than a two-level
+      // checkerboard. x + 2z changes for every direct neighbour, and the four
+      // non-overlapping height bands keep adjacent pillars visibly distinct.
+      vec2 groundGridCell = floor(bassColumnGrid + vec2(0.5));
+      float groundHeightBandIndex = mod(
+        groundGridCell.x + groundGridCell.y * 2.0 + 4096.0,
+        4.0
+      );
+      // Deterministic phase disorder breaks up the diagonal stripes while two
+      // shared tempos keep the field rhythmic rather than jittering randomly.
+      float groundPhaseJitter = random(groundGridCell * 0.173 + vec2(19.7, 43.1)) * 2.4 - 1.2;
+      float groundPhase = dot(groundGridCell, vec2(0.47, 0.71)) + groundPhaseJitter;
+      float groundBeat = 0.5 + 0.5 * sin(uTime * 1.06 - groundPhase);
+      float groundPrimaryWave = groundBeat * groundBeat * (3.0 - 2.0 * groundBeat);
+      float groundSecondaryBeat = 0.5 + 0.5 * sin(uTime * 0.57 + groundPhase * 1.73);
+      float groundSecondaryWave = groundSecondaryBeat * groundSecondaryBeat
+        * (3.0 - 2.0 * groundSecondaryBeat);
+      float groundWave = mix(groundPrimaryWave, groundSecondaryWave, 0.24);
+      float groundHeightBand;
+      if (groundHeightBandIndex < 0.5) {
+        groundHeightBand = 0.38 + groundWave * 0.18;
+      } else if (groundHeightBandIndex < 1.5) {
+        groundHeightBand = 0.74 + groundWave * 0.20;
+      } else if (groundHeightBandIndex < 2.5) {
+        groundHeightBand = 1.12 + groundWave * 0.22;
+      } else {
+        groundHeightBand = 1.52 + groundWave * 0.25;
+      }
+      float groundEdgeFade = 1.0 - smoothstep(72.0, 78.0, centerDist);
+      float allGroundFloatLift = uAllGroundFloat * groundHeightBand * groundEdgeFade;
+
+      float elevation = idleElevation + audioElevation + allGroundFloatLift;
       float rippleElevation = 0.0;
       float rippleIntensityNormal = 0.0;
       float rippleIntensityWhite = 0.0;
@@ -5954,6 +7342,11 @@ function createSonicTopographyMaterial(THREE, theme) {
     uniform vec3 uOuterColumnColor;
     uniform float uSonicBrightness;
     uniform float uSonicExposure;
+    uniform vec3 uTyndallBounceColor;
+    uniform float uTyndallReceiverBounce;
+    uniform float uAtmosphereDaylightFill;
+    uniform vec2 uTyndallLightDirection;
+    uniform float uTyndallGoboPhase;
     uniform vec3 uRippleColor;
     uniform float uGlowIntensity;
 
@@ -6041,6 +7434,32 @@ function createSonicTopographyMaterial(THREE, theme) {
       finalColor += uRippleColor * vRippleAnim.x * 0.6;
       finalColor += vec3(1.0, 1.0, 1.0) * vRippleAnim.y * 1.2;
 
+      // Approximate the soft local color return visible where the shafts meet
+      // the terrain. This is intentionally a tiny emissive response on the
+      // existing column shader rather than a second lighting or raytrace pass.
+      vec2 receiverDirection = normalize(uTyndallLightDirection);
+      vec2 receiverTangent = vec2(-receiverDirection.y, receiverDirection.x);
+      float receiverAlong = dot(vInstancePos, receiverDirection) * 0.035;
+      float receiverAcross = dot(vInstancePos, receiverTangent) * 0.12;
+      float receiverGobo = random(floor(vInstancePos * 0.22 + uTyndallGoboPhase));
+      float receiverCanopy = smoothstep(0.27, 0.78,
+        receiverGobo * 0.58 + (sin(receiverAcross + receiverAlong * 0.7) * 0.5 + 0.5) * 0.42);
+      float receiverBounceStrength = mix(0.28, 1.0, receiverCanopy)
+        * mix(0.72, 1.0, smoothstep(-1.4, 1.2, receiverAlong));
+      float receiverEmissiveIntensity = receiverBounceStrength
+        * uTyndallReceiverBounce * mix(0.48, 1.0, smoothstep(0.25, 0.88, vRelativeY));
+      vec3 receiverBounce = uTyndallBounceColor * receiverEmissiveIntensity;
+      float receiverPeak = max(receiverBounce.r, max(receiverBounce.g, receiverBounce.b));
+      receiverBounce /= 1.0 + max(0.0, receiverPeak - 0.38) * 1.8;
+      finalColor += receiverBounce;
+      // Sunlight also contributes a soft, directional daylight fill. Keep its
+      // low-frequency canopy variation so raised atmosphere settings reveal
+      // more midtones without flattening the terrain or creating a light spot.
+      float daylightShape = mix(0.42, 1.0, receiverCanopy)
+        * mix(0.7, 1.0, smoothstep(-1.4, 1.2, receiverAlong));
+      daylightShape *= isTop ? 1.0 : mix(0.62, 0.9, vRelativeY);
+      finalColor += uTyndallBounceColor * uAtmosphereDaylightFill * daylightShape;
+
       float aerialFog = smoothstep(30.0, 65.0, vDistance);
       vec3 atmosphericColor = mix(cBase1, cBase2, 0.4);
       finalColor = mix(finalColor, atmosphericColor, aerialFog * 0.5);
@@ -6083,15 +7502,34 @@ function resolvedSonicTopographyColors() {
   };
 }
 
-function saveSonicSettingsPreferences() {
-  try {
-    window.localStorage.setItem(SONIC_SETTINGS_PREFS_KEY, JSON.stringify(
-      {
-        ...normalizeSonicSettings(state.sonicTopography.settings),
-        cameraFramingVersion: SONIC_CAMERA_FRAMING_VERSION
-      }
-    ));
-  } catch (error) {}
+let sonicSettingsPreferenceSaveTimer = 0;
+
+function saveSonicSettingsPreferences({ immediate = false } = {}) {
+  window.clearTimeout(sonicSettingsPreferenceSaveTimer);
+  sonicSettingsPreferenceSaveTimer = 0;
+  const commit = () => {
+    sonicSettingsPreferenceSaveTimer = 0;
+    try {
+      window.localStorage.setItem(SONIC_SETTINGS_PREFS_KEY, JSON.stringify(
+        {
+          ...normalizeSonicSettings(state.sonicTopography.settings),
+          cameraFramingVersion: SONIC_CAMERA_FRAMING_VERSION
+        }
+      ));
+    } catch (error) {}
+  };
+  if (immediate) {
+    commit();
+    return;
+  }
+  sonicSettingsPreferenceSaveTimer = window.setTimeout(
+    commit,
+    VISUAL_PREFERENCE_SAVE_DEBOUNCE_MS
+  );
+}
+
+function flushSonicSettingsPreferences() {
+  if (sonicSettingsPreferenceSaveTimer) saveSonicSettingsPreferences({ immediate: true });
 }
 
 function syncSonicSettingsControls() {
@@ -6104,14 +7542,28 @@ function syncSonicSettingsControls() {
   if (els.sonicOuterColorInput) els.sonicOuterColorInput.value = colors.outer;
   if (els.sonicFountainColorInput) els.sonicFountainColorInput.value = settings.fountainColor;
   if (els.sonicStarfieldColorInput) els.sonicStarfieldColorInput.value = settings.starfieldColor;
+  if (els.sonicGalaxyColorInput) els.sonicGalaxyColorInput.value = settings.galaxyColor;
   if (els.sonicFountainToggle) {
     els.sonicFountainToggle.checked = settings.fountainEnabled;
     els.sonicFountainToggle.setAttribute('aria-checked', String(settings.fountainEnabled));
+  }
+  if (els.sonicAllGroundFloatToggle) {
+    els.sonicAllGroundFloatToggle.checked = settings.allGroundFloatEnabled;
+    els.sonicAllGroundFloatToggle.setAttribute('aria-checked', String(settings.allGroundFloatEnabled));
   }
   if (els.sonicStarfieldToggle) {
     els.sonicStarfieldToggle.checked = settings.starfieldEnabled;
     els.sonicStarfieldToggle.setAttribute('aria-checked', String(settings.starfieldEnabled));
   }
+  const syncToggle = (input, checked) => {
+    if (!input) return;
+    input.checked = checked;
+    input.setAttribute('aria-checked', String(checked));
+  };
+  syncToggle(els.sonicGalaxyToggle, settings.galaxyEnabled);
+  syncToggle(els.sonicAtmosphereToggle, settings.atmosphereEnabled);
+  syncToggle(els.sonicCoverBackgroundToggle, settings.coverBackgroundEnabled);
+  if (els.sonicTyndallToneSelect) els.sonicTyndallToneSelect.value = settings.tyndallTone;
   if (els.sonicPaletteMode) {
     els.sonicPaletteMode.textContent = isAutomatic
       ? '颜色跟随封面'
@@ -6135,6 +7587,15 @@ function syncSonicSettingsControls() {
   syncRange(els.sonicColumnHeightRange, els.sonicColumnHeightValue, Math.round(settings.columnHeight * 100), `${Math.round(settings.columnHeight * 100)}%`);
   syncRange(els.sonicFovRange, els.sonicFovValue, Math.round(settings.fov), `${Math.round(settings.fov)}°`);
   syncRange(els.sonicSmoothingRange, els.sonicSmoothingValue, Math.round(settings.smoothing * 100), `${Math.round(settings.smoothing * 100)}%`);
+  syncRange(els.sonicGalaxyIntensityRange, els.sonicGalaxyIntensityValue, Math.round(settings.galaxyIntensity * 100), `${Math.round(settings.galaxyIntensity * 100)}%`);
+  syncRange(els.sonicFogDensityRange, els.sonicFogDensityValue, Math.round(settings.fogDensity * 100), `${Math.round(settings.fogDensity * 100)}%`);
+  syncRange(els.sonicFogSpeedRange, els.sonicFogSpeedValue, Math.round(settings.fogSpeed * 100), `${Math.round(settings.fogSpeed * 100)}%`);
+  syncRange(els.sonicFogGlowRange, els.sonicFogGlowValue, Math.round(settings.fogGlow * 100), `${Math.round(settings.fogGlow * 100)}%`);
+  syncRange(els.sonicMistReflectanceRange, els.sonicMistReflectanceValue, Math.round(settings.mistReflectance * 100), `${Math.round(settings.mistReflectance * 100)}%`);
+  syncRange(els.sonicMistEmissionRange, els.sonicMistEmissionValue, Math.round(settings.mistEmission * 100), `${Math.round(settings.mistEmission * 100)}%`);
+  syncRange(els.sonicTyndallIntensityRange, els.sonicTyndallIntensityValue, Math.round(settings.tyndallIntensity * 100), `${Math.round(settings.tyndallIntensity * 100)}%`);
+  syncRange(els.sonicTyndallSpreadRange, els.sonicTyndallSpreadValue, Math.round(settings.tyndallSpread * 100), `${Math.round(settings.tyndallSpread * 100)}%`);
+  syncRange(els.sonicCoverBackgroundMixRange, els.sonicCoverBackgroundMixValue, Math.round(settings.coverBackgroundMix * 100), `${Math.round(settings.coverBackgroundMix * 100)}%`);
 }
 
 function sonicTopographyCameraFitRadius(aspect, fov) {
@@ -6143,20 +7604,29 @@ function sonicTopographyCameraFitRadius(aspect, fov) {
   const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * safeAspect);
   const fitFov = Math.min(verticalFov, horizontalFov);
   const activeRadius = Math.min(Math.SQRT2 * SONIC_TOPOGRAPHY_HALF, 78);
-  return Math.hypot(activeRadius, 10) * 0.84 / Math.sin(fitFov / 2);
+  return Math.hypot(activeRadius, 10) * 0.74 / Math.sin(fitFov / 2);
 }
 
 function updateSonicTopographyCameraFit() {
   const topo = state.sonicTopography;
   if (!topo.camera) return;
-  const settings = normalizeSonicSettings(topo.settings);
+  // Settings are normalized when loaded/applied, so camera refits can reuse them.
+  const settings = topo.settings || DEFAULT_SONIC_SETTINGS;
   topo.camera.fov = settings.fov;
   topo.baseCameraRadius = sonicTopographyCameraFitRadius(topo.camera.aspect, settings.fov);
   topo.camera.updateProjectionMatrix();
+  fitSonicWallpaperSurface(topo);
+  fitSonicWallpaperTexture(topo);
   if (topo.scene?.fog) {
     const activeRadius = Math.min(Math.SQRT2 * SONIC_TOPOGRAPHY_HALF, 78);
-    topo.scene.fog.near = topo.baseCameraRadius * 0.58;
-    topo.scene.fog.far = topo.baseCameraRadius + activeRadius * 1.8;
+    const fogAmount = settings.fogEnabled ? settings.fogDensity : 0;
+    if (!settings.fogEnabled) {
+      topo.scene.fog.near = topo.baseCameraRadius + activeRadius * 2.6;
+      topo.scene.fog.far = topo.scene.fog.near + activeRadius;
+    } else {
+      topo.scene.fog.near = topo.baseCameraRadius * (0.98 - fogAmount * 0.1);
+      topo.scene.fog.far = topo.baseCameraRadius + activeRadius * (2.8 - fogAmount * 0.4);
+    }
   }
 }
 
@@ -6172,14 +7642,655 @@ function applySonicTopographySettings(options = {}) {
     if (topo.uniforms.uSonicBrightness) topo.uniforms.uSonicBrightness.value = settings.brightness;
     if (topo.uniforms.uSonicExposure) topo.uniforms.uSonicExposure.value = settings.exposure;
     if (topo.uniforms.uColumnHeightScale) topo.uniforms.uColumnHeightScale.value = settings.columnHeight;
+    if (topo.uniforms.uAllGroundFloat) topo.uniforms.uAllGroundFloat.value = settings.allGroundFloatEnabled ? 1 : 0;
   }
   if (topo.particleMaterial?.color) topo.particleMaterial.color.set(settings.fountainColor);
   if (topo.starfield) topo.starfield.visible = settings.starfieldEnabled;
   if (topo.starfieldMaterial?.color) topo.starfieldMaterial.color.set(settings.starfieldColor);
+  if (topo.galaxy) topo.galaxy.visible = settings.galaxyEnabled;
+  if (topo.galaxyMaterial?.color) topo.galaxyMaterial.color.set(settings.galaxyColor);
+  if (topo.galaxyMaterial) topo.galaxyMaterial.opacity = 0.08 + settings.galaxyIntensity * 0.56;
+  if (topo.fogGroup) topo.fogGroup.visible = settings.atmosphereEnabled;
+  const toneColor = settings.tyndallTone === 'cold'
+    ? 0xb9dcff
+    : settings.tyndallTone === 'warm' ? 0xffd29a : 0xf4fbff;
+  const forwardScatterColor = settings.tyndallTone === 'cold'
+    ? 0xe8f5ff
+    : settings.tyndallTone === 'warm' ? 0xfff0d6 : 0xf8fbff;
+  const mistScatterColor = settings.tyndallTone === 'cold'
+    ? 0xdbe7ec
+    : settings.tyndallTone === 'warm' ? 0xeee5d8 : 0xdfe8e7;
+  const skyAtmosphereColor = settings.tyndallTone === 'cold'
+    ? 0xf0f6ff
+    : settings.tyndallTone === 'warm' ? 0xffe7bd : 0xfff1d6;
+  const sonicAtmosphereContrast = settings.atmosphereEnabled
+    ? clamp(0.42 + settings.fogDensity * 0.42 + settings.fogGlow * 0.1, 0.42, 1)
+    : 0;
+  const perceptualTyndallIntensity = settings.tyndallIntensity <= 0
+    ? 0
+    : Math.pow(clamp(settings.tyndallIntensity / 1.5, 0, 1), 0.72) * 1.5;
+  const beamVisibility = 1 - smoothstep(0.34, 0.96, settings.mistEmission);
+  const daylightFill = settings.atmosphereEnabled
+    ? clamp(
+      sonicAtmosphereContrast * 0.2 + perceptualTyndallIntensity * 0.055,
+      0,
+      0.28
+    )
+    : 0;
+  const atmosphereDaylightFill = settings.atmosphereEnabled
+    ? clamp(
+      0.018
+        + smoothstep(0.56, 0.9, sonicAtmosphereContrast) * 0.135
+        + smoothstep(0.78, 1.5, perceptualTyndallIntensity) * 0.035,
+      0,
+      0.18
+    )
+    : 0;
+  const sonicHighlightShoulder = topo.sonicHighlightShoulder || 0.9;
+  topo.atmosphereContrast = sonicAtmosphereContrast;
+  if (topo.scene?.fog) {
+    topo.scene.fog.near = 190 - sonicAtmosphereContrast * 98;
+    topo.scene.fog.far = 410 - sonicAtmosphereContrast * 150;
+  }
+  if (topo.renderer) {
+    topo.renderer.toneMappingExposure = clamp(
+      sonicHighlightShoulder + settings.exposure * 0.045,
+      0.82,
+      1.0
+    );
+  }
+  if (topo.ambientLight) {
+    topo.ambientLight.color.set(toneColor);
+    topo.ambientLight.intensity = 0.44 + daylightFill;
+  }
+  if (topo.keyLight) {
+    topo.keyLight.color.set(toneColor);
+    topo.keyLight.intensity = 0.9 + daylightFill * 0.58;
+  }
+  if (topo.tyndallLight) {
+    topo.tyndallLight.visible = settings.atmosphereEnabled && beamVisibility > 0.002;
+    topo.tyndallLight.color.set(toneColor);
+    topo.tyndallLight.intensity = Math.min(
+      perceptualTyndallIntensity * (0.72 + settings.mistReflectance * 0.32) * beamVisibility,
+      SONIC_TYNDALL_TOTAL_ENERGY_CAP * 3.8
+    );
+  }
+  const receiverBounceStrength = settings.atmosphereEnabled
+    ? Math.min(
+      perceptualTyndallIntensity * (0.09 + settings.mistReflectance * 0.15) * beamVisibility,
+      SONIC_TYNDALL_TOTAL_ENERGY_CAP * 0.44
+    )
+    : 0;
+  if (topo.uniforms?.uTyndallBounceColor) topo.uniforms.uTyndallBounceColor.value.set(toneColor);
+  if (topo.uniforms?.uTyndallReceiverBounce) {
+    topo.uniforms.uTyndallReceiverBounce.value = receiverBounceStrength;
+  }
+  if (topo.uniforms?.uAtmosphereDaylightFill) {
+    topo.uniforms.uAtmosphereDaylightFill.value = atmosphereDaylightFill;
+  }
+  if (topo.uniforms?.uTyndallLightDirection) {
+    topo.uniforms.uTyndallLightDirection.value.set(72, -48).normalize();
+  }
+  if (topo.tyndallGroundSheenMaterial?.uniforms) {
+    const groundUniforms = topo.tyndallGroundSheenMaterial.uniforms;
+    groundUniforms.uReflectionColor.value.set(toneColor);
+    groundUniforms.uIntensity.value = receiverBounceStrength;
+    groundUniforms.uReflectionFeather.value = clamp(0.7 + settings.tyndallSpread * 0.16, 0.7, 0.92);
+    groundUniforms.uGoboOcclusion.value = clamp(0.78 - settings.fogDensity * 0.22, 0.48, 0.78);
+    groundUniforms.uSheenDirection.value.set(72, -48).normalize();
+  }
+  if (topo.tyndallGroundSheen) topo.tyndallGroundSheen.visible = settings.atmosphereEnabled;
+  if (topo.tyndallWallBounceMaterial?.uniforms) {
+    const wallUniforms = topo.tyndallWallBounceMaterial.uniforms;
+    wallUniforms.uReflectionColor.value.set(toneColor);
+    wallUniforms.uIntensity.value = Math.min(receiverBounceStrength * 0.58, SONIC_TYNDALL_TOTAL_ENERGY_CAP * 0.24);
+    wallUniforms.uReflectionFeather.value = clamp(0.76 + settings.tyndallSpread * 0.12, 0.76, 0.94);
+    wallUniforms.uGoboOcclusion.value = clamp(0.82 - settings.fogDensity * 0.2, 0.54, 0.82);
+    wallUniforms.uSheenDirection.value.set(72, -48).normalize();
+  }
+  if (topo.tyndallWallBounce) topo.tyndallWallBounce.visible = settings.atmosphereEnabled;
+  topo.tyndallBeams?.forEach((beam) => {
+    beam.visible = settings.atmosphereEnabled && beamVisibility > 0.002;
+    const uniforms = beam.material?.uniforms;
+    uniforms?.uColor?.value?.set?.(toneColor);
+    uniforms?.uForwardScatterColor?.value?.set?.(forwardScatterColor);
+    uniforms?.uMistScatterColor?.value?.set?.(mistScatterColor);
+    if (uniforms?.uMistReflectance) uniforms.uMistReflectance.value = settings.mistReflectance;
+    const spreadScale = 0.48 + settings.tyndallSpread * 0.68;
+    beam.scale.x = beam.userData.baseWidth * spreadScale;
+    const halo = beam.userData.halo;
+    if (!halo) return;
+    halo.visible = beam.visible;
+    const haloUniforms = halo.material?.uniforms;
+    haloUniforms?.uColor?.value?.set?.(toneColor);
+    haloUniforms?.uForwardScatterColor?.value?.set?.(forwardScatterColor);
+    haloUniforms?.uMistScatterColor?.value?.set?.(mistScatterColor);
+    if (haloUniforms?.uMistReflectance) haloUniforms.uMistReflectance.value = settings.mistReflectance;
+    halo.scale.x = halo.userData.baseWidth * spreadScale;
+  });
+  if (topo.background) topo.background.visible = settings.coverBackgroundEnabled;
+  if (topo.backgroundMaterial?.uniforms?.uBackgroundMix) {
+    topo.backgroundMaterial.uniforms.uBackgroundMix.value = settings.coverBackgroundMix;
+    topo.backgroundMaterial.uniforms.uSkyAtmosphereColor?.value?.set?.(skyAtmosphereColor);
+    if (topo.backgroundMaterial.uniforms.uSkyContribution) {
+      topo.backgroundMaterial.uniforms.uSkyContribution.value = settings.atmosphereEnabled
+        ? 0.032 + settings.fogDensity * 0.052 + settings.mistEmission * 0.016
+        : 0;
+    }
+  }
   updateSonicTopographyCameraFit();
-  if (options.persist !== false) saveSonicSettingsPreferences();
+  if (options.persist !== false) {
+    saveSonicSettingsPreferences({ immediate: options.persistImmediately === true });
+  }
   if (options.sync !== false) syncSonicSettingsControls();
   if (options.renderConfig !== false) renderDiySelectedPresetConfig();
+}
+
+function sonicCoverBackgroundColors(palette) {
+  const source = palette || fallbackLyricPalette(state.currentSong);
+  const fallback = [source?.primary, source?.glow, source?.highlight];
+  return [0, 1, 2].map((index) => source?.coverColors?.[index] || fallback[index] || { r: 11, g: 15, b: 21 });
+}
+
+function createSonicWaterMistTexture(THREE) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 256;
+  const context = canvas.getContext('2d');
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.globalCompositeOperation = 'screen';
+
+  const octaveCanvas = document.createElement('canvas');
+  octaveCanvas.width = canvas.width;
+  octaveCanvas.height = canvas.height;
+  const octaveContext = octaveCanvas.getContext('2d');
+  const mistOctaves = [
+    { count: 74, radius: 38, stretch: 2.8, alpha: 0.07, blur: 7 },
+    { count: 128, radius: 19, stretch: 3.6, alpha: 0.052, blur: 3.5 },
+    { count: 212, radius: 8, stretch: 4.8, alpha: 0.035, blur: 1.25 }
+  ];
+
+  mistOctaves.forEach((octave, octaveIndex) => {
+    octaveContext.clearRect(0, 0, octaveCanvas.width, octaveCanvas.height);
+    for (let index = 0; index < octave.count; index += 1) {
+      const seedA = Math.sin((index + 1) * (37.219 + octaveIndex * 11.73)) * 43758.5453;
+      const seedB = Math.sin((index + 1) * (83.117 + octaveIndex * 7.91)) * 24634.6345;
+      const randomA = seedA - Math.floor(seedA);
+      const randomB = seedB - Math.floor(seedB);
+      const x = randomA * octaveCanvas.width;
+      const y = (0.08 + randomB * 0.84) * octaveCanvas.height;
+      const radius = octave.radius * (0.58 + randomB * 0.72);
+      const stretch = octave.stretch * (0.74 + randomA * 0.52);
+      octaveContext.save();
+      octaveContext.translate(x, y);
+      octaveContext.scale(stretch, 1);
+      const gradient = octaveContext.createRadialGradient(0, 0, 0, 0, 0, radius);
+      gradient.addColorStop(0, `rgba(255,255,255,${octave.alpha})`);
+      gradient.addColorStop(0.38, `rgba(255,255,255,${octave.alpha * 0.66})`);
+      gradient.addColorStop(0.76, `rgba(255,255,255,${octave.alpha * 0.2})`);
+      gradient.addColorStop(1, 'rgba(255,255,255,0)');
+      octaveContext.fillStyle = gradient;
+      octaveContext.fillRect(-radius, -radius, radius * 2, radius * 2);
+      octaveContext.restore();
+    }
+    context.save();
+    context.filter = `blur(${octave.blur}px)`;
+    context.globalAlpha = 0.72 + octaveIndex * 0.1;
+    context.drawImage(octaveCanvas, 0, 0);
+    context.restore();
+  });
+
+  context.save();
+  context.filter = 'blur(0.8px)';
+  context.lineCap = 'round';
+  for (let index = 0; index < 28; index += 1) {
+    const y = 18 + ((index * 29) % 216);
+    const phase = (index * 61) % 137;
+    context.beginPath();
+    context.moveTo(-42, y);
+    context.bezierCurveTo(118 + phase, y - 8, 324 - phase, y + 11, 554, y - 3);
+    context.strokeStyle = `rgba(255,255,255,${0.012 + (index % 4) * 0.004})`;
+    context.lineWidth = 0.6 + (index % 3) * 0.45;
+    context.stroke();
+  }
+  context.restore();
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = true;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function createSonicBackgroundMaterial(THREE, colors) {
+  const toColor = (color) => new THREE.Color(rgbHexValue(color));
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uBackgroundColor1: { value: toColor(colors[0]) },
+      uBackgroundColor2: { value: toColor(colors[1]) },
+      uBackgroundColor3: { value: toColor(colors[2]) },
+      uBackgroundMix: { value: DEFAULT_SONIC_SETTINGS.coverBackgroundMix },
+      uBackgroundDither: { value: 0.82 / 255 },
+      uSkyAtmosphereColor: { value: new THREE.Color(0xfff1d6) },
+      uSkyContribution: { value: 0.045 }
+    },
+    vertexShader: `
+      varying vec3 vBackgroundDirection;
+      void main() {
+        vBackgroundDirection = normalize(position);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uBackgroundColor1;
+      uniform vec3 uBackgroundColor2;
+      uniform vec3 uBackgroundColor3;
+      uniform float uBackgroundMix;
+      uniform float uBackgroundDither;
+      uniform vec3 uSkyAtmosphereColor;
+      uniform float uSkyContribution;
+      varying vec3 vBackgroundDirection;
+
+      float backgroundHash(vec2 point) {
+        return fract(sin(dot(point, vec2(12.9898, 78.233))) * 43758.5453123);
+      }
+
+      float backgroundNoise(vec3 point) {
+        vec3 cell = floor(point);
+        vec3 local = fract(point);
+        local = local * local * (3.0 - 2.0 * local);
+        float n000 = backgroundHash(cell.xy + cell.z * 19.19);
+        float n100 = backgroundHash(cell.xy + vec2(1.0, 0.0) + cell.z * 19.19);
+        float n010 = backgroundHash(cell.xy + vec2(0.0, 1.0) + cell.z * 19.19);
+        float n110 = backgroundHash(cell.xy + vec2(1.0, 1.0) + cell.z * 19.19);
+        float n001 = backgroundHash(cell.xy + (cell.z + 1.0) * 19.19);
+        float n101 = backgroundHash(cell.xy + vec2(1.0, 0.0) + (cell.z + 1.0) * 19.19);
+        float n011 = backgroundHash(cell.xy + vec2(0.0, 1.0) + (cell.z + 1.0) * 19.19);
+        float n111 = backgroundHash(cell.xy + vec2(1.0, 1.0) + (cell.z + 1.0) * 19.19);
+        float lower = mix(mix(n000, n100, local.x), mix(n010, n110, local.x), local.y);
+        float upper = mix(mix(n001, n101, local.x), mix(n011, n111, local.x), local.y);
+        return mix(lower, upper, local.z);
+      }
+
+      void main() {
+        vec3 direction = normalize(vBackgroundDirection);
+        float broadWarp = backgroundNoise(direction * 2.15 + vec3(2.7, 5.1, 1.3)) - 0.5;
+        float fineWarp = backgroundNoise(direction * 5.4 + vec3(8.3, 1.7, 6.2)) - 0.5;
+        vec3 warpedDirection = normalize(direction + vec3(
+          broadWarp * 0.12,
+          fineWarp * 0.07,
+          (broadWarp - fineWarp) * 0.1
+        ));
+
+        float paletteWeightA = smoothstep(-0.48, 0.78, dot(warpedDirection, normalize(vec3(-0.72, 0.22, 0.66))));
+        float paletteWeightB = smoothstep(-0.48, 0.78, dot(warpedDirection, normalize(vec3(0.76, 0.36, 0.54))));
+        float paletteWeightC = smoothstep(-0.52, 0.74, dot(warpedDirection, normalize(vec3(-0.04, -0.86, -0.5))));
+        paletteWeightA = paletteWeightA * paletteWeightA + 0.12;
+        paletteWeightB = paletteWeightB * paletteWeightB + 0.12;
+        paletteWeightC = paletteWeightC * paletteWeightC + 0.12;
+        float paletteWeightSum = paletteWeightA + paletteWeightB + paletteWeightC;
+        vec3 color = (
+          uBackgroundColor1 * paletteWeightA
+          + uBackgroundColor2 * paletteWeightB
+          + uBackgroundColor3 * paletteWeightC
+        ) / max(paletteWeightSum, 0.001);
+
+        float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
+        color = mix(vec3(luminance), color, 0.84);
+        float horizonLight = 0.84 + smoothstep(-0.82, 0.45, direction.y) * 0.16;
+        float skyHeight = smoothstep(0.02, 0.92, direction.y);
+        color = mix(color, uSkyAtmosphereColor, skyHeight * uSkyContribution);
+        float vignette = 0.42 + (1.0 - abs(direction.y)) * 0.13;
+        color *= horizonLight * vignette * (0.34 + uBackgroundMix * 0.48);
+        float dither = backgroundHash(gl_FragCoord.xy + direction.xy * 173.0) - 0.5;
+        color += (vec3(dither)) * uBackgroundDither;
+        gl_FragColor = vec4(max(color, vec3(0.0)), clamp(uBackgroundMix * 0.9, 0.0, 0.9));
+      }
+    `,
+    side: THREE.BackSide,
+    transparent: true,
+    depthWrite: false,
+    depthTest: false,
+    toneMapped: false
+  });
+}
+
+function createSonicTyndallBeamMaterial(THREE, color, phase) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uColor: { value: new THREE.Color(color) },
+      uForwardScatterColor: { value: new THREE.Color(0xf8fbff) },
+      uMistScatterColor: { value: new THREE.Color(0xddeaf2) },
+      uOpacity: { value: 0 },
+      uTime: { value: 0 },
+      uGoboPhase: { value: phase },
+      uMistCoupling: { value: 0.2 },
+      uMistReflectance: { value: DEFAULT_SONIC_SETTINGS.mistReflectance },
+      uHaloStrength: { value: 0 },
+      uGoboShadowDepth: { value: 0.62 },
+      uEdgeFeather: { value: 0.3 },
+      uAtmosphereVariation: { value: 0.5 }
+    },
+    vertexShader: `
+      varying vec2 vBeamUv;
+      void main() {
+        vBeamUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uColor;
+      uniform vec3 uForwardScatterColor;
+      uniform vec3 uMistScatterColor;
+      uniform float uOpacity;
+      uniform float uTime;
+      uniform float uGoboPhase;
+      uniform float uMistCoupling;
+      uniform float uMistReflectance;
+      uniform float uGoboShadowDepth;
+      uniform float uEdgeFeather;
+      uniform float uAtmosphereVariation;
+      varying vec2 vBeamUv;
+
+      float beamHash(vec2 point) {
+        return fract(sin(dot(point, vec2(127.1, 311.7))) * 43758.5453123);
+      }
+
+      float beamNoise(vec2 point) {
+        vec2 cell = floor(point);
+        vec2 local = fract(point);
+        local = local * local * (3.0 - 2.0 * local);
+        return mix(
+          mix(beamHash(cell), beamHash(cell + vec2(1.0, 0.0)), local.x),
+          mix(beamHash(cell + vec2(0.0, 1.0)), beamHash(cell + vec2(1.0)), local.x),
+          local.y
+        );
+      }
+
+      void main() {
+        float beamSoftProgress = smoothstep(0.0, 0.9, vBeamUv.y);
+        float taperWidth = mix(0.07, 0.86, beamSoftProgress);
+        float lateral = abs(vBeamUv.x - 0.5) * 2.0;
+        float edgeStart = taperWidth * mix(0.32, 0.58, uEdgeFeather);
+        float edgeSoftness = 1.0 - smoothstep(edgeStart, taperWidth, lateral);
+        float longitudinal = smoothstep(0.02, 0.16, vBeamUv.y)
+          * (1.0 - smoothstep(0.82, 1.0, vBeamUv.y));
+        float livingDrift = mix(0.72, 1.32, uAtmosphereVariation);
+        vec2 drift = vec2(
+          uTime * -0.018 * livingDrift + sin(uTime * 0.037 + uGoboPhase) * 0.08,
+          uTime * 0.012 * livingDrift + uGoboPhase
+        );
+        float broadGobo = beamNoise(vBeamUv * vec2(4.8, 11.4) + drift);
+        float fineGobo = beamNoise(vBeamUv * vec2(15.6, 31.0) - drift * 1.7);
+        float occlusionBands = sin(vBeamUv.y * 52.0 + broadGobo * 5.0 + uGoboPhase) * 0.5 + 0.5;
+        float gobo = smoothstep(0.22, 0.78, broadGobo * 0.52 + fineGobo * 0.3 + occlusionBands * 0.18);
+        float goboOcclusion = mix(1.0 - uGoboShadowDepth, 1.0, gobo);
+        float mistScatter = mix(0.48, 1.0, goboOcclusion) * mix(0.72, 1.08, uMistCoupling);
+        vec3 scatterColor = mix(uForwardScatterColor, uMistScatterColor, 0.22 + gobo * 0.16);
+        vec3 reflectedColor = mix(uColor, scatterColor, clamp(uMistReflectance * 0.22, 0.0, 0.42));
+        vec3 sonicHighlightShoulder = reflectedColor
+          / (1.0 + max(vec3(0.0), reflectedColor - vec3(0.72)) * 1.7);
+        float atmosphereBreath = mix(0.82, 1.16, uAtmosphereVariation);
+        float alpha = uOpacity * edgeSoftness * longitudinal * mistScatter * atmosphereBreath;
+        gl_FragColor = vec4(sonicHighlightShoulder, alpha);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    toneMapped: true
+  });
+}
+
+function createSonicTyndallHaloMaterial(THREE, color, phase) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uColor: { value: new THREE.Color(color) },
+      uForwardScatterColor: { value: new THREE.Color(0xf8fbff) },
+      uMistScatterColor: { value: new THREE.Color(0xddeaf2) },
+      uOpacity: { value: 0 },
+      uTime: { value: 0 },
+      uGoboPhase: { value: phase },
+      uMistCoupling: { value: 0.2 },
+      uMistReflectance: { value: DEFAULT_SONIC_SETTINGS.mistReflectance },
+      uHaloStrength: { value: 0.16 },
+      uGoboShadowDepth: { value: 0.72 },
+      uEdgeFeather: { value: 0.62 },
+      uAtmosphereVariation: { value: 0.5 }
+    },
+    vertexShader: `
+      varying vec2 vBeamUv;
+      void main() {
+        vBeamUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uColor;
+      uniform vec3 uForwardScatterColor;
+      uniform vec3 uMistScatterColor;
+      uniform float uOpacity;
+      uniform float uTime;
+      uniform float uGoboPhase;
+      uniform float uMistCoupling;
+      uniform float uMistReflectance;
+      uniform float uHaloStrength;
+      uniform float uGoboShadowDepth;
+      uniform float uEdgeFeather;
+      uniform float uAtmosphereVariation;
+      varying vec2 vBeamUv;
+
+      float haloHash(vec2 point) {
+        return fract(sin(dot(point, vec2(41.17, 289.31))) * 43758.5453123);
+      }
+
+      float haloNoise(vec2 point) {
+        vec2 cell = floor(point);
+        vec2 local = fract(point);
+        local = local * local * (3.0 - 2.0 * local);
+        return mix(
+          mix(haloHash(cell), haloHash(cell + vec2(1.0, 0.0)), local.x),
+          mix(haloHash(cell + vec2(0.0, 1.0)), haloHash(cell + vec2(1.0)), local.x),
+          local.y
+        );
+      }
+
+      void main() {
+        float beamSoftProgress = smoothstep(0.0, 0.92, vBeamUv.y);
+        float taperWidth = mix(0.12, 0.92, beamSoftProgress);
+        float lateral = abs(vBeamUv.x - 0.5) * 2.0 / max(taperWidth, 0.08);
+        float softHalo = exp(-lateral * lateral * mix(2.4, 4.8, uEdgeFeather));
+        float longitudinal = smoothstep(0.04, 0.19, vBeamUv.y)
+          * (1.0 - smoothstep(0.7, 1.0, vBeamUv.y));
+        float haloDrift = mix(0.74, 1.28, uAtmosphereVariation);
+        float breakup = 0.42 + haloNoise(
+          vBeamUv * vec2(2.1, 10.4)
+            + vec2(uGoboPhase + sin(uTime * 0.029 + uGoboPhase) * 0.06, -uTime * 0.011 * haloDrift)
+        ) * 0.58;
+        float occlusionBands = sin(vBeamUv.y * 34.0 + uGoboPhase * 3.0) * 0.5 + 0.5;
+        float shadowedBreakup = mix(1.0 - uGoboShadowDepth, 1.0, breakup * (0.76 + occlusionBands * 0.24));
+        float mistModulation = mix(0.08, shadowedBreakup, clamp(uMistCoupling, 0.0, 1.0));
+        vec3 scatterColor = mix(uForwardScatterColor, uMistScatterColor, 0.32);
+        vec3 haloColor = mix(uColor, scatterColor, clamp(0.18 + uMistReflectance * 0.16, 0.0, 0.42));
+        vec3 sonicHighlightShoulder = haloColor
+          / (1.0 + max(vec3(0.0), haloColor - vec3(0.68)) * 1.9);
+        float atmosphereBreath = mix(0.84, 1.13, uAtmosphereVariation);
+        float alpha = uOpacity * uHaloStrength * softHalo * longitudinal
+          * mistModulation * atmosphereBreath;
+        gl_FragColor = vec4(sonicHighlightShoulder, alpha);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    toneMapped: true
+  });
+}
+
+function createSonicGroundSheenMaterial(THREE) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uReflectionColor: { value: new THREE.Color(0xf4fbff) },
+      uIntensity: { value: 0 },
+      uReflectionFeather: { value: 0.78 },
+      uGoboOcclusion: { value: 0.66 },
+      uSheenDirection: { value: new THREE.Vector2(72, -48).normalize() },
+      uTime: { value: 0 }
+    },
+    vertexShader: `
+      varying vec2 vGroundUv;
+      void main() {
+        vGroundUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uReflectionColor;
+      uniform float uIntensity;
+      uniform float uReflectionFeather;
+      uniform float uGoboOcclusion;
+      uniform vec2 uSheenDirection;
+      uniform float uTime;
+      varying vec2 vGroundUv;
+
+      float groundHash(vec2 point) {
+        return fract(sin(dot(point, vec2(91.17, 257.41))) * 43758.5453123);
+      }
+
+      float groundNoise(vec2 point) {
+        vec2 cell = floor(point);
+        vec2 local = fract(point);
+        local = local * local * (3.0 - 2.0 * local);
+        return mix(
+          mix(groundHash(cell), groundHash(cell + vec2(1.0, 0.0)), local.x),
+          mix(groundHash(cell + vec2(0.0, 1.0)), groundHash(cell + vec2(1.0)), local.x),
+          local.y
+        );
+      }
+
+      vec3 sonicHighlightShoulder(vec3 color) {
+        float peak = max(color.r, max(color.g, color.b));
+        return color / (1.0 + max(0.0, peak - 0.54) * 2.1);
+      }
+
+      void main() {
+        vec2 groundPosition = vGroundUv * 2.0 - 1.0;
+        vec2 lightDirection = normalize(uSheenDirection);
+        vec2 lightTangent = vec2(-lightDirection.y, lightDirection.x);
+        float alongLight = dot(groundPosition, lightDirection);
+        float acrossLight = dot(groundPosition, lightTangent);
+        float broadCanopy = groundNoise(groundPosition * 3.6 + lightDirection * uTime * 0.006);
+        float fineCanopy = groundNoise(groundPosition * 10.8 - lightDirection * uTime * 0.011);
+        float occlusionBands = sin(acrossLight * 23.0 + alongLight * 6.0 + broadCanopy * 4.0) * 0.5 + 0.5;
+        float goboVisibility = smoothstep(0.24, 0.79,
+          broadCanopy * 0.52 + fineCanopy * 0.26 + occlusionBands * 0.22);
+        goboVisibility = mix(1.0 - uGoboOcclusion, 1.0, goboVisibility);
+
+        // One continuous receiving plane: the direction changes its rough
+        // sheen, while only the outer scene boundary fades. There is no radial
+        // center, circle, ellipse or independent light decal in this material.
+        float directionalIlluminance = mix(0.42, 1.0, smoothstep(-1.0, 0.92, alongLight));
+        float roughSheen = mix(0.74, 1.0, pow(1.0 - clamp(abs(acrossLight) * 0.22, 0.0, 0.82),
+          mix(1.4, 0.58, uReflectionFeather)));
+        float edgeDistance = max(abs(groundPosition.x), abs(groundPosition.y));
+        float boundaryFeather = 1.0 - smoothstep(0.985, 1.0, edgeDistance);
+        float groundGrain = mix(0.9, 1.08, groundNoise(groundPosition * 34.0));
+        float reflectedEnergy = min(
+          uIntensity * directionalIlluminance * roughSheen * goboVisibility,
+          0.085
+        );
+        vec3 groundBase = vec3(0.007, 0.011, 0.016) * groundGrain;
+        vec3 reflected = sonicHighlightShoulder(uReflectionColor * reflectedEnergy);
+        float alpha = boundaryFeather * (0.08 + reflectedEnergy * 0.82);
+        gl_FragColor = vec4(groundBase + reflected, alpha);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    blending: THREE.NormalBlending,
+    side: THREE.DoubleSide,
+    toneMapped: true
+  });
+}
+
+function createSonicWallBounceMaterial(THREE) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uReflectionColor: { value: new THREE.Color(0xf4fbff) },
+      uIntensity: { value: 0 },
+      uReflectionFeather: { value: 0.82 },
+      uGoboOcclusion: { value: 0.72 },
+      uSheenDirection: { value: new THREE.Vector2(72, -48).normalize() },
+      uTime: { value: 0 }
+    },
+    vertexShader: `
+      varying vec2 vWallUv;
+      void main() {
+        vWallUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uReflectionColor;
+      uniform float uIntensity;
+      uniform float uReflectionFeather;
+      uniform float uGoboOcclusion;
+      uniform vec2 uSheenDirection;
+      uniform float uTime;
+      varying vec2 vWallUv;
+
+      float wallHash(vec2 point) {
+        return fract(sin(dot(point, vec2(43.71, 173.23))) * 43758.5453123);
+      }
+
+      void main() {
+        vec2 wallPosition = vWallUv * 2.0 - 1.0;
+        vec2 lightDirection = normalize(uSheenDirection);
+        vec2 lightTangent = vec2(-lightDirection.y, lightDirection.x);
+        float alongLight = dot(wallPosition, lightDirection);
+        float acrossLight = dot(wallPosition, lightTangent);
+        float canopy = wallHash(floor(wallPosition * 18.0 + vec2(uTime * 0.018, 0.0)));
+        float occlusionBands = sin(acrossLight * 18.0 + alongLight * 7.0 + canopy * 4.2) * 0.5 + 0.5;
+        float goboVisibility = mix(1.0 - uGoboOcclusion, 1.0,
+          smoothstep(0.18, 0.84, canopy * 0.58 + occlusionBands * 0.42));
+        float broadDirectionalSheen = mix(0.42, 1.0, smoothstep(-1.15, 0.88, alongLight));
+        float softAcross = mix(0.7, 1.0,
+          pow(1.0 - clamp(abs(acrossLight) * 0.28, 0.0, 0.84), mix(1.5, 0.62, uReflectionFeather)));
+        float edgeFeather = (1.0 - smoothstep(0.76, 1.0, abs(wallPosition.x)))
+          * (1.0 - smoothstep(0.82, 1.0, abs(wallPosition.y)));
+        float bouncedEnergy = min(uIntensity * broadDirectionalSheen * softAcross * goboVisibility, 0.038);
+        vec3 bouncedLight = uReflectionColor * bouncedEnergy;
+        float peak = max(bouncedLight.r, max(bouncedLight.g, bouncedLight.b));
+        bouncedLight /= 1.0 + max(0.0, peak - 0.32) * 2.4;
+        gl_FragColor = vec4(bouncedLight, edgeFeather * bouncedEnergy * 1.35);
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    depthTest: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.BackSide,
+    toneMapped: true
+  });
+}
+
+function orientSonicTyndallPlane(THREE, plane, camera) {
+  if (!plane?.userData?.start || !plane?.userData?.end || !camera) return;
+  const data = plane.userData;
+  data.along.copy(data.end).sub(data.start).normalize();
+  data.view.copy(camera.position).sub(data.midpoint).normalize();
+  data.across.crossVectors(data.along, data.view);
+  if (data.across.lengthSq() < 0.0001) data.across.set(1, 0, 0);
+  else data.across.normalize();
+  data.normal.crossVectors(data.across, data.along).normalize();
+  data.orientation.makeBasis(data.across, data.along, data.normal);
+  plane.quaternion.setFromRotationMatrix(data.orientation);
 }
 
 function buildSonicTopography() {
@@ -6199,6 +8310,9 @@ function buildSonicTopography() {
   });
   renderer.setClearColor(0x000000, 0);
   renderer.setPixelRatio(renderPixelRatio('webgl'));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  const sonicHighlightShoulder = 0.9;
+  renderer.toneMappingExposure = sonicHighlightShoulder;
   const renderQuality = createPresetRenderQuality(renderer, 0.2);
   renderer.domElement.className = 'sonic-topography-canvas';
   els.sonicTopographyCore.textContent = '';
@@ -6206,17 +8320,120 @@ function buildSonicTopography() {
 
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(theme.uBaseColor1.clone(), 100, 320);
+  const backgroundColors = sonicCoverBackgroundColors(topo.palette || fallbackLyricPalette(state.currentSong));
+  const backgroundMaterial = createSonicBackgroundMaterial(THREE, backgroundColors);
+  const background = new THREE.Mesh(new THREE.SphereGeometry(255, 32, 18), backgroundMaterial);
+  background.renderOrder = -100;
+  scene.add(background);
+  const tyndallGroundSheenMaterial = createSonicGroundSheenMaterial(THREE);
+  const tyndallGroundSheen = new THREE.Mesh(
+    new THREE.PlaneGeometry(220, 220, 1, 1),
+    tyndallGroundSheenMaterial
+  );
+  tyndallGroundSheen.name = 'SonicSunlitGroundReceiver';
+  tyndallGroundSheen.rotation.x = -Math.PI / 2;
+  tyndallGroundSheen.position.y = 0.015;
+  tyndallGroundSheen.renderOrder = -5;
+  tyndallGroundSheen.frustumCulled = false;
+  scene.add(tyndallGroundSheen);
+
+  const tyndallWallBounceMaterial = createSonicWallBounceMaterial(THREE);
+  const tyndallWallBounce = new THREE.Mesh(
+    new THREE.CylinderGeometry(147.4, 147.4, 142, 72, 1, true, Math.PI * 0.8, Math.PI * 0.9),
+    tyndallWallBounceMaterial
+  );
+  tyndallWallBounce.name = 'SonicCurvedWallSunBounce';
+  tyndallWallBounce.position.y = 12;
+  tyndallWallBounce.rotation.y = Math.PI * 0.25;
+  tyndallWallBounce.renderOrder = -89;
+  tyndallWallBounce.frustumCulled = false;
+  scene.add(tyndallWallBounce);
   const camera = new THREE.PerspectiveCamera(state.sonicTopography.settings.fov, 1, 0.1, 500);
   camera.position.set(SONIC_TOPOGRAPHY_CAMERA.x, SONIC_TOPOGRAPHY_CAMERA.y, SONIC_TOPOGRAPHY_CAMERA.z);
-  camera.lookAt(0, 0, 0);
+  camera.lookAt(0, SONIC_TOPOGRAPHY_CAMERA.targetY, 0);
+  scene.add(camera);
+  const wallpaperSurface = createSonicWallpaperSurface(THREE);
+  camera.add(wallpaperSurface);
 
   const group = new THREE.Group();
   scene.add(group);
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-  const key = new THREE.DirectionalLight(0xffffff, 1);
-  key.position.set(10, 20, 10);
-  scene.add(key);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+  scene.add(ambientLight);
+  const keyLight = new THREE.DirectionalLight(0xffffff, 1);
+  keyLight.position.set(10, 20, 10);
+  scene.add(keyLight);
+
+  const tyndallLightTarget = new THREE.Object3D();
+  tyndallLightTarget.position.set(0, 0, 0);
+  // A sun-like directional source illuminates the full receiving field. The
+  // visible shafts are only the mist revealing this direction, never a
+  // SpotLight footprint or a projected decal on the ground.
+  const tyndallLight = new THREE.DirectionalLight(0xf4fbff, 0.7);
+  tyndallLight.position.set(-72, 94, 48);
+  tyndallLight.target = tyndallLightTarget;
+  tyndallLight.castShadow = false;
+  scene.add(tyndallLightTarget, tyndallLight);
+
+  const tyndallPlaneGeometry = new THREE.PlaneGeometry(1, 1, 1, 16);
+  const tyndallHalos = [];
+  const tyndallBeams = Array.from({ length: SONIC_TYNDALL_BEAM_COUNT }, (_, index) => {
+    const lane = index - (SONIC_TYNDALL_BEAM_COUNT - 1) * 0.5;
+    const target = new THREE.Vector3(
+      -1 + lane * 5.1,
+      0.6 + (index % 2) * 0.7,
+      -11 + Math.sin(index * 1.73) * 11
+    );
+    const phase = index / SONIC_TYNDALL_BEAM_COUNT * Math.PI * 2;
+    const width = 1.45 + (index % 3) * 0.34;
+    const length = target.distanceTo(tyndallLight.position);
+    const midpoint = tyndallLight.position.clone().add(target).multiplyScalar(0.5);
+    const material = createSonicTyndallBeamMaterial(THREE, 0xf4fbff, phase);
+    const beam = new THREE.Mesh(tyndallPlaneGeometry, material);
+    beam.position.copy(midpoint);
+    beam.scale.set(width, length, 1);
+    Object.assign(beam.userData, {
+      start: tyndallLight.position.clone(),
+      end: target,
+      midpoint,
+      along: new THREE.Vector3(),
+      view: new THREE.Vector3(),
+      across: new THREE.Vector3(),
+      normal: new THREE.Vector3(),
+      orientation: new THREE.Matrix4(),
+      baseWidth: width,
+      baseOpacity: 0.118 - (index % 4) * 0.008,
+      driftRate: 0.17 + (index % 5) * 0.031,
+      phase
+    });
+    orientSonicTyndallPlane(THREE, beam, camera);
+    beam.renderOrder = 3;
+
+    const haloMaterial = createSonicTyndallHaloMaterial(THREE, 0xf4fbff, phase + 0.37);
+    const halo = new THREE.Mesh(tyndallPlaneGeometry, haloMaterial);
+    halo.position.copy(midpoint);
+    halo.scale.set(width * 3.1, length * 1.015, 1);
+    Object.assign(halo.userData, {
+      start: tyndallLight.position.clone(),
+      end: target.clone(),
+      midpoint: midpoint.clone(),
+      along: new THREE.Vector3(),
+      view: new THREE.Vector3(),
+      across: new THREE.Vector3(),
+      normal: new THREE.Vector3(),
+      orientation: new THREE.Matrix4(),
+      baseWidth: width * 3.1,
+      baseOpacity: 0.058 - (index % 3) * 0.005,
+      driftRate: 0.115 + (index % 4) * 0.024,
+      phase
+    });
+    orientSonicTyndallPlane(THREE, halo, camera);
+    halo.renderOrder = 2;
+    beam.userData.halo = halo;
+    tyndallHalos.push(halo);
+    scene.add(halo, beam);
+    return beam;
+  });
 
   const bassColumnRadius = SONIC_BASS_COLUMN_CLUSTER.radius;
   const bassColumnCorePoints = [];
@@ -6287,6 +8504,7 @@ function buildSonicTopography() {
   const terrain = new THREE.InstancedMesh(geometry, material, count);
   terrain.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   group.add(terrain);
+  const tyndallColumnReceivers = [material];
 
   const meteorMesh = new THREE.InstancedMesh(
     new THREE.BoxGeometry(0.4, 1.2, 0.4),
@@ -6356,10 +8574,13 @@ function buildSonicTopography() {
   starfieldGeometry.setAttribute('aStarPhase', starfieldPhaseAttribute);
   starfieldGeometry.computeBoundingSphere();
   const starfieldTexture = new THREE.CanvasTexture(createPlaybackParticleSprite(48, 0.08));
-  const starfieldDriftUniforms = { uStarfieldTime: { value: 0 } };
+  const starfieldDriftUniforms = {
+    uStarfieldTime: { value: 0 },
+    uStarfieldAudio: { value: 0 }
+  };
   const starfieldMaterial = new THREE.PointsMaterial({
     color: DEFAULT_SONIC_SETTINGS.starfieldColor,
-    size: 0.38,
+    size: 0.22,
     sizeAttenuation: true,
     vertexColors: true,
     map: starfieldTexture,
@@ -6373,10 +8594,11 @@ function buildSonicTopography() {
   starfieldMaterial.userData.driftUniforms = starfieldDriftUniforms;
   starfieldMaterial.onBeforeCompile = (shader) => {
     shader.uniforms.uStarfieldTime = starfieldDriftUniforms.uStarfieldTime;
+    shader.uniforms.uStarfieldAudio = starfieldDriftUniforms.uStarfieldAudio;
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
-        '#include <common>\nattribute vec3 aStarDrift;\nattribute float aStarPhase;\nuniform float uStarfieldTime;'
+        '#include <common>\nattribute vec3 aStarDrift;\nattribute float aStarPhase;\nuniform float uStarfieldTime;\nuniform float uStarfieldAudio;'
       )
       .replace(
         '#include <begin_vertex>',
@@ -6386,14 +8608,110 @@ function buildSonicTopography() {
           aStarDrift.y * sin(uStarfieldTime * 0.13 + aStarPhase * 1.37),
           aStarDrift.z * cos(uStarfieldTime * 0.15 + aStarPhase * 0.83)
         );`
+      )
+      .replace(
+        '#include <pointsize_vertex>',
+        '#include <pointsize_vertex>\ngl_PointSize *= 1.0 + uStarfieldAudio * 0.72;'
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uStarfieldAudio;')
+      .replace(
+        '#include <map_particle_fragment>',
+        '#include <map_particle_fragment>\ndiffuseColor.rgb *= 1.0 + uStarfieldAudio * 0.78;'
       );
   };
-  starfieldMaterial.customProgramCacheKey = () => 'fe-monster-sonic-starfield-drift-v1';
+  starfieldMaterial.customProgramCacheKey = () => 'fe-monster-sonic-starfield-audio-drift-v2';
   const starfield = new THREE.Points(starfieldGeometry, starfieldMaterial);
   starfield.frustumCulled = false;
   starfield.visible = false;
   starfield.userData.layers = starfieldLayers;
   scene.add(starfield);
+
+  const galaxyPositions = new Float32Array(SONIC_GALAXY_PARTICLES * 3);
+  const galaxyColors = new Float32Array(SONIC_GALAXY_PARTICLES * 3);
+  const galaxyArmCount = 5;
+  for (let index = 0; index < SONIC_GALAXY_PARTICLES; index += 1) {
+    const progress = index / Math.max(1, SONIC_GALAXY_PARTICLES - 1);
+    const arm = index % galaxyArmCount;
+    const noiseA = Math.sin((index + 1) * 12.9898) * 43758.5453;
+    const noiseB = Math.sin((index + 1) * 78.233) * 24634.6345;
+    const randomA = noiseA - Math.floor(noiseA);
+    const randomB = noiseB - Math.floor(noiseB);
+    const radius = 4 + Math.pow(progress, 0.67) * (starfieldRadius * 1.2 - 4);
+    const armAngle = arm / galaxyArmCount * Math.PI * 2;
+    const angle = armAngle + radius * 0.115 + (randomA - 0.5) * (0.92 - progress * 0.52);
+    const thickness = (randomB - 0.5) * (2.2 + radius * 0.075);
+    const positionOffset = index * 3;
+    galaxyPositions[positionOffset] = Math.cos(angle) * radius + Math.cos(angle + Math.PI / 2) * thickness;
+    galaxyPositions[positionOffset + 1] = 2.4 + (randomA - 0.5) * (3.5 + radius * 0.038);
+    galaxyPositions[positionOffset + 2] = Math.sin(angle) * radius + Math.sin(angle + Math.PI / 2) * thickness;
+    const brightness = 0.34 + (1 - progress) * 0.58 + randomB * 0.08;
+    galaxyColors[positionOffset] = brightness;
+    galaxyColors[positionOffset + 1] = brightness;
+    galaxyColors[positionOffset + 2] = brightness;
+  }
+  const galaxyGeometry = new THREE.BufferGeometry();
+  galaxyGeometry.setAttribute('position', new THREE.BufferAttribute(galaxyPositions, 3));
+  galaxyGeometry.setAttribute('color', new THREE.BufferAttribute(galaxyColors, 3));
+  galaxyGeometry.computeBoundingSphere();
+  const galaxyMaterial = new THREE.PointsMaterial({
+    color: DEFAULT_SONIC_SETTINGS.galaxyColor,
+    size: 0.18,
+    sizeAttenuation: true,
+    vertexColors: true,
+    map: starfieldTexture,
+    transparent: true,
+    opacity: 0.37,
+    alphaTest: 0.008,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false
+  });
+  const galaxy = new THREE.Points(galaxyGeometry, galaxyMaterial);
+  galaxy.frustumCulled = false;
+  galaxy.renderOrder = -2;
+  scene.add(galaxy);
+
+  const fogGroup = new THREE.Group();
+  const waterMistTexture = createSonicWaterMistTexture(THREE);
+  const fogWrap = starfieldRadius * 1.42;
+  const fogLayers = Array.from({ length: SONIC_WATER_MIST_LAYER_COUNT }, (_, index) => {
+    const layerProgress = index / Math.max(1, SONIC_WATER_MIST_LAYER_COUNT - 1);
+    const material = new THREE.SpriteMaterial({
+      map: waterMistTexture,
+      color: theme.uBaseColor2.clone(),
+      transparent: true,
+      opacity: 0.012,
+      depthWrite: false,
+      depthTest: true,
+      blending: THREE.NormalBlending,
+      toneMapped: false
+    });
+    material.rotation = (index % 2 === 0 ? -1 : 1) * (0.012 + layerProgress * 0.018);
+    const mistLayer = new THREE.Sprite(material);
+    const phase = index / SONIC_WATER_MIST_LAYER_COUNT * Math.PI * 2;
+    const baseY = 4.5 + (index % 4) * 8.2 + layerProgress * 6.5;
+    const baseScaleY = 12.5 + (index % 3) * 3.8 + layerProgress * 4.2;
+    mistLayer.position.set(
+      fogWrap - layerProgress * fogWrap * 2,
+      baseY,
+      -62 + layerProgress * 112 + Math.sin(phase) * 8
+    );
+    mistLayer.scale.set(starfieldRadius * (0.62 + (index % 3) * 0.08), baseScaleY, 1);
+    mistLayer.userData.wrap = fogWrap;
+    mistLayer.userData.speedScale = 0.68 + (index % 4) * 0.13;
+    mistLayer.userData.opacityScale = 0.7 + (index % 5) * 0.09;
+    mistLayer.userData.parallax = 0.58 + layerProgress * 0.72;
+    mistLayer.userData.phase = phase;
+    mistLayer.userData.baseY = baseY;
+    mistLayer.userData.baseScaleX = mistLayer.scale.x;
+    mistLayer.userData.baseScaleY = baseScaleY;
+    mistLayer.userData.baseRotation = material.rotation;
+    mistLayer.renderOrder = 4 + index;
+    fogGroup.add(mistLayer);
+    return mistLayer;
+  });
+  scene.add(fogGroup);
 
   const dummy = new THREE.Object3D();
   let index = 0;
@@ -6462,6 +8780,30 @@ function buildSonicTopography() {
   topo.particleMaterial = particleMesh.material;
   topo.starfield = starfield;
   topo.starfieldMaterial = starfieldMaterial;
+  topo.galaxy = galaxy;
+  topo.galaxyMaterial = galaxyMaterial;
+  topo.fogGroup = fogGroup;
+  topo.fogLayers = fogLayers;
+  topo.ambientLight = ambientLight;
+  topo.keyLight = keyLight;
+  topo.tyndallLight = tyndallLight;
+  topo.tyndallLightTarget = tyndallLightTarget;
+  topo.tyndallBeams = tyndallBeams;
+  topo.tyndallHalos = tyndallHalos;
+  topo.tyndallGroundSheen = tyndallGroundSheen;
+  topo.tyndallGroundSheenMaterial = tyndallGroundSheenMaterial;
+  topo.tyndallColumnReceivers = tyndallColumnReceivers;
+  topo.tyndallWallBounce = tyndallWallBounce;
+  topo.tyndallWallBounceMaterial = tyndallWallBounceMaterial;
+  topo.sonicHighlightShoulder = sonicHighlightShoulder;
+  topo.mistBlackLiftGuard = 1;
+  topo.background = background;
+  topo.backgroundMaterial = backgroundMaterial;
+  topo.wallpaperSurface = wallpaperSurface;
+  fitSonicWallpaperSurface(topo);
+  topo.backgroundTargetColors = backgroundColors.map((color) => new THREE.Color(rgbHexValue(color)));
+  topo.atmosphereColor = new THREE.Color();
+  topo.starfieldAudio = 0;
   topo.dummy = dummy;
   topo.meteorTargetColor = new THREE.Color();
   topo.whiteColor = new THREE.Color(0xffffff);
@@ -6472,6 +8814,7 @@ function buildSonicTopography() {
   topo.fountainEmitters = fountainEmitters;
   applySonicTopographySettings({ persist: false, sync: true, renderConfig: false });
   topo.built = true;
+  syncSceneWallpaperSurface('topography');
   observePresetRendererSize(topo, els.sonicTopographyCore, resizeSonicTopographyRenderer);
   applySonicTopographyPalette(topo.palette || fallbackLyricPalette(state.currentSong));
   applyPresetUpscaler({ force: true });
@@ -6497,6 +8840,7 @@ function resizeSonicTopographyRenderer() {
 function disposeSonicTopography() {
   const topo = state.sonicTopography;
   if (!topo.built) return;
+  disposeSonicWallpaperSurface(topo);
   disposePresetRenderer(topo, els.sonicTopographyCore);
   topo.lowFrequencySpectrum?.dispose?.();
   Object.assign(topo, {
@@ -6518,6 +8862,26 @@ function disposeSonicTopography() {
     particleMaterial: null,
     starfield: null,
     starfieldMaterial: null,
+    galaxy: null,
+    galaxyMaterial: null,
+    fogGroup: null,
+    fogLayers: [],
+    ambientLight: null,
+    keyLight: null,
+    tyndallLight: null,
+    tyndallLightTarget: null,
+    tyndallBeams: [],
+    tyndallHalos: [],
+    background: null,
+    backgroundMaterial: null,
+    wallpaperSurface: null,
+    wallpaperTexture: null,
+    wallpaperVideo: null,
+    wallpaperRequestId: 0,
+    wallpaperSignature: '',
+    backgroundTargetColors: [],
+    atmosphereColor: null,
+    starfieldAudio: 0,
     dummy: null,
     theme: null,
     ripples: [],
@@ -6550,6 +8914,22 @@ function disposeSonicTopography() {
   topo.frameAudio.lowFrequencyBandTargets.fill(0);
 }
 
+function sonicAtmosphereRuntimeSnapshot() {
+  const topo = state.sonicTopography;
+  return {
+    mistLayerCount: topo.fogLayers?.length || 0,
+    beamCount: topo.tyndallBeams?.length || 0,
+    haloCount: topo.tyndallHalos?.length || 0,
+    groundReceiverCount: topo.tyndallGroundSheen ? 1 : 0,
+    receiverBounceCount: (topo.tyndallColumnReceivers?.length || 0) + (topo.tyndallWallBounce ? 1 : 0),
+    highlightShoulder: topo.sonicHighlightShoulder || 0,
+    blackLiftGuard: topo.mistBlackLiftGuard ?? 1,
+    atmosphereContrast: topo.atmosphereContrast ?? 0,
+    groundUsesDirectionalSheen: !!topo.tyndallGroundSheenMaterial?.uniforms?.uSheenDirection,
+    groundHasNoSpotGeometry: topo.tyndallGroundSheen?.geometry?.type === 'PlaneGeometry'
+  };
+}
+
 function updateSonicTopographyVisibility() {
   const visible = state.playbackPage && isSonicTopographyPreset();
   if (els.sonicTopographyScene) els.sonicTopographyScene.hidden = !visible;
@@ -6560,6 +8940,411 @@ function updateSonicTopographyVisibility() {
 
 function wallpaperById(id) {
   return state.wallpapers.find((wallpaper) => String(wallpaper.id) === String(id)) || null;
+}
+
+function sceneWallpaperSetting(preset = state.diyPreset) {
+  if (!SCENE_WALLPAPER_PRESETS.includes(preset)) return null;
+  const normalized = normalizeSceneWallpaperSetting(state.sceneWallpaperSettings?.[preset]);
+  state.sceneWallpaperSettings[preset] = normalized;
+  return normalized;
+}
+
+function sceneWallpaperTextureUrl(wallpaper) {
+  const kind = safeText(wallpaper?.kind, 'image');
+  if (wallpaper?.kind === 'web') return safeText(wallpaper.previewUrl, '');
+  if (kind === 'video') return safeText(wallpaper?.url, '');
+  if (kind === 'scene') return safeText(wallpaper?.previewUrl, '');
+  return safeText(wallpaper?.url || wallpaper?.previewUrl, '');
+}
+
+function createSonicWallpaperSurface(THREE) {
+  const geometry = new THREE.PlaneGeometry(2, 2, 80, 40);
+  const positions = geometry.getAttribute('position');
+  for (let index = 0; index < positions.count; index += 1) {
+    const x = positions.getX(index);
+    const y = positions.getY(index);
+    positions.setZ(index, -(x * x * 0.085 + y * y * 0.015));
+  }
+  positions.needsUpdate = true;
+  const material = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    map: null,
+    transparent: true,
+    opacity: 0,
+    depthTest: false,
+    depthWrite: false,
+    side: THREE.FrontSide,
+    toneMapped: false,
+    fog: false
+  });
+  const wallpaperSurface = new THREE.Mesh(geometry, material);
+  wallpaperSurface.name = 'SonicCameraCurvedFullscreenWallpaper';
+  wallpaperSurface.position.set(0, 0, -360);
+  wallpaperSurface.userData.distance = 360;
+  wallpaperSurface.userData.overscan = 1.1;
+  wallpaperSurface.userData.surface = 'camera-curved-fullscreen';
+  wallpaperSurface.renderOrder = -110;
+  wallpaperSurface.visible = false;
+  wallpaperSurface.frustumCulled = false;
+  return wallpaperSurface;
+}
+
+function fitSonicWallpaperSurface(topo = state.sonicTopography) {
+  const surface = topo?.wallpaperSurface;
+  const camera = topo?.camera;
+  if (!surface || !camera) return false;
+  const distance = Number(surface.userData?.distance) || 360;
+  const overscan = Number(surface.userData?.overscan) || 1.1;
+  const visibleHeight = 2 * Math.tan(camera.fov * Math.PI / 360) * distance;
+  const visibleWidth = visibleHeight * Math.max(0.1, camera.aspect || 1);
+  surface.position.set(0, 0, -distance);
+  surface.scale.set(visibleWidth * 0.5 * overscan, visibleHeight * 0.5 * overscan, distance * 0.24);
+  return true;
+}
+
+function fitSonicWallpaperTexture(topo = state.sonicTopography, texture = topo?.wallpaperTexture) {
+  if (!topo?.camera || !texture?.repeat?.set || !texture?.offset?.set) return false;
+  const source = texture.image || texture.source?.data || null;
+  const width = Number(source?.naturalWidth || source?.videoWidth || source?.width) || 0;
+  const height = Number(source?.naturalHeight || source?.videoHeight || source?.height) || 0;
+  if (!width || !height) return false;
+  const sourceAspect = width / height;
+  const viewportAspect = Math.max(0.1, topo.camera.aspect || 1);
+  let repeatX = 1;
+  let repeatY = 1;
+  if (sourceAspect > viewportAspect) repeatX = viewportAspect / sourceAspect;
+  else repeatY = sourceAspect / viewportAspect;
+  texture.repeat.set(repeatX, repeatY);
+  texture.offset.set((1 - repeatX) * 0.5, (1 - repeatY) * 0.5);
+  texture.needsUpdate = true;
+  return true;
+}
+
+function disposeSonicWallpaperSurface(topo = state.sonicTopography) {
+  if (!topo) return;
+  topo.wallpaperRequestId = (topo.wallpaperRequestId || 0) + 1;
+  if (topo.wallpaperVideo) {
+    topo.wallpaperVideo.pause?.();
+    topo.wallpaperVideo.removeAttribute?.('src');
+    topo.wallpaperVideo.load?.();
+    topo.wallpaperVideo = null;
+  }
+  topo.wallpaperTexture?.dispose?.();
+  topo.wallpaperTexture = null;
+  topo.wallpaperSignature = '';
+  if (topo.wallpaperSurface?.material) {
+    topo.wallpaperSurface.material.map = null;
+    topo.wallpaperSurface.material.opacity = 0;
+    topo.wallpaperSurface.material.needsUpdate = true;
+  }
+  if (topo.wallpaperSurface) topo.wallpaperSurface.visible = false;
+  if (topo.background) topo.background.visible = true;
+}
+
+function setSonicWallpaperSurface(request) {
+  const topo = state.sonicTopography;
+  const surface = topo.wallpaperSurface;
+  if (!surface?.material || !window.THREE) return false;
+  const config = request && typeof request === 'object' ? request : {};
+  const enabled = config.enabled === true;
+  const url = safeText(config.url, '').trim();
+  const mediaKind = config.mediaKind === 'video' ? 'video' : 'image';
+  const opacity = clamp(Number(config.opacity) || 0.68, 0.1, 1);
+  const signature = enabled && url ? `${mediaKind}:${url}` : '';
+  surface.material.opacity = opacity;
+  if (!signature) {
+    disposeSonicWallpaperSurface(topo);
+    return true;
+  }
+  if (signature === topo.wallpaperSignature) {
+    if (topo.wallpaperTexture) {
+      surface.visible = true;
+      if (topo.background) topo.background.visible = false;
+    }
+    return true;
+  }
+
+  topo.wallpaperRequestId = (topo.wallpaperRequestId || 0) + 1;
+  const requestId = topo.wallpaperRequestId;
+  topo.wallpaperSignature = signature;
+  surface.visible = false;
+  if (topo.background) topo.background.visible = true;
+  surface.material.map = null;
+  if (topo.wallpaperVideo) {
+    topo.wallpaperVideo.pause?.();
+    topo.wallpaperVideo.removeAttribute?.('src');
+    topo.wallpaperVideo.load?.();
+    topo.wallpaperVideo = null;
+  }
+  topo.wallpaperTexture?.dispose?.();
+  topo.wallpaperTexture = null;
+  const applyTexture = (texture) => {
+    if (!topo.built || topo.wallpaperRequestId !== requestId || topo.wallpaperSignature !== signature) {
+      texture.dispose?.();
+      return false;
+    }
+    if ('colorSpace' in texture && window.THREE.SRGBColorSpace) texture.colorSpace = window.THREE.SRGBColorSpace;
+    else if ('encoding' in texture && window.THREE.sRGBEncoding !== undefined) texture.encoding = window.THREE.sRGBEncoding;
+    texture.wrapS = window.THREE.ClampToEdgeWrapping;
+    texture.wrapT = window.THREE.ClampToEdgeWrapping;
+    fitSonicWallpaperTexture(topo, texture);
+    texture.needsUpdate = true;
+    topo.wallpaperTexture = texture;
+    surface.material.map = texture;
+    surface.material.needsUpdate = true;
+    surface.visible = true;
+    if (topo.background) topo.background.visible = false;
+    requestOrbFrame();
+    return true;
+  };
+  const failTexture = () => {
+    if (topo.wallpaperRequestId !== requestId) return;
+    topo.wallpaperSignature = '';
+    surface.visible = false;
+    if (topo.background) topo.background.visible = true;
+  };
+
+  if (mediaKind === 'video') {
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
+    video.preload = 'auto';
+    video.muted = true;
+    video.defaultMuted = true;
+    video.loop = true;
+    video.playsInline = true;
+    const texture = new window.THREE.VideoTexture(video);
+    texture.minFilter = window.THREE.LinearFilter;
+    texture.magFilter = window.THREE.LinearFilter;
+    topo.wallpaperVideo = video;
+    video.addEventListener('loadeddata', () => {
+      if (!applyTexture(texture)) return;
+      video.play().catch(() => {});
+    }, { once: true });
+    video.addEventListener('error', () => {
+      texture.dispose?.();
+      if (topo.wallpaperVideo === video) topo.wallpaperVideo = null;
+      failTexture();
+    }, { once: true });
+    video.src = url;
+    video.load();
+    video.play().catch(() => {});
+    return true;
+  }
+
+  const loader = new window.THREE.TextureLoader();
+  loader.setCrossOrigin?.('anonymous');
+  loader.load(
+    url,
+    applyTexture,
+    undefined,
+    failTexture
+  );
+  return true;
+}
+
+function sceneWallpaperChoices() {
+  const seen = new Set();
+  return state.wallpapers.filter((wallpaper) => {
+    const id = safeText(wallpaper?.id, '');
+    if (!id || seen.has(id) || !sceneWallpaperTextureUrl(wallpaper)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
+function mergeWallpaperCatalog(items) {
+  const merged = new Map();
+  [...state.wallpapers, ...(Array.isArray(items) ? items : [])].forEach((wallpaper) => {
+    const id = safeText(wallpaper?.id, '');
+    if (id) merged.set(id, wallpaper);
+  });
+  state.wallpapers = Array.from(merged.values());
+}
+
+async function refreshSceneWallpaperCatalog(options = {}) {
+  if (state.sceneWallpaperCatalogLoading) return;
+  if (state.wallpaperEngineCatalogLoaded && options.force !== true) return;
+  state.sceneWallpaperCatalogLoading = true;
+  try {
+    const payload = await apiJson(`/api/wallpapers?${query({ scan: true })}`);
+    mergeWallpaperCatalog(payload.wallpapers);
+    state.wallpaperEngineCatalogLoaded = true;
+    syncSceneWallpaperControl();
+    if (state.diyPage === 'wallpaper') renderWallpaperList();
+  } catch (error) {
+    if (els.sceneWallpaperStatus && !sceneWallpaperDescriptor()?.wallpaperUrl) {
+      els.sceneWallpaperStatus.textContent = error.message || 'Wallpaper Engine 壁纸读取失败';
+    }
+  } finally {
+    state.sceneWallpaperCatalogLoading = false;
+  }
+}
+
+function sceneWallpaperDescriptor(preset = state.diyPreset) {
+  const setting = sceneWallpaperSetting(preset);
+  if (!setting) return null;
+  const wallpaper = wallpaperById(setting.wallpaperId);
+  const resolvedUrl = sceneWallpaperTextureUrl(wallpaper) || setting.wallpaperUrl;
+  return {
+    ...setting,
+    wallpaperUrl: resolvedUrl,
+    wallpaperName: safeText(wallpaper?.name || setting.wallpaperName, '场景壁纸'),
+    mediaKind: safeText(wallpaper?.kind, setting.mediaKind) === 'video' ? 'video' : 'image'
+  };
+}
+
+function syncSceneWallpaperSurface(preset = state.diyPreset) {
+  const descriptor = sceneWallpaperDescriptor(preset);
+  if (!descriptor) return;
+  const request = {
+    enabled: descriptor.enabled && !!descriptor.wallpaperUrl,
+    url: descriptor.wallpaperUrl,
+    mediaKind: descriptor.mediaKind,
+    opacity: descriptor.opacity
+  };
+  if (preset === 'cover-particles') {
+    els.coverParticleScene?.classList.toggle('has-scene-wallpaper', request.enabled);
+    setCoverParticleWallpaper(request);
+  }
+  if (preset === 'topography') setSonicWallpaperSurface(request);
+  if (preset === 'chladni' && state.chladni.runtime && window.FeChladniRuntime?.setWallpaper) {
+    els.chladniScene?.classList.toggle('has-scene-wallpaper', request.enabled);
+    window.FeChladniRuntime.setWallpaper(state.chladni.runtime, request);
+  } else if (preset === 'chladni') {
+    els.chladniScene?.classList.toggle('has-scene-wallpaper', request.enabled);
+  }
+}
+
+function syncAllSceneWallpaperSurfaces() {
+  SCENE_WALLPAPER_PRESETS.forEach((preset) => syncSceneWallpaperSurface(preset));
+}
+
+function syncSceneWallpaperControl() {
+  if (!els.sceneWallpaperControl) return;
+  const preset = SCENE_WALLPAPER_PRESETS.includes(state.diyPreset) ? state.diyPreset : '';
+  els.sceneWallpaperControl.hidden = !preset;
+  els.sceneWallpaperControl.dataset.sceneWallpaperPreset = preset;
+  if (!preset) return;
+  if (!state.wallpaperEngineCatalogLoaded && !state.sceneWallpaperCatalogLoading) {
+    void refreshSceneWallpaperCatalog();
+  }
+  const setting = sceneWallpaperSetting(preset);
+  const descriptor = sceneWallpaperDescriptor(preset);
+  const choices = sceneWallpaperChoices();
+  if (els.sceneWallpaperSelect) {
+    els.sceneWallpaperSelect.replaceChildren();
+    const empty = document.createElement('option');
+    empty.value = SCENE_WALLPAPER_SOFT_GLOW_ID;
+    empty.textContent = choices.length ? '未选择' : '暂无可用壁纸';
+    empty.textContent = '柔光背景（跟随封面取色）';
+    els.sceneWallpaperSelect.appendChild(empty);
+    choices.forEach((wallpaper) => {
+      const option = document.createElement('option');
+      option.value = safeText(wallpaper.id, '');
+      option.textContent = safeText(wallpaper.name, 'Wallpaper');
+      els.sceneWallpaperSelect.appendChild(option);
+    });
+    if (setting.wallpaperId && !choices.some((item) => String(item.id) === String(setting.wallpaperId))) {
+      const persisted = document.createElement('option');
+      persisted.value = setting.wallpaperId;
+      persisted.textContent = setting.wallpaperName || '已保存的壁纸';
+      els.sceneWallpaperSelect.appendChild(persisted);
+    }
+    els.sceneWallpaperSelect.value = setting.enabled && setting.wallpaperId
+      ? setting.wallpaperId
+      : SCENE_WALLPAPER_SOFT_GLOW_ID;
+  }
+  if (els.sceneWallpaperEnabledToggle) {
+    els.sceneWallpaperEnabledToggle.checked = setting.enabled;
+    els.sceneWallpaperEnabledToggle.disabled = !descriptor.wallpaperUrl;
+    els.sceneWallpaperEnabledToggle.setAttribute('aria-checked', String(setting.enabled));
+  }
+  if (els.sceneWallpaperOpacityRange) {
+    const percent = Math.round(setting.opacity * 100);
+    els.sceneWallpaperOpacityRange.value = String(percent);
+    els.sceneWallpaperOpacityRange.setAttribute('aria-valuetext', `${percent}%`);
+    syncElasticRangeVisual(els.sceneWallpaperOpacityRange);
+    if (els.sceneWallpaperOpacityValue) els.sceneWallpaperOpacityValue.textContent = `${percent}%`;
+  }
+  const current = wallpaperById(state.activeWallpaperId);
+  if (els.sceneWallpaperUseCurrentButton) {
+    els.sceneWallpaperUseCurrentButton.disabled = !sceneWallpaperTextureUrl(current);
+  }
+  if (els.sceneWallpaperRemoveButton) els.sceneWallpaperRemoveButton.disabled = !descriptor.wallpaperUrl;
+  if (els.sceneWallpaperStatus) {
+    els.sceneWallpaperStatus.textContent = descriptor.wallpaperUrl
+      ? `${setting.enabled ? '正在使用' : '已停用'} · ${descriptor.wallpaperName}`
+      : '未添加壁纸';
+    if (!descriptor.wallpaperUrl) {
+      els.sceneWallpaperStatus.textContent = '柔光背景 · 跟随封面取色';
+    }
+  }
+}
+
+function setSceneWallpaperForPreset(preset, wallpaper, enabled = true) {
+  if (!SCENE_WALLPAPER_PRESETS.includes(preset) || !wallpaper) return false;
+  const wallpaperUrl = sceneWallpaperTextureUrl(wallpaper);
+  if (!wallpaperUrl) {
+    toast('该壁纸没有可用的图片预览或视频源，不能作为场景贴图');
+    return false;
+  }
+  const previous = sceneWallpaperSetting(preset);
+  state.sceneWallpaperSettings[preset] = normalizeSceneWallpaperSetting({
+    ...previous,
+    enabled,
+    wallpaperId: safeText(wallpaper.id, ''),
+    wallpaperUrl,
+    wallpaperName: safeText(wallpaper.name, '场景壁纸'),
+    mediaKind: safeText(wallpaper.kind, 'image') === 'video' ? 'video' : 'image',
+    opacity: previous.wallpaperId ? previous.opacity : 1
+  });
+  saveSceneWallpaperPrefs();
+  syncSceneWallpaperSurface(preset);
+  syncSceneWallpaperControl();
+  renderDiySelectedPresetConfig();
+  requestOrbFrame();
+  return true;
+}
+
+function updateSceneWallpaperSetting(preset, patch) {
+  if (!SCENE_WALLPAPER_PRESETS.includes(preset)) return;
+  state.sceneWallpaperSettings[preset] = normalizeSceneWallpaperSetting({
+    ...sceneWallpaperSetting(preset),
+    ...(patch || {})
+  });
+  saveSceneWallpaperPrefs();
+  syncSceneWallpaperSurface(preset);
+  syncSceneWallpaperControl();
+  renderDiySelectedPresetConfig();
+  requestOrbFrame();
+}
+
+function removeSceneWallpaper(preset) {
+  if (!SCENE_WALLPAPER_PRESETS.includes(preset)) return;
+  const opacity = sceneWallpaperSetting(preset)?.opacity || 1;
+  state.sceneWallpaperSettings[preset] = normalizeSceneWallpaperSetting({ opacity });
+  saveSceneWallpaperPrefs();
+  syncSceneWallpaperSurface(preset);
+  syncSceneWallpaperControl();
+  renderDiySelectedPresetConfig();
+  requestOrbFrame();
+}
+
+function selectSoftGlowBackground(preset = state.scenePreset) {
+  if (!SCENE_WALLPAPER_PRESETS.includes(preset)) return false;
+  removeSceneWallpaper(preset);
+  if (preset === 'cover-particles') {
+    state.coverParticle.backgroundEnabled = true;
+    updateCoverParticleBackgroundMode();
+  }
+  setWallpaperStatus('已切回柔光背景 · 跟随封面取色');
+  return true;
+}
+
+async function importSceneWallpaperFiles(files, preset = state.diyPreset) {
+  await importWallpaperFiles(files);
+  const imported = wallpaperById(state.activeWallpaperId);
+  if (imported) setSceneWallpaperForPreset(preset, imported, true);
 }
 
 function visibleWallpapers() {
@@ -6829,17 +9614,20 @@ function renderWallpaperList() {
 
     const thumb = document.createElement('span');
     thumb.className = 'diy-wallpaper-thumb';
+    const thumbnailUrl = wallpaper.previewUrl || (wallpaper.kind === 'video' ? '' : wallpaper.url);
+    if (thumbnailUrl) {
+      const image = document.createElement('img');
+      image.alt = '';
+      image.loading = 'lazy';
+      image.decoding = 'async';
+      image.src = thumbnailUrl;
+      thumb.appendChild(image);
+    }
     if (wallpaper.kind === 'video') {
       const videoMark = document.createElement('span');
       videoMark.className = 'diy-wallpaper-video-mark';
       videoMark.textContent = '动态';
       thumb.appendChild(videoMark);
-    } else {
-      const image = document.createElement('img');
-      image.alt = '';
-      image.loading = 'lazy';
-      image.src = wallpaper.previewUrl || wallpaper.url;
-      thumb.appendChild(image);
     }
 
     const copy = document.createElement('span');
@@ -6876,6 +9664,9 @@ function selectWallpaper(id) {
   if (!wallpaper) return;
   state.activeWallpaperId = wallpaper.id;
   state.activeWallpaperIds[state.wallpaperSource] = wallpaper.id;
+  if (SCENE_WALLPAPER_PRESETS.includes(state.scenePreset)) {
+    setSceneWallpaperForPreset(state.scenePreset, wallpaper, true);
+  }
   saveWallpaperPrefs();
   renderWallpaperList();
   if (wallpaper.kind === 'scene') activateNativeWallpaperScene(wallpaper);
@@ -6893,7 +9684,14 @@ async function refreshWallpapers(options = {}) {
     const scan = options.scan ?? requestedSource === 'live';
     const payload = await apiJson(`/api/wallpapers?${query({ scan })}`);
     if (state.wallpaperSource !== requestedSource) return;
-    state.wallpapers = Array.isArray(payload.wallpapers) ? payload.wallpapers : [];
+    if (requestedSource === 'live') {
+      state.wallpapers = Array.isArray(payload.wallpapers) ? payload.wallpapers : [];
+      state.wallpaperEngineCatalogLoaded = true;
+    } else {
+      const engineItems = state.wallpapers.filter((wallpaper) => wallpaper?.source === 'wallpaper-engine');
+      state.wallpapers = [];
+      mergeWallpaperCatalog([...(Array.isArray(payload.wallpapers) ? payload.wallpapers : []), ...engineItems]);
+    }
     renderWallpaperList();
   } catch (error) {
     if (state.wallpaperSource === requestedSource) setWallpaperStatus(error.message || '壁纸加载失败');
@@ -6958,20 +9756,9 @@ function playCoverParticleEngine() {
   } catch (error) {}
 }
 
-function resetCoverParticleShock() {
-  const cover = state.coverParticle;
-  cover.shockAge = COVER_PARTICLE_SHOCK_DURATION_SECONDS;
-  cover.shockStrength = 0;
-  cover.shockCooldown = 0;
-  cover.shockArmed = false;
-  cover.lastShockDrive = 0;
-  cover.lastBassInput = 0;
-}
-
 function pauseCoverParticleEngine(force = false) {
   const cover = state.coverParticle;
   const container = cover.engineContainer;
-  resetCoverParticleShock();
   if (!container || (!force && !cover.enginePlaying)) return;
   if (typeof container.pause === 'function') {
     try { container.pause(); } catch (error) {}
@@ -6992,6 +9779,8 @@ function updateCoverParticleVisibility() {
     if (visibilityChanged) ensureCoverParticleEngine().then(playCoverParticleEngine);
   } else if (visibilityChanged) {
     pauseCoverParticleEngine();
+    state.coverParticle.motionGate = 0;
+    state.coverParticle.wholeJump = 0;
   }
 }
 
@@ -6999,20 +9788,56 @@ function updateCoverParticleBackgroundMode() {
   const enabled = !!state.coverParticle.backgroundEnabled && coverParticlePresetVisible();
   if (els.coverParticleScene) els.coverParticleScene.classList.toggle('has-soft-background', enabled);
   if (els.diyCoverParticleBackgroundToggle) {
-    els.diyCoverParticleBackgroundToggle.checked = !!state.coverParticle.backgroundEnabled;
-    els.diyCoverParticleBackgroundToggle.setAttribute('aria-pressed', String(!!state.coverParticle.backgroundEnabled));
+    const backgroundEnabled = !!state.coverParticle.backgroundEnabled;
+    if (els.diyCoverParticleBackgroundToggle.checked !== backgroundEnabled) {
+      els.diyCoverParticleBackgroundToggle.checked = backgroundEnabled;
+    }
+    const ariaPressed = String(backgroundEnabled);
+    if (els.diyCoverParticleBackgroundToggle.getAttribute('aria-pressed') !== ariaPressed) {
+      els.diyCoverParticleBackgroundToggle.setAttribute('aria-pressed', ariaPressed);
+    }
   }
   if (els.diyCoverParticleBackgroundValue) {
-    els.diyCoverParticleBackgroundValue.textContent = state.coverParticle.backgroundEnabled ? 'ON' : 'OFF';
+    const backgroundValue = state.coverParticle.backgroundEnabled ? 'ON' : 'OFF';
+    if (els.diyCoverParticleBackgroundValue.textContent !== backgroundValue) {
+      els.diyCoverParticleBackgroundValue.textContent = backgroundValue;
+    }
   }
   const motionPercent = coverParticleMotionPercent();
   if (els.diyCoverParticleMotionRange) {
-    els.diyCoverParticleMotionRange.value = String(motionPercent);
-    els.diyCoverParticleMotionRange.setAttribute('aria-valuetext', `${motionPercent}%`);
+    const motionValue = String(motionPercent);
+    const motionAriaValue = `${motionPercent}%`;
+    if (els.diyCoverParticleMotionRange.value !== motionValue) {
+      els.diyCoverParticleMotionRange.value = motionValue;
+    }
+    if (els.diyCoverParticleMotionRange.getAttribute('aria-valuetext') !== motionAriaValue) {
+      els.diyCoverParticleMotionRange.setAttribute('aria-valuetext', motionAriaValue);
+    }
     syncElasticRangeVisual(els.diyCoverParticleMotionRange);
   }
   if (els.diyCoverParticleMotionValue) {
-    els.diyCoverParticleMotionValue.textContent = `${motionPercent}%`;
+    const motionValue = `${motionPercent}%`;
+    if (els.diyCoverParticleMotionValue.textContent !== motionValue) {
+      els.diyCoverParticleMotionValue.textContent = motionValue;
+    }
+  }
+  const floatSpeedPercent = coverParticleFloatSpeedPercent();
+  if (els.diyCoverParticleFloatSpeedRange) {
+    const floatSpeedValue = String(floatSpeedPercent);
+    const floatSpeedAriaValue = `${floatSpeedPercent}%`;
+    if (els.diyCoverParticleFloatSpeedRange.value !== floatSpeedValue) {
+      els.diyCoverParticleFloatSpeedRange.value = floatSpeedValue;
+    }
+    if (els.diyCoverParticleFloatSpeedRange.getAttribute('aria-valuetext') !== floatSpeedAriaValue) {
+      els.diyCoverParticleFloatSpeedRange.setAttribute('aria-valuetext', floatSpeedAriaValue);
+    }
+    syncElasticRangeVisual(els.diyCoverParticleFloatSpeedRange);
+  }
+  if (els.diyCoverParticleFloatSpeedValue) {
+    const floatSpeedValue = `${floatSpeedPercent}%`;
+    if (els.diyCoverParticleFloatSpeedValue.textContent !== floatSpeedValue) {
+      els.diyCoverParticleFloatSpeedValue.textContent = floatSpeedValue;
+    }
   }
 }
 
@@ -7022,6 +9847,14 @@ function coverParticleMotionPercent() {
 
 function coverParticleMotionScale() {
   return clamp(Number(state.coverParticle.motionAmplitude) || 0, 0, 2) * (reducedMotion ? 0.35 : 1);
+}
+
+function coverParticleFloatSpeedPercent() {
+  return Math.round(normalizeCoverParticleFloatSpeed(state.coverParticle.floatSpeed) * 100);
+}
+
+function coverParticleFloatSpeedScale() {
+  return normalizeCoverParticleFloatSpeed(state.coverParticle.floatSpeed);
 }
 
 function addSonicTopographyRipple(x, z, strength = 1, white = false) {
@@ -7243,7 +10076,9 @@ function updateSonicTopographyMotion() {
     ? clamp(Math.max(Number(live.bass) || 0, Number(state.visual.bass) || 0), 0, 1)
     : 0;
   const lowMidTarget = audioDriving ? clamp(live.lowMid || 0, 0, 1) : 0;
-  const settings = normalizeSonicSettings(topo.settings);
+  // This is an animation-frame hot path. Settings are normalized by
+  // applySonicTopographySettings(), so allocating another full object here is redundant.
+  const settings = topo.settings || DEFAULT_SONIC_SETTINGS;
   const smoothing = settings.smoothing;
   const attackResponse = 1 - Math.exp(-dt / (SONIC_BASS_COLUMN_ATTACK_SECONDS * smoothing));
   const releaseResponse = 1 - Math.exp(-dt / (SONIC_BASS_COLUMN_RELEASE_SECONDS * smoothing));
@@ -7364,6 +10199,17 @@ function updateSonicTopographyMotion() {
 
   if (topo.scene.fog && topo.scene.fog.color) {
     topo.scene.fog.color.lerp(theme.uBaseColor1, lerpSpeed);
+    if (settings.atmosphereEnabled && topo.tyndallLight?.color) {
+      const aerialSunlightCoupling = clamp(
+        0.08 + settings.fogGlow * 0.04 + settings.mistReflectance * 0.03,
+        0.08,
+        0.22
+      );
+      topo.scene.fog.color.lerp(
+        topo.tyndallLight.color,
+        clamp(lerpSpeed * aerialSunlightCoupling, 0, 0.04)
+      );
+    }
   }
   if (topo.meteorMaterial && topo.meteorMaterial.color) {
     topo.meteorTargetColor.copy(theme.uWarmCore).lerp(topo.whiteColor, 0.7);
@@ -7421,26 +10267,149 @@ function updateSonicTopographyMotion() {
 
   if (!topo.resizeObserver) resizeSonicTopographyRenderer();
 
+  const starfieldFlashTarget = audioDriving
+    ? clamp(audio.energy * 0.58 + audio.beat * 0.72 + audio.brilliance * 0.16, 0, 1)
+    : 0;
+  topo.starfieldAudio += (starfieldFlashTarget - topo.starfieldAudio) * clamp(dt * 7.5, 0, 1);
+  const starfieldAudioUniform = topo.starfieldMaterial?.userData?.driftUniforms?.uStarfieldAudio;
+  if (starfieldAudioUniform) starfieldAudioUniform.value = topo.starfieldAudio;
+
   if (settings.starfieldEnabled && topo.starfield && !reducedMotion) {
     const driftTime = topo.starfieldMaterial?.userData?.driftUniforms?.uStarfieldTime;
     if (driftTime) driftTime.value += dt;
     topo.starfield.rotation.y += dt * 0.045;
   }
+  if (settings.galaxyEnabled && topo.galaxy && !reducedMotion) {
+    topo.galaxy.rotation.y += dt * 0.018;
+  }
+  if (topo.backgroundMaterial && topo.backgroundTargetColors.length >= 3) {
+    const backgroundLerp = clamp(dt * 1.65, 0, 1);
+    topo.backgroundMaterial.uniforms.uBackgroundColor1.value.lerp(topo.backgroundTargetColors[0], backgroundLerp);
+    topo.backgroundMaterial.uniforms.uBackgroundColor2.value.lerp(topo.backgroundTargetColors[1], backgroundLerp);
+    topo.backgroundMaterial.uniforms.uBackgroundColor3.value.lerp(topo.backgroundTargetColors[2], backgroundLerp);
+  }
+  const tyndallColor = topo.tyndallLight?.color;
+  const mistClock = uniforms.uTime.value;
+  const perceptualTyndallIntensity = settings.tyndallIntensity <= 0
+    ? 0
+    : Math.pow(clamp(settings.tyndallIntensity / 1.5, 0, 1), 0.72) * 1.5;
+  const maxMistSceneOpacity = SONIC_TYNDALL_TOTAL_ENERGY_CAP * 0.56;
+  const mistBlackLiftGuard = clamp(
+    1 - settings.mistEmission * 0.36 - settings.fogDensity * 0.14,
+    0.48,
+    1
+  );
+  topo.mistBlackLiftGuard = mistBlackLiftGuard;
+  topo.fogLayers?.forEach((mistLayer) => {
+    if (settings.atmosphereEnabled && !reducedMotion) {
+      mistLayer.position.x -= dt * (3.2 + settings.fogSpeed * 14)
+        * mistLayer.userData.speedScale * mistLayer.userData.parallax;
+      if (mistLayer.position.x < -mistLayer.userData.wrap) {
+        mistLayer.position.x = mistLayer.userData.wrap;
+      }
+      mistLayer.position.y = mistLayer.userData.baseY
+        + Math.sin(mistClock * (0.075 + mistLayer.userData.parallax * 0.018) + mistLayer.userData.phase) * 0.85;
+      mistLayer.material.rotation = mistLayer.userData.baseRotation
+        + Math.sin(mistClock * 0.052 + mistLayer.userData.phase) * 0.012;
+    }
+    if (!mistLayer.material) return;
+    topo.atmosphereColor?.copy(theme.uBaseColor2);
+    if (settings.atmosphereEnabled && tyndallColor && topo.atmosphereColor) {
+      const weakScatter = clamp(0.045 + settings.mistReflectance * 0.11 + settings.fogGlow * 0.045, 0, 0.28);
+      topo.atmosphereColor.lerp(tyndallColor, weakScatter);
+    }
+    if (topo.atmosphereColor) mistLayer.material.color.lerp(topo.atmosphereColor, clamp(dt * 2.2, 0, 1));
+    const lightCoupling = settings.tyndallIntensity * settings.mistReflectance
+      * (0.004 + settings.fogGlow * 0.006);
+    const targetOpacity = (0.004 + settings.fogDensity * 0.03
+      + settings.mistEmission * 0.038 + lightCoupling) * mistLayer.userData.opacityScale;
+    mistLayer.material.opacity += (Math.min(
+      targetOpacity * mistBlackLiftGuard,
+      maxMistSceneOpacity / SONIC_WATER_MIST_LAYER_COUNT
+    ) - mistLayer.material.opacity) * clamp(dt * 2.7, 0, 1);
+    const emissionFill = 1 + settings.mistEmission * 0.52;
+    mistLayer.scale.x += (mistLayer.userData.baseScaleX * emissionFill - mistLayer.scale.x) * clamp(dt * 2, 0, 1);
+    mistLayer.scale.y += (
+      mistLayer.userData.baseScaleY * (1 + settings.mistEmission * 0.38) - mistLayer.scale.y
+    ) * clamp(dt * 2, 0, 1);
+  });
+  topo.tyndallBeams?.forEach((beam) => {
+    const beamUniforms = beam.material?.uniforms;
+    if (!beamUniforms) return;
+    const atmosphereBreath = 0.5 + 0.5 * Math.sin(
+      mistClock * beam.userData.driftRate + beam.userData.phase
+    );
+    const beamVisibility = 1 - smoothstep(0.34, 0.96, settings.mistEmission);
+    const mediumGain = settings.atmosphereEnabled ? 0.48 + settings.fogDensity * 0.52 : 0;
+    const mistCoupling = clamp(
+      settings.fogDensity * 0.68 + settings.fogGlow * 0.16 + settings.mistEmission * 0.3,
+      0,
+      1
+    );
+    const beamEnergyBudget = SONIC_TYNDALL_TOTAL_ENERGY_CAP * 1.2 / SONIC_TYNDALL_BEAM_COUNT;
+    const rawBeamOpacity = beam.userData.baseOpacity * perceptualTyndallIntensity * mediumGain
+      * (0.48 + settings.mistReflectance * 0.42) * beamVisibility;
+    const targetOpacity = Math.min(rawBeamOpacity, beamEnergyBudget);
+    beamUniforms.uOpacity.value += (targetOpacity - beamUniforms.uOpacity.value) * clamp(dt * 4, 0, 1);
+    beamUniforms.uTime.value = mistClock;
+    beamUniforms.uMistCoupling.value = mistCoupling;
+    beamUniforms.uMistReflectance.value = settings.mistReflectance;
+    beamUniforms.uAtmosphereVariation.value = atmosphereBreath;
+
+    const halo = beam.userData.halo;
+    if (!halo?.material?.uniforms) return;
+    const haloBreath = 0.5 + 0.5 * Math.sin(
+      mistClock * halo.userData.driftRate + halo.userData.phase
+    );
+    const haloEnergyCap = SONIC_TYNDALL_TOTAL_ENERGY_CAP * 0.42 / SONIC_TYNDALL_BEAM_COUNT;
+    const haloTargetOpacity = Math.min(
+      halo.userData.baseOpacity * perceptualTyndallIntensity
+        * mediumGain * (0.42 + settings.mistReflectance * 0.34) * beamVisibility,
+      haloEnergyCap
+    );
+    halo.material.uniforms.uOpacity.value += (
+      haloTargetOpacity - halo.material.uniforms.uOpacity.value
+    ) * clamp(dt * 3.2, 0, 1);
+    halo.material.uniforms.uTime.value = mistClock;
+    halo.material.uniforms.uMistCoupling.value = mistCoupling;
+    halo.material.uniforms.uMistReflectance.value = settings.mistReflectance;
+    halo.material.uniforms.uHaloStrength.value = clamp(0.09 + settings.fogGlow * 0.09, 0.08, 0.22);
+    halo.material.uniforms.uAtmosphereVariation.value = haloBreath;
+  });
+  const reflectionEnergyCap = SONIC_TYNDALL_TOTAL_ENERGY_CAP * 0.32;
+  if (topo.tyndallGroundSheenMaterial?.uniforms) {
+    const groundUniforms = topo.tyndallGroundSheenMaterial.uniforms;
+    groundUniforms.uTime.value = mistClock;
+    groundUniforms.uIntensity.value = Math.min(groundUniforms.uIntensity.value, reflectionEnergyCap);
+  }
+  if (topo.tyndallWallBounceMaterial?.uniforms) {
+    const wallUniforms = topo.tyndallWallBounceMaterial.uniforms;
+    wallUniforms.uTime.value = mistClock;
+    wallUniforms.uIntensity.value = Math.min(
+      wallUniforms.uIntensity.value,
+      reflectionEnergyCap * 0.38
+    );
+  }
+  if (uniforms.uTyndallGoboPhase) uniforms.uTyndallGoboPhase.value = mistClock * 0.018;
   if (!state.playbackVisual.dragging && !reducedMotion) topo.autoYaw += dt * 0.05;
   const referenceRadius = Math.hypot(SONIC_TOPOGRAPHY_CAMERA.x, SONIC_TOPOGRAPHY_CAMERA.y, SONIC_TOPOGRAPHY_CAMERA.z);
   const baseRadius = topo.baseCameraRadius || referenceRadius;
   const radius = baseRadius / clamp(state.playbackVisual.zoom || 1, 0.58, 2.35);
   const baseAzimuth = Math.atan2(SONIC_TOPOGRAPHY_CAMERA.x, SONIC_TOPOGRAPHY_CAMERA.z);
   const baseElevation = Math.asin(SONIC_TOPOGRAPHY_CAMERA.y / referenceRadius);
-  const yaw = baseAzimuth + topo.autoYaw + (state.playbackVisual.yaw - PLAYBACK_REST_YAW) * 0.72;
-  const elevation = clamp(baseElevation + (state.playbackVisual.pitch - PLAYBACK_REST_PITCH) * 0.48, 0.1, Math.PI / 2 - 0.1);
+  const yaw = baseAzimuth + topo.autoYaw + (state.playbackVisual.yaw - PLAYBACK_REST_YAW);
+  const elevation = clamp(baseElevation + (state.playbackVisual.pitch - PLAYBACK_REST_PITCH), 0.1, Math.PI / 2 - 0.1);
   const horizontalRadius = Math.cos(elevation) * radius;
   topo.camera.position.set(
     Math.sin(yaw) * horizontalRadius,
     Math.sin(elevation) * radius,
     Math.cos(yaw) * horizontalRadius
   );
-  topo.camera.lookAt(0, 0, 0);
+  topo.camera.lookAt(0, SONIC_TOPOGRAPHY_CAMERA.targetY, 0);
+  topo.tyndallBeams?.forEach((beam) => {
+    orientSonicTyndallPlane(window.THREE, beam, topo.camera);
+    if (beam.userData.halo) orientSonicTyndallPlane(window.THREE, beam.userData.halo, topo.camera);
+  });
 
   updateSonicTopographyProjectiles(dt);
   if (topo.renderQuality) topo.renderQuality.render(topo.scene, topo.camera, nowMs);
@@ -7536,7 +10505,7 @@ function coverUrl(song) {
 function textPalettePresetId(preset = state.textPreset) {
   if (TEXT_PALETTE_PRESET_IDS.includes(preset)) return preset;
   if (TEXT_PALETTE_PRESET_IDS.includes(state.lastSelectableTextPreset)) return state.lastSelectableTextPreset;
-  return 'depth';
+  return DEFAULT_TEXT_PRESET;
 }
 
 function textPalettePreference(preset = state.textPreset) {
@@ -7701,17 +10670,54 @@ function sampleCoverBase(data) {
   return mixRgb(best, average, 0.28);
 }
 
+const COVER_PALETTE_SAMPLE_SIZE = 36;
+const COVER_PALETTE_CACHE_LIMIT = 48;
+const coverPaletteCache = new Map();
+const coverPaletteLoads = new Map();
+let coverPaletteSampleCanvas = null;
+let coverPaletteSampleContext = null;
+
+function coverPaletteSampler() {
+  if (coverPaletteSampleCanvas && coverPaletteSampleContext) {
+    return { canvas: coverPaletteSampleCanvas, context: coverPaletteSampleContext };
+  }
+  coverPaletteSampleCanvas = document.createElement('canvas');
+  coverPaletteSampleCanvas.width = COVER_PALETTE_SAMPLE_SIZE;
+  coverPaletteSampleCanvas.height = COVER_PALETTE_SAMPLE_SIZE;
+  coverPaletteSampleContext = coverPaletteSampleCanvas.getContext('2d', { willReadFrequently: true });
+  return { canvas: coverPaletteSampleCanvas, context: coverPaletteSampleContext };
+}
+
+function rememberCoverPalette(signature, palette) {
+  if (!signature || !palette) return;
+  coverPaletteCache.delete(signature);
+  coverPaletteCache.set(signature, palette);
+  while (coverPaletteCache.size > COVER_PALETTE_CACHE_LIMIT) {
+    coverPaletteCache.delete(coverPaletteCache.keys().next().value);
+  }
+}
+
+function cachedCoverPalette(signature) {
+  const palette = coverPaletteCache.get(signature);
+  if (!palette) return null;
+  coverPaletteCache.delete(signature);
+  coverPaletteCache.set(signature, palette);
+  return palette;
+}
+
 function sampleCoverPalette(img) {
   if (!img || !img.complete || !img.naturalWidth || !img.naturalHeight) return null;
-  const canvas = document.createElement('canvas');
-  const size = 36;
-  canvas.width = size;
-  canvas.height = size;
-  const context = canvas.getContext('2d', { willReadFrequently: true });
+  const { context } = coverPaletteSampler();
   if (!context) return null;
   try {
-    context.drawImage(img, 0, 0, size, size);
-    const data = context.getImageData(0, 0, size, size).data;
+    context.clearRect(0, 0, COVER_PALETTE_SAMPLE_SIZE, COVER_PALETTE_SAMPLE_SIZE);
+    context.drawImage(img, 0, 0, COVER_PALETTE_SAMPLE_SIZE, COVER_PALETTE_SAMPLE_SIZE);
+    const data = context.getImageData(
+      0,
+      0,
+      COVER_PALETTE_SAMPLE_SIZE,
+      COVER_PALETTE_SAMPLE_SIZE
+    ).data;
     const coverColors = extractCoverColors(data);
     if (!coverColors.length) return null;
     const fallback = fallbackLyricPalette(state.currentSong).coverColors;
@@ -7809,6 +10815,12 @@ function applySonicTopographyPalette(palette) {
   const topo = state.sonicTopography;
   topo.palette = palette;
   topo.theme = createSonicTopographyTheme(palette);
+
+  if (topo.backgroundTargetColors?.length >= 3) {
+    sonicCoverBackgroundColors(palette).forEach((color, index) => {
+      topo.backgroundTargetColors[index].set(rgbHexValue(color));
+    });
+  }
 
   if (!topo.uniforms || !topo.theme) return;
   topo.uniforms.uBaseColor1.value.copy(topo.theme.uBaseColor1);
@@ -7988,26 +11000,228 @@ function applyLyricPalette(palette) {
 
 function applyCoverSample(img, signature) {
   if (signature !== state.playbackVisual.coverSignature) return false;
+  const cached = cachedCoverPalette(signature);
+  if (cached) {
+    applyLyricPalette(cached);
+    return true;
+  }
   const palette = sampleCoverPalette(img);
   if (!palette) return false;
+  rememberCoverPalette(signature, palette);
   applyLyricPalette(palette);
   return true;
 }
 
 function loadCoverPalette(url, signature) {
   if (!url) return;
+  const cached = cachedCoverPalette(signature);
+  if (cached) {
+    if (signature === state.playbackVisual.coverSignature) applyLyricPalette(cached);
+    return;
+  }
+  if (coverPaletteLoads.has(signature)) return;
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.decoding = 'async';
-  img.addEventListener('load', () => applyCoverSample(img, signature), { once: true });
+  coverPaletteLoads.set(signature, img);
+  const finish = () => coverPaletteLoads.delete(signature);
+  img.addEventListener('load', () => {
+    applyCoverSample(img, signature);
+    finish();
+  }, { once: true });
+  img.addEventListener('error', finish, { once: true });
   img.src = url;
+}
+
+function drawCoverParticleWallpaper() {
+  const canvas = els.coverParticleWallpaperCanvas;
+  const cover = state.coverParticle;
+  const image = cover.wallpaperImage;
+  const sourcePixelWidth = Number(image?.naturalWidth || image?.videoWidth) || 0;
+  const sourcePixelHeight = Number(image?.naturalHeight || image?.videoHeight) || 0;
+  if (!canvas || !sourcePixelWidth || !sourcePixelHeight) return;
+  const rect = (canvas.parentElement || canvas).getBoundingClientRect();
+  const width = Math.max(1, Math.round(rect.width || canvas.clientWidth || 1));
+  const height = Math.max(1, Math.round(rect.height || canvas.clientHeight || 1));
+  const dpr = clamp(window.devicePixelRatio || 1, 1, 2);
+  const pixelWidth = Math.max(1, Math.round(width * dpr));
+  const pixelHeight = Math.max(1, Math.round(height * dpr));
+  const videoFrameTime = image === cover.wallpaperVideo
+    ? Math.round((Number(image.currentTime) || 0) * 1000)
+    : -1;
+  const drawSignature = `${cover.wallpaperSignature}|${pixelWidth}x${pixelHeight}|${videoFrameTime}`;
+  if (cover.wallpaperDrawSignature === drawSignature) return;
+  if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
+  if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
+  const context = canvas.getContext('2d', { alpha: true });
+  if (!context) return;
+  context.setTransform(dpr, 0, 0, dpr, 0, 0);
+  context.clearRect(0, 0, width, height);
+
+  const sourceAspect = sourcePixelWidth / Math.max(1, sourcePixelHeight);
+  const targetAspect = width / Math.max(1, height);
+  let sourceX = 0;
+  let sourceY = 0;
+  let sourceWidth = sourcePixelWidth;
+  let sourceHeight = sourcePixelHeight;
+  if (sourceAspect > targetAspect) {
+    sourceWidth = sourcePixelHeight * targetAspect;
+    sourceX = (sourcePixelWidth - sourceWidth) * 0.5;
+  } else {
+    sourceHeight = sourcePixelWidth / targetAspect;
+    sourceY = (sourcePixelHeight - sourceHeight) * 0.5;
+  }
+
+  const curveAngle = 0.22;
+  const curveDenominator = Math.sin(curveAngle);
+  for (let segment = 0; segment < COVER_PARTICLE_WALLPAPER_SEGMENTS; segment += 1) {
+    const sourceU0 = segment / COVER_PARTICLE_WALLPAPER_SEGMENTS;
+    const sourceU1 = (segment + 1) / COVER_PARTICLE_WALLPAPER_SEGMENTS;
+    const normalized0 = sourceU0 * 2 - 1;
+    const normalized1 = sourceU1 * 2 - 1;
+    const destinationU0 = (Math.sin(normalized0 * curveAngle) / curveDenominator + 1) * 0.5;
+    const destinationU1 = (Math.sin(normalized1 * curveAngle) / curveDenominator + 1) * 0.5;
+    const destinationX = destinationU0 * width;
+    const destinationWidth = Math.max(1, (destinationU1 - destinationU0) * width + 0.75);
+    const center = (normalized0 + normalized1) * 0.5;
+    const depth = 1 - Math.pow(Math.abs(center), 1.55);
+    const destinationHeight = height * (1 - depth * 0.02);
+    const destinationY = (height - destinationHeight) * 0.5;
+    context.drawImage(
+      image,
+      sourceX + sourceWidth * sourceU0,
+      sourceY,
+      sourceWidth * (sourceU1 - sourceU0) + 0.5,
+      sourceHeight,
+      destinationX,
+      destinationY,
+      destinationWidth,
+      destinationHeight
+    );
+  }
+
+  const inwardShade = context.createRadialGradient(width * 0.5, height * 0.48, 0, width * 0.5, height * 0.5, width * 0.72);
+  inwardShade.addColorStop(0, 'rgba(2, 5, 9, 0.12)');
+  inwardShade.addColorStop(0.62, 'rgba(2, 5, 9, 0.03)');
+  inwardShade.addColorStop(1, 'rgba(2, 5, 9, 0.2)');
+  context.fillStyle = inwardShade;
+  context.fillRect(0, 0, width, height);
+  cover.wallpaperDrawSignature = drawSignature;
+}
+
+function disposeCoverParticleWallpaperMedia() {
+  if (state.coverParticle.wallpaperVideo) {
+    state.coverParticle.wallpaperVideo.pause?.();
+    state.coverParticle.wallpaperVideo.removeAttribute?.('src');
+    state.coverParticle.wallpaperVideo.load?.();
+    state.coverParticle.wallpaperVideo = null;
+  }
+  state.coverParticle.wallpaperImage = null;
+  state.coverParticle.wallpaperDrawSignature = '';
+}
+
+function scheduleCoverParticleWallpaperVideoFrame(video, requestId, signature) {
+  if (typeof video?.requestVideoFrameCallback !== 'function') return;
+  video.requestVideoFrameCallback(() => {
+    const cover = state.coverParticle;
+    if (cover.wallpaperVideo !== video
+        || cover.wallpaperRequestId !== requestId
+        || cover.wallpaperSignature !== signature) {
+      return;
+    }
+    drawCoverParticleWallpaper();
+    scheduleCoverParticleWallpaperVideoFrame(video, requestId, signature);
+  });
+}
+
+function setCoverParticleWallpaper(request) {
+  const canvas = els.coverParticleWallpaperCanvas;
+  if (!canvas) return;
+  const config = request && typeof request === 'object' ? request : {};
+  const enabled = config.enabled === true;
+  const url = safeText(config.url, '');
+  const mediaKind = config.mediaKind === 'video' ? 'video' : 'image';
+  const opacity = clamp(Number(config.opacity) || 0.68, 0.1, 1);
+  const signature = enabled && url ? `${mediaKind}:${url}` : '';
+  canvas.style.setProperty('--scene-wallpaper-opacity', opacity.toFixed(2));
+  if (!signature) {
+    state.coverParticle.wallpaperRequestId += 1;
+    disposeCoverParticleWallpaperMedia();
+    state.coverParticle.wallpaperSignature = '';
+    const context = canvas.getContext('2d');
+    context?.clearRect(0, 0, canvas.width, canvas.height);
+    canvas.hidden = true;
+    return;
+  }
+  canvas.hidden = false;
+  if (state.coverParticle.wallpaperSignature === signature && state.coverParticle.wallpaperImage) {
+    drawCoverParticleWallpaper();
+    return;
+  }
+  const requestId = state.coverParticle.wallpaperRequestId + 1;
+  state.coverParticle.wallpaperRequestId = requestId;
+  state.coverParticle.wallpaperSignature = signature;
+  disposeCoverParticleWallpaperMedia();
+
+  if (mediaKind === 'video') {
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
+    video.preload = 'auto';
+    video.muted = true;
+    video.defaultMuted = true;
+    video.loop = true;
+    video.playsInline = true;
+    state.coverParticle.wallpaperVideo = video;
+    video.addEventListener('loadeddata', () => {
+      if (state.coverParticle.wallpaperRequestId !== requestId
+          || state.coverParticle.wallpaperSignature !== signature) {
+        return;
+      }
+      state.coverParticle.wallpaperImage = video;
+      drawCoverParticleWallpaper();
+      const supportsVideoFrames = typeof video.requestVideoFrameCallback === 'function';
+      if (supportsVideoFrames) {
+        scheduleCoverParticleWallpaperVideoFrame(video, requestId, signature);
+      } else {
+        video.addEventListener('timeupdate', drawCoverParticleWallpaper);
+      }
+      video.play().catch(() => {});
+    }, { once: true });
+    video.addEventListener('error', () => {
+      if (state.coverParticle.wallpaperRequestId !== requestId) return;
+      disposeCoverParticleWallpaperMedia();
+      state.coverParticle.wallpaperSignature = '';
+      canvas.hidden = true;
+      els.coverParticleScene?.classList.remove('has-scene-wallpaper');
+    }, { once: true });
+    video.src = url;
+    video.load();
+    video.play().catch(() => {});
+    return;
+  }
+
+  const image = new Image();
+  image.decoding = 'async';
+  image.crossOrigin = 'anonymous';
+  image.addEventListener('load', () => {
+    if (state.coverParticle.wallpaperRequestId !== requestId || state.coverParticle.wallpaperSignature !== signature) return;
+    state.coverParticle.wallpaperImage = image;
+    drawCoverParticleWallpaper();
+  }, { once: true });
+  image.addEventListener('error', () => {
+    if (state.coverParticle.wallpaperRequestId !== requestId) return;
+    state.coverParticle.wallpaperImage = null;
+    state.coverParticle.wallpaperSignature = '';
+    canvas.hidden = true;
+    els.coverParticleScene?.classList.remove('has-scene-wallpaper');
+  }, { once: true });
+  image.src = url;
 }
 
 function resetCoverParticleSamples() {
   state.coverParticle.sampleSignature = '';
   state.coverParticle.particles = [];
   state.coverParticle.gpuSignature = '';
-  resetCoverParticleShock();
 }
 
 function updateCoverParticleImage(song = state.currentSong) {
@@ -8145,6 +11359,9 @@ const LYRIC_TIMESTAMP_COMPENSATION_SECONDS = 0.22;
 const BOOK_LYRIC_SCROLL_SNAP_PX = 0.65;
 const BOOK_LYRIC_SCROLL_MIN_STEP_SECONDS = 1 / 240;
 const BOOK_LYRIC_SCROLL_MAX_STEP_SECONDS = 0.08;
+const QISHUI_LYRIC_TRANSITION_SECONDS = 0.34;
+const QISHUI_SEEK_HANDOFF_TOLERANCE_SECONDS = 0.08;
+const QISHUI_SEEK_HANDOFF_MAX_MS = 1600;
 
 function resetLyricFrameSync() {
   state.lyricFrameTime = -1;
@@ -8156,9 +11373,11 @@ function resetBookLyricScrollState(options = {}) {
   const store = options.store || state;
   const targetKey = options.targetKey || 'lyricBookScrollTarget';
   const frameAtKey = options.frameAtKey || 'lyricBookScrollFrameAt';
+  const clockTimeKey = options.clockTimeKey || 'lyricBookScrollClockTime';
   const layoutVersionKey = options.layoutVersionKey || 'lyricBookLayoutVersion';
   store[targetKey] = Number.NaN;
   store[frameAtKey] = 0;
+  store[clockTimeKey] = Number.NaN;
   store[layoutVersionKey] = (Number(store[layoutVersionKey]) || 0) + 1;
 }
 
@@ -8194,6 +11413,7 @@ function syncBookLyricScroll(line, options = {}) {
   const store = options.store || state;
   const targetKey = options.targetKey || 'lyricBookScrollTarget';
   const frameAtKey = options.frameAtKey || 'lyricBookScrollFrameAt';
+  const clockTimeKey = options.clockTimeKey || 'lyricBookScrollClockTime';
   const lines = Array.isArray(options.lines) ? options.lines : state.lyricLines;
   const activeIndex = Number.isInteger(options.activeIndex) ? options.activeIndex : state.lyricIndex;
   if (!list || !line) return false;
@@ -8213,13 +11433,23 @@ function syncBookLyricScroll(line, options = {}) {
     return true;
   }
 
+  const clockTime = Number(options.clockTime);
+  const previousClockTime = Number(store[clockTimeKey]);
+  const usesMediaClock = Number.isFinite(clockTime);
   const lastAt = Number(store[frameAtKey]) || now;
-  const dt = clamp(
-    (now - lastAt) / 1000,
-    BOOK_LYRIC_SCROLL_MIN_STEP_SECONDS,
-    BOOK_LYRIC_SCROLL_MAX_STEP_SECONDS
-  );
+  const dt = usesMediaClock
+    ? clamp(
+        Number.isFinite(previousClockTime) ? clockTime - previousClockTime : 0,
+        0,
+        BOOK_LYRIC_SCROLL_MAX_STEP_SECONDS
+      )
+    : clamp(
+        (now - lastAt) / 1000,
+        BOOK_LYRIC_SCROLL_MIN_STEP_SECONDS,
+        BOOK_LYRIC_SCROLL_MAX_STEP_SECONDS
+      );
   store[frameAtKey] = now;
+  if (usesMediaClock) store[clockTimeKey] = clockTime;
 
   const reducedMotionEnabled = options.reducedMotion ?? state.orb.reducedMotion;
   const playbackRunning = options.playbackRunning ?? isPlaybackClockRunning();
@@ -8227,6 +11457,7 @@ function syncBookLyricScroll(line, options = {}) {
     list.scrollTop = target;
     return true;
   }
+  if (usesMediaClock && dt <= 0) return false;
 
   const activeLine = lines[activeIndex] || {};
   const nextLine = lines[activeIndex + 1] || {};
@@ -8454,7 +11685,7 @@ function updateBookLyricLines(progressPercent = state.lyricProgressPercent, curr
   if (!els.bookLyricList || state.textPreset !== 'book') return;
   renderBookLyricLines();
   const lines = bookLyricDisplayLines();
-  const active = state.lyricLines.length ? clamp(state.lyricIndex, 0, Math.max(0, lines.length - 1)) : 0;
+  const active = state.lyricLines.length ? clamp(state.lyricIndex, -1, Math.max(0, lines.length - 1)) : 0;
   const progressValue = clamp(Number(progressPercent) || 0, 0, 100);
   const progress = `${progressValue.toFixed(2)}%`;
   const currentTimeValue = Number.isFinite(Number(currentTime))
@@ -8610,6 +11841,108 @@ function saveCommunityMessageDnd(value) {
   try {
     window.localStorage.setItem(COMMUNITY_MESSAGE_DND_KEY, String(state.community.messageBubbleMuted));
   } catch (error) {}
+}
+
+function normalizeCommunityEventCursor(value = '') {
+  const cursor = safeText(value, '');
+  if (!/^\d+$/.test(cursor)) return '';
+  const numeric = Number(cursor);
+  return Number.isSafeInteger(numeric) && numeric > 0 ? String(numeric) : '';
+}
+
+function loadCommunityHistoryLedger() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(COMMUNITY_HISTORY_LEDGER_KEY) || '{}');
+    const records = Array.isArray(parsed && parsed.records) ? parsed.records : [];
+    return records
+      .filter((record) => record && typeof record === 'object' && safeText(record.identity, ''))
+      .map((record) => ({
+        identity: safeText(record.identity, ''),
+        updatedAt: Math.max(0, Number(record.updatedAt) || 0),
+        cursor: normalizeCommunityEventCursor(record.cursor),
+        eventKeys: Array.isArray(record.eventKeys)
+          ? record.eventKeys.map((key) => safeText(key, '')).filter(Boolean).slice(-COMMUNITY_HISTORY_SEEN_LIMIT)
+          : [],
+        messageKeys: Array.isArray(record.messageKeys)
+          ? record.messageKeys.map((key) => safeText(key, '')).filter(Boolean).slice(-COMMUNITY_HISTORY_SEEN_LIMIT)
+          : []
+      }))
+      .sort((left, right) => right.updatedAt - left.updatedAt)
+      .slice(0, COMMUNITY_HISTORY_IDENTITY_LIMIT);
+  } catch (error) {
+    return [];
+  }
+}
+
+function saveCommunityHistoryLedger() {
+  const identity = safeText(state.community.eventHistoryIdentity, '');
+  if (!identity) return;
+  try {
+    const records = loadCommunityHistoryLedger().filter((record) => record.identity !== identity);
+    records.unshift({
+      identity,
+      updatedAt: Date.now(),
+      cursor: normalizeCommunityEventCursor(state.community.eventCursor),
+      eventKeys: state.community.eventSeenKeyOrder.slice(-COMMUNITY_HISTORY_SEEN_LIMIT),
+      messageKeys: state.community.messageBubbleSeenOrder.slice(-COMMUNITY_HISTORY_SEEN_LIMIT)
+    });
+    window.localStorage.setItem(COMMUNITY_HISTORY_LEDGER_KEY, JSON.stringify({
+      version: 1,
+      records: records.slice(0, COMMUNITY_HISTORY_IDENTITY_LIMIT)
+    }));
+  } catch (error) {}
+}
+
+function restoreCommunityHistoryLedger(identity = '') {
+  const normalized = safeText(identity, '');
+  state.community.eventHistoryIdentity = normalized;
+  state.community.eventCursor = '';
+  state.community.eventSeenKeys.clear();
+  state.community.eventSeenKeyOrder.length = 0;
+  state.community.messageBubbleSeenKeys.clear();
+  state.community.messageBubbleSeenOrder.length = 0;
+  window.clearTimeout(state.community.messageBubbleTimer);
+  state.community.messageBubbleTimer = 0;
+  state.community.messageBubbleSeenReady = false;
+  state.community.messageBubbles = [];
+  renderCommunityMessageBubbles();
+  state.community.eventHydrationStartedAt = normalized ? Date.now() : 0;
+  state.community.eventHistoryBefore = state.community.eventHydrationStartedAt;
+  state.community.eventHistoryCalibrated = false;
+  if (!normalized) return;
+
+  const record = loadCommunityHistoryLedger().find((item) => item.identity === normalized);
+  if (!record) return;
+  state.community.eventCursor = record.cursor;
+  record.eventKeys.forEach((key) => {
+    state.community.eventSeenKeys.add(key);
+    state.community.eventSeenKeyOrder.push(key);
+  });
+  record.messageKeys.forEach((key) => {
+    state.community.messageBubbleSeenKeys.add(key);
+    state.community.messageBubbleSeenOrder.push(key);
+  });
+}
+
+function rememberCommunitySeenKey(seen, order, key, persist = true) {
+  const normalized = safeText(key, '');
+  if (!normalized || seen.has(normalized)) return false;
+  seen.add(normalized);
+  order.push(normalized);
+  while (order.length > COMMUNITY_HISTORY_SEEN_LIMIT) {
+    seen.delete(order.shift());
+  }
+  if (persist) saveCommunityHistoryLedger();
+  return true;
+}
+
+function rememberCommunityMessageKey(message = {}, persist = true) {
+  return rememberCommunitySeenKey(
+    state.community.messageBubbleSeenKeys,
+    state.community.messageBubbleSeenOrder,
+    communityMessageKey(message),
+    persist
+  );
 }
 
 function loadCommunityCardCollapsed() {
@@ -8790,7 +12123,11 @@ function normalizedSong(song = {}, fallbackProvider = state.activeProvider) {
     album: songAlbumName(song),
     cover: songCoverSource(song),
     duration: Number(song.duration) || 0,
-    provider
+    provider,
+    sourceRef: song.sourceRef && typeof song.sourceRef === 'object'
+      ? { ...song.sourceRef }
+      : {},
+    guestSearchMatched: song.guestSearchMatched === true
   };
 }
 
@@ -9386,6 +12723,148 @@ function normalizeSearchResults(songs) {
     });
 }
 
+function isQishuiMetadataSong(song = {}) {
+  return providerInfo(song.provider || state.activeProvider).id === 'qishui'
+    && song.sourceRef
+    && typeof song.sourceRef === 'object'
+    && song.sourceRef.metadataOnly === true;
+}
+
+function isGuestSearchMatchedSong(song = {}) {
+  return song.guestSearchMatched === true
+    || (song.sourceRef && song.sourceRef.guestSearchMatch === true);
+}
+
+function normalizeQishuiMatchText(value) {
+  return safeText(value, '')
+    .normalize('NFKC')
+    .toLocaleLowerCase()
+    .replace(/[\p{P}\p{S}\s]+/gu, '');
+}
+
+function qishuiGuestMatchScore(source = {}, candidate = {}) {
+  const sourceTitle = normalizeQishuiMatchText(source.title);
+  const candidateTitle = normalizeQishuiMatchText(candidate.title);
+  if (!sourceTitle || !candidateTitle) return Number.NEGATIVE_INFINITY;
+  let score = sourceTitle === candidateTitle
+    ? 72
+    : sourceTitle.includes(candidateTitle) || candidateTitle.includes(sourceTitle)
+      ? 46
+      : Number.NEGATIVE_INFINITY;
+  if (!Number.isFinite(score)) return score;
+
+  const sourceArtist = normalizeQishuiMatchText(source.artist);
+  const candidateArtist = normalizeQishuiMatchText(candidate.artist);
+  if (sourceArtist) {
+    if (!candidateArtist) return Number.NEGATIVE_INFINITY;
+    if (sourceArtist === candidateArtist) score += 24;
+    else if (sourceArtist.includes(candidateArtist) || candidateArtist.includes(sourceArtist)) score += 14;
+    else return Number.NEGATIVE_INFINITY;
+  }
+
+  const sourceAlbum = normalizeQishuiMatchText(source.album);
+  const candidateAlbum = normalizeQishuiMatchText(candidate.album);
+  if (sourceAlbum && candidateAlbum) {
+    if (sourceAlbum === candidateAlbum) score += 8;
+    else if (sourceAlbum.includes(candidateAlbum) || candidateAlbum.includes(sourceAlbum)) score += 3;
+  }
+
+  const sourceDuration = Number(source.duration);
+  const candidateDuration = Number(candidate.duration);
+  if (sourceDuration > 0 && candidateDuration > 0) {
+    const difference = Math.abs(sourceDuration - candidateDuration);
+    if (difference <= 2) score += 14;
+    else if (difference <= 5) score += 9;
+    else if (difference <= 12) score += 3;
+    else if (difference > 30) score -= 16;
+  }
+  return score;
+}
+
+function qishuiGuestMatchCacheKey(song = {}) {
+  return [
+    normalizeQishuiMatchText(song.title),
+    normalizeQishuiMatchText(song.artist),
+    normalizeQishuiMatchText(song.album),
+    Math.round(Number(song.duration) || 0)
+  ].join('|');
+}
+
+async function qishuiGuestCandidateIsPlayable(song) {
+  try {
+    const payload = await apiJson(`/api/song/url?${songParams(song, {
+      quality: preferredPlaybackQuality(song.provider)
+    })}`);
+    return payload.playable === true && /^https:\/\//i.test(safeText(payload.url, ''));
+  } catch (error) {
+    return false;
+  }
+}
+
+async function resolveQishuiMetadataViaGuestSearch(song) {
+  const cacheKey = qishuiGuestMatchCacheKey(song);
+  if (!cacheKey || cacheKey.startsWith('|||')) return null;
+  const cached = state.qishuiGuestMatches.cache.get(cacheKey);
+  if (cached && Date.now() - cached.time < QISHUI_GUEST_MATCH_CACHE_MS) return cached.song;
+  if (state.qishuiGuestMatches.requests.has(cacheKey)) {
+    return state.qishuiGuestMatches.requests.get(cacheKey);
+  }
+
+  const request = (async () => {
+    const providers = QISHUI_GUEST_FALLBACK_PROVIDERS.filter((provider) => (
+      provider !== 'qishui' && providerConfigured(provider)
+    ));
+    const keyword = [safeText(song.title, ''), safeText(song.artist, '')]
+      .filter(Boolean)
+      .join(' ');
+    const responses = await Promise.allSettled(providers.map(async (provider) => {
+      const payload = await apiJson(`/api/search?${query({ q: keyword, limit: 12, provider })}`);
+      return (Array.isArray(payload.songs) ? payload.songs : [])
+        .map((candidate) => normalizedSong(candidate, provider))
+        .filter((candidate) => candidate.provider === provider);
+    }));
+    const seen = new Set();
+    const candidates = responses
+      .filter((response) => response.status === 'fulfilled')
+      .flatMap((response) => response.value)
+      .map((candidate) => ({
+        song: candidate,
+        score: qishuiGuestMatchScore(song, candidate)
+      }))
+      .filter((candidate) => {
+        const id = `${candidate.song.provider}:${safeText(candidate.song.id, '')}`;
+        if (!Number.isFinite(candidate.score) || candidate.score < 60 || !candidate.song.id || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      })
+      .sort((left, right) => right.score - left.score);
+
+    for (const candidate of candidates.slice(0, 8)) {
+      if (!await qishuiGuestCandidateIsPlayable(candidate.song)) continue;
+      const matched = {
+        ...candidate.song,
+        guestSearchMatched: true,
+        sourceRef: {
+          ...(candidate.song.sourceRef || {}),
+          guestSearchMatch: true,
+          guestSearchOrigin: 'qishui-local-metadata',
+          guestSearchScore: Math.round(candidate.score)
+        }
+      };
+      state.qishuiGuestMatches.cache.set(cacheKey, { time: Date.now(), song: matched });
+      return matched;
+    }
+    state.qishuiGuestMatches.cache.set(cacheKey, { time: Date.now(), song: null });
+    return null;
+  })();
+  state.qishuiGuestMatches.requests.set(cacheKey, request);
+  try {
+    return await request;
+  } finally {
+    state.qishuiGuestMatches.requests.delete(cacheKey);
+  }
+}
+
 async function fetchSearchSuggestions(keyword) {
   const provider = providerInfo(state.activeProvider).id;
   if (!providerConfigured(provider)) {
@@ -9927,7 +13406,7 @@ function showCommunityBroadcast(payload = {}, options = {}) {
   state.community.broadcastSeenKey = key;
   state.community.broadcastUnread = options.unread !== false;
   renderCommunityBroadcastButton();
-  if (!duplicate || options.force) renderCommunityBroadcastToast(false);
+  if (options.notify !== false && (!duplicate || options.force)) renderCommunityBroadcastToast(false);
 }
 
 function openCommunityBroadcast() {
@@ -10411,10 +13890,7 @@ function stopCommunityEventStream(reset = false) {
   state.community.eventLastActivityAt = 0;
   if (reset) {
     state.community.eventKey = '';
-    state.community.eventCursor = '';
     state.community.eventReconnectDelay = 1200;
-    state.community.eventSeenSeqs.clear();
-    state.community.eventSeenOrder.length = 0;
   }
 }
 
@@ -10455,15 +13931,76 @@ function checkCommunityEventHeartbeat() {
   );
 }
 
-function communityEventAlreadyHandled(seq) {
-  if (!seq) return false;
-  if (state.community.eventSeenSeqs.has(seq)) return true;
-  state.community.eventSeenSeqs.add(seq);
-  state.community.eventSeenOrder.push(seq);
-  while (state.community.eventSeenOrder.length > 512) {
-    state.community.eventSeenSeqs.delete(state.community.eventSeenOrder.shift());
+function communityStableJson(value, depth = 0) {
+  if (depth > 6 || value === undefined || typeof value === 'function') return 'null';
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => communityStableJson(item, depth + 1)).join(',')}]`;
   }
-  return false;
+  return `{${Object.keys(value)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${communityStableJson(value[key], depth + 1)}`)
+    .join(',')}}`;
+}
+
+function communityStableHash(value) {
+  const text = typeof value === 'string' ? value : communityStableJson(value);
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function communityEventTimestamp(envelope = {}) {
+  const payload = envelope.payload && typeof envelope.payload === 'object' ? envelope.payload : {};
+  const message = payload.message && typeof payload.message === 'object' ? payload.message : {};
+  const relay = payload.relay && typeof payload.relay === 'object' ? payload.relay : payload;
+  return Math.max(
+    0,
+    Number(envelope.createdAt) || 0,
+    Number(message.sentAt) || 0,
+    Number(relay.sentAt) || 0,
+    Number(payload.createdAt) || 0
+  );
+}
+
+function communityEventKey(envelope = {}, event = {}) {
+  const type = safeText(envelope.type, 'unknown');
+  const payload = envelope.payload && typeof envelope.payload === 'object' ? envelope.payload : {};
+  if (type === 'message.sent' && payload.message) {
+    return `message:${communityMessageKey(payload.message)}`;
+  }
+  const serverId = safeText(envelope.id || envelope.seq || event.lastEventId, '');
+  const timestamp = communityEventTimestamp(envelope);
+  const suffix = timestamp ? String(timestamp) : communityStableHash(payload);
+  return `event:${type}:${serverId || 'fallback'}:${suffix}`;
+}
+
+function communityEventIsHistorical(envelope = {}) {
+  const cutoff = Math.max(0, Number(state.community.eventHistoryBefore) || 0);
+  const timestamp = communityEventTimestamp(envelope);
+  return !!cutoff && !!timestamp && timestamp < cutoff;
+}
+
+function advanceCommunityEventCursor(seq = '') {
+  const next = normalizeCommunityEventCursor(seq);
+  if (!next) return false;
+  const current = normalizeCommunityEventCursor(state.community.eventCursor);
+  if (current && Number(next) <= Number(current)) return false;
+  state.community.eventCursor = next;
+  return true;
+}
+
+function communityEventAlreadyHandled(key, persist = true) {
+  if (!key) return false;
+  return !rememberCommunitySeenKey(
+    state.community.eventSeenKeys,
+    state.community.eventSeenKeyOrder,
+    key,
+    persist
+  );
 }
 
 function ensureCommunityEventStream() {
@@ -10478,6 +14015,9 @@ function ensureCommunityEventStream() {
   }
   if (state.community.eventKey && state.community.eventKey !== key) {
     stopCommunityEventStream(true);
+  }
+  if (state.community.eventHistoryIdentity !== key) {
+    restoreCommunityHistoryLedger(key);
   }
   if (state.community.eventSource && state.community.eventKey === key) return;
 
@@ -10495,9 +14035,20 @@ function ensureCommunityEventStream() {
       state.community.eventReconnectDelay = 1200;
       touchCommunityEventStream();
     });
-    source.addEventListener('community-ready', () => {
+    source.addEventListener('community-ready', (event) => {
       if (state.community.eventSource !== source) return;
       state.community.eventConnected = true;
+      if (!state.community.eventHistoryCalibrated) {
+        let ready = {};
+        try {
+          ready = JSON.parse(event.data || '{}');
+        } catch (error) {}
+        const localNow = Date.now();
+        const hydrationStartedAt = state.community.eventHydrationStartedAt || localNow;
+        const serverNow = Math.max(0, Number(ready.serverTime) || localNow);
+        state.community.eventHistoryBefore = Math.max(0, serverNow - Math.max(0, localNow - hydrationStartedAt));
+        state.community.eventHistoryCalibrated = true;
+      }
       touchCommunityEventStream();
       scheduleCommunityRefresh(80);
     });
@@ -10531,14 +14082,21 @@ function handleCommunityServerEvent(event) {
   const type = safeText(envelope.type, '');
   const payload = envelope.payload || {};
   const seq = safeText(envelope.seq || event.lastEventId, '');
-  if (seq) state.community.eventCursor = seq;
-  if (communityEventAlreadyHandled(seq)) return;
+  const cursorAdvanced = advanceCommunityEventCursor(seq);
+  const duplicate = communityEventAlreadyHandled(communityEventKey(envelope, event), false);
+  const historical = communityEventIsHistorical(envelope);
+  let ledgerChanged = cursorAdvanced || !duplicate;
+  if (historical && type === 'message.sent') {
+    ledgerChanged = rememberCommunityMessageKey(payload.message || {}, false) || ledgerChanged;
+  }
+  if (ledgerChanged) saveCommunityHistoryLedger();
+  if (duplicate && !historical) return;
 
   if (type === 'message.sent') {
     const message = payload.message || {};
     const me = state.community.profile && state.community.profile.feId ? String(state.community.profile.feId) : '';
     const peerId = String(message.from) === me ? String(message.to || '') : String(message.from || '');
-    showCommunityMessageBubble(message);
+    if (!historical) showCommunityMessageBubble(message);
     if (peerId && state.community.selectedFriendId && peerId === String(state.community.selectedFriendId) && els.communityMessageDialog && !els.communityMessageDialog.hidden) {
       refreshCommunityMessages().catch(() => {});
     }
@@ -10553,12 +14111,18 @@ function handleCommunityServerEvent(event) {
   }
 
   if (type === 'listen.sync') {
-    applyCommunityListenSync(payload).catch(() => {});
+    if (historical) refreshCommunityListenState().catch(() => {});
+    else applyCommunityListenSync(payload).catch(() => {});
     scheduleCommunityRefresh(120);
     return;
   }
 
   if (type === 'listen.left') {
+    if (historical) {
+      refreshCommunityListenState().catch(() => {});
+      scheduleCommunityRefresh(120);
+      return;
+    }
     const session = payload.session || {};
     const activeId = safeText(state.community.activeSession && state.community.activeSession.id, '');
     const leftId = safeText(session.id, '');
@@ -10572,22 +14136,24 @@ function handleCommunityServerEvent(event) {
   }
 
   if (type === 'call.signal') {
-    pollCommunityCallSignals().catch(() => {});
+    if (!historical) pollCommunityCallSignals().catch(() => {});
     return;
   }
 
   if (type === 'client.relay') {
-    window.dispatchEvent(new CustomEvent('fe-monster-community-relay', { detail: payload.relay || payload }));
+    if (!historical) {
+      window.dispatchEvent(new CustomEvent('fe-monster-community-relay', { detail: payload.relay || payload }));
+    }
     return;
   }
 
   if (type === 'announcement.broadcast' || type === 'community.broadcast' || type === 'broadcast.announcement') {
-    showCommunityBroadcast(payload);
+    showCommunityBroadcast(payload, historical ? { unread: false, notify: false } : {});
     return;
   }
 
   if (type === 'update.available') {
-    showUpdateDialog(payload.release || {});
+    if (!historical) showUpdateDialog(payload.release || {});
     return;
   }
 
@@ -10595,7 +14161,7 @@ function handleCommunityServerEvent(event) {
     const targetId = safeText(payload.targetId, '');
     const me = state.community.profile && state.community.profile.feId ? String(state.community.profile.feId) : '';
     scheduleCommunityRefresh(120);
-    if (targetId && me && targetId === me) {
+    if (!historical && targetId && me && targetId === me) {
       const badge = payload.badge || {};
       if (type === 'badge.assigned' && badge.label) {
         toast(`已获得徽章：${safeText(badge.label, '社区认证')}`);
@@ -11258,12 +14824,24 @@ function endCommunityFloatingPanelDrag(kind, event) {
 }
 
 function communityMessageKey(message = {}) {
-  return safeText(message.id, '') || [
+  const serverId = safeText(message.id, '');
+  if (serverId) return `id:${serverId}`;
+  return `fallback:${JSON.stringify([
     safeText(message.from, ''),
     safeText(message.to, ''),
     safeText(message.sentAt, ''),
     safeText(message.text, '')
-  ].join('|');
+  ])}`;
+}
+
+function dedupeCommunityMessages(messages = []) {
+  const seen = new Set();
+  return (Array.isArray(messages) ? messages : []).filter((message) => {
+    const key = communityMessageKey(message);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function dismissCommunityMessageBubble(key = '') {
@@ -11284,8 +14862,7 @@ function showCommunityMessageBubble(message = {}) {
   const toId = safeText(message.to, '');
   if (!me || !fromId || toId !== me || fromId === me) return;
   const key = communityMessageKey(message);
-  if (!key || state.community.messageBubbleSeenKeys[key]) return;
-  state.community.messageBubbleSeenKeys[key] = true;
+  if (!key || !rememberCommunityMessageKey(message)) return;
   if (state.community.messageBubbleMuted) return;
   if (state.community.selectedFriendId && String(state.community.selectedFriendId) === fromId && els.communityMessageDialog && !els.communityMessageDialog.hidden) {
     return;
@@ -11386,8 +14963,18 @@ async function pollCommunityMessageBubbles() {
   const me = state.community.profile && state.community.profile.feId ? String(state.community.profile.feId) : '';
   const friends = state.community.friends.filter((friend) => friend && friend.feId).slice(0, 8);
   if (!me || !friends.length) return;
+  if (
+    !state.community.messageBubbleSeenReady &&
+    !state.community.eventHistoryCalibrated &&
+    typeof window.EventSource !== 'undefined' &&
+    Date.now() - state.community.eventHydrationStartedAt < COMMUNITY_EVENT_STALE_MS
+  ) {
+    scheduleCommunityMessageBubblePoll(350);
+    return;
+  }
   const recentAfter = Date.now() - 10 * 60 * 1000;
   const wasReady = state.community.messageBubbleSeenReady;
+  let ledgerChanged = false;
   await Promise.allSettled(friends.map(async (friend) => {
     const payload = await apiJson(`/api/community/messages?${query({ provider: state.activeProvider, targetId: friend.feId })}`);
     const messages = Array.isArray(payload.messages) ? payload.messages : [];
@@ -11396,17 +14983,23 @@ async function pollCommunityMessageBubbles() {
       .slice(-3)
       .forEach((message) => {
         const key = communityMessageKey(message);
-        if (!key || state.community.messageBubbleSeenKeys[key]) return;
+        if (!key || state.community.messageBubbleSeenKeys.has(key)) return;
         if (!wasReady) {
-          state.community.messageBubbleSeenKeys[key] = true;
+          const historical = communityEventIsHistorical({
+            type: 'message.sent',
+            payload: { message }
+          });
+          if (historical) ledgerChanged = rememberCommunityMessageKey(message, false) || ledgerChanged;
+          else showCommunityMessageBubble(message);
           return;
         }
         const sentAt = Number(message.sentAt) || Date.now();
         if (sentAt >= recentAfter) showCommunityMessageBubble(message);
-        else state.community.messageBubbleSeenKeys[key] = true;
+        else ledgerChanged = rememberCommunityMessageKey(message, false) || ledgerChanged;
       });
   }));
   state.community.messageBubbleSeenReady = true;
+  if (ledgerChanged) saveCommunityHistoryLedger();
 }
 
 function setCommunityMessageOpen(open) {
@@ -11438,6 +15031,7 @@ async function openCommunityMessages(friendId = '') {
 
 function renderCommunityMessages(messages = []) {
   if (!els.communityMessageList) return;
+  messages = dedupeCommunityMessages(messages);
   clearElement(els.communityMessageList);
   const me = state.community.profile && state.community.profile.feId ? String(state.community.profile.feId) : '';
   if (!messages.length) {
@@ -11460,7 +15054,7 @@ async function refreshCommunityMessages() {
   if (document.hidden || !state.community.selectedFriendId || els.communityMessageDialog.hidden) return;
   try {
     const payload = await apiJson(`/api/community/messages?${query({ provider: state.activeProvider, targetId: state.community.selectedFriendId })}`);
-    state.community.messages = Array.isArray(payload.messages) ? payload.messages : [];
+    state.community.messages = dedupeCommunityMessages(payload.messages);
     renderCommunityMessages(state.community.messages);
   } catch (error) {
     renderCommunityMessages([]);
@@ -11480,7 +15074,9 @@ async function sendCommunityMessage(event) {
     });
     if (!payload.ok) throw new Error(payload.error || '消息发送失败');
     els.communityMessageInput.value = '';
-    state.community.messages = Array.isArray(payload.messages) ? payload.messages : state.community.messages;
+    state.community.messages = Array.isArray(payload.messages)
+      ? dedupeCommunityMessages(payload.messages)
+      : state.community.messages;
     renderCommunityMessages(state.community.messages);
     await refreshCommunityMessages();
   } catch (error) {
@@ -12216,11 +15812,6 @@ async function reportCommunityListening(force = false) {
   }
 }
 
-function clearLoginQrTimer() {
-  window.clearInterval(state.loginQrTimer);
-  state.loginQrTimer = 0;
-}
-
 function setOfficialBrowserLoginStatus(message = '', hidden = false) {
   if (!els.officialBrowserLoginStatus) return;
   els.officialBrowserLoginStatus.textContent = safeText(message, '');
@@ -12237,7 +15828,7 @@ function clearOfficialBrowserLoginTimer(options = {}) {
   state.officialBrowserLoginLoading = false;
   if (els.officialBrowserLoginButton) {
     els.officialBrowserLoginButton.disabled = false;
-    els.officialBrowserLoginButton.textContent = '官方浏览器登录';
+    els.officialBrowserLoginButton.textContent = '打开官方扫码登录';
   }
   if (options.cancel && session && provider) {
     void apiJson(`${providerPath('/login/browser/cancel', provider)}?${query({ session })}`, {
@@ -12276,6 +15867,10 @@ async function checkOfficialBrowserLogin() {
 async function startOfficialBrowserLogin() {
   const provider = state.activeProvider;
   if (!providerConfigured(provider) || state.officialBrowserLoginLoading) return;
+  if (!OFFICIAL_BROWSER_LOGIN_PROVIDERS.has(provider)) {
+    setOfficialBrowserLoginStatus('当前平台不支持浏览器扫码登录。');
+    return;
+  }
   clearOfficialBrowserLoginTimer({ cancel: true });
   state.officialBrowserLoginLoading = true;
   if (els.officialBrowserLoginButton) {
@@ -12305,6 +15900,53 @@ async function startOfficialBrowserLogin() {
   }
 }
 
+async function switchOfficialBrowserAccount() {
+  const provider = state.activeProvider;
+  if (!OFFICIAL_BROWSER_LOGIN_PROVIDERS.has(provider)
+    || state.officialBrowserSwitching
+    || state.officialBrowserLoginLoading) return;
+  clearOfficialBrowserLoginTimer();
+  state.officialBrowserSwitching = true;
+  if (els.officialBrowserLoginButton) els.officialBrowserLoginButton.disabled = true;
+  if (els.officialBrowserSwitchAccountButton) {
+    els.officialBrowserSwitchAccountButton.disabled = true;
+    els.officialBrowserSwitchAccountButton.textContent = '正在清除当前账号';
+  }
+  setOfficialBrowserLoginStatus(`正在清除${providerInfo(provider).label}当前账号并打开新的官方扫码窗口`);
+  try {
+    const payload = await apiJson(providerPath('/login/browser/switch', provider), {
+      method: 'POST',
+      headers: { 'X-FE-Monster-Login': '1' }
+    });
+    const session = safeText(payload.session, '');
+    if (!session) throw new Error(payload.error || '未创建新的官方浏览器登录会话');
+    if (provider !== state.activeProvider) {
+      void apiJson(`${providerPath('/login/browser/cancel', provider)}?${query({ session })}`, {
+        method: 'POST',
+        headers: { 'X-FE-Monster-Login': '1' }
+      }).catch(() => {});
+      return;
+    }
+    state.officialBrowserLoginSession = session;
+    state.officialBrowserLoginProvider = provider;
+    clearLoginStatusRetry(provider);
+    delete state.loginStatusByProvider[provider];
+    renderLoginStatus({ provider, loggedIn: false });
+    setOfficialBrowserLoginStatus(payload.message || `当前账号已清除，请在${providerInfo(provider).label}官方窗口中使用新账号扫码登录`);
+    state.officialBrowserLoginTimer = window.setInterval(checkOfficialBrowserLogin, 1500);
+    window.setTimeout(checkOfficialBrowserLogin, 450);
+  } catch (error) {
+    clearOfficialBrowserLoginTimer();
+    setOfficialBrowserLoginStatus(error.message || '切换账号失败，请重试');
+  } finally {
+    state.officialBrowserSwitching = false;
+    if (els.officialBrowserSwitchAccountButton) {
+      els.officialBrowserSwitchAccountButton.textContent = '切换账号';
+    }
+    syncBrowserLoginSurface(state.activeProvider);
+  }
+}
+
 function toggleOfficialBrowserLogin() {
   if (state.officialBrowserLoginSession) {
     clearOfficialBrowserLoginTimer({ cancel: true });
@@ -12314,19 +15956,211 @@ function toggleOfficialBrowserLogin() {
   startOfficialBrowserLogin();
 }
 
-function setQrStatus(message) {
-  els.qrStatus.textContent = message;
+async function configureQishuiOpenApiLogin(event) {
+  event?.preventDefault();
+  if (state.activeProvider !== 'qishui' || !providerConfigured('qishui')) return;
+  const accessToken = (els.qishuiAccessToken?.value || '').trim();
+  const openId = (els.qishuiOpenId?.value || '').trim();
+  const clientKey = (els.qishuiClientKey?.value || '').trim();
+  const refreshToken = (els.qishuiRefreshToken?.value || '').trim();
+  if (!accessToken) {
+    setOfficialBrowserLoginStatus('请输入由抖音开放平台签发的 access_token。');
+    els.qishuiAccessToken?.focus();
+    return;
+  }
+  if (els.qishuiLoginSubmit) els.qishuiLoginSubmit.disabled = true;
+  setOfficialBrowserLoginStatus('正在通过汽水音乐官方 OpenAPI 验证权限…');
+  try {
+    const payload = await apiJson('/api/qishui/login/token', {
+      method: 'POST',
+      headers: { 'X-FE-Monster-Login': '1' },
+      body: JSON.stringify({ accessToken, openId, clientKey, refreshToken })
+    });
+    if (!payload.loggedIn) throw new Error(payload.error || '官方 OpenAPI 未确认当前授权');
+    delete state.loginStatusByProvider.qishui;
+    await refreshLoginStatus('qishui');
+    setOfficialBrowserLoginStatus('汽水音乐 OpenAPI 授权已验证并保存在本机。');
+    window.setTimeout(closeLoginDialog, 700);
+  } catch (error) {
+    setOfficialBrowserLoginStatus(error.message || '汽水音乐 OpenAPI 授权验证失败。');
+  } finally {
+    if (els.qishuiAccessToken) els.qishuiAccessToken.value = '';
+    if (els.qishuiRefreshToken) els.qishuiRefreshToken.value = '';
+    if (els.qishuiLoginSubmit) els.qishuiLoginSubmit.disabled = false;
+  }
+}
+
+function qishuiPublicAvatarUrl(value) {
+  const raw = safeText(value, '');
+  if (!raw) return '';
+  try {
+    const url = new URL(raw, window.location.href);
+    return url.protocol === 'https:' ? proxiedImageUrl(url.toString()) : '';
+  } catch (error) {
+    return '';
+  }
+}
+
+function renderQishuiLocalProfile(payload = {}) {
+  const loginDetected = payload.loginDetected === true;
+  const displayName = loginDetected
+    ? safeText(payload.displayName, '汽水音乐用户').slice(0, 80)
+    : '';
+  const avatarUrl = loginDetected ? qishuiPublicAvatarUrl(payload.avatar) : '';
+  const likedCount = Math.max(0, Number(payload.likedCount) || 0);
+  const collections = (Array.isArray(payload.collections) ? payload.collections : [])
+    .filter((collection) => {
+      if (!collection || typeof collection !== 'object') return false;
+      const name = safeText(collection.name, '').trim();
+      const id = safeText(collection.id, '').trim();
+      return !!(name || id);
+    })
+    .slice(0, 4);
+
+  if (els.qishuiLocalProfile) {
+    els.qishuiLocalProfile.hidden = !loginDetected;
+    els.qishuiLocalProfile.classList.toggle('has-avatar', !!avatarUrl);
+  }
+  if (els.qishuiLocalProfileName) {
+    els.qishuiLocalProfileName.textContent = displayName || '汽水音乐用户';
+  }
+  if (els.qishuiLocalProfileMeta) {
+    els.qishuiLocalProfileMeta.textContent = loginDetected
+      ? `${payload.isVip === true ? 'VIP · ' : ''}本地客户端已登录 · 未读取凭据`
+      : '本地客户端公开资料';
+  }
+  if (els.qishuiLocalProfileAvatar) {
+    if (avatarUrl) els.qishuiLocalProfileAvatar.src = avatarUrl;
+    else els.qishuiLocalProfileAvatar.removeAttribute('src');
+  }
+  if (els.qishuiLocalCollections) {
+    els.qishuiLocalCollections.replaceChildren();
+    for (const collection of collections) {
+      const item = document.createElement('span');
+      item.className = 'qishui-local-collection-summary';
+      const name = safeText(collection.name, '本地收藏').slice(0, 80);
+      const count = Math.max(0, Number(collection.trackCount) || 0);
+      const metadataReady = collection.metadataState === 'ready' && collection.playable === true;
+      item.classList.toggle('is-ready', metadataReady);
+      item.textContent = metadataReady
+        ? `${name} · ${count} 首 · 可在歌单页打开`
+        : `${name} · ${count} 首 · 本地暂未缓存歌曲列表`;
+      item.title = metadataReady
+        ? '只读取本地缓存中的歌名、歌手等元数据；点击歌曲后会使用游客搜索匹配合法公开音源。'
+        : '当前只检测到集合与数量，不会读取凭据或受保护音源。';
+      els.qishuiLocalCollections.appendChild(item);
+    }
+    els.qishuiLocalCollections.hidden = collections.length === 0;
+  }
+
+  if (loginDetected) {
+    const previous = state.loginStatusByProvider.qishui || {};
+    const identity = {
+      ...previous,
+      provider: 'qishui',
+      loggedIn: true,
+      playbackAuthorized: previous.playbackAuthorized === true,
+      localLoginDetected: true,
+      likedCount,
+      metadataState: safeText(payload.metadataState, 'unavailable'),
+      collections,
+      account: {
+        ...(previous.account || {}),
+        nickname: displayName || safeText(previous.account?.nickname, '汽水音乐用户'),
+        avatar: avatarUrl ? safeText(payload.avatar, '') : '',
+        isVip: payload.isVip === true
+      }
+    };
+    state.loginStatusByProvider.qishui = identity;
+    if (state.activeProvider === 'qishui') renderLoginStatus(identity);
+    else if (playbackCardProvider(playbackCardSong()).id === 'qishui') {
+      renderQishuiPlaybackIdentity(providerInfo('qishui'));
+    }
+  }
+}
+
+async function refreshQishuiLocalClientStatus() {
+  if (!els.qishuiLocalClientStatus) return;
+  if (!providerConfigured('qishui')) {
+    els.qishuiLocalClientStatus.dataset.loading = 'false';
+    els.qishuiLocalClientStatus.textContent = '汽水音乐插件未导入；导入后可使用游客搜索，并只读检测本机 SodaMusic 歌单元数据。';
+    return;
+  }
+  if (els.qishuiLocalClientStatus.dataset.loading === 'true') return;
+  els.qishuiLocalClientStatus.dataset.loading = 'true';
+  try {
+    const payload = await apiJson('/api/qishui/local/status');
+    renderQishuiLocalProfile(payload);
+    const installed = payload.installed === true;
+    const running = payload.running === true;
+    const localProfilePresent = payload.localProfilePresent === true;
+    const trackCount = Math.max(0, Number(payload.trackCount) || 0);
+    const loginDetected = payload.loginDetected === true;
+    const displayName = safeText(payload.displayName, '汽水音乐用户');
+    const likedCount = Math.max(0, Number(payload.likedCount) || 0);
+    const localCollections = (Array.isArray(payload.collections) ? payload.collections : [])
+      .filter((collection) => collection && typeof collection === 'object');
+    const readyCollections = localCollections
+      .filter((collection) => collection.metadataState === 'ready' && collection.playable === true);
+    const readyCollectionTracks = readyCollections.reduce(
+      (total, collection) => total + Math.max(0, Number(collection.trackCount) || 0),
+      0
+    );
+    const queueStatus = localProfilePresent
+      ? payload.queueCacheState === 'ready'
+        ? `；已从固定的本地播放队列缓存白名单读取 ${trackCount} 首元数据`
+        : '；检测到本地资料，但播放队列缓存未通过安全校验'
+      : '';
+    const collectionStatus = readyCollections.length
+      ? `；已只读识别 ${readyCollections.length} 个本地收藏、${readyCollectionTracks} 首歌曲元数据`
+      : '；收藏歌曲列表尚未出现在本地公开缓存中';
+    els.qishuiLocalClientStatus.textContent = installed
+      ? loginDetected
+        ? `已从固定 Config 的公开字段确认 ${displayName} 本地登录${likedCount ? `；我喜欢 ${likedCount} 首` : ''}${collectionStatus}${queueStatus}；未读取任何凭据或音源。`
+        : `已只读检测到 SodaMusic${running ? '正在运行' : '本地资料'}${queueStatus}；未确认登录，未提取任何凭据或音源。`
+      : '未在已知安装位置检测到 SodaMusic；登录状态未知，未读取任何凭据。';
+    if (state.activeProvider === 'qishui' && readyCollections.length) {
+      scheduleUserPlaylistsRefresh(0);
+    }
+  } catch (error) {
+    renderQishuiLocalProfile({});
+    els.qishuiLocalClientStatus.textContent = '本地 SodaMusic 检测不可用；未读取任何凭据。';
+  } finally {
+    els.qishuiLocalClientStatus.dataset.loading = 'false';
+  }
+}
+
+async function importQishuiLibraryMetadataFile(file) {
+  if (!file || !providerConfigured('qishui')) return;
+  if (file.size > 2 * 1024 * 1024) {
+    setOfficialBrowserLoginStatus('歌单元数据文件不能超过 2 MiB。');
+    return;
+  }
+  if (els.qishuiLibraryImportButton) els.qishuiLibraryImportButton.disabled = true;
+  setOfficialBrowserLoginStatus('正在校验并导入汽水歌单元数据…');
+  try {
+    const text = await file.text();
+    const library = JSON.parse(text);
+    const payload = await apiJson('/api/qishui/local/library/import', {
+      method: 'POST',
+      headers: { 'X-FE-Monster-Login': '1' },
+      body: JSON.stringify(library)
+    });
+    if (payload.ok === false) throw new Error(payload.error || '汽水歌单元数据被拒绝');
+    setOfficialBrowserLoginStatus(`已导入 ${Number(payload.playlists) || 0} 个歌单、${Number(payload.tracks) || 0} 首元数据歌曲；播放时会重新匹配官方授权 feed。`);
+    scheduleUserPlaylistsRefresh(0);
+  } catch (error) {
+    setOfficialBrowserLoginStatus(error.message || '汽水歌单元数据导入失败。');
+  } finally {
+    if (els.qishuiLibraryImportInput) els.qishuiLibraryImportInput.value = '';
+    if (els.qishuiLibraryImportButton) els.qishuiLibraryImportButton.disabled = false;
+  }
 }
 
 function closeLoginDialog() {
-  clearLoginQrTimer();
   clearOfficialBrowserLoginTimer({ cancel: true });
-  state.loginQrKey = '';
-  state.loginQrLoading = false;
   els.loginDialog.hidden = true;
   els.loginButton.setAttribute('aria-expanded', 'false');
-  els.loginRefresh.disabled = false;
-  if (OFFICIAL_BROWSER_LOGIN_MODE) window.close();
 }
 
 function providerInfo(provider = state.activeProvider) {
@@ -12339,26 +16173,105 @@ function providerConfigured(provider = state.activeProvider) {
   return info.enabled === true && info.configured === true;
 }
 
+function loginProviderVisible(provider) {
+  return !!provider && (provider.id === 'qishui' || providerConfigured(provider.id));
+}
+
+function qishuiPluginStatusCopy() {
+  const apiStatus = safeText(providerInfo('qishui').apiStatus, 'configured').toLowerCase();
+  switch (apiStatus) {
+    case 'ready':
+      return '汽水音乐插件已就绪：未登录也可使用游客搜索；本地客户端仅做歌单元数据只读检测，不代表已登录。完整播放仍需官方授权。';
+    case 'checking':
+    case 'starting':
+    case 'configured':
+      return '汽水音乐插件已导入，接口服务正在启动或确认可用性；服务就绪后可使用游客搜索和本地客户端只读检测，不代表已登录。';
+    default:
+      return `汽水音乐插件已导入，但接口服务尚未就绪（${apiStatus || 'unknown'}）；请检查插件服务后再使用游客搜索或本地客户端只读检测。`;
+  }
+}
+
+function syncBrowserLoginSurface(provider = state.activeProvider) {
+  const info = providerInfo(provider);
+  const browserLogin = OFFICIAL_BROWSER_LOGIN_PROVIDERS.has(info.id);
+  const qishuiOpenApi = info.id === 'qishui';
+  const qishuiConfigured = providerConfigured('qishui');
+  if (els.officialBrowserLoginButton) {
+    els.officialBrowserLoginButton.hidden = ANDROID_CLIENT || !browserLogin;
+    els.officialBrowserLoginButton.disabled = state.officialBrowserLoginLoading
+      || state.officialBrowserSwitching
+      || (!providerConfigured(info.id) && !state.officialBrowserLoginSession);
+    if (!state.officialBrowserLoginSession) {
+      els.officialBrowserLoginButton.textContent = '打开官方扫码登录';
+    } else {
+      els.officialBrowserLoginButton.textContent = '关闭官方登录窗口';
+    }
+  }
+  if (els.officialBrowserSwitchAccountButton) {
+    els.officialBrowserSwitchAccountButton.hidden = ANDROID_CLIENT || !browserLogin;
+    els.officialBrowserSwitchAccountButton.disabled = state.officialBrowserSwitching
+      || state.officialBrowserLoginLoading;
+  }
+  if (els.qishuiOpenApiLoginPanel) {
+    els.qishuiOpenApiLoginPanel.hidden = !qishuiOpenApi;
+  }
+  if (els.qishuiLoginSubmit) {
+    els.qishuiLoginSubmit.disabled = !qishuiConfigured;
+  }
+  if (els.qishuiLibraryImportButton) {
+    els.qishuiLibraryImportButton.disabled = !qishuiConfigured;
+  }
+  if (!qishuiOpenApi && els.qishuiAccessToken) {
+    els.qishuiAccessToken.value = '';
+  }
+  if (!qishuiOpenApi && els.qishuiRefreshToken) {
+    els.qishuiRefreshToken.value = '';
+  }
+  if (els.browserLoginCopy) {
+    els.browserLoginCopy.textContent = ANDROID_CLIENT
+      ? `${info.label}账号由本机音乐登录服务处理，登录状态与歌单只保存在此设备。`
+      : qishuiOpenApi
+        ? qishuiConfigured
+          ? qishuiPluginStatusCopy()
+          : '汽水音乐插件未导入：请先导入插件。导入后可使用游客搜索，并只读检测本机 SodaMusic 歌单元数据；不会伪装为已登录。'
+        : browserLogin
+          ? `将在独立窗口打开${info.label}官网的扫码登录界面，登录成功后自动同步本机账号与歌单。`
+          : '当前平台不支持浏览器扫码登录。';
+  }
+  if (qishuiOpenApi) {
+    setMusicApiImportStatus(qishuiConfigured
+      ? qishuiPluginStatusCopy()
+      : '请导入汽水音乐插件，以启用游客搜索与本地客户端只读检测');
+  }
+  if (qishuiOpenApi) void refreshQishuiLocalClientStatus();
+}
+
 function setMusicApiImportStatus(message) {
   if (els.musicApiImportStatus) els.musicApiImportStatus.textContent = safeText(message, '未导入插件前无法使用音乐平台');
 }
 
 function syncMusicApiProviderTabs() {
   if (!els.loginProviderTabs) return;
-  const configuredProviders = Object.values(state.providers)
-    .filter((provider) => provider && providerConfigured(provider.id));
+  const loginProviders = Object.values(state.providers)
+    .filter((provider) => loginProviderVisible(provider));
   els.loginProviderTabs.replaceChildren();
-  configuredProviders.forEach((provider) => {
+  loginProviders.forEach((provider) => {
     const tab = document.createElement('button');
     const active = provider.id === state.activeProvider;
+    const configured = providerConfigured(provider.id);
     tab.className = `login-provider-tab${active ? ' is-active' : ''}`;
     tab.type = 'button';
     tab.dataset.loginProvider = provider.id;
+    tab.dataset.providerConfigured = String(configured);
+    tab.dataset.providerReady = String(configured && provider.apiStatus === 'ready');
     tab.setAttribute('aria-pressed', String(active));
+    tab.setAttribute('aria-label', provider.id === 'qishui' && !configured
+      ? `${provider.label}，插件未导入`
+      : provider.label);
     tab.textContent = provider.label;
     els.loginProviderTabs.appendChild(tab);
   });
-  els.loginProviderTabs.hidden = configuredProviders.length === 0;
+  els.loginProviderTabs.hidden = loginProviders.length === 0;
 }
 
 function mergeMusicApiProviders(payload = {}) {
@@ -12381,17 +16294,13 @@ function mergeMusicApiProviders(payload = {}) {
       apiUrl: safeText(item.baseUrl, state.providers[id].apiUrl),
       enabled: item.enabled === true,
       configured: item.configured === true,
-      loginQr: item.loginQr === undefined ? state.providers[id].loginQr !== false : item.loginQr !== false,
       apiStatus: safeText(item.status, '')
     };
   });
   syncMusicApiProviderTabs();
-  if (!providerConfigured(state.activeProvider)) {
-    clearLoginQrTimer();
-    state.loginQrRequestId += 1;
-    state.loginQrLoading = false;
+  if (!loginProviderVisible(state.providers[state.activeProvider])) {
     const fallback = Object.keys(MUSIC_PROVIDERS).find((provider) => providerConfigured(provider));
-    if (fallback) setActiveProvider(fallback, { reloadQr: false });
+    setActiveProvider(fallback || 'qishui');
   }
   return providers;
 }
@@ -12444,7 +16353,7 @@ async function importMusicApiFile(file) {
       : 'API 配置已导入');
     await refreshMusicApiProviders({ silent: true });
     if (importedId && providerConfigured(importedId)) {
-      setActiveProvider(importedId, { reloadQr: true });
+      setActiveProvider(importedId);
     }
     toast('音乐 API 已导入并应用');
   } catch (error) {
@@ -12458,61 +16367,6 @@ async function importMusicApiFile(file) {
 
 function providerPath(path, provider = state.activeProvider) {
   return `/api/${providerInfo(provider).id}${path}`;
-}
-
-function syncAndroidLoginWorkflow(provider = state.activeProvider) {
-  if (!ANDROID_CLIENT || !els.androidLoginWorkflow) return;
-  const info = providerInfo(provider);
-  els.androidLoginWorkflow.hidden = false;
-  if (els.androidQrHelp) {
-    els.androidQrHelp.textContent = `保存二维码后，打开${info.appName}，进入扫一扫并从相册选择该二维码。`;
-  }
-  if (els.androidMusicAppButton) {
-    const canOpenApp = !!ANDROID_MUSIC_APP_URIS[info.id];
-    els.androidMusicAppButton.textContent = canOpenApp ? `打开${info.label}` : `请手动打开${info.label}`;
-    els.androidMusicAppButton.disabled = !canOpenApp;
-  }
-}
-
-async function saveAndroidLoginQr() {
-  if (!ANDROID_CLIENT || !els.qrImage || !els.androidQrSaveButton) return;
-  const source = els.qrImage.currentSrc || els.qrImage.getAttribute('src') || '';
-  if (!source) {
-    setQrStatus('二维码尚未生成，请稍后重试');
-    return;
-  }
-  els.androidQrSaveButton.disabled = true;
-  try {
-    if (typeof window.feMonsterAndroidSaveBlob !== 'function') throw new Error('Android 保存能力不可用');
-    const response = await fetch(source, { credentials: 'same-origin' });
-    if (!response.ok) throw new Error(`二维码读取失败 (${response.status})`);
-    const blob = await response.blob();
-    const provider = providerInfo().id;
-    await window.feMonsterAndroidSaveBlob(blob, `fe-monster-${provider}-login-qr.png`);
-    setQrStatus('二维码已保存；请在音乐 App 的扫一扫中从相册选择');
-    toast('登录二维码已保存到手机');
-  } catch (error) {
-    setQrStatus(error.message || '二维码保存失败，请重试');
-  } finally {
-    els.androidQrSaveButton.disabled = !els.qrImage.getAttribute('src');
-  }
-}
-
-function openAndroidMusicApp() {
-  if (!ANDROID_CLIENT) return;
-  const provider = providerInfo().id;
-  const uri = ANDROID_MUSIC_APP_URIS[provider];
-  if (!uri) return;
-  try {
-    if (typeof window.FeMonsterAndroid?.openExternal === 'function') {
-      window.FeMonsterAndroid.openExternal(uri);
-    } else {
-      window.location.href = uri;
-    }
-    setQrStatus(`已尝试打开${providerInfo(provider).appName}；请选择扫一扫 → 相册`);
-  } catch (error) {
-    setQrStatus(`无法打开${providerInfo(provider).appName}，请手动打开后从相册扫码`);
-  }
 }
 
 function playbackQualityProvider(song = state.currentSong) {
@@ -12750,14 +16604,9 @@ async function selectPlaybackQuality(quality) {
   }
 }
 
-function setActiveProvider(provider, options = {}) {
+function setActiveProvider(provider) {
   const requestedProvider = safeText(provider, 'netease');
-  if (!MUSIC_PROVIDERS[requestedProvider] || !providerConfigured(requestedProvider)) {
-    clearLoginQrTimer();
-    state.loginQrRequestId += 1;
-    state.loginQrLoading = false;
-    resetQrImage('请先导入 API');
-    setQrStatus(`${safeText(MUSIC_PROVIDERS[requestedProvider]?.label, '该平台')} API 插件尚未导入，请先在上方导入插件`);
+  if (!MUSIC_PROVIDERS[requestedProvider] || !loginProviderVisible(MUSIC_PROVIDERS[requestedProvider])) {
     setMusicApiImportStatus(`等待导入${safeText(MUSIC_PROVIDERS[requestedProvider]?.label, '音乐')} API 插件`);
     els.musicApiImportButton?.focus();
     return false;
@@ -12767,22 +16616,28 @@ function setActiveProvider(provider, options = {}) {
   if (changed) clearOfficialBrowserLoginTimer({ cancel: true });
   state.activeProvider = nextProvider;
   const info = providerInfo(nextProvider);
-  syncAndroidLoginWorkflow(nextProvider);
 
-  if (els.loginTitle) els.loginTitle.textContent = info.loginQr === false
-    ? `${info.label} API`
-    : `${info.label}\u4e8c\u7ef4\u7801\u767b\u5f55`;
-  if (els.loginSubtitle) els.loginSubtitle.textContent = info.loginQr === false
-    ? '\u5df2\u542f\u7528\u641c\u7d22\u4e0e\u64ad\u653e\uff0c\u5f53\u524d API \u5305\u672a\u58f0\u660e\u626b\u7801\u767b\u5f55'
-    : `\u4f7f\u7528${info.appName}\u626b\u7801\u786e\u8ba4`;
-  if (els.qrImage) els.qrImage.alt = `${info.label}\u767b\u5f55\u4e8c\u7ef4\u7801`;
+  const browserLogin = OFFICIAL_BROWSER_LOGIN_PROVIDERS.has(nextProvider);
+  const qishuiOpenApi = nextProvider === 'qishui';
+  if (els.loginTitle) els.loginTitle.textContent = ANDROID_CLIENT
+    ? `${info.label}本机登录`
+    : qishuiOpenApi
+      ? `${info.label} OpenAPI 授权`
+    : browserLogin
+      ? `${info.label}浏览器登录`
+      : `${info.label}本机 App`;
+  if (els.loginSubtitle) els.loginSubtitle.textContent = ANDROID_CLIENT
+    ? '由本机音乐登录服务连接平台账号，不依赖电脑端网关'
+    : qishuiOpenApi
+      ? '验证具备汽水音乐播放 scope 的官方 OpenAPI token'
+    : browserLogin
+      ? '使用音乐平台官网提供的扫码方式登录'
+      : '检测本机账号摘要；开放 API 凭据单独用于播放授权';
+  syncBrowserLoginSurface(nextProvider);
   syncMusicApiProviderTabs();
 
   if (changed) {
-    state.loginQrRequestId += 1;
-    state.loginQrLoading = false;
     state.playbackQuality = preferredPlaybackQuality(nextProvider);
-    state.loginQrKey = '';
     state.userPlaylists = [];
     state.recommendedPlaylists = [];
     state.playlistsLoggedIn = false;
@@ -12802,7 +16657,6 @@ function setActiveProvider(provider, options = {}) {
     stopCommunityEventStream(true);
     renderPlaylistOrbit(playbackPlaylists());
   }
-  if (options.reloadQr && !els.loginDialog.hidden) loadLoginQr();
   refreshLoginStatus(nextProvider);
   if (changed) scheduleUserPlaylistsRefresh(180);
   syncQishuiPlaybackCard();
@@ -12827,7 +16681,9 @@ function renderLoginStatus(payload = {}) {
   if (els.loginVipBadge) els.loginVipBadge.hidden = !vip;
   els.loginButton.setAttribute('aria-label', loggedIn
     ? `${provider.label}\u5df2\u767b\u5f55\uff1a${els.loginLabel.textContent}${vip ? '\uff0cVIP\u4f1a\u5458' : ''}`
-    : `\u6253\u5f00${provider.label}\u4e8c\u7ef4\u7801\u767b\u5f55`);
+    : provider.id === 'qishui'
+      ? '打开汽水音乐插件与 OpenAPI 授权'
+      : `\u6253\u5f00${provider.label}\u4e8c\u7ef4\u7801\u767b\u5f55`);
   if (provider.id === playbackQualityProvider()) {
     state.playbackQuality = normalizePlaybackQuality(provider.id, preferredPlaybackQuality(provider.id, state.playbackQuality));
   }
@@ -12836,8 +16692,6 @@ function renderLoginStatus(payload = {}) {
 }
 
 const LOGIN_STATUS_RETRY_DELAYS = Object.freeze([320, 700, 1400, 2600]);
-const CONFIRMED_LOGIN_RETRY_DELAYS = Object.freeze([0, 180, 420, 800, 1400, 2400]);
-
 function loginStatusNeedsRetry(payload = {}) {
   const code = safeText(payload.code, '').toUpperCase();
   const gatewayState = safeText(payload.gatewayState || payload.status, '').toLowerCase();
@@ -12895,211 +16749,13 @@ async function refreshLoginStatus(provider = state.activeProvider) {
   }
 }
 
-async function waitForConfirmedLoginAccount(provider = state.activeProvider) {
-  const id = providerInfo(provider).id;
-  let account = { provider: id, loggedIn: false };
-  for (const delay of CONFIRMED_LOGIN_RETRY_DELAYS) {
-    if (delay > 0) await new Promise((resolve) => window.setTimeout(resolve, delay));
-    if (id !== state.activeProvider) return account;
-    account = await refreshLoginStatus(id);
-    if (account?.loggedIn) return account;
-  }
-  return account;
-}
-
-function resetQrImage(message = '\u751f\u6210\u4e8c\u7ef4\u7801') {
-  els.qrImage.removeAttribute('src');
-  els.qrShell.classList.remove('has-qr');
-  els.qrPlaceholder.textContent = message;
-  if (els.androidQrSaveButton) els.androidQrSaveButton.disabled = true;
-}
-
 async function showLoginDialog() {
   els.loginDialog.hidden = false;
   els.loginButton.setAttribute('aria-expanded', 'true');
   setOfficialBrowserLoginStatus('', true);
-  if (els.officialBrowserLoginButton) els.officialBrowserLoginButton.hidden = ANDROID_CLIENT;
   await refreshMusicApiProviders({ silent: true });
   if (els.loginDialog.hidden) return;
-  if (setActiveProvider(state.activeProvider)) await loadLoginQr();
-}
-
-function qrCodeMessage(code, message, provider = state.activeProvider) {
-  const info = providerInfo(provider);
-  if (provider === 'kugou') {
-    if (code === 0) return '\u4e8c\u7ef4\u7801\u5df2\u8fc7\u671f\uff0c\u8bf7\u5237\u65b0';
-    if (code === 1) return `\u7b49\u5f85${info.appName}\u626b\u7801`;
-    if (code === 2) return '\u5df2\u626b\u7801\uff0c\u8bf7\u5728\u624b\u673a\u4e0a\u786e\u8ba4';
-    if (code === 4) return '\u767b\u5f55\u6210\u529f\uff0c\u6b63\u5728\u540c\u6b65\u6b4c\u5355';
-  }
-  if (code === 800) return '\u4e8c\u7ef4\u7801\u5df2\u8fc7\u671f\uff0c\u8bf7\u5237\u65b0';
-  if (code === 801) return `\u7b49\u5f85${info.appName}\u626b\u7801`;
-  if (code === 802) return '\u5df2\u626b\u7801\uff0c\u8bf7\u5728\u624b\u673a\u4e0a\u786e\u8ba4';
-  if (code === 803) return '\u767b\u5f55\u6210\u529f\uff0c\u6b63\u5728\u540c\u6b65\u6b4c\u5355';
-  if (code === 0 || code === 200) return message || `\u7b49\u5f85${info.appName}\u626b\u7801`;
-  return message || '\u7b49\u5f85\u626b\u7801\u786e\u8ba4';
-}
-
-function loginQrCode(payload, provider = state.activeProvider) {
-  const data = payload && payload.data ? payload.data : {};
-  if (provider === 'kugou') {
-    return Number(
-      data.status ?? data.code ?? data.result ??
-      payload.code ?? payload.status ?? payload.result ?? 0
-    ) || 0;
-  }
-  return Number(
-    payload.code ?? payload.status ?? payload.result ??
-    data.code ?? data.status ?? data.result ?? 0
-  ) || 0;
-}
-
-function loginQrImage(payload) {
-  const data = payload && payload.data ? payload.data : {};
-  return safeText(
-    data.qrcode_img || data.qrimg || data.qrImg || data.base64 || data.image || data.img || data.url || data.qrurl || data.qrcode || data.qrCode,
-    safeText(
-      payload.qrcode_img || payload.qrimg || payload.qrImg || payload.base64 || payload.image || payload.img || payload.url || payload.qrurl || payload.qrcode || payload.qrCode,
-      ''
-    )
-  );
-}
-
-function loginQrKeyValue(payload) {
-  const data = payload && payload.data ? payload.data : {};
-  const ptqrtoken = safeText(data.ptqrtoken || data.ptqrToken || payload.ptqrtoken || payload.ptqrToken, '');
-  const qrsig = safeText(data.qrsig || payload.qrsig, '');
-  if (ptqrtoken && qrsig) return `qq|${ptqrtoken}|${encodeURIComponent(qrsig)}`;
-  return safeText(
-    data.unikey || data.key || data.qrKey || data.qrcode || data.qrsig || data.token || data.id,
-    safeText(payload.unikey || payload.key || payload.qrKey || payload.qrcode || payload.qrsig || payload.token || payload.id, '')
-  );
-}
-
-function loginQrSucceeded(payload, provider = state.activeProvider) {
-  const data = payload && payload.data ? payload.data : {};
-  const code = loginQrCode(payload, provider);
-  const text = `${safeText(payload.message || payload.msg || data.message || data.msg, '')}`.toLowerCase();
-  return code === 803 ||
-    (provider === 'kugou' && code === 4) ||
-    payload.loggedIn === true ||
-    payload.success === true ||
-    payload.isOk === true ||
-    data.loggedIn === true ||
-    data.success === true ||
-    data.isOk === true ||
-    /success|logged|confirmed|authorized|\u6210\u529f|\u5df2\u767b\u5f55/.test(text);
-}
-
-function loginQrExpired(payload, provider = state.activeProvider) {
-  const data = payload && payload.data ? payload.data : {};
-  const code = loginQrCode(payload, provider);
-  const text = `${safeText(payload.message || payload.msg || data.message || data.msg, '')}`.toLowerCase();
-  return code === 800 || (provider === 'kugou' && code === 0) || /expired|timeout|\u8fc7\u671f/.test(text);
-}
-
-function loginQrFailureMessage(error, provider = state.activeProvider) {
-  const info = providerInfo(provider);
-  const raw = safeText(error && error.message, '');
-  if (/unavailable|ClosedChannelException|connection refused|connect|timeout|ECONNREFUSED/i.test(raw)) {
-    return `${info.label}\u63a5\u53e3\u670d\u52a1\u672a\u5c31\u7eea\uff1a${info.apiUrl}\u3002${info.setup}`;
-  }
-  if (/404|not found|Cannot GET/i.test(raw)) {
-    return `${info.label}\u63a5\u53e3\u5df2\u8fde\u4e0a\uff0c\u4f46\u6ca1\u6709\u4e8c\u7ef4\u7801\u767b\u5f55\u7aef\u70b9\u3002${info.setup}`;
-  }
-  return raw || '\u4e8c\u7ef4\u7801\u751f\u6210\u5931\u8d25';
-}
-
-async function checkLoginQr() {
-  if (document.hidden || !state.loginQrKey) return;
-  const provider = state.activeProvider;
-  try {
-    const payload = await apiJson(`${providerPath('/login/qr/check', provider)}?${query({ key: state.loginQrKey })}`);
-    if (provider !== state.activeProvider) return;
-    const code = loginQrCode(payload, provider);
-    setQrStatus(qrCodeMessage(code, payload.message || payload.msg, provider));
-
-    if (loginQrExpired(payload, provider)) {
-      clearLoginQrTimer();
-      resetQrImage('\u4e8c\u7ef4\u7801\u8fc7\u671f');
-      return;
-    }
-
-    if (loginQrSucceeded(payload, provider)) {
-      clearLoginQrTimer();
-      setQrStatus(`${providerInfo(provider).label}\u767b\u5f55\u5df2\u786e\u8ba4\uff0c\u6b63\u5728\u540c\u6b65\u8d26\u53f7\u4e0e\u6b4c\u5355`);
-      const account = await waitForConfirmedLoginAccount(provider);
-      if (provider !== state.activeProvider) return;
-      if (account?.loggedIn) {
-        await refreshUserPlaylists();
-        setQrStatus(`${providerInfo(provider).label}\u767b\u5f55\u6210\u529f`);
-        window.setTimeout(closeLoginDialog, 420);
-      } else {
-        setQrStatus('\u624b\u673a\u7aef\u5df2\u786e\u8ba4\uff0c\u8d26\u53f7\u540c\u6b65\u8d85\u65f6\uff0c\u8bf7\u70b9\u51fb\u5237\u65b0\u91cd\u8bd5');
-      }
-    }
-  } catch (error) {
-    clearLoginQrTimer();
-    setQrStatus(loginQrFailureMessage(error, provider));
-  }
-}
-
-async function loadLoginQr() {
-  const requestId = ++state.loginQrRequestId;
-  const provider = state.activeProvider;
-  const info = providerInfo(provider);
-  if (!providerConfigured(provider)) {
-    clearLoginQrTimer();
-    resetQrImage('请先导入 API');
-    setQrStatus(`${info.label} API 插件尚未导入，请先在上方导入插件`);
-    return;
-  }
-  if (info.loginQr === false) {
-    clearLoginQrTimer();
-    state.loginQrKey = '';
-    resetQrImage('API 已启用');
-    setQrStatus(`${info.label} API 已启用，可搜索播放；当前 API 包未声明扫码登录能力`);
-    els.loginRefresh.disabled = false;
-    return;
-  }
-  state.loginQrLoading = true;
-  clearLoginQrTimer();
-  state.loginQrKey = '';
-  resetQrImage('\u751f\u6210\u4e8c\u7ef4\u7801');
-  setQrStatus(`\u6b63\u5728\u8fde\u63a5${info.label}\u7b2c\u4e09\u65b9 API`);
-  els.loginRefresh.disabled = true;
-
-  try {
-    const keyPayload = await apiJson(providerPath('/login/qr/key', provider));
-    if (requestId !== state.loginQrRequestId || provider !== state.activeProvider) return;
-    const key = loginQrKeyValue(keyPayload);
-    if (!key) throw new Error(keyPayload.error || `\u672a\u83b7\u53d6\u5230${info.label}\u4e8c\u7ef4\u7801 key`);
-
-    state.loginQrKey = key;
-    let qrImage = loginQrImage(keyPayload);
-    if (!qrImage) {
-      const qrPayload = await apiJson(`${providerPath('/login/qr/create', provider)}?${query({ key, qrimg: 'true' })}`);
-      if (requestId !== state.loginQrRequestId || provider !== state.activeProvider) return;
-      qrImage = loginQrImage(qrPayload);
-      if (!qrImage) throw new Error(qrPayload.error || `\u672a\u83b7\u53d6\u5230${info.label}\u4e8c\u7ef4\u7801\u56fe\u7247`);
-    }
-
-    els.qrImage.src = qrImage;
-    els.qrShell.classList.add('has-qr');
-    if (els.androidQrSaveButton) els.androidQrSaveButton.disabled = false;
-    setQrStatus(`\u7b49\u5f85${info.appName}\u626b\u7801`);
-    state.loginQrTimer = window.setInterval(checkLoginQr, 1800);
-    checkLoginQr();
-  } catch (error) {
-    if (requestId !== state.loginQrRequestId || provider !== state.activeProvider) return;
-    resetQrImage('\u670d\u52a1\u672a\u5c31\u7eea');
-    setQrStatus(loginQrFailureMessage(error, provider));
-  } finally {
-    if (requestId === state.loginQrRequestId) {
-      state.loginQrLoading = false;
-      els.loginRefresh.disabled = false;
-    }
-  }
+  if (setActiveProvider(state.activeProvider)) syncBrowserLoginSurface(state.activeProvider);
 }
 
 function hidePlaylistOrbit() {
@@ -13156,7 +16812,8 @@ function createPlaylistCard(playlist, index) {
     const image = document.createElement('img');
     image.alt = '';
     image.loading = 'lazy';
-    image.src = imageUrl;
+    image.decoding = 'async';
+    image.dataset.src = imageUrl;
     image.addEventListener('load', () => removeElement(fallback));
     image.addEventListener('error', () => removeElement(image));
     cover.appendChild(image);
@@ -13186,6 +16843,26 @@ function createPlaylistCard(playlist, index) {
   return button;
 }
 
+let playlistCoverHydrationTimer = 0;
+
+function hydrateVisiblePlaylistCovers() {
+  playlistCoverHydrationTimer = 0;
+  const cards = els.playlistCards.querySelectorAll('.orb-playlist-card');
+  cards.forEach((card, index) => {
+    const focused = Math.abs(index - state.playlistFocusIndex) <= PLAYLIST_COVER_HYDRATION_RADIUS;
+    const active = String(card.dataset.playlistId) === String(state.activePlaylistId);
+    if (!focused && !active) return;
+    const image = card.querySelector('.orb-playlist-cover img[data-src]');
+    if (!image || image.hasAttribute('src')) return;
+    image.src = image.dataset.src;
+  });
+}
+
+function scheduleVisiblePlaylistCoverHydration(delay = 45) {
+  window.clearTimeout(playlistCoverHydrationTimer);
+  playlistCoverHydrationTimer = window.setTimeout(hydrateVisiblePlaylistCovers, delay);
+}
+
 function updateActivePlaylistCard() {
   const cards = Array.from(els.playlistCards.querySelectorAll('.orb-playlist-card'));
   if (!cards.length) return;
@@ -13207,6 +16884,7 @@ function updateActivePlaylistCard() {
     if (isActive) card.setAttribute('aria-current', 'true');
     else card.removeAttribute('aria-current');
   });
+  scheduleVisiblePlaylistCoverHydration();
 }
 
 function setPlaylistFocus(index) {
@@ -13260,25 +16938,35 @@ function setSongFocus(index, options = {}) {
   if (!count) return;
   state.songFocusIndex = ((Math.round(index) % count) + count) % count;
 
-  const renderedIndices = state.songButtonCache.map((button) => Number(button.dataset.songIndex));
-  const renderedStart = renderedIndices.length ? Math.min(...renderedIndices) : -1;
-  const renderedEnd = renderedIndices.length ? Math.max(...renderedIndices) : -1;
+  let renderedStart = Number.POSITIVE_INFINITY;
+  let renderedEnd = -1;
+  for (const button of state.songButtonCache) {
+    const itemIndex = Number(button.dataset.songIndex);
+    if (!Number.isFinite(itemIndex)) continue;
+    renderedStart = Math.min(renderedStart, itemIndex);
+    renderedEnd = Math.max(renderedEnd, itemIndex);
+  }
+  if (!Number.isFinite(renderedStart)) renderedStart = -1;
   const visibleStart = Math.max(0, state.songFocusIndex - PLAYLIST_SONG_RENDER_RADIUS);
   const visibleEnd = Math.min(count - 1, state.songFocusIndex + PLAYLIST_SONG_RENDER_RADIUS);
   if (options.forceAll || renderedStart < 0 || visibleStart < renderedStart || visibleEnd > renderedEnd) {
     renderShelfSongWindow(state.songFocusIndex);
   } else {
-    for (const button of [...state.songButtonCache, ...state.songButtonBackCache]) {
+    for (const button of state.songButtonCache) {
       updateSongButtonFocusVisual(button, Number(button.dataset.songIndex), state.songFocusIndex);
     }
-    rebuildShelfSongButtonLookup();
+    for (const button of state.songButtonBackCache) {
+      updateSongButtonFocusVisual(button, Number(button.dataset.songIndex), state.songFocusIndex);
+    }
     updateShelfCurrentSong();
   }
   scheduleVisibleShelfSongCoverHydration();
   if (options.focus !== false) {
-    state.songButtonCache
-      .find((button) => Number(button.dataset.songIndex) === state.songFocusIndex)
-      ?.focus({ preventScroll: true });
+    for (const button of state.songButtonCache) {
+      if (Number(button.dataset.songIndex) !== state.songFocusIndex) continue;
+      button.focus({ preventScroll: true });
+      break;
+    }
   }
 }
 
@@ -13331,7 +17019,7 @@ async function refreshUserPlaylists() {
       : {};
     const playlists = Array.isArray(library.playlists) ? library.playlists : [];
     const recommended = Array.isArray(recommendations.playlists) ? recommendations.playlists : [];
-    state.playlistsLoggedIn = !!library.loggedIn;
+    state.playlistsLoggedIn = !!library.loggedIn || !!library.libraryAvailable;
     state.userPlaylists = state.playlistsLoggedIn
       ? playlists.map((playlist) => ({ ...playlist, provider }))
       : [];
@@ -13597,7 +17285,6 @@ const PLAYBACK_CARD_PROVIDER_ACCENTS = Object.freeze({
   netease: '#e5484d',
   qq: '#2fc77a',
   kugou: '#2d9ff0',
-  qishui: '#ff8a4c',
   local: '#7dd3fc'
 });
 const PLAYBACK_CARD_VISIBILITY_TRANSITION_MS = 240;
@@ -13763,6 +17450,8 @@ function renderQishuiPlaybackIdentity(provider = playbackCardProvider()) {
   const payload = local ? null : state.loginStatusByProvider[provider.id];
   const loading = !local && !payload;
   const loggedIn = !!(payload && payload.loggedIn);
+  const localClientLogin = !!(payload && payload.localLoginDetected);
+  const playbackAuthorized = !!(payload && payload.playbackAuthorized);
   const avatarUrl = loggedIn ? accountAvatar(payload) : '';
   const vipLabel = loggedIn ? accountVipLabel(payload) : '';
   const accountLabel = local
@@ -13775,7 +17464,9 @@ function renderQishuiPlaybackIdentity(provider = playbackCardProvider()) {
   const statusLabel = local
     ? '本地播放'
     : loggedIn
-      ? '已登录'
+      ? localClientLogin && !playbackAuthorized
+        ? '本地客户端已登录'
+        : '已登录'
       : loading
         ? '连接中'
         : '未登录';
@@ -13864,6 +17555,107 @@ function qishuiPlaybackBookLines(text = '', subtitle = '') {
   ];
 }
 
+function disposeQishuiLyricTransition() {
+  const transition = state.qishuiPlaybackCard.lyricTransition;
+  if (!transition) return;
+  transition.animations.forEach(({ animation }) => {
+    try { animation.cancel(); } catch (error) {}
+  });
+  state.qishuiPlaybackCard.lyricTransition = null;
+}
+
+function startQishuiLyricTransition(
+  snapshots,
+  activeIndex,
+  previousIndex,
+  playbackTime,
+  playbackRunning
+) {
+  disposeQishuiLyricTransition();
+  if (
+    reducedMotion
+    || playbackRunning !== true
+    || !(snapshots instanceof Map)
+    || !snapshots.size
+    || !Number.isFinite(Number(playbackTime))
+    || previousIndex < 0
+    || previousIndex === activeIndex
+  ) {
+    return;
+  }
+
+  const durationMs = QISHUI_LYRIC_TRANSITION_SECONDS * 1000;
+  const animations = [];
+  snapshots.forEach((snapshot, line) => {
+    const nextRect = line.getBoundingClientRect();
+    if (!nextRect.width || !nextRect.height) return;
+    const index = Number(line.dataset.bookLyricIndex);
+    const targetOpacity = index === activeIndex
+      ? 1
+      : clamp(Number.parseFloat(getComputedStyle(line).opacity) || 0, 0, 1);
+    const fromOpacity = clamp(Number(snapshot.opacity) || 0, 0, 1);
+    const deltaX = snapshot.rect.left - nextRect.left;
+    const deltaY = snapshot.rect.top - nextRect.top;
+    const scaleX = clamp(snapshot.rect.width / nextRect.width, 0.72, 1.38);
+    const scaleY = clamp(snapshot.rect.height / nextRect.height, 0.72, 1.38);
+    const changed = Math.abs(deltaX) > 0.2
+      || Math.abs(deltaY) > 0.2
+      || Math.abs(scaleX - 1) > 0.005
+      || Math.abs(scaleY - 1) > 0.005
+      || Math.abs(targetOpacity - fromOpacity) > 0.01
+      || index === activeIndex
+      || index === previousIndex;
+    if (!changed || typeof line.animate !== 'function') return;
+
+    const animation = line.animate([
+      {
+        translate: `${deltaX.toFixed(2)}px ${deltaY.toFixed(2)}px`,
+        scale: `${scaleX.toFixed(4)} ${scaleY.toFixed(4)}`,
+        opacity: fromOpacity
+      },
+      {
+        translate: '0px 0px',
+        scale: '1 1',
+        opacity: targetOpacity
+      }
+    ], {
+      duration: durationMs,
+      easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+      fill: 'both'
+    });
+    animation.pause();
+    animation.currentTime = 0;
+    animations.push({ animation, line });
+  });
+
+  if (!animations.length) return;
+  state.qishuiPlaybackCard.lyricTransition = {
+    activeIndex,
+    startTime: Number(playbackTime),
+    durationMs,
+    animations
+  };
+}
+
+function syncQishuiLyricTransition(playbackTime, arrived) {
+  const transition = state.qishuiPlaybackCard.lyricTransition;
+  const mediaTime = Number(playbackTime);
+  if (!transition || !Number.isFinite(mediaTime)) return 1;
+  const elapsed = Math.max(0, mediaTime - transition.startTime);
+  const progress = clamp(
+    elapsed / Math.max(0.001, transition.durationMs / 1000),
+    0,
+    1
+  );
+  const timelineProgress = progress >= 1 && !arrived ? 0.999 : progress;
+  transition.animations.forEach(({ animation }) => {
+    animation.pause();
+    animation.currentTime = timelineProgress * transition.durationMs;
+  });
+  if (progress >= 1 && arrived) disposeQishuiLyricTransition();
+  return progress;
+}
+
 function qishuiPlaybackBookFrame(lines, playbackTime = Number.NaN) {
   if (!state.lyricLines.length) {
     return { activeIndex: 0, currentTime: Number.NaN, progressPercent: 0 };
@@ -13915,10 +17707,14 @@ function updateQishuiPlaybackLyrics(
   if (!els.qishuiPlaybackLyrics || !els.qishuiPlaybackLyricPage) return;
   const list = els.qishuiPlaybackLyricPage;
   const cardState = state.qishuiPlaybackCard;
+  const playbackRunning = cardState.progressDragging
+    ? false
+    : (scrollOptions.playbackRunning ?? isPlaybackClockRunning());
   const lines = qishuiPlaybackBookLines(text, subtitle);
   const songId = safeText(playbackCardSong()?.id, 'empty');
   const signature = `${songId}|${bookLyricSignature(lines)}`;
   if (signature !== cardState.lyricSignature) {
+    disposeQishuiLyricTransition();
     cardState.lyricSignature = signature;
     cardState.lastLyricIndex = -1;
     cardState.lyricBookIndex = -2;
@@ -13945,6 +17741,7 @@ function updateQishuiPlaybackLyrics(
 
   if (cardState.lyricBookIndex !== activeIndex) {
     const previousBookIndex = cardState.lyricBookIndex;
+    disposeQishuiLyricTransition();
     cardState.lyricBookIndex = activeIndex;
     cardState.lyricBookCurrentLine = null;
     cardState.lyricBookArrivedIndex = -2;
@@ -13965,6 +17762,15 @@ function updateQishuiPlaybackLyrics(
     const updateEnd = previousIndexIsValid
       ? Math.min(lyricLineElements.length - 1, Math.max(previousBookIndex, activeIndex) + 6)
       : lyricLineElements.length - 1;
+    const previousVisuals = reducedMotion || playbackRunning !== true
+      ? null
+      : new Map(lyricLineElements
+          .slice(updateStart, updateEnd + 1)
+          .filter(Boolean)
+          .map((line) => [line, {
+            rect: line.getBoundingClientRect(),
+            opacity: Number.parseFloat(getComputedStyle(line).opacity) || 0
+          }]));
     for (let elementIndex = updateStart; elementIndex <= updateEnd; elementIndex += 1) {
       const line = lyricLineElements[elementIndex];
       if (!line) continue;
@@ -13987,6 +17793,13 @@ function updateQishuiPlaybackLyrics(
         line.id = 'qishuiPlaybackLyricNext';
       }
     }
+    startQishuiLyricTransition(
+      previousVisuals,
+      activeIndex,
+      previousBookIndex,
+      currentTime,
+      playbackRunning
+    );
     resetBookLyricScrollState({ store: cardState });
   }
 
@@ -13998,21 +17811,25 @@ function updateQishuiPlaybackLyrics(
     cardState.lyricBookCurrentLine = current;
   }
 
-  const scrollArrived = current
-    ? syncBookLyricScroll(current, {
-        list,
-        store: cardState,
-        lines,
-        activeIndex,
-        reducedMotion: reducedMotion,
-        playbackRunning: scrollOptions.playbackRunning
-      })
-    : false;
+  const alreadyArrived = cardState.lyricBookArrivedIndex === activeIndex;
+  const scrollArrived = alreadyArrived
+    ? true
+    : current
+      ? syncBookLyricScroll(current, {
+          list,
+          store: cardState,
+          lines,
+          activeIndex,
+          reducedMotion: reducedMotion,
+          playbackRunning,
+          clockTime: currentTime
+        })
+      : false;
   // Once the line reaches the reading position, keep its highlight latched
   // until the active lyric changes. The larger current-line typography changes
   // layout by a pixel or two; treating that reflow as "not arrived" makes the
   // line expand and collapse every other frame on tall fullscreen layouts.
-  const arrived = cardState.lyricBookArrivedIndex === activeIndex || scrollArrived;
+  const arrived = alreadyArrived || scrollArrived;
   cardState.lyricBookArrivedIndex = arrived ? activeIndex : -2;
   list.classList.toggle('is-highlight-pending', !arrived);
   list.dataset.activeIndex = String(activeIndex);
@@ -14033,6 +17850,7 @@ function updateQishuiPlaybackLyrics(
   );
   if (arrived) current.setAttribute('aria-current', 'true');
   else current.removeAttribute('aria-current');
+  syncQishuiLyricTransition(currentTime, arrived);
 }
 
 function qishuiPlaybackSeekDuration() {
@@ -14076,7 +17894,15 @@ function updateQishuiPlaybackProgress(
       : Number.NaN;
   const fallbackCurrent = song ? estimatedPlayerClockTime(Number(song.position) || 0) : 0;
   const fallbackDuration = song ? Number(song.duration) || 0 : 0;
-  const safeCurrent = Math.max(0, Number.isFinite(audioCurrent) ? audioCurrent : fallbackCurrent);
+  const dragPreviewTarget = Number(state.qishuiPlaybackCard.pendingSeekTarget);
+  const safeCurrent = Math.max(
+    0,
+    state.qishuiPlaybackCard.progressDragging && Number.isFinite(dragPreviewTarget)
+      ? dragPreviewTarget
+      : Number.isFinite(audioCurrent)
+        ? audioCurrent
+        : fallbackCurrent
+  );
   const safeDuration = Math.max(0, Number.isFinite(audioDuration) && audioDuration > 0 ? audioDuration : fallbackDuration);
   const progress = safeDuration > 0 ? clamp(safeCurrent / safeDuration, 0, 1) : 0;
   els.qishuiPlaybackProgressRange.disabled = safeDuration <= 0;
@@ -14101,26 +17927,36 @@ function updateQishuiPlaybackProgress(
   }
 }
 
-function previewQishuiPlaybackSeek() {
-  const duration = qishuiPlaybackSeekDuration();
-  if (!duration || !els.qishuiPlaybackProgressRange) return false;
+function beginQishuiPlaybackSeek() {
+  if (!els.qishuiPlaybackProgressRange || els.qishuiPlaybackProgressRange.disabled) return false;
   if (state.qishuiPlaybackCard.seekPending) {
     state.qishuiPlaybackCard.seekRequestId += 1;
     state.qishuiPlaybackCard.seekPending = false;
   }
   state.qishuiPlaybackCard.progressDragging = true;
+  state.qishuiPlaybackCard.pendingSeekTarget = qishuiPlaybackSeekTarget();
+  state.qishuiPlaybackCard.pendingAudioSeekTarget = null;
+  state.qishuiPlaybackCard.seekHandoffTarget = null;
+  state.qishuiPlaybackCard.seekHandoffStartedAt = 0;
+  disposeQishuiLyricTransition();
+  els.playbackLyricText?.__lyricGeometryFlip?.cancel?.();
+  els.playbackLyricSubtitle?.__lyricGeometryFlip?.cancel?.();
+  resetLyricFrameSync();
+  return true;
+}
+
+function previewQishuiPlaybackSeek() {
+  const duration = qishuiPlaybackSeekDuration();
+  if (!duration || !els.qishuiPlaybackProgressRange) return false;
+  if (!state.qishuiPlaybackCard.progressDragging && !beginQishuiPlaybackSeek()) return false;
   const target = qishuiPlaybackSeekTarget();
   state.qishuiPlaybackCard.pendingSeekTarget = target;
-  const audioDuration = Number(els.audio && els.audio.duration);
-  if (Number.isFinite(audioDuration) && audioDuration > 0) {
-    els.audio.currentTime = target;
-    state.qishuiPlaybackCard.pendingAudioSeekTarget = null;
-  } else if (els.progressRange) {
+  if (els.progressRange) {
     els.progressRange.value = els.qishuiPlaybackProgressRange.value;
     syncElasticRangeVisual(els.progressRange);
-    if (els.audio?.src) state.qishuiPlaybackCard.pendingAudioSeekTarget = target;
   }
   updateQishuiPlaybackProgress(target, duration, { forceRange: true });
+  resetLyricFrameSync();
   syncPlaybackLyricAtTime(target);
   return true;
 }
@@ -14128,23 +17964,33 @@ function previewQishuiPlaybackSeek() {
 async function commitQishuiPlaybackSeek() {
   if (!state.qishuiPlaybackCard.progressDragging) return false;
   const duration = qishuiPlaybackSeekDuration();
-  const target = qishuiPlaybackSeekTarget();
+  const previewTarget = Number(state.qishuiPlaybackCard.pendingSeekTarget);
+  const target = Number.isFinite(previewTarget)
+    ? clamp(previewTarget, 0, duration || previewTarget)
+    : qishuiPlaybackSeekTarget();
   state.qishuiPlaybackCard.progressDragging = false;
   if (!duration) {
+    state.qishuiPlaybackCard.pendingSeekTarget = null;
     updateQishuiPlaybackProgress();
     return false;
   }
   const audioDuration = Number(els.audio && els.audio.duration);
   if (Number.isFinite(audioDuration) && audioDuration > 0) {
+    state.qishuiPlaybackCard.seekHandoffTarget = target;
+    state.qishuiPlaybackCard.seekHandoffStartedAt = performance.now();
     els.audio.currentTime = target;
     state.qishuiPlaybackCard.pendingAudioSeekTarget = null;
   } else if (els.audio?.src) {
     state.qishuiPlaybackCard.pendingAudioSeekTarget = target;
+    state.qishuiPlaybackCard.seekHandoffTarget = target;
+    state.qishuiPlaybackCard.seekHandoffStartedAt = performance.now();
   }
   state.qishuiPlaybackCard.pendingSeekTarget = target;
   if (state.currentSong) state.currentSong = { ...state.currentSong, position: target };
   updatePlayerClock(target, duration, isPlaybackClockRunning());
   updateQishuiPlaybackProgress(target, duration, { forceRange: true });
+  resetLyricFrameSync();
+  syncPlaybackLyricAtTime(target);
   if (!state.localQueueActive) {
     const requestId = state.qishuiPlaybackCard.seekRequestId + 1;
     state.qishuiPlaybackCard.seekRequestId = requestId;
@@ -14169,7 +18015,7 @@ async function commitQishuiPlaybackSeek() {
   return true;
 }
 
-function updateQishuiPlaybackPlayState(playing = !els.audio.paused && !!els.audio.src) {
+function updateQishuiPlaybackPlayState(playing = isPlaybackClockRunning()) {
   if (!els.qishuiPlaybackPlayButton) return;
   const enabled = !!playbackCardSong();
   if (els.qishuiPlaybackPreviousButton) els.qishuiPlaybackPreviousButton.disabled = !enabled;
@@ -14185,7 +18031,10 @@ function renderQishuiPlaybackCard(song = state.currentSong) {
   const active = playbackCardSong(song);
   const provider = playbackCardProvider(active);
   const title = safeText(active && active.title, '等待播放');
-  const artist = safeText(active && (active.artist || active.album), provider.label);
+  const artistBase = safeText(active && (active.artist || active.album), provider.label);
+  const artist = active && isGuestSearchMatchedSong(active)
+    ? `${artistBase} · 游客搜索匹配`
+    : artistBase;
   const imageUrl = coverUrl(active);
   if (active && state.playbackVisual.palette) {
     applyQishuiPlaybackPalette(state.playbackVisual.palette);
@@ -14276,6 +18125,8 @@ function syncQishuiPlaybackCard() {
   state.qishuiPlaybackCard.seekPending = false;
   state.qishuiPlaybackCard.pendingSeekTarget = null;
   state.qishuiPlaybackCard.pendingAudioSeekTarget = null;
+  state.qishuiPlaybackCard.seekHandoffTarget = null;
+  state.qishuiPlaybackCard.seekHandoffStartedAt = 0;
   state.qishuiPlaybackCard.seekRequestId += 1;
   state.qishuiPlaybackCard.switchId += 1;
   state.qishuiPlaybackCard.lyricSignature = '';
@@ -14396,6 +18247,8 @@ function switchQishuiPlaybackTrack(direction) {
   state.qishuiPlaybackCard.seekPending = false;
   state.qishuiPlaybackCard.pendingSeekTarget = null;
   state.qishuiPlaybackCard.pendingAudioSeekTarget = null;
+  state.qishuiPlaybackCard.seekHandoffTarget = null;
+  state.qishuiPlaybackCard.seekHandoffStartedAt = 0;
   state.qishuiPlaybackCard.seekRequestId += 1;
   if (els.qishuiPlaybackPhone) {
     clearQishuiPlaybackSwitchClasses();
@@ -14514,7 +18367,7 @@ function enterWallpaperHome() {
   state.sandbox.playbackPresetId = '';
   state.sandbox.playbackKeepBackground = false;
   state.sandbox.playbackPreviewUrl = '';
-  setTextPreset('none');
+  setTextPreset(DEFAULT_TEXT_PRESET, { applyTemplate: false });
   commitDiyPage('wallpaper');
   resetPlaybackView();
   requestOrbFrame();
@@ -14880,7 +18733,7 @@ async function loadPlaylistFromCard(card) {
 
 async function playShelfSong(button) {
   const index = Number(button.dataset.songIndex);
-  const song = state.activePlaylistSongs[index];
+  let song = state.activePlaylistSongs[index];
   if (!song) return;
   if (index !== state.songFocusIndex) {
     setSongFocus(index);
@@ -14902,16 +18755,27 @@ async function playShelfSong(button) {
       }
       return;
     }
+    let playbackQueue = state.activePlaylistSongs;
+    let playbackQueueIndex = index;
+    if (isQishuiMetadataSong(song)) {
+      const matched = await resolveQishuiMetadataViaGuestSearch(song);
+      if (!matched) {
+        throw new Error('未找到可公开播放的游客搜索匹配；未读取或解密汽水受保护音源');
+      }
+      song = matched;
+      playbackQueue = [matched];
+      playbackQueueIndex = 0;
+    }
     await apiJson('/api/player/queue', {
       method: 'POST',
-      body: JSON.stringify({ songs: state.activePlaylistSongs, currentIndex: index })
+      body: JSON.stringify({ songs: playbackQueue, currentIndex: playbackQueueIndex })
     });
-    state.queue = state.activePlaylistSongs;
-    state.queueIndex = index;
+    state.queue = playbackQueue;
+    state.queueIndex = playbackQueueIndex;
     let loaded = await loadSong(song, { silent: true });
     if (!loaded) {
       loaded = await transport('/api/player/next', {
-        maxAttempts: state.activePlaylistSongs.length,
+        maxAttempts: playbackQueue.length,
         autoSkipUnavailable: true,
         unavailableReason: `${safeText(song.title, '当前歌曲')}没有可用音源`
       });
@@ -14956,8 +18820,15 @@ function playbackLyricSecondaryText(line, song = state.currentSong) {
   return playbackLyricSubtitle(song);
 }
 
+const LYRIC_TIME_PATTERN = /^(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?$/;
+const LYRIC_INLINE_MARKER_PATTERN = /<(\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?)>/g;
+const LYRIC_LRC_TIMESTAMP_PATTERN = /\[([0-9:.]+)\]/g;
+const LYRIC_LRC_TAG_PATTERN = /\[[^\]]+\]/g;
+const LYRIC_KARAOKE_LINE_PATTERN = /^\[(\d+)\s*,\s*(\d+)\](.*)$/;
+const LYRIC_KARAOKE_TOKEN_PATTERN = /(?:\((\d+)\s*,\s*(\d+)(?:\s*,\s*[^)]*)?\)|<(\d+)\s*,\s*(\d+)(?:\s*,\s*[^>]*)?>)([^()<]*)/g;
+
 function parseLyricTime(raw) {
-  const match = /^(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?$/.exec(raw.trim());
+  const match = LYRIC_TIME_PATTERN.exec(raw.trim());
   if (!match) return Number.NaN;
   const minutes = Number(match[1]);
   const seconds = Number(match[2]);
@@ -15009,13 +18880,32 @@ function glyphTimingsFromWordTimings(wordTimings, lineEndTime = Number.NaN) {
     .filter(Boolean);
 }
 
+function normalizeGlyphTimeline(glyphTimings) {
+  return (Array.isArray(glyphTimings) ? glyphTimings : [])
+    .map((timing) => {
+      const start = Number(timing && (timing.start ?? timing.startTime));
+      const explicitEnd = Number(timing && timing.end);
+      const duration = Number(timing && timing.duration);
+      const end = Number.isFinite(explicitEnd)
+        ? explicitEnd
+        : Number.isFinite(duration) && duration > 0
+        ? start + duration
+        : Number.NaN;
+      return Number.isFinite(start) && Number.isFinite(end) && end > start
+        ? { ...timing, start, end }
+        : null;
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.start - right.start);
+}
+
 function parseInlineLrcLyric(rawText, trackId = LYRIC_TRACK_MAIN) {
   const source = String(rawText || '');
   const wordTimings = [];
   let text = '';
   let cursor = 0;
   let currentStart = Number.NaN;
-  const markerPattern = /<(\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?)>/g;
+  LYRIC_INLINE_MARKER_PATTERN.lastIndex = 0;
   let markerMatch;
 
   const appendChunk = (chunk) => {
@@ -15032,10 +18922,10 @@ function parseInlineLrcLyric(rawText, trackId = LYRIC_TRACK_MAIN) {
     });
   };
 
-  while ((markerMatch = markerPattern.exec(source))) {
+  while ((markerMatch = LYRIC_INLINE_MARKER_PATTERN.exec(source))) {
     appendChunk(source.slice(cursor, markerMatch.index));
     currentStart = parseLyricTime(markerMatch[1]);
-    cursor = markerPattern.lastIndex;
+    cursor = LYRIC_INLINE_MARKER_PATTERN.lastIndex;
   }
   appendChunk(source.slice(cursor));
 
@@ -15048,7 +18938,7 @@ function parseInlineLrcLyric(rawText, trackId = LYRIC_TRACK_MAIN) {
 }
 
 function normalizeParsedLyricLines(lines) {
-  return (Array.isArray(lines) ? lines : [])
+  const merged = (Array.isArray(lines) ? lines : [])
     .filter((line) => line && Number.isFinite(Number(line.time)) && safeText(line.text, '').trim())
     .sort((a, b) => Number(a.time) - Number(b.time))
     .reduce((result, line) => {
@@ -15067,6 +18957,10 @@ function normalizeParsedLyricLines(lines) {
       result.push({ ...line });
       return result;
     }, []);
+  return merged.map((line) => ({
+    ...line,
+    glyphTimings: normalizeGlyphTimeline(line.glyphTimings)
+  }));
 }
 
 function completeLineWordTimings(lines) {
@@ -15089,14 +18983,14 @@ function parseLrc(text, trackId = LYRIC_TRACK_MAIN) {
   if (!text || typeof text !== 'string') return [];
   const lines = [];
   text.split(/\r?\n/).forEach((rawLine) => {
-    const stamps = Array.from(rawLine.matchAll(/\[([0-9:.]+)\]/g));
+    const stamps = Array.from(rawLine.matchAll(LYRIC_LRC_TIMESTAMP_PATTERN));
     if (!stamps.length) return;
     const times = stamps
       .map((stamp) => parseLyricTime(stamp[1]))
       .filter((time) => Number.isFinite(time));
     const time = times[times.length - 1];
     if (!Number.isFinite(time)) return;
-    const parsed = parseInlineLrcLyric(rawLine.replace(/\[[^\]]+\]/g, ''), trackId);
+    const parsed = parseInlineLrcLyric(rawLine.replace(LYRIC_LRC_TAG_PATTERN, ''), trackId);
     if (!parsed.text || isLyricCreditLine(parsed.text)) return;
     lines.push({
       time,
@@ -15142,15 +19036,15 @@ function parseKaraokeLyric(text, trackId = LYRIC_TRACK_MAIN) {
   if (!text || typeof text !== 'string') return [];
   const lines = [];
   text.split(/\r?\n/).forEach((rawLine) => {
-    const lineMatch = /^\[(\d+)\s*,\s*(\d+)\](.*)$/.exec(rawLine.trim());
+    const lineMatch = LYRIC_KARAOKE_LINE_PATTERN.exec(rawLine.trim());
     if (!lineMatch) return;
     const lineStartMs = Number(lineMatch[1]);
     const lineDurationMs = Number(lineMatch[2]);
     if (!Number.isFinite(lineStartMs) || !Number.isFinite(lineDurationMs)) return;
     const tokens = [];
-    const tokenPattern = /(?:\((\d+)\s*,\s*(\d+)(?:\s*,\s*[^)]*)?\)|<(\d+)\s*,\s*(\d+)(?:\s*,\s*[^>]*)?>)([^()<]*)/g;
+    LYRIC_KARAOKE_TOKEN_PATTERN.lastIndex = 0;
     let tokenMatch;
-    while ((tokenMatch = tokenPattern.exec(lineMatch[3] || ''))) {
+    while ((tokenMatch = LYRIC_KARAOKE_TOKEN_PATTERN.exec(lineMatch[3] || ''))) {
       const rawTokenStartMs = Number(tokenMatch[1] || tokenMatch[3]);
       const tokenDurationMs = Number(tokenMatch[2] || tokenMatch[4]);
       const tokenText = tokenMatch[5] || '';
@@ -15332,7 +19226,6 @@ const LYRIC_AUTO_LINE_MIN_DURATION_SECONDS = 1.15;
 const LYRIC_AUTO_LINE_MAX_DURATION_SECONDS = 7.25;
 const LYRIC_AUTO_LINE_MIN_GAP_SECONDS = 4.75;
 const LYRIC_AUTO_LINE_TAIL_SECONDS = 0.12;
-const LYRIC_AUTO_LINE_FAST_PROGRESS = 0.86;
 
 function isCjkLyricGlyph(glyph) {
   const code = glyph && glyph.codePointAt ? glyph.codePointAt(0) : 0;
@@ -15520,106 +19413,10 @@ function autoDetectLyricSpeed(lines, song = state.currentSong) {
   return autoFitPlainLyricLinePacing(lines.map((line) => scaleLyricLineTiming(line, anchorTime, scale)), song);
 }
 
-function playbackGlyphRenderMode() {
-  if (state.textPreset === 'book') return '';
-  if (state.textPreset === 'depth') return isRainGlassPreset() ? 'rain-glass' : 'depth';
-  if (state.textPreset === 'book-effect') return 'book-effect';
-  return '';
-}
-
-function appendPlaybackLyricGlyphs(target, text, options = {}) {
-  const wordGlow = !!options.wordGlow;
-  const tokens = wordGlow
-    ? String(text || '').match(/\r|\n|\s+|[A-Za-z0-9]+(?:['\u2019-][A-Za-z0-9]+)*|[^\sA-Za-z0-9]/gu) || []
-    : Array.from(text);
-  let glyphIndex = 0;
-  tokens.forEach((glyph) => {
-    if (glyph === '\r') return;
-    if (glyph === '\n') {
-      target.appendChild(document.createElement('br'));
-      return;
-    }
-    const span = document.createElement('span');
-    const isSpace = !glyph.trim();
-    span.className = isSpace
-      ? 'playback-lyric-glyph playback-lyric-glyph--space'
-      : `playback-lyric-glyph${wordGlow ? ' playback-lyric-glyph--word' : ''}`;
-    span.textContent = glyph;
-    if (!isSpace) {
-      span.dataset.playbackGlyphIndex = String(glyphIndex);
-      span.__playbackGlyphIndex = glyphIndex;
-      span.style.setProperty('--lyric-glyph-glow-size', `${(1.65 + (glyphIndex % 5) * 0.32).toFixed(2)}px`);
-      span.style.setProperty('--lyric-glyph-drift', `${(((glyphIndex % 7) - 3) * 0.22).toFixed(2)}px`);
-      glyphIndex += 1;
-    }
-    target.appendChild(span);
-  });
-}
-
-function resetPlaybackGlyphCache() {
-  state.lyricPlaybackGlyphs = [];
-  state.lyricPlaybackGlyphCount = 0;
-}
-
-function cachePlaybackGlyphs(layer) {
-  if (!layer) {
-    resetPlaybackGlyphCache();
-    return;
-  }
-  const glyphs = Array.from(layer.querySelectorAll('.playback-lyric-glyph:not(.playback-lyric-glyph--space)'));
-  glyphs.forEach((glyph, fallbackIndex) => {
-    if (!Number.isFinite(glyph.__playbackGlyphIndex)) {
-      const index = Number(glyph.dataset.playbackGlyphIndex);
-      glyph.__playbackGlyphIndex = Number.isFinite(index) ? index : fallbackIndex;
-    }
-  });
-  state.lyricPlaybackGlyphs = glyphs;
-  state.lyricPlaybackGlyphCount = glyphs.length;
-}
-
-function setPlaybackLayerText(layer, text, useGlyphs, glyphRenderMode = '') {
+function setPlaybackLayerText(layer, text) {
   clearElement(layer);
-  if (useGlyphs) {
-    appendPlaybackLyricGlyphs(layer, text, { wordGlow: glyphRenderMode === 'book-effect' });
-  } else {
-    layer.textContent = text;
-  }
-  if (layer === els.playbackLyricText) {
-    if (useGlyphs) cachePlaybackGlyphs(layer);
-    else resetPlaybackGlyphCache();
-  }
+  layer.textContent = text;
   layer.setAttribute('data-text', text);
-}
-
-function updatePlaybackLyricGlyphProgress(progressPercent) {
-  if (!els.playbackLyricText) return;
-  let glyphs = state.lyricPlaybackGlyphs;
-  if (!Array.isArray(glyphs) || glyphs.length !== state.lyricPlaybackGlyphCount) {
-    cachePlaybackGlyphs(els.playbackLyricText);
-    glyphs = state.lyricPlaybackGlyphs;
-  }
-  if (!glyphs.length) return;
-  const head = clamp((Number(progressPercent) || 0) / 100, 0, 1) * glyphs.length;
-  glyphs.forEach((glyph, fallbackIndex) => {
-    const glyphIndex = Number.isFinite(glyph.__playbackGlyphIndex) ? glyph.__playbackGlyphIndex : fallbackIndex;
-    const hot = bookGlyphEase(head - glyphIndex);
-    const roll = bookGlyphEase(1 - Math.abs(head - (glyphIndex + 0.5)) / 1.35);
-    const hotValue = hot.toFixed(4);
-    const rollValue = roll.toFixed(4);
-    const alphaValue = (0.68 + hot * 0.32).toFixed(4);
-    const hotGlowValue = Math.min(0.56, hot * 0.56).toFixed(4);
-    const blurValue = state.lyricGlyphRenderMode === 'book-effect'
-      ? `${Math.max(0, 1.9 - hot * 1.9).toFixed(2)}px`
-      : '0px';
-    const signature = `${hotValue}|${rollValue}|${alphaValue}|${hotGlowValue}|${blurValue}`;
-    if (glyph.__playbackGlyphSignature === signature) return;
-    glyph.__playbackGlyphSignature = signature;
-    glyph.style.setProperty('--lyric-glyph-hot', hotValue);
-    glyph.style.setProperty('--lyric-glyph-roll', rollValue);
-    glyph.style.setProperty('--lyric-glyph-alpha', alphaValue);
-    glyph.style.setProperty('--lyric-glyph-hot-glow', hotGlowValue);
-    glyph.style.setProperty('--lyric-glyph-blur', blurValue);
-  });
 }
 
 function triggerFocusEchoTransition() {
@@ -15638,20 +19435,118 @@ function triggerFocusEchoTransition() {
   });
 }
 
+function animateLyricGeometryFlip(element, previousRect, options = {}) {
+  if (!element || reducedMotion || typeof element.animate !== 'function') return null;
+  const nextRect = element.getBoundingClientRect();
+  if (!nextRect.width || !nextRect.height) return null;
+  const before = previousRect && Number.isFinite(previousRect.top)
+    ? previousRect
+    : nextRect;
+  const deltaX = before.left - nextRect.left;
+  const deltaY = before.top - nextRect.top;
+  const scaleX = clamp(before.width / nextRect.width, 0.5, 1.6);
+  const scaleY = clamp(before.height / nextRect.height, 0.5, 1.6);
+  const geometryChanged = Math.abs(deltaX) > 0.35
+    || Math.abs(deltaY) > 0.35
+    || Math.abs(scaleX - 1) > 0.01
+    || Math.abs(scaleY - 1) > 0.01;
+  if (!geometryChanged && options.contentChanged !== true) return null;
+
+  const enterY = geometryChanged ? deltaY : Number(options.enterY) || 5;
+  const animation = element.animate([
+    {
+      translate: `${deltaX.toFixed(2)}px ${enterY.toFixed(2)}px`,
+      scale: `${scaleX.toFixed(4)} ${scaleY.toFixed(4)}`,
+      opacity: options.fade === false ? 1 : 0.58
+    },
+    {
+      translate: '0px 0px',
+      scale: '1 1',
+      opacity: 1
+    }
+  ], {
+    duration: clamp(Number(options.duration) || 260, 120, 520),
+    easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+    fill: 'none'
+  });
+  element.__lyricGeometryFlip?.cancel?.();
+  element.__lyricGeometryFlip = animation;
+  animation.onfinish = () => {
+    if (element.__lyricGeometryFlip === animation) element.__lyricGeometryFlip = null;
+  };
+  animation.oncancel = animation.onfinish;
+  return animation;
+}
+
+function cancelPlaybackLyricGeometryFlips() {
+  els.playbackLyricText?.__lyricGeometryFlip?.cancel?.();
+  els.playbackLyricSubtitle?.__lyricGeometryFlip?.cancel?.();
+}
+
+function syncPlaybackLyricSubtitleLayout() {
+  if (!els.playbackLyricRig || !els.playbackLyricText || !els.playbackLyricSubtitle) return;
+  if (state.textPreset === 'book') {
+    els.playbackLyricSubtitle.style.removeProperty('top');
+    els.playbackLyricSubtitle.style.removeProperty('left');
+    return;
+  }
+  // Main lyric and translation are children of the same 3D core. Keep their
+  // alignment in that local coordinate system so rotating the parent moves
+  // both as one rigid object. Screen-space rect compensation here would fight
+  // the parent's transform on every pointer frame and make the subtitle jump.
+  if (els.playbackLyricSubtitle.style.left) {
+    els.playbackLyricSubtitle.style.removeProperty('left');
+  }
+  const mainTop = Number(els.playbackLyricText.offsetTop) || 0;
+  const mainHeight = Number(els.playbackLyricText.offsetHeight) || 0;
+  if (!mainHeight) return;
+  const translationGap = normalizeTextComposerSettings(state.textComposerSettings).translationGap;
+  const subtitleTop = `${(mainTop + mainHeight + translationGap).toFixed(2)}px`;
+  if (els.playbackLyricSubtitle.style.top !== subtitleTop) {
+    els.playbackLyricSubtitle.style.top = subtitleTop;
+  }
+}
+
 function setPlaybackLyricLine(text, subtitle, progress = 0, currentTime = Number.NaN) {
   const line = safeText(text, playbackLyricText());
   const nextSubtitle = safeText(subtitle, playbackLyricSubtitle());
   const progressPercent = clamp(progress, 0, 1) * 100;
-  const glyphRenderMode = playbackGlyphRenderMode();
-  const lineChanged = line !== state.lyricDisplayText || glyphRenderMode !== state.lyricGlyphRenderMode;
+  const lineChanged = line !== state.lyricDisplayText;
   const subtitleChanged = nextSubtitle !== state.lyricSubtitleText;
+  if (!textLyricsEnabled()) {
+    state.lyricDisplayText = line;
+    state.lyricSubtitleText = nextSubtitle;
+    state.lyricProgressPercent = progressPercent;
+    if (playbackCardLyricsVisible()) {
+      updateQishuiPlaybackLyrics(line, nextSubtitle, currentPlaybackLyricTime());
+    }
+    return;
+  }
+  const seekPreviewActive = state.qishuiPlaybackCard.progressDragging;
+  const lyricTransformActive = !!(
+    state.textPresetGesture?.dragging
+    || state.textPresetGesture?.pending
+    || state.chladniTextTransform?.dragging
+    || state.bookEffectTransform?.dragging
+    || state.bookEffectTransform?.pending
+    || state.playbackVisual?.dragging
+  );
+  const rigidLyricMotionActive = seekPreviewActive || lyricTransformActive;
+  if (rigidLyricMotionActive) {
+    cancelPlaybackLyricGeometryFlips();
+  }
+  const previousMainRect = lineChanged && !rigidLyricMotionActive
+    ? els.playbackLyricText?.getBoundingClientRect()
+    : null;
+  const previousSubtitleRect = (lineChanged || subtitleChanged) && !rigidLyricMotionActive
+    ? els.playbackLyricSubtitle?.getBoundingClientRect()
+    : null;
 
   if (lineChanged) {
     els.playbackLyricScene.querySelectorAll('.playback-lyric-layer').forEach((layer) => {
-      setPlaybackLayerText(layer, line, glyphRenderMode && layer === els.playbackLyricText, glyphRenderMode);
+      setPlaybackLayerText(layer, line);
     });
     state.lyricDisplayText = line;
-    state.lyricGlyphRenderMode = glyphRenderMode;
     if (state.textPreset === 'focus-echo') triggerFocusEchoTransition();
   }
 
@@ -15662,31 +19557,98 @@ function setPlaybackLyricLine(text, subtitle, progress = 0, currentTime = Number
   if (els.playbackLyricSubtitle.dataset.text !== nextSubtitle) {
     els.playbackLyricSubtitle.dataset.text = nextSubtitle;
   }
+  if (lineChanged || subtitleChanged) syncGlitchTextLayers(line);
+  if (lineChanged || subtitleChanged) {
+    syncPlaybackLyricSubtitleLayout();
+    if (lineChanged && !rigidLyricMotionActive) {
+      animateLyricGeometryFlip(els.playbackLyricText, previousMainRect, {
+        contentChanged: true,
+        enterY: 7,
+        duration: 280
+      });
+    }
+    if (!rigidLyricMotionActive) {
+      animateLyricGeometryFlip(els.playbackLyricSubtitle, previousSubtitleRect, {
+        contentChanged: subtitleChanged,
+        enterY: 6,
+        duration: 300
+      });
+    }
+  }
   updateBookLyricArtist(playbackLyricSubtitle());
 
   if (Math.abs(progressPercent - state.lyricProgressPercent) >= 0.01) {
     els.playbackLyricScene.style.setProperty('--lyric-line-progress', `${progressPercent.toFixed(2)}%`);
     state.lyricProgressPercent = progressPercent;
   }
-  if (glyphRenderMode) updatePlaybackLyricGlyphProgress(progressPercent);
 
   if (state.textPreset === 'flow') syncBlurLyricComponent(line);
   if (state.textPreset === 'book') updateBookLyricLines(progressPercent, currentTime);
   if (state.multiRowLyricsEnabled) renderMultiRowLyrics();
   if (playbackCardLyricsVisible()) {
-    updateQishuiPlaybackLyrics(line, nextSubtitle, currentTime);
+    // The playback-card renderer applies lyricTimelineTime itself. Feed it the
+    // authoritative media clock so latency/offset calibration is applied once.
+    updateQishuiPlaybackLyrics(line, nextSubtitle, currentPlaybackLyricTime());
   }
   if (lineChanged || subtitleChanged) scheduleDesktopSceneSnapshot();
 }
 
+function lyricClockOffsetSeconds() {
+  return normalizeLyricClockOffsetSeconds(state.lyricClockOffsetSeconds);
+}
+
+function lyricAudioOutputLatencySeconds() {
+  const spatial = state.obrSpatialAudio;
+  const nativeGraph = spatial?.graph;
+  if (
+    spatial?.enabled === true
+    && nativeGraph?.nativeStream === true
+    && nativeGraph.disposed !== true
+  ) {
+    return clamp(
+      Number(nativeGraph.nativeOutputLatencySeconds)
+        || Number(spatial.nativeOutputLatencySeconds)
+        || 0,
+      0,
+      LYRIC_AUDIO_OUTPUT_LATENCY_MAX_SECONDS
+    );
+  }
+  const analysis = state.audioAnalysis;
+  const context = analysis?.context;
+  if (
+    !context
+    || context.state === 'closed'
+    || analysis.sourceMode !== 'media'
+    || analysis.outputConnected !== true
+  ) {
+    return 0;
+  }
+  const baseLatency = Math.max(0, Number(context.baseLatency) || 0);
+  const outputLatency = Math.max(0, Number(context.outputLatency) || 0);
+  return clamp(
+    baseLatency + outputLatency,
+    0,
+    LYRIC_AUDIO_OUTPUT_LATENCY_MAX_SECONDS
+  );
+}
+
 function lyricTimelineTime(currentTime, visualLead = 0) {
-  return Math.max(0, Number(currentTime) + Number(visualLead) - LYRIC_TIMESTAMP_COMPENSATION_SECONDS);
+  const mediaTime = Number(currentTime);
+  const lead = Number(visualLead);
+  return Math.max(
+    0,
+    (Number.isFinite(mediaTime) ? mediaTime : 0)
+      + (Number.isFinite(lead) ? lead : 0)
+      - LYRIC_TIMESTAMP_COMPENSATION_SECONDS
+      - lyricAudioOutputLatencySeconds()
+      + lyricClockOffsetSeconds()
+  );
 }
 
 function findLyricIndexAtTime(lines, currentTime, visualLead = 0) {
   let low = 0;
   let high = lines.length - 1;
-  let found = 0;
+  let found = -1;
   const time = lyricTimelineTime(currentTime, visualLead);
   while (low <= high) {
     const mid = Math.floor((low + high) / 2);
@@ -15733,6 +19695,33 @@ function isPlaybackClockRunning() {
 }
 
 function currentPlaybackLyricTime(fallback = 0) {
+  const cardState = state.qishuiPlaybackCard;
+  const previewTarget = cardState.pendingSeekTarget == null
+    ? Number.NaN
+    : Number(cardState.pendingSeekTarget);
+  if (cardState.progressDragging && Number.isFinite(previewTarget)) {
+    return Math.max(0, previewTarget);
+  }
+  const handoffTarget = cardState.seekHandoffTarget == null
+    ? Number.NaN
+    : Number(cardState.seekHandoffTarget);
+  if (Number.isFinite(handoffTarget)) {
+    const audioTime = Number(els.audio?.currentTime);
+    const handoffAge = performance.now() - (Number(cardState.seekHandoffStartedAt) || 0);
+    if (
+      Number.isFinite(audioTime)
+      && Math.abs(audioTime - handoffTarget) <= QISHUI_SEEK_HANDOFF_TOLERANCE_SECONDS
+    ) {
+      cardState.seekHandoffTarget = null;
+      cardState.seekHandoffStartedAt = 0;
+      return Math.max(0, audioTime);
+    }
+    if (els.audio?.src && handoffAge <= QISHUI_SEEK_HANDOFF_MAX_MS) {
+      return Math.max(0, handoffTarget);
+    }
+    cardState.seekHandoffTarget = null;
+    cardState.seekHandoffStartedAt = 0;
+  }
   if (els.audio && els.audio.src && Number.isFinite(els.audio.currentTime)) {
     return Math.max(0, els.audio.currentTime);
   }
@@ -15778,13 +19767,27 @@ function lyricProgressForLineAtTime(line, displayTime, endTime, options = {}) {
   if (!Number.isFinite(start) || !Number.isFinite(stop) || stop <= start) return 1;
   const linear = clamp((displayTime - start) / (stop - start), 0, 1);
   if (options.linear) return linear;
+  const glyphTimings = Array.isArray(line && line.glyphTimings)
+    ? line.glyphTimings
+    : [];
+  if (glyphTimings.length) {
+    const glyphCount = glyphTimings.length;
+    for (let index = 0; index < glyphCount; index += 1) {
+      const timing = glyphTimings[index];
+      if (displayTime < timing.start) return index / glyphCount;
+      if (displayTime <= timing.end) {
+        const glyphProgress = bookGlyphEase((displayTime - timing.start) / (timing.end - timing.start));
+        return (index + glyphProgress) / glyphCount;
+      }
+    }
+    return 1;
+  }
   const autoVocalEnd = Number(line && line.autoVocalEndTime);
   if (!Number.isFinite(autoVocalEnd) || autoVocalEnd <= start || autoVocalEnd >= stop) return linear;
   if (displayTime <= autoVocalEnd) {
-    return bookGlyphEase((displayTime - start) / (autoVocalEnd - start)) * LYRIC_AUTO_LINE_FAST_PROGRESS;
+    return bookGlyphEase((displayTime - start) / (autoVocalEnd - start));
   }
-  const tailProgress = bookGlyphEase((displayTime - autoVocalEnd) / (stop - autoVocalEnd));
-  return LYRIC_AUTO_LINE_FAST_PROGRESS + (1 - LYRIC_AUTO_LINE_FAST_PROGRESS) * tailProgress;
+  return 1;
 }
 
 function bookLyricProgressEndTime(line, fallbackEndTime) {
@@ -15809,6 +19812,12 @@ function updatePlaybackLyricAtTime(currentTime = els.audio.currentTime || 0, vis
   const displayTime = lyricTimelineTime(currentTime, visualLead);
   const index = findLyricIndexAtTime(lines, currentTime, visualLead);
 
+  if (index < 0) {
+    if (state.lyricIndex !== -1) state.lyricIndex = -1;
+    setPlaybackLyricLine(playbackLyricText(), playbackLyricSubtitle(), 0, displayTime);
+    return;
+  }
+
   const line = lines[index];
   const nextLine = lines[index + 1];
   const timedEnd = Number(line.endTime);
@@ -15825,7 +19834,8 @@ function updatePlaybackLyricAtTime(currentTime = els.audio.currentTime || 0, vis
 
 function lyricSignatureForSong(song = state.currentSong) {
   const id = safeText(song && song.id, '');
-  return id ? `${id}|${safeText(song && song.title, '')}` : '';
+  const provider = playbackQualityProvider(song);
+  return id ? `${provider}|${id}|${safeText(song && song.title, '')}` : '';
 }
 
 function clearLyricRetryTimer() {
@@ -15895,7 +19905,14 @@ async function loadPlaybackLyrics(song = state.currentSong) {
   setPlaybackLyricLine(playbackLyricText(song), playbackLyricSubtitle(song), 0);
 
   try {
-    const payload = await apiJson(`/api/netease/lyric?${query({ id })}`);
+    const provider = playbackQualityProvider(song);
+    const payload = await apiJson(`/api/lyric?${query({
+      provider,
+      id,
+      title: safeText(song && song.title, ''),
+      artist: safeText(song && song.artist, ''),
+      duration: Math.max(0, Math.round(Number(song && song.duration) || 0))
+    })}`);
     if (signature !== state.lyricSignature) return;
     const parsed = autoDetectLyricSpeed(parseLyricPayload(payload), song);
     state.lyricLines = parsed.length ? parsed : [];
@@ -15971,7 +19988,9 @@ function setPlaybackLyricVisible(visible) {
 }
 
 function textLyricsEnabled(preset = state.textPreset) {
-  return preset !== 'none';
+  if (preset === 'book') return true;
+  return preset !== 'none'
+    && state.textComposerSettings?.lyricsEnabled !== false;
 }
 
 function syncPlaybackLyricVisibility() {
@@ -15989,8 +20008,17 @@ function syncPlaybackLyricVisibility() {
 function updatePlaybackSceneTransform() {
   if (!els.playbackLyricScene) return;
   if (textLyricsEnabled()) {
-    setStylePropertyIfChanged(els.playbackLyricScene, '--scene-rotate-x', `${state.playbackVisual.pitch}rad`);
-    setStylePropertyIfChanged(els.playbackLyricScene, '--scene-rotate-y', `${state.playbackVisual.yaw}rad`);
+    updateLyricRasterScale();
+    setStylePropertyIfChanged(
+      els.playbackLyricScene,
+      '--scene-rotate-x',
+      `${state.playbackVisual.pitch}rad`
+    );
+    setStylePropertyIfChanged(
+      els.playbackLyricScene,
+      '--scene-rotate-y',
+      `${state.playbackVisual.yaw}rad`
+    );
     setStylePropertyIfChanged(els.playbackLyricScene, '--playback-zoom', (state.playbackVisual.zoom || 1).toFixed(3));
   }
   if (coverParticlePresetVisible()) {
@@ -15998,11 +20026,13 @@ function updatePlaybackSceneTransform() {
     setStylePropertyIfChanged(els.coverParticleScene, '--scene-rotate-y', `${state.playbackVisual.yaw}rad`);
     setStylePropertyIfChanged(els.coverParticleScene, '--playback-zoom', (state.playbackVisual.zoom || 1).toFixed(3));
   }
+  syncSandboxPlaybackCameraToView();
   syncShelfRotationToPlaybackView();
 }
 
 function selectableTextPreset(preset) {
-  return ['none', 'depth', 'flow', 'book-effect', 'focus-echo'].includes(preset) ? preset : 'depth';
+  if (preset === 'book') return 'book';
+  return ['depth', 'focus-echo'].includes(preset) ? preset : DEFAULT_TEXT_PRESET;
 }
 
 function textPresetButtons() {
@@ -16017,10 +20047,8 @@ function syncTextPresetButtons() {
     button.classList.toggle('is-active', active);
     button.disabled = locked;
     button.setAttribute('aria-disabled', String(locked));
+    button.setAttribute('aria-pressed', String(active));
     button.classList.toggle('is-disabled', locked);
-  });
-  document.querySelectorAll('[data-inline-text-presets]').forEach((group) => {
-    group.hidden = locked;
   });
 }
 
@@ -16028,10 +20056,376 @@ function updateTextPresetAvailability() {
   syncTextPresetButtons();
 }
 
+function textComposerTemplateSettings(preset = state.textPreset, options = {}) {
+  const template = TEXT_COMPOSER_TEMPLATE_SETTINGS[preset] || DEFAULT_TEXT_COMPOSER_SETTINGS;
+  if (options.preserveIndependent === false) return normalizeTextComposerSettings(template);
+  const current = normalizeTextComposerSettings(state.textComposerSettings);
+  const independent = [...TEXT_TRANSLATION_SETTING_KEYS, ...TEXT_GLITCH_TUNING_SETTING_KEYS]
+    .reduce((settings, key) => {
+      settings[key] = current[key];
+      return settings;
+    }, {});
+  return normalizeTextComposerSettings({
+    ...template,
+    ...independent,
+    glitchEnabled: preset === 'glitch'
+  });
+}
+
+const TEXT_COMPOSER_SAVE_DEBOUNCE_MS = 140;
+let textComposerSaveTimer = 0;
+
+function saveTextComposerSettings({ immediate = false } = {}) {
+  window.clearTimeout(textComposerSaveTimer);
+  textComposerSaveTimer = 0;
+  const commit = () => {
+    textComposerSaveTimer = 0;
+    try {
+      window.localStorage.setItem(TEXT_COMPOSER_PREFS_KEY, JSON.stringify({
+        version: 1,
+        settings: state.textComposerSettings
+      }));
+    } catch (error) {
+    }
+  };
+  if (immediate) {
+    commit();
+    return;
+  }
+  textComposerSaveTimer = window.setTimeout(commit, TEXT_COMPOSER_SAVE_DEBOUNCE_MS);
+}
+
+function flushTextComposerSettingsSave() {
+  if (!textComposerSaveTimer) return;
+  saveTextComposerSettings({ immediate: true });
+}
+
+function textComposerOutputText(key, value) {
+  if (key === 'layoutMode') {
+    return ({ single: '单排', multi: '多排' })[value] || '单排';
+  }
+  if (key === 'echoLayers') return `${value} 层`;
+  if (key === 'echoSpacing' || key === 'unsungBlur' || key === 'letterSpacing'
+      || key === 'glitchRgbOffset' || key === 'translationGap') {
+    return `${Number(value).toFixed(Number(value) % 1 ? 1 : 0)}px`;
+  }
+  if (key === 'glitchSpeed') return `${Number(value).toFixed(1)}×`;
+  if (key === 'glitchSliceDensity') return `${value} 切片`;
+  if (key === 'glitchBeatDuration') return `${value}ms`;
+  if (key === 'multiRowLineCount') return `${value} 行`;
+  return `${Number(value).toFixed(Number(value) % 1 ? 1 : 0)}%`;
+}
+
+function syncTextComposerControls() {
+  if (!els.textComposerControl) return;
+  let settings = normalizeTextComposerSettings(state.textComposerSettings);
+  const editable = state.textPreset !== 'book';
+  const enabled = editable && textLyricsEnabled();
+  const focusEchoLocked = state.textPreset === 'focus-echo';
+  if (focusEchoLocked && settings.layoutMode !== 'single') {
+    settings = normalizeTextComposerSettings({ ...settings, layoutMode: 'single' });
+  }
+  state.textComposerSettings = settings;
+  const glitchControlsEnabled = enabled && !focusEchoLocked && settings.glitchEnabled;
+  const translationControlsEnabled = enabled && state.bilingualLyricsEnabled !== false;
+  const controls = [
+    ['layoutMode', els.textLayoutMode, els.textLayoutModeValue],
+    ['flowIntensity', els.textFlowIntensity, els.textFlowIntensityValue],
+    ['echoLayers', els.textEchoLayers, els.textEchoLayersValue],
+    ['echoSpacing', els.textEchoSpacing, els.textEchoSpacingValue],
+    ['depth', els.textDepth, els.textDepthValue],
+    ['highlightIntensity', els.textHighlightIntensity, els.textHighlightIntensityValue],
+    ['highlightSoftness', els.textHighlightSoftness, els.textHighlightSoftnessValue],
+    ['gloss', els.textGloss, els.textGlossValue],
+    ['unsungBlur', els.textUnsungBlur, els.textUnsungBlurValue],
+    ['letterSpacing', els.textLetterSpacing, els.textLetterSpacingValue],
+    ['lowBassGlow', els.textLowBassGlow, els.textLowBassGlowValue],
+    ['glitchSpeed', els.textGlitchSpeed, els.textGlitchSpeedValue],
+    ['glitchRgbOffset', els.textGlitchRgbOffset, els.textGlitchRgbOffsetValue],
+    ['glitchSliceDensity', els.textGlitchSliceDensity, els.textGlitchSliceDensityValue],
+    ['glitchBeatSensitivity', els.textGlitchBeatSensitivity, els.textGlitchBeatSensitivityValue],
+    ['glitchBeatDuration', els.textGlitchBeatDuration, els.textGlitchBeatDurationValue],
+    ['multiRowLineCount', els.multiRowLineCount, els.multiRowLineCountValue],
+    ['translationFontSize', els.translationFontSize, els.translationFontSizeValue],
+    ['translationGap', els.translationGap, els.translationGapValue],
+    ['translationOpacity', els.translationOpacity, els.translationOpacityValue]
+  ];
+  const glitchKeys = new Set([
+    'glitchSpeed',
+    'glitchRgbOffset',
+    'glitchSliceDensity',
+    'glitchBeatSensitivity',
+    'glitchBeatDuration'
+  ]);
+  const translationKeys = new Set(['translationFontSize', 'translationGap', 'translationOpacity']);
+  els.textComposerControl.disabled = !editable;
+  els.textComposerControl.classList.toggle('is-disabled', !editable);
+  els.textTranslationSettingsGroup?.classList.toggle('is-disabled', !enabled);
+  els.textAnimationSettingsGroup?.classList.toggle('is-disabled', !editable);
+  els.textColorEffectsGroup?.classList.toggle('is-disabled', !enabled);
+  els.textGlitchControl?.classList.toggle('is-disabled', !glitchControlsEnabled);
+  els.textComposerControl.querySelectorAll('[data-focus-echo-only]').forEach((field) => {
+    field.hidden = !focusEchoLocked;
+  });
+  const multiLayoutOption = Array.from(els.textLayoutMode?.options || [])
+    .find((option) => option.value === 'multi');
+  if (multiLayoutOption) {
+    multiLayoutOption.hidden = focusEchoLocked;
+    multiLayoutOption.disabled = focusEchoLocked;
+  }
+  if (els.textLyricsToggle) {
+    els.textLyricsToggle.checked = settings.lyricsEnabled;
+    els.textLyricsToggle.disabled = !editable;
+    els.textLyricsToggle.setAttribute('aria-checked', String(settings.lyricsEnabled));
+  }
+  if (els.textLyricsValue) {
+    els.textLyricsValue.textContent = settings.lyricsEnabled ? 'ON' : 'OFF';
+  }
+  if (els.textGlitchToggle) {
+    els.textGlitchToggle.checked = settings.glitchEnabled;
+    els.textGlitchToggle.disabled = !enabled || focusEchoLocked;
+    els.textGlitchToggle.setAttribute('aria-checked', String(settings.glitchEnabled));
+  }
+  if (els.textGlitchValue) {
+    els.textGlitchValue.textContent = settings.glitchEnabled ? 'ON' : 'OFF';
+  }
+  controls.forEach(([key, control, output]) => {
+    if (!control) return;
+    const value = settings[key];
+    if (control.value !== String(value)) control.value = String(value);
+    control.disabled = !enabled
+      || (key === 'unsungBlur' && focusEchoLocked)
+      || (glitchKeys.has(key) && !glitchControlsEnabled)
+      || (translationKeys.has(key) && !translationControlsEnabled);
+    control.setAttribute('aria-valuetext', textComposerOutputText(key, value));
+    if (output) output.textContent = textComposerOutputText(key, value);
+    if (control.type === 'range') syncElasticRangeVisual(control);
+  });
+  if (els.textComposerResetButton) els.textComposerResetButton.disabled = !enabled;
+}
+
+function syncGlitchTextElement(element, text, active) {
+  if (!element) return;
+  const normalizedText = safeText(text, element.dataset.text || '');
+  element.dataset.text = normalizedText;
+  element.classList.toggle('is-glitch-text', active);
+  const copies = Array.from(element.children).filter((child) => (
+    child.classList.contains('text-glitch-copy')
+  ));
+  if (!active) {
+    copies.forEach((copy) => copy.remove());
+    return;
+  }
+  ['cyan', 'magenta'].forEach((variant) => {
+    let copy = copies.find((candidate) => candidate.classList.contains(`text-glitch-copy--${variant}`));
+    if (!copy) {
+      copy = document.createElement('span');
+      copy.className = `text-glitch-copy text-glitch-copy--${variant}`;
+      copy.setAttribute('aria-hidden', 'true');
+      element.appendChild(copy);
+    }
+    if (copy.textContent !== normalizedText) copy.textContent = normalizedText;
+    copy.dataset.text = normalizedText;
+  });
+}
+
+function glitchTextEffectActive(settings = state.textComposerSettings || DEFAULT_TEXT_COMPOSER_SETTINGS) {
+  return textLyricsEnabled()
+    && state.textPreset !== 'book'
+    && state.textPreset !== 'focus-echo'
+    && settings.glitchEnabled
+    && !reducedMotion;
+}
+
+function applyGlitchTextCssVars(target, settings) {
+  if (!target) return;
+  const speed = Math.max(0.2, settings.glitchSpeed);
+  setStylePropertyIfChanged(target, '--text-glitch-speed', speed.toFixed(2));
+  setStylePropertyIfChanged(
+    target,
+    '--text-glitch-rgb-offset',
+    `${settings.glitchRgbOffset.toFixed(1)}px`
+  );
+  setStylePropertyIfChanged(target, '--text-glitch-slice-density', String(settings.glitchSliceDensity));
+  const beatDuration = Math.round(settings.glitchBeatDuration / speed);
+  setStylePropertyIfChanged(target, '--text-glitch-beat-duration', `${beatDuration}ms`);
+  setStylePropertyIfChanged(target, '--text-glitch-cyan-duration', `${beatDuration}ms`);
+  setStylePropertyIfChanged(target, '--text-glitch-magenta-duration', `${Math.round(beatDuration * 1.08)}ms`);
+}
+
+function syncGlitchTextLayers(text = state.lyricDisplayText) {
+  const settings = normalizeTextComposerSettings(state.textComposerSettings);
+  const active = glitchTextEffectActive(settings);
+  syncGlitchTextElement(els.playbackLyricText, text, active);
+  syncGlitchTextElement(
+    els.playbackLyricSubtitle,
+    state.lyricSubtitleText || els.playbackLyricSubtitle?.dataset.text || '',
+    active && state.bilingualLyricsEnabled !== false
+  );
+  els.multiRowLyricList?.querySelectorAll('.multi-row-lyric-main').forEach((main) => {
+    const current = main.closest('.multi-row-lyric-line')?.classList.contains('is-current');
+    syncGlitchTextElement(main, main.dataset.text || main.textContent, active && current);
+  });
+  els.multiRowLyricList?.querySelectorAll('.multi-row-lyric-translation').forEach((translation) => {
+    const current = translation.closest('.multi-row-lyric-line')?.classList.contains('is-current');
+    syncGlitchTextElement(
+      translation,
+      translation.dataset.text || translation.textContent,
+      active && current
+    );
+  });
+}
+
+function applyTextComposerSettings({
+  persist = false,
+  persistImmediately = false,
+  renderLyrics = true,
+  measureSubtitle = true,
+  syncGlitch = true
+} = {}) {
+  const settings = normalizeTextComposerSettings(state.textComposerSettings);
+  state.textComposerSettings = settings;
+  const textEnabled = textLyricsEnabled() && state.textPreset !== 'book';
+  const glitchActive = glitchTextEffectActive(settings);
+  const effectiveUnsungBlur = state.textPreset === 'focus-echo' ? 0 : settings.unsungBlur;
+  const multiRow = textEnabled && settings.layoutMode === 'multi';
+  if (state.multiRowLyricsEnabled !== multiRow) {
+    state.multiRowLyricsEnabled = multiRow;
+    state.multiRowLyricSignature = '';
+    saveMultiRowLyricsPreference();
+  }
+
+  if (els.playbackLyricScene) {
+    const scene = els.playbackLyricScene;
+    scene.dataset.textLayout = state.textPreset === 'book' ? 'book-page' : settings.layoutMode;
+    scene.dataset.textEchoLayers = String(settings.echoLayers);
+    scene.dataset.textGlitch = glitchActive ? 'on' : 'off';
+    scene.classList.toggle('has-text-composer-flow', textEnabled && settings.flowIntensity > 0);
+    scene.classList.toggle('has-text-composer-echo', textEnabled && settings.echoLayers > 0);
+    scene.classList.toggle('is-book-effect-text', false);
+    scene.classList.toggle(
+      'is-text-glitch-active',
+      glitchActive
+    );
+    scene.style.setProperty('--text-flow-intensity', (settings.flowIntensity / 100).toFixed(3));
+    scene.style.setProperty('--text-flow-transition-duration', `${150 - settings.flowIntensity}ms`);
+    scene.style.setProperty('--text-echo-spacing', `${settings.echoSpacing.toFixed(1)}px`);
+    scene.style.setProperty('--text-depth-strength', (settings.depth / 100).toFixed(3));
+    scene.style.setProperty('--text-highlight-intensity', (settings.highlightIntensity / 100).toFixed(3));
+    scene.style.setProperty('--text-highlight-softness', `${settings.highlightSoftness.toFixed(2)}%`);
+    scene.style.setProperty('--text-highlight-gloss', (settings.gloss / 100).toFixed(3));
+    scene.style.setProperty('--text-unplayed-blur', `${effectiveUnsungBlur.toFixed(2)}px`);
+    scene.style.setProperty('--text-letter-spacing', `${settings.letterSpacing.toFixed(2)}px`);
+    scene.style.setProperty('--text-bass-spread', (settings.lowBassGlow / 100).toFixed(3));
+    applyGlitchTextCssVars(scene, settings);
+    scene.style.setProperty('--multi-row-line-count', String(settings.multiRowLineCount));
+    scene.style.setProperty('--translation-font-size', `${settings.translationFontSize.toFixed(0)}%`);
+    scene.style.setProperty('--translation-gap', `${settings.translationGap.toFixed(1)}px`);
+    scene.style.setProperty('--translation-opacity', (settings.translationOpacity / 100).toFixed(3));
+    scene.querySelectorAll('.playback-lyric-layer').forEach((layer) => {
+      const match = layer.className.match(/\blyric-depth-(\d)\b/);
+      const layerIndex = match ? Number(match[1]) : 0;
+      const visible = textEnabled
+        && layerIndex > 0
+        && layerIndex <= settings.echoLayers;
+      layer.classList.toggle('is-text-composer-layer-visible', visible);
+      if (layerIndex > 0) {
+        const direction = layerIndex % 2 ? -1 : 1;
+        const depthPixels = settings.depth * 0.52 * layerIndex;
+        layer.style.setProperty('--text-echo-layer-index', String(layerIndex));
+        layer.style.setProperty(
+          '--text-echo-x',
+          `${(direction * settings.echoSpacing * layerIndex * 0.58).toFixed(2)}px`
+        );
+        layer.style.setProperty(
+          '--text-echo-y',
+          `${(settings.echoSpacing * layerIndex * 0.34).toFixed(2)}px`
+        );
+        layer.style.setProperty('--text-echo-z', `${(-depthPixels).toFixed(2)}px`);
+        layer.style.setProperty(
+          '--text-echo-opacity',
+          clamp(0.7 - layerIndex * 0.085, 0.16, 0.62).toFixed(3)
+        );
+        layer.style.setProperty(
+          '--text-echo-blur',
+          `${(effectiveUnsungBlur + layerIndex * 0.8).toFixed(2)}px`
+        );
+      }
+    });
+  }
+  if (els.appShell) {
+    els.appShell.classList.toggle('has-text-glitch-effect', glitchActive);
+    applyGlitchTextCssVars(els.appShell, settings);
+  }
+  applyGlitchTextCssVars(els.textGlitchControl, settings);
+  if (syncGlitch) syncGlitchTextLayers();
+  syncTextComposerControls();
+  syncMultiRowLyricsControl();
+  if (renderLyrics) renderMultiRowLyrics(true);
+  if (measureSubtitle) syncPlaybackLyricSubtitleLayout();
+  if (persist) saveTextComposerSettings({ immediate: persistImmediately });
+  requestOrbFrame();
+  scheduleDesktopSceneSnapshot();
+}
+
+function shiftPlaybackLyricSubtitleGap(previousGap, nextGap) {
+  if (!els.playbackLyricSubtitle || state.textPreset === 'book') return;
+  const delta = Number(nextGap) - Number(previousGap);
+  const currentTop = Number.parseFloat(els.playbackLyricSubtitle.style.top);
+  if (!Number.isFinite(delta) || !Number.isFinite(currentTop) || Math.abs(delta) < 0.01) return;
+  const previousRect = els.playbackLyricSubtitle.getBoundingClientRect();
+  els.playbackLyricSubtitle.style.top = `${(currentTop + delta).toFixed(2)}px`;
+  animateLyricGeometryFlip(els.playbackLyricSubtitle, previousRect, {
+    fade: false,
+    duration: 220
+  });
+}
+
+function setTextComposerSetting(key, value, options = {}) {
+  if (!Object.prototype.hasOwnProperty.call(DEFAULT_TEXT_COMPOSER_SETTINGS, key)) return;
+  if (key === 'layoutMode' && state.textPreset === 'focus-echo' && value !== 'single') {
+    syncTextComposerControls();
+    return;
+  }
+  const previous = normalizeTextComposerSettings(state.textComposerSettings);
+  const next = normalizeTextComposerSettings({
+    ...previous,
+    [key]: value
+  });
+  if (next[key] === previous[key]) {
+    if (options.commit) {
+      flushTextComposerSettingsSave();
+      if (key === 'translationGap') syncPlaybackLyricSubtitleLayout();
+    }
+    return;
+  }
+  if (key === 'translationGap') {
+    shiftPlaybackLyricSubtitleGap(previous.translationGap, next.translationGap);
+  }
+  state.textComposerSettings = next;
+  const structural = key === 'lyricsEnabled' || key === 'layoutMode' || key === 'multiRowLineCount';
+  applyTextComposerSettings({
+    persist: true,
+    persistImmediately: options.commit === true,
+    renderLyrics: structural,
+    measureSubtitle: key === 'layoutMode' || (key === 'translationGap' && options.commit === true),
+    syncGlitch: key === 'glitchEnabled' || key === 'layoutMode'
+  });
+  if (key === 'lyricsEnabled') syncPlaybackLyricVisibility();
+}
+
+function resetTextComposerSettings() {
+  state.textComposerSettings = textComposerTemplateSettings(DEFAULT_TEXT_PRESET, {
+    preserveIndependent: false
+  });
+  setTextPreset(DEFAULT_TEXT_PRESET, { applyTemplate: false });
+  saveTextComposerSettings({ immediate: true });
+}
+
 function textFontPresetId(preset = state.textPreset) {
   if (TEXT_PALETTE_PRESET_IDS.includes(preset)) return preset;
   if (TEXT_PALETTE_PRESET_IDS.includes(state.lastSelectableTextPreset)) return state.lastSelectableTextPreset;
-  return 'depth';
+  return DEFAULT_TEXT_PRESET;
 }
 
 function textFontOption(fontId = TEXT_FONT_DEFAULT_ID) {
@@ -16202,11 +20596,11 @@ function syncTextFontControls() {
     els.textFontPreview.textContent = textFontPreviewSample(option);
   }
   if (els.textFontStatus) {
-    els.textFontStatus.textContent = enabled ? option.label : '选择文字预设';
+    els.textFontStatus.textContent = enabled ? option.label : '启用歌词后可选择字体';
   }
   if (els.textFontAvailability) {
     if (!enabled) {
-      els.textFontAvailability.textContent = '选择文字预设后可设置独立字体';
+      els.textFontAvailability.textContent = '启用歌词后可设置字体';
     } else if (licenseStatus === 'system') {
       els.textFontAvailability.textContent = '跟随当前设备的系统字体';
     } else if (licenseStatus === 'bundled') {
@@ -16293,7 +20687,7 @@ function syncTextPaletteControls() {
   if (els.textPaletteStatus) {
     els.textPaletteStatus.textContent = enabled
       ? (manual ? preference.color.toUpperCase() : '封面自动')
-      : '选择文字预设';
+      : '启用歌词后可调色';
   }
   if (els.textPaletteAutoButton) {
     els.textPaletteAutoButton.disabled = !enabled;
@@ -16383,6 +20777,50 @@ function setPlaybackLyricPalettePreference(mode, color) {
   requestOrbFrame();
 }
 
+function saveLyricClockOffsetPreference() {
+  try {
+    window.localStorage.setItem(LYRIC_CLOCK_OFFSET_PREFERENCE_KEY, JSON.stringify({
+      version: 1,
+      offsetSeconds: lyricClockOffsetSeconds()
+    }));
+  } catch (error) {
+  }
+}
+
+function lyricClockOffsetLabel(offset = lyricClockOffsetSeconds()) {
+  const normalized = normalizeLyricClockOffsetSeconds(offset);
+  if (Math.abs(normalized) < LYRIC_CLOCK_OFFSET_STEP_SECONDS / 2) return '\u540c\u6b65';
+  const amount = Math.abs(normalized).toFixed(1);
+  return normalized > 0 ? `\u63d0\u524d ${amount}s` : `\u5ef6\u540e ${amount}s`;
+}
+
+function syncLyricClockControls() {
+  const offset = lyricClockOffsetSeconds();
+  const label = lyricClockOffsetLabel(offset);
+  if (els.qishuiPlaybackLyricEarlierButton) {
+    els.qishuiPlaybackLyricEarlierButton.disabled = offset >= LYRIC_CLOCK_OFFSET_MAX_SECONDS;
+    els.qishuiPlaybackLyricEarlierButton.title = `\u6b4c\u8bcd\u63d0\u524d 0.1 \u79d2\uff08\u5f53\u524d${label}\uff09`;
+  }
+  if (els.qishuiPlaybackLyricLaterButton) {
+    els.qishuiPlaybackLyricLaterButton.disabled = offset <= LYRIC_CLOCK_OFFSET_MIN_SECONDS;
+    els.qishuiPlaybackLyricLaterButton.title = `\u6b4c\u8bcd\u5ef6\u540e 0.1 \u79d2\uff08\u5f53\u524d${label}\uff09`;
+  }
+}
+
+function setLyricClockOffsetSeconds(value) {
+  state.lyricClockOffsetSeconds = normalizeLyricClockOffsetSeconds(value);
+  saveLyricClockOffsetPreference();
+  syncLyricClockControls();
+  resetLyricFrameSync();
+  syncPlaybackLyricToCurrentTime();
+  scheduleDesktopSceneSnapshot();
+  requestOrbFrame();
+}
+
+function adjustLyricClockOffsetSeconds(delta) {
+  setLyricClockOffsetSeconds(lyricClockOffsetSeconds() + Number(delta || 0));
+}
+
 function saveBilingualLyricsPreference() {
   try {
     window.localStorage.setItem(BILINGUAL_LYRICS_PREFS_KEY, JSON.stringify({
@@ -16416,6 +20854,7 @@ function setBilingualLyricsEnabled(enabled) {
   state.bilingualLyricsEnabled = !!enabled;
   saveBilingualLyricsPreference();
   syncBilingualLyricsControl();
+  syncTextComposerControls();
   state.lyricBookSignature = '';
   if (state.qishuiPlaybackCard) state.qishuiPlaybackCard.lyricSignature = '';
   syncPlaybackLyricToCurrentTime();
@@ -16442,11 +20881,25 @@ function saveMultiRowLyricsPreference() {
 }
 
 function syncMultiRowLyricsControl() {
+  const focusEchoLocked = state.textPreset === 'focus-echo';
+  if (focusEchoLocked) {
+    state.multiRowLyricsEnabled = false;
+    if (state.textComposerSettings?.layoutMode !== 'single') {
+      state.textComposerSettings = normalizeTextComposerSettings({
+        ...state.textComposerSettings,
+        layoutMode: 'single'
+      });
+    }
+  }
   const enabled = state.multiRowLyricsEnabled === true;
   if (els.qishuiPlaybackMultiRowToggle) {
-    const label = enabled ? '关闭多排歌词' : '开启多排歌词';
+    const label = focusEchoLocked
+      ? '焦点回声仅支持单排歌词'
+      : enabled ? '关闭多排歌词' : '开启多排歌词';
     els.qishuiPlaybackMultiRowToggle.classList.toggle('is-active', enabled);
     els.qishuiPlaybackMultiRowToggle.setAttribute('aria-pressed', String(enabled));
+    els.qishuiPlaybackMultiRowToggle.disabled = focusEchoLocked;
+    els.qishuiPlaybackMultiRowToggle.setAttribute('aria-disabled', String(focusEchoLocked));
     els.qishuiPlaybackMultiRowToggle.setAttribute('aria-label', label);
     els.qishuiPlaybackMultiRowToggle.title = label;
     const glyph = els.qishuiPlaybackMultiRowToggle.querySelector('b');
@@ -16470,31 +20923,61 @@ function multiRowDisplayLines() {
   }];
 }
 
-function createMultiRowLyricLine(line, index, active) {
-  const item = document.createElement('div');
-  item.className = 'multi-row-lyric-line';
+function updateMultiRowLyricLine(item, line, index, active, maxDistance = 4) {
   item.dataset.multiRowLyricIndex = String(index);
   item.classList.toggle('is-past', index < active);
   item.classList.toggle('is-current', index === active);
   item.classList.toggle('is-future', index > active);
-  item.style.setProperty('--multi-row-distance', String(Math.min(4, Math.abs(index - active))));
+  item.style.setProperty(
+    '--multi-row-distance',
+    String(Math.min(maxDistance, Math.abs(index - active)))
+  );
   if (index === active) item.setAttribute('aria-current', 'true');
+  else item.removeAttribute('aria-current');
 
-  const main = document.createElement('span');
-  main.className = 'multi-row-lyric-main';
-  main.textContent = safeText(line?.text, playbackLyricText());
-  item.appendChild(main);
+  let main = item.querySelector('.multi-row-lyric-main');
+  if (!main) {
+    main = document.createElement('span');
+    main.className = 'multi-row-lyric-main';
+    item.appendChild(main);
+  }
+  const mainText = safeText(line?.text, playbackLyricText());
+  if (main.dataset.text !== mainText) main.textContent = mainText;
+  main.dataset.text = mainText;
+  syncGlitchTextElement(main, mainText, index === active && glitchTextEffectActive());
 
   const translation = state.bilingualLyricsEnabled
     ? safeText(line?.translationText, '')
     : '';
   if (translation) {
-    const subtitle = document.createElement('span');
-    subtitle.className = 'multi-row-lyric-translation';
-    subtitle.textContent = translation;
-    item.appendChild(subtitle);
+    let subtitle = item.querySelector('.multi-row-lyric-translation');
+    const previousSubtitleRect = subtitle?.getBoundingClientRect();
+    if (!subtitle) {
+      subtitle = document.createElement('span');
+      subtitle.className = 'multi-row-lyric-translation';
+      item.appendChild(subtitle);
+    }
+    const translationChanged = subtitle.dataset.text !== translation;
+    if (translationChanged) subtitle.textContent = translation;
+    subtitle.dataset.text = translation;
+    syncGlitchTextElement(subtitle, translation, index === active && glitchTextEffectActive());
+    if (translationChanged) {
+      animateLyricGeometryFlip(subtitle, previousSubtitleRect, {
+        contentChanged: true,
+        enterY: 4,
+        duration: 280
+      });
+    }
+  } else {
+    item.querySelector('.multi-row-lyric-translation')?.remove();
   }
   return item;
+}
+
+function createMultiRowLyricLine(line, index, active, maxDistance) {
+  const item = document.createElement('div');
+  item.className = 'multi-row-lyric-line';
+  return updateMultiRowLyricLine(item, line, index, active, maxDistance);
 }
 
 function renderMultiRowLyrics(force = false) {
@@ -16503,16 +20986,59 @@ function renderMultiRowLyrics(force = false) {
   if (!state.multiRowLyricsEnabled || !textLyricsEnabled()) return;
   const lines = multiRowDisplayLines();
   const active = state.lyricLines.length
-    ? clamp(state.lyricIndex, 0, Math.max(0, lines.length - 1))
+    ? clamp(state.lyricIndex, -1, Math.max(0, lines.length - 1))
     : 0;
-  const signature = `${state.lyricSignature}|${active}|${state.bilingualLyricsEnabled ? 1 : 0}|${lines.length}`;
+  const settings = normalizeTextComposerSettings(state.textComposerSettings);
+  const lineCount = settings.multiRowLineCount;
+  const maxDistance = Math.max(2, Math.floor(lineCount / 2));
+  const signature = `${state.lyricSignature}|${active}|${state.bilingualLyricsEnabled ? 1 : 0}|${lines.length}|${lineCount}`;
   if (force || signature !== state.multiRowLyricSignature) {
     state.multiRowLyricSignature = signature;
-    clearElement(els.multiRowLyricList);
-    const start = Math.max(0, Math.min(active - 2, lines.length - 7));
-    const end = Math.min(lines.length, start + 7);
+    const activeCenter = Math.max(0, active);
+    const start = Math.max(
+      0,
+      Math.min(activeCenter - Math.floor(lineCount / 2), lines.length - lineCount)
+    );
+    const end = Math.min(lines.length, start + lineCount);
+    const existing = new Map(Array.from(els.multiRowLyricList.children).map((item) => [
+      Number(item.dataset.multiRowLyricIndex),
+      item
+    ]));
+    const previousTops = new Map(Array.from(existing.entries()).map(([index, item]) => [
+      index,
+      item.getBoundingClientRect().top
+    ]));
+    const retained = new Set();
     for (let index = start; index < end; index += 1) {
-      els.multiRowLyricList.appendChild(createMultiRowLyricLine(lines[index], index, active));
+      const item = existing.get(index)
+        || createMultiRowLyricLine(lines[index], index, active, maxDistance);
+      updateMultiRowLyricLine(item, lines[index], index, active, maxDistance);
+      retained.add(index);
+      els.multiRowLyricList.appendChild(item);
+    }
+    existing.forEach((item, index) => {
+      if (!retained.has(index)) item.remove();
+    });
+
+    const movedItems = [];
+    retained.forEach((index) => {
+      const item = existing.get(index);
+      const previousTop = previousTops.get(index);
+      if (!item || !Number.isFinite(previousTop)) return;
+      const delta = previousTop - item.getBoundingClientRect().top;
+      if (Math.abs(delta) < 0.5) return;
+      item.style.transition = 'none';
+      item.style.setProperty('--multi-row-flip-y', `${delta.toFixed(2)}px`);
+      movedItems.push(item);
+    });
+    if (movedItems.length) {
+      void els.multiRowLyricList.offsetHeight;
+      window.requestAnimationFrame(() => {
+        movedItems.forEach((item) => {
+          item.style.removeProperty('transition');
+          item.style.setProperty('--multi-row-flip-y', '0px');
+        });
+      });
     }
   }
   const current = els.multiRowLyricList.querySelector('.multi-row-lyric-line.is-current');
@@ -16520,11 +21046,41 @@ function renderMultiRowLyrics(force = false) {
 }
 
 function setMultiRowLyricsEnabled(enabled) {
-  state.multiRowLyricsEnabled = !!enabled;
+  if (state.textPreset === 'focus-echo') {
+    state.multiRowLyricsEnabled = false;
+    state.textComposerSettings = normalizeTextComposerSettings({
+      ...state.textComposerSettings,
+      layoutMode: 'single'
+    });
+    saveMultiRowLyricsPreference();
+    syncTextComposerControls();
+    syncMultiRowLyricsControl();
+    renderMultiRowLyrics(true);
+    return false;
+  }
+  const nextEnabled = !!enabled;
+  state.multiRowLyricsEnabled = nextEnabled;
   if (state.multiRowLyricsEnabled && !textLyricsEnabled()) {
     setTextPreset(TEXT_PALETTE_PRESET_IDS.includes(state.lastSelectableTextPreset)
       ? state.lastSelectableTextPreset
-      : 'depth');
+      : DEFAULT_TEXT_PRESET);
+  }
+  if (state.textPreset !== 'book') {
+    const current = normalizeTextComposerSettings(state.textComposerSettings);
+    state.textComposerSettings = normalizeTextComposerSettings({
+      ...current,
+      layoutMode: nextEnabled
+        ? 'multi'
+        : current.layoutMode === 'multi'
+          ? 'single'
+          : current.layoutMode
+    });
+    applyTextComposerSettings({
+      persist: true,
+      persistImmediately: true,
+      renderLyrics: false,
+      measureSubtitle: false
+    });
   }
   saveMultiRowLyricsPreference();
   state.multiRowLyricSignature = '';
@@ -16532,6 +21088,7 @@ function setMultiRowLyricsEnabled(enabled) {
   renderMultiRowLyrics(true);
   scheduleDesktopSceneSnapshot();
   requestOrbFrame();
+  return true;
 }
 
 function updateBookEffectTextTransform() {
@@ -16568,6 +21125,7 @@ function clearBookEffectTextHoldTimer() {
 function beginBookEffectTextGesture(event) {
   const mode = bookEffectTextGestureMode(event);
   if (!mode) return false;
+  cancelPlaybackLyricGeometryFlips();
   const transform = state.bookEffectTransform;
   clearBookEffectTextHoldTimer();
   transform.pending = true;
@@ -16616,6 +21174,7 @@ function endBookEffectTextGesture(event) {
   transform.pointerId = null;
   if (els.stage) els.stage.classList.remove('is-book-effect-adjusting');
   updateBookEffectTextTransform();
+  syncPlaybackLyricSubtitleLayout();
   return true;
 }
 
@@ -16697,7 +21256,8 @@ function updateChladniTextTransform() {
 
 function chladniTextDragTarget() {
   if (!state.playbackPage || !isChladniPreset() || state.textPreset === 'none') return null;
-  return state.textPreset === 'book' ? els.bookLyricStage : els.playbackLyricCore;
+  if (state.textPreset === 'book') return null;
+  return els.playbackLyricCore;
 }
 
 function chladniTextPointInside(event, target = chladniTextDragTarget(), padding = 34) {
@@ -16735,6 +21295,7 @@ function beginChladniTextGesture(event) {
   const target = chladniTextDragTarget();
   const mode = chladniTextGestureMode(event, target);
   if (!mode) return false;
+  cancelPlaybackLyricGeometryFlips();
   const transform = state.chladniTextTransform;
   transform.dragging = true;
   transform.mode = mode;
@@ -16773,6 +21334,7 @@ function endChladniTextGesture(event) {
   transform.mode = 'move';
   transform.pointerId = null;
   updateChladniTextTransform();
+  syncPlaybackLyricSubtitleLayout();
   return true;
 }
 
@@ -16787,10 +21349,31 @@ function scaleChladniTextFromWheel(event) {
 }
 
 function textPresetTransform(preset = state.textPreset) {
-  const id = TEXT_PALETTE_PRESET_IDS.includes(preset) ? preset : 'depth';
+  const id = TEXT_PALETTE_PRESET_IDS.includes(preset) ? preset : DEFAULT_TEXT_PRESET;
   const transform = normalizeTextPresetTransform(state.textPresetTransforms?.[id]);
   state.textPresetTransforms[id] = transform;
   return transform;
+}
+
+function updateLyricRasterScale() {
+  if (!els.playbackLyricScene || state.textPreset === 'book') return;
+  // Sonic camera zoom changes only the 3D terrain framing. Its DOM lyrics keep
+  // an independent layout zoom so moving closer never magnifies their raster.
+  const cameraScale = isSonicTopographyPreset()
+    ? 1
+    : clamp(state.playbackVisual.zoom || 1, 0.58, 2.35);
+  const presetId = TEXT_PALETTE_PRESET_IDS.includes(state.textPreset)
+    ? state.textPreset
+    : DEFAULT_TEXT_PRESET;
+  const userScale = clamp(Number(state.textPresetTransforms?.[presetId]?.scale) || 1, 0.5, 2.5);
+  const rasterScale = cameraScale * userScale;
+  if (Math.abs(rasterScale - state.playbackVisual.lastLyricRasterScale) < 0.0005) return;
+  state.playbackVisual.lastLyricRasterScale = rasterScale;
+  setStylePropertyIfChanged(
+    els.playbackLyricScene,
+    '--lyric-raster-scale',
+    rasterScale.toFixed(3)
+  );
 }
 
 function saveTextPresetTransforms() {
@@ -16806,11 +21389,17 @@ function saveTextPresetTransforms() {
 function updateTextPresetTransform({ persist = false } = {}) {
   if (!els.playbackLyricScene) return;
   const transform = textPresetTransform();
+  els.playbackLyricScene.style.setProperty('--text-preset-x', `${transform.x.toFixed(1)}px`);
+  els.playbackLyricScene.style.setProperty('--text-preset-y', `${transform.y.toFixed(1)}px`);
   els.playbackLyricScene.style.setProperty('--text-preset-rotate-x', `${transform.rotateX.toFixed(2)}deg`);
   els.playbackLyricScene.style.setProperty('--text-preset-rotate-y', `${transform.rotateY.toFixed(2)}deg`);
   els.playbackLyricScene.style.setProperty('--text-preset-rotate-z', `${transform.rotateZ.toFixed(2)}deg`);
   els.playbackLyricScene.style.setProperty('--text-preset-scale', transform.scale.toFixed(3));
-  els.playbackLyricScene.classList.toggle('is-text-preset-adjusting', !!state.textPresetGesture.dragging);
+  updateLyricRasterScale();
+  els.playbackLyricScene.classList.toggle(
+    'is-text-preset-adjusting',
+    !!state.textPresetGesture.dragging || !!state.textPresetGesture.pending
+  );
   if (persist) saveTextPresetTransforms();
   scheduleDesktopSceneSnapshot();
   requestOrbFrame();
@@ -16818,8 +21407,8 @@ function updateTextPresetTransform({ persist = false } = {}) {
 
 function textPresetTargets() {
   if (!state.playbackPage || state.textPreset === 'none') return [];
-  if (state.multiRowLyricsEnabled) return [els.multiRowLyricStage].filter(Boolean);
-  if (state.textPreset === 'book') return [els.bookLyricStage].filter(Boolean);
+  if (state.textPreset === 'book') return [];
+  if (state.multiRowLyricsEnabled) return [els.multiRowLyricList || els.multiRowLyricStage].filter(Boolean);
   return [els.playbackLyricText, els.playbackLyricSubtitle].filter((target) => {
     if (!target) return false;
     const rect = target.getBoundingClientRect();
@@ -16827,10 +21416,16 @@ function textPresetTargets() {
   });
 }
 
-function textPresetPointInside(event, padding = 18) {
+function textPresetHitTest(event, padding = 18) {
   const source = event.target instanceof Element ? event.target : null;
-  if (source?.closest('button, input, select, textarea, a, [role="button"], [role="slider"], #qishuiPlaybackCard')) {
-    return false;
+  const interactive = source?.closest(
+    'button, input, select, textarea, a, [role="button"], [role="slider"], #qishuiPlaybackCard'
+  );
+  const lyricInteraction = interactive?.closest(
+    '#bookLyricPage, #multiRowLyricStage, #playbackLyricRig'
+  );
+  if (interactive && !lyricInteraction) {
+    return null;
   }
   const stageRect = els.stage?.getBoundingClientRect();
   if (stageRect && (
@@ -16838,33 +21433,78 @@ function textPresetPointInside(event, padding = 18) {
     || event.clientX > stageRect.right - 24
     || event.clientY < stageRect.top + 24
     || event.clientY > stageRect.bottom - 24
-  )) return false;
-  return textPresetTargets().some((target) => {
+  )) return null;
+  for (const target of textPresetTargets()) {
     const rect = target.getBoundingClientRect();
-    if (!rect.width || !rect.height) return false;
+    if (!rect.width || !rect.height) continue;
     const scale = Math.max(0.1, Number(textPresetTransform().scale) || 1);
     const stableWidth = Math.max(1, Math.min(rect.width, target.offsetWidth * scale || rect.width));
     const stableHeight = Math.max(1, Math.min(rect.height, target.offsetHeight * scale || rect.height));
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    return event.clientX >= centerX - stableWidth / 2 - padding
+    const left = centerX - stableWidth / 2;
+    const right = centerX + stableWidth / 2;
+    const inside = event.clientX >= left - padding
       && event.clientX <= centerX + stableWidth / 2 + padding
       && event.clientY >= centerY - stableHeight / 2 - padding
       && event.clientY <= centerY + stableHeight / 2 + padding;
-  });
+    if (!inside) continue;
+    const normalizedX = clamp((event.clientX - left) / Math.max(1, right - left), 0, 1);
+    return {
+      target,
+      rect,
+      zone: normalizedX <= 0.28 ? 'head' : normalizedX >= 0.72 ? 'tail' : 'middle'
+    };
+  }
+  return null;
+}
+
+function textPresetPointInside(event, padding = 18) {
+  return !!textPresetHitTest(event, padding);
+}
+
+function clearTextPresetHoldTimer() {
+  const gesture = state.textPresetGesture;
+  if (!gesture.holdTimer) return;
+  window.clearTimeout(gesture.holdTimer);
+  gesture.holdTimer = 0;
 }
 
 function beginTextPresetGesture(event) {
   if (event.shiftKey) return false;
-  if (!textPresetPointInside(event, 12)) return false;
+  const hit = textPresetHitTest(event, 12);
+  if (!hit) return false;
+  cancelPlaybackLyricGeometryFlips();
   const gesture = state.textPresetGesture;
   const transform = textPresetTransform();
-  gesture.dragging = true;
+  clearTextPresetHoldTimer();
+  gesture.dragging = hit.zone !== 'middle';
+  gesture.pending = hit.zone === 'middle';
+  gesture.mode = hit.zone === 'middle' ? 'move-pending' : 'rotate-end';
+  gesture.zone = hit.zone;
   gesture.pointerId = event.pointerId;
   gesture.startX = event.clientX;
   gesture.startY = event.clientY;
+  gesture.lastX = event.clientX;
+  gesture.lastY = event.clientY;
+  gesture.startOffsetX = transform.x;
+  gesture.startOffsetY = transform.y;
   gesture.startRotateX = transform.rotateX;
   gesture.startRotateY = transform.rotateY;
+  gesture.startRotateZ = transform.rotateZ;
+  if (gesture.pending) {
+    gesture.holdTimer = window.setTimeout(() => {
+      gesture.holdTimer = 0;
+      if (!gesture.pending || gesture.pointerId !== event.pointerId) return;
+      gesture.pending = false;
+      gesture.dragging = true;
+      gesture.mode = 'move';
+      gesture.startX = gesture.lastX;
+      gesture.startY = gesture.lastY;
+      if (els.stage) els.stage.classList.add('is-text-preset-adjusting', 'is-text-preset-moving');
+      updateTextPresetTransform();
+    }, 360);
+  }
   if (els.stage) {
     els.stage.classList.remove('is-text-preset-hover');
     els.stage.classList.add('is-text-preset-adjusting');
@@ -16875,22 +21515,50 @@ function beginTextPresetGesture(event) {
 
 function moveTextPresetGesture(event) {
   const gesture = state.textPresetGesture;
-  if (!gesture.dragging || gesture.pointerId !== event.pointerId) return false;
+  if (gesture.pointerId !== event.pointerId) return false;
+  if (gesture.pending) {
+    gesture.lastX = event.clientX;
+    gesture.lastY = event.clientY;
+    return true;
+  }
+  if (!gesture.dragging) return false;
   const transform = textPresetTransform();
-  transform.rotateX = ((gesture.startRotateX - (event.clientY - gesture.startY) * 0.52 + 180) % 360 + 360) % 360 - 180;
-  transform.rotateY = ((gesture.startRotateY + (event.clientX - gesture.startX) * 0.52 + 180) % 360 + 360) % 360 - 180;
-  state.textPresetTransforms[state.textPreset] = transform;
+  const dx = event.clientX - gesture.startX;
+  const dy = event.clientY - gesture.startY;
+  if (gesture.mode === 'move') {
+    const stageRect = els.stage?.getBoundingClientRect();
+    const maxX = Math.max(180, Number(stageRect?.width) * 0.46 || 720);
+    const maxY = Math.max(120, Number(stageRect?.height) * 0.44 || 420);
+    transform.x = clamp(gesture.startOffsetX + dx, -maxX, maxX);
+    transform.y = clamp(gesture.startOffsetY + dy, -maxY, maxY);
+  } else {
+    const endpointDirection = gesture.zone === 'tail' ? 1 : -1;
+    transform.rotateX = gesture.startRotateX - dy * 0.52;
+    transform.rotateY = gesture.startRotateY + dx * 0.52;
+    transform.rotateZ = gesture.startRotateZ + dy * 0.24 * endpointDirection;
+  }
+  state.textPresetTransforms[state.textPreset] = normalizeTextPresetTransform(transform);
   updateTextPresetTransform();
   return true;
 }
 
 function endTextPresetGesture(event) {
   const gesture = state.textPresetGesture;
-  if (!gesture.dragging || gesture.pointerId !== event.pointerId) return false;
+  if (gesture.pointerId !== event.pointerId) return false;
+  const changed = gesture.dragging && Math.hypot(
+    Number(event.clientX ?? gesture.startX) - gesture.startX,
+    Number(event.clientY ?? gesture.startY) - gesture.startY
+  ) > 4;
+  clearTextPresetHoldTimer();
+  if (changed) gesture.suppressClickUntil = performance.now() + 420;
   gesture.dragging = false;
+  gesture.pending = false;
+  gesture.mode = '';
+  gesture.zone = 'middle';
   gesture.pointerId = null;
-  if (els.stage) els.stage.classList.remove('is-text-preset-adjusting');
+  if (els.stage) els.stage.classList.remove('is-text-preset-adjusting', 'is-text-preset-moving');
   updateTextPresetTransform({ persist: true });
+  syncPlaybackLyricSubtitleLayout();
   return true;
 }
 
@@ -16907,6 +21575,7 @@ function scaleTextPresetFromWheel(event) {
 
 function resetTextPresetTransform(event) {
   if (!textPresetPointInside(event)) return false;
+  clearTextPresetHoldTimer();
   state.textPresetTransforms[state.textPreset] = normalizeTextPresetTransform();
   updateTextPresetTransform({ persist: true });
   return true;
@@ -16959,7 +21628,19 @@ function setWallpaperSource(source) {
     els.wallpaperLiveModeButton.classList.toggle('is-active', state.wallpaperSource === 'live');
     els.wallpaperLiveModeButton.setAttribute('aria-pressed', String(state.wallpaperSource === 'live'));
   }
-  if (els.wallpaperImportActions) els.wallpaperImportActions.hidden = state.wallpaperSource !== 'imported';
+  if (els.wallpaperImportActions) {
+    els.wallpaperImportActions.hidden = false;
+    els.wallpaperImportActions.classList.toggle('is-live', state.wallpaperSource === 'live');
+  }
+  if (els.wallpaperImportButton) {
+    els.wallpaperImportButton.hidden = state.wallpaperSource !== 'imported';
+  }
+  if (els.wallpaperRefreshButton) {
+    els.wallpaperRefreshButton.hidden = false;
+    els.wallpaperRefreshButton.textContent = state.wallpaperSource === 'live'
+      ? '读取 Wallpaper Engine'
+      : '刷新';
+  }
   saveWallpaperPrefs();
   refreshWallpapers({ source: state.wallpaperSource });
 }
@@ -16971,7 +21652,7 @@ function commitDiyPage(page) {
   const wallpaperPage = state.diyPage === 'wallpaper';
   if (presetPage) setDiySandboxPresetGroupExpanded(false);
   if (els.diyCardTitle) {
-    els.diyCardTitle.textContent = presetPage ? '场景预设' : textPage ? '文字预设' : '壁纸模式';
+    els.diyCardTitle.textContent = presetPage ? '场景预设' : textPage ? '歌词效果' : '壁纸模式';
   }
   if (els.diyPresetButton) {
     els.diyPresetButton.classList.toggle('is-active', presetPage);
@@ -17050,7 +21731,7 @@ const DIY_PRESET_CONFIG_LABELS = Object.freeze({
   runtimeControls: '当前运行参数',
   lightingMode: '光照模式',
   weatherMode: '天气模式',
-  textPreset: '文字预设',
+  textPreset: '歌词效果',
   lyricBrightness: '歌词亮度',
   lyricSpeed: '歌词速度',
   cubeIntensity: '场景强度',
@@ -17077,6 +21758,20 @@ const DIY_PRESET_CONFIG_LABELS = Object.freeze({
   sonicFountainColor: '喷泉颜色',
   sonicStarfield: '星空粒子',
   sonicStarfieldColor: '星空颜色',
+  sonicGalaxy: '星河粒子',
+  sonicGalaxyColor: '星河颜色',
+  sonicGalaxyIntensity: '星河强度',
+  sonicAtmosphere: '水雾光束',
+  sonicFogDensity: '水雾浓度',
+  sonicFogSpeed: '水雾流速',
+  sonicFogGlow: '水雾散射',
+  sonicMistReflectance: '水雾反射率',
+  sonicMistEmission: '水雾自发光',
+  sonicTyndallTone: '太阳光色温',
+  sonicTyndallIntensity: '光束强度',
+  sonicTyndallSpread: '光束扩散',
+  sonicCoverBackground: '封面三色背景',
+  sonicCoverBackgroundMix: '背景混合强度',
   sonicBrightness: 'Sonic 亮度',
   sonicExposure: 'Sonic 曝光',
   sonicColumnHeight: '音柱高度',
@@ -17125,10 +21820,25 @@ function builtinDiyPresetConfiguration() {
     runtimeControls.sonicCenterColor = settings.centerColor || `跟随封面 · ${colors.center}`;
     runtimeControls.sonicCoreColor = settings.coreColor || `跟随封面 · ${colors.core}`;
     runtimeControls.sonicOuterColor = settings.outerColor || `跟随封面 · ${colors.outer}`;
+    runtimeControls.sonicAllGroundFloat = settings.allGroundFloatEnabled;
     runtimeControls.sonicFountain = settings.fountainEnabled;
     runtimeControls.sonicFountainColor = settings.fountainColor;
     runtimeControls.sonicStarfield = settings.starfieldEnabled;
     runtimeControls.sonicStarfieldColor = settings.starfieldColor;
+    runtimeControls.sonicGalaxy = settings.galaxyEnabled;
+    runtimeControls.sonicGalaxyColor = settings.galaxyColor;
+    runtimeControls.sonicGalaxyIntensity = `${Math.round(settings.galaxyIntensity * 100)}%`;
+    runtimeControls.sonicAtmosphere = settings.atmosphereEnabled;
+    runtimeControls.sonicFogDensity = `${Math.round(settings.fogDensity * 100)}%`;
+    runtimeControls.sonicFogSpeed = `${Math.round(settings.fogSpeed * 100)}%`;
+    runtimeControls.sonicFogGlow = `${Math.round(settings.fogGlow * 100)}%`;
+    runtimeControls.sonicMistReflectance = `${Math.round(settings.mistReflectance * 100)}%`;
+    runtimeControls.sonicMistEmission = `${Math.round(settings.mistEmission * 100)}%`;
+    runtimeControls.sonicTyndallTone = { normal: '正常光', cold: '冷光', warm: '暖光' }[settings.tyndallTone];
+    runtimeControls.sonicTyndallIntensity = `${Math.round(settings.tyndallIntensity * 100)}%`;
+    runtimeControls.sonicTyndallSpread = `${Math.round(settings.tyndallSpread * 100)}%`;
+    runtimeControls.sonicCoverBackground = settings.coverBackgroundEnabled;
+    runtimeControls.sonicCoverBackgroundMix = `${Math.round(settings.coverBackgroundMix * 100)}%`;
     runtimeControls.sonicBrightness = `${Math.round(settings.brightness * 100)}%`;
     runtimeControls.sonicExposure = `${settings.exposure > 0 ? '+' : ''}${settings.exposure.toFixed(2)} EV`;
     runtimeControls.sonicColumnHeight = `${Math.round(settings.columnHeight * 100)}%`;
@@ -17145,6 +21855,7 @@ function builtinDiyPresetConfiguration() {
   } else if (preset === 'cover-particles') {
     runtimeControls.coverBackground = !!state.coverParticle.backgroundEnabled;
     runtimeControls.coverMotionAmplitude = `${coverParticleMotionPercent()}%`;
+    runtimeControls.coverFloatSpeed = `${coverParticleFloatSpeedPercent()}%`;
     runtimeControls.particleCount = state.coverParticle.particles.length || (
       reducedMotion ? 192 * 192 : MOBILE_RENDER_TARGET ? 224 * 224 : 256 * 256
     );
@@ -17178,6 +21889,43 @@ function activeDiyScenePreset() {
   )) || null;
 }
 
+function syncScenePresetSettingsGroup(stormOcean = false, activeScenePreset = null) {
+  if (!els.scenePresetSettingsGroup) return;
+  let sceneName = '';
+  if (state.diyPreset === 'topography') sceneName = 'Sonic';
+  else if (state.diyPreset === 'chladni') sceneName = '克拉尼';
+  else if (state.diyPreset === 'cover-particles') sceneName = '粒子封面';
+  else if (state.diyPreset === 'cube') sceneName = '动态魔方';
+  else if (isFreeCubePreset()) sceneName = '自由方块';
+  else if (stormOcean) sceneName = safeText(activeScenePreset?.name, '风暴海域');
+
+  els.scenePresetSettingsGroup.hidden = !sceneName;
+  if (!sceneName) return;
+  if (els.scenePresetSettingsTitle) {
+    els.scenePresetSettingsTitle.textContent = `${sceneName} · 专属功能`;
+  }
+  if (els.scenePresetSettingsMeta) {
+    els.scenePresetSettingsMeta.textContent = `仅显示 ${sceneName} 的开关与调节参数`;
+  }
+}
+
+function syncSceneFeatureGroups(activeScenePreset = null, stormOcean = false) {
+  let featurePreset = state.diyPreset;
+  if (stormOcean) featurePreset = 'storm-ocean';
+  else if (isFreeCubePreset()) featurePreset = 'free-cube';
+  else if (isChladniPreset()) featurePreset = 'chladni';
+  document.querySelectorAll('[data-scene-feature-preset]').forEach((group) => {
+    const supportedPresets = safeText(group.dataset.sceneFeaturePreset, '')
+      .split(',')
+      .map((preset) => preset.trim())
+      .filter(Boolean);
+    group.hidden = !supportedPresets.includes(featurePreset);
+    if (stormOcean && group.id === 'stormLightingFeatureGroup') {
+      group.dataset.stormPresetId = safeText(activeScenePreset?.id, '');
+    }
+  });
+}
+
 function syncDiyPresetAdjustmentVisibility() {
   const activeScenePreset = activeDiyScenePreset();
   const stormOcean = isStormOceanPreset(activeScenePreset);
@@ -17200,6 +21948,8 @@ function syncDiyPresetAdjustmentVisibility() {
     els.stormPresetLightingQuickControls.hidden = !stormOcean;
     els.stormPresetLightingQuickControls.dataset.stormPresetId = stormOcean ? activeScenePreset.id : '';
   }
+  syncSceneFeatureGroups(activeScenePreset, stormOcean);
+  syncScenePresetSettingsGroup(stormOcean, activeScenePreset);
 }
 
 function selectedDiyPresetConfiguration() {
@@ -17393,7 +22143,8 @@ function enterDiyScenePresetPlayback(id) {
   state.sandbox.playbackAssetReady = false;
   state.sandbox.playbackAssetFailed = false;
   const playbackAsset = preset.sceneItems[0]?.component?.asset || {};
-  if (window.FeStormOceanRuntime?.isProfile?.(playbackAsset.reactivity)) {
+  const stormOcean = window.FeStormOceanRuntime?.isProfile?.(playbackAsset.reactivity) === true;
+  if (stormOcean) {
     state.sandbox.stormLightingMode = 'sunset';
     state.sandbox.stormWeatherMode = 'auto';
   }
@@ -17409,6 +22160,7 @@ function enterDiyScenePresetPlayback(id) {
   setDiyOpen(false);
   setDiyPreset('sandbox-scene');
   enterPlaybackPage();
+  if (stormOcean) resetPlaybackView();
 }
 
 function setDiyPreset(preset) {
@@ -17447,18 +22199,38 @@ function setDiyPreset(preset) {
   updateLyricDiyVars();
   updateWallpaperDiyVars();
   syncDiyPresetAdjustmentVisibility();
+  syncSceneWallpaperControl();
+  syncSceneWallpaperSurface(state.diyPreset);
   renderDiySelectedPresetConfig();
   applyPresetUpscaler({ force: true });
   scheduleDesktopSceneSnapshot();
 }
 
-function setTextPreset(preset) {
-  const nextPreset = preset === 'book' ? 'book' : selectableTextPreset(preset);
+function setTextPreset(preset, options = {}) {
+  const requestedPreset = safeText(preset, DEFAULT_TEXT_PRESET);
+  const nextPreset = selectableTextPreset(requestedPreset);
   if (state.diyPreset === 'book' && nextPreset !== 'book') {
     updateTextPresetAvailability();
     return;
   }
   state.textPreset = nextPreset;
+  if (requestedPreset === 'none') {
+    state.textComposerSettings = normalizeTextComposerSettings({
+      ...state.textComposerSettings,
+      lyricsEnabled: false
+    });
+  } else if (options.applyTemplate && TEXT_COMPOSER_TEMPLATE_SETTINGS[requestedPreset]) {
+    state.textComposerSettings = normalizeTextComposerSettings({
+      ...textComposerTemplateSettings(requestedPreset),
+      lyricsEnabled: true
+    });
+  }
+  if (state.textPreset === 'focus-echo' && state.textComposerSettings.layoutMode !== 'single') {
+    state.textComposerSettings = normalizeTextComposerSettings({
+      ...state.textComposerSettings,
+      layoutMode: 'single'
+    });
+  }
   if (state.textPreset !== 'book' && state.textPreset !== 'none') {
     state.lastSelectableTextPreset = state.textPreset;
   }
@@ -17467,9 +22239,12 @@ function setTextPreset(preset) {
   if (els.diyPresetPage) els.diyPresetPage.dataset.activeTextPreset = state.textPreset;
   if (els.diyTextPage) els.diyTextPage.dataset.activeTextPreset = state.textPreset;
   if (els.playbackLyricScene) {
-    els.playbackLyricScene.classList.toggle('is-depth-single-text', state.textPreset === 'depth' && !isRainGlassPreset());
-    els.playbackLyricScene.classList.toggle('is-flow-text', state.textPreset === 'flow');
-    els.playbackLyricScene.classList.toggle('is-book-effect-text', state.textPreset === 'book-effect');
+    els.playbackLyricScene.classList.toggle(
+      'is-depth-single-text',
+      state.textPreset === 'depth' && !isRainGlassPreset()
+    );
+    els.playbackLyricScene.classList.remove('is-flow-text');
+    els.playbackLyricScene.classList.remove('is-book-effect-text');
     els.playbackLyricScene.classList.toggle('is-focus-echo-text', state.textPreset === 'focus-echo');
     els.playbackLyricScene.classList.toggle('is-book-text', state.textPreset === 'book');
     els.playbackLyricScene.classList.toggle('is-rain-glass-text', isRainGlassPreset() && state.textPreset === 'depth');
@@ -17484,7 +22259,12 @@ function setTextPreset(preset) {
     els.bookLyricStage.setAttribute('aria-hidden', state.textPreset === 'book' ? 'false' : 'true');
   }
   state.multiRowLyricSignature = '';
-  syncMultiRowLyricsControl();
+  applyTextComposerSettings({
+    persist: options.applyTemplate === true,
+    persistImmediately: options.applyTemplate === true,
+    renderLyrics: false,
+    measureSubtitle: false
+  });
   resetLyricFrameSync();
   triggerFocusEchoTransition();
   updateTextPresetAvailability();
@@ -17492,6 +22272,7 @@ function setTextPreset(preset) {
   updateChladniTextTransform();
   updateTextPresetTransform();
   syncBlurLyricComponent();
+  syncPlaybackLyricSubtitleLayout();
   if (state.textPreset === 'book') {
     resetBookLyricScrollState();
     renderBookLyricLines(true);
@@ -18556,7 +23337,8 @@ function applySandboxSelectionStyle() {
 function updateSandboxCamera() {
   const sandbox = state.sandbox;
   if (!sandbox.camera || !sandbox.cameraTarget) return;
-  const playbackAsset = sandboxPlaybackActive()
+  const playbackActive = sandboxPlaybackActive();
+  const playbackAsset = playbackActive
     ? sandbox.sceneItems[0]?.component?.asset
     : null;
   const playbackView = playbackAsset?.playbackView || {};
@@ -18577,21 +23359,59 @@ function updateSandboxCamera() {
   sandbox.cameraTarget.set(targetX, targetY, targetZ);
   const horizontal = Math.cos(sandbox.pitch) * sandbox.distance;
   const hasAuthoredCamera = Number.isFinite(Number(playbackView.cameraZ));
-  if (hasAuthoredCamera) {
+  const baseX = hasAuthoredCamera
+    ? Number(playbackView.cameraX) || 0
+    : Math.sin(sandbox.yaw) * horizontal;
+  const baseY = hasAuthoredCamera
+    ? Number(playbackView.cameraY) || 0
+    : Math.sin(sandbox.pitch) * sandbox.distance + 1.4;
+  const baseZ = hasAuthoredCamera
+    ? Number(playbackView.cameraZ)
+    : Math.cos(sandbox.yaw) * horizontal;
+  if (playbackActive && playbackSceneSupportsOrbit('sandbox-scene')) {
+    const relativeX = baseX - targetX;
+    const relativeY = baseY - targetY;
+    const relativeZ = baseZ - targetZ;
+    const baseRadius = Math.max(0.001, Math.hypot(relativeX, relativeY, relativeZ));
+    const baseYaw = Math.atan2(relativeX, relativeZ);
+    const basePitch = Math.asin(clamp(relativeY / baseRadius, -1, 1));
+    const yawOffset = state.playbackVisual.yaw - PLAYBACK_REST_YAW;
+    const pitchOffset = state.playbackVisual.pitch - PLAYBACK_REST_PITCH;
+    const viewYaw = baseYaw + yawOffset;
+    const viewPitch = clamp(basePitch + pitchOffset, -1.42, 1.42);
+    const viewRadius = baseRadius / clamp(state.playbackVisual.zoom || 1, 0.58, 2.35);
+    const viewHorizontal = Math.cos(viewPitch) * viewRadius;
     sandbox.camera.position.set(
-      Number(playbackView.cameraX) || 0,
-      Number(playbackView.cameraY) || 0,
-      Number(playbackView.cameraZ)
+      targetX + Math.sin(viewYaw) * viewHorizontal,
+      targetY + Math.sin(viewPitch) * viewRadius,
+      targetZ + Math.cos(viewYaw) * viewHorizontal
     );
   } else {
-    sandbox.camera.position.set(
-      Math.sin(sandbox.yaw) * horizontal,
-      Math.sin(sandbox.pitch) * sandbox.distance + 1.4,
-      Math.cos(sandbox.yaw) * horizontal
-    );
+    sandbox.camera.position.set(baseX, baseY, baseZ);
   }
   sandbox.camera.lookAt(sandbox.cameraTarget);
   requestSandboxRender();
+}
+
+function syncSandboxPlaybackCameraToView() {
+  const sandbox = state.sandbox;
+  if (!sandboxPlaybackActive() || !sandbox.camera) {
+    sandbox.playbackCameraViewSignature = '';
+    return false;
+  }
+  const signature = [
+    sandbox.playbackPresetId,
+    sandbox.yaw,
+    sandbox.pitch,
+    sandbox.distance,
+    state.playbackVisual.yaw,
+    state.playbackVisual.pitch,
+    state.playbackVisual.zoom
+  ].map((value) => String(value)).join('|');
+  if (signature === sandbox.playbackCameraViewSignature) return false;
+  sandbox.playbackCameraViewSignature = signature;
+  updateSandboxCamera();
+  return true;
 }
 
 function resetSandboxView() {
@@ -20330,6 +25150,7 @@ function bindSandboxEvents() {
     els.sandboxCanvas.addEventListener('pointerup', endSandboxCanvasPointer);
     els.sandboxCanvas.addEventListener('pointercancel', endSandboxCanvasPointer);
     els.sandboxCanvas.addEventListener('wheel', (event) => {
+      if (sandboxPlaybackActive()) return;
       const selected = sandboxSceneItemById(state.sandbox.selectedId);
       if (event.altKey && selected) {
         selected.position.y = clamp(selected.position.y + (event.deltaY < 0 ? 0.1 : -0.1), 0, 8);
@@ -20524,7 +25345,18 @@ function endDiyCardRotation(event) {
 }
 
 function postNativeWindowAction(action, payload = {}) {
-  const nativeWindowActions = new Set(['fullscreen', 'normal', 'restore', 'minimize', 'minimise', 'drag', 'move']);
+  const nativeWindowActions = new Set([
+    'fullscreen',
+    'normal',
+    'restore',
+    'minimize',
+    'minimise',
+    'drag',
+    'move',
+    'quit',
+    'exit',
+    'close'
+  ]);
   if (!nativeWindowActions.has(action)) return false;
   if (window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessage === 'function') {
     window.chrome.webview.postMessage({ type: 'fe-window', action, ...payload });
@@ -20555,8 +25387,10 @@ function desktopSceneSnapshot() {
     chladniMode: state.chladni.mode,
     coverParticleBackgroundEnabled: !!state.coverParticle.backgroundEnabled,
     coverParticleMotionAmplitude: state.coverParticle.motionAmplitude,
+    coverParticleFloatSpeed: state.coverParticle.floatSpeed,
     textPalettePreferences: state.textPalettePreferences,
     textFontPreferences: state.textFontPreferences,
+    textComposerSettings: normalizeTextComposerSettings(state.textComposerSettings),
     textTransforms: {
       bookEffect: {
         x: state.bookEffectTransform.x,
@@ -20674,6 +25508,9 @@ async function applyDesktopSceneSnapshot(snapshot = {}) {
     if (snapshot.textFontPreferences && typeof snapshot.textFontPreferences === 'object') {
       Object.assign(state.textFontPreferences, snapshot.textFontPreferences);
     }
+    if (snapshot.textComposerSettings && typeof snapshot.textComposerSettings === 'object') {
+      state.textComposerSettings = normalizeTextComposerSettings(snapshot.textComposerSettings);
+    }
     if (snapshot.textTransforms && typeof snapshot.textTransforms === 'object') {
       if (snapshot.textTransforms.bookEffect && typeof snapshot.textTransforms.bookEffect === 'object') {
         Object.assign(state.bookEffectTransform, snapshot.textTransforms.bookEffect);
@@ -20710,10 +25547,13 @@ async function applyDesktopSceneSnapshot(snapshot = {}) {
     state.sonicTopography.settings = normalizeSonicSettings(snapshot.sonicSettings || state.sonicTopography.settings);
     state.chladni.mode = snapshot.chladniMode === 'radial' ? 'radial' : 'cube';
     state.coverParticle.backgroundEnabled = snapshot.coverParticleBackgroundEnabled !== false;
-    state.coverParticle.motionAmplitude = clamp(
-      Number(snapshot.coverParticleMotionAmplitude) || state.coverParticle.motionAmplitude,
-      0,
-      2
+    const snapshotCoverMotionAmplitude = Number(snapshot.coverParticleMotionAmplitude);
+    if (Number.isFinite(snapshotCoverMotionAmplitude)) {
+      state.coverParticle.motionAmplitude = clamp(snapshotCoverMotionAmplitude, 0, 2);
+    }
+    state.coverParticle.floatSpeed = normalizeCoverParticleFloatSpeed(
+      snapshot.coverParticleFloatSpeed,
+      state.coverParticle.floatSpeed
     );
 
     const sandboxPresetId = safeText(snapshot.sandboxPresetId, '');
@@ -20798,7 +25638,16 @@ function toggleDesktopSceneMapping() {
 }
 
 async function requestAppWindowAction(action) {
-  const nativeWindowActions = new Set(['fullscreen', 'normal', 'restore', 'minimize', 'minimise']);
+  const nativeWindowActions = new Set([
+    'fullscreen',
+    'normal',
+    'restore',
+    'minimize',
+    'minimise',
+    'quit',
+    'exit',
+    'close'
+  ]);
   if (nativeWindowActions.has(action) && postNativeWindowAction(action)) {
     return { ok: true, action, nativeHost: 'webview2' };
   }
@@ -20876,7 +25725,10 @@ function renderCurrent(song = state.currentSong) {
   resetSpectrumForSong(song);
   const active = song || { title: '未播放', artist: '等待播放器状态' };
   els.dockTitle.textContent = safeText(active.title, '未播放');
-  els.dockArtist.textContent = safeText(active.artist || active.album, '等待播放器状态');
+  const artist = safeText(active.artist || active.album, '等待播放器状态');
+  els.dockArtist.textContent = song && isGuestSearchMatchedSong(song)
+    ? `${artist} · 游客搜索匹配`
+    : artist;
   setImage(els.dockCover, song);
   updateBookLyricCover(song);
   updatePlaybackLyricText(song);
@@ -20916,11 +25768,31 @@ async function refreshPlayerState() {
     renderCurrent(state.currentSong);
     return;
   }
+  const requestId = state.playerStateSync.requestId + 1;
+  state.playerStateSync.requestId = requestId;
+  const sourceGeneration = state.audioPlaybackContinuity.sourceGeneration;
   const seekRevision = state.qishuiPlaybackCard.seekRequestId;
   const data = await apiJson('/api/player/state');
-  const sameSong = !data.song?.id
+  if (
+    requestId !== state.playerStateSync.requestId
+    || sourceGeneration !== state.audioPlaybackContinuity.sourceGeneration
+    || (
+      sourceGeneration > 0
+      && state.audioPlaybackContinuity.pendingLoadGeneration === sourceGeneration
+    )
+  ) {
+    return;
+  }
+  const sameSongId = !data.song?.id
     || !state.currentSong?.id
     || String(data.song.id) === String(state.currentSong.id);
+  const incomingProvider = safeText(data.song?.provider, '');
+  const currentProvider = safeText(state.currentSong?.provider, '');
+  const sameSong = sameSongId && (
+    !incomingProvider
+    || !currentProvider
+    || incomingProvider === currentProvider
+  );
   const preserveSeek = sameSong && (
     state.qishuiPlaybackCard.progressDragging
     || state.qishuiPlaybackCard.seekPending
@@ -20934,12 +25806,40 @@ async function refreshPlayerState() {
   const playerPlaying = data.playing === true && data.paused !== true;
   const pendingSeekTarget = state.qishuiPlaybackCard.pendingSeekTarget;
   const pendingTarget = pendingSeekTarget == null ? Number.NaN : Number(pendingSeekTarget);
+  const mediaPosition = els.audio?.src ? Number(els.audio.currentTime) : Number.NaN;
+  const activelyPlayingMedia = sameSong
+    && !!els.audio?.src
+    && !els.audio.paused
+    && !els.audio.ended
+    && Number.isFinite(mediaPosition);
+  // During ordinary playback the HTML media element is the only authoritative
+  // clock. Backend polling may lag by more than a second; correcting that lag
+  // with playbackRate time-stretches otherwise clean PCM and is audible even
+  // with OBR disabled. Together-listen applies its own explicit clock sync.
+  const preserveContinuousPlayback = sameSong && activelyPlayingMedia;
+  if (preserveContinuousPlayback && !state.community.activeSession) {
+    resetSyncedAudioPlaybackRate();
+  }
   const preservedPosition = Number.isFinite(pendingTarget)
     ? pendingTarget
     : estimatedPlayerClockTime(Number(state.currentSong?.position) || 0);
-  const effectivePosition = preserveSeek ? preservedPosition : playerPosition;
-  if (!preserveSeek && Number.isFinite(playerPosition)) {
+  const continuousPosition = Number.isFinite(mediaPosition)
+    ? mediaPosition
+    : Math.max(0, Number(state.currentSong?.position) || preservedPosition);
+  const preservePosition = preserveSeek || preserveContinuousPlayback;
+  const effectivePosition = preserveSeek
+    ? preservedPosition
+    : preserveContinuousPlayback
+      ? continuousPosition
+      : playerPosition;
+  if (!preservePosition && Number.isFinite(playerPosition)) {
     updatePlayerClock(playerPosition, Number.isFinite(playerDuration) ? playerDuration : 0, playerPlaying);
+  } else if (preserveContinuousPlayback && Number.isFinite(effectivePosition)) {
+    updatePlayerClock(
+      effectivePosition,
+      Number.isFinite(playerDuration) ? playerDuration : Number(state.currentSong?.duration) || 0,
+      activelyPlayingMedia || playerPlaying
+    );
   }
   if (playerPlaying) requestOrbFrame();
   if (data.song && data.song.id) {
@@ -20967,7 +25867,13 @@ async function refreshPlayerState() {
   els.volumeLabel.textContent = `${els.volumeRange.value}%`;
   if (Number.isFinite(effectivePosition)) {
     if (els.audio && els.audio.src) {
-      if (!preserveSeek) setAudioPlaybackPosition(effectivePosition);
+      if (!preservePosition) {
+        smoothlySyncAudioPlaybackPosition(effectivePosition, {
+          hardTolerance: 4,
+          softTolerance: 0.38,
+          maxRateDelta: 0.022
+        });
+      }
       syncPlaybackLyricToCurrentTime();
     } else {
       renderManualProgress(effectivePosition, Number.isFinite(playerDuration) ? playerDuration : 0);
@@ -20991,15 +25897,21 @@ function applyAudioBridgePayload(audio = {}) {
   applyBridgeVisual();
 }
 
-async function refreshNativeAudioSample() {
+let nativeAudioSampleRequest = null;
+
+function refreshNativeAudioSample() {
   if (document.hidden) return;
   if (!state.clientRuntime.nativeAudioActive || !state.clientRuntime.settings.xAudio2) return;
-  try {
-    const data = await apiJson('/api/audio/sample');
-    applyAudioBridgePayload(data || {});
-  } catch (error) {
-    // Native sampling is optional; Web Audio or the bridge fallback can keep visuals alive.
-  }
+  if (nativeAudioSampleRequest) return nativeAudioSampleRequest;
+  nativeAudioSampleRequest = apiJson('/api/audio/sample')
+    .then((data) => applyAudioBridgePayload(data || {}))
+    .catch(() => {
+      // Native sampling is optional; Web Audio or the bridge fallback can keep visuals alive.
+    })
+    .finally(() => {
+      nativeAudioSampleRequest = null;
+    });
+  return nativeAudioSampleRequest;
 }
 
 async function refreshVisualBridge() {
@@ -21009,6 +25921,219 @@ async function refreshVisualBridge() {
     applyAudioBridgePayload(data.audio || {});
   } catch (error) {
     // The particle stage keeps breathing even without bridge data.
+  }
+}
+
+function resetAudioPlaybackContinuity(position = Number.NaN, now = performance.now()) {
+  const continuity = state.audioPlaybackContinuity;
+  const mediaTime = Number(position);
+  continuity.lastMediaTime = Number.isFinite(mediaTime) ? Math.max(0, mediaTime) : Number.NaN;
+  continuity.lastAdvanceAt = Number.isFinite(Number(now)) ? Number(now) : performance.now();
+  continuity.stallHintAt = 0;
+  continuity.softRecoveryAt = 0;
+  continuity.retryAfter = 0;
+  return continuity;
+}
+
+function prepareAudioPlaybackSource(position = 0, autoplay = true, recoveryToken = 0) {
+  const continuity = state.audioPlaybackContinuity;
+  const requestedToken = Number(recoveryToken);
+  if (Number.isInteger(requestedToken) && requestedToken > 0) {
+    if (requestedToken !== continuity.sourceGeneration) return 0;
+  } else {
+    continuity.sourceGeneration += 1;
+  }
+  continuity.playingIntent = autoplay !== false;
+  resetAudioPlaybackContinuity(position);
+  return continuity.sourceGeneration;
+}
+
+function audioBufferedSecondsAhead(position = Number.NaN) {
+  const audio = els.audio;
+  if (!audio?.buffered) return 0;
+  const target = Number.isFinite(Number(position))
+    ? Math.max(0, Number(position))
+    : Math.max(0, Number(audio.currentTime) || 0);
+  try {
+    for (let index = 0; index < audio.buffered.length; index += 1) {
+      const start = Number(audio.buffered.start(index));
+      const end = Number(audio.buffered.end(index));
+      if (target >= start - 0.08 && target <= end + 0.08) {
+        return Math.max(0, end - target);
+      }
+    }
+  } catch (error) {
+  }
+  return 0;
+}
+
+function waitForAudioPlaybackStartBuffer(position = 0, timeoutMs = AUDIO_PLAYBACK_START_BUFFER_TIMEOUT_MS) {
+  const audio = els.audio;
+  if (!audio?.src) return Promise.resolve('no-source');
+  const source = audio.src;
+  const enoughBuffered = () => (
+    audioBufferedSecondsAhead(position) >= AUDIO_PLAYBACK_START_BUFFER_SECONDS
+    || (Number.isFinite(audio.duration)
+      && audio.duration > 0
+      && audioBufferedSecondsAhead(position) >= Math.max(0, audio.duration - Number(position) - 0.15))
+  );
+  if (enoughBuffered()) return Promise.resolve('buffered');
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const eventNames = ['progress', 'canplay', 'canplaythrough', 'loadeddata', 'durationchange'];
+    const cleanup = () => {
+      window.clearTimeout(timer);
+      eventNames.forEach((name) => audio.removeEventListener(name, check));
+    };
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(result);
+    };
+    const check = () => {
+      if (audio.src !== source) finish('source-changed');
+      else if (enoughBuffered()) finish('buffered');
+    };
+    const timer = window.setTimeout(() => finish('timeout'), Math.max(0, Number(timeoutMs) || 0));
+    eventNames.forEach((name) => audio.addEventListener(name, check));
+    check();
+  });
+}
+
+function noteAudioPlaybackProgress(now = performance.now()) {
+  const continuity = state.audioPlaybackContinuity;
+  const current = Number(els.audio?.currentTime);
+  if (!Number.isFinite(current)) return false;
+  const previous = Number(continuity.lastMediaTime);
+  if (
+    !Number.isFinite(previous)
+    || current < previous - 0.2
+    || current - previous >= AUDIO_PLAYBACK_ADVANCE_EPSILON_SECONDS
+  ) {
+    continuity.lastMediaTime = Math.max(0, current);
+    continuity.lastAdvanceAt = Number.isFinite(Number(now)) ? Number(now) : performance.now();
+    continuity.stallHintAt = 0;
+    continuity.softRecoveryAt = 0;
+    return true;
+  }
+  return false;
+}
+
+function markAudioPlaybackStallHint(now = performance.now()) {
+  const continuity = state.audioPlaybackContinuity;
+  if (!continuity.playingIntent || !els.audio?.src || els.audio.paused || els.audio.ended) return;
+  if (!continuity.stallHintAt) continuity.stallHintAt = Number(now) || performance.now();
+  if (!continuity.lastAdvanceAt) continuity.lastAdvanceAt = continuity.stallHintAt;
+}
+
+async function recoverStalledAudioPlayback(position, detectedAt = performance.now()) {
+  const continuity = state.audioPlaybackContinuity;
+  const song = state.currentSong && { ...state.currentSong };
+  if (!song || (!song.id && !isLocalSong(song))) return false;
+
+  const recoveryToken = continuity.sourceGeneration + 1;
+  continuity.sourceGeneration = recoveryToken;
+  continuity.recovering = true;
+  continuity.retryAfter = detectedAt + AUDIO_PLAYBACK_RECOVERY_RETRY_MS;
+  try {
+    const loaded = await loadSong({ ...song, position }, {
+      position,
+      autoplay: true,
+      silent: true,
+      recovery: true,
+      recoveryToken
+    });
+    if (!loaded || continuity.sourceGeneration !== recoveryToken) {
+      continuity.lastAdvanceAt = detectedAt;
+      continuity.retryAfter = detectedAt + AUDIO_PLAYBACK_RECOVERY_RETRY_MS;
+      return false;
+    }
+    continuity.playingIntent = true;
+    resetAudioPlaybackContinuity(position, detectedAt);
+    return true;
+  } finally {
+    continuity.recovering = false;
+  }
+}
+
+async function monitorAudioPlaybackContinuity(now = performance.now()) {
+  const continuity = state.audioPlaybackContinuity;
+  const sampleAt = Number.isFinite(Number(now)) ? Number(now) : performance.now();
+  const audio = els.audio;
+  const current = Number(audio?.currentTime);
+  const active = !!(
+    audio?.src
+    && continuity.playingIntent
+    && !audio.paused
+    && !audio.ended
+  );
+
+  if (!active || audio.seeking || document.hidden || !Number.isFinite(current)) {
+    if (Number.isFinite(current)) {
+      continuity.lastMediaTime = Math.max(0, current);
+      continuity.lastAdvanceAt = sampleAt;
+    }
+    continuity.stallHintAt = 0;
+    return 'idle';
+  }
+
+  if (noteAudioPlaybackProgress(sampleAt)) return 'advanced';
+  if (!continuity.lastAdvanceAt) {
+    continuity.lastAdvanceAt = sampleAt;
+    continuity.lastMediaTime = Math.max(0, current);
+    return 'watching';
+  }
+  if (continuity.recoveryPromise) return 'recovering';
+  if (sampleAt < continuity.retryAfter) return 'backoff';
+
+  const hasStallHint = continuity.stallHintAt > 0 || Number(audio.readyState) < 3;
+  const timeout = hasStallHint
+    ? AUDIO_PLAYBACK_STALL_HINT_TIMEOUT_MS
+    : AUDIO_PLAYBACK_STALL_TIMEOUT_MS;
+  if (sampleAt - continuity.lastAdvanceAt < timeout) return 'watching';
+
+  const hardMediaFailure = !!audio.error
+    || Number(audio.networkState) === Number(window.HTMLMediaElement?.NETWORK_NO_SOURCE);
+  if (Array.isArray(window.__DEBUG_audio_continuity_9c42)) {
+    window.__DEBUG_audio_continuity_9c42.push({
+      sampleAt,
+      current,
+      readyState: Number(audio.readyState),
+      networkState: Number(audio.networkState),
+      bufferedAhead: audioBufferedSecondsAhead(current),
+      hardMediaFailure,
+      softRecoveryAt: continuity.softRecoveryAt,
+      sourceGeneration: continuity.sourceGeneration
+    });
+  }
+  // The same-origin stream proxy now repairs bounded upstream interruptions
+  // inside the existing response. If the media clock still freezes, renew the
+  // playback URL before the freeze crosses the user-visible continuity limit.
+  if (state.audioAnalysis.context?.state === 'suspended') {
+    continuity.softRecoveryAt = sampleAt;
+    await state.audioAnalysis.context.resume().catch(() => {});
+    if (
+      !hasStallHint
+      && !hardMediaFailure
+      && sampleAt - continuity.lastAdvanceAt < AUDIO_PLAYBACK_UX_FREEZE_LIMIT_MS
+    ) {
+      return 'soft-recovered';
+    }
+  }
+
+  const frozenPosition = Math.max(0, current);
+  const recovery = recoverStalledAudioPlayback(frozenPosition, sampleAt);
+  continuity.recoveryPromise = recovery;
+  try {
+    return await recovery ? 'recovered' : 'failed';
+  } catch (error) {
+    continuity.lastAdvanceAt = sampleAt;
+    continuity.retryAfter = sampleAt + AUDIO_PLAYBACK_RECOVERY_RETRY_MS;
+    return 'failed';
+  } finally {
+    if (continuity.recoveryPromise === recovery) continuity.recoveryPromise = null;
   }
 }
 
@@ -21024,6 +26149,65 @@ function setAudioPlaybackPosition(position, tolerance = 1.25) {
   }
 }
 
+function resetSyncedAudioPlaybackRate() {
+  window.clearTimeout(state.audioPositionSync.rateResetTimer);
+  state.audioPositionSync.rateResetTimer = 0;
+  try {
+    if (Math.abs((Number(els.audio?.playbackRate) || 1) - 1) > 0.001) els.audio.playbackRate = 1;
+  } catch (error) {
+  }
+}
+
+function scheduleSyncedAudioPlaybackRateReset() {
+  window.clearTimeout(state.audioPositionSync.rateResetTimer);
+  state.audioPositionSync.rateResetTimer = window.setTimeout(() => {
+    resetSyncedAudioPlaybackRate();
+  }, 6500);
+}
+
+function smoothlySyncAudioPlaybackPosition(position, options = {}) {
+  const target = Number(position);
+  if (!Number.isFinite(target) || target < 0 || !els.audio) return 'ignored';
+  const current = Number.isFinite(els.audio.currentTime) ? els.audio.currentTime : 0;
+  const drift = target - current;
+  const absoluteDrift = Math.abs(drift);
+  const hardTolerance = clamp(Number(options.hardTolerance) || 4, 2.5, 12);
+  const softTolerance = clamp(Number(options.softTolerance) || 0.32, 0.12, 1);
+  const maxRateDelta = clamp(Number(options.maxRateDelta) || 0.025, 0.005, 0.06);
+  const activelyPlaying = !els.audio.paused && !els.audio.ended;
+  const mediaBuffering = activelyPlaying && (els.audio.seeking || Number(els.audio.readyState) < 3);
+
+  try {
+    if (mediaBuffering) {
+      resetSyncedAudioPlaybackRate();
+      syncPlaybackLyricAtTime(currentPlaybackLyricTime(target));
+      return 'buffering';
+    }
+    if (!activelyPlaying || absoluteDrift >= hardTolerance) {
+      if (absoluteDrift >= (activelyPlaying ? hardTolerance : softTolerance)) {
+        els.audio.currentTime = target;
+      }
+      resetSyncedAudioPlaybackRate();
+      syncPlaybackLyricAtTime(target);
+      return absoluteDrift >= hardTolerance ? 'seek' : 'aligned';
+    }
+
+    const nextRate = absoluteDrift <= softTolerance
+      ? 1
+      : clamp(1 + drift * 0.014, 1 - maxRateDelta, 1 + maxRateDelta);
+    if (Math.abs((Number(els.audio.playbackRate) || 1) - nextRate) > 0.001) {
+      els.audio.playbackRate = nextRate;
+    }
+    if (nextRate === 1) resetSyncedAudioPlaybackRate();
+    else scheduleSyncedAudioPlaybackRateReset();
+    syncPlaybackLyricAtTime(currentPlaybackLyricTime(target));
+    return nextRate === 1 ? 'aligned' : 'rate';
+  } catch (error) {
+    resetSyncedAudioPlaybackRate();
+    return 'ignored';
+  }
+}
+
 function renderManualProgress(position = 0, duration = 0) {
   const safeDuration = Math.max(0, Number(duration) || 0);
   const safePosition = Math.max(0, Math.min(Number(position) || 0, safeDuration || Number(position) || 0));
@@ -21034,7 +26218,7 @@ function renderManualProgress(position = 0, duration = 0) {
   if (els.currentTime.textContent !== currentTimeLabel) els.currentTime.textContent = currentTimeLabel;
   if (els.totalTime.textContent !== totalTimeLabel) els.totalTime.textContent = totalTimeLabel;
   updateQishuiPlaybackProgress(safePosition, safeDuration);
-  syncPlaybackLyricAtTime(safePosition);
+  if (!isPlaybackClockRunning()) syncPlaybackLyricAtTime(safePosition);
 }
 
 async function skipUnavailableCommunitySong(reason = '') {
@@ -21068,6 +26252,9 @@ function applyCommunityUnavailableSong(song = {}, reason = '') {
     position
   };
   state.playerUrl = '';
+  state.audioPlaybackContinuity.sourceGeneration += 1;
+  state.audioPlaybackContinuity.playingIntent = false;
+  resetAudioPlaybackContinuity(position);
   try {
     els.audio.pause();
     els.audio.removeAttribute('src');
@@ -21098,15 +26285,22 @@ async function applyCommunityPlaybackControls(song = {}) {
     renderManualProgress(position, duration);
     return;
   }
-  setAudioPlaybackPosition(position, 0.35);
+  smoothlySyncAudioPlaybackPosition(position, {
+    hardTolerance: 3.5,
+    softTolerance: 0.22,
+    maxRateDelta: 0.04
+  });
   if (song.playing === false) {
+    state.audioPlaybackContinuity.playingIntent = false;
     els.audio.pause();
     await apiJson('/api/player/pause').catch(() => {});
   } else if (els.audio.paused) {
+    state.audioPlaybackContinuity.playingIntent = true;
     await apiJson('/api/player/play').catch(() => {});
     try {
       await els.audio.play();
     } catch (error) {
+      state.audioPlaybackContinuity.playingIntent = false;
       await skipUnavailableCommunitySong(error.message);
       return;
     }
@@ -21120,6 +26314,12 @@ async function loadLocalSong(song, options = {}) {
   if (!isLocalSong(song)) throw new Error('本地歌曲文件已失效，请重新导入');
   const targetPosition = Number(options.position ?? song.position) || 0;
   const requestedDuration = Number(song.duration) || 0;
+  const sourceGeneration = prepareAudioPlaybackSource(
+    targetPosition,
+    options.autoplay !== false,
+    options.recoveryToken
+  );
+  if (!sourceGeneration) return false;
   state.localQueueActive = true;
   state.playerUrl = song.localUrl;
   state.currentSong = { ...song, duration: requestedDuration, position: targetPosition };
@@ -21132,7 +26332,10 @@ async function loadLocalSong(song, options = {}) {
   }
   resetSpectrumForSong(state.currentSong);
   renderCurrent(state.currentSong);
-  if (options.autoplay === false) els.audio.pause();
+  if (options.autoplay === false) {
+    state.audioPlaybackContinuity.playingIntent = false;
+    els.audio.pause();
+  }
   else await els.audio.play();
   if (options.autoplay !== false) await ensureAudioAnalysis();
   updateProgress();
@@ -21141,8 +26344,34 @@ async function loadLocalSong(song, options = {}) {
 }
 
 async function loadSong(song, options = {}) {
+  let pendingLoadGeneration = 0;
   try {
     if (isLocalSong(song)) return await loadLocalSong(song, options);
+    if (isQishuiMetadataSong(song)) {
+      const qishuiIdentity = await ensureQualityLoginStatus('qishui');
+      if (qishuiIdentity?.playbackAuthorized !== true) {
+        if (!options.silent && !options.communitySync) {
+          toast(`正在为「${safeText(song.title, '歌曲')}」寻找合法公开音源`);
+        }
+        const matched = await resolveQishuiMetadataViaGuestSearch(song);
+        if (!matched) {
+          throw new Error('未找到可公开播放的游客搜索匹配；未读取或解密汽水受保护音源');
+        }
+        song = matched;
+        if (!options.silent && !options.communitySync) {
+          toast(`游客搜索匹配：${safeText(matched.title, '歌曲')} · ${providerInfo(matched.provider).label}`);
+        }
+      }
+    }
+    const targetPosition = Number(options.position ?? song.position) || 0;
+    const sourceGeneration = prepareAudioPlaybackSource(
+      targetPosition,
+      options.autoplay !== false,
+      options.recoveryToken
+    );
+    if (!sourceGeneration) return false;
+    pendingLoadGeneration = sourceGeneration;
+    state.audioPlaybackContinuity.pendingLoadGeneration = sourceGeneration;
     state.localQueueActive = false;
     const provider = playbackQualityProvider(song);
     const quality = normalizePlaybackQuality(
@@ -21151,6 +26380,7 @@ async function loadSong(song, options = {}) {
     );
     state.playbackQuality = quality;
     const data = await apiJson(`/api/player/load?${songParams(song, { quality })}`);
+    if (sourceGeneration !== state.audioPlaybackContinuity.sourceGeneration) return false;
     if (!data.playable || !data.url) {
       if (options.communitySync) {
         applyCommunityUnavailableSong(song, data.error || '当前歌曲不可播放');
@@ -21169,8 +26399,10 @@ async function loadSong(song, options = {}) {
     state.playbackQuality = safeText(data.quality, quality);
     state.playerUrl = data.url;
     els.audio.src = browserAudioUrl(data.url);
+    if (state.audioPlaybackContinuity.pendingLoadGeneration === sourceGeneration) {
+      state.audioPlaybackContinuity.pendingLoadGeneration = 0;
+    }
     els.audio.volume = Number(els.volumeRange.value) / 100;
-    const targetPosition = Number(options.position ?? song.position) || 0;
     if (targetPosition > 0) {
       await apiJson(`/api/player/seek?${query({ position: Math.round(targetPosition) })}`).catch(() => {});
       const applyPosition = () => setAudioPlaybackPosition(targetPosition, 0.25);
@@ -21180,9 +26412,12 @@ async function loadSong(song, options = {}) {
     resetSpectrumForSong(state.currentSong);
     renderCurrent(state.currentSong);
     if (options.autoplay === false) {
+      state.audioPlaybackContinuity.playingIntent = false;
       els.audio.pause();
       await apiJson('/api/player/pause').catch(() => {});
     } else {
+      await waitForAudioPlaybackStartBuffer(targetPosition);
+      if (sourceGeneration !== state.audioPlaybackContinuity.sourceGeneration) return false;
       await els.audio.play();
     }
     if (targetPosition > 0) setAudioPlaybackPosition(targetPosition, 0.25);
@@ -21201,6 +26436,13 @@ async function loadSong(song, options = {}) {
     }
     if (!options.silent) toast(error.message);
     return false;
+  } finally {
+    if (
+      pendingLoadGeneration > 0
+      && state.audioPlaybackContinuity.pendingLoadGeneration === pendingLoadGeneration
+    ) {
+      state.audioPlaybackContinuity.pendingLoadGeneration = 0;
+    }
   }
 }
 
@@ -21282,6 +26524,7 @@ async function transport(path, options = {}) {
         if (Number(data.skipped) >= maxAttempts) break;
         continue;
       }
+      prepareAudioPlaybackSource(0, true);
       state.currentSong = data.song || state.currentSong;
       state.playerUrl = data.url;
       if (data.quality) state.playbackQuality = safeText(data.quality, state.playbackQuality);
@@ -21289,9 +26532,11 @@ async function transport(path, options = {}) {
       resetSpectrumForSong(state.currentSong);
       renderCurrent(state.currentSong);
       try {
+        await waitForAudioPlaybackStartBuffer(0);
         await els.audio.play();
       } catch (error) {
         lastError = safeText(error && error.message, '音频源格式不受支持');
+        state.audioPlaybackContinuity.playingIntent = false;
         els.audio.removeAttribute('src');
         els.audio.load();
         continue;
@@ -21328,12 +26573,15 @@ async function togglePlay() {
   if (state.localQueueActive && isLocalSong(state.currentSong)) {
     if (els.audio.paused) {
       try {
+        state.audioPlaybackContinuity.playingIntent = true;
         await els.audio.play();
         ensureAudioAnalysis();
       } catch (error) {
+        state.audioPlaybackContinuity.playingIntent = false;
         toast(error.message || '本地歌曲无法播放');
       }
     } else {
+      state.audioPlaybackContinuity.playingIntent = false;
       els.audio.pause();
     }
     updatePlayState();
@@ -21341,14 +26589,17 @@ async function togglePlay() {
   }
   if (els.audio.paused) {
     try {
+      state.audioPlaybackContinuity.playingIntent = true;
       await apiJson('/api/player/play');
       await els.audio.play();
       ensureAudioAnalysis();
       if (state.community.activeSession) reportCommunityListening(true).catch(() => {});
     } catch (error) {
+      state.audioPlaybackContinuity.playingIntent = false;
       toast(error.message);
     }
   } else {
+    state.audioPlaybackContinuity.playingIntent = false;
     els.audio.pause();
     await apiJson('/api/player/pause').catch(() => {});
     if (state.community.activeSession) reportCommunityListening(true).catch(() => {});
@@ -21358,7 +26609,8 @@ async function togglePlay() {
 
 function updateProgress() {
   const duration = Number.isFinite(els.audio.duration) ? els.audio.duration : 0;
-  const current = Number.isFinite(els.audio.currentTime) ? els.audio.currentTime : 0;
+  const audioCurrent = Number.isFinite(els.audio.currentTime) ? els.audio.currentTime : 0;
+  const current = currentPlaybackLyricTime(audioCurrent);
   els.progressRange.value = duration > 0 ? Math.round((current / duration) * 1000) : 0;
   syncElasticRangeVisual(els.progressRange);
   els.currentTime.textContent = formatTime(current);
@@ -21617,7 +26869,55 @@ function dismissTopUiLayer() {
   return true;
 }
 
+const PLAYER_VOLUME_COMMIT_DEBOUNCE_MS = 160;
+let playerVolumeCommitTimer = 0;
+let pendingPlayerVolume = null;
+
+function commitPlayerVolume() {
+  window.clearTimeout(playerVolumeCommitTimer);
+  playerVolumeCommitTimer = 0;
+  const volume = pendingPlayerVolume;
+  pendingPlayerVolume = null;
+  if (volume == null || state.localQueueActive) return;
+  apiJson(`/api/player/volume?${query({ value: volume.toFixed(2) })}`).catch(() => {});
+}
+
+function schedulePlayerVolumeCommit(volume, { immediate = false } = {}) {
+  if (state.localQueueActive) {
+    window.clearTimeout(playerVolumeCommitTimer);
+    playerVolumeCommitTimer = 0;
+    pendingPlayerVolume = null;
+    return;
+  }
+  pendingPlayerVolume = clamp(Number(volume) || 0, 0, 1);
+  window.clearTimeout(playerVolumeCommitTimer);
+  playerVolumeCommitTimer = 0;
+  if (immediate) {
+    commitPlayerVolume();
+    return;
+  }
+  playerVolumeCommitTimer = window.setTimeout(commitPlayerVolume, PLAYER_VOLUME_COMMIT_DEBOUNCE_MS);
+}
+
 function bindEvents() {
+  if (els.loginAvatarImage) {
+    els.loginAvatarImage.addEventListener('error', () => {
+      els.loginAvatar?.classList.remove('has-avatar');
+      els.loginAvatarImage.removeAttribute('src');
+    });
+  }
+  if (els.qishuiPlaybackAccountAvatarImage) {
+    els.qishuiPlaybackAccountAvatarImage.addEventListener('error', () => {
+      els.qishuiPlaybackAccountAvatar?.classList.remove('has-avatar');
+      els.qishuiPlaybackAccountAvatarImage.removeAttribute('src');
+    });
+  }
+  if (els.qishuiLocalProfileAvatar) {
+    els.qishuiLocalProfileAvatar.addEventListener('error', () => {
+      els.qishuiLocalProfile?.classList.remove('has-avatar');
+      els.qishuiLocalProfileAvatar.removeAttribute('src');
+    });
+  }
   els.searchForm.addEventListener('submit', submitSearch);
   if (els.searchInput) {
     els.searchInput.addEventListener('input', scheduleSearchSuggestions);
@@ -21971,9 +27271,11 @@ function bindEvents() {
         selectDiyScenePreset(sandboxPresetCard.dataset.diyPresetCard);
         return;
       }
-      const button = event.target && event.target.closest ? event.target.closest('[data-text-preset]') : null;
+      const button = event.target && event.target.closest
+        ? event.target.closest('[data-text-preset]')
+        : null;
       if (!button || !els.diySidebar.contains(button) || button.disabled) return;
-      setTextPreset(button.dataset.textPreset);
+      setTextPreset(button.dataset.textPreset, { applyTemplate: true });
     });
   }
   if (els.textPaletteAutoButton) {
@@ -21981,6 +27283,29 @@ function bindEvents() {
   }
   if (els.textFontSelect) {
     els.textFontSelect.addEventListener('change', () => setTextFontPreference(els.textFontSelect.value));
+  }
+  if (els.textComposerControl) {
+    const updateTextComposerFromControl = (event, commit = false) => {
+      const control = event.target?.closest?.('[data-text-composer-setting]');
+      if (!control || !els.textComposerControl.contains(control)) return;
+      setTextComposerSetting(
+        control.dataset.textComposerSetting,
+        control.type === 'checkbox' ? control.checked : control.value,
+        { commit }
+      );
+    };
+    els.textComposerControl.addEventListener('input', (event) => {
+      const control = event.target?.closest?.('[data-text-composer-setting]');
+      if (!control || control.tagName === 'SELECT' || control.type === 'checkbox') return;
+      updateTextComposerFromControl(event);
+    });
+    els.textComposerControl.addEventListener('change', (event) => {
+      updateTextComposerFromControl(event, true);
+    });
+    window.addEventListener('pagehide', flushTextComposerSettingsSave);
+  }
+  if (els.textComposerResetButton) {
+    els.textComposerResetButton.addEventListener('click', resetTextComposerSettings);
   }
   if (els.textPaletteResetButton) {
     els.textPaletteResetButton.addEventListener('click', () => setTextPalettePreference('auto'));
@@ -22029,6 +27354,16 @@ function bindEvents() {
   if (els.bilingualLyricsToggle) {
     els.bilingualLyricsToggle.addEventListener('change', () => {
       setBilingualLyricsEnabled(els.bilingualLyricsToggle.checked);
+    });
+  }
+  if (els.qishuiPlaybackLyricEarlierButton) {
+    els.qishuiPlaybackLyricEarlierButton.addEventListener('click', () => {
+      adjustLyricClockOffsetSeconds(LYRIC_CLOCK_OFFSET_STEP_SECONDS);
+    });
+  }
+  if (els.qishuiPlaybackLyricLaterButton) {
+    els.qishuiPlaybackLyricLaterButton.addEventListener('click', () => {
+      adjustLyricClockOffsetSeconds(-LYRIC_CLOCK_OFFSET_STEP_SECONDS);
     });
   }
   window.addEventListener('pointerup', endDiyCardRotation);
@@ -22096,6 +27431,53 @@ function bindEvents() {
     });
   }
   if (els.wallpaperRefreshButton) els.wallpaperRefreshButton.addEventListener('click', () => refreshWallpapers({ source: state.wallpaperSource }));
+  if (els.sceneWallpaperImportButton && els.sceneWallpaperImportInput) {
+    els.sceneWallpaperImportButton.addEventListener('click', () => {
+      els.sceneWallpaperImportInput.dataset.sceneWallpaperPreset = state.diyPreset;
+      els.sceneWallpaperImportInput.click();
+    });
+    els.sceneWallpaperImportInput.addEventListener('change', () => {
+      const preset = els.sceneWallpaperImportInput.dataset.sceneWallpaperPreset || state.diyPreset;
+      importSceneWallpaperFiles(els.sceneWallpaperImportInput.files, preset)
+        .catch((error) => toast(error.message || '\u5bfc\u5165\u573a\u666f\u58c1\u7eb8\u5931\u8d25'))
+        .finally(() => {
+          els.sceneWallpaperImportInput.value = '';
+          delete els.sceneWallpaperImportInput.dataset.sceneWallpaperPreset;
+          syncSceneWallpaperControl();
+        });
+    });
+  }
+  if (els.sceneWallpaperUseCurrentButton) {
+    els.sceneWallpaperUseCurrentButton.addEventListener('click', () => {
+      const current = wallpaperById(state.activeWallpaperId);
+      if (current) setSceneWallpaperForPreset(state.diyPreset, current, true);
+    });
+  }
+  if (els.sceneWallpaperRemoveButton) {
+    els.sceneWallpaperRemoveButton.addEventListener('click', () => removeSceneWallpaper(state.diyPreset));
+  }
+  if (els.sceneWallpaperEnabledToggle) {
+    els.sceneWallpaperEnabledToggle.addEventListener('change', () => {
+      updateSceneWallpaperSetting(state.diyPreset, { enabled: els.sceneWallpaperEnabledToggle.checked });
+    });
+  }
+  if (els.sceneWallpaperSelect) {
+    els.sceneWallpaperSelect.addEventListener('change', () => {
+      if (els.sceneWallpaperSelect.value === SCENE_WALLPAPER_SOFT_GLOW_ID) {
+        selectSoftGlowBackground(state.diyPreset);
+        return;
+      }
+      const wallpaper = wallpaperById(els.sceneWallpaperSelect.value);
+      if (wallpaper) setSceneWallpaperForPreset(state.diyPreset, wallpaper, true);
+    });
+  }
+  if (els.sceneWallpaperOpacityRange) {
+    els.sceneWallpaperOpacityRange.addEventListener('input', () => {
+      updateSceneWallpaperSetting(state.diyPreset, {
+        opacity: Number(els.sceneWallpaperOpacityRange.value) / 100
+      });
+    });
+  }
   els.lyricBrightnessRange.addEventListener('input', () => {
     state.lyricBrightness = clamp(Number(els.lyricBrightnessRange.value) / 100, 0.6, 1.8);
     updateLyricDiyVars();
@@ -22134,7 +27516,13 @@ function bindEvents() {
   if (els.sonicFountainToggle) {
     els.sonicFountainToggle.addEventListener('change', () => {
       state.sonicTopography.settings.fountainEnabled = els.sonicFountainToggle.checked;
-      applySonicTopographySettings();
+      applySonicTopographySettings({ persistImmediately: true });
+    });
+  }
+  if (els.sonicAllGroundFloatToggle) {
+    els.sonicAllGroundFloatToggle.addEventListener('change', () => {
+      state.sonicTopography.settings.allGroundFloatEnabled = els.sonicAllGroundFloatToggle.checked;
+      applySonicTopographySettings({ persistImmediately: true });
     });
   }
   if (els.sonicFountainColorInput) {
@@ -22146,7 +27534,7 @@ function bindEvents() {
   if (els.sonicStarfieldToggle) {
     els.sonicStarfieldToggle.addEventListener('change', () => {
       state.sonicTopography.settings.starfieldEnabled = els.sonicStarfieldToggle.checked;
-      applySonicTopographySettings();
+      applySonicTopographySettings({ persistImmediately: true });
     });
   }
   if (els.sonicStarfieldColorInput) {
@@ -22155,12 +27543,58 @@ function bindEvents() {
       applySonicTopographySettings();
     });
   }
+  if (els.sonicGalaxyToggle) {
+    els.sonicGalaxyToggle.addEventListener('change', () => {
+      state.sonicTopography.settings.galaxyEnabled = els.sonicGalaxyToggle.checked;
+      applySonicTopographySettings({ persistImmediately: true });
+    });
+  }
+  if (els.sonicGalaxyColorInput) {
+    els.sonicGalaxyColorInput.addEventListener('input', () => {
+      state.sonicTopography.settings.galaxyColor = els.sonicGalaxyColorInput.value;
+      applySonicTopographySettings();
+    });
+  }
+  if (els.sonicAtmosphereToggle) {
+    els.sonicAtmosphereToggle.addEventListener('change', () => {
+      state.sonicTopography.settings.atmosphereEnabled = els.sonicAtmosphereToggle.checked;
+      applySonicTopographySettings({ persistImmediately: true });
+    });
+  }
+  if (els.sonicTyndallToneSelect) {
+    els.sonicTyndallToneSelect.addEventListener('change', () => {
+      state.sonicTopography.settings.tyndallTone = els.sonicTyndallToneSelect.value;
+      applySonicTopographySettings({ persistImmediately: true });
+    });
+  }
+  if (els.sonicCoverBackgroundToggle) {
+    els.sonicCoverBackgroundToggle.addEventListener('change', () => {
+      state.sonicTopography.settings.coverBackgroundEnabled = els.sonicCoverBackgroundToggle.checked;
+      applySonicTopographySettings({ persistImmediately: true });
+    });
+  }
+  const bindSonicPercentRange = (input, settingName) => {
+    if (!input) return;
+    input.addEventListener('input', () => {
+      state.sonicTopography.settings[settingName] = Number(input.value) / 100;
+      applySonicTopographySettings();
+    });
+  };
+  bindSonicPercentRange(els.sonicGalaxyIntensityRange, 'galaxyIntensity');
+  bindSonicPercentRange(els.sonicFogDensityRange, 'fogDensity');
+  bindSonicPercentRange(els.sonicFogSpeedRange, 'fogSpeed');
+  bindSonicPercentRange(els.sonicFogGlowRange, 'fogGlow');
+  bindSonicPercentRange(els.sonicMistReflectanceRange, 'mistReflectance');
+  bindSonicPercentRange(els.sonicMistEmissionRange, 'mistEmission');
+  bindSonicPercentRange(els.sonicTyndallIntensityRange, 'tyndallIntensity');
+  bindSonicPercentRange(els.sonicTyndallSpreadRange, 'tyndallSpread');
+  bindSonicPercentRange(els.sonicCoverBackgroundMixRange, 'coverBackgroundMix');
   if (els.sonicFollowCoverButton) {
     els.sonicFollowCoverButton.addEventListener('click', () => {
       state.sonicTopography.settings.centerColor = null;
       state.sonicTopography.settings.coreColor = null;
       state.sonicTopography.settings.outerColor = null;
-      applySonicTopographySettings();
+      applySonicTopographySettings({ persistImmediately: true });
     });
   }
   if (els.sonicBrightnessRange) {
@@ -22193,6 +27627,28 @@ function bindEvents() {
       applySonicTopographySettings();
     });
   }
+  [
+    els.sonicCenterColorInput,
+    els.sonicCoreColorInput,
+    els.sonicOuterColorInput,
+    els.sonicFountainColorInput,
+    els.sonicStarfieldColorInput,
+    els.sonicGalaxyColorInput,
+    els.sonicGalaxyIntensityRange,
+    els.sonicFogDensityRange,
+    els.sonicFogSpeedRange,
+    els.sonicFogGlowRange,
+    els.sonicMistReflectanceRange,
+    els.sonicMistEmissionRange,
+    els.sonicTyndallIntensityRange,
+    els.sonicTyndallSpreadRange,
+    els.sonicCoverBackgroundMixRange,
+    els.sonicBrightnessRange,
+    els.sonicExposureRange,
+    els.sonicColumnHeightRange,
+    els.sonicFovRange,
+    els.sonicSmoothingRange
+  ].forEach((input) => input?.addEventListener('change', flushSonicSettingsPreferences));
   if (els.freeCubeHeartButton) {
     els.freeCubeHeartButton.addEventListener('click', toggleFreeCubeHeart);
   }
@@ -22210,6 +27666,7 @@ function bindEvents() {
   if (els.diyCoverParticleBackgroundToggle) {
     els.diyCoverParticleBackgroundToggle.addEventListener('change', () => {
       state.coverParticle.backgroundEnabled = !!els.diyCoverParticleBackgroundToggle.checked;
+      saveCoverParticlePreferences();
       updateCoverParticleBackgroundMode();
       renderDiySelectedPresetConfig();
     });
@@ -22217,8 +27674,21 @@ function bindEvents() {
   if (els.diyCoverParticleMotionRange) {
     els.diyCoverParticleMotionRange.addEventListener('input', () => {
       state.coverParticle.motionAmplitude = clamp(Number(els.diyCoverParticleMotionRange.value) / 100, 0, 2);
+      saveCoverParticlePreferences();
       updateCoverParticleBackgroundMode();
       renderDiySelectedPresetConfig();
+      requestOrbFrame();
+    });
+  }
+  if (els.diyCoverParticleFloatSpeedRange) {
+    els.diyCoverParticleFloatSpeedRange.addEventListener('input', () => {
+      state.coverParticle.floatSpeed = normalizeCoverParticleFloatSpeed(
+        Number(els.diyCoverParticleFloatSpeedRange.value) / 100
+      );
+      saveCoverParticlePreferences();
+      updateCoverParticleBackgroundMode();
+      renderDiySelectedPresetConfig();
+      requestOrbFrame();
     });
   }
   if (els.wallpaperOpacityRange) {
@@ -22281,21 +27751,47 @@ function bindEvents() {
   if (els.gestureCameraButton) {
     els.gestureCameraButton.addEventListener('click', () => setGestureCameraSource('camera'));
   }
+  if (els.cursorSkinSelect) {
+    els.cursorSkinSelect.addEventListener('change', () => {
+      setCursorPreferences({ skin: els.cursorSkinSelect.value });
+    });
+  }
+  if (els.cursorImportButton && els.cursorImportInput) {
+    els.cursorImportButton.addEventListener('click', () => els.cursorImportInput.click());
+    els.cursorImportInput.addEventListener('change', () => {
+      void importUserCursor(els.cursorImportInput.files?.[0]);
+    });
+  }
+  if (els.cursorMotionSelect) {
+    els.cursorMotionSelect.addEventListener('change', () => {
+      setCursorPreferences({ motion: els.cursorMotionSelect.value });
+    });
+  }
+  if (els.cursorTrailSelect) {
+    els.cursorTrailSelect.addEventListener('change', () => {
+      setCursorPreferences({ trail: els.cursorTrailSelect.value });
+    });
+  }
   els.loginButton.addEventListener('click', showLoginDialog);
   els.loginClose.addEventListener('click', closeLoginDialog);
-  els.loginRefresh.addEventListener('click', loadLoginQr);
   if (els.officialBrowserLoginButton) els.officialBrowserLoginButton.addEventListener('click', toggleOfficialBrowserLogin);
+  if (els.officialBrowserSwitchAccountButton) els.officialBrowserSwitchAccountButton.addEventListener('click', switchOfficialBrowserAccount);
+  if (els.qishuiOpenApiLoginPanel) els.qishuiOpenApiLoginPanel.addEventListener('submit', configureQishuiOpenApiLogin);
+  if (els.qishuiLibraryImportButton && els.qishuiLibraryImportInput) {
+    els.qishuiLibraryImportButton.addEventListener('click', () => els.qishuiLibraryImportInput.click());
+    els.qishuiLibraryImportInput.addEventListener('change', () => {
+      void importQishuiLibraryMetadataFile(els.qishuiLibraryImportInput.files?.[0]);
+    });
+  }
   if (els.musicApiImportButton && els.musicApiImportInput) {
     els.musicApiImportButton.addEventListener('click', () => els.musicApiImportInput.click());
     els.musicApiImportInput.addEventListener('change', () => importMusicApiFile(els.musicApiImportInput.files?.[0]));
   }
-  if (els.androidQrSaveButton) els.androidQrSaveButton.addEventListener('click', saveAndroidLoginQr);
-  if (els.androidMusicAppButton) els.androidMusicAppButton.addEventListener('click', openAndroidMusicApp);
   if (els.loginProviderTabs) {
     els.loginProviderTabs.addEventListener('click', (event) => {
       const tab = event.target.closest('[data-login-provider]');
       if (!tab) return;
-      setActiveProvider(tab.dataset.loginProvider, { reloadQr: true });
+      setActiveProvider(tab.dataset.loginProvider);
     });
   }
   els.loginDialog.addEventListener('click', (event) => {
@@ -22484,11 +27980,7 @@ function bindEvents() {
     els.qishuiPlaybackCard.addEventListener('wheel', handleQishuiPlaybackWheel, { passive: false });
   }
   if (els.qishuiPlaybackProgressRange) {
-    els.qishuiPlaybackProgressRange.addEventListener('pointerdown', () => {
-      if (!els.qishuiPlaybackProgressRange.disabled) {
-        state.qishuiPlaybackCard.progressDragging = true;
-      }
-    });
+    els.qishuiPlaybackProgressRange.addEventListener('pointerdown', beginQishuiPlaybackSeek);
     els.qishuiPlaybackProgressRange.addEventListener('input', previewQishuiPlaybackSeek);
     els.qishuiPlaybackProgressRange.addEventListener('change', commitQishuiPlaybackSeek);
     els.qishuiPlaybackProgressRange.addEventListener('pointerup', commitQishuiPlaybackSeek);
@@ -22581,6 +28073,22 @@ function bindEvents() {
   }, { passive: true });
   window.addEventListener('beforeunload', () => {
     clearBackgroundPolling();
+    clearOfficialBrowserLoginTimer();
+    stopCommunityEventStream(false);
+    clearCommunityDanmakuBubbles();
+    stopSandboxRendering();
+    cancelUiPointerUpdates();
+    if (state.orb.animationFrame) window.cancelAnimationFrame(state.orb.animationFrame);
+    state.orb.animationFrame = 0;
+    state.orb.resizeObserver?.disconnect?.();
+    state.orb.resizeObserver = null;
+    if (wallpaperResizeFrame) window.cancelAnimationFrame(wallpaperResizeFrame);
+    wallpaperResizeFrame = 0;
+    wallpaperResizeObserver?.disconnect?.();
+    wallpaperResizeObserver = null;
+    flushWallpaperPrefs();
+    flushSonicSettingsPreferences();
+    commitPlayerVolume();
     saveCommunityListeningStats();
     window.cancelAnimationFrame(desktopSceneRuntime.publishFrame);
     desktopSceneRuntime.publishFrame = 0;
@@ -22589,11 +28097,14 @@ function bindEvents() {
   }, { once: true });
   window.addEventListener('pageshow', () => scheduleUserPlaylistsRefresh(160), { passive: true });
   window.addEventListener('resize', () => {
+    invalidateOrbCanvasMetrics();
     syncPlaybackCardPanelState();
     scheduleWallpaperAutoSize();
+    drawCoverParticleWallpaper();
     resetBookLyricScrollState();
     scheduleBookLyricFit();
     scheduleQishuiPlaybackLyricLayout();
+    syncPlaybackLyricSubtitleLayout();
     setListenMiniPosition();
     setCommunityFloatingPanelPosition('message');
     setCommunityFloatingPanelPosition('profile');
@@ -22604,6 +28115,9 @@ function bindEvents() {
   }, { passive: true });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
+      flushWallpaperPrefs();
+      flushSonicSettingsPreferences();
+      commitPlayerVolume();
       if (!els.audio.paused && !!els.audio.src) flushCommunityListeningStats();
       else state.community.listeningStatsLastAt = performance.now();
       saveCommunityListeningStats();
@@ -22651,14 +28165,21 @@ function bindEvents() {
     const volume = Number(els.volumeRange.value) / 100;
     els.audio.volume = volume;
     els.volumeLabel.textContent = `${els.volumeRange.value}%`;
-    if (!state.localQueueActive) apiJson(`/api/player/volume?${query({ value: volume.toFixed(2) })}`).catch(() => {});
+    schedulePlayerVolumeCommit(volume);
+  });
+  els.volumeRange.addEventListener('change', () => {
+    schedulePlayerVolumeCommit(Number(els.volumeRange.value) / 100, { immediate: true });
   });
 
-  els.audio.addEventListener('timeupdate', updateProgress);
+  els.audio.addEventListener('timeupdate', () => {
+    noteAudioPlaybackProgress();
+    updateProgress();
+  });
   els.audio.addEventListener('durationchange', updateProgress);
   els.audio.addEventListener('seeking', updateProgress);
   els.audio.addEventListener('seeked', updateProgress);
   els.audio.addEventListener('loadedmetadata', () => {
+    resetSyncedAudioPlaybackRate();
     const pendingAudioSeekTarget = state.qishuiPlaybackCard.pendingAudioSeekTarget;
     if (pendingAudioSeekTarget != null && Number.isFinite(Number(pendingAudioSeekTarget))) {
       setAudioPlaybackPosition(Number(pendingAudioSeekTarget), 0.05);
@@ -22679,6 +28200,8 @@ function bindEvents() {
     updateProgress();
   });
   els.audio.addEventListener('play', () => {
+    state.audioPlaybackContinuity.playingIntent = true;
+    resetAudioPlaybackContinuity(els.audio.currentTime);
     ensureAudioAnalysis();
     const nowMs = performance.now();
     state.community.lastListenReportAt = nowMs;
@@ -22688,7 +28211,22 @@ function bindEvents() {
     updatePlayState();
     requestOrbFrame();
   });
+  els.audio.addEventListener('playing', () => {
+    state.audioPlaybackContinuity.playingIntent = true;
+    resetAudioPlaybackContinuity(els.audio.currentTime);
+  });
+  els.audio.addEventListener('canplay', () => {
+    if (state.audioPlaybackContinuity.playingIntent) {
+      resetAudioPlaybackContinuity(els.audio.currentTime);
+    }
+  });
+  els.audio.addEventListener('waiting', () => markAudioPlaybackStallHint());
+  els.audio.addEventListener('stalled', () => markAudioPlaybackStallHint());
   els.audio.addEventListener('pause', () => {
+    if (!state.audioPlaybackContinuity.recovering) {
+      state.audioPlaybackContinuity.playingIntent = false;
+    }
+    resetSyncedAudioPlaybackRate();
     flushCommunityListeningStats();
     reportCommunityListening(true).catch(() => {});
     state.audioAnalysis.live = false;
@@ -22696,31 +28234,47 @@ function bindEvents() {
     updatePlayState();
   });
   els.audio.addEventListener('ended', () => {
+    state.audioPlaybackContinuity.playingIntent = false;
+    resetAudioPlaybackContinuity(els.audio.currentTime);
+    resetSyncedAudioPlaybackRate();
     flushCommunityListeningStats();
     reportCommunityListening(true).catch(() => {});
     transport('/api/player/next');
   });
   els.audio.addEventListener('error', () => {
+    resetSyncedAudioPlaybackRate();
     const extension = isLocalSong(state.currentSong) ? localAudioExtension(state.currentSong.fileName) : '';
     if (!extension && state.community.activeSession && !state.community.listenRecoveryActive) {
       window.setTimeout(() => skipUnavailableCommunitySong('当前音频源格式不受支持').catch(() => {}), 0);
+      return;
+    }
+    const continuity = state.audioPlaybackContinuity;
+    const expectedPlaying = continuity.playingIntent
+      || state.playerClock?.playing === true
+      || state.currentSong?.playing === true;
+    if (
+      !extension
+      && expectedPlaying
+      && !continuity.recovering
+      && !continuity.recoveryPromise
+      && performance.now() >= continuity.retryAfter
+    ) {
+      continuity.playingIntent = true;
+      const recovery = recoverStalledAudioPlayback(Number(els.audio.currentTime) || 0);
+      continuity.recoveryPromise = recovery;
+      recovery.then((recovered) => {
+        if (!recovered) toast('音频续流失败，请重试播放');
+      }).catch(() => {
+        toast('音频续流失败，请重试播放');
+      }).finally(() => {
+        if (continuity.recoveryPromise === recovery) continuity.recoveryPromise = null;
+      });
+      return;
     }
     toast(extension
       ? `当前播放引擎无法解码 ${extension.toUpperCase()} 音频`
       : '本地客户端无法播放当前音频源');
   });
-}
-
-function rotatePoint(point, yaw, pitch) {
-  const cy = Math.cos(yaw);
-  const sy = Math.sin(yaw);
-  const cp = Math.cos(pitch);
-  const sp = Math.sin(pitch);
-  const x1 = point.x * cy + point.z * sy;
-  const z1 = -point.x * sy + point.z * cy;
-  const y1 = point.y * cp - z1 * sp;
-  const z2 = point.y * sp + z1 * cp;
-  return { x: x1, y: y1, z: z2 };
 }
 
 function updateStageZoom(deltaY) {
@@ -22740,7 +28294,7 @@ function bindOrbEvents() {
     if (event.button !== 0) return;
     if (state.playbackPage && beginTextPresetGesture(event)) {
       captureStagePointer(event.pointerId);
-      event.preventDefault();
+      if (!state.textPresetGesture.pending) event.preventDefault();
       return;
     }
     if (state.playbackPage && beginChladniTextGesture(event)) {
@@ -22762,7 +28316,9 @@ function bindOrbEvents() {
       event.preventDefault();
       return;
     }
+    if (state.playbackPage && !playbackSceneSupportsOrbit()) return;
     if (state.playbackPage) {
+      cancelPlaybackLyricGeometryFlips();
       state.playbackVisual.dragging = true;
       state.playbackVisual.pointerId = event.pointerId;
       state.playbackVisual.lastX = event.clientX;
@@ -22867,6 +28423,7 @@ function bindOrbEvents() {
       }
       state.playbackVisual.dragging = false;
       state.playbackVisual.pointerId = null;
+      syncPlaybackLyricSubtitleLayout();
       els.stage.classList.remove('is-dragging');
       releaseStagePointer(event.pointerId);
       return;
@@ -22880,6 +28437,12 @@ function bindOrbEvents() {
 
   els.stage.addEventListener('pointerup', endDrag);
   els.stage.addEventListener('pointercancel', endDrag);
+  els.stage.addEventListener('click', (event) => {
+    if (performance.now() > state.textPresetGesture.suppressClickUntil) return;
+    if (!textPresetPointInside(event, 26)) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }, true);
   els.stage.addEventListener('pointerleave', () => {
     if (!state.orb.dragging) state.orb.mouseActive = false;
     if (!state.textPresetGesture.dragging) els.stage.classList.remove('is-text-preset-hover');
@@ -22912,11 +28475,11 @@ function bindOrbEvents() {
     resetPlaybackView();
   });
   els.stage.addEventListener('wheel', (event) => {
-    if (event.target.closest('.playlist-song-page, .playlist-shelf, .orb-playlists, button, input, textarea, select')) return;
     if (scaleTextPresetFromWheel(event)) {
       event.preventDefault();
       return;
     }
+    if (event.target.closest('.playlist-song-page, .playlist-shelf, .orb-playlists, button, input, textarea, select')) return;
     if (scaleChladniTextFromWheel(event)) {
       event.preventDefault();
       return;
@@ -22928,15 +28491,21 @@ function bindOrbEvents() {
 
 function initPlaybackParticles() {
   const count = reducedMotion ? Math.min(620, RENDER_PROFILE.playbackParticles) : RENDER_PROFILE.playbackParticles;
-  state.playbackVisual.particles = Array.from({ length: count }, () => ({
-    x: Math.random() * 2 - 1,
-    y: Math.random() * 2 - 1,
-    z: Math.random() * 2 - 1,
-    size: 0.42 + Math.random() * 1.05,
-    speed: 0.18 + Math.random() * 0.74,
-    drift: Math.random() * Math.PI * 2,
-    phase: Math.random() * Math.PI * 2
-  }));
+  state.playbackVisual.particles = Array.from({ length: count }, () => {
+    const phase = Math.random() * Math.PI * 2;
+    const phaseYaw = phase * 0.008;
+    return {
+      x: Math.random() * 2 - 1,
+      y: Math.random() * 2 - 1,
+      z: Math.random() * 2 - 1,
+      size: 0.42 + Math.random() * 1.05,
+      speed: 0.18 + Math.random() * 0.74,
+      drift: Math.random() * Math.PI * 2,
+      phase,
+      phaseYawCos: Math.cos(phaseYaw),
+      phaseYawSin: Math.sin(phaseYaw)
+    };
+  });
 }
 
 function recyclePlaybackParticle(particle, direction = -1) {
@@ -22944,6 +28513,9 @@ function recyclePlaybackParticle(particle, direction = -1) {
   particle.y = direction < 0 ? 1.18 + Math.random() * 0.28 : -1.18 - Math.random() * 0.28;
   particle.z = Math.random() * 2 - 1;
   particle.phase = Math.random() * Math.PI * 2;
+  const phaseYaw = particle.phase * 0.008;
+  particle.phaseYawCos = Math.cos(phaseYaw);
+  particle.phaseYawSin = Math.sin(phaseYaw);
 }
 
 function createPlaybackParticleSprite(size, coreRatio) {
@@ -23211,11 +28783,18 @@ function buildCoverParticleSamples(width, height, dpr) {
         + py * 5.1
         + Math.sin((px - py) * 3.8) * 0.58
         + (coverParticleNoise(x, y, 4) - 0.5) * 0.18;
+      const displayR = coverParticleDisplayChannel(color.r);
+      const displayG = coverParticleDisplayChannel(color.g);
+      const displayB = coverParticleDisplayChannel(color.b);
+      const cpuRadialPhase = Math.hypot(px, py) * 14 + sheetPhase * 0.18;
+      const cpuMicroPhase = clamp((px + 0.64) / 1.28, 0, 1)
+        * Math.PI * 2 * COVER_PARTICLE_MICRO_WAVE_SEGMENTS + py * 0.65;
       particles.push({
         x: px,
         y: py,
         z: depth,
-        rgb: `${coverParticleDisplayChannel(color.r)}, ${coverParticleDisplayChannel(color.g)}, ${coverParticleDisplayChannel(color.b)}`,
+        colorCss: `rgb(${displayR}, ${displayG}, ${displayB})`,
+        shadowColorCss: `rgba(${displayR}, ${displayG}, ${displayB}, 0.12)`,
         r: color.r / 255,
         g: color.g / 255,
         b: color.b / 255,
@@ -23223,9 +28802,13 @@ function buildCoverParticleSamples(width, height, dpr) {
         size: 0.82 + coverParticleNoise(x, y, 5) * 0.12,
         wavePhase: sheetPhase,
         waveStrength: 0.54 + relief * 0.66 + coverParticleNoise(x, y, 6) * 0.12,
-        lowCyclePhase: coverParticleNoise(x, y, 7) * Math.PI * 2,
-        lowCycleRate: (coverParticleNoise(x, y, 8) < 0.5 ? -1 : 1)
-          * (0.58 + coverParticleNoise(x, y, 9) * 0.68),
+        floatPhase: coverParticleNoise(x, y, 7) * Math.PI * 2,
+        floatRate: (coverParticleNoise(x, y, 8) < 0.5 ? -1 : 1)
+          * (0.42 + coverParticleNoise(x, y, 9) * 0.54),
+        cpuWaveBPhase: sheetPhase * 1.31 + px * 5.2,
+        cpuWaveCPhase: -sheetPhase * 0.89 + py * 6.6,
+        cpuRadialPhase,
+        cpuMicroPhase,
         bumpDriftX: driftX * driftMagnitude,
         bumpDriftY: driftY * driftMagnitude
       });
@@ -23239,23 +28822,26 @@ function buildCoverParticleSamples(width, height, dpr) {
 function syncCoverParticleCanvas(width, height, dpr) {
   const canvas = els.coverParticleCanvas;
   if (!canvas) return null;
-  const cssWidth = Math.max(1, Math.round(els.coverParticleRig && els.coverParticleRig.clientWidth ? els.coverParticleRig.clientWidth : width / dpr));
-  const cssHeight = Math.max(1, Math.round(els.coverParticleRig && els.coverParticleRig.clientHeight ? els.coverParticleRig.clientHeight : height / dpr));
-  const renderWidth = Math.max(1, Math.floor(cssWidth * dpr));
-  const renderHeight = Math.max(1, Math.floor(cssHeight * dpr));
+  const safeDpr = Math.max(0.1, Number(dpr) || 1);
+  const cssWidth = Math.max(1, Math.round(width / safeDpr));
+  const cssHeight = Math.max(1, Math.round(height / safeDpr));
+  const renderWidth = Math.max(1, Math.floor(cssWidth * safeDpr));
+  const renderHeight = Math.max(1, Math.floor(cssHeight * safeDpr));
   if (canvas.width !== renderWidth || canvas.height !== renderHeight) {
     canvas.width = renderWidth;
     canvas.height = renderHeight;
   }
-  canvas.style.width = `${cssWidth}px`;
-  canvas.style.height = `${cssHeight}px`;
-  return {
-    canvas,
-    cssWidth,
-    cssHeight,
-    width: renderWidth,
-    height: renderHeight
-  };
+  const cssWidthStyle = `${cssWidth}px`;
+  const cssHeightStyle = `${cssHeight}px`;
+  if (canvas.style.width !== cssWidthStyle) canvas.style.width = cssWidthStyle;
+  if (canvas.style.height !== cssHeightStyle) canvas.style.height = cssHeightStyle;
+  const frame = state.coverParticle.renderFrame;
+  frame.canvas = canvas;
+  frame.cssWidth = cssWidth;
+  frame.cssHeight = cssHeight;
+  frame.width = renderWidth;
+  frame.height = renderHeight;
+  return frame;
 }
 
 function coverParticleGpuMaterial(THREE) {
@@ -23265,11 +28851,7 @@ function coverParticleGpuMaterial(THREE) {
       uCenter: { value: new THREE.Vector2(0, 0) },
       uMouse: { value: new THREE.Vector2(0, 0) },
       uTime: { value: 0 },
-      uBass: { value: 0 },
       uEnergy: { value: 0 },
-      uBeat: { value: 0 },
-      uShockProgress: { value: 1 },
-      uShockStrength: { value: 0 },
       uAudioActive: { value: 0 },
       uYawCos: { value: 1 },
       uYawSin: { value: 0 },
@@ -23278,6 +28860,8 @@ function coverParticleGpuMaterial(THREE) {
       uCoverSize: { value: 1 },
       uCoverPixelSize: { value: 1 },
       uMotionScale: { value: 1 },
+      uFloatSpeed: { value: 1 },
+      uWholeJump: { value: 0 },
       uMouseActive: { value: 0 },
       uMouseLimit: { value: 1 },
       uMousePullBase: { value: 0 },
@@ -23289,18 +28873,14 @@ function coverParticleGpuMaterial(THREE) {
       attribute float aSize;
       attribute float aWavePhase;
       attribute float aWaveStrength;
-      attribute float aLowCyclePhase;
-      attribute float aLowCycleRate;
+      attribute float aFloatPhase;
+      attribute float aFloatRate;
       attribute vec2 aDrift;
       uniform vec2 uResolution;
       uniform vec2 uCenter;
       uniform vec2 uMouse;
       uniform float uTime;
-      uniform float uBass;
       uniform float uEnergy;
-      uniform float uBeat;
-      uniform float uShockProgress;
-      uniform float uShockStrength;
       uniform float uAudioActive;
       uniform float uYawCos;
       uniform float uYawSin;
@@ -23309,6 +28889,8 @@ function coverParticleGpuMaterial(THREE) {
       uniform float uCoverSize;
       uniform float uCoverPixelSize;
       uniform float uMotionScale;
+      uniform float uFloatSpeed;
+      uniform float uWholeJump;
       uniform float uMouseActive;
       uniform float uMouseLimit;
       uniform float uMousePullBase;
@@ -23322,43 +28904,24 @@ function coverParticleGpuMaterial(THREE) {
       void main() {
         float relief = clamp((position.z + 0.04) / 0.14, 0.0, 1.0);
         float sheetTime = uTime;
+        float particleFloatTime = uTime * uFloatSpeed;
         float particleRadius = length(position.xy);
         float waveA = sin(sheetTime + aWavePhase);
         float waveB = sin(sheetTime * 0.73 + aWavePhase * 1.31 + position.x * 5.2);
         float waveC = sin(sheetTime * 1.17 - aWavePhase * 0.89 + position.y * 6.6);
         float radialWave = sin(particleRadius * 14.0 - sheetTime * 1.28 + aWavePhase * 0.18);
-        float lowDrive = clamp(uBass * 0.82 + uEnergy * 0.22, 0.0, 1.25);
         float baseNaturalWave = waveA * 0.42 + waveB * 0.28 + waveC * 0.20 + radialWave * 0.10;
         float segmentProgress = clamp((position.x + 0.64) / 1.28, 0.0, 1.0);
-        float lowSegmentWave = sin(segmentProgress * 6.28318530718 * ${COVER_PARTICLE_LOW_WAVE_SEGMENTS}.0 + position.y * 0.65 - sheetTime * 0.56);
-        float lowSegmentMix = clamp(lowDrive * 0.72, 0.0, 0.68);
-        float randomParticleCycle = sin(sheetTime * aLowCycleRate + aLowCyclePhase);
-        float randomCycleMix = clamp(uBass * 1.08, 0.0, 0.78);
-        float lowFrequencyWave = mix(lowSegmentWave, randomParticleCycle, randomCycleMix);
-        float naturalWave = mix(baseNaturalWave, lowFrequencyWave, lowSegmentMix);
-        float beatDrive = clamp(uBeat, 0.0, 1.4);
-        float waveDepth = uAudioActive * naturalWave * (0.010 + lowDrive * 0.014 + beatDrive * 0.004) * aWaveStrength * uMotionScale;
-        float macroWave = sin(
-          segmentProgress * 6.28318530718 * ${COVER_PARTICLE_MACRO_WAVE_SEGMENTS}.0
-            + position.y * 1.55
-            - sheetTime * 0.42
+        float microWave = sin(
+          segmentProgress * 6.28318530718 * ${COVER_PARTICLE_MICRO_WAVE_SEGMENTS}.0
+            + position.y * 0.65
+            - sheetTime * 0.34
         );
-        float macroWaveDepth = uAudioActive * macroWave * lowDrive
-          * (0.018 + beatDrive * 0.006) * aWaveStrength * uMotionScale;
-        float shockDepth = 0.0;
-        if (uShockStrength > 0.001) {
-          float normalizedRadius = particleRadius * 1.104854346;
-          float shockRadius = mix(0.02, 1.04, uShockProgress);
-          float shockRing = 1.0 - smoothstep(
-            0.028,
-            0.10,
-            abs(normalizedRadius - shockRadius)
-          );
-          float shockFade = 1.0 - smoothstep(0.0, 1.0, uShockProgress);
-          shockDepth = uAudioActive * shockRing * shockFade
-            * uShockStrength * 0.028 * uMotionScale;
-        }
-        float dynamicDepth = clamp(waveDepth + macroWaveDepth + shockDepth, -0.070, 0.070);
+        float particleFloat = sin(particleFloatTime * aFloatRate + aFloatPhase);
+        float naturalFloat = particleFloat * 0.64 + baseNaturalWave * 0.28 + microWave * 0.08;
+        float waveDepth = uAudioActive * naturalFloat
+          * (0.016 + relief * 0.008) * aWaveStrength * uMotionScale;
+        float dynamicDepth = clamp(waveDepth, -0.050, 0.050);
         float backLayer = 1.0 - smoothstep(0.22, 0.34, relief);
         float frontLayer = smoothstep(0.66, 0.78, relief);
         float depthLayer = frontLayer - backLayer;
@@ -23366,9 +28929,11 @@ function coverParticleGpuMaterial(THREE) {
         float depthLayerOffset = depthLayer * 0.018 * depthLayerMotion;
         float depthLayerScale = 1.0 + depthLayer * 0.09 * depthLayerMotion;
         float motionAmount = abs(dynamicDepth) * 8.0;
-        float lateralWave = uAudioActive * naturalWave * (0.12 + lowDrive * 0.08) * uMotionScale;
-        vec3 source = vec3(position.xy, position.z * uAudioActive)
+        float lateralWave = uAudioActive * naturalFloat * 0.14 * uMotionScale;
+        float wholeJumpOffset = uWholeJump * 0.052 * uMotionScale;
+        vec3 source = vec3(position.xy, position.z)
           + vec3(aDrift * lateralWave, depthLayerOffset + dynamicDepth);
+        source.z += wholeJumpOffset;
 
         float rotatedX = source.x * uYawCos + source.z * uYawSin;
         float rotatedZ = -source.x * uYawSin + source.z * uYawCos;
@@ -23392,7 +28957,7 @@ function coverParticleGpuMaterial(THREE) {
         gl_PointSize = max(
           uMinPointSize,
           uCoverPixelSize * aSize * depthLayerScale
-            * (1.0 + motionAmount * 0.08 + interaction * 0.08 + uBass * 0.012)
+            * (1.0 + motionAmount * 0.08 + interaction * 0.08)
             * perspective
         );
         vec2 clip = vec2(point.x / uResolution.x * 2.0 - 1.0, 1.0 - point.y / uResolution.y * 2.0);
@@ -23490,8 +29055,8 @@ function rebuildCoverParticleGpuGeometry() {
   const sizes = new Float32Array(count);
   const wavePhases = new Float32Array(count);
   const waveStrengths = new Float32Array(count);
-  const lowCyclePhases = new Float32Array(count);
-  const lowCycleRates = new Float32Array(count);
+  const floatPhases = new Float32Array(count);
+  const floatRates = new Float32Array(count);
   const drifts = new Float32Array(count * 2);
   for (let index = 0; index < count; index += 1) {
     const particle = particles[index];
@@ -23507,8 +29072,8 @@ function rebuildCoverParticleGpuGeometry() {
     sizes[index] = particle.size;
     wavePhases[index] = particle.wavePhase;
     waveStrengths[index] = particle.waveStrength;
-    lowCyclePhases[index] = particle.lowCyclePhase;
-    lowCycleRates[index] = particle.lowCycleRate;
+    floatPhases[index] = particle.floatPhase;
+    floatRates[index] = particle.floatRate;
     drifts[p2] = particle.bumpDriftX;
     drifts[p2 + 1] = particle.bumpDriftY;
   }
@@ -23520,8 +29085,8 @@ function rebuildCoverParticleGpuGeometry() {
   geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
   geometry.setAttribute('aWavePhase', new THREE.BufferAttribute(wavePhases, 1));
   geometry.setAttribute('aWaveStrength', new THREE.BufferAttribute(waveStrengths, 1));
-  geometry.setAttribute('aLowCyclePhase', new THREE.BufferAttribute(lowCyclePhases, 1));
-  geometry.setAttribute('aLowCycleRate', new THREE.BufferAttribute(lowCycleRates, 1));
+  geometry.setAttribute('aFloatPhase', new THREE.BufferAttribute(floatPhases, 1));
+  geometry.setAttribute('aFloatRate', new THREE.BufferAttribute(floatRates, 1));
   geometry.setAttribute('aDrift', new THREE.BufferAttribute(drifts, 2));
 
   const points = new THREE.Points(geometry, cover.gpuMaterial);
@@ -23536,6 +29101,37 @@ function coverParticlePointSize(coverSize, particleCount) {
   return coverSize / Math.max(1, Math.sqrt(Math.max(1, particleCount)));
 }
 
+function updateCoverParticleMotionEnvelope(audioActive, envelopeStepMs) {
+  const cover = state.coverParticle;
+  const audioEnergy = audioActive
+    ? clamp(Number(state.visual.energy) || 0, 0, 1)
+    : 0;
+  const lowFrequencyTarget = audioActive
+    ? clamp(Math.max(
+      Number(state.visual.lowFrequencyAmplitude) || 0,
+      Number(state.visual.subBass) || 0,
+      Number(state.visual.bass) || 0,
+      Number(state.visualBridge.lowFrequencyAmplitude) || 0,
+      Number(state.visualBridge.subBass) || 0,
+      Number(state.visualBridge.bass) || 0
+    ), 0, 1)
+    : 0;
+  const energyRate = 1 - Math.exp(-envelopeStepMs / (audioEnergy > cover.energy ? 85 : 380));
+  cover.energy += (audioEnergy - cover.energy) * energyRate;
+  const gateTarget = audioActive ? 1 : 0;
+  const gateRate = 1 - Math.exp(-envelopeStepMs / (gateTarget > cover.motionGate ? 260 : 420));
+  cover.motionGate += (gateTarget - cover.motionGate) * gateRate;
+  const wholeJumpTarget = audioActive
+    ? smoothstep(0.035, 0.92, lowFrequencyTarget)
+    : 0;
+  const wholeJumpRate = 1 - Math.exp(
+    -envelopeStepMs / (wholeJumpTarget > cover.wholeJump ? 72 : 280)
+  );
+  cover.wholeJump += (wholeJumpTarget - cover.wholeJump) * wholeJumpRate;
+  if (wholeJumpTarget === 0 && cover.wholeJump < 0.024) cover.wholeJump = 0;
+  if (audioActive) cover.waveTime += envelopeStepMs / 1000 * 0.72;
+}
+
 function drawCoverParticleSceneGpu(
   frame,
   width,
@@ -23543,10 +29139,7 @@ function drawCoverParticleSceneGpu(
   dpr,
   now,
   waveTime,
-  audioActive,
-  wholePulse,
-  shockProgress,
-  shockStrength
+  motionGate
 ) {
   if (!ensureCoverParticleGpu(frame) || !rebuildCoverParticleGpuGeometry()) return false;
   const cover = state.coverParticle;
@@ -23560,23 +29153,18 @@ function drawCoverParticleSceneGpu(
   }
 
   const zoom = clamp(state.playbackVisual.zoom || 1, 0.58, 2.35);
-  const wholeScale = 1 + wholePulse * 0.04;
-  const coverSize = Math.min(width, height) * 0.76 * zoom * wholeScale;
+  const coverSize = Math.min(width, height) * 0.76 * zoom;
   const coverPixelSize = coverParticlePointSize(coverSize, cover.particles.length);
   const mouseActive = state.orb.mouseActive && now - state.orb.lastMouseAt < 1600;
   const coverYaw = state.playbackVisual.yaw - PLAYBACK_REST_YAW;
   const coverPitch = state.playbackVisual.pitch - PLAYBACK_REST_PITCH;
 
   uniforms.uResolution.value.set(width, height);
-  uniforms.uCenter.value.set(width * 0.5, height * (0.48 - wholePulse * 0.008));
+  uniforms.uCenter.value.set(width * 0.5, height * 0.48);
   uniforms.uMouse.value.set(state.playbackVisual.mouseX * width, state.playbackVisual.mouseY * height);
   uniforms.uTime.value = waveTime;
-  uniforms.uBass.value = audioActive ? cover.bass : 0;
-  uniforms.uEnergy.value = audioActive ? cover.energy : 0;
-  uniforms.uBeat.value = audioActive ? cover.beat : 0;
-  uniforms.uShockProgress.value = shockProgress;
-  uniforms.uShockStrength.value = shockStrength;
-  uniforms.uAudioActive.value = audioActive ? 1 : 0;
+  uniforms.uEnergy.value = cover.energy;
+  uniforms.uAudioActive.value = motionGate;
   uniforms.uYawCos.value = Math.cos(coverYaw);
   uniforms.uYawSin.value = Math.sin(coverYaw);
   uniforms.uPitchCos.value = Math.cos(coverPitch);
@@ -23584,6 +29172,8 @@ function drawCoverParticleSceneGpu(
   uniforms.uCoverSize.value = coverSize;
   uniforms.uCoverPixelSize.value = coverPixelSize;
   uniforms.uMotionScale.value = coverParticleMotionScale();
+  uniforms.uFloatSpeed.value = coverParticleFloatSpeedScale();
+  uniforms.uWholeJump.value = cover.wholeJump;
   uniforms.uMouseActive.value = mouseActive ? 1 : 0;
   uniforms.uMouseLimit.value = 132 * dpr;
   uniforms.uMousePullBase.value = (16 + cover.energy * 28) * dpr;
@@ -23609,63 +29199,9 @@ function drawCoverParticleScene(width, height, dpr) {
   );
   const now = performance.now();
   const audioActive = isPlaybackClockRunning();
-  const audioBass = audioActive
-    ? clamp(Math.max(Number(state.visual.lowFrequencyAmplitude) || 0, state.visual.bass || 0), 0, 1.25)
-    : 0;
-  const audioEnergy = audioActive
-    ? clamp(Number(state.visual.energy) || 0, 0, 1)
-    : 0;
-  const audioBeat = audioActive ? clamp(Number(state.visual.beat) || 0, 0, 1.4) : 0;
   const frameStep = state.playbackVisual.frameStep || 1;
   const envelopeStepMs = Math.max(1, frameStep * RENDER_PROFILE.targetFrameMs);
-  const envelopeStepSeconds = envelopeStepMs / 1000;
-  const bassRate = 1 - Math.exp(-envelopeStepMs / (audioBass > cover.bass ? 60 : 340));
-  const energyRate = 1 - Math.exp(-envelopeStepMs / (audioEnergy > cover.energy ? 85 : 380));
-  const beatRate = 1 - Math.exp(-envelopeStepMs / (audioBeat > cover.beat ? 50 : 320));
-  cover.bass += (audioBass - cover.bass) * bassRate;
-  cover.energy += (audioEnergy - cover.energy) * energyRate;
-  cover.beat += (audioBeat - cover.beat) * beatRate;
-  if (audioActive) {
-    cover.waveTime += envelopeStepSeconds * (0.68 + cover.bass * 0.54 + cover.beat * 0.12);
-    const bassRise = Math.max(0, audioBass - cover.lastBassInput);
-    const fluxDrive = clamp(Number(state.visual.fluxPulse) || 0, 0, 1.4);
-    const shockDrive = clamp(Math.max(audioBeat, fluxDrive * 1.35, bassRise * 2.4), 0, 1.2);
-    const shockRise = shockDrive - cover.lastShockDrive;
-    cover.shockCooldown = Math.max(0, cover.shockCooldown - envelopeStepSeconds);
-    if (shockDrive < 0.12) cover.shockArmed = true;
-    if (!reducedMotion
-        && cover.shockArmed
-        && cover.shockCooldown <= 0
-        && shockDrive > 0.22
-        && shockRise > 0.035) {
-      cover.shockAge = 0;
-      cover.shockStrength = Math.max(cover.shockStrength, shockDrive);
-      cover.shockCooldown = 0.16;
-      cover.shockArmed = false;
-    }
-    cover.shockAge = Math.min(
-      COVER_PARTICLE_SHOCK_DURATION_SECONDS,
-      cover.shockAge + envelopeStepSeconds
-    );
-    if (cover.shockAge >= COVER_PARTICLE_SHOCK_DURATION_SECONDS) {
-      cover.shockStrength = 0;
-    } else {
-      cover.shockStrength *= Math.exp(-envelopeStepSeconds / 0.32);
-    }
-    cover.lastShockDrive = shockDrive;
-    cover.lastBassInput = audioBass;
-  } else {
-    resetCoverParticleShock();
-  }
-  const shockProgress = clamp(
-    cover.shockAge / COVER_PARTICLE_SHOCK_DURATION_SECONDS,
-    0,
-    1
-  );
-  const shockStrength = audioActive && !reducedMotion ? cover.shockStrength : 0;
-  const wholePulse = audioActive
-    ? clamp(Math.pow(cover.bass, 1.1) * 0.88 + cover.beat * 0.12, 0, 1.15)
-    : 0;
+  updateCoverParticleMotionEnvelope(audioActive, envelopeStepMs);
 
   if (drawCoverParticleSceneGpu(
     frame,
@@ -23674,19 +29210,16 @@ function drawCoverParticleScene(width, height, dpr) {
     dpr,
     now,
     cover.waveTime,
-    audioActive,
-    wholePulse,
-    shockProgress,
-    shockStrength
+    cover.motionGate
   )) return;
 
   const context = frame.canvas.getContext('2d');
   if (!context) return;
   context.clearRect(0, 0, width, height);
   const cx = width * 0.5;
-  const cy = height * (0.48 - wholePulse * 0.008);
+  const cy = height * 0.48;
   const zoom = clamp(state.playbackVisual.zoom || 1, 0.58, 2.35);
-  const coverSize = Math.min(width, height) * 0.76 * zoom * (1 + wholePulse * 0.04);
+  const coverSize = Math.min(width, height) * 0.76 * zoom;
   const coverPixelSize = coverParticlePointSize(coverSize, particles.length);
   const mouseX = state.playbackVisual.mouseX * width;
   const mouseY = state.playbackVisual.mouseY * height;
@@ -23698,22 +29231,60 @@ function drawCoverParticleScene(width, height, dpr) {
   const pitchCos = Math.cos(coverPitch);
   const pitchSin = Math.sin(coverPitch);
   const motionScale = coverParticleMotionScale();
-  const bass = audioActive ? cover.bass : 0;
-  const energy = audioActive ? cover.energy : 0;
-  const beat = audioActive ? cover.beat : 0;
+  const motionGate = cover.motionGate;
+  const energy = cover.energy;
   const mouseLimit = 132 * dpr;
   const mouseLimitSq = mouseLimit * mouseLimit;
   const mousePullBase = (16 + cover.energy * 28) * dpr;
   const sheetTime = cover.waveTime;
+  const particleFloatTime = cover.waveTime * coverParticleFloatSpeedScale();
+  const wholeJumpOffset = cover.wholeJump * 0.052 * motionScale;
   const drawAllParticles = particleLimit >= particles.length;
   const sampleScale = drawAllParticles ? 1 : particles.length / particleLimit;
 
-  const glow = context.createRadialGradient(cx, cy, coverSize * 0.08, cx, cy, coverSize * 0.82);
-  glow.addColorStop(0, `rgba(255, 255, 255, ${0.04 + bass * 0.035})`);
-  glow.addColorStop(0.42, `rgba(177, 237, 255, ${0.026 + energy * 0.028})`);
-  glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  context.fillStyle = glow;
+  if (
+    cover.fallbackGlowContext !== context
+    || cover.fallbackGlowWidth !== width
+    || cover.fallbackGlowHeight !== height
+    || Math.abs(cover.fallbackGlowCoverSize - coverSize) > 0.5
+  ) {
+    const baseGlow = context.createRadialGradient(
+      cx,
+      cy,
+      coverSize * 0.08,
+      cx,
+      cy,
+      coverSize * 0.82
+    );
+    baseGlow.addColorStop(0, 'rgba(255, 255, 255, 0.04)');
+    baseGlow.addColorStop(0.42, 'rgba(177, 237, 255, 0.026)');
+    baseGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    const energyGlow = context.createRadialGradient(
+      cx,
+      cy,
+      coverSize * 0.08,
+      cx,
+      cy,
+      coverSize * 0.82
+    );
+    energyGlow.addColorStop(0, 'rgba(255, 255, 255, 0)');
+    energyGlow.addColorStop(0.42, 'rgba(177, 237, 255, 0.028)');
+    energyGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    cover.fallbackGlowContext = context;
+    cover.fallbackGlowWidth = width;
+    cover.fallbackGlowHeight = height;
+    cover.fallbackGlowCoverSize = coverSize;
+    cover.fallbackGlowBase = baseGlow;
+    cover.fallbackGlowEnergy = energyGlow;
+  }
+  context.fillStyle = cover.fallbackGlowBase;
   context.fillRect(0, 0, width, height);
+  if (energy > 0.001) {
+    context.globalAlpha = energy;
+    context.fillStyle = cover.fallbackGlowEnergy;
+    context.fillRect(0, 0, width, height);
+    context.globalAlpha = 1;
+  }
 
   context.save();
   context.globalCompositeOperation = 'source-over';
@@ -23726,47 +29297,18 @@ function drawCoverParticleScene(width, height, dpr) {
       : Math.floor(drawIndex * sampleScale);
     const particle = particles[sampleIndex];
     const waveA = Math.sin(sheetTime + particle.wavePhase);
-    const waveB = Math.sin(sheetTime * 0.73 + particle.wavePhase * 1.31 + particle.x * 5.2);
-    const waveC = Math.sin(sheetTime * 1.17 - particle.wavePhase * 0.89 + particle.y * 6.6);
-    const particleRadius = Math.hypot(particle.x, particle.y);
-    const radialWave = Math.sin(particleRadius * 14 - sheetTime * 1.28 + particle.wavePhase * 0.18);
-    const lowDrive = clamp(bass * 0.82 + energy * 0.22, 0, 1.25);
+    const waveB = Math.sin(sheetTime * 0.73 + particle.cpuWaveBPhase);
+    const waveC = Math.sin(sheetTime * 1.17 + particle.cpuWaveCPhase);
+    const radialWave = Math.sin(particle.cpuRadialPhase - sheetTime * 1.28);
     const baseNaturalWave = waveA * 0.42 + waveB * 0.28 + waveC * 0.2 + radialWave * 0.1;
-    const segmentProgress = clamp((particle.x + 0.64) / 1.28, 0, 1);
-    const lowSegmentWave = Math.sin(
-      segmentProgress * Math.PI * 2 * COVER_PARTICLE_LOW_WAVE_SEGMENTS
-        + particle.y * 0.65
-        - sheetTime * 0.56
-    );
-    const lowSegmentMix = clamp(lowDrive * 0.72, 0, 0.68);
-    const randomParticleCycle = Math.sin(sheetTime * particle.lowCycleRate + particle.lowCyclePhase);
-    const randomCycleMix = clamp(bass * 1.08, 0, 0.78);
-    const lowFrequencyWave = lowSegmentWave * (1 - randomCycleMix) + randomParticleCycle * randomCycleMix;
-    const naturalWave = baseNaturalWave * (1 - lowSegmentMix) + lowFrequencyWave * lowSegmentMix;
-    const audioGate = audioActive ? 1 : 0;
-    const waveDepth = audioGate * naturalWave * (0.01 + lowDrive * 0.014 + beat * 0.004) * particle.waveStrength * motionScale;
-    const macroWave = Math.sin(
-      segmentProgress * Math.PI * 2 * COVER_PARTICLE_MACRO_WAVE_SEGMENTS
-        + particle.y * 1.55
-        - sheetTime * 0.42
-    );
-    const macroWaveDepth = audioGate * macroWave * lowDrive
-      * (0.018 + beat * 0.006) * particle.waveStrength * motionScale;
-    let shockDepth = 0;
-    if (shockStrength > 0.001) {
-      const normalizedRadius = particleRadius * 1.104854346;
-      const shockRadius = 0.02 + (1.04 - 0.02) * shockProgress;
-      const shockRing = 1 - smoothstep(
-        0.028,
-        0.1,
-        Math.abs(normalizedRadius - shockRadius)
-      );
-      const shockFade = 1 - smoothstep(0, 1, shockProgress);
-      shockDepth = audioGate * shockRing * shockFade
-        * shockStrength * 0.028 * motionScale;
-    }
-    const dynamicDepth = clamp(waveDepth + macroWaveDepth + shockDepth, -0.07, 0.07);
+    const microWave = Math.sin(particle.cpuMicroPhase - sheetTime * 0.34);
     const relief = clamp((particle.z + 0.04) / 0.14, 0, 1);
+    const particleFloat = Math.sin(particleFloatTime * particle.floatRate + particle.floatPhase);
+    const naturalFloat = particleFloat * 0.64 + baseNaturalWave * 0.28 + microWave * 0.08;
+    const audioGate = motionGate;
+    const waveDepth = audioGate * naturalFloat
+      * (0.016 + relief * 0.008) * particle.waveStrength * motionScale;
+    const dynamicDepth = clamp(waveDepth, -0.05, 0.05);
     const backLayer = 1 - smoothstep(0.22, 0.34, relief);
     const frontLayer = smoothstep(0.66, 0.78, relief);
     const depthLayer = frontLayer - backLayer;
@@ -23774,12 +29316,10 @@ function drawCoverParticleScene(width, height, dpr) {
     const depthLayerOffset = depthLayer * 0.018 * depthLayerMotion;
     const depthLayerScale = 1 + depthLayer * 0.09 * depthLayerMotion;
     const motionAmount = Math.abs(dynamicDepth) * 8;
-    const lateralWave = audioGate * naturalWave * (0.12 + lowDrive * 0.08) * motionScale;
+    const lateralWave = audioGate * naturalFloat * 0.14 * motionScale;
     const sourceX = particle.x + particle.bumpDriftX * lateralWave;
     const sourceY = particle.y + particle.bumpDriftY * lateralWave;
-    const sourceZ = particle.z * (audioActive ? 1 : 0)
-      + depthLayerOffset
-      + dynamicDepth;
+    const sourceZ = particle.z + depthLayerOffset + dynamicDepth + wholeJumpOffset;
     const rotatedX = sourceX * yawCos + sourceZ * yawSin;
     const rotatedZ = -sourceX * yawSin + sourceZ * yawCos;
     const rotatedY = sourceY * pitchCos - rotatedZ * pitchSin;
@@ -23805,7 +29345,7 @@ function drawCoverParticleScene(width, height, dpr) {
     if (depth < 0) depth = 0;
     else if (depth > 1) depth = 1;
     let size = coverPixelSize * particle.size * depthLayerScale
-      * (1 + motionAmount * 0.08 + interaction * 0.08 + bass * 0.012)
+      * (1 + motionAmount * 0.08 + interaction * 0.08)
       * perspective;
     const minSize = 0.42 * dpr;
     if (size < minSize) size = minSize;
@@ -23820,13 +29360,14 @@ function drawCoverParticleScene(width, height, dpr) {
       if (shadowActive) {
         coverParticleShadowActive = true;
         context.shadowBlur = (0.45 + interaction * 2.2) * dpr;
-        context.shadowColor = `rgba(${particle.rgb}, ${alpha * 0.12})`;
+        context.shadowColor = particle.shadowColorCss;
       } else if (coverParticleShadowActive) {
         coverParticleShadowActive = false;
         context.shadowBlur = 0;
       }
     }
-    context.fillStyle = `rgba(${particle.rgb}, ${alpha})`;
+    context.globalAlpha = alpha;
+    context.fillStyle = particle.colorCss;
     context.fillRect(x - size / 2, y - size / 2, size, size);
   }
   context.restore();
@@ -23859,6 +29400,79 @@ function updateOrbMotion() {
   if (Math.abs(state.orb.pitch) > Math.PI * 64) state.orb.pitch %= fullTurn;
 }
 
+function updateTextPresetBassGlow(playbackRunning) {
+  if (!els.playbackLyricScene) return;
+  const eligible = playbackRunning
+    && textLyricsEnabled()
+    && state.textPreset !== 'book';
+  const lowFrequency = eligible
+    ? clamp(Math.max(
+      Number(state.visual.lowFrequencyAmplitude) || 0,
+      Number(state.visual.bass) || 0,
+      Number(state.visualBridge.lowFrequencyAmplitude) || 0,
+      Number(state.visualBridge.bass) || 0
+    ), 0, 1)
+    : 0;
+  const glow = lowFrequency > 0.035 ? Math.pow(lowFrequency, 0.72) : 0;
+  const bassSpread = clamp(Number(state.textComposerSettings?.lowBassGlow) || 0, 0, 100) / 100;
+  setStylePropertyIfChanged(
+    els.playbackLyricScene,
+    '--text-bass-glow-alpha',
+    clamp(glow * 0.82 * bassSpread, 0, 0.82).toFixed(3)
+  );
+  setStylePropertyIfChanged(
+    els.playbackLyricScene,
+    '--text-bass-glow-scale',
+    (0.92 + glow * 0.34 * bassSpread).toFixed(3)
+  );
+}
+
+function updateGlitchBeatMotion(playbackRunning, now = performance.now()) {
+  const scene = els.playbackLyricScene;
+  const shell = els.appShell;
+  if (!scene || !shell) return;
+  const settings = state.textComposerSettings;
+  const runtime = state.playbackVisual;
+  const active = playbackRunning && glitchTextEffectActive(settings);
+  const beatClasses = TEXT_GLITCH_BEAT_CLASSES;
+  if (!active) {
+    runtime.glitchBeatArmed = true;
+    scene.classList.remove(...beatClasses);
+    shell.classList.remove(...beatClasses);
+    setStylePropertyIfChanged(scene, '--text-glitch-beat-strength', '0');
+    setStylePropertyIfChanged(shell, '--text-glitch-beat-strength', '0');
+    return;
+  }
+
+  const beat = clamp(Number(state.visual.beat) || 0, 0, 1.4);
+  const sensitivity = clamp(Number(settings.glitchBeatSensitivity) || 56, 20, 95) / 100;
+  const threshold = 0.82 - sensitivity * 0.56;
+  const releaseThreshold = threshold * 0.62;
+  if (beat <= releaseThreshold) runtime.glitchBeatArmed = true;
+
+  const duration = clamp(Number(settings.glitchBeatDuration) || 180, 80, 420);
+  const cooldown = Math.max(96, duration * 0.58);
+  if (
+    !runtime.glitchBeatArmed
+    || beat < threshold
+    || now - runtime.glitchBeatLastAt < cooldown
+  ) return;
+
+  runtime.glitchBeatArmed = false;
+  runtime.glitchBeatLastAt = now;
+  runtime.glitchBeatVariant = runtime.glitchBeatVariant ? 0 : 1;
+  const strength = clamp(0.34 + (beat - threshold) / Math.max(0.12, 1 - threshold), 0.34, 1.25);
+  const nextClass = runtime.glitchBeatVariant
+    ? 'is-text-glitch-beat-a'
+    : 'is-text-glitch-beat-b';
+  scene.classList.remove(...beatClasses);
+  shell.classList.remove(...beatClasses);
+  setStylePropertyIfChanged(scene, '--text-glitch-beat-strength', strength.toFixed(3));
+  setStylePropertyIfChanged(shell, '--text-glitch-beat-strength', strength.toFixed(3));
+  scene.classList.add(nextClass);
+  shell.classList.add(nextClass);
+}
+
 function updatePlaybackSceneMotion() {
   const visual = state.playbackVisual;
   const now = performance.now();
@@ -23885,6 +29499,8 @@ function updatePlaybackSceneMotion() {
   visual.yaw = wrapRadians(visual.yaw);
   visual.pitch = wrapRadians(visual.pitch);
   updatePlaybackSceneTransform();
+  updateTextPresetBassGlow(playbackRunning);
+  updateGlitchBeatMotion(playbackRunning, now);
 
   if (centralLyricsNeedFrame) {
     const energy = Math.max(state.visual.energy, playbackRunning ? 0.48 : 0.08);
@@ -23899,8 +29515,7 @@ function updatePlaybackSceneMotion() {
     const bounce = playbackRunning
       ? Math.sin(now / 1000 * (2.2 + state.lyricSpeed * 0.72)) * 2.4 - bassJump * 16
       : 0;
-    const zoom = clamp(visual.zoom || 1, 0.58, 2.35);
-    const scale = (1 + visual.lyricPulse * 0.026 + bassJump * 0.05) * zoom;
+    const scale = 1 + visual.lyricPulse * 0.026 + bassJump * 0.05;
     const glowSize = Math.round(1 + bassJump * 8);
     const glowAlpha = clamp(bassJump * 0.42, 0, 0.48);
     setStylePropertyIfChanged(els.playbackLyricScene, '--lyric-pulse', visual.lyricPulse.toFixed(3));
@@ -24275,6 +29890,12 @@ function drawPlaybackParticles(context, rect, dpr, width, height) {
   const spreadY = height * 0.62 * zoom;
   const mouseX = visual.mouseX * width;
   const mouseY = visual.mouseY * height;
+  const mouseLimit = 170 * dpr;
+  const mouseLimitSq = mouseLimit * mouseLimit;
+  const baseYawCos = Math.cos(visual.yaw);
+  const baseYawSin = Math.sin(visual.yaw);
+  const pitchCos = Math.cos(visual.pitch);
+  const pitchSin = Math.sin(visual.pitch);
   const sprites = playbackParticleSprites(dpr);
   const particleLimit = Math.max(RENDER_PROFILE.playbackParticleFloor, Math.floor(visual.particles.length * visual.quality));
 
@@ -24292,20 +29913,25 @@ function drawPlaybackParticles(context, rect, dpr, width, height) {
       particle.z = Math.random() * 2 - 1;
     }
 
-    const point = rotatePoint(particle, visual.yaw + particle.phase * 0.008, visual.pitch);
-    const perspective = 1.34 / (1.34 - point.z * 0.42);
-    let x = cx + point.x * spreadX * perspective;
-    let y = cy + point.y * spreadY * perspective;
+    const yawCos = baseYawCos * particle.phaseYawCos - baseYawSin * particle.phaseYawSin;
+    const yawSin = baseYawSin * particle.phaseYawCos + baseYawCos * particle.phaseYawSin;
+    const rotatedX = particle.x * yawCos + particle.z * yawSin;
+    const yawZ = -particle.x * yawSin + particle.z * yawCos;
+    const rotatedY = particle.y * pitchCos - yawZ * pitchSin;
+    const rotatedZ = particle.y * pitchSin + yawZ * pitchCos;
+    const perspective = 1.34 / (1.34 - rotatedZ * 0.42);
+    let x = cx + rotatedX * spreadX * perspective;
+    let y = cy + rotatedY * spreadY * perspective;
     const dx = x - mouseX;
     const dy = y - mouseY;
-    const distance = Math.hypot(dx, dy);
-    if (distance < 170 * dpr) {
-      const force = (1 - distance / (170 * dpr)) * (26 + energy * 22) * dpr;
-      const angle = Math.atan2(dy, dx);
-      x += Math.cos(angle) * force;
-      y += Math.sin(angle) * force;
+    const distanceSq = dx * dx + dy * dy;
+    if (distanceSq < mouseLimitSq && distanceSq > 0.0001) {
+      const distance = Math.sqrt(distanceSq);
+      const force = (1 - distance / mouseLimit) * (26 + energy * 22) * dpr;
+      x += dx / distance * force;
+      y += dy / distance * force;
     }
-    const depth = (point.z + 1) / 2;
+    const depth = (rotatedZ + 1) / 2;
     const flicker = 0.72 + Math.sin(t * 2.2 + particle.phase) * 0.22;
     const size = Math.max(1.55 * dpr, particle.size * (3.4 + bass * 1.9) * perspective * dpr);
     const alpha = clamp(0.34 + depth * 0.5 + energy * 0.24, 0.18, 0.98) * flicker;
@@ -24346,7 +29972,7 @@ function spawnAmbientOrbStreak(width, height, dpr, now) {
 
 function drawAmbientOrbStreaks(context, width, height, dpr, now) {
   if (!RENDER_PROFILE.ambientStreaks) {
-    state.orb.ambientStreaks = [];
+    state.orb.ambientStreaks.length = 0;
     return;
   }
   if (!state.orb.nextAmbientStreakAt) scheduleAmbientOrbStreak(now);
@@ -24356,13 +29982,22 @@ function drawAmbientOrbStreaks(context, width, height, dpr, now) {
     scheduleAmbientOrbStreak(now);
   }
 
-  state.orb.ambientStreaks = state.orb.ambientStreaks.filter((streak) => now - streak.startedAt < streak.duration);
-  if (!state.orb.ambientStreaks.length) return;
+  const streaks = state.orb.ambientStreaks;
+  let activeCount = 0;
+  for (let index = 0; index < streaks.length; index += 1) {
+    const streak = streaks[index];
+    if (now - streak.startedAt < streak.duration) {
+      streaks[activeCount] = streak;
+      activeCount += 1;
+    }
+  }
+  streaks.length = activeCount;
+  if (!activeCount) return;
 
   context.save();
   context.globalCompositeOperation = 'lighter';
   context.lineCap = 'round';
-  for (const streak of state.orb.ambientStreaks) {
+  for (const streak of streaks) {
     const progress = clamp((now - streak.startedAt) / streak.duration, 0, 1);
     const ease = 1 - Math.pow(1 - progress, 3);
     const fade = Math.sin(progress * Math.PI);
@@ -24407,11 +30042,45 @@ function coveredPlaybackCanvasKey() {
   return '';
 }
 
+function invalidateOrbCanvasMetrics() {
+  state.orb.canvasMetrics.width = 0;
+  state.orb.canvasMetrics.height = 0;
+  state.orb.coveredCanvasKey = '';
+}
+
+function orbCanvasMetrics(canvas = els.canvas) {
+  const metrics = state.orb.canvasMetrics;
+  if (metrics.width > 0 && metrics.height > 0) return metrics;
+  const rect = canvas.getBoundingClientRect();
+  metrics.width = rect.width || window.innerWidth || document.documentElement.clientWidth || 1;
+  metrics.height = rect.height || window.innerHeight || document.documentElement.clientHeight || 1;
+  return metrics;
+}
+
+function initOrbCanvasMetrics() {
+  if (!els.canvas) return;
+  orbCanvasMetrics(els.canvas);
+  if (!('ResizeObserver' in window) || state.orb.resizeObserver) return;
+  state.orb.resizeObserver = new ResizeObserver((entries) => {
+    const rect = entries[entries.length - 1]?.contentRect;
+    const width = Number(rect?.width) || 0;
+    const height = Number(rect?.height) || 0;
+    if (!width || !height) return;
+    const metrics = state.orb.canvasMetrics;
+    if (metrics.width === width && metrics.height === height) return;
+    metrics.width = width;
+    metrics.height = height;
+    state.orb.coveredCanvasKey = '';
+    requestOrbFrame();
+  });
+  state.orb.resizeObserver.observe(els.canvas);
+}
+
 function clearCoveredPlaybackCanvas(canvas, key) {
   if (!canvas || state.orb.coveredCanvasKey === key) return;
   state.orb.coveredCanvasKey = key;
-  const context = canvas.getContext('2d');
-  const rect = canvas.getBoundingClientRect();
+  const context = state.orb.context || (state.orb.context = canvas.getContext('2d'));
+  const rect = orbCanvasMetrics(canvas);
   const dpr = renderPixelRatio('playback');
   const width = Math.max(1, Math.floor(rect.width * dpr));
   const height = Math.max(1, Math.floor(rect.height * dpr));
@@ -24455,8 +30124,8 @@ function drawOrb(now = performance.now()) {
     return;
   }
   state.orb.coveredCanvasKey = '';
-  const context = canvas.getContext('2d');
-  const rect = canvas.getBoundingClientRect();
+  const context = state.orb.context || (state.orb.context = canvas.getContext('2d'));
+  const rect = orbCanvasMetrics(canvas);
   const dpr = state.playbackPage ? renderPixelRatio('playback') : renderPixelRatio('canvas');
   const width = Math.max(1, Math.floor(rect.width * dpr));
   const height = Math.max(1, Math.floor(rect.height * dpr));
@@ -24703,6 +30372,8 @@ function startBackgroundPolling() {
     backgroundPollingTimers.push(window.setInterval(callback, interval));
   };
   every(refreshNativeAudioSample, MOBILE_RENDER_TARGET ? 120 : 50);
+  every(() => refreshNativeGoogleObrHealth().catch(() => {}), 250);
+  every(() => monitorAudioPlaybackContinuity().catch(() => {}), 100);
   every(refreshVisualBridge, 1000);
   every(() => refreshPlayerState().catch(() => {}), 5000);
   every(refreshUserPlaylists, 30000);
@@ -24711,27 +30382,9 @@ function startBackgroundPolling() {
   every(() => reportCommunityListening(false).catch(() => {}), 5000);
 }
 
-async function initOfficialBrowserLoginMode() {
-  initGlassSurfaces();
-  applyRuntimeDataset();
-  bindEvents();
-  initElasticRangeVisuals();
-  if (els.bootScreen) els.bootScreen.hidden = true;
-  els.loginDialog.hidden = false;
-  els.loginButton.setAttribute('aria-expanded', 'true');
-  if (els.officialBrowserLoginButton) els.officialBrowserLoginButton.hidden = true;
-  setOfficialBrowserLoginStatus('', true);
-
-  await refreshMusicApiProviders({ silent: true });
-  const selected = setActiveProvider(OFFICIAL_BROWSER_LOGIN_PROVIDER, { reloadQr: false });
-  if (selected) await loadLoginQr();
-}
-
 async function init() {
-  if (OFFICIAL_BROWSER_LOGIN_MODE) {
-    await initOfficialBrowserLoginMode();
-    return;
-  }
+  initCursorPreferences();
+  initCursorMotionRuntime();
   initDesktopSceneBridge();
   initBootScreen();
   initGlassSurfaces();
@@ -24739,13 +30392,18 @@ async function init() {
   initRenderCapabilityBridge();
   applyRuntimeDataset();
   loadWallpaperPrefs();
+  loadSceneWallpaperPrefs();
   applySonicTopographySettings({ persist: false, sync: true, renderConfig: false });
   restoreSandboxDraft();
+  await refreshUserCursors();
   await loadBundledSceneLibrary();
   bindEvents();
   bindSandboxEvents();
   bindOrbEvents();
+  syncAllSceneWallpaperSurfaces();
+  syncSceneWallpaperControl();
   initElasticRangeVisuals();
+  initOrbCanvasMetrics();
   initPlaybackParticles();
   initRenderClarity();
   enterWallpaperHome();
@@ -24756,6 +30414,7 @@ async function init() {
   syncPlaybackLyricPaletteControls();
   syncBilingualLyricsControl();
   syncMultiRowLyricsControl();
+  syncLyricClockControls();
   syncGoogleObrToggle();
   updateWallpaperDiyVars();
   updateBookLyricTransform();
@@ -24777,7 +30436,7 @@ async function init() {
 }
 
 function scheduleButtonGlowEnhancement() {
-  if (OFFICIAL_BROWSER_LOGIN_MODE || MOBILE_RENDER_TARGET || reducedMotion || RENDER_PROFILE.tier === 'economy') return;
+  if (MOBILE_RENDER_TARGET || reducedMotion || RENDER_PROFILE.tier === 'economy') return;
   const load = () => import('./border-glow-buttons.js?v=20260712-ui-performance-audit').catch(() => {});
   if ('requestIdleCallback' in window) {
     window.requestIdleCallback(load, { timeout: 2400 });
