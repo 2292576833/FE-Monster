@@ -61,7 +61,7 @@ final class FeMonsterWindowController: NSWindowController,
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
-        configuration.applicationNameForUserAgent = "FE-Monster-Mac/1.1.6"
+        configuration.applicationNameForUserAgent = "FE-Monster-Mac/1.8.8"
 
         webView = WKWebView(frame: .zero, configuration: configuration)
         hostView = RoundedContentView(frame: NSRect(

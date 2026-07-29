@@ -14,7 +14,7 @@ struct FEMonsterWebView: UIViewRepresentable {
         configuration.allowsInlineMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
         configuration.websiteDataStore = .default()
-        configuration.applicationNameForUserAgent = "FE-Monster-iOS/1.1.6"
+        configuration.applicationNameForUserAgent = "FE-Monster-iOS/1.8.8"
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
 
         let resourceRoot = Bundle.main.resourceURL?
