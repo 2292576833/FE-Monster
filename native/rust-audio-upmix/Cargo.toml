@@ -1,0 +1,20 @@
+[package]
+name = "fe-monster-upmix"
+version = "1.8.8"
+edition = "2024"
+license = "Apache-2.0"
+description = "FE Monster real-time-safe ABI wrapper for OxiMedia surround upmixing"
+
+[lib]
+name = "fe_monster_upmix"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+oximedia-audiopost = { version = "=0.2.0", default-features = false }
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+opt-level = 3
+panic = "abort"
+strip = "symbols"
