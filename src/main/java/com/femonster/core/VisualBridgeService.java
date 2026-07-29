@@ -84,14 +84,13 @@ public final class VisualBridgeService {
         double nativeLow = clamp01(SimpleJson.asDouble(nativeSample.get("lowFrequencyAmplitude"), 0));
         double nativeEnergy = clamp01(SimpleJson.asDouble(nativeSample.get("energy"), 0));
         double nativeBeat = clamp01(SimpleJson.asDouble(nativeSample.get("beat"), 0));
-        List<Double> nativeLowBands = lowFrequencyBands(nativeSample.get("lowFrequencyBands"), nativeLow);
         if (nativeActive) {
             Map<String, Object> map = new LinkedHashMap<>();
             double energy = clamp01(Math.max(nativeEnergy, nativeLow * 0.72));
             map.put("energy", energy);
             map.put("bass", nativeLow);
             map.put("lowFrequencyAmplitude", nativeLow);
-            map.put("lowFrequencyBands", nativeLowBands);
+            map.put("lowFrequencyBands", lowFrequencyBands(nativeSample.get("lowFrequencyBands"), nativeLow));
             map.put("lowFrequencyMinHz", 20);
             map.put("lowFrequencyMaxHz", 150);
             map.put("mid", clamp01(energy * 0.48));
@@ -121,14 +120,20 @@ public final class VisualBridgeService {
         return map;
     }
 
-    private static List<Double> lowFrequencyBands(Object value, double fallback) {
+    private static float[] lowFrequencyBands(Object value, double fallback) {
+        if (value instanceof float[] nativeBands && nativeBands.length == LOW_FREQUENCY_BAND_COUNT) {
+            // NativeAudioEngine already clamps this freshly-created sample array. Preserve it so
+            // the visual-state endpoint does not allocate and box another 512 spectrum values.
+            return nativeBands;
+        }
+
         List<Object> source = SimpleJson.asList(value);
-        List<Double> bands = new ArrayList<>(LOW_FREQUENCY_BAND_COUNT);
+        float[] bands = new float[LOW_FREQUENCY_BAND_COUNT];
+        float fallbackBand = (float) clamp01(fallback);
         for (int index = 0; index < LOW_FREQUENCY_BAND_COUNT; index += 1) {
-            double band = index < source.size()
-                ? SimpleJson.asDouble(source.get(index), fallback)
-                : fallback;
-            bands.add(clamp01(band));
+            bands[index] = index < source.size()
+                ? (float) clamp01(SimpleJson.asDouble(source.get(index), fallbackBand))
+                : fallbackBand;
         }
         return bands;
     }

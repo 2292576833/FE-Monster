@@ -41,10 +41,12 @@ import javax.net.ssl.X509TrustManager;
 
 public final class CommunityService implements CommunityClient {
     private static final Duration TIMEOUT = Duration.ofSeconds(3);
+    private static final long HEALTH_CACHE_MILLIS = 1800L;
     private final HttpClient http;
     private final String baseUrl;
     private final MachineIdentityService machine;
     private final CommunityModuleBridge communityModule;
+    private final Object healthCheckLock = new Object();
     private Map<String, Object> lastProfile = new LinkedHashMap<>();
     private volatile long lastHealthCheckAt = 0L;
     private volatile boolean lastHealthCheckOk = false;
@@ -335,25 +337,23 @@ public final class CommunityService implements CommunityClient {
 
     private boolean isOnline() {
         long now = System.currentTimeMillis();
-        if (!lastHealthCheckOk && now - lastHealthCheckAt < 1800) return false;
-        boolean online = isOnlineOnce();
-        if (!online) {
-            try {
-                sleepBeforeRetry();
-                online = isOnlineOnce();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+        if (now - lastHealthCheckAt < HEALTH_CACHE_MILLIS) return lastHealthCheckOk;
+        synchronized (healthCheckLock) {
+            now = System.currentTimeMillis();
+            if (now - lastHealthCheckAt < HEALTH_CACHE_MILLIS) return lastHealthCheckOk;
+            boolean online = isOnlineOnce();
+            if (!online) {
+                try {
+                    sleepBeforeRetry();
+                    online = isOnlineOnce();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
             }
+            lastHealthCheckAt = System.currentTimeMillis();
+            lastHealthCheckOk = online;
+            return online;
         }
-        if (online) {
-            lastHealthCheckAt = now;
-            lastHealthCheckOk = true;
-            return true;
-        }
-
-        lastHealthCheckAt = now;
-        lastHealthCheckOk = false;
-        return false;
     }
 
     private boolean isOnlineOnce() {

@@ -14,17 +14,46 @@ public final class HttpUtil {
     }
 
     public static Map<String, String> query(HttpExchange exchange) {
+        return parseQuery(exchange.getRequestURI().getRawQuery());
+    }
+
+    static Map<String, String> parseQuery(String raw) {
+        if (raw == null || raw.isBlank()) return Map.of();
         Map<String, String> params = new LinkedHashMap<>();
-        String raw = exchange.getRequestURI().getRawQuery();
-        if (raw == null || raw.isBlank()) return params;
-        for (String pair : raw.split("&")) {
-            if (pair.isEmpty()) continue;
-            int eq = pair.indexOf('=');
-            String key = eq >= 0 ? pair.substring(0, eq) : pair;
-            String value = eq >= 0 ? pair.substring(eq + 1) : "";
-            params.put(decode(key), decode(value));
+        int start = 0;
+        while (start <= raw.length()) {
+            int end = raw.indexOf('&', start);
+            if (end < 0) end = raw.length();
+            if (end > start) {
+                int eq = raw.indexOf('=', start);
+                if (eq < 0 || eq >= end) eq = end;
+                String key = raw.substring(start, eq);
+                String value = eq < end ? raw.substring(eq + 1, end) : "";
+                params.put(decode(key), decode(value));
+            }
+            if (end >= raw.length()) break;
+            start = end + 1;
         }
         return params;
+    }
+
+    static boolean hasNonEmptyRawParameter(String raw, String name) {
+        if (raw == null || raw.isBlank() || name == null || name.isEmpty()) return false;
+        int start = 0;
+        while (start <= raw.length()) {
+            int end = raw.indexOf('&', start);
+            if (end < 0) end = raw.length();
+            int eq = raw.indexOf('=', start);
+            if (eq > start && eq < end
+                && eq - start == name.length()
+                && raw.regionMatches(start, name, 0, name.length())
+                && eq + 1 < end) {
+                return true;
+            }
+            if (end >= raw.length()) break;
+            start = end + 1;
+        }
+        return false;
     }
 
     public static String readBody(HttpExchange exchange) throws IOException {

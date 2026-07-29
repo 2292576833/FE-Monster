@@ -1,10 +1,10 @@
 package com.femonster.core;
 
 import com.femonster.community.CommunityClient;
-import com.femonster.music.GenericMusicClient;
 import com.femonster.music.MusicApiConfigService;
 import com.femonster.music.MusicProviderClient;
 import com.femonster.music.MusicProviderRegistry;
+import com.femonster.music.ProviderProtocolClient;
 import com.femonster.netease.NeteaseClient;
 
 import java.io.IOException;
@@ -23,6 +23,7 @@ public final class AppContext {
     public final PlayerService player;
     public final VisualBridgeService visualBridge;
     public final WallpaperService wallpapers;
+    public final UserCursorService userCursors;
     public final CommunityClient community;
     public final CommunityModuleBridge communityModule;
     public final MachineIdentityService machine;
@@ -44,11 +45,14 @@ public final class AppContext {
         this.player = new PlayerService(paths.dataDir.resolve("player-state.json"), music);
         this.visualBridge = new VisualBridgeService(player, audioEngine);
         this.wallpapers = new WallpaperService(paths.dataDir);
+        this.userCursors = new UserCursorService(paths.dataDir);
         if (runtimeSettings.gestureControlEnabled()) {
             this.gestureControl.applyEnabled(true, runtimeSettings.gestureCameraSource());
         }
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            this.player.close();
             this.gestureControl.stop();
+            this.audioEngine.close();
             this.browserLogin.close();
             this.musicApis.close();
         }, "fe-monster-local-services-shutdown"));
@@ -72,7 +76,7 @@ public final class AppContext {
         for (String id : List.of("qq", "kugou", "qishui")) {
             MusicApiConfigService.ProviderConfig config = musicApis.provider(id);
             if (!config.enabled() || !config.configured()) continue;
-            clients.add(new GenericMusicClient(
+            clients.add(new ProviderProtocolClient(
                 config.id(),
                 config.label(),
                 config.baseUrl(),

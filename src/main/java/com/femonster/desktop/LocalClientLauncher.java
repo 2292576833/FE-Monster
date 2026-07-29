@@ -112,7 +112,7 @@ public final class LocalClientLauncher {
                 return false;
             }
             int debugPort = waitForDebugPort(profileDir);
-            currentSession = new ClientSession(process, profileDir, debugPort);
+            currentSession = new ClientSession(process, profileDir, debugPort, root);
             applyBorderlessWindow(root, process.pid());
             System.out.println("Local client: " + executable + (debugPort > 0 ? " (debug port " + debugPort + ")" : ""));
             return true;
@@ -143,7 +143,7 @@ public final class LocalClientLauncher {
                 if (process.waitFor(650, TimeUnit.MILLISECONDS) && process.exitValue() != 0) {
                     continue;
                 }
-                currentSession = new ClientSession(process, Path.of(executable).getParent(), -1);
+                currentSession = new ClientSession(process, Path.of(executable).getParent(), -1, root);
                 System.out.println("Native embedded client: " + executable);
                 return true;
             } catch (IOException ignored) {
@@ -158,6 +158,7 @@ public final class LocalClientLauncher {
     private static List<String> nativeClientCandidates(Path root) {
         List<String> candidates = new ArrayList<>();
         addEnv(candidates, "FE_MONSTER_NATIVE_CLIENT_EXE");
+        candidates.add(root.resolve("native").resolve("windows").resolve("build").resolve("winforms").resolve("FE Monster.exe").toString());
         candidates.add(root.resolve("native").resolve("windows").resolve("build").resolve("winforms").resolve("fe-monster-client.exe").toString());
         candidates.add(root.resolve("native").resolve("windows").resolve("build").resolve("fe-monster-client.exe").toString());
         candidates.add(root.resolve("out").resolve("fe-monster-client.exe").toString());
@@ -191,11 +192,15 @@ public final class LocalClientLauncher {
     }
 
     private static void applyBorderlessWindow(Path root, long processId) {
+        applyBorderlessWindow(root, processId, false, false);
+    }
+
+    private static void applyBorderlessWindow(Path root, long processId, boolean shapeOnly, boolean fullscreen) {
         String os = System.getProperty("os.name", "").toLowerCase();
         if (!os.contains("win")) return;
         Path script = root.resolve("scripts").resolve("make-window-borderless.ps1").toAbsolutePath().normalize();
         if (!Files.isRegularFile(script)) return;
-        List<String> command = List.of(
+        List<String> command = new ArrayList<>(List.of(
             "powershell.exe",
             "-NoProfile",
             "-ExecutionPolicy",
@@ -210,7 +215,9 @@ public final class LocalClientLauncher {
             String.valueOf(DEFAULT_WINDOW_WIDTH),
             "-Height",
             String.valueOf(DEFAULT_WINDOW_HEIGHT)
-        );
+        ));
+        if (shapeOnly) command.add("-ShapeOnly");
+        if (fullscreen) command.add("-Fullscreen");
         try {
             new ProcessBuilder(command).start();
         } catch (IOException ignored) {
@@ -271,6 +278,7 @@ public final class LocalClientLauncher {
         Map<String, Object> bounds = new LinkedHashMap<>();
         bounds.put("windowState", state);
         cdpCommand(session.debugPort, "Browser.setWindowBounds", Map.of("windowId", windowId, "bounds", bounds));
+        applyBorderlessWindow(session.root, session.process.pid(), true, "fullscreen".equals(state));
         Map<String, Object> body = ok();
         body.put("action", state);
         return body;
@@ -388,6 +396,6 @@ public final class LocalClientLauncher {
         return body;
     }
 
-    private record ClientSession(Process process, Path profileDir, int debugPort) {
+    private record ClientSession(Process process, Path profileDir, int debugPort, Path root) {
     }
 }

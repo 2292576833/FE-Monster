@@ -18,11 +18,18 @@ import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +39,8 @@ public final class ApiRoutes {
     private static final String WALLPAPER_WEB_ENTRY_PREFIX = "/api/wallpapers/web-entry/";
     private static final String WALLPAPER_WEB_FILE_PREFIX = "/api/wallpapers/web/";
     private static final String WALLPAPER_WEB_HOST = "wallpaper.localhost";
+    private static final String COVER_CACHE_CONTROL = "private, max-age=86400, stale-while-revalidate=604800";
+    private static final int MAX_QISHUI_LIBRARY_METADATA_BYTES = 2 * 1024 * 1024;
     private static final String WALLPAPER_WEB_CSP = String.join(" ",
         "sandbox allow-scripts allow-same-origin allow-forms allow-pointer-lock;",
         "default-src 'self' data: blob: https:;",
@@ -127,6 +136,8 @@ public final class ApiRoutes {
             ));
             case "/api/audio/runtime" -> HttpUtil.sendJson(exchange, context.audioEngine.runtimePayload());
             case "/api/audio/sample" -> HttpUtil.sendJson(exchange, context.audioEngine.samplePayload());
+            case "/api/audio/stream/status" -> HttpUtil.sendJson(exchange, audioStreamProxy.status());
+            case "/api/audio/spatial/status" -> HttpUtil.sendJson(exchange, context.audioEngine.spatialPayload());
             case "/api/app/window/fullscreen" -> HttpUtil.sendJson(exchange, LocalClientLauncher.controlPayload("fullscreen"));
             case "/api/app/window/normal" -> HttpUtil.sendJson(exchange, LocalClientLauncher.controlPayload("normal"));
             case "/api/app/window/minimize" -> HttpUtil.sendJson(exchange, LocalClientLauncher.controlPayload("minimize"));
@@ -136,6 +147,8 @@ public final class ApiRoutes {
             case "/api/visual-bridge/state" -> HttpUtil.sendJson(exchange, context.visualBridge.state());
             case "/api/wallpapers" -> HttpUtil.sendJson(exchange, context.wallpapers.payload(Boolean.parseBoolean(HttpUtil.param(query, "scan", "true"))));
             case "/api/wallpapers/file" -> handleWallpaperFile(exchange, query);
+            case "/api/user-cursors" -> HttpUtil.sendJson(exchange, context.userCursors.payload());
+            case "/api/user-cursors/file" -> handleUserCursorFile(exchange, query);
             case "/api/providers" -> HttpUtil.sendJson(exchange, context.music.providersPayload());
             case "/api/music-apis" -> HttpUtil.sendJson(exchange, context.musicApis.redactedPayload());
             case "/api/music-apis/status" -> HttpUtil.sendJson(exchange, context.musicApis.refreshStatus(
@@ -155,37 +168,34 @@ public final class ApiRoutes {
             ));
             case "/api/song/url", "/api/netease/song/url", "/api/qq/song/url", "/api/kugou/song/url", "/api/qishui/song/url" -> HttpUtil.sendJson(exchange, context.music.songUrlPayload(
                 providerFrom(path, query),
-                HttpUtil.param(query, "id", ""),
+                songFromQuery(query),
                 HttpUtil.param(query, "quality", HttpUtil.param(query, "level", "standard"))
             ));
-            case "/api/song/comments", "/api/netease/song/comments", "/api/qq/song/comments", "/api/kugou/song/comments", "/api/qishui/song/comments" -> HttpUtil.sendJson(exchange, context.music.commentsPayload(
+            case "/api/song/comments", "/api/netease/song/comments", "/api/qq/song/comments", "/api/kugou/song/comments" -> HttpUtil.sendJson(exchange, context.music.commentsPayload(
                 providerFrom(path, query),
                 songCommentId(query),
                 HttpUtil.intParam(query, "limit", 20, 1, 80)
             ));
-            case "/api/lyric", "/api/netease/lyric" -> HttpUtil.sendRawJson(exchange, 200, requireNetease().rawGet(
-                "/lyric",
-                mapOf("id", HttpUtil.param(query, "id", ""))
-            ));
+            case "/api/lyric", "/api/netease/lyric", "/api/qq/lyric", "/api/kugou/lyric" -> HttpUtil.sendJson(
+                exchange,
+                context.music.lyricPayload(
+                    providerFrom(path, query),
+                    HttpUtil.param(query, "id", ""),
+                    HttpUtil.param(query, "title", ""),
+                    HttpUtil.param(query, "artist", ""),
+                    HttpUtil.intParam(query, "duration", 0, 0, 86400)
+                )
+            );
             case "/api/cover" -> handleCover(exchange, query);
             case "/api/login/status" -> HttpUtil.sendJson(exchange, context.music.accountPayload(providerFrom(path, query)));
-            case "/api/netease/login/browser/status", "/api/qq/login/browser/status", "/api/kugou/login/browser/status", "/api/qishui/login/browser/status" -> HttpUtil.sendJson(
+            case "/api/netease/login/browser/status", "/api/qq/login/browser/status", "/api/kugou/login/browser/status" -> HttpUtil.sendJson(
                 exchange,
                 context.browserLogin.status(providerFrom(path, query), HttpUtil.param(query, "session", ""))
             );
-            case "/api/login/qr/key", "/api/netease/login/qr/key", "/api/qq/login/qr/key", "/api/kugou/login/qr/key", "/api/qishui/login/qr/key" -> HttpUtil.sendRawJson(exchange, 200, context.music.loginQrKeyPayload(providerFrom(path, query)));
             case "/api/netease/service/status", "/api/qq/service/status", "/api/kugou/service/status", "/api/qishui/service/status" -> HttpUtil.sendJson(exchange, context.music.serviceStatus(providerFrom(path, query)));
             case "/api/netease/login/status" -> HttpUtil.sendRawJson(exchange, 200, requireNetease().rawGet("/login/status"));
             case "/api/qq/login/status", "/api/kugou/login/status", "/api/qishui/login/status" -> HttpUtil.sendJson(exchange, context.music.accountPayload(providerFrom(path, query)));
-            case "/api/netease/login/qr/create", "/api/qq/login/qr/create", "/api/kugou/login/qr/create", "/api/qishui/login/qr/create" -> HttpUtil.sendRawJson(exchange, 200, context.music.loginQrCreatePayload(
-                providerFrom(path, query),
-                HttpUtil.param(query, "key", ""),
-                Boolean.parseBoolean(HttpUtil.param(query, "qrimg", "true"))
-            ));
-            case "/api/netease/login/qr/check", "/api/qq/login/qr/check", "/api/kugou/login/qr/check", "/api/qishui/login/qr/check" -> HttpUtil.sendRawJson(exchange, 200, context.music.loginQrCheckPayload(
-                providerFrom(path, query),
-                HttpUtil.param(query, "key", "")
-            ));
+            case "/api/qishui/local/status" -> HttpUtil.sendJson(exchange, context.music.localClientStatus("qishui"));
             case "/api/netease/user/playlists", "/api/qq/user/playlists", "/api/kugou/user/playlists", "/api/qishui/user/playlists" -> HttpUtil.sendJson(exchange, context.music.userPlaylistsPayload(providerFrom(path, query)));
             case "/api/user/playlists" -> HttpUtil.sendJson(exchange, SimpleJson.asList(context.music.userPlaylistsPayload(providerFrom(path, query)).get("playlists")));
             case "/api/recommend/playlists" -> HttpUtil.sendJson(exchange, context.music.recommendedPlaylistsPayload(
@@ -228,6 +238,7 @@ public final class ApiRoutes {
     }
 
     private void handleQuit(HttpExchange exchange, boolean quitServer) throws IOException {
+        context.player.flush();
         HttpUtil.sendJson(exchange, LocalClientLauncher.controlPayload(quitServer ? "quit" : "close"));
         if (quitServer) {
             Thread shutdown = new Thread(() -> {
@@ -281,17 +292,44 @@ public final class ApiRoutes {
     }
 
     private void handlePost(HttpExchange exchange, String path, Map<String, String> query) throws IOException {
-        if (path.equals("/api/netease/login/browser/start") || path.equals("/api/qq/login/browser/start")
-            || path.equals("/api/kugou/login/browser/start") || path.equals("/api/qishui/login/browser/start")) {
-            requireLocalBrowserLogin(exchange);
-            HttpUtil.sendJson(exchange, context.browserLogin.start(
-                providerFrom(path, query),
-                exchange.getLocalAddress().getPort()
+        if ("/api/audio/spatial/start".equals(path)) {
+            requireLocalNativeAudio(exchange);
+            HttpUtil.sendJson(exchange, context.audioEngine.startSpatialStream(
+                HttpUtil.intParam(query, "sampleRate", 48000, 16000, 192000),
+                HttpUtil.intParam(query, "inputChannels", 2, 1, 2),
+                HttpUtil.intParam(query, "layoutChannels", 6, 6, 8),
+                HttpUtil.intParam(query, "algorithm", 2, 0, 3)
             ));
             return;
         }
+        if ("/api/audio/spatial/activate".equals(path)) {
+            requireLocalNativeAudio(exchange);
+            HttpUtil.sendJson(exchange, context.audioEngine.setSpatialStreamMuted(
+                longParam(query, "session", 0),
+                false
+            ));
+            return;
+        }
+        if ("/api/audio/spatial/stop".equals(path)) {
+            requireLocalNativeAudio(exchange);
+            HttpUtil.sendJson(exchange, context.audioEngine.stopSpatialStream(
+                longParam(query, "session", 0)
+            ));
+            return;
+        }
+        if ("/api/audio/spatial/stream".equals(path)) {
+            requireLocalNativeAudio(exchange);
+            handleNativeSpatialStream(exchange, query);
+            return;
+        }
+        if (path.equals("/api/netease/login/browser/start") || path.equals("/api/qq/login/browser/start")
+            || path.equals("/api/kugou/login/browser/start")) {
+            requireLocalBrowserLogin(exchange);
+            HttpUtil.sendJson(exchange, context.browserLogin.start(providerFrom(path, query)));
+            return;
+        }
         if (path.equals("/api/netease/login/browser/cancel") || path.equals("/api/qq/login/browser/cancel")
-            || path.equals("/api/kugou/login/browser/cancel") || path.equals("/api/qishui/login/browser/cancel")) {
+            || path.equals("/api/kugou/login/browser/cancel")) {
             requireLocalBrowserLogin(exchange);
             HttpUtil.sendJson(exchange, context.browserLogin.cancel(
                 providerFrom(path, query),
@@ -299,12 +337,42 @@ public final class ApiRoutes {
             ));
             return;
         }
+        if (path.equals("/api/netease/login/browser/switch") || path.equals("/api/qq/login/browser/switch")
+            || path.equals("/api/kugou/login/browser/switch")) {
+            requireLocalBrowserLogin(exchange);
+            HttpUtil.sendJson(exchange, context.browserLogin.switchAccount(providerFrom(path, query)));
+            return;
+        }
         if ("/api/music-apis/import".equals(path)) {
             handleMusicApiImport(exchange, query);
             return;
         }
+        if ("/api/qishui/local/library/import".equals(path)) {
+            requireLocalBrowserLogin(exchange);
+            byte[] bytes = exchange.getRequestBody().readNBytes(MAX_QISHUI_LIBRARY_METADATA_BYTES + 1);
+            if (bytes.length > MAX_QISHUI_LIBRARY_METADATA_BYTES) {
+                throw new IllegalArgumentException("Qishui library metadata exceeds 2 MiB");
+            }
+            Map<String, Object> library = SimpleJson.parseObjectStrict(
+                new String(bytes, StandardCharsets.UTF_8)
+            );
+            HttpUtil.sendJson(exchange, context.music.importLibraryMetadata("qishui", library));
+            return;
+        }
         if ("/api/wallpapers/import".equals(path)) {
             HttpUtil.sendJson(exchange, context.wallpapers.importFile(HttpUtil.param(query, "name", "wallpaper"), exchange.getRequestBody()));
+            return;
+        }
+        if ("/api/user-cursors/import".equals(path)) {
+            requireLocalUserCursorImport(exchange);
+            String contentType = SimpleJson.asString(exchange.getRequestHeaders().getFirst("Content-Type"), "");
+            if (!contentType.toLowerCase().startsWith("image/png")) {
+                throw new IllegalArgumentException("user cursor upload must be a normalized PNG");
+            }
+            HttpUtil.sendJson(exchange, context.userCursors.importPng(
+                HttpUtil.param(query, "name", "cursor.png"),
+                exchange.getRequestBody()
+            ));
             return;
         }
         if ("/api/app/recording/save".equals(path)) {
@@ -327,13 +395,17 @@ public final class ApiRoutes {
                 exchange,
                 context.wallpapers.activate(SimpleJson.asString(root.get("id"), ""))
             );
+            case "/api/qishui/login/token" -> {
+                requireLocalBrowserLogin(exchange);
+                HttpUtil.sendJson(exchange, context.music.configureLogin("qishui", qishuiLoginCredentials(root)));
+            }
             case "/api/sandbox/generate", "/api/sandbox/codex/commit", "/api/sandbox/codex/rework",
                 "/api/sandbox/presets", "/api/sandbox/presets/delete",
                 "/api/sandbox/components", "/api/sandbox/components/delete",
                 "/api/preset-market/upload", "/api/preset-market/download",
                 "/api/component-market/upload", "/api/component-market/download" ->
                 HttpUtil.sendJson(exchange, context.community.sandboxPost(path, root));
-            case "/api/playlist/add", "/api/netease/playlist/add", "/api/qq/playlist/add", "/api/kugou/playlist/add", "/api/qishui/playlist/add" -> handlePlaylistAdd(exchange, path, query, root);
+            case "/api/playlist/add", "/api/netease/playlist/add", "/api/qq/playlist/add", "/api/kugou/playlist/add" -> handlePlaylistAdd(exchange, path, query, root);
             case "/api/community/friends/add" -> handleCommunityAddFriend(exchange, query, root);
             case "/api/community/profile" -> handleCommunityProfile(exchange, query, root);
             case "/api/community/listening" -> handleCommunityListening(exchange, query, root);
@@ -436,6 +508,117 @@ public final class ApiRoutes {
         }
     }
 
+    private static void requireLocalUserCursorImport(HttpExchange exchange) {
+        if (!"1".equals(exchange.getRequestHeaders().getFirst("X-FE-Monster-Cursor"))) {
+            throw new IllegalArgumentException("user cursor import must be confirmed by the local application");
+        }
+        var remote = exchange.getRemoteAddress();
+        if (remote == null || remote.getAddress() == null || !remote.getAddress().isLoopbackAddress()) {
+            throw new IllegalArgumentException("user cursor import is only available from this device");
+        }
+        String origin = exchange.getRequestHeaders().getFirst("Origin");
+        if (origin == null || origin.isBlank()) return;
+        try {
+            URI uri = URI.create(origin);
+            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase();
+            int originPort = uri.getPort() >= 0 ? uri.getPort() : 80;
+            int servicePort = exchange.getLocalAddress().getPort();
+            if (!("127.0.0.1".equals(host) || "localhost".equals(host) || "::1".equals(host))
+                || originPort != servicePort) {
+                throw new IllegalArgumentException("user cursor import requires a local application origin");
+            }
+        } catch (IllegalArgumentException error) {
+            throw new IllegalArgumentException("user cursor import requires a local application origin");
+        }
+    }
+
+    private static Map<String, String> qishuiLoginCredentials(Map<String, Object> root) {
+        Map<String, String> credentials = new LinkedHashMap<>();
+        String accessToken = boundedLoginCredential(root.get("accessToken"), "accessToken", 4096, true);
+        credentials.put("accessToken", accessToken);
+        putLoginCredential(credentials, "openId", root.get("openId"), 256);
+        putLoginCredential(credentials, "refreshToken", root.get("refreshToken"), 4096);
+        putLoginCredential(credentials, "clientKey", root.get("clientKey"), 256);
+        return credentials;
+    }
+
+    private static void putLoginCredential(
+        Map<String, String> target,
+        String name,
+        Object value,
+        int maximumLength
+    ) {
+        String credential = boundedLoginCredential(value, name, maximumLength, false);
+        if (!credential.isBlank()) target.put(name, credential);
+    }
+
+    private static String boundedLoginCredential(
+        Object value,
+        String name,
+        int maximumLength,
+        boolean required
+    ) {
+        String credential = SimpleJson.asString(value, "").trim();
+        if (required && credential.isBlank()) throw new IllegalArgumentException(name + " is required");
+        if (credential.length() > maximumLength) throw new IllegalArgumentException(name + " is too long");
+        return credential;
+    }
+
+    private static void requireLocalNativeAudio(HttpExchange exchange) {
+        if (!"1".equals(exchange.getRequestHeaders().getFirst("X-FE-Monster-Audio"))) {
+            throw new IllegalArgumentException("native audio stream must be started by the local application");
+        }
+        if (exchange.getRemoteAddress() == null
+            || exchange.getRemoteAddress().getAddress() == null
+            || !exchange.getRemoteAddress().getAddress().isLoopbackAddress()) {
+            throw new IllegalArgumentException("native audio streaming is only available on this device");
+        }
+    }
+
+    private void handleNativeSpatialStream(
+        HttpExchange exchange,
+        Map<String, String> query
+    ) throws IOException {
+        long session = longParam(query, "session", 0);
+        int inputChannels = HttpUtil.intParam(query, "inputChannels", 2, 1, 2);
+        if (session <= 0) throw new IllegalArgumentException("native spatial session is required");
+
+        int framesPerTransportBlock = 4096;
+        int samplesPerBlock = framesPerTransportBlock * inputChannels;
+        ByteBuffer encodedBlock = ByteBuffer
+            .allocateDirect(samplesPerBlock * Float.BYTES)
+            .order(ByteOrder.LITTLE_ENDIAN);
+        int blocks = 0;
+        int lastResult = 0;
+        try (InputStream input = exchange.getRequestBody();
+             ReadableByteChannel channel = Channels.newChannel(input)) {
+            while (true) {
+                int read = channel.read(encodedBlock);
+                if (read < 0) break;
+                if (encodedBlock.hasRemaining()) continue;
+
+                encodedBlock.flip();
+                lastResult = context.audioEngine.submitSpatialPcm(
+                    session,
+                    encodedBlock,
+                    framesPerTransportBlock
+                );
+                if (lastResult < 0) {
+                    throw new IOException("native spatial PCM submit failed: " + lastResult);
+                }
+                encodedBlock.clear();
+                blocks += 1;
+            }
+        } finally {
+            context.audioEngine.stopSpatialStream(session);
+        }
+
+        Map<String, Object> body = HttpUtil.ok();
+        body.put("blocks", blocks);
+        body.put("lastResult", lastResult);
+        HttpUtil.sendJson(exchange, body);
+    }
+
     private static long parseContentLength(HttpExchange exchange) {
         String value = exchange.getRequestHeaders().getFirst("Content-Length");
         if (value == null || value.isBlank()) return -1;
@@ -443,6 +626,14 @@ public final class ApiRoutes {
             return Long.parseLong(value);
         } catch (NumberFormatException error) {
             throw new IllegalArgumentException("invalid music API import length");
+        }
+    }
+
+    private static long longParam(Map<String, String> query, String name, long fallback) {
+        try {
+            return Long.parseLong(HttpUtil.param(query, name, String.valueOf(fallback)));
+        } catch (NumberFormatException ignored) {
+            return fallback;
         }
     }
 
@@ -726,6 +917,19 @@ public final class ApiRoutes {
         sendWallpaperFile(exchange, file, false);
     }
 
+    private void handleUserCursorFile(HttpExchange exchange, Map<String, String> query) throws IOException {
+        Path file = context.userCursors.resolve(HttpUtil.param(query, "id", ""));
+        byte[] png = Files.readAllBytes(file);
+        HttpUtil.addCors(exchange);
+        exchange.getResponseHeaders().set("Content-Type", "image/png");
+        exchange.getResponseHeaders().set("Cache-Control", "private, max-age=31536000, immutable");
+        exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+        exchange.sendResponseHeaders(200, png.length);
+        try (OutputStream output = exchange.getResponseBody()) {
+            output.write(png);
+        }
+    }
+
     private void handleWallpaperWebEntry(HttpExchange exchange, String path) throws IOException {
         WallpaperWebRoute route = parseWallpaperWebRoute(path, WALLPAPER_WEB_ENTRY_PREFIX);
         context.wallpapers.resolveWebFile(route.projectKey(), route.relativePath());
@@ -886,12 +1090,41 @@ public final class ApiRoutes {
             return;
         }
         try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+            HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(url))
                 .timeout(Duration.ofSeconds(10))
-                .GET()
-                .build();
-            HttpResponse<byte[]> response = coverClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+                .GET();
+            copyCoverConditionalHeader(exchange, request, "If-None-Match");
+            copyCoverConditionalHeader(exchange, request, "If-Modified-Since");
+            HttpResponse<byte[]> response = coverClient.send(request.build(), HttpResponse.BodyHandlers.ofByteArray());
             String type = response.headers().firstValue("content-type").orElse("image/jpeg");
+            if (response.statusCode() == 304) {
+                applyCoverCacheHeaders(
+                    exchange,
+                    type,
+                    response.headers().firstValue("etag").orElse(""),
+                    response.headers().firstValue("last-modified").orElse("")
+                );
+                sendCoverNotModified(exchange);
+                return;
+            }
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                byte[] body = response.body();
+                String etag = response.headers().firstValue("etag")
+                    .filter(value -> !value.isBlank())
+                    .orElseGet(() -> coverEntityTag(body));
+                applyCoverCacheHeaders(
+                    exchange,
+                    type,
+                    etag,
+                    response.headers().firstValue("last-modified").orElse("")
+                );
+                if (coverEntityTagMatches(exchange.getRequestHeaders().getFirst("If-None-Match"), etag)) {
+                    sendCoverNotModified(exchange);
+                    return;
+                }
+            } else {
+                exchange.getResponseHeaders().set("Cache-Control", "no-store");
+            }
             HttpUtil.sendBytes(exchange, response.statusCode(), type, response.body());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -901,10 +1134,70 @@ public final class ApiRoutes {
         }
     }
 
+    private static void copyCoverConditionalHeader(
+        HttpExchange exchange,
+        HttpRequest.Builder request,
+        String name
+    ) {
+        String value = exchange.getRequestHeaders().getFirst(name);
+        if (value == null || value.isBlank() || value.length() > 1024) return;
+        request.header(name, value);
+    }
+
+    private static void applyCoverCacheHeaders(
+        HttpExchange exchange,
+        String contentType,
+        String etag,
+        String lastModified
+    ) {
+        HttpUtil.addCors(exchange);
+        exchange.getResponseHeaders().set("Cache-Control", COVER_CACHE_CONTROL);
+        exchange.getResponseHeaders().set("Content-Type", contentType == null || contentType.isBlank() ? "image/jpeg" : contentType);
+        exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+        if (etag != null && !etag.isBlank()) exchange.getResponseHeaders().set("ETag", etag);
+        if (lastModified != null && !lastModified.isBlank()) {
+            exchange.getResponseHeaders().set("Last-Modified", lastModified);
+        }
+    }
+
+    private static void sendCoverNotModified(HttpExchange exchange) throws IOException {
+        exchange.sendResponseHeaders(304, -1);
+        exchange.close();
+    }
+
+    static String coverEntityTag(byte[] body) {
+        byte[] bytes = body == null ? new byte[0] : body;
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(bytes);
+            return '"' + HexFormat.of().formatHex(digest) + '"';
+        } catch (NoSuchAlgorithmException ignored) {
+            return "W/\"fe-" + bytes.length + '-' + Integer.toHexString(java.util.Arrays.hashCode(bytes)) + "\"";
+        }
+    }
+
+    static boolean coverEntityTagMatches(String requestValue, String currentValue) {
+        if (requestValue == null || requestValue.isBlank() || currentValue == null || currentValue.isBlank()) {
+            return false;
+        }
+        if ("*".equals(requestValue.trim())) return true;
+        String current = weakEntityTagValue(currentValue);
+        for (String candidate : requestValue.split(",")) {
+            if (weakEntityTagValue(candidate).equals(current)) return true;
+        }
+        return false;
+    }
+
+    private static String weakEntityTagValue(String value) {
+        String normalized = value == null ? "" : value.trim();
+        return normalized.regionMatches(true, 0, "W/", 0, 2)
+            ? normalized.substring(2).trim()
+            : normalized;
+    }
+
     private static Map<String, Object> appVersion() {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("name", "FE Monster Java");
-        body.put("version", "1.1.6");
+        body.put("version", "1.8.8");
         body.put("runtime", System.getProperty("java.version"));
         body.put("ok", true);
         return body;
@@ -928,6 +1221,14 @@ public final class ApiRoutes {
         song.cover = HttpUtil.param(query, "cover", "");
         song.provider = MusicProviderRegistry.normalize(HttpUtil.param(query, "provider", "netease"));
         song.duration = HttpUtil.intParam(query, "duration", 0, 0, 86400);
+        String sourceRef = HttpUtil.param(query, "sourceRef", "");
+        if (!sourceRef.isBlank()) {
+            try {
+                song.setSourceRef(SimpleJson.asMap(SimpleJson.parse(sourceRef)));
+            } catch (RuntimeException ignored) {
+                song.setSourceRef(Map.of());
+            }
+        }
         return song;
     }
 
@@ -1002,7 +1303,7 @@ public final class ApiRoutes {
 
     private static Map<String, Object> updatePayload() {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("version", "1.1.6");
+        body.put("version", "1.8.8");
         body.put("downloadUrl", "");
         body.put("releaseNotes", "New translucent playback page, clearer lyrics, independent lyric colors, rhythm mode, and adaptive preset performance.");
         body.put("fileSize", 0);

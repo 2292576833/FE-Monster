@@ -6,6 +6,7 @@ import com.femonster.music.MusicProviderRegistry;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.URI;
+import java.net.URLDecoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -34,10 +35,21 @@ import java.util.concurrent.TimeUnit;
 public final class OfficialBrowserLoginService implements AutoCloseable {
     private static final Duration SESSION_TTL = Duration.ofMinutes(10);
     private static final Map<String, ProviderSpec> PROVIDERS = Map.of(
-        "netease", new ProviderSpec("网易云音乐", List.of("163.com")),
-        "qq", new ProviderSpec("QQ 音乐", List.of("qq.com")),
-        "kugou", new ProviderSpec("酷狗音乐", List.of("kugou.com")),
-        "qishui", new ProviderSpec("汽水音乐", List.of("qishui.com"))
+        "netease", new ProviderSpec(
+            "网易云音乐",
+            "https://music.163.com/#/login",
+            List.of("163.com")
+        ),
+        "qq", new ProviderSpec(
+            "QQ 音乐",
+            "https://y.qq.com/n/ryqq/profile/like/song",
+            List.of("qq.com")
+        ),
+        "kugou", new ProviderSpec(
+            "酷狗音乐",
+            "https://activity.kugou.com/login/v-53b2f120/index.html?appid=1014&redirectUrl=https%3A%2F%2Fwww.kugou.com%2F",
+            List.of("kugou.com")
+        )
     );
 
     private final Path profileRoot;
@@ -52,12 +64,10 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
         this.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
     }
 
-    public synchronized Map<String, Object> start(String provider, int applicationPort) {
+    public synchronized Map<String, Object> start(String provider) {
         String id = MusicProviderRegistry.normalize(provider);
         ProviderSpec spec = PROVIDERS.get(id);
         if (spec == null) throw new IllegalArgumentException("unsupported browser login provider: " + id);
-        if (applicationPort < 1 || applicationPort > 65535) throw new IllegalArgumentException("invalid local application port");
-        music.get(id);
 
         String previousId = activeByProvider.remove(id);
         if (previousId != null) closeSession(sessions.get(previousId), "replaced");
@@ -81,8 +91,8 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
             command.add("--no-first-run");
             command.add("--no-default-browser-check");
             command.add("--disable-sync");
-            command.add("--window-size=440,600");
-            command.add("--app=http://127.0.0.1:" + applicationPort + "/?official-login=" + id);
+            command.add("--window-size=520,720");
+            command.add("--app=" + spec.loginUrl());
 
             ProcessBuilder builder = new ProcessBuilder(command);
             builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
@@ -161,6 +171,22 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
         }
     }
 
+    public synchronized Map<String, Object> switchAccount(String provider) {
+        String id = MusicProviderRegistry.normalize(provider);
+        if (!PROVIDERS.containsKey(id)) {
+            throw new IllegalArgumentException("unsupported browser login provider: " + id);
+        }
+        String previousId = activeByProvider.remove(id);
+        if (previousId != null) closeSession(sessions.get(previousId), "replaced");
+        boolean clearedLocalSession = music.clearBrowserSession(id);
+        clearProviderProfile(id);
+        Map<String, Object> body = new LinkedHashMap<>(start(id));
+        body.put("switchedAccount", true);
+        body.put("clearedLocalSession", clearedLocalSession);
+        body.put("message", PROVIDERS.get(id).label() + "当前账号已清除，请使用新账号扫码登录");
+        return body;
+    }
+
     private LoginSession requireSession(String provider, String sessionId) {
         String id = sessionId == null ? "" : sessionId.trim();
         LoginSession session = sessions.get(id);
@@ -226,11 +252,63 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
             case "netease" -> hasCookie(cookies, "MUSIC_U", "MUSIC_A");
             case "qq" -> hasCookie(cookies, "uin", "p_uin", "wxuin")
                 && hasCookie(cookies, "qm_keyst", "qqmusic_key", "p_skey", "skey");
-            case "kugou" -> hasCookie(cookies, "KuGoo", "KugooID", "userid")
-                || hasCookie(cookies, "token", "KugooToken");
-            case "qishui" -> hasCookie(cookies, "sessionid", "sessionid_ss", "sid_tt", "sid_guard");
+            case "kugou" -> hasKugouAuthenticatedSession(cookies);
             default -> false;
         };
+    }
+
+    private static boolean hasKugouAuthenticatedSession(Map<String, String> cookies) {
+        String kugoo = cookieValue(cookies, "KuGoo");
+        String userid = firstNonBlank(
+            cookieValue(cookies, "userid", "KugooID", "kugooid"),
+            nestedCookieValue(kugoo, "KugooID", "userid")
+        );
+        String token = firstNonBlank(
+            cookieValue(cookies, "token", "t", "KugooToken", "kugootoken", "KugooPwd"),
+            nestedCookieValue(kugoo, "t", "KugooPwd", "token")
+        );
+        return !userid.isBlank() && !"0".equals(userid) && !token.isBlank();
+    }
+
+    private static String cookieValue(Map<String, String> cookies, String... names) {
+        if (cookies == null || names == null) return "";
+        for (String name : names) {
+            for (Map.Entry<String, String> entry : cookies.entrySet()) {
+                if (entry.getKey().equalsIgnoreCase(name)
+                    && entry.getValue() != null
+                    && !entry.getValue().isBlank()) {
+                    return entry.getValue().trim();
+                }
+            }
+        }
+        return "";
+    }
+
+    private static String nestedCookieValue(String raw, String... names) {
+        if (raw == null || raw.isBlank()) return "";
+        String decoded;
+        try {
+            decoded = URLDecoder.decode(raw, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException ignored) {
+            decoded = raw;
+        }
+        for (String part : decoded.split("[&;]")) {
+            int separator = part.indexOf('=');
+            if (separator <= 0) continue;
+            String key = part.substring(0, separator).trim();
+            String value = part.substring(separator + 1).trim();
+            for (String name : names) {
+                if (key.equalsIgnoreCase(name) && !value.isBlank()) return value;
+            }
+        }
+        return "";
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) return value.trim();
+        }
+        return "";
     }
 
     private static boolean hasCookie(Map<String, String> cookies, String... names) {
@@ -300,6 +378,35 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
         }
     }
 
+    private void clearProviderProfile(String provider) {
+        Path normalizedRoot = profileRoot.toAbsolutePath().normalize();
+        Path target = normalizedRoot.resolve(provider).normalize();
+        if (!target.startsWith(normalizedRoot) || target.equals(normalizedRoot)) {
+            throw new IllegalArgumentException("invalid browser profile path");
+        }
+        IOException lastError = null;
+        for (int attempt = 0; attempt < 4; attempt++) {
+            try {
+                if (!Files.exists(target)) return;
+                List<Path> paths;
+                try (var stream = Files.walk(target)) {
+                    paths = stream.sorted(Comparator.reverseOrder()).toList();
+                }
+                for (Path path : paths) Files.deleteIfExists(path);
+                return;
+            } catch (IOException error) {
+                lastError = error;
+                try {
+                    Thread.sleep(120L * (attempt + 1));
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("browser profile cleanup interrupted", interrupted);
+                }
+            }
+        }
+        throw new IllegalStateException("unable to clear isolated browser profile for " + provider, lastError);
+    }
+
     private void closeSession(LoginSession session, String phase) {
         if (session == null) return;
         synchronized (session) {
@@ -314,10 +421,21 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
     private static void closeProcess(Process process) {
         if (process == null) return;
         try {
-            process.descendants().sorted(Comparator.comparingLong(ProcessHandle::pid).reversed()).forEach(handle -> {
+            List<ProcessHandle> descendants = process.descendants()
+                .sorted(Comparator.comparingLong(ProcessHandle::pid).reversed())
+                .toList();
+            descendants.forEach(handle -> {
                 if (handle.isAlive()) handle.destroy();
             });
             if (process.isAlive()) process.destroy();
+            if (process.isAlive()) process.waitFor(1500, TimeUnit.MILLISECONDS);
+            descendants.forEach(handle -> {
+                if (handle.isAlive()) handle.destroyForcibly();
+            });
+            if (process.isAlive()) process.destroyForcibly();
+            if (process.isAlive()) process.waitFor(1500, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
         } catch (RuntimeException ignored) {
         }
     }
@@ -335,7 +453,7 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
         activeByProvider.clear();
     }
 
-    private record ProviderSpec(String label, List<String> domains) {
+    private record ProviderSpec(String label, String loginUrl, List<String> domains) {
         boolean matchesDomain(String value) {
             String domain = value == null ? "" : value.toLowerCase(Locale.ROOT);
             while (domain.startsWith(".")) domain = domain.substring(1);

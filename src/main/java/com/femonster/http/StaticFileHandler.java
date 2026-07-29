@@ -107,7 +107,7 @@ public final class StaticFileHandler implements HttpHandler {
 
     private static boolean hasVersionToken(HttpExchange exchange) {
         String query = exchange.getRequestURI().getRawQuery();
-        return query != null && query.matches("(?:^|.*&)v=[^&]+(?:&.*|$)");
+        return HttpUtil.hasNonEmptyRawParameter(query, "v");
     }
 
     private static boolean isReloadableAppAsset(String contentType) {
