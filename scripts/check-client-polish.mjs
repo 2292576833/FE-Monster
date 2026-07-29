@@ -244,6 +244,16 @@ try {
       }
       enterPresetPlaybackPage('lyric');
 
+      const importedPngBytes = Uint8Array.from(
+        atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='),
+        (character) => character.charCodeAt(0)
+      );
+      await withTimeout(importWallpaperFiles([
+        new File([importedPngBytes], 'QA Imported Wallpaper.png', {
+          type: 'image/png',
+          lastModified: 20
+        })
+      ]), 'imported wallpaper fixture');
       await withTimeout(refreshWallpapers({ source: 'imported', scan: false }), 'imported wallpaper refresh');
       const importedImage = visibleWallpapers().find((wallpaper) => wallpaper.kind === 'image');
       if (importedImage) selectWallpaper(importedImage.id);
@@ -282,7 +292,7 @@ try {
       };
       const searchGlass = glassState(els.searchForm, searchStyle);
       const dockGlass = glassState(dock, dockStyle);
-      const bookPresetStyle = getComputedStyle(els.diyBookLyricPreset);
+      const bookPresetCoverStyle = getComputedStyle(els.diyBookLyricPreset, '::before');
       setDiyOpen(true);
       setDiyCardOpen(true);
       els.diyPresetPage.scrollTop = 32;
@@ -302,7 +312,8 @@ try {
           && (els.diyPresetPage.scrollHeight <= els.diyPresetPage.clientHeight + 1
             || els.diyPresetPage.scrollTop > 0),
         vipVisible: !els.loginVipBadge.hidden && getComputedStyle(els.loginVipBadge).display !== 'none',
-        bookPresetMatteBlack: bookPresetStyle.backgroundColor === 'rgb(10, 10, 10)',
+        bookPresetHasCover: bookPresetCoverStyle.backgroundImage.includes('scene-book-v2.webp')
+          && Number.parseFloat(bookPresetCoverStyle.opacity) >= 0.85,
         bookLyricComplete: bookMetrics.complete,
         bookLyricStaysSingleLine: bookMetrics.measurable
           && bookMetrics.fitsWidth
@@ -330,7 +341,7 @@ try {
         && result.hiddenScrollbar
         && result.pageStillScrolls
         && result.vipVisible
-        && result.bookPresetMatteBlack
+        && result.bookPresetHasCover
         && result.bookLyricComplete
         && result.bookLyricStaysSingleLine
         && result.bookLyricLayersAligned
@@ -345,6 +356,59 @@ try {
     })()`,
   });
   if (evaluation.exceptionDetails) throw new Error(evaluation.exceptionDetails.text || "Client polish evaluation failed");
+  const screenshotDir = path.resolve("artifacts");
+  mkdirSync(screenshotDir, { recursive: true });
+  const capturePage = async (fileName) => {
+    const screenshot = await command("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
+    const screenshotPath = path.join(screenshotDir, fileName);
+    writeFileSync(screenshotPath, Buffer.from(screenshot.data, "base64"));
+    return screenshotPath;
+  };
+  const inspectHoverSurface = async (selector, thresholds) => {
+    const readSurface = () => command("Runtime.evaluate", {
+      returnByValue: true,
+      expression: `(() => {
+        const card = document.querySelector(${JSON.stringify(selector)});
+        if (!card) return { available: false };
+        const rect = card.getBoundingClientRect();
+        const style = getComputedStyle(card);
+        const imageElement = card.matches('.diy-wallpaper-item')
+          ? card.querySelector('.diy-wallpaper-thumb img')
+          : null;
+        const imageStyle = imageElement ? getComputedStyle(imageElement) : getComputedStyle(card, '::before');
+        const matrix = new DOMMatrix(style.transform);
+        const imageMatrix = new DOMMatrix(imageStyle.transform);
+        return {
+          available: true,
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+          translateY: matrix.m42,
+          scale: matrix.m11,
+          imageScale: imageMatrix.m11,
+          borderColor: style.borderColor,
+          boxShadow: style.boxShadow,
+          hoverCapable: matchMedia('(hover: hover) and (pointer: fine)').matches
+        };
+      })()`,
+    });
+    const baseline = (await readSurface()).result.value;
+    if (!baseline.available) return { pass: false, baseline, hovered: { available: false } };
+    await command("Input.dispatchMouseEvent", { type: "mouseMoved", x: baseline.x, y: baseline.y });
+    await delay(420);
+    const hovered = (await readSurface()).result.value;
+    return {
+      pass: baseline.hoverCapable
+        && baseline.translateY <= thresholds.restY
+        && baseline.imageScale >= thresholds.restImageScale
+        && hovered.translateY <= thresholds.hoverY
+        && hovered.scale >= thresholds.hoverScale
+        && hovered.imageScale >= thresholds.hoverImageScale
+        && hovered.borderColor !== baseline.borderColor
+        && hovered.boxShadow !== baseline.boxShadow,
+      baseline,
+      hovered,
+    };
+  };
   await command("Runtime.evaluate", {
     expression: `(() => {
       els.bootScreen.hidden = true;
@@ -357,12 +421,124 @@ try {
     })()`,
   });
   await delay(600);
-  const screenshot = await command("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
-  const screenshotDir = path.resolve("artifacts");
-  const screenshotPath = path.join(screenshotDir, "client-polish-audit-1440x900.png");
-  mkdirSync(screenshotDir, { recursive: true });
-  writeFileSync(screenshotPath, Buffer.from(screenshot.data, "base64"));
+  const presetBaseline = await command("Runtime.evaluate", {
+    returnByValue: true,
+    expression: `(() => {
+      const card = document.querySelector('#diyScenePresetList [data-preset="cube"]');
+      const summarizeCards = (selector) => {
+        const cards = Array.from(document.querySelectorAll(selector));
+        const covers = cards.map((item) => getComputedStyle(item, '::before').backgroundImage);
+        const accents = cards.map((item) => getComputedStyle(item).getPropertyValue('--preset-accent-rgb').trim());
+        return {
+          count: cards.length,
+          distinctCovers: new Set(covers).size,
+          distinctAccents: new Set(accents).size,
+          allUseGeneratedCovers: covers.every((value) => value.includes('/assets/preset-covers/') && value.includes('-v2.webp'))
+        };
+      };
+      const rect = card.getBoundingClientRect();
+      const style = getComputedStyle(card);
+      const coverStyle = getComputedStyle(card, '::before');
+      const matrix = new DOMMatrix(style.transform);
+      const coverMatrix = new DOMMatrix(coverStyle.transform);
+      return {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+        translateY: matrix.m42,
+        scale: matrix.m11,
+        coverScale: coverMatrix.m11,
+        borderColor: style.borderColor,
+        boxShadow: style.boxShadow,
+        coverImage: coverStyle.backgroundImage,
+        mattePanel: getComputedStyle(els.diySidebar).backgroundImage,
+        panelFilter: getComputedStyle(els.diySidebar).backdropFilter,
+        scenePalette: summarizeCards('#diyScenePresetList .diy-preset-card[data-preset]'),
+        textPalette: summarizeCards('#diyTextPage .diy-preset-card[data-text-preset]')
+      };
+    })()`,
+  });
+  await command("Input.dispatchMouseEvent", {
+    type: "mouseMoved",
+    x: presetBaseline.result.value.x,
+    y: presetBaseline.result.value.y,
+  });
+  await delay(420);
+  const presetHovered = await command("Runtime.evaluate", {
+    returnByValue: true,
+    expression: `(() => {
+      const card = document.querySelector('#diyScenePresetList [data-preset="cube"]');
+      const style = getComputedStyle(card);
+      const coverStyle = getComputedStyle(card, '::before');
+      const matrix = new DOMMatrix(style.transform);
+      const coverMatrix = new DOMMatrix(coverStyle.transform);
+      return {
+        translateY: matrix.m42,
+        scale: matrix.m11,
+        coverScale: coverMatrix.m11,
+        borderColor: style.borderColor,
+        boxShadow: style.boxShadow,
+        hoverCapable: matchMedia('(hover: hover) and (pointer: fine)').matches
+      };
+    })()`,
+  });
+  const presetBaselineValue = presetBaseline.result.value;
+  const presetHoveredValue = presetHovered.result.value;
+  evaluation.result.value.presetCardSurface = {
+    pass: presetBaselineValue.coverImage.includes('scene-cube-v2.webp')
+      && presetBaselineValue.mattePanel.includes('rgba(8, 8, 10, 0.76)')
+      && presetBaselineValue.panelFilter.includes('blur(20px)')
+      && presetBaselineValue.scenePalette.count === 9
+      && presetBaselineValue.scenePalette.distinctCovers === 9
+      && presetBaselineValue.scenePalette.distinctAccents === 9
+      && presetBaselineValue.scenePalette.allUseGeneratedCovers
+      && presetBaselineValue.textPalette.count === 2
+      && presetBaselineValue.textPalette.distinctCovers === 2
+      && presetBaselineValue.textPalette.distinctAccents === 2
+      && presetBaselineValue.textPalette.allUseGeneratedCovers
+      && presetBaselineValue.translateY <= -2
+      && presetBaselineValue.coverScale >= 1.02
+      && presetHoveredValue.hoverCapable
+      && presetHoveredValue.translateY <= -9
+      && presetHoveredValue.scale >= 1.045
+      && presetHoveredValue.coverScale >= 1.075
+      && presetHoveredValue.borderColor !== presetBaselineValue.borderColor
+      && presetHoveredValue.boxShadow !== presetBaselineValue.boxShadow,
+    baseline: presetBaselineValue,
+    hovered: presetHoveredValue,
+  };
+  evaluation.result.value.ok = evaluation.result.value.ok && evaluation.result.value.presetCardSurface.pass;
+  const screenshotPath = await capturePage("client-polish-audit-1440x900.png");
+  await command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 4, y: 4 });
+  await command("Runtime.evaluate", {
+    expression: `(() => {
+      setDiyPreset('topography');
+      setTextPreset('depth');
+      commitDiyPage('text');
+    })()`,
+  });
+  await delay(520);
+  evaluation.result.value.textCardSurface = await inspectHoverSurface(
+    '#diyTextPage .diy-preset-card[data-text-preset="depth"]',
+    { restY: -2, restImageScale: 1.02, hoverY: -9, hoverScale: 1.045, hoverImageScale: 1.075 },
+  );
+  const textScreenshotPath = await capturePage("client-polish-text-1440x900.png");
+  await command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 4, y: 4 });
+  await command("Runtime.evaluate", { expression: `commitDiyPage('wallpaper')` });
+  await delay(520);
+  evaluation.result.value.wallpaperCardSurface = await inspectHoverSurface(
+    '#wallpaperList .diy-wallpaper-item',
+    { restY: -1, restImageScale: 1, hoverY: -7, hoverScale: 1.025, hoverImageScale: 1 },
+  );
+  const wallpaperScreenshotPath = await capturePage("client-polish-wallpaper-1440x900.png");
+  evaluation.result.value.ok = evaluation.result.value.ok
+    && evaluation.result.value.textCardSurface.pass
+    && evaluation.result.value.wallpaperCardSurface.pass;
   evaluation.result.value.screenshotPath = screenshotPath;
+  evaluation.result.value.screenshotPaths = {
+    preset: screenshotPath,
+    text: textScreenshotPath,
+    wallpaper: wallpaperScreenshotPath,
+  };
   process.stdout.write(`${JSON.stringify(evaluation.result.value, null, 2)}\n`);
   process.exitCode = evaluation.result.value.ok ? 0 : 1;
 } finally {

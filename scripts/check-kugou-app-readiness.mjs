@@ -1,11 +1,12 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:net';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const workspaceRoot = path.resolve('.');
 const jar = path.resolve(process.env.FE_TEST_JAR || 'out/fe-monster-java.jar');
-const pluginZip = path.resolve('dist/plugins/FE-Monster-Kugou-API-Plugin-1.5.1.zip');
+const pluginZip = path.resolve('dist/plugins/FE-Monster-Kugou-API-Plugin-2.0.1.zip');
 const javaCandidates = [
   process.env.FE_TEST_JAVA,
   process.env.FE_JAVA26_HOME ? path.join(process.env.FE_JAVA26_HOME, 'bin', 'java.exe') : '',
@@ -16,6 +17,14 @@ const javaCandidates = [
 const java = javaCandidates.find((candidate) => candidate === 'java.exe' || existsSync(candidate));
 if (!java) throw new Error('Java runtime was not found');
 if (!existsSync(jar)) throw new Error(`FE Monster jar was not found: ${jar}`);
+const configuredDataDir = String(process.env.FE_TEST_DATA_DIR || '').trim();
+const testDataDir = configuredDataDir
+  ? path.resolve(configuredDataDir)
+  : mkdtempSync(path.join(tmpdir(), 'fe-monster-kugou-readiness-'));
+const ownsTestDataDir = !configuredDataDir;
+const shouldImportPlugin = existsSync(pluginZip)
+  && process.env.FE_KUGOU_IMPORT_PLUGIN !== '0'
+  && (ownsTestDataDir || process.env.FE_KUGOU_IMPORT_PLUGIN === '1');
 
 async function freePort() {
   const server = createServer();
@@ -33,7 +42,12 @@ const port = await freePort();
 const baseUrl = `http://127.0.0.1:${port}`;
 const app = spawn(java, ['-jar', jar, '--no-client'], {
   cwd: workspaceRoot,
-  env: { ...process.env, FE_MONSTER_PORT: String(port), FE_MONSTER_BIND: '127.0.0.1' },
+  env: {
+    ...process.env,
+    FE_MONSTER_PORT: String(port),
+    FE_MONSTER_BIND: '127.0.0.1',
+    FE_MONSTER_DATA_DIR: testDataDir
+  },
   stdio: ['ignore', 'pipe', 'pipe'],
   windowsHide: true
 });
@@ -53,7 +67,13 @@ async function json(pathname, timeout = 30000) {
 }
 
 async function playableSource(song) {
-  const source = await json(`/api/kugou/song/url?id=${encodeURIComponent(song.id)}&quality=standard`);
+  let source;
+  try {
+    source = await json(`/api/kugou/song/url?id=${encodeURIComponent(song.id)}&quality=standard`);
+  } catch (error) {
+    if (/returned (?:403|404|422):/.test(String(error?.message || ''))) return null;
+    throw error;
+  }
   if (!source.url) return null;
   const media = await fetch(`${baseUrl}/api/audio/stream?url=${encodeURIComponent(source.url)}`, {
     headers: { Range: 'bytes=0-4095' },
@@ -80,7 +100,7 @@ try {
   }
   if (!ready) throw new Error(`FE Monster did not start: ${output.trim()}`);
 
-  if (process.env.FE_KUGOU_IMPORT_PLUGIN === '1' && existsSync(pluginZip)) {
+  if (shouldImportPlugin) {
     const imported = await fetch(
       `${baseUrl}/api/music-apis/import?${new URLSearchParams({ name: path.basename(pluginZip), trusted: 'true' })}`,
       {
@@ -100,15 +120,22 @@ try {
   }
 
   let reachable = false;
+  let lastProviderStatus = {};
   for (let attempt = 0; attempt < 100; attempt += 1) {
     const status = await json('/api/music-apis/status?provider=kugou').catch(() => ({}));
+    lastProviderStatus = status;
     if (status.reachable === true) {
       reachable = true;
       break;
     }
     await delay(150);
   }
-  if (!reachable) throw new Error('Imported Kugou plugin did not become reachable');
+  if (!reachable) {
+    throw new Error(
+      `Imported Kugou plugin did not become reachable: ${JSON.stringify(lastProviderStatus)}`
+      + (output.trim() ? `; app output: ${output.trim()}` : '')
+    );
+  }
 
   const account = await json('/api/login/status?provider=kugou');
   const library = await json('/api/kugou/user/playlists');
@@ -161,7 +188,7 @@ try {
   }
   if (!playlistPlayback) throw new Error(`Kugou playlist songs had no playable audio: ${JSON.stringify(playlistReports)}`);
 
-  const search = await json(`/api/kugou/search?q=${encodeURIComponent('周杰伦')}&limit=12`);
+  const search = await json(`/api/kugou/search?q=${encodeURIComponent('纯音乐')}&limit=30`);
   const songs = Array.isArray(search.songs) ? search.songs : [];
   let playbackReport = null;
   for (const song of songs) {
@@ -176,6 +203,14 @@ try {
       spawnSync('taskkill.exe', ['/PID', String(app.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
     } else {
       app.kill('SIGTERM');
+    }
+  }
+  if (ownsTestDataDir) {
+    await delay(750);
+    try {
+      rmSync(testDataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 200 });
+    } catch (error) {
+      console.warn(`Kugou readiness cleanup was deferred: ${error.message}`);
     }
   }
 }

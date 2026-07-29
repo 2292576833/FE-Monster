@@ -1,7 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
@@ -9,11 +8,14 @@ const webRoot = path.join(root, 'web');
 const edge = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const width = Math.max(960, Number.parseInt(process.argv[2] || '1440', 10) || 1440);
 const height = Math.max(540, Number.parseInt(process.argv[3] || '900', 10) || 900);
-const debugPort = 17000 + (process.pid % 10000);
-const profile = path.resolve(tmpdir(), `fe-monster-chladni-${process.pid}`);
+const debugPort = 17000 + Math.floor(Math.random() * 10000);
+const testTempRoot = path.join(root, '.tmp');
+mkdirSync(testTempRoot, { recursive: true });
+const profile = path.resolve(testTempRoot, `fe-monster-chladni-${process.pid}`);
 const artifactDir = path.resolve(root, 'artifacts');
 const screenshotPath = path.join(artifactDir, `chladni-${width}x${height}.png`);
 const planeScreenshotPath = path.join(artifactDir, `chladni-plane-${width}x${height}.png`);
+const sonicScreenshotPath = path.join(artifactDir, `sonic-wallpaper-${width}x${height}.png`);
 const loginStatusStartedAt = new Map();
 mkdirSync(artifactDir, { recursive: true });
 
@@ -136,7 +138,8 @@ async function evaluate(expression) {
 
 try {
   const targets = await retryJson(`http://127.0.0.1:${debugPort}/json`);
-  const target = targets.find((item) => item.type === 'page');
+  const target = targets.find((item) => item.type === 'page' && item.url === 'about:blank')
+    || targets.find((item) => item.type === 'page');
   if (!target?.webSocketDebuggerUrl) throw new Error('No Edge page target was found');
   socket = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => {
@@ -202,7 +205,10 @@ try {
     const first = window.FeSandboxDiagnostics.chladni();
     const textDragResults = {};
     const sceneZoomBeforeTextTransforms = state.playbackVisual.zoom;
-    const textPresets = ['depth', 'flow', 'book-effect', 'focus-echo', 'book'];
+    // Only the two restored cards are selectable. Flow/book are composer
+    // parameters now, so treating their old ids as presets produces false
+    // interaction failures and accidentally falls back to the depth card.
+    const textPresets = ['depth', 'focus-echo'];
     for (let index = 0; index < textPresets.length; index += 1) {
       const preset = textPresets[index];
       const text = 'QA drag ' + preset;
@@ -235,13 +241,17 @@ try {
           const b = right.getBoundingClientRect();
           return a.width * a.height - b.width * b.height;
         });
-      const target = preset === 'book'
-        ? document.querySelector('#bookLyricStage')
-        : candidates[0] || lyricRoot;
+      const gestureTargets = typeof textPresetTargets === 'function'
+        ? textPresetTargets()
+        : [];
+      const target = gestureTargets.find((element) => {
+        const rect = element?.getBoundingClientRect?.();
+        return rect && rect.width > 1 && rect.height > 1;
+      }) || candidates[0] || lyricRoot;
       const before = target?.getBoundingClientRect();
       if (target && before) {
         const pointerId = 70 + index;
-        const startX = before.left + before.width / 2;
+        const startX = before.left + before.width * 0.12;
         const startY = before.top + before.height / 2;
         target.dispatchEvent(new PointerEvent('pointerdown', {
           bubbles: true, pointerId, pointerType: 'mouse', button: 0, buttons: 1,
@@ -257,9 +267,32 @@ try {
         }));
         await wait(50);
       }
-      const after = target?.getBoundingClientRect();
+      const afterRotate = target?.getBoundingClientRect();
       const genericRotateX = Number(state.textPresetTransforms?.[preset]?.rotateX) || 0;
       const genericRotateY = Number(state.textPresetTransforms?.[preset]?.rotateY) || 0;
+      const genericRotateZ = Number(state.textPresetTransforms?.[preset]?.rotateZ) || 0;
+      if (target && afterRotate) {
+        const pointerId = 80 + index;
+        const startX = afterRotate.left + afterRotate.width / 2;
+        const startY = afterRotate.top + afterRotate.height / 2;
+        target.dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true, pointerId, pointerType: 'mouse', button: 0, buttons: 1,
+          clientX: startX, clientY: startY
+        }));
+        await wait(390);
+        els.stage.dispatchEvent(new PointerEvent('pointermove', {
+          bubbles: true, pointerId, pointerType: 'mouse', buttons: 1,
+          clientX: startX + 56, clientY: startY + 34
+        }));
+        els.stage.dispatchEvent(new PointerEvent('pointerup', {
+          bubbles: true, pointerId, pointerType: 'mouse', button: 0, buttons: 0,
+          clientX: startX + 56, clientY: startY + 34
+        }));
+        await wait(30);
+      }
+      const genericX = Number(state.textPresetTransforms?.[preset]?.x) || 0;
+      const genericY = Number(state.textPresetTransforms?.[preset]?.y) || 0;
+      const after = target?.getBoundingClientRect();
       const rotateBefore = Number(state.chladniTextTransform?.rotate) || 0;
       const shiftMoveBefore = Number(state.chladniTextTransform?.x) || 0;
       if (target && after) {
@@ -283,9 +316,7 @@ try {
       const shiftMoveAfter = Number(state.chladniTextTransform?.x) || 0;
       const rotateXBefore = Number(state.chladniTextTransform?.rotateX) || 0;
       const rotateYBefore = Number(state.chladniTextTransform?.rotateY) || 0;
-      const tiltTarget = preset === 'book'
-        ? document.querySelector('#bookLyricStage')
-        : document.querySelector('#playbackLyricCore');
+      const tiltTarget = document.querySelector('#playbackLyricCore');
       const tiltRect = tiltTarget?.getBoundingClientRect();
       if (tiltTarget && tiltRect) {
         const pointerId = 105 + index;
@@ -323,8 +354,8 @@ try {
       textDragResults[preset] = {
         selected: state.textPreset === preset,
         targetFound: Boolean(target && before && after),
-        deltaX: before && after ? Math.round((after.left - before.left) * 10) / 10 : 0,
-        deltaY: before && after ? Math.round((after.top - before.top) * 10) / 10 : 0,
+        genericX: Math.round(genericX * 10) / 10,
+        genericY: Math.round(genericY * 10) / 10,
         rotateDelta: Math.round((rotateAfter - rotateBefore) * 10) / 10,
         shiftMoveDelta: Math.round((shiftMoveAfter - shiftMoveBefore) * 10) / 10,
         rotateXDelta: Math.round((rotateXAfter - rotateXBefore) * 10) / 10,
@@ -332,13 +363,15 @@ try {
         scaleDelta: Math.round((genericScaleAfter - genericScaleBefore) * 1000) / 1000,
         genericRotateX: Math.round(genericRotateX * 10) / 10,
         genericRotateY: Math.round(genericRotateY * 10) / 10,
+        genericRotateZ: Math.round(genericRotateZ * 10) / 10,
         legacyScaleDelta: Math.round((scaleAfter - scaleBefore) * 1000) / 1000
       };
     }
+    setTextPreset('depth');
     state.chladniTextTransform.rotateX = 170;
     state.chladniTextTransform.rotateY = 170;
     updateChladniTextTransform();
-    const freeTiltTarget = document.querySelector('#bookLyricStage');
+    const freeTiltTarget = document.querySelector('#playbackLyricCore');
     const freeTiltRect = freeTiltTarget.getBoundingClientRect();
     const freeTiltStableWidth = freeTiltTarget.offsetWidth * (Number(state.chladniTextTransform?.scale) || 1);
     const freeTiltStartX = freeTiltRect.left + freeTiltRect.width / 2 - freeTiltStableWidth / 2 - 52;
@@ -438,6 +471,39 @@ try {
     };
   })()`);
 
+  const wallpaper = await evaluate(`(async () => {
+    const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+    const svg = [
+      '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">',
+      '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">',
+      '<stop offset="0" stop-color="#14213d"/><stop offset="0.52" stop-color="#6b2d5c"/>',
+      '<stop offset="1" stop-color="#d97736"/></linearGradient></defs>',
+      '<rect width="1600" height="900" fill="url(#g)"/>',
+      '<path d="M0 720 Q400 520 800 720 T1600 720 V900 H0Z" fill="#08111e" opacity=".72"/>',
+      '<circle cx="140" cy="140" r="72" fill="#f2d492" opacity=".92"/>',
+      '<rect x="1340" y="90" width="150" height="150" rx="28" fill="#70d6ff" opacity=".82"/>',
+      '<text x="800" y="830" text-anchor="middle" fill="white" font-size="48" font-family="sans-serif">FE WALLPAPER QA</text>',
+      '</svg>'
+    ].join('');
+    const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    const runtime = state.chladni.runtime;
+    window.FeChladniRuntime.setWallpaper(runtime, {
+      enabled: true,
+      url,
+      mediaKind: 'image',
+      opacity: 1
+    });
+    const startedAt = performance.now();
+    while (!runtime.wallpaperTexture && performance.now() - startedAt < 4000) await wait(40);
+    setChladniMode('plane');
+    await wait(180);
+    const plane = window.FeSandboxDiagnostics.chladni();
+    setChladniMode('cube');
+    await wait(180);
+    const cube = window.FeSandboxDiagnostics.chladni();
+    return { plane, cube };
+  })()`);
+
   await evaluate(`(async () => {
     setTextPreset('none');
     setChladniMode('plane');
@@ -458,6 +524,65 @@ try {
     return window.FeSandboxDiagnostics.chladni();
   })()`);
 
+  const sonicWallpaper = await evaluate(`(async () => {
+    const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+    enterPresetPlaybackPage('topography');
+    requestOrbFrame();
+    const startedAt = performance.now();
+    while (!state.sonicTopography?.renderer && performance.now() - startedAt < 8000) await wait(80);
+    const topo = state.sonicTopography;
+    if (!topo?.renderer) throw new Error('Sonic renderer did not start');
+    const svg = [
+      '<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">',
+      '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">',
+      '<stop offset="0" stop-color="#081426"/><stop offset="0.52" stop-color="#214b63"/>',
+      '<stop offset="1" stop-color="#bb5f45"/></linearGradient></defs>',
+      '<rect width="1600" height="900" fill="url(#g)"/>',
+      '<circle cx="170" cy="160" r="82" fill="#ffe7a3" opacity=".88"/>',
+      '<path d="M0 690 Q360 580 720 680 T1440 660 T1600 650" fill="none" stroke="#78e3ff" stroke-width="12" opacity=".7"/>',
+      '<text x="800" y="825" text-anchor="middle" fill="white" font-size="46" font-family="sans-serif">SONIC WALLPAPER QA</text>',
+      '</svg>'
+    ].join('');
+    setSonicWallpaperSurface({
+      enabled: true,
+      url: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg),
+      mediaKind: 'image',
+      opacity: 1
+    });
+    const textureStartedAt = performance.now();
+    while (!topo.wallpaperTexture && performance.now() - textureStartedAt < 4000) await wait(40);
+    topo.lastMotionAt = performance.now() - 16;
+    topo.lastRenderAt = 0;
+    updateSonicTopographyMotion();
+    await wait(260);
+    const surface = topo.wallpaperSurface;
+    const distance = Number(surface?.userData?.distance) || 0;
+    const visibleHeight = 2 * Math.tan(topo.camera.fov * Math.PI / 360) * distance;
+    const visibleWidth = visibleHeight * Math.max(0.1, topo.camera.aspect || 1);
+    const positions = surface?.geometry?.getAttribute?.('position');
+    let minimumDepth = 0;
+    for (let index = 0; index < (positions?.count || 0); index += 1) {
+      minimumDepth = Math.min(minimumDepth, positions.getZ(index));
+    }
+    return {
+      enabled: surface?.visible === true,
+      loaded: !!topo.wallpaperTexture,
+      surface: surface?.userData?.surface || '',
+      cameraAnchored: surface?.parent === topo.camera,
+      fullViewport: surface?.scale?.x * 2 >= visibleWidth
+        && surface?.scale?.y * 2 >= visibleHeight,
+      curved: minimumDepth < -0.02,
+      backgroundSuppressed: topo.background?.visible === false
+    };
+  })()`);
+  const sonicScreenshot = await command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+  writeFileSync(sonicScreenshotPath, Buffer.from(sonicScreenshot.data, 'base64'));
+  await evaluate(`(async () => {
+    setDiyPreset('lyric');
+    returnHomePage();
+    await new Promise((resolve) => setTimeout(resolve, 160));
+  })()`);
+
   const shaderErrors = browserErrors.filter((message) => /shader|webgl|gl_invalid|program/i.test(message));
   const checks = {
     startupAccountRestored: startupAccount.loggedIn
@@ -471,6 +596,21 @@ try {
       && scene.first.nodeAccumulation === 'particle-opacity-peaks-at-zero-displacement'
       && scene.first.transparentPlate === false
       && scene.first.centerSphere === false,
+    wallpaperFillsPlaneAndCube: ['plane', 'cube'].every((mode) => (
+      wallpaper[mode]?.wallpaper?.enabled === true
+      && wallpaper[mode]?.wallpaper?.loaded === true
+      && wallpaper[mode]?.wallpaper?.cameraAnchored === true
+      && wallpaper[mode]?.wallpaper?.fullViewport === true
+      && wallpaper[mode]?.wallpaper?.surface === 'camera-concave-fullscreen'
+      && wallpaper[mode]?.supportObjectCount === 0
+    )),
+    sonicWallpaperFillsCurvedViewport: sonicWallpaper.enabled === true
+      && sonicWallpaper.loaded === true
+      && sonicWallpaper.surface === 'camera-curved-fullscreen'
+      && sonicWallpaper.cameraAnchored === true
+      && sonicWallpaper.fullViewport === true
+      && sonicWallpaper.curved === true
+      && sonicWallpaper.backgroundSuppressed === true,
     threeDimensional: scene.first.threeDimensional === true && scene.first.displacementAxis === 'y',
     crispParticles: scene.first.particleProfile === 'crisp-antialiased-disc'
       && scene.first.maxPointSize === 2.6
@@ -522,8 +662,8 @@ try {
     allTextPresetsDraggable: Object.values(scene.textDragResults).every((result) => (
       result.selected
       && result.targetFound
-      && Math.abs(result.deltaX) >= 24
-      && Math.abs(result.deltaY) >= 12
+      && Math.abs(result.genericX) >= 40
+      && Math.abs(result.genericY) >= 20
     )),
     shiftDragMovesWithoutRotation: Object.values(scene.textDragResults).every((result) => (
       Math.abs(result.shiftMoveDelta) >= 30
@@ -531,8 +671,9 @@ try {
       && result.scaleDelta >= 0.05
     )),
     allTextPresetsThreeDimensional: Object.values(scene.textDragResults).every((result) => (
-      Math.abs(result.genericRotateX) >= 12
-      && Math.abs(result.genericRotateY) >= 12
+      result.genericRotateX <= -12
+      && result.genericRotateY >= 20
+      && result.genericRotateZ <= -5
     )),
     textTransformsLeaveSceneZoom: scene.sceneZoomAfterTextTransforms === scene.sceneZoomBeforeTextTransforms,
     textScaleRequiresHover: scene.textScaleAfterOutsideWheel === scene.textScaleBeforeOutsideWheel,
@@ -540,6 +681,7 @@ try {
     freeTextThreeDimensionalRotation: Object.values(scene.textDragResults).every((result) => (
       Math.abs(result.genericRotateX) >= 12
       && Math.abs(result.genericRotateY) >= 12
+      && Math.abs(result.genericRotateZ) >= 5
       && Math.abs(result.genericRotateX) <= 180
       && Math.abs(result.genericRotateY) <= 180
     )),
@@ -553,11 +695,14 @@ try {
     viewport: `${width}x${height}`,
     checks,
     diagnostics: scene,
+    wallpaper,
+    sonicWallpaper,
     startupAccount,
     cleanup,
     browserErrors,
     screenshotPath,
-    planeScreenshotPath
+    planeScreenshotPath,
+    sonicScreenshotPath
   };
   console.log(JSON.stringify(result, null, 2));
   if (!result.pass) process.exitCode = 1;

@@ -20,7 +20,7 @@ function lyricTimelineTime(currentTime, visualLead, compensation) {
 function findLyricIndexAtTime(lines, currentTime, visualLead, compensation) {
   let low = 0;
   let high = lines.length - 1;
-  let found = 0;
+  let found = -1;
   const time = lyricTimelineTime(currentTime, visualLead, compensation);
   while (low <= high) {
     const mid = Math.floor((low + high) / 2);
@@ -37,6 +37,16 @@ function findLyricIndexAtTime(lines, currentTime, visualLead, compensation) {
 const bookLead = constant('BOOK_LYRIC_VISUAL_LEAD_SECONDS');
 const glyphLead = constant('BOOK_LYRIC_GLYPH_VISUAL_LEAD_SECONDS');
 const compensation = constant('LYRIC_TIMESTAMP_COMPENSATION_SECONDS');
+
+if (!/function findLyricIndexAtTime[\s\S]*?let found = -1;/.test(source)) {
+  throw new Error('Lyric lookup still activates the first line before its timestamp');
+}
+if (!/function updateBookLyricLines[\s\S]*?clamp\(state\.lyricIndex, -1,/.test(source)) {
+  throw new Error('Book lyrics still force the first row active before its timestamp');
+}
+if (!/function renderMultiRowLyrics[\s\S]*?clamp\(state\.lyricIndex, -1,/.test(source)) {
+  throw new Error('Multi-row lyrics still force the first row active before its timestamp');
+}
 
 if (source.includes('Math.round(time / LYRIC_FRAME_SAMPLE_SECONDS)')) {
   throw new Error('Book lyric time is still quantized to a fixed refresh rate');
@@ -75,6 +85,11 @@ const lines = [
   { time: 10, text: 'next lyric' },
   { time: 12.4, text: 'after lyric' }
 ];
+
+const indexBeforeFirstTimestamp = findLyricIndexAtTime(lines, 1, 0, compensation);
+if (indexBeforeFirstTimestamp !== -1) {
+  throw new Error(`First lyric activated before its timestamp: ${indexBeforeFirstTimestamp}`);
+}
 
 const indexBeforeLeadWindow = findLyricIndexAtTime(lines, 9.80, bookLead, compensation);
 const indexInsideLeadWindow = findLyricIndexAtTime(lines, 9.91, bookLead, compensation);

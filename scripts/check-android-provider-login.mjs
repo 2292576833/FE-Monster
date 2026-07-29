@@ -6,7 +6,7 @@ import vm from "node:vm";
 const root = path.resolve(import.meta.dirname, "..");
 const runtimePath = path.join(root, "android/app/src/main/androidWeb/fe-monster-mobile-runtime.js");
 const runtimeSource = readFileSync(runtimePath, "utf8");
-const providers = ["netease", "qq", "kugou", "qishui"];
+const providers = ["netease", "qq", "kugou"];
 const require = createRequire(import.meta.url);
 const gatewayHelpers = require(path.join(root, "android/app/src/main/nodeGateway/main.cjs"));
 
@@ -18,7 +18,7 @@ function check(name, passed, detail = undefined) {
 
 function providerFromPath(pathAndQuery) {
   const url = new URL(String(pathAndQuery || ""), "https://fe-monster.local/");
-  return url.pathname.match(/^\/api\/(netease|qq|kugou|qishui)(?:\/|$)/)?.[1]
+  return url.pathname.match(/^\/api\/(netease|qq|kugou)(?:\/|$)/)?.[1]
     || url.searchParams.get("provider")
     || "netease";
 }
@@ -107,7 +107,6 @@ function makeFixture() {
 
       const url = new URL(call.pathAndQuery, "https://fe-monster.local/");
       const isLoginStatus = url.pathname.endsWith("/login/status") || url.pathname === "/api/login/status";
-      const isPhoneVerify = url.pathname === "/api/qishui/login/phone/verify";
       const isSearch = url.pathname === "/api/search" || url.pathname.endsWith("/search");
       const isPlayerLoad = url.pathname === "/api/player/load"
         || url.pathname === "/api/song/url"
@@ -140,7 +139,7 @@ function makeFixture() {
             : {
                 ok: true,
                 provider: call.provider,
-                loggedIn: isLoginStatus || isPhoneVerify,
+                loggedIn: isLoginStatus,
                 account: accounts[call.provider]
               }
         : {
@@ -303,23 +302,6 @@ async function main() {
   check("androidSearchSubmitIsNotBlockedByLocalOnlyHandler",
     !runtimeSource.includes("本机模式不把搜索发送到电脑端；请从歌单页选择手机中的本地音乐。"));
 
-  const credentialSentinels = {
-    phone: "13900001234",
-    code: "654321",
-    token: "TOKEN-MUST-NOT-PERSIST",
-    cookie: "COOKIE-MUST-NOT-PERSIST"
-  };
-  const verifyResult = await responseJson(fixture.sandbox.fetch("/api/qishui/login/phone/verify", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(credentialSentinels)
-  }));
-  const verifyCall = fixture.bridgeCalls.find((call) => call.pathAndQuery.includes("/api/qishui/login/phone/verify"));
-  check("qishuiPhoneLoginRoutesToNative",
-    verifyResult.payload.provider === "qishui"
-      && verifyCall?.method === "POST"
-      && JSON.parse(verifyCall.bodyJson).code === credentialSentinels.code);
-
   const nativeCallsBeforeLocalWork = fixture.bridgeCalls.length;
   const queued = await responseJson(fixture.sandbox.fetch("/api/player/queue", {
     method: "POST",
@@ -348,11 +330,6 @@ async function main() {
       && offlinePlayer.payload.queue?.[0]?.id === "local-track"
       && fixture.bridgeCalls.length === callsAfterOfflineProvider);
 
-  const persisted = JSON.stringify(fixture.storageWrites);
-  const rendered = fixture.domWrites.join("\n");
-  const secrets = Object.values(credentialSentinels);
-  check("credentialsDoNotReachLocalStorage", secrets.every((secret) => !persisted.includes(secret)));
-  check("credentialsDoNotReachDom", secrets.every((secret) => !rendered.includes(secret)));
   check("onlyLocalRuntimeStateIsPersisted",
     fixture.storageWrites.every(({ key }) => key === "fe-monster.android.local-runtime/v1"),
     fixture.storageWrites.map(({ key }) => key));

@@ -30,15 +30,11 @@ async function freePort() {
 }
 
 const gatewayPort = await freePort();
-let qishuiPort = await freePort();
-while (qishuiPort === gatewayPort) qishuiPort = await freePort();
 const token = `fe-monster-live-${Date.now().toString(36)}-0123456789abcdef0123456789abcdef`;
 const child = spawn(process.execPath, [
   "main.cjs",
   "--port",
   String(gatewayPort),
-  "--qishui-port",
-  String(qishuiPort),
   "--token",
   token
 ], {

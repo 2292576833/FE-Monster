@@ -260,17 +260,32 @@ try {
     const storedPreference = JSON.parse(localStorage.getItem(GOOGLE_OBR_PREFS_KEY) || '{}');
     check(storedPreference.channelLayout === '7.1', 'OBR channel layout preference was not persisted.');
 
-    const failedGraph = state.obrSpatialAudio.graph;
-    failedGraph.node.onprocessorerror?.();
-    const recovered = await wait(
-      () => state.obrSpatialAudio.enabled
-        && state.obrSpatialAudio.graph
-        && state.obrSpatialAudio.graph !== failedGraph
-        && state.obrSpatialAudio.graph.channelLayout === '7.1'
-        && state.obrSpatialAudio.processedBlocks > 0,
-      20000
-    );
-    check(recovered, 'Google OBR did not rebuild and reconnect after an AudioWorklet failure.');
+    const failureRecoveryCycles = [];
+    for (let cycle = 0; cycle < 4; cycle += 1) {
+      const failedGraph = state.obrSpatialAudio.graph;
+      failedGraph.node.onprocessorerror?.();
+      const immediateDry = Number(failedGraph.dryGain.gain.value);
+      const immediateWet = Number(failedGraph.wetGain.gain.value);
+      check(
+        immediateDry > 0.99 && immediateWet < 0.01,
+        'OBR failure cycle ' + (cycle + 1) + ' did not restore dry audio in the same quantum.'
+      );
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      check(
+        Number(failedGraph.dryGain.gain.value) > 0.95,
+        'OBR failure cycle ' + (cycle + 1) + ' muted the dry path before recovery could reconnect.'
+      );
+      const recovered = await wait(
+        () => state.obrSpatialAudio.enabled
+          && state.obrSpatialAudio.graph
+          && state.obrSpatialAudio.graph !== failedGraph
+          && state.obrSpatialAudio.graph.channelLayout === '7.1'
+          && state.obrSpatialAudio.graph.processedBlocks > 0,
+        20000
+      );
+      check(recovered, 'Google OBR did not rebuild after failure cycle ' + (cycle + 1) + '.');
+      failureRecoveryCycles.push({ cycle: cycle + 1, immediateDry, immediateWet, recovered });
+    }
 
     await setGoogleObrSpatialAudioEnabled(false, { announce: false });
     await new Promise((resolve) => setTimeout(resolve, 150));
@@ -299,6 +314,73 @@ try {
       'A late AudioWorklet failure re-enabled OBR after the user switched it off.');
     check(!state.obrSpatialAudio.recoveryTimer, 'A late AudioWorklet failure scheduled recovery while OBR was off.');
 
+    check(
+      typeof refreshNativeGoogleObrHealth === 'function',
+      'Native OBR does not expose a continuous underrun health poll.'
+    );
+    let underrunFailures = [];
+    let nativeLyricLatency = 0;
+    if (typeof refreshNativeGoogleObrHealth === 'function') {
+      const originalApiJson = apiJson;
+      const originalFailGoogleObr = failGoogleObr;
+      const previousGraph = state.obrSpatialAudio.graph;
+      const previousEnabled = state.obrSpatialAudio.enabled;
+      const previousRequested = state.obrSpatialAudio.requested;
+      const fakeNativeGraph = {
+        nativeStream: true,
+        disposed: false,
+        session: 77,
+        context: state.audioAnalysis.context,
+        nativeQueueUnderruns: 0,
+        nativeOutputLatencySeconds: 0.1875,
+        nativeClockOriginMediaTime: Number(audio.currentTime) || 0,
+        nativeClockOriginConsumedFrames: 0,
+        nativeLastMediaTime: Number(audio.currentTime) || 0
+      };
+      state.obrSpatialAudio.graph = fakeNativeGraph;
+      state.obrSpatialAudio.enabled = true;
+      state.obrSpatialAudio.requested = true;
+      apiJson = async (url) => String(url) === '/api/audio/spatial/status'
+        ? {
+            active: true,
+            session: 77,
+            running: true,
+            sampleRate: 48000,
+            buffersQueued: 20,
+            buffersConsumed: 1,
+            droppedBuffers: 0,
+            bufferPoolExhaustions: 0,
+            lastResult: 0,
+            queueUnderruns: 1,
+            prerollTargetBuffers: 24
+          }
+        : {};
+      failGoogleObr = (error, options = {}) => {
+        underrunFailures.push({
+          message: String(error?.message || error),
+          sameGraph: options.graph === fakeNativeGraph
+        });
+        return false;
+      };
+      nativeLyricLatency = lyricAudioOutputLatencySeconds();
+      await refreshNativeGoogleObrHealth();
+      apiJson = originalApiJson;
+      failGoogleObr = originalFailGoogleObr;
+      state.obrSpatialAudio.graph = previousGraph;
+      state.obrSpatialAudio.enabled = previousEnabled;
+      state.obrSpatialAudio.requested = previousRequested;
+    }
+    check(
+      underrunFailures.length === 1
+        && underrunFailures[0].sameGraph
+        && /underrun/i.test(underrunFailures[0].message),
+      'A native XAudio2 queue underrun did not trigger controlled OBR fallback.'
+    );
+    check(
+      Math.abs(nativeLyricLatency - 0.1875) < 0.0001,
+      'Native OBR lyrics did not use the measured native output latency.'
+    );
+
     card.classList.add('is-user-hidden');
     check(getComputedStyle(button).display === 'none', 'Collapsed playback card still exposes the OBR toggle.');
     card.classList.remove('is-user-hidden');
@@ -311,7 +393,10 @@ try {
       revision: state.obrSpatialAudio.revision,
       processedBlocks: state.obrSpatialAudio.processedBlocks,
       inputRms: state.obrSpatialAudio.inputRms,
-      outputRms: state.obrSpatialAudio.outputRms
+      outputRms: state.obrSpatialAudio.outputRms,
+      failureRecoveryCycles,
+      underrunFailures,
+      nativeLyricLatency
     };
   })()`, true);
 
