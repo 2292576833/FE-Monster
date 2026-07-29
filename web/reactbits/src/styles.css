@@ -643,13 +643,15 @@ input[type="range"]::-webkit-slider-runnable-track {
 
 input[type="range"]::-webkit-slider-thumb {
   appearance: none;
-  width: 16px;
-  height: 16px;
-  margin-top: -5px;
-  border: 2px solid #f4fbff;
-  border-radius: 50%;
-  background: #78dfff;
-  box-shadow: 0 0 16px rgba(126, 223, 255, 0.44);
+  -webkit-appearance: none;
+  width: 1px;
+  height: 1px;
+  margin-top: 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
 }
 
 input[type="range"]::-moz-range-track {
@@ -665,11 +667,13 @@ input[type="range"]::-moz-range-progress {
 }
 
 input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border: 2px solid #f4fbff;
-  border-radius: 50%;
-  background: #78dfff;
+  width: 1px;
+  height: 1px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
 }
 
 .time-row {
