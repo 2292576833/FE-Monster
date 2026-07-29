@@ -1,4 +1,4 @@
-$Script:PreferredJavaMajor = 26
+$Script:PreferredJavaMajor = 17
 $Script:MinimumJavaMajor = 17
 $Script:TemurinJavaRuntimeUrl = "https://api.adoptium.net/v3/binary/latest/$Script:PreferredJavaMajor/ga/windows/x64/jre/hotspot/normal/eclipse"
 
@@ -75,9 +75,7 @@ function Get-JavaSearchRoots {
   foreach ($explicitRoot in @(
     $Env:FE_JAVA26_HOME,
     $Env:FE_JAVA_HOME,
-    'E:\java26',
-    'D:\java26',
-    'C:\java26'
+    $Env:FE_JAVA17_HOME
   )) {
     if (![string]::IsNullOrWhiteSpace($explicitRoot)) {
       $roots.Add($explicitRoot.TrimEnd('\')) | Out-Null
@@ -180,6 +178,31 @@ function Find-JavaRuntime {
     }
   }
   return $best
+}
+
+function Find-JavaDevelopmentKit {
+  param(
+    [string]$Root = '',
+    [int]$MinimumMajor = $Script:MinimumJavaMajor
+  )
+
+  Update-JavaRuntimeEnvironment
+  $bestHome = ''
+  $bestMajor = [int]::MaxValue
+  foreach ($candidate in Get-JavaExecutableCandidates -Root $Root) {
+    $major = Get-JavaMajorVersion $candidate
+    if ($major -lt $MinimumMajor -or $major -gt $bestMajor) { continue }
+    $jdkCandidateHome = Split-Path -Parent (Split-Path -Parent $candidate)
+    $requiredTools = @('javac.exe', 'jar.exe', 'jdeps.exe', 'jlink.exe')
+    $complete = @($requiredTools | Where-Object {
+      !(Test-Path -LiteralPath (Join-Path $jdkCandidateHome "bin\$_") -PathType Leaf)
+    }).Count -eq 0
+    if ($complete) {
+      $bestHome = $jdkCandidateHome
+      $bestMajor = $major
+    }
+  }
+  return $bestHome
 }
 
 function Assert-JavaRuntimeTarget {

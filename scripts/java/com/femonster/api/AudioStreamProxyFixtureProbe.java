@@ -33,6 +33,9 @@ public final class AudioStreamProxyFixtureProbe {
         AtomicReference<String> observedRange = new AtomicReference<>("");
         AtomicReference<String> observedIfRange = new AtomicReference<>("");
         AtomicReference<String> observedUserAgent = new AtomicReference<>("");
+        AtomicReference<String> observedResumeRange = new AtomicReference<>("");
+        AtomicReference<String> observedResumeIfRange = new AtomicReference<>("");
+        AtomicInteger interruptedRequests = new AtomicInteger();
         AtomicInteger validationCount = new AtomicInteger();
         AtomicInteger blockedEndpointHits = new AtomicInteger();
 
@@ -43,6 +46,13 @@ public final class AudioStreamProxyFixtureProbe {
             observedUserAgent
         ));
         upstream.createContext("/redirect", exchange -> redirect(exchange, "/audio"));
+        upstream.createContext("/disconnect-once", exchange -> serveInterruptedAudio(
+            exchange,
+            interruptedRequests,
+            observedResumeRange,
+            observedResumeIfRange
+        ));
+        upstream.createContext("/wrong-type.flac", AudioStreamProxyFixtureProbe::serveMislabelledFlac);
         upstream.createContext("/redirect-blocked", exchange -> redirect(exchange, "/blocked"));
         upstream.createContext("/blocked", exchange -> {
             blockedEndpointHits.incrementAndGet();
@@ -97,6 +107,39 @@ public final class AudioStreamProxyFixtureProbe {
                         partial.headers().firstValue("Content-Range").orElse("")
                     )
                     && "4096".equals(partial.headers().firstValue("Content-Length").orElse("")));
+
+            boolean resumedInterruptedStream = false;
+            try {
+                HttpResponse<byte[]> resumed = send(
+                    proxyBase,
+                    "/api/audio/stream",
+                    upstreamBase + "/disconnect-once",
+                    "bytes=0-",
+                    null
+                );
+                resumedInterruptedStream = resumed.statusCode() == 206
+                    && Arrays.equals(resumed.body(), AUDIO)
+                    && interruptedRequests.get() == 2
+                    && "bytes=32768-".equals(observedResumeRange.get())
+                    && "\"fixture-v1\"".equals(observedResumeIfRange.get());
+            } catch (IOException ignored) {
+            }
+            checks.put("resumesInterruptedBodyWithValidatedRange", resumedInterruptedStream);
+
+            HttpResponse<byte[]> correctedFlac = send(
+                proxyBase,
+                "/api/audio/stream",
+                upstreamBase + "/wrong-type.flac?token=fixture",
+                "bytes=0-63",
+                null
+            );
+            checks.put("sanitizesBinaryAudioHeaders",
+                correctedFlac.statusCode() == 206
+                    && correctedFlac.body().length == 64
+                    && "audio/flac".equals(correctedFlac.headers().firstValue("Content-Type").orElse(""))
+                    && "bytes".equals(correctedFlac.headers().firstValue("Accept-Ranges").orElse(""))
+                    && !correctedFlac.headers().firstValue("Content-Type").orElse("")
+                        .toLowerCase().contains("charset="));
 
             HttpRequest headRequest = HttpRequest.newBuilder(proxyUri(
                     proxyBase,
@@ -180,6 +223,7 @@ public final class AudioStreamProxyFixtureProbe {
     ) throws IOException, InterruptedException {
         HttpRequest.Builder request = HttpRequest.newBuilder(proxyUri(proxyBase, path, target))
             .header("User-Agent", "FE-Monster-OBR-Fixture/1.0")
+            .timeout(Duration.ofSeconds(5))
             .GET();
         if (range != null) request.header("Range", range);
         if (ifRange != null) request.header("If-Range", ifRange);
@@ -235,6 +279,71 @@ public final class AudioStreamProxyFixtureProbe {
         exchange.sendResponseHeaders(status, length);
         try (var output = exchange.getResponseBody()) {
             output.write(source, offset, length);
+        }
+    }
+
+    private static void serveInterruptedAudio(
+        HttpExchange exchange,
+        AtomicInteger requests,
+        AtomicReference<String> observedResumeRange,
+        AtomicReference<String> observedResumeIfRange
+    ) throws IOException {
+        int request = requests.incrementAndGet();
+        String range = value(exchange, "Range");
+        if (request == 1 && "bytes=0-".equals(range)) {
+            exchange.getResponseHeaders().set("Content-Type", "audio/flac");
+            exchange.getResponseHeaders().set("Accept-Ranges", "bytes");
+            exchange.getResponseHeaders().set("ETag", "\"fixture-v1\"");
+            exchange.getResponseHeaders().set(
+                "Content-Range",
+                "bytes 0-" + (AUDIO.length - 1) + "/" + AUDIO.length
+            );
+            exchange.sendResponseHeaders(206, 0);
+            try {
+                exchange.getResponseBody().write(AUDIO, 0, 32768);
+                exchange.getResponseBody().flush();
+            } finally {
+                exchange.close();
+            }
+            return;
+        }
+
+        observedResumeRange.set(range);
+        observedResumeIfRange.set(value(exchange, "If-Range"));
+        if (!"bytes=32768-".equals(range)) {
+            exchange.sendResponseHeaders(416, -1);
+            exchange.close();
+            return;
+        }
+        exchange.getResponseHeaders().set(
+            "Content-Range",
+            "bytes 32768-" + (AUDIO.length - 1) + "/" + AUDIO.length
+        );
+        serveBytes(exchange, 206, AUDIO, 32768, AUDIO.length - 32768);
+    }
+
+    private static void serveMislabelledFlac(HttpExchange exchange) throws IOException {
+        String range = exchange.getRequestHeaders().getFirst("Range");
+        int start = 0;
+        int end = AUDIO.length - 1;
+        int status = 200;
+        if (range != null && range.startsWith("bytes=")) {
+            String[] bounds = range.substring("bytes=".length()).split("-", 2);
+            start = Integer.parseInt(bounds[0]);
+            if (bounds.length > 1 && !bounds[1].isBlank()) {
+                end = Math.min(Integer.parseInt(bounds[1]), AUDIO.length - 1);
+            }
+            status = 206;
+            exchange.getResponseHeaders().set(
+                "Content-Range",
+                "bytes " + start + "-" + end + "/" + AUDIO.length
+            );
+        }
+        int length = end - start + 1;
+        exchange.getResponseHeaders().set("Content-Type", "audio/mpeg; charset=UTF-8");
+        exchange.sendResponseHeaders(status, length);
+        try (var output = exchange.getResponseBody()) {
+            output.write(AUDIO, start, length);
         }
     }
 

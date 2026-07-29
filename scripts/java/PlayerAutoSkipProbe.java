@@ -63,11 +63,12 @@ public final class PlayerAutoSkipProbe {
         }
         @Override public Map<String, Object> serviceStatus() { return Map.of("ok", true); }
         @Override public Map<String, Object> accountPayload() { return Map.of(); }
-        @Override public String loginQrKeyPayload() { return "{}"; }
-        @Override public String loginQrCreatePayload(String key, boolean qrimg) { return "{}"; }
-        @Override public String loginQrCheckPayload(String key) { return "{}"; }
         @Override public Map<String, Object> search(String keyword, int page, int limit) { return Map.of(); }
-        @Override public Map<String, Object> songUrlPayload(String id, String quality) { return Map.of(); }
+        @Override public Map<String, Object> songUrlPayload(String id, String quality) {
+            String url = songUrl(id, quality);
+            return Map.of("playable", !url.isBlank(), "url", url);
+        }
+        @Override public Map<String, Object> lyricPayload(String songId) { return Map.of(); }
         @Override public Map<String, Object> userPlaylistsPayload() { return Map.of(); }
         @Override public Map<String, Object> recommendedPlaylistsPayload(int limit) { return Map.of(); }
         @Override public Map<String, Object> playlistTracksPayload(String playlistId, int limit) { return Map.of(); }

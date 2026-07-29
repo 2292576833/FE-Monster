@@ -54,7 +54,7 @@ function Get-CommunityUrl {
 }
 
 function Get-InstalledVersion {
-  return '1.1.6'
+  return '1.8.8'
 }
 
 function Invoke-AutoInstall {
@@ -73,6 +73,8 @@ function Invoke-AutoInstall {
   if (!(Test-Path $script)) { return }
   $process = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
     '-NoProfile',
+    '-ExecutionPolicy',
+    'Bypass',
     '-WindowStyle',
     'Hidden',
     '-File',
