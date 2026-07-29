@@ -82,7 +82,7 @@ for (const key of [
 ]) {
   requirePattern(infoPlist, new RegExp(`<key>${key}</key>`), `Info.plist ${key}`);
 }
-requirePattern(infoPlist, /<string>1\.1\.6<\/string>/, "Info.plist version 1.1.6");
+requirePattern(infoPlist, /<string>1\.8\.8<\/string>/, "Info.plist version 1.8.8");
 requirePattern(syncScript, /gesture-requirements-macos\.txt/, "macOS gesture dependencies");
 
 const sourceText = [mainSwift, optionsSwift, backendSwift, windowSwift, toolbarSwift].join("\n");
@@ -103,6 +103,6 @@ process.stdout.write(`${JSON.stringify({
   ok: true,
   macRoot,
   swiftFiles: sourceFiles,
-  version: "1.1.6",
+  version: "1.8.8",
   generatedArtifacts: false,
 }, null, 2)}\n`);

@@ -9,7 +9,8 @@ const debugPort = 15000 + (process.pid % 14000);
 const profile = path.resolve(tmpdir(), `fe-monster-live-wallpaper-${process.pid}`);
 const browser = spawn(edge, [
   "--headless=new",
-  "--disable-gpu",
+  "--enable-gpu",
+  "--ignore-gpu-blocklist",
   "--autoplay-policy=no-user-gesture-required",
   `--remote-debugging-port=${debugPort}`,
   `--user-data-dir=${profile}`,

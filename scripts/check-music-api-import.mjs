@@ -8,11 +8,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const scratchRoot = path.join(workspaceRoot, ".tmp");
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 const checks = [];
 let feProcess = null;
 let feOutput = "";
-let qishuiServer = null;
+let kugouServer = null;
 let neteaseSentinel = null;
 let tempRoot = "";
 let managedApiPid = 0;
@@ -144,7 +145,7 @@ function jsonResponse(response, status, payload) {
   response.end(JSON.stringify(payload));
 }
 
-function createQishuiMock(requests) {
+function createKugouMock(requests) {
   return http.createServer((request, response) => {
     const url = new URL(request.url || "/", "http://127.0.0.1");
     requests.push({
@@ -154,7 +155,7 @@ function createQishuiMock(requests) {
     });
 
     if (url.pathname === "/" || url.pathname === "/health") {
-      jsonResponse(response, 200, { ok: true, service: "qishui-mock" });
+      jsonResponse(response, 200, { ok: true, service: "kugou-mock" });
       return;
     }
     if (url.pathname === "/search") {
@@ -162,8 +163,8 @@ function createQishuiMock(requests) {
         ok: true,
         data: {
           songs: [{
-            id: "qishui-track-1",
-            title: "汽水回归测试",
+            id: "kugou-track-1",
+            title: "酷狗回归测试",
             artist: "FE Monster QA",
             album: "Import Contract",
             duration: 123,
@@ -175,11 +176,18 @@ function createQishuiMock(requests) {
     if (url.pathname === "/song/url") {
       jsonResponse(response, 200, {
         ok: true,
-        data: { url: `http://127.0.0.1:${serverPort(response)}/audio/qishui-track-1.mp3` },
+        data: { url: `http://127.0.0.1:${serverPort(response)}/audio/kugou-track-1.mp3` },
       });
       return;
     }
-    if (url.pathname === "/audio/qishui-track-1.mp3") {
+    if (url.pathname === "/lyric") {
+      jsonResponse(response, 200, {
+        ok: true,
+        lyric: "[00:01.00]Kugou import lyric",
+      });
+      return;
+    }
+    if (url.pathname === "/audio/kugou-track-1.mp3") {
       response.writeHead(200, { "content-type": "audio/mpeg" });
       response.end(Buffer.from([0x49, 0x44, 0x33]));
       return;
@@ -429,7 +437,7 @@ function attachProcessOutput(processHandle) {
 }
 
 async function cleanup() {
-  if (qishuiServer?.listening) await closeServer(qishuiServer).catch(() => {});
+  if (kugouServer?.listening) await closeServer(kugouServer).catch(() => {});
   if (neteaseSentinel?.listening) await closeServer(neteaseSentinel).catch(() => {});
   if (feProcess?.pid && feProcess.exitCode === null) {
     if (process.platform === "win32") {
@@ -450,8 +458,8 @@ async function cleanup() {
     }
   }
   const resolvedTemp = tempRoot ? path.resolve(tempRoot) : "";
-  const systemTemp = path.resolve(os.tmpdir()) + path.sep;
-  if (resolvedTemp.startsWith(systemTemp) && path.basename(resolvedTemp).startsWith("fe-monster-music-api-import-")) {
+  const scratchBoundary = path.resolve(scratchRoot) + path.sep;
+  if (resolvedTemp.startsWith(scratchBoundary) && path.basename(resolvedTemp).startsWith("fe-monster-music-api-import-")) {
     await rm(resolvedTemp, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }).catch(() => {});
   }
 }
@@ -470,9 +478,13 @@ try {
   assert(javaPath, "Java runtime not found; set FE_TEST_JAVA or FE_JAVA_HOME");
   const appSource = await readFile(path.join(workspaceRoot, "web", "app.js"), "utf8");
   const indexSource = await readFile(path.join(workspaceRoot, "web", "index.html"), "utf8");
-  const providerDefaults = appSource.match(/const MUSIC_PROVIDERS = \{([\s\S]*?)\n\};\nconst ANDROID_MUSIC_APP_URIS/)?.[1] || "";
-  assert((providerDefaults.match(/enabled:\s*false/g) || []).length === 4, "All four web provider defaults must start disabled");
-  assert((providerDefaults.match(/configured:\s*false/g) || []).length === 4, "All four web provider defaults must start unconfigured");
+  const providerDefaults = appSource.match(/const MUSIC_PROVIDERS = \{([\s\S]*?)\r?\n\};\r?\nconst OFFICIAL_BROWSER_LOGIN_PROVIDERS/)?.[1] || "";
+  const expectedProviderIds = ["netease", "qq", "kugou", "qishui"];
+  assert((providerDefaults.match(/enabled:\s*false/g) || []).length === expectedProviderIds.length, "All four web provider defaults must start disabled");
+  assert((providerDefaults.match(/configured:\s*false/g) || []).length === expectedProviderIds.length, "All four web provider defaults must start unconfigured");
+  for (const id of expectedProviderIds) {
+    assert(new RegExp(`\\n\\s{2}${id}:\\s*\\{`).test(providerDefaults), `Web provider default is missing: ${id}`);
+  }
   assert(
     /return info\.enabled === true && info\.configured === true;/.test(appSource),
     "Web provider gate is not fail-closed",
@@ -487,18 +499,21 @@ try {
     "Login platform tabs are not generated from the imported plugin inventory",
   );
   assert(
-    !/qishuiPhone|qishuiGuest|\/login\/phone\//.test(`${indexSource}\n${appSource}`),
+    !/\/login\/phone\/|data-login-mode=["'](?:phone|guest)["']|id=["'][^"']*(?:PhoneLogin|GuestLogin)/i.test(`${indexSource}\n${appSource}`),
     "Phone or guest login controls remain in the web client",
   );
-  assert(indexSource.includes('id="qrLoginStage"'), "QR login stage is missing");
+  assert(indexSource.includes('id="browserLoginStage"'), "Official browser login stage is missing");
+  assert(!indexSource.includes('id="qrLoginStage"'), "Embedded QR login stage is still present");
+  assert(!appSource.includes('/login/qr/'), "Embedded QR API calls are still present");
   assert(indexSource.includes("导入 API 插件"), "Login panel does not expose the API plugin import action");
-  passed("fail-closed QR-only dynamic plugin login UI");
+  passed("fail-closed official-browser dynamic plugin login UI");
 
-  tempRoot = await mkdtemp(path.join(os.tmpdir(), "fe-monster-music-api-import-"));
+  await mkdir(scratchRoot, { recursive: true });
+  tempRoot = await mkdtemp(path.join(scratchRoot, "fe-monster-music-api-import-"));
   const dataDir = path.join(tempRoot, "isolated-data");
   const musicApiDir = path.join(dataDir, "music-api");
   const providersFile = path.join(musicApiDir, "providers.json");
-  const qishuiRequests = [];
+  const kugouRequests = [];
   const neteaseRequests = [];
 
   await mkdir(musicApiDir, { recursive: true });
@@ -511,7 +526,7 @@ try {
         enabled: true,
         configured: true,
         autostart: true,
-        loginQr: true,
+        loginQr: false,
         source: "builtin",
         baseUrl: "http://127.0.0.1:3010",
       },
@@ -520,7 +535,7 @@ try {
         enabled: true,
         configured: true,
         autostart: true,
-        loginQr: true,
+        loginQr: false,
         source: "builtin",
         baseUrl: "http://127.0.0.1:3011",
       },
@@ -529,25 +544,16 @@ try {
         enabled: true,
         configured: true,
         autostart: true,
-        loginQr: true,
+        loginQr: false,
         source: "builtin",
         baseUrl: "http://127.0.0.1:3012",
-      },
-      {
-        id: "qishui",
-        enabled: true,
-        configured: false,
-        autostart: false,
-        loginQr: false,
-        source: "builtin-slot",
-        baseUrl: "http://127.0.0.1:3013",
       },
     ],
   }), "utf8");
 
-  qishuiServer = createQishuiMock(qishuiRequests);
-  const qishuiPort = await listen(qishuiServer);
-  const qishuiBaseUrl = `http://127.0.0.1:${qishuiPort}`;
+  kugouServer = createKugouMock(kugouRequests);
+  const kugouPort = await listen(kugouServer);
+  const kugouBaseUrl = `http://127.0.0.1:${kugouPort}`;
 
   neteaseSentinel = createNeteaseSentinel(neteaseRequests);
   const neteasePort = await listen(neteaseSentinel);
@@ -564,10 +570,11 @@ try {
       FE_MONSTER_PORT: String(appPort),
       FE_MONSTER_WEB_ROOT: path.join(workspaceRoot, "web"),
       FE_MONSTER_DATA_DIR: dataDir,
+      TEMP: scratchRoot,
+      TMP: scratchRoot,
       FE_MUSIC_API_AUTOSTART: "0",
       FE_NETEASE_BASE_URL: `http://127.0.0.1:${neteasePort}`,
       FE_QQ_AUTOSTART: "0",
-      FE_KUGOU_AUTOSTART: "0",
     },
   });
   attachProcessOutput(feProcess);
@@ -580,7 +587,7 @@ try {
   assert(initialApis.status === 200, `GET /api/music-apis returned HTTP ${initialApis.status}`, initialApis.text);
   assert(initialApis.payload && typeof initialApis.payload === "object", "GET /api/music-apis did not return JSON", initialApis.text);
   const initialProviders = await requestJson(baseUrl, "/api/providers");
-  for (const id of ["netease", "qq", "kugou", "qishui"]) {
+  for (const id of expectedProviderIds) {
     const slot = objectWithId(initialApis.payload, id);
     assert(slot, `Default API plugin slot is missing: ${id}`, initialApis.payload);
     assert(slot.configured !== true, `Legacy built-in API remained configured: ${id}`, slot);
@@ -609,7 +616,7 @@ try {
   );
   const migratedConfig = JSON.parse(await readFile(providersFile, "utf8"));
   assert(
-    ["netease", "qq", "kugou", "qishui"].every((id) => {
+    expectedProviderIds.every((id) => {
       const slot = providerFrom(migratedConfig, id);
       return slot?.source === "plugin-slot" && slot.configured !== true;
     }),
@@ -625,7 +632,7 @@ try {
   });
 
   const guardedConfig = Buffer.from(JSON.stringify({
-    providers: [{ id: "qq", baseUrl: qishuiBaseUrl }],
+    providers: [{ id: "qq", baseUrl: kugouBaseUrl }],
   }), "utf8");
   const missingHeaderImport = await requestJson(baseUrl, "/api/music-apis/import?name=guard.json", {
     method: "POST",
@@ -644,7 +651,7 @@ try {
   assert(missingHeaderImport.status === 400, "Import without the local confirmation header was accepted", missingHeaderImport.payload);
   assert(evilOriginImport.status === 400, "Import from a different localhost origin was accepted", evilOriginImport.payload);
   const afterGuardApis = await requestJson(baseUrl, "/api/music-apis");
-  assert(objectWithId(afterGuardApis.payload, "qq")?.baseUrl !== qishuiBaseUrl, "Rejected import changed the QQ configuration", afterGuardApis.payload);
+  assert(objectWithId(afterGuardApis.payload, "qq")?.baseUrl !== kugouBaseUrl, "Rejected import changed the QQ configuration", afterGuardApis.payload);
   passed("local import CSRF guard", { missingHeader: missingHeaderImport.status, evilOrigin: evilOriginImport.status });
 
   const malformedImport = await importBinary(
@@ -668,7 +675,7 @@ try {
 
   const jsonProvider = {
     version: 1,
-    providers: [{ id: "qq", label: "QQ音乐", baseUrl: qishuiBaseUrl }],
+    providers: [{ id: "qq", label: "QQ音乐", baseUrl: kugouBaseUrl }],
   };
   const jsonImport = await importBinary(
     baseUrl,
@@ -684,49 +691,49 @@ try {
   const registeredQq = providerFrom(afterJsonProviders.payload, "qq");
   assert(configuredQq, "JSON QQ import is missing from /api/music-apis", afterJsonApis.payload);
   assert(registeredQq, "JSON QQ import did not update the registered provider", afterJsonProviders.payload);
-  assert(String(configuredQq.baseUrl || "") === qishuiBaseUrl, "JSON QQ config did not update baseUrl", configuredQq);
-  assert(String(registeredQq.baseUrl || "") === qishuiBaseUrl, "Registered QQ provider kept the old baseUrl", registeredQq);
+  assert(String(configuredQq.baseUrl || "") === kugouBaseUrl, "JSON QQ config did not update baseUrl", configuredQq);
+  assert(String(registeredQq.baseUrl || "") === kugouBaseUrl, "Registered QQ provider kept the old baseUrl", registeredQq);
   passed("JSON provider import", { id: "qq", baseUrl: registeredQq.baseUrl });
 
   const beforeUntrustedApis = await requestJson(baseUrl, "/api/music-apis");
   const beforeUntrustedProviders = await requestJson(baseUrl, "/api/providers");
-  const qishuiSlotBeforeTrustGate = objectWithId(beforeUntrustedApis.payload, "qishui");
-  assert(qishuiSlotBeforeTrustGate, "Qishui configuration slot is missing", beforeUntrustedApis.payload);
-  assert(qishuiSlotBeforeTrustGate.configured !== true, "Qishui was already configured before the trust-gate test", qishuiSlotBeforeTrustGate);
-  assert(!providerFrom(beforeUntrustedProviders.payload, "qishui"), "Qishui was already active before the trust-gate test", beforeUntrustedProviders.payload);
-  const untrustedZip = packageZip(packageManifest("qishui", "汽水音乐", qishuiBaseUrl));
+  const kugouSlotBeforeTrustGate = objectWithId(beforeUntrustedApis.payload, "kugou");
+  assert(kugouSlotBeforeTrustGate, "Kugou configuration slot is missing", beforeUntrustedApis.payload);
+  assert(kugouSlotBeforeTrustGate.configured !== true, "Kugou was already configured before the trust-gate test", kugouSlotBeforeTrustGate);
+  assert(!providerFrom(beforeUntrustedProviders.payload, "kugou"), "Kugou was already active before the trust-gate test", beforeUntrustedProviders.payload);
+  const untrustedZip = packageZip(packageManifest("kugou", "酷狗音乐", kugouBaseUrl));
   const untrustedImport = await importBinary(baseUrl, "untrusted-runtime.zip", false, untrustedZip, "application/zip");
   const afterUntrustedApis = await requestJson(baseUrl, "/api/music-apis");
   const afterUntrustedProviders = await requestJson(baseUrl, "/api/providers");
-  const qishuiSlotAfterTrustGate = objectWithId(afterUntrustedApis.payload, "qishui");
+  const kugouSlotAfterTrustGate = objectWithId(afterUntrustedApis.payload, "kugou");
   assert(importTrustGated(untrustedImport), "trusted=false executable ZIP was not trust-gated", untrustedImport.payload);
-  assert(qishuiSlotAfterTrustGate?.configured !== true, "trusted=false executable ZIP became configured", qishuiSlotAfterTrustGate);
+  assert(kugouSlotAfterTrustGate?.configured !== true, "trusted=false executable ZIP became configured", kugouSlotAfterTrustGate);
   assert(
-    stableConfigSignature(qishuiSlotAfterTrustGate) === stableConfigSignature(qishuiSlotBeforeTrustGate),
-    "trusted=false executable ZIP changed the Qishui configuration slot",
-    { before: qishuiSlotBeforeTrustGate, after: qishuiSlotAfterTrustGate },
+    stableConfigSignature(kugouSlotAfterTrustGate) === stableConfigSignature(kugouSlotBeforeTrustGate),
+    "trusted=false executable ZIP changed the Kugou configuration slot",
+    { before: kugouSlotBeforeTrustGate, after: kugouSlotAfterTrustGate },
   );
-  assert(!providerFrom(afterUntrustedProviders.payload, "qishui"), "trusted=false executable ZIP became an active provider", afterUntrustedProviders.payload);
+  assert(!providerFrom(afterUntrustedProviders.payload, "kugou"), "trusted=false executable ZIP became an active provider", afterUntrustedProviders.payload);
   passed("trusted=false runtime gate", { status: untrustedImport.status });
 
-  const qishuiZip = packageZip(packageManifest("qishui", "汽水音乐", qishuiBaseUrl));
-  const zipImport = await importBinary(baseUrl, "qishui-api.zip", true, qishuiZip, "application/zip");
+  const kugouZip = packageZip(packageManifest("kugou", "酷狗音乐", kugouBaseUrl));
+  const zipImport = await importBinary(baseUrl, "kugou-api.zip", true, kugouZip, "application/zip");
   assert(importAccepted(zipImport), `trusted ZIP import was rejected with HTTP ${zipImport.status}`, zipImport.text);
   const afterZipApis = await requestJson(baseUrl, "/api/music-apis");
   const afterZipProviders = await requestJson(baseUrl, "/api/providers");
-  const qishuiApi = objectWithId(afterZipApis.payload, "qishui");
-  const qishuiProvider = providerFrom(afterZipProviders.payload, "qishui");
-  assert(qishuiApi, "Qishui package is missing from /api/music-apis", afterZipApis.payload);
-  assert(qishuiProvider, "Qishui package did not register in /api/providers", afterZipProviders.payload);
-  assert(String(qishuiProvider.label || "") === "汽水音乐", "Qishui provider label is incorrect", qishuiProvider);
-  passed("trusted ZIP provider import", { id: "qishui", label: qishuiProvider.label });
+  const kugouApi = objectWithId(afterZipApis.payload, "kugou");
+  const kugouProvider = providerFrom(afterZipProviders.payload, "kugou");
+  assert(kugouApi, "Kugou package is missing from /api/music-apis", afterZipApis.payload);
+  assert(kugouProvider, "Kugou package did not register in /api/providers", afterZipProviders.payload);
+  assert(String(kugouProvider.label || "") === "酷狗音乐", "Kugou provider label is incorrect", kugouProvider);
+  passed("trusted ZIP provider import", { id: "kugou", label: kugouProvider.label });
 
-  const qishuiConfigSignature = stableConfigSignature(qishuiApi);
-  const qishuiConfiguredBaseUrl = String(qishuiApi.baseUrl || "");
-  const qishuiRegisteredBaseUrl = String(qishuiProvider.baseUrl || "");
+  const kugouConfigSignature = stableConfigSignature(kugouApi);
+  const kugouConfiguredBaseUrl = String(kugouApi.baseUrl || "");
+  const kugouRegisteredBaseUrl = String(kugouProvider.baseUrl || "");
   const slipMarker = `zip-slip-sentinel-${process.pid}-${Date.now()}.txt`;
   const maliciousZip = packageZip(
-    packageManifest("qishui", "汽水音乐", "http://127.0.0.1:1"),
+    packageManifest("kugou", "酷狗音乐", "http://127.0.0.1:1"),
     [
       { name: `../${slipMarker}`, data: "zip-slip must never be extracted" },
       { name: `..\\${slipMarker}.windows`, data: "windows zip-slip must never be extracted" },
@@ -735,39 +742,49 @@ try {
   const maliciousImport = await importBinary(baseUrl, "zip-slip.zip", true, maliciousZip, "application/zip");
   const afterSlipApis = await requestJson(baseUrl, "/api/music-apis");
   const afterSlipProviders = await requestJson(baseUrl, "/api/providers");
-  const qishuiAfterSlip = objectWithId(afterSlipApis.payload, "qishui");
-  const qishuiProviderAfterSlip = providerFrom(afterSlipProviders.payload, "qishui");
+  const kugouAfterSlip = objectWithId(afterSlipApis.payload, "kugou");
+  const kugouProviderAfterSlip = providerFrom(afterSlipProviders.payload, "kugou");
   assert(!importAccepted(maliciousImport), "zip-slip archive was accepted", maliciousImport.payload);
-  assert(qishuiAfterSlip, "zip-slip rejection removed the existing Qishui config", afterSlipApis.payload);
-  assert(qishuiProviderAfterSlip, "zip-slip rejection removed the active Qishui provider", afterSlipProviders.payload);
-  assert(stableConfigSignature(qishuiAfterSlip) === qishuiConfigSignature, "zip-slip rejection changed the Qishui config", {
-    before: qishuiApi,
-    after: qishuiAfterSlip,
+  assert(kugouAfterSlip, "zip-slip rejection removed the existing Kugou config", afterSlipApis.payload);
+  assert(kugouProviderAfterSlip, "zip-slip rejection removed the active Kugou provider", afterSlipProviders.payload);
+  assert(stableConfigSignature(kugouAfterSlip) === kugouConfigSignature, "zip-slip rejection changed the Kugou config", {
+    before: kugouApi,
+    after: kugouAfterSlip,
   });
-  assert(String(qishuiAfterSlip.baseUrl || "") === qishuiConfiguredBaseUrl, "zip-slip rejection changed configured baseUrl", qishuiAfterSlip);
-  assert(String(qishuiProviderAfterSlip.baseUrl || "") === qishuiRegisteredBaseUrl, "zip-slip rejection changed active provider baseUrl", qishuiProviderAfterSlip);
+  assert(String(kugouAfterSlip.baseUrl || "") === kugouConfiguredBaseUrl, "zip-slip rejection changed configured baseUrl", kugouAfterSlip);
+  assert(String(kugouProviderAfterSlip.baseUrl || "") === kugouRegisteredBaseUrl, "zip-slip rejection changed active provider baseUrl", kugouProviderAfterSlip);
   assert(!await findFileNamed(tempRoot, slipMarker), "zip-slip entry was written under the isolated application root");
   assert(!await findFileNamed(tempRoot, `${slipMarker}.windows`), "Windows zip-slip entry was written under the isolated application root");
   passed("zip-slip archive rejected", { status: maliciousImport.status });
 
-  const search = await requestJson(baseUrl, `/api/search?${new URLSearchParams({ provider: "qishui", q: "测试", limit: "3" })}`);
-  assert(search.status === 200 && search.payload?.ok !== false, `Qishui search failed with HTTP ${search.status}`, search.text);
-  assert(search.payload?.provider === "qishui", "Qishui search returned the wrong provider", search.payload);
-  assert(Array.isArray(search.payload?.songs) && search.payload.songs.length > 0, "Qishui search returned no songs", search.payload);
-  assert(search.payload.songs.every((song) => song.provider === "qishui"), "Qishui search songs lost their provider id", search.payload.songs);
-  const searchRequest = qishuiRequests.find((request) => request.pathname === "/search"
+  const search = await requestJson(baseUrl, `/api/search?${new URLSearchParams({ provider: "kugou", q: "测试", limit: "3" })}`);
+  assert(search.status === 200 && search.payload?.ok !== false, `Kugou search failed with HTTP ${search.status}`, search.text);
+  assert(search.payload?.provider === "kugou", "Kugou search returned the wrong provider", search.payload);
+  assert(Array.isArray(search.payload?.songs) && search.payload.songs.length > 0, "Kugou search returned no songs", search.payload);
+  assert(search.payload.songs.every((song) => song.provider === "kugou"), "Kugou search songs lost their provider id", search.payload.songs);
+  const searchRequest = kugouRequests.find((request) => request.pathname === "/search"
     && (request.query.q === "测试" || request.query.keyword === "测试"));
-  assert(searchRequest, "Qishui mock did not receive /search", qishuiRequests);
-  assert(searchRequest.query.q === "测试" || searchRequest.query.keyword === "测试", "Qishui search keyword was not forwarded", searchRequest);
+  assert(searchRequest, "Kugou mock did not receive /search", kugouRequests);
+  assert(searchRequest.query.q === "测试" || searchRequest.query.keyword === "测试", "Kugou search keyword was not forwarded", searchRequest);
 
-  const songUrl = await requestJson(baseUrl, `/api/song/url?${new URLSearchParams({ provider: "qishui", id: "qishui-track-1", quality: "standard" })}`);
-  assert(songUrl.status === 200 && songUrl.payload?.playable === true, `Qishui song URL failed with HTTP ${songUrl.status}`, songUrl.text);
-  assert(String(songUrl.payload?.url || "").includes("/audio/qishui-track-1.mp3"), "Qishui song URL is incorrect", songUrl.payload);
-  const urlRequest = qishuiRequests.find((request) => request.pathname === "/song/url"
-    && [request.query.id, request.query.songid, request.query.songmid].includes("qishui-track-1"));
-  assert(urlRequest, "Qishui mock did not receive /song/url", qishuiRequests);
-  assert([urlRequest.query.id, urlRequest.query.songid, urlRequest.query.songmid].includes("qishui-track-1"), "Qishui song id was not forwarded", urlRequest);
-  passed("Qishui generic search and song URL", { requests: qishuiRequests.length });
+  const songUrl = await requestJson(baseUrl, `/api/song/url?${new URLSearchParams({ provider: "kugou", id: "kugou-track-1", quality: "standard" })}`);
+  assert(songUrl.status === 200 && songUrl.payload?.playable === true, `Kugou song URL failed with HTTP ${songUrl.status}`, songUrl.text);
+  assert(String(songUrl.payload?.url || "").includes("/audio/kugou-track-1.mp3"), "Kugou song URL is incorrect", songUrl.payload);
+  const urlRequest = kugouRequests.find((request) => request.pathname === "/song/url"
+    && [request.query.id, request.query.songid, request.query.songmid].includes("kugou-track-1"));
+  assert(urlRequest, "Kugou mock did not receive /song/url", kugouRequests);
+  assert([urlRequest.query.id, urlRequest.query.songid, urlRequest.query.songmid].includes("kugou-track-1"), "Kugou song id was not forwarded", urlRequest);
+
+  const genericLyric = await requestJson(baseUrl, "/api/lyric?provider=kugou&id=kugou-track-1");
+  const providerLyric = await requestJson(baseUrl, "/api/kugou/lyric?id=kugou-track-1");
+  for (const result of [genericLyric, providerLyric]) {
+    assert(result.status === 200 && result.payload?.provider === "kugou", "Kugou lyric route used the wrong provider", result);
+    assert(result.payload?.lrc?.lyric === "[00:01.00]Kugou import lyric", "Kugou lyric was not normalized", result.payload);
+  }
+  const lyricRequests = kugouRequests.filter((request) =>
+    request.pathname === "/lyric" && request.query.id === "kugou-track-1");
+  assert(lyricRequests.length === 2, "Kugou lyric routes did not reach the imported plugin", kugouRequests);
+  passed("Kugou generic search, song URL, and lyrics", { requests: kugouRequests.length });
 
   const sentinelCount = neteaseRequests.length;
   const unknownSearch = await requestJson(baseUrl, "/api/search?provider=definitely-unknown&q=must-not-fallback&limit=1");
@@ -789,17 +806,17 @@ try {
   );
   passed("unknown provider does not fall back", { searchStatus: unknownSearch.status, songUrlStatus: unknownUrl.status });
 
-  await closeServer(qishuiServer);
-  const unavailableSearch = await requestJson(baseUrl, "/api/search?provider=qishui&q=offline&limit=1", { timeoutMs: 20000 });
-  const unavailableUrl = await requestJson(baseUrl, "/api/song/url?provider=qishui&id=qishui-track-1", { timeoutMs: 20000 });
+  await closeServer(kugouServer);
+  const unavailableSearch = await requestJson(baseUrl, "/api/search?provider=kugou&q=offline&limit=1", { timeoutMs: 20000 });
+  const unavailableUrl = await requestJson(baseUrl, "/api/song/url?provider=kugou&id=kugou-track-1", { timeoutMs: 20000 });
   await delay(200);
-  assert(feProcess.exitCode === null, `FE Monster exited after the Qishui API became unavailable (code ${feProcess.exitCode})`, feOutput);
+  assert(feProcess.exitCode === null, `FE Monster exited after the Kugou API became unavailable (code ${feProcess.exitCode})`, feOutput);
   assert(unavailableSearch.status < 500 && unavailableUrl.status < 500, "Unavailable provider caused an internal server error", {
     search: unavailableSearch.status,
     songUrl: unavailableUrl.status,
   });
   const alive = await requestJson(baseUrl, "/api/providers");
-  assert(alive.status === 200 && providerFrom(alive.payload, "qishui"), "FE Monster stopped serving providers after API outage", alive.text);
+  assert(alive.status === 200 && providerFrom(alive.payload, "kugou"), "FE Monster stopped serving providers after API outage", alive.text);
   passed("missing provider API does not terminate FE", {
     searchStatus: unavailableSearch.status,
     songUrlStatus: unavailableUrl.status,
@@ -818,7 +835,7 @@ try {
     }).listen(port, "127.0.0.1");
   `;
   const managedManifest = {
-    ...packageManifest("qishui", "汽水音乐", managedBaseUrl),
+    ...packageManifest("kugou", "酷狗音乐", managedBaseUrl),
     healthPath: "/health",
     autostart: true,
     loginQr: false,
@@ -827,8 +844,8 @@ try {
     { name: "music-api-package.json", data: JSON.stringify(managedManifest) },
     { name: "server.cjs", data: managedScript },
   ]);
-  const managedImport = await importBinary(baseUrl, "qishui-managed.zip", true, managedZip, "application/zip");
-  assert(importAccepted(managedImport), "Managed Qishui package import failed", managedImport.payload);
+  const managedImport = await importBinary(baseUrl, "kugou-managed.zip", true, managedZip, "application/zip");
+  assert(importAccepted(managedImport), "Managed Kugou package import failed", managedImport.payload);
   const managedResponse = await waitForHttp(`${managedBaseUrl}/health`);
   const managedPayload = await managedResponse.json();
   managedApiPid = Number(managedPayload.pid) || 0;
