@@ -40,7 +40,8 @@ public final class RealtimeAudioPerformanceProbe {
             2
         );
         long session = number(start, "session").longValue();
-        require(Boolean.TRUE.equals(start.get("ok")) && session > 0, "native start failed: " + start);
+        long generation = number(start, "generation").longValue();
+        require(Boolean.TRUE.equals(start.get("ok")) && session > 0 && generation > 0, "native start failed: " + start);
 
         ByteBuffer directPcm = ByteBuffer.allocateDirect(
             TRANSPORT_FRAMES * INPUT_CHANNELS * Float.BYTES
@@ -74,7 +75,7 @@ public final class RealtimeAudioPerformanceProbe {
                 parkUntil(deadline);
             }
 
-            int result = engine.submitSpatialPcm(session, directPcm, TRANSPORT_FRAMES);
+            int result = engine.submitSpatialPcm(session, generation, directPcm, TRANSPORT_FRAMES);
             require(result >= 0, "direct PCM submit failed at batch " + batch + ": " + result);
             if (batch == PREROLL_BATCHES - 1) paceEpoch = System.nanoTime();
 
@@ -116,7 +117,7 @@ public final class RealtimeAudioPerformanceProbe {
             && Double.isFinite(number(status, "outputEnergy").doubleValue())
             && number(status, "outputEnergy").doubleValue() > 1.0e-6;
 
-        engine.stopSpatialStream(session);
+        engine.stopSpatialStream(session, generation);
         boolean stopped = !Boolean.TRUE.equals(engine.spatialPayload().get("active"));
         engine.close();
         long elapsedMillis = Math.round((System.nanoTime() - startedAt) / 1_000_000.0);

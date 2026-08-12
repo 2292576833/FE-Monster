@@ -115,6 +115,15 @@ public final class HttpUtil {
         }
     }
 
+    public static long longParam(Map<String, String> params, String name, long fallback, long min, long max) {
+        try {
+            long parsed = Long.parseLong(param(params, name, String.valueOf(fallback)));
+            return Math.max(min, Math.min(max, parsed));
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
+    }
+
     public static double doubleParam(Map<String, String> params, String name, double fallback, double min, double max) {
         try {
             double parsed = Double.parseDouble(param(params, name, String.valueOf(fallback)));
@@ -142,6 +151,11 @@ public final class HttpUtil {
     }
 
     public static void addCors(HttpExchange exchange) {
+        if (Boolean.TRUE.equals(exchange.getAttribute("fe.cors.same-origin"))) {
+            exchange.getResponseHeaders().remove("Access-Control-Allow-Origin");
+            exchange.getResponseHeaders().set("Cross-Origin-Resource-Policy", "same-origin");
+            return;
+        }
         exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
         exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
         exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");

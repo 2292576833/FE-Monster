@@ -1,7 +1,8 @@
 (function () {
   "use strict";
 
-  const TRAIL_MODES = new Set(["off", "glow", "comet", "stardust", "ribbon", "prism"]);
+  const TRAIL_MODES = new Set(["off", "glow", "comet", "stardust", "ribbon", "prism", "custom"]);
+  const CUSTOM_TRAIL_STORAGE_KEY = "fe-monster-custom-cursor-trail-v1";
   const MODE_LIMITS = Object.freeze({
     glow: Object.freeze({ lifetime: 360, points: 22 }),
     comet: Object.freeze({ lifetime: 460, points: 30 }),
@@ -9,6 +10,8 @@
     ribbon: Object.freeze({ lifetime: 480, points: 36 }),
     prism: Object.freeze({ lifetime: 520, points: 38 })
   });
+  const TRAIL_TARGET_FPS = 60;
+  const TRAIL_FRAME_BUDGET_MS = 1000 / TRAIL_TARGET_FPS;
   const finePointerQuery = window.matchMedia?.("(any-hover: hover) and (any-pointer: fine)");
   const reducedMotionQuery = window.matchMedia?.("(prefers-reduced-motion: reduce)");
   const samples = [];
@@ -22,6 +25,59 @@
   let viewportHeight = 0;
   let renderedFrames = 0;
   let lastAcceptedPoint = null;
+  let frameClock = 0;
+  let frameCarry = 0;
+  let customTrail = null;
+
+  function clamp(value, min, max, fallback) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? Math.min(max, Math.max(min, numeric)) : fallback;
+  }
+
+  function normaliseColour(value, fallback) {
+    const colour = String(value || "").trim().toLowerCase();
+    return /^#[0-9a-f]{6}$/.test(colour) ? colour : fallback;
+  }
+
+  function normaliseCustomTrail(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const style = ["glow", "comet", "stardust", "ribbon", "prism"].includes(value.style)
+      ? value.style
+      : "comet";
+    return {
+      schema: "fe-monster.cursor-trail/v1",
+      name: String(value.name || "创作市场尾迹").trim().slice(0, 64) || "创作市场尾迹",
+      style,
+      primary: normaliseColour(value.primary, "#9ce5ff"),
+      secondary: normaliseColour(value.secondary, "#ff9ffc"),
+      lifetime: Math.round(clamp(value.lifetime, 180, 1200, 520)),
+      points: Math.round(clamp(value.points, 10, 64, 36)),
+      width: clamp(value.width, 0.5, 8, 2.4),
+      glow: clamp(value.glow, 0, 28, 12),
+      particles: value.particles !== false
+    };
+  }
+
+  function loadCustomTrail() {
+    try {
+      return normaliseCustomTrail(JSON.parse(window.localStorage?.getItem(CUSTOM_TRAIL_STORAGE_KEY) || "null"));
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function installCustomTrail(value) {
+    const normalised = normaliseCustomTrail(value);
+    if (!normalised) return null;
+    try {
+      window.localStorage?.setItem(CUSTOM_TRAIL_STORAGE_KEY, JSON.stringify(normalised));
+    } catch (error) {
+      return null;
+    }
+    customTrail = normalised;
+    syncMode();
+    return { ...normalised };
+  }
 
   function activeMode() {
     const requested = document.documentElement.dataset.feCursorTrail || "off";
@@ -62,12 +118,16 @@
     lastAcceptedPoint = null;
     if (frame) cancelAnimationFrame(frame);
     frame = 0;
+    frameClock = 0;
+    frameCarry = 0;
     if (context) context.clearRect(0, 0, viewportWidth, viewportHeight);
     if (canvas) canvas.hidden = true;
   }
 
   function syncMode() {
+    customTrail = loadCustomTrail();
     mode = activeMode();
+    if (mode === "custom" && !customTrail) mode = "off";
     if (!motionAllowed()) {
       clearTrail();
       return;
@@ -95,7 +155,7 @@
     };
     samples.push(point);
     lastAcceptedPoint = point;
-    const limit = MODE_LIMITS[mode]?.points || 24;
+    const limit = mode === "custom" ? customTrail?.points || 24 : MODE_LIMITS[mode]?.points || 24;
     if (samples.length > limit) samples.splice(0, samples.length - limit);
   }
 
@@ -204,13 +264,70 @@
     }
   }
 
+  function colourRgba(hex, alpha) {
+    const value = normaliseColour(hex, "#ffffff");
+    const red = Number.parseInt(value.slice(1, 3), 16);
+    const green = Number.parseInt(value.slice(3, 5), 16);
+    const blue = Number.parseInt(value.slice(5, 7), 16);
+    return `rgba(${red}, ${green}, ${blue}, ${Math.max(0, Math.min(1, alpha))})`;
+  }
+
+  function drawCustom(now, config) {
+    if (!config || samples.length < 1) return;
+    context.save();
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.shadowBlur = config.glow;
+    context.shadowColor = colourRgba(config.secondary, 0.62);
+    for (let index = 1; index < samples.length; index += 1) {
+      const previous = samples[index - 1];
+      const point = samples[index];
+      const progress = Math.min(1, Math.max(0, (now - point.bornAt) / config.lifetime));
+      const alpha = Math.pow(1 - progress, 1.42);
+      if (alpha <= 0.01) continue;
+      const hueShift = config.style === "prism" ? (point.seed * 120 + now * 0.045) % 360 : null;
+      context.strokeStyle = hueShift === null
+        ? colourRgba(index % 2 ? config.primary : config.secondary, 0.72 * alpha)
+        : `hsla(${hueShift}, 92%, 72%, ${0.76 * alpha})`;
+      context.lineWidth = Math.max(0.5, config.width * (0.42 + alpha * 0.72));
+      context.beginPath();
+      context.moveTo(previous.x, previous.y);
+      context.lineTo(point.x, point.y);
+      context.stroke();
+    }
+    if (config.particles) {
+      for (let index = 0; index < samples.length; index += 2) {
+        const point = samples[index];
+        const progress = Math.min(1, Math.max(0, (now - point.bornAt) / config.lifetime));
+        const alpha = Math.pow(1 - progress, 1.7);
+        if (alpha <= 0.02) continue;
+        const drift = config.style === "stardust" ? progress * (5 + point.seed * 12) : 0;
+        context.fillStyle = colourRgba(point.seed > 0.5 ? config.primary : config.secondary, 0.7 * alpha);
+        context.beginPath();
+        context.arc(point.x + (point.seed - 0.5) * drift, point.y - drift, 0.8 + alpha * config.width * 0.7, 0, Math.PI * 2);
+        context.fill();
+      }
+    }
+    context.restore();
+  }
+
   function drawFrame(now) {
     frame = 0;
     if (!motionAllowed() || !context || !canvas) {
       clearTrail();
       return;
     }
-    const config = MODE_LIMITS[mode] || MODE_LIMITS.glow;
+    const frameElapsed = frameClock
+      ? Math.min(100, Math.max(0, now - frameClock))
+      : TRAIL_FRAME_BUDGET_MS;
+    frameClock = now;
+    frameCarry = Math.min(TRAIL_FRAME_BUDGET_MS * 2, frameCarry + frameElapsed);
+    if (frameCarry + 0.1 < TRAIL_FRAME_BUDGET_MS) {
+      queueFrame();
+      return;
+    }
+    frameCarry %= TRAIL_FRAME_BUDGET_MS;
+    const config = mode === "custom" ? customTrail : MODE_LIMITS[mode] || MODE_LIMITS.glow;
     while (samples.length && now - samples[0].bornAt >= config.lifetime) samples.shift();
     context.clearRect(0, 0, viewportWidth, viewportHeight);
     if (!samples.length) {
@@ -221,7 +338,8 @@
 
     context.save();
     context.globalCompositeOperation = "lighter";
-    if (mode === "glow") drawGlow(now, config.lifetime);
+    if (mode === "custom") drawCustom(now, config);
+    else if (mode === "glow") drawGlow(now, config.lifetime);
     else if (mode === "comet") drawSegmentTrail(now, config.lifetime, false);
     else if (mode === "stardust") drawStardust(now, config.lifetime);
     else if (mode === "ribbon") drawRibbon(now, config.lifetime);
@@ -251,6 +369,10 @@
     window.FeCursorTrails = Object.freeze({
       sync: syncMode,
       clear: clearTrail,
+      installCustom: installCustomTrail,
+      getCustom() {
+        return customTrail ? { ...customTrail } : null;
+      },
       getDiagnostics() {
         return {
           mode,

@@ -10,7 +10,8 @@ public final class NativeSpatialAudioBridgeProbe {
         NativeAudioEngine engine = new NativeAudioEngine(ProjectPaths.detect());
         Map<String, Object> start = engine.startSpatialStream(48000, 2, 6, 2);
         long session = ((Number) start.getOrDefault("session", 0)).longValue();
-        if (!Boolean.TRUE.equals(start.get("ok")) || session <= 0) {
+        long generation = ((Number) start.getOrDefault("generation", 0)).longValue();
+        if (!Boolean.TRUE.equals(start.get("ok")) || session <= 0 || generation <= 0) {
             throw new IllegalStateException("start failed: " + start);
         }
 
@@ -24,7 +25,7 @@ public final class NativeSpatialAudioBridgeProbe {
                 pcm[frame * 2 + 1] = right;
                 phase += Math.PI * 2.0 * 73.0 / 48000.0;
             }
-            int result = engine.submitSpatialPcm(session, pcm);
+            int result = engine.submitSpatialPcm(session, generation, pcm);
             if (result < 0) throw new IllegalStateException("submit failed: " + result);
             Thread.sleep(18);
         }
@@ -41,12 +42,25 @@ public final class NativeSpatialAudioBridgeProbe {
             && ((Number) status.getOrDefault("bufferPoolExhaustions", 1)).longValue() == 0
             && Boolean.TRUE.equals(status.get("voiceStarted"))
             && ((Number) status.getOrDefault("outputEnergy", 0.0)).doubleValue() > 0.0;
-        engine.stopSpatialStream(session);
-        boolean stopped = !Boolean.TRUE.equals(engine.spatialPayload().get("active"));
+        Map<String, Object> paused = engine.pauseSpatialStream(session, generation);
+        boolean stopped = Boolean.TRUE.equals(paused.get("flushed"))
+            && !Boolean.TRUE.equals(engine.spatialPayload().get("active"));
+        int staleAfterPause = engine.submitSpatialPcm(session, generation, new float[512 * 2]);
+        Map<String, Object> restarted = engine.startSpatialStream(48000, 2, 6, 2);
+        long nextSession = ((Number) restarted.getOrDefault("session", 0)).longValue();
+        long nextGeneration = ((Number) restarted.getOrDefault("generation", 0)).longValue();
+        int staleAfterRestart = engine.submitSpatialPcm(session, generation, new float[512 * 2]);
+        int currentAccepted = engine.submitSpatialPcm(nextSession, nextGeneration, new float[512 * 2]);
+        boolean generationAdvanced = nextSession > session
+            && nextGeneration > generation
+            && staleAfterPause == -1
+            && staleAfterRestart == -1
+            && currentAccepted >= 0;
+        engine.stopSpatialStream(nextSession, nextGeneration);
         engine.close();
 
         System.out.println("{"
-            + "\"pass\":" + (pass && stopped)
+            + "\"pass\":" + (pass && stopped && generationAdvanced)
             + ",\"chain\":\"PCM -> OxiMedia/Rust -> X3DAudio -> Google OBR -> XAudio2\""
             + ",\"rustCalls\":" + status.get("rustUpmixProcessCalls")
             + ",\"obrCalls\":" + status.get("obrProcessCalls")
@@ -57,7 +71,10 @@ public final class NativeSpatialAudioBridgeProbe {
             + ",\"voiceStarted\":" + status.get("voiceStarted")
             + ",\"outputEnergy\":" + status.get("outputEnergy")
             + ",\"stopped\":" + stopped
+            + ",\"generationAdvanced\":" + generationAdvanced
+            + ",\"staleAfterPause\":" + staleAfterPause
+            + ",\"staleAfterRestart\":" + staleAfterRestart
             + "}");
-        if (!pass || !stopped) System.exit(1);
+        if (!pass || !stopped || !generationAdvanced) System.exit(1);
     }
 }

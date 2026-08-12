@@ -1,0 +1,137 @@
+.pet-assistant[data-pet-behavior="groove"]:not([data-state="dragging"]):not([data-state="edge-peek"]):not([data-state="sleep"]):not([data-state="offline"]) .pet-assistant__rig-body {
+  animation: pet-p2-groove-body .44s cubic-bezier(.37, 0, .63, 1) infinite;
+}
+
+.pet-assistant[data-pet-behavior="groove"] .pet-assistant__rig-head {
+  animation: pet-p2-groove-head .44s ease-in-out infinite alternate;
+}
+
+.pet-assistant[data-pet-behavior="groove"] .pet-assistant__tail {
+  animation: pet-p2-groove-tail .32s ease-in-out infinite alternate;
+  transform-origin: 5% 50%;
+}
+
+.pet-assistant[data-pet-behavior="groove"] .pet-assistant__spectrum-marks {
+  opacity: calc(.62 + var(--pet-program-energy, 0) * .38);
+  animation: pet-p2-groove-spectrum .26s ease-in-out infinite alternate;
+}
+
+.pet-assistant[data-pet-behavior="groove"] .pet-assistant__aura {
+  opacity: .82;
+  animation: pet-p2-groove-aura .62s ease-in-out infinite alternate;
+}
+
+.pet-assistant[data-pet-behavior="night-yawn"]:not([data-state="dragging"]):not([data-state="edge-peek"]) .pet-assistant__rig-head {
+  animation: pet-p2-yawn-head 6.4s ease-in-out infinite;
+}
+
+.pet-assistant[data-pet-behavior="night-yawn"] .pet-assistant__eyelid {
+  animation: pet-p2-yawn-eyelids 6.4s ease-in-out infinite;
+}
+
+.pet-assistant[data-pet-behavior="night-yawn"] .pet-assistant__mouth {
+  animation: pet-p2-yawn-mouth 6.4s ease-in-out infinite;
+}
+
+.pet-assistant[data-pet-reaction="eye-roll"] .pet-assistant__rig-head {
+  animation: pet-p2-eye-roll-head .9s cubic-bezier(.2, .8, .2, 1) 3;
+}
+
+.pet-assistant[data-pet-reaction="eye-roll"] .pet-assistant__eyes {
+  animation: pet-p2-eye-roll-eyes .9s ease-in-out 3;
+}
+
+.pet-assistant[data-pet-reaction="eye-roll"] .pet-assistant__eyelid {
+  animation: pet-p2-eye-roll-lids .9s ease-in-out 3;
+}
+
+.pet-assistant[data-pet-reaction="eye-roll"] .pet-assistant__eye-glow {
+  opacity: .72;
+  filter: grayscale(1) brightness(1.65) drop-shadow(0 0 5px rgba(255, 255, 255, .72));
+  animation: pet-p2-eye-roll-glow .9s ease-in-out 3;
+}
+
+@keyframes pet-p2-groove-body {
+  0%, 100% { transform: translate3d(-2px, 1px, 0) rotate(-1.2deg) scaleY(.99); }
+  45% { transform: translate3d(2px, -7px, 0) rotate(1.8deg) scaleY(1.02); }
+  68% { transform: translate3d(0, -3px, 0) rotate(.4deg) scaleY(1.005); }
+}
+
+@keyframes pet-p2-groove-head {
+  from { transform: rotate(-2.6deg) translateY(2px); }
+  to { transform: rotate(3.2deg) translateY(-3px); }
+}
+
+@keyframes pet-p2-groove-tail {
+  from { transform: rotate(-7deg) translateY(2px); }
+  to { transform: rotate(11deg) translateY(-4px); }
+}
+
+@keyframes pet-p2-groove-spectrum {
+  from { transform: scaleY(.76); filter: drop-shadow(0 0 2px #2cecff); }
+  to { transform: scaleY(1.14); filter: drop-shadow(0 0 8px #a63cff); }
+}
+
+@keyframes pet-p2-groove-aura {
+  from { transform: scale(.9); filter: blur(7px); }
+  to { transform: scale(1.16); filter: blur(10px); }
+}
+
+@keyframes pet-p2-yawn-head {
+  0%, 62%, 100% { transform: rotate(-2deg) translateY(1px); }
+  72% { transform: rotate(-5deg) translateY(7px); }
+  84% { transform: rotate(-4deg) translateY(4px); }
+}
+
+@keyframes pet-p2-yawn-eyelids {
+  0%, 62%, 100% { transform: scaleY(0); opacity: 0; }
+  70%, 88% { transform: scaleY(.92); opacity: .94; }
+}
+
+@keyframes pet-p2-yawn-mouth {
+  0%, 62%, 100% { opacity: 0; transform: scale(.7, .3); }
+  73% { opacity: .96; transform: scale(.92, 1.8) translateY(5px); }
+  86% { opacity: .72; transform: scale(.84, 1.15) translateY(2px); }
+}
+
+@keyframes pet-p2-eye-roll-head {
+  0%, 100% { transform: rotate(0) translateY(0); }
+  28% { transform: rotate(-3deg) translateY(2px); }
+  58% { transform: rotate(2deg) translateY(-2px); }
+}
+
+@keyframes pet-p2-eye-roll-eyes {
+  0%, 100% { transform: translate(0, 0); }
+  24% { transform: translate(-3px, -5px); }
+  54% { transform: translate(4px, -7px); }
+  78% { transform: translate(5px, -2px); }
+}
+
+@keyframes pet-p2-eye-roll-lids {
+  0%, 100% { transform: scaleY(0); opacity: 0; }
+  18%, 78% { transform: translateY(-8px) scaleY(.78); opacity: .88; }
+}
+
+@keyframes pet-p2-eye-roll-glow {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  28% { transform: translateX(-53%) translateY(-6px); }
+  58% { transform: translateX(-47%) translateY(-8px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-assistant[data-pet-behavior="groove"] .pet-assistant__rig-body,
+  .pet-assistant[data-pet-behavior="groove"] .pet-assistant__rig-head,
+  .pet-assistant[data-pet-behavior="groove"] .pet-assistant__tail,
+  .pet-assistant[data-pet-behavior="groove"] .pet-assistant__spectrum-marks,
+  .pet-assistant[data-pet-behavior="groove"] .pet-assistant__aura,
+  .pet-assistant[data-pet-behavior="night-yawn"] .pet-assistant__rig-head,
+  .pet-assistant[data-pet-behavior="night-yawn"] .pet-assistant__eyelid,
+  .pet-assistant[data-pet-behavior="night-yawn"] .pet-assistant__mouth,
+  .pet-assistant[data-pet-reaction="eye-roll"] .pet-assistant__rig-head,
+  .pet-assistant[data-pet-reaction="eye-roll"] .pet-assistant__eyes,
+  .pet-assistant[data-pet-reaction="eye-roll"] .pet-assistant__eyelid,
+  .pet-assistant[data-pet-reaction="eye-roll"] .pet-assistant__eye-glow {
+    animation-duration: 1.8s;
+    animation-iteration-count: 1;
+  }
+}

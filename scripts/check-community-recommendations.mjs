@@ -41,8 +41,11 @@ const checks = {
     /is-recommended-playlist/.test(app)
     && /今日推荐/.test(app),
   selectedPlaylistBecomesPlaybackQueue:
-    /state\.queue\s*=\s*state\.activePlaylistSongs/.test(app)
-    && /currentIndex:\s*index/.test(app),
+    /const tracks = Array\.isArray\(songs\)[\s\S]{0,180}?slice\(0, 2000\)/.test(app)
+    && /state\.activePlaylistSongs = tracks/.test(app)
+    && /let playbackQueue = tracks/.test(app)
+    && /currentIndex:\s*playbackQueueIndex/.test(app)
+    && /state\.queue\s*=\s*playbackQueue/.test(app),
   playbackWheelUsesCurrentQueue:
     /function handleQishuiPlaybackWheel/.test(app)
     && /function switchQishuiPlaybackTrack[\s\S]*?playQueueIndex/.test(app),

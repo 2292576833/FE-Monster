@@ -5,11 +5,25 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 public final class MusicProviderRegistry {
+    private static final long PROVIDER_ACCESS_RECHECK_NANOS = TimeUnit.SECONDS.toNanos(1);
+    private static final Consumer<String> NO_PROVIDER_ACCESS = provider -> {
+    };
+
+    private final Consumer<String> providerAccess;
+    private final Map<String, Long> providerAccessAt = new ConcurrentHashMap<>();
     private volatile Map<String, MusicProviderClient> providers = Map.of();
 
     public MusicProviderRegistry(MusicProviderClient... clients) {
+        this(NO_PROVIDER_ACCESS, clients);
+    }
+
+    public MusicProviderRegistry(Consumer<String> providerAccess, MusicProviderClient... clients) {
+        this.providerAccess = providerAccess == null ? NO_PROVIDER_ACCESS : providerAccess;
         replace(clients);
     }
 
@@ -17,7 +31,27 @@ public final class MusicProviderRegistry {
         String id = normalize(provider);
         MusicProviderClient client = providers.get(id);
         if (client == null) throw new IllegalArgumentException("music API plugin is not configured: " + id);
+        signalProviderAccess(id);
         return client;
+    }
+
+    private void signalProviderAccess(String id) {
+        long now = System.nanoTime();
+        while (true) {
+            Long previous = providerAccessAt.get(id);
+            if (previous != null && now - previous < PROVIDER_ACCESS_RECHECK_NANOS) return;
+            boolean acquired = previous == null
+                ? providerAccessAt.putIfAbsent(id, now) == null
+                : providerAccessAt.replace(id, previous, now);
+            if (!acquired) continue;
+            try {
+                providerAccess.accept(id);
+            } catch (RuntimeException error) {
+                providerAccessAt.remove(id, now);
+                throw error;
+            }
+            return;
+        }
     }
 
     public synchronized void replace(MusicProviderClient... clients) {
@@ -28,6 +62,11 @@ public final class MusicProviderRegistry {
             }
         }
         providers = Collections.unmodifiableMap(next);
+        providerAccessAt.clear();
+    }
+
+    public void resetProviderAccess() {
+        providerAccessAt.clear();
     }
 
     public Map<String, Object> providersPayload() {
@@ -68,6 +107,52 @@ public final class MusicProviderRegistry {
 
     public void rememberBrowserSession(String provider, Map<String, String> cookies) {
         get(provider).rememberBrowserSession(cookies);
+    }
+
+    public Map<String, Object> beginProviderLogin(String provider) {
+        return get(provider).beginProviderLogin();
+    }
+
+    public Map<String, Object> pollProviderLogin(String provider, String key) {
+        return get(provider).pollProviderLogin(key);
+    }
+
+    /**
+     * Persists an official-browser session and verifies that both the account
+     * and its playlist library are readable before login is reported complete.
+     */
+    public Map<String, Object> synchronizeBrowserSession(String provider, Map<String, String> cookies) {
+        MusicProviderClient client = get(provider);
+        if (!"kugou".equals(normalize(provider))) {
+            client.rememberBrowserSession(cookies);
+        }
+        return synchronizeCurrentSession(provider, client);
+    }
+
+    public Map<String, Object> synchronizeCurrentSession(String provider) {
+        return synchronizeCurrentSession(provider, get(provider));
+    }
+
+    private Map<String, Object> synchronizeCurrentSession(String provider, MusicProviderClient client) {
+        Map<String, Object> account = client.accountPayload();
+        boolean loggedIn = Boolean.TRUE.equals(account.get("ok"))
+            && Boolean.TRUE.equals(account.get("loggedIn"));
+        Map<String, Object> playlists = loggedIn
+            ? client.userPlaylistsPayload()
+            : Map.of("ok", false, "loggedIn", false, "playlists", List.of());
+        boolean playlistsReady = loggedIn
+            && Boolean.TRUE.equals(playlists.get("ok"))
+            && Boolean.TRUE.equals(playlists.get("loggedIn"))
+            && Boolean.TRUE.equals(playlists.get("userLibrary"));
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("provider", normalize(provider));
+        body.put("loggedIn", loggedIn);
+        body.put("playlistsReady", playlistsReady);
+        body.put("ready", loggedIn && playlistsReady);
+        body.put("account", account);
+        body.put("playlists", playlists);
+        return body;
     }
 
     public boolean clearBrowserSession(String provider) {

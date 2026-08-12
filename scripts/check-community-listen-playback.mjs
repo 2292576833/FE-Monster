@@ -199,9 +199,35 @@ try {
     const badSong = { id: 'vip-no-source', title: 'VIP unavailable', artist: 'QA', provider: 'netease', duration: 180, position: 19, playing: true };
     const secondBadSong = { id: 'expired-source', title: 'Expired source', artist: 'QA', provider: 'netease', duration: 160 };
     const goodSong = { id: 'playable-spatial', title: 'Playable spatial', artist: 'QA', provider: 'netease', duration: 4 };
-    const session = { id: 'listen-session-qa', song: badSong, members: [{ feId: '10000001' }, { feId: '10000002' }] };
+    const originalSharedScene = communitySharedSceneSnapshot();
+    const originalVisualPreferences = localStorage.getItem(VISUAL_SETTINGS_PREFS_KEY);
+    const originalSonicPreferences = localStorage.getItem(SONIC_SETTINGS_PREFS_KEY);
+    const initialSharedScene = {
+      preset: 'lyric',
+      textPreset: 'depth',
+      lyricBrightness: 1.31,
+      lyricSpeed: 1.07,
+      cubeIntensity: 1.22,
+      sonic: { ...normalizeSonicSettings(state.sonicTopography.settings), fluorescence: 1.14 },
+      freeCube: { mode: 'free', backgroundEnabled: true },
+      chladniMode: 'cube',
+      storm: { lightingMode: 'sunset', weatherMode: 'auto' },
+      coverParticle: { backgroundEnabled: true, motionAmplitude: 0.8, floatSpeed: 1 }
+    };
+    const session = {
+      id: 'listen-session-qa',
+      song: badSong,
+      scene: initialSharedScene,
+      sceneRevision: 1,
+      members: [{ feId: '10000001' }, { feId: '10000002' }]
+    };
     const requests = [];
+    const listeningRequestBodies = [];
     let nextAttempt = 0;
+    let serverSceneRevision = 2;
+    const sceneRequestBodies = [];
+    let releaseFirstSceneRequest;
+    const firstSceneRequestGate = new Promise((resolve) => { releaseFirstSceneRequest = resolve; });
     let resolveLeave;
     const leaveGate = new Promise((resolve) => { resolveLeave = resolve; });
     const originalApiJson = apiJson;
@@ -217,7 +243,20 @@ try {
         await leaveGate;
         return { ok: true, state: { sessions: [], incoming: [] } };
       }
-      if (String(url).startsWith('/api/community/listening')) return { ok: true, syncedSessions: [] };
+      if (String(url).startsWith('/api/community/listen/scene')) {
+        const body = JSON.parse(options.body || '{}');
+        sceneRequestBodies.push(body);
+        if (sceneRequestBodies.length === 1) await firstSceneRequestGate;
+        serverSceneRevision += 1;
+        return {
+          ok: true,
+          session: { ...session, scene: body.scene, sceneRevision: serverSceneRevision, sceneUpdatedBy: '10000002' }
+        };
+      }
+      if (String(url).startsWith('/api/community/listening')) {
+        listeningRequestBodies.push(JSON.parse(options.body || '{}'));
+        return { ok: true, syncedSessions: [] };
+      }
       return { ok: true };
     };
 
@@ -229,6 +268,39 @@ try {
     await setGoogleObrSpatialAudioEnabled(true, { announce: false });
     qaStage('sync-unavailable');
     await applyCommunityListenSync({ session, song: badSong, sourceId: '10000001' });
+    check(Math.abs(state.lyricBrightness - 1.31) < 0.001,
+      'Joining together-listen did not apply the canonical shared scene.');
+    check(localStorage.getItem(VISUAL_SETTINGS_PREFS_KEY) === originalVisualPreferences
+      && localStorage.getItem(SONIC_SETTINGS_PREFS_KEY) === originalSonicPreferences,
+      'Applying the shared scene overwrote persistent local scene preferences.');
+    const sceneRequestsBeforeRemote = requests.filter((url) => url.startsWith('/api/community/listen/scene')).length;
+    await applyCommunitySharedSceneSession({
+      ...session,
+      sceneRevision: 2,
+      scene: { ...initialSharedScene, lyricBrightness: 1.63 }
+    });
+    await new Promise((resolve) => setTimeout(resolve, 140));
+    check(Math.abs(state.lyricBrightness - 1.63) < 0.001,
+      'A newer canonical shared-scene revision was not applied.');
+    check(requests.filter((url) => url.startsWith('/api/community/listen/scene')).length === sceneRequestsBeforeRemote,
+      'Applying a remote shared scene echoed the scene back to the server.');
+    state.lyricBrightness = 1.42;
+    updateLyricDiyVars();
+    saveVisualSettingsPreferences();
+    await wait(() => sceneRequestBodies.length === 1, 2000);
+    state.lyricBrightness = 1.52;
+    updateLyricDiyVars();
+    saveVisualSettingsPreferences();
+    releaseFirstSceneRequest();
+    await wait(() => sceneRequestBodies.length === 2 && !state.community.listenSceneInFlight, 3000);
+    check(requests.filter((url) => url.startsWith('/api/community/listen/scene')).length === sceneRequestsBeforeRemote + 2,
+      'A local shared-scene change made during an in-flight request was lost.');
+    check(Math.abs(Number(sceneRequestBodies[1]?.scene?.lyricBrightness) - 1.52) < 0.001,
+      'The queued co-host scene did not preserve the newest local parameter value.');
+    check(Math.abs(state.lyricBrightness - 1.52) < 0.001,
+      'An older canonical response overwrote a newer dirty local scene.');
+    check(localStorage.getItem(VISUAL_SETTINGS_PREFS_KEY) === originalVisualPreferences,
+      'A co-host scene adjustment leaked into persistent local preferences.');
     const recovered = await wait(() => state.currentSong?.id === goodSong.id && !els.audio.paused, 20000);
     const obrProcessed = await wait(
       () => state.obrSpatialAudio.enabled && state.obrSpatialAudio.processedBlocks > 1 && state.obrSpatialAudio.outputRms > 0,
@@ -309,6 +381,10 @@ try {
     await new Promise((resolve) => setTimeout(resolve, 20));
     check(document.getElementById('listenMini').hidden, 'Together-listen window did not close immediately.');
     check(state.community.activeSession === null, 'Together-listen session remained locally active after closing.');
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    check(state.diyPreset === originalSharedScene.preset
+      && Math.abs(state.lyricBrightness - originalSharedScene.lyricBrightness) < 0.001,
+      'Closing together-listen did not restore the pre-session local scene.');
     check(danmakuToggle?.hidden === true && danmakuComposer?.getAttribute('aria-hidden') === 'true',
       'Danmaku controls remained visible after together-listen ended.');
     qaStage('danmaku-expiry');
@@ -334,6 +410,19 @@ try {
     check(state.community.activeSession === null, 'A stale poll response restored the closed session.');
     resolveLeave();
     await new Promise((resolve) => setTimeout(resolve, 50));
+
+    els.audio.pause();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    listeningRequestBodies.length = 0;
+    state.currentSong = { ...goodSong, position: Number(els.audio.currentTime) || 0 };
+    state.community.profile = { feId: '10000002' };
+    state.community.lastListenReportAt = performance.now() - 1000;
+    await reportCommunityListening(true);
+    const pausedListeningReport = listeningRequestBodies.at(-1);
+    check(pausedListeningReport?.listenMsDelta === 0,
+      'A forced paused listening report did not send listenMsDelta: 0.');
+    check(pausedListeningReport?.song?.playing === false,
+      'A forced paused listening report did not send song.playing: false.');
 
     apiJson = originalApiJson;
 
@@ -369,14 +458,75 @@ try {
 
     let heartbeatClosed = false;
     const heartbeatSource = { close: () => { heartbeatClosed = true; } };
+    const petStreamStates = [];
+    const recordPetStreamState = (event) => petStreamStates.push(event.detail?.state || '');
+    window.addEventListener('fe-monster-pet-stream-state', recordPetStreamState);
     state.community.eventSource = heartbeatSource;
     state.community.eventKey = 'qa-heartbeat';
     state.community.eventConnected = true;
+    touchCommunityEventStream();
+    state.community.eventLastActivityAt = performance.now() - COMMUNITY_EVENT_STALE_MS + 1;
+    checkCommunityEventHeartbeat();
+    check(!heartbeatClosed && state.community.eventConnected,
+      'A live community event stream was closed before the heartbeat grace expired.');
     state.community.eventLastActivityAt = performance.now() - COMMUNITY_EVENT_STALE_MS - 1;
     checkCommunityEventHeartbeat();
     check(heartbeatClosed && !state.community.eventConnected && !!state.community.eventReconnectTimer,
       'A stale community event stream was not closed and scheduled for reconnect.');
+    check(petStreamStates.includes('connected') && petStreamStates.includes('stale'),
+      'Pet stream liveness did not receive connected and stale transitions.');
+    window.removeEventListener('fe-monster-pet-stream-state', recordPetStreamState);
     stopCommunityEventStream(true);
+
+    const disconnectRestoreScene = communitySharedSceneSnapshot();
+    const disconnectSession = {
+      id: 'listen-sse-disconnect-qa',
+      sceneRevision: 1,
+      scene: { ...disconnectRestoreScene, preset: 'lyric', lyricBrightness: 1.71 },
+      members: session.members
+    };
+    beginCommunitySceneOverride(disconnectSession);
+    state.community.activeSession = disconnectSession;
+    await applyCommunitySharedSceneSession(disconnectSession);
+    state.community.eventConnected = false;
+    scheduleCommunitySceneDisconnectRestore(0);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    check(state.community.activeSession === null
+      && state.diyPreset === disconnectRestoreScene.preset
+      && Math.abs(state.lyricBrightness - disconnectRestoreScene.lyricBrightness) < 0.001,
+      'An unrecovered together-listen event-stream disconnect did not restore the local scene snapshot.');
+
+    const retrySession = {
+      id: 'listen-scene-retry-qa',
+      sceneRevision: 1,
+      scene: disconnectRestoreScene,
+      members: session.members
+    };
+    beginCommunitySceneOverride(retrySession);
+    state.community.activeSession = retrySession;
+    await applyCommunitySharedSceneSession(retrySession);
+    const retrySceneAttempts = [];
+    const retryApiJson = apiJson;
+    apiJson = async (url, options = {}) => {
+      if (String(url).startsWith('/api/community/listen/scene')) {
+        retrySceneAttempts.push(performance.now());
+        throw new Error('simulated scene-sync outage');
+      }
+      return retryApiJson(url, options);
+    };
+    state.lyricBrightness = clamp(disconnectRestoreScene.lyricBrightness + 0.17, 0.6, 1.8);
+    saveVisualSettingsPreferences();
+    await new Promise((resolve) => setTimeout(resolve, 920));
+    check(retrySceneAttempts.length >= 2 && retrySceneAttempts.length <= 3,
+      'Failed scene sync retried in an unbounded zero-delay loop.');
+    check(retrySceneAttempts.slice(1).every((time, index) => time - retrySceneAttempts[index] >= 200),
+      'Failed scene sync did not use bounded exponential retry delays.');
+    resetCommunityListenState({ sessionId: retrySession.id });
+    const attemptsAtReset = retrySceneAttempts.length;
+    await new Promise((resolve) => setTimeout(resolve, 620));
+    check(retrySceneAttempts.length === attemptsAtReset,
+      'Leaving together-listen did not cancel a queued scene-sync retry.');
+    apiJson = retryApiJson;
 
     els.audio.pause();
     URL.revokeObjectURL(playableUrl);

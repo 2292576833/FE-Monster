@@ -439,6 +439,8 @@ try {
       const rect = card.getBoundingClientRect();
       const style = getComputedStyle(card);
       const coverStyle = getComputedStyle(card, '::before');
+      const panelStyle = getComputedStyle(els.diySidebar);
+      const pageStyle = getComputedStyle(document.getElementById('diyPresetPage'));
       const matrix = new DOMMatrix(style.transform);
       const coverMatrix = new DOMMatrix(coverStyle.transform);
       return {
@@ -450,8 +452,27 @@ try {
         borderColor: style.borderColor,
         boxShadow: style.boxShadow,
         coverImage: coverStyle.backgroundImage,
-        mattePanel: getComputedStyle(els.diySidebar).backgroundImage,
-        panelFilter: getComputedStyle(els.diySidebar).backdropFilter,
+        mattePanel: panelStyle.backgroundImage,
+        mattePanelColor: panelStyle.backgroundColor,
+        panelFilter: panelStyle.backdropFilter,
+        pageUnderlay: {
+          backgroundColor: pageStyle.backgroundColor,
+          backgroundImage: pageStyle.backgroundImage,
+          boxShadow: pageStyle.boxShadow,
+          backdropFilter: pageStyle.backdropFilter,
+          webkitBackdropFilter: pageStyle.webkitBackdropFilter
+        },
+        modeButtonSurfaces: [
+          'diyPresetButton',
+          'diyTextModeButton',
+          'diyWallpaperModeButton'
+        ].map((id) => {
+          const buttonStyle = getComputedStyle(document.getElementById(id));
+          return {
+            backgroundColor: buttonStyle.backgroundColor,
+            backgroundImage: buttonStyle.backgroundImage
+          };
+        }),
         scenePalette: summarizeCards('#diyScenePresetList .diy-preset-card[data-preset]'),
         textPalette: summarizeCards('#diyTextPage .diy-preset-card[data-text-preset]')
       };
@@ -485,8 +506,20 @@ try {
   const presetHoveredValue = presetHovered.result.value;
   evaluation.result.value.presetCardSurface = {
     pass: presetBaselineValue.coverImage.includes('scene-cube-v2.webp')
-      && presetBaselineValue.mattePanel.includes('rgba(8, 8, 10, 0.76)')
+      && presetBaselineValue.mattePanel === 'none'
+      && presetBaselineValue.mattePanelColor === 'rgba(0, 0, 0, 0.07)'
       && presetBaselineValue.panelFilter.includes('blur(20px)')
+      && presetBaselineValue.pageUnderlay.backgroundColor === 'rgba(0, 0, 0, 0)'
+      && presetBaselineValue.pageUnderlay.backgroundImage === 'none'
+      && presetBaselineValue.pageUnderlay.boxShadow === 'none'
+      && presetBaselineValue.pageUnderlay.backdropFilter === 'none'
+      && (!presetBaselineValue.pageUnderlay.webkitBackdropFilter
+        || presetBaselineValue.pageUnderlay.webkitBackdropFilter === 'none')
+      && presetBaselineValue.modeButtonSurfaces.length === 3
+      && presetBaselineValue.modeButtonSurfaces.every((surface) => (
+        surface.backgroundColor === 'rgba(255, 246, 232, 0.1)'
+        && surface.backgroundImage === 'none'
+      ))
       && presetBaselineValue.scenePalette.count === 9
       && presetBaselineValue.scenePalette.distinctCovers === 9
       && presetBaselineValue.scenePalette.distinctAccents === 9

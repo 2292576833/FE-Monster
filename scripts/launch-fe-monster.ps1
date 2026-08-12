@@ -1,13 +1,17 @@
 param(
-  [string]$Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path,
+  [string]$Root = '',
   [Parameter(ValueFromRemainingArguments = $true)]
   [string[]]$ClientArgs = @()
 )
 
 $ErrorActionPreference = 'Stop'
+if ([string]::IsNullOrWhiteSpace($Root)) {
+  $Root = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+}
 $rootPath = (Resolve-Path -LiteralPath $Root).Path
 $outDir = Join-Path $rootPath 'out'
 $logFile = Join-Path $outDir 'launch.log'
+$buildLogFile = Join-Path $outDir 'launch-build.log'
 $mainExecutable = Join-Path $rootPath 'native\windows\build\winforms\FE Monster.exe'
 $javaJar = Join-Path $rootPath 'out\fe-monster-java.jar'
 
@@ -33,41 +37,65 @@ function Show-VisibleError {
   ) | Out-Null
 }
 
-function Quote-Arg {
-  param([string]$Value)
-  if ($null -eq $Value) { return '""' }
-  return '"' + ($Value -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"'
-}
-
 try {
+  . (Join-Path $rootPath 'scripts\windows-no-console-process.ps1')
   Write-Log 'Legacy launcher delegated to the named FE Monster host.'
 
   if (!(Test-Path -LiteralPath $javaJar -PathType Leaf)) {
     $javaBuilder = Join-Path $rootPath 'scripts\build-java.ps1'
     Write-Log 'Java backend is missing; building it from source.'
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $javaBuilder -Root $rootPath
-    if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $javaJar -PathType Leaf)) {
-      throw "FE Monster Java backend build failed with exit code $LASTEXITCODE."
+    $javaBuild = Invoke-NoConsoleProcess `
+      -FilePath (Get-Command powershell.exe -ErrorAction Stop).Source `
+      -ArgumentList @(
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        $javaBuilder,
+        '-Root',
+        $rootPath
+      ) `
+      -WorkingDirectory $rootPath `
+      -Wait `
+      -CaptureOutput `
+      -LogPath $buildLogFile
+    if ($javaBuild.ExitCode -ne 0 -or !(Test-Path -LiteralPath $javaJar -PathType Leaf)) {
+      throw "FE Monster Java backend build failed with exit code $($javaBuild.ExitCode). See $buildLogFile"
     }
   }
 
   if (!(Test-Path -LiteralPath $mainExecutable -PathType Leaf)) {
     $clientBuilder = Join-Path $rootPath 'scripts\build-winforms-client.ps1'
     Write-Log 'Windows host is missing; building it from source.'
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $clientBuilder -Root $rootPath
-    if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $mainExecutable -PathType Leaf)) {
-      throw "FE Monster Windows host build failed with exit code $LASTEXITCODE. Install .NET SDK 8 and try again."
+    $clientBuild = Invoke-NoConsoleProcess `
+      -FilePath (Get-Command powershell.exe -ErrorAction Stop).Source `
+      -ArgumentList @(
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        $clientBuilder,
+        '-Root',
+        $rootPath
+      ) `
+      -WorkingDirectory $rootPath `
+      -Wait `
+      -CaptureOutput `
+      -LogPath $buildLogFile
+    if ($clientBuild.ExitCode -ne 0 -or !(Test-Path -LiteralPath $mainExecutable -PathType Leaf)) {
+      throw "FE Monster Windows host build failed with exit code $($clientBuild.ExitCode). Install .NET SDK 8 and try again. See $buildLogFile"
     }
   }
 
-  $argumentLine = ($ClientArgs | ForEach-Object { Quote-Arg $_ }) -join ' '
-  $process = Start-Process `
+  $process = Invoke-NoConsoleProcess `
     -FilePath $mainExecutable `
-    -ArgumentList $argumentLine `
+    -ArgumentList $ClientArgs `
     -WorkingDirectory $rootPath `
-    -PassThru
-  Start-Sleep -Milliseconds 750
-  if ($process.HasExited -and $process.ExitCode -ne 0) {
+    -WindowStyle Normal
+  $exitedDuringHandoff = $process.WaitForExit(50)
+  if ($exitedDuringHandoff -and $process.ExitCode -ne 0) {
     throw "FE Monster exited during startup with code $($process.ExitCode). See $Env:LOCALAPPDATA\FE Monster\logs\startup.log"
   }
   Write-Log "FE Monster host started with process id $($process.Id)."

@@ -10,15 +10,20 @@ public final class NativeAudioEngine {
     private static final int NATIVE_SAMPLE_HEADER_SIZE = 5;
     private static final int NATIVE_SPATIAL_STATUS_SIZE = 26;
     private static final int LOW_FREQUENCY_BAND_COUNT = 512;
+    private static final int NATIVE_CAPTURE_RUNNING_INDEX = NATIVE_SAMPLE_HEADER_SIZE
+        + LOW_FREQUENCY_BAND_COUNT;
     private static final float[] EMPTY_LOW_FREQUENCY_BANDS = new float[LOW_FREQUENCY_BAND_COUNT];
 
     private final Path dllPath;
     private final boolean windows;
+    private boolean nativeLibraryLoaded;
     private boolean available;
     private String status = "not-loaded";
     private String error = "";
     private long spatialSessionCounter = 0;
     private long activeSpatialSession = 0;
+    private long spatialGenerationCounter = 0;
+    private long activeSpatialGeneration = 0;
     private int spatialInputChannels = 0;
 
     public NativeAudioEngine(ProjectPaths paths) {
@@ -29,13 +34,16 @@ public final class NativeAudioEngine {
 
     public synchronized Map<String, Object> runtimePayload() {
         Map<String, Object> body = new LinkedHashMap<>();
-        NativeSample sample = sample();
+        // Runtime/status probes must not wake the WASAPI loopback capture
+        // thread. Capture starts only when the playback UI requests samples.
+        NativeSample sample = sample(false);
         body.put("requested", true);
         body.put("active", available);
         body.put("backend", available ? "xaudio2" : "html-audio-fallback");
         body.put("spatialBackend", windows ? "x3daudio" : "web-audio-panner");
         body.put("decoder", windows ? "media-foundation" : "webkit-media");
         body.put("sampleSource", sample.active ? "xaudio2-native-loopback" : "inactive");
+        body.put("captureRunning", sample.captureRunning);
         body.put("sampleRate", sample.sampleRate);
         body.put("lowFrequencyAmplitude", sample.lowFrequencyAmplitude);
         body.put("lowFrequencyBands", sample.lowFrequencyBands);
@@ -81,16 +89,18 @@ public final class NativeAudioEngine {
         if (!configured) return spatialError("unable to initialize Rust/X3DAudio/OBR pipeline");
 
         activeSpatialSession = ++spatialSessionCounter;
+        activeSpatialGeneration = ++spatialGenerationCounter;
         spatialInputChannels = inputChannels;
         Map<String, Object> body = spatialPayload();
         body.put("ok", true);
         body.put("session", activeSpatialSession);
+        body.put("generation", activeSpatialGeneration);
         body.put("muted", true);
         return body;
     }
 
-    public synchronized int submitSpatialPcm(long session, float[] pcm) {
-        if (session <= 0 || session != activeSpatialSession || pcm == null || pcm.length == 0) {
+    public synchronized int submitSpatialPcm(long session, long generation, float[] pcm) {
+        if (!isActiveSpatialGeneration(session, generation) || pcm == null || pcm.length == 0) {
             return -1;
         }
         int frames = pcm.length / Math.max(1, spatialInputChannels);
@@ -102,8 +112,8 @@ public final class NativeAudioEngine {
         }
     }
 
-    public synchronized int submitSpatialPcm(long session, ByteBuffer pcm, int frames) {
-        if (session <= 0 || session != activeSpatialSession || pcm == null || frames <= 0) {
+    public synchronized int submitSpatialPcm(long session, long generation, ByteBuffer pcm, int frames) {
+        if (!isActiveSpatialGeneration(session, generation) || pcm == null || frames <= 0) {
             return -1;
         }
         int requiredBytes = Math.multiplyExact(
@@ -118,8 +128,8 @@ public final class NativeAudioEngine {
         }
     }
 
-    public synchronized Map<String, Object> setSpatialStreamMuted(long session, boolean muted) {
-        if (session <= 0 || session != activeSpatialSession) return spatialError("stale native spatial session");
+    public synchronized Map<String, Object> setSpatialStreamMuted(long session, long generation, boolean muted) {
+        if (!isActiveSpatialGeneration(session, generation)) return spatialError("stale native spatial generation");
         int result;
         try {
             result = nativeSetSpatialMuted(muted);
@@ -129,17 +139,37 @@ public final class NativeAudioEngine {
         Map<String, Object> body = spatialPayload();
         body.put("ok", result >= 0);
         body.put("session", activeSpatialSession);
+        body.put("generation", activeSpatialGeneration);
         body.put("muted", muted);
         body.put("result", result);
         if (result < 0) body.put("error", "native spatial mute failed: " + result);
         return body;
     }
 
-    public synchronized Map<String, Object> stopSpatialStream(long session) {
-        if (session > 0 && session != activeSpatialSession) {
+    public synchronized Map<String, Object> pauseSpatialStream(long session, long generation) {
+        if (!isActiveSpatialGeneration(session, generation)) {
             Map<String, Object> body = spatialPayload();
             body.put("ok", true);
             body.put("ignored", true);
+            body.put("stale", true);
+            return body;
+        }
+        long stoppedGeneration = activeSpatialGeneration;
+        stopSpatialStreamInternal();
+        Map<String, Object> body = spatialPayload();
+        body.put("ok", true);
+        body.put("paused", true);
+        body.put("flushed", true);
+        body.put("generation", stoppedGeneration);
+        return body;
+    }
+
+    public synchronized Map<String, Object> stopSpatialStream(long session, long generation) {
+        if (session > 0 && !isActiveSpatialGeneration(session, generation)) {
+            Map<String, Object> body = spatialPayload();
+            body.put("ok", true);
+            body.put("ignored", true);
+            body.put("stale", true);
             return body;
         }
         stopSpatialStreamInternal();
@@ -162,6 +192,7 @@ public final class NativeAudioEngine {
             && values[0] > 0.5;
         body.put("active", active);
         body.put("session", active ? activeSpatialSession : 0);
+        body.put("generation", active ? activeSpatialGeneration : 0);
         body.put("running", active && values[1] > 0.5);
         body.put("rendererReady", active && values[2] > 0.5);
         body.put("sampleRate", active ? Math.round(values[3]) : 0);
@@ -195,14 +226,23 @@ public final class NativeAudioEngine {
 
     public synchronized void close() {
         stopSpatialStreamInternal();
+        if (nativeLibraryLoaded) {
+            try {
+                nativeShutdown();
+            } catch (UnsatisfiedLinkError | SecurityException ignored) {
+            }
+        }
+        available = false;
+        status = "closed";
     }
 
     public synchronized Map<String, Object> samplePayload() {
-        NativeSample sample = sample();
+        NativeSample sample = sample(true);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("active", available && sample.active);
         body.put("backend", available ? "xaudio2" : "html-audio-fallback");
         body.put("source", sample.active ? "xaudio2-native-loopback" : (windows ? "inactive" : "web-audio"));
+        body.put("captureRunning", sample.captureRunning);
         body.put("lowFrequencyAmplitude", sample.lowFrequencyAmplitude);
         body.put("lowFrequencyBands", sample.lowFrequencyBands);
         body.put("energy", sample.energy);
@@ -227,6 +267,7 @@ public final class NativeAudioEngine {
         }
         try {
             System.load(dllPath.toAbsolutePath().normalize().toString());
+            nativeLibraryLoaded = true;
             available = nativeInit();
             status = available ? "ready" : "init-failed";
             error = available ? "" : "nativeInit returned false";
@@ -244,7 +285,15 @@ public final class NativeAudioEngine {
         } catch (UnsatisfiedLinkError | SecurityException ignored) {
         }
         activeSpatialSession = 0;
+        activeSpatialGeneration = 0;
         spatialInputChannels = 0;
+    }
+
+    private boolean isActiveSpatialGeneration(long session, long generation) {
+        return session > 0
+            && generation > 0
+            && session == activeSpatialSession
+            && generation == activeSpatialGeneration;
     }
 
     private static Map<String, Object> spatialError(String message) {
@@ -257,13 +306,25 @@ public final class NativeAudioEngine {
     private static Path resolveDll(ProjectPaths paths) {
         String override = System.getenv("FE_MONSTER_XAUDIO2_DLL");
         if (override != null && !override.isBlank()) return Path.of(override);
-        return paths.root.resolve("native").resolve("windows").resolve("build").resolve("fe-monster-xaudio2.dll");
+        Path installed = paths.root.resolve("native").resolve("windows")
+            .resolve("build").resolve("fe-monster-xaudio2.dll");
+        Path nextLaunch = paths.root.resolve("native").resolve("windows")
+            .resolve("build-next").resolve("fe-monster-xaudio2.dll");
+        if (!Files.isRegularFile(nextLaunch)) return installed;
+        if (!Files.isRegularFile(installed)) return nextLaunch;
+        try {
+            return Files.getLastModifiedTime(nextLaunch).compareTo(Files.getLastModifiedTime(installed)) > 0
+                ? nextLaunch
+                : installed;
+        } catch (Exception ignored) {
+            return installed;
+        }
     }
 
-    private NativeSample sample() {
+    private NativeSample sample(boolean requestCapture) {
         if (!available) return NativeSample.empty();
         try {
-            float[] values = nativeSampleState();
+            float[] values = nativeSampleState(requestCapture);
             if (values == null || values.length < NATIVE_SAMPLE_HEADER_SIZE) return NativeSample.empty();
             float lowFrequencyAmplitude = clamp01(values[0]);
             return new NativeSample(
@@ -272,7 +333,9 @@ public final class NativeAudioEngine {
                 clamp01(values[2]),
                 Math.max(0, Math.round(values[3])),
                 values[4] > 0.5f,
-                lowFrequencyBands(values, lowFrequencyAmplitude)
+                lowFrequencyBands(values, lowFrequencyAmplitude),
+                values.length > NATIVE_CAPTURE_RUNNING_INDEX
+                    && values[NATIVE_CAPTURE_RUNNING_INDEX] > 0.5f
             );
         } catch (UnsatisfiedLinkError | SecurityException e) {
             return NativeSample.empty();
@@ -296,7 +359,9 @@ public final class NativeAudioEngine {
 
     private static native boolean nativeInit();
 
-    private static native float[] nativeSampleState();
+    private static native float[] nativeSampleState(boolean requestCapture);
+
+    private static native void nativeShutdown();
 
     @SuppressWarnings("unused")
     private static native float[] nativeSpatialMatrix(
@@ -332,10 +397,19 @@ public final class NativeAudioEngine {
         float beat,
         int sampleRate,
         boolean active,
-        float[] lowFrequencyBands
+        float[] lowFrequencyBands,
+        boolean captureRunning
     ) {
         static NativeSample empty() {
-            return new NativeSample(0.0f, 0.0f, 0.0f, 0, false, EMPTY_LOW_FREQUENCY_BANDS);
+            return new NativeSample(
+                0.0f,
+                0.0f,
+                0.0f,
+                0,
+                false,
+                EMPTY_LOW_FREQUENCY_BANDS,
+                false
+            );
         }
     }
 }

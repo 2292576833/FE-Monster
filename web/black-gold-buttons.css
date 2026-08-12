@@ -48,7 +48,7 @@
     .reactbits-glass-target,
     .reactbits-glass-panel-target,
     .rb-glass-surface,
-    .community-avatar, .boot-logo-button, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
+    .community-avatar, .boot-logo-button, .pet-assistant__character, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
   ) {
   --fe-button-current-fill: var(--fe-button-fill);
   --fe-button-current-edge: var(--fe-button-edge);
@@ -125,7 +125,7 @@
       .reactbits-glass-target,
       .reactbits-glass-panel-target,
       .rb-glass-surface,
-      .community-avatar, .boot-logo-button, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
+      .community-avatar, .boot-logo-button, .pet-assistant__character, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
     ):not(:disabled):not([aria-disabled="true"]):hover {
     --fe-button-current-fill: var(--fe-button-fill-hover);
     --fe-button-current-edge: var(--fe-button-edge-hover);
@@ -151,7 +151,7 @@
     .reactbits-glass-target,
     .reactbits-glass-panel-target,
     .rb-glass-surface,
-    .community-avatar, .boot-logo-button, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
+    .community-avatar, .boot-logo-button, .pet-assistant__character, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
   ):is(.is-active, .is-current, .is-selected, [aria-pressed="true"], [aria-selected="true"], [aria-expanded="true"]) {
   --fe-button-current-fill: var(--fe-button-fill-selected);
   --fe-button-current-edge: var(--fe-button-edge-selected);
@@ -175,7 +175,7 @@
     .reactbits-glass-target,
     .reactbits-glass-panel-target,
     .rb-glass-surface,
-    .community-avatar, .boot-logo-button, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
+    .community-avatar, .boot-logo-button, .pet-assistant__character, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
   ):not(:disabled):not([aria-disabled="true"]):active {
   transform: translateY(1px) scale(0.985);
 }
@@ -196,7 +196,7 @@
     .reactbits-glass-target,
     .reactbits-glass-panel-target,
     .rb-glass-surface,
-    .community-avatar, .boot-logo-button, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
+    .community-avatar, .boot-logo-button, .pet-assistant__character, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
   ):focus-visible {
   outline: 2px solid var(--fe-button-focus) !important;
   outline-offset: 3px !important;
@@ -218,7 +218,7 @@
     .reactbits-glass-target,
     .reactbits-glass-panel-target,
     .rb-glass-surface,
-    .community-avatar, .boot-logo-button, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
+    .community-avatar, .boot-logo-button, .pet-assistant__character, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
   ):is(:disabled, [aria-disabled="true"]) {
   color: var(--fe-button-ink-disabled) !important;
   cursor: not-allowed;
@@ -245,7 +245,7 @@
       .reactbits-glass-target,
       .reactbits-glass-panel-target,
       .rb-glass-surface,
-      .community-avatar, .boot-logo-button, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
+      .community-avatar, .boot-logo-button, .pet-assistant__character, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
     ) {
     min-inline-size: 44px;
     min-block-size: 44px;
@@ -595,7 +595,7 @@
       .reactbits-glass-target,
       .reactbits-glass-panel-target,
       .rb-glass-surface,
-      .community-avatar, .boot-logo-button, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
+      .community-avatar, .boot-logo-button, .pet-assistant__character, #diyBookLyricPreset, .book-lyric-line, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
     ) {
     transition-duration: 0.01ms;
   }
@@ -618,6 +618,30 @@
   background: #101011 !important;
 }
 
+/* The release badge is a status indicator, so it keeps its round gold identity. */
+#updateNoticeButton {
+  min-inline-size: 25px;
+  min-block-size: 25px;
+  border: 1px solid rgba(255, 222, 117, 0.78) !important;
+  border-radius: 50% !important;
+  color: #fff3b5 !important;
+  background:
+    radial-gradient(circle at 34% 24%, rgba(255, 255, 255, 0.62), transparent 28%),
+    linear-gradient(145deg, #c99225, #6d4312) !important;
+  box-shadow:
+    0 0 0 3px rgba(255, 205, 75, 0.13),
+    0 0 17px rgba(255, 187, 49, 0.48) !important;
+}
+
+#updateNoticeButton:hover {
+  border-color: rgba(255, 239, 171, 0.98) !important;
+  color: #fffbea !important;
+  background: linear-gradient(145deg, #e1ae3f, #865418) !important;
+  box-shadow:
+    0 0 0 4px rgba(255, 205, 75, 0.17),
+    0 0 22px rgba(255, 187, 49, 0.62) !important;
+}
+
 @media (forced-colors: active) {
   :where(
       button,
@@ -635,7 +659,7 @@
       .reactbits-glass-target,
       .reactbits-glass-panel-target,
       .rb-glass-surface,
-      .community-avatar, .boot-logo-button, #diyBookLyricPreset, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
+      .community-avatar, .boot-logo-button, .pet-assistant__character, #diyBookLyricPreset, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
     ) {
     border: 1px solid ButtonText !important;
     background: ButtonFace !important;
@@ -654,7 +678,7 @@
       .reactbits-glass-target,
       .reactbits-glass-panel-target,
       .rb-glass-surface,
-      .community-avatar, .boot-logo-button, #diyBookLyricPreset, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
+      .community-avatar, .boot-logo-button, .pet-assistant__character, #diyBookLyricPreset, .sandbox-component-select, .orb-playlist-card, .shelf-song-button
     ):focus-visible {
     outline-color: Highlight !important;
   }
@@ -760,4 +784,72 @@
       0 0 21px rgba(221, 232, 239, 0.22) !important;
     transform: translate3d(0, -9px, 20px) scale(1.032) !important;
   }
+}
+
+/* Primary DIY launchers use one stable 10% warm-white surface in every
+ * interaction state. State is communicated by a warmer edge and halo, not
+ * by replacing the material. The rhythm-game launcher intentionally keeps
+ * its existing treatment. */
+.diy-quick-menu :is(#diyPresetButton, #diyTextModeButton, #diyWallpaperModeButton) {
+  border: 1px solid var(--fe-diy-mode-edge-rest) !important;
+  color: var(--fe-diy-mode-text-rest) !important;
+  background: var(--fe-diy-mode-bg) !important;
+  background-image: none !important;
+  box-shadow: var(--fe-diy-mode-glow-rest) !important;
+  text-shadow: none !important;
+}
+
+.diy-quick-menu :is(#diyPresetButton, #diyTextModeButton, #diyWallpaperModeButton):is(
+    :hover,
+    :active,
+    :focus-visible,
+    .is-active,
+    [aria-pressed="true"]
+  ) {
+  border-color: var(--fe-diy-mode-edge-active) !important;
+  color: var(--fe-diy-mode-text-active) !important;
+  background: var(--fe-diy-mode-bg) !important;
+  background-image: none !important;
+  box-shadow: var(--fe-diy-mode-glow-active) !important;
+  text-shadow: none !important;
+}
+
+.diy-quick-menu :is(#diyPresetButton, #diyTextModeButton, #diyWallpaperModeButton):focus-visible {
+  outline-color: var(--fe-diy-mode-edge-active) !important;
+}
+
+/* Playlist cards use one stable 15% black layer. Song rows intentionally keep
+ * their separate 10% material contract in styles.css. */
+#orbPlaylistCards .orb-playlist-card {
+  border-color: var(--fe-playlist-card-edge-rest) !important;
+  background: var(--fe-playlist-card-bg) !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: var(--fe-playlist-card-glow-rest) !important;
+  filter: none !important;
+}
+
+#orbPlaylistCards .orb-playlist-card:hover {
+  border-color: var(--fe-playlist-card-edge-hover) !important;
+  background: var(--fe-playlist-card-bg) !important;
+  background-image: none !important;
+  box-shadow: var(--fe-playlist-card-glow-hover) !important;
+}
+
+#orbPlaylistCards .orb-playlist-card:is(.is-active, .is-focused, [aria-selected="true"]) {
+  border-color: var(--fe-playlist-card-edge-active) !important;
+  background: var(--fe-playlist-card-bg) !important;
+  background-image: none !important;
+  box-shadow: var(--fe-playlist-card-glow-active) !important;
+}
+
+#orbPlaylistCards .orb-playlist-card:focus-visible {
+  outline-color: var(--fe-playlist-card-edge-active) !important;
+}
+
+#orbPlaylistCards .orb-playlist-card::after,
+#orbPlaylistCards .orb-playlist-card.is-active::after {
+  background: var(--fe-content-neutral) !important;
+  box-shadow: var(--fe-glow-neutral-hover) !important;
 }

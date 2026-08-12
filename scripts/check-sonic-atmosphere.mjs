@@ -67,9 +67,14 @@ const checks = {
   lowerSceneCompositionLeavesWallpaperVisible:
     /SONIC_TOPOGRAPHY_CAMERA\s*=\s*Object\.freeze\(\{\s*x:\s*102,\s*y:\s*48,\s*z:\s*102,\s*fov:\s*44,\s*targetY:\s*8\s*\}\)/.test(app)
     && /topo\.camera\.lookAt\(0,\s*SONIC_TOPOGRAPHY_CAMERA\.targetY,\s*0\)/.test(app),
-  wallpaperHasOnlySlightConcavity:
-    /positions\.setZ\(index,\s*-\(x \* x \* 0\.085 \+ y \* y \* 0\.015\)\)/.test(app)
-    && /surface\.scale\.set\([^;]*distance \* 0\.24\)/.test(app),
+  wallpaperUsesUpperDomeConcavity:
+    /const sideWrap = x \* x \* \(0\.26 \+ dome \* 0\.055\);/.test(app)
+    && /const topDome = dome \* dome \* 0\.18;/.test(app)
+    && /positions\.setZ\(index,\s*sideWrap \+ midRecline \+ topDome \+ centerInset\)/.test(app)
+    && /wallpaperSurface\.userData\.surface = ['"]camera-deep-concave-contain-dome['"]/.test(app)
+    && /surface\.scale\.set\([\s\S]{0,220}distance \* 0\.25\s*\)/.test(app)
+    && /uContainRegion/.test(app)
+    && /bottomFeather/.test(app),
   separatedColumns: /const SONIC_TOPOGRAPHY_SIZE = 0\.[78]\d;/.test(app),
   denserSmallerStarfield: /const SONIC_STARFIELD_PARTICLES = (?:[6-9]\d{3}|[1-9]\d{4});/.test(app)
     && /size:\s*0\.(?:1\d|2\d)/.test(app),

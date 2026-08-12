@@ -417,6 +417,7 @@
     if (!runtime) return;
     runtime.wallpaperRequestId = (runtime.wallpaperRequestId || 0) + 1;
     if (runtime.wallpaperVideo) {
+      globalThis.FeWallpaperVideoContinuity?.release?.(runtime.wallpaperVideo);
       runtime.wallpaperVideo.pause?.();
       runtime.wallpaperVideo.removeAttribute?.('src');
       runtime.wallpaperVideo.load?.();
@@ -457,6 +458,7 @@
     runtime.wallpaperMesh.visible = false;
     runtime.wallpaperMesh.material.map = null;
     if (runtime.wallpaperVideo) {
+      globalThis.FeWallpaperVideoContinuity?.release?.(runtime.wallpaperVideo);
       runtime.wallpaperVideo.pause?.();
       runtime.wallpaperVideo.removeAttribute?.('src');
       runtime.wallpaperVideo.load?.();
@@ -494,8 +496,8 @@
       video.preload = 'auto';
       video.muted = true;
       video.defaultMuted = true;
-      video.loop = true;
       video.playsInline = true;
+      globalThis.FeWallpaperVideoContinuity?.prepare(video);
       const texture = new runtime.THREE.VideoTexture(video);
       texture.minFilter = runtime.THREE.LinearFilter;
       texture.magFilter = runtime.THREE.LinearFilter;
@@ -505,6 +507,7 @@
         video.play().catch(() => {});
       }, { once: true });
       video.addEventListener('error', () => {
+        globalThis.FeWallpaperVideoContinuity?.release?.(video);
         texture.dispose?.();
         if (runtime.wallpaperVideo === video) runtime.wallpaperVideo = null;
         failTexture();

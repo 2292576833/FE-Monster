@@ -1,12 +1,17 @@
 {
 	"license": "MIT",
-	"version": "1.8.8",
+	"version": "2.0.1",
+	"scripts": {
+		"check:web-cache": "node scripts/check-web-cache-fingerprints.mjs",
+		"check:web-cache:copies": "node scripts/check-web-cache-fingerprints.mjs --copies"
+	},
 	"dependencies": {
 		"@chakra-ui/react": "^3.36.0",
 		"@tsparticles/configs": "^4.3.0",
 		"@tsparticles/engine": "^4.3.0",
 		"@tsparticles/slim": "^4.3.0",
 		"motion": "^12.42.1",
+		"ogl": "^1.0.11",
 		"react-icons": "^5.7.0",
 		"three": "^0.185.1"
 	}

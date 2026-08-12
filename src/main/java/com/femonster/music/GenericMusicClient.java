@@ -30,11 +30,19 @@ public class GenericMusicClient implements MusicProviderClient {
     private static final Pattern KUGOU_ID_SEPARATOR = Pattern.compile("\\|");
     private static final Pattern KUGOU_HASH = Pattern.compile("(?i)[a-f0-9]{32}");
     private static final Pattern DECIMAL_ID = Pattern.compile("[0-9]+");
+    private static final String[] VIP_STATUS_KEYS = {
+        "vipStatus", "vipType", "vip_type", "viptype", "vip", "isVip", "isVIP",
+        "is_vip", "isVipUser", "vipLevel", "vip_level", "svip", "superVip", "musicPackage",
+        "m_type", "mType", "y_type", "yType", "user_y_type"
+    };
+    private static final String[] VIP_TYPE_KEYS = {
+        "vipType", "vip_type", "viptype", "vipLevel", "vip_level", "vip", "svip"
+    };
 
     private final String id;
     private final String label;
     private final String baseUrl;
-    private final HttpClient client;
+    private volatile HttpClient client;
     private final CookieManager cookieManager;
     private final Path sessionFile;
     private final Map<String, String> session;
@@ -65,10 +73,6 @@ public class GenericMusicClient implements MusicProviderClient {
         this.protocol = protocol;
         this.explicitProtocol = explicitProtocol;
         this.cookieManager = new CookieManager(null, CookiePolicy.ACCEPT_ALL);
-        this.client = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .cookieHandler(cookieManager)
-            .build();
     }
 
     @Override
@@ -128,13 +132,48 @@ public class GenericMusicClient implements MusicProviderClient {
             );
         };
         Map<String, Object> login = SimpleJson.asMap(SimpleJson.parse(raw));
-        Map<String, Object> account = extractAccount(login);
+        Map<String, Object> account = extractAccount(login, id);
+        boolean upstreamAccountAvailable = !SimpleJson.asString(account.get("userId"), "").isBlank()
+            || !SimpleJson.asString(account.get("nickname"), "").isBlank();
+        boolean upstreamAccountSucceeded = providerPayloadSucceeded(login);
         applySessionAccountFallback(account);
-        boolean providerReportedLogin = SimpleJson.asBoolean(login.get("loggedIn"), false);
-        boolean loggedIn = providerReportedLogin
+        boolean providerReportedLogin = SimpleJson.asBoolean(login.get("loggedIn"), false)
+            || ("kugou".equals(id) && kugouLoginStatusAuthenticated(login));
+        boolean accountAvailable = providerReportedLogin
             || !SimpleJson.asString(account.get("userId"), "").isBlank()
             || !SimpleJson.asString(account.get("nickname"), "").isBlank()
             || hasAuthSession();
+        boolean kugouAccountValidated = false;
+        if (accountAvailable && "qq".equals(id)) {
+            Map<String, Object> avatarPayload = SimpleJson.asMap(SimpleJson.parse(
+                rawGet("/user/getUserAvatar", params)
+            ));
+            mergeAccount(account, extractAccount(avatarPayload, id), false);
+        } else if (accountAvailable && "kugou".equals(id)) {
+            Map<String, Object> profilePayload = SimpleJson.asMap(SimpleJson.parse(
+                rawGet("/user/detail", params)
+            ));
+            if (providerPayloadSucceeded(profilePayload)) {
+                Map<String, Object> verifiedProfile = extractAccount(profilePayload, id);
+                kugouAccountValidated = !SimpleJson.asString(verifiedProfile.get("userId"), "").isBlank()
+                    || !SimpleJson.asString(verifiedProfile.get("nickname"), "").isBlank();
+                mergeAccount(account, verifiedProfile, true);
+            }
+            Map<String, Object> vipPayload = SimpleJson.asMap(SimpleJson.parse(
+                rawGet("/user/vip/detail", params)
+            ));
+            if (!vipPayload.containsKey("error")) {
+                mergeAccount(account, extractAccount(vipPayload, id), true);
+            }
+        }
+        boolean loggedIn = "qq".equals(id)
+            ? providerReportedLogin || (upstreamAccountSucceeded && upstreamAccountAvailable)
+            : "kugou".equals(id)
+                ? kugouAccountValidated
+                : providerReportedLogin
+                || !SimpleJson.asString(account.get("userId"), "").isBlank()
+                || !SimpleJson.asString(account.get("nickname"), "").isBlank()
+                || hasAuthSession();
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("ok", !login.containsKey("error") || loggedIn);
@@ -187,6 +226,10 @@ public class GenericMusicClient implements MusicProviderClient {
 
     @Override
     public void rememberBrowserSession(Map<String, String> cookies) {
+        // Kugou website credentials (appid 1014) cannot authenticate the App
+        // APIs (appid 1005). Only the verified provider QR sidecar session may
+        // supply Kugou profile, VIP and library access.
+        if ("kugou".equals(id)) return;
         if (cookies == null || cookies.isEmpty()) return;
         Map<String, String> updates = new LinkedHashMap<>();
         StringJoiner joined = new StringJoiner("; ");
@@ -201,22 +244,47 @@ public class GenericMusicClient implements MusicProviderClient {
         putIfPresent(updates, "cookie", cookie);
         if ("qq".equals(id)) {
             putIfPresent(updates, "uin", normalizeQqUin(firstCookieValue(cookies, "uin", "p_uin", "wxuin")));
-        } else if ("kugou".equals(id)) {
-            String kugoo = firstCookieValue(cookies, "KuGoo");
-            putIfPresent(updates, "userid", firstNonBlank(
-                firstCookieValue(cookies, "userid", "KugooID", "kugooid"),
-                nestedCookieValue(kugoo, "KugooID", "userid")
-            ));
-            putIfPresent(updates, "token", firstNonBlank(
-                firstCookieValue(cookies, "token", "t", "KugooToken", "kugootoken", "KugooPwd"),
-                nestedCookieValue(kugoo, "t", "KugooPwd", "token")
-            ));
         }
         rememberSession(updates);
     }
 
     @Override
+    public Map<String, Object> beginProviderLogin() {
+        if (!"kugou".equals(id)) return Map.of();
+        Map<String, Object> root = SimpleJson.asMap(SimpleJson.parse(rawGet("/login/qr/key", Map.of())));
+        Map<String, Object> data = SimpleJson.asMap(root.get("data"));
+        String key = SimpleJson.asString(data.get("key"), "").trim();
+        String loginUrl = SimpleJson.asString(data.get("loginUrl"), "").trim();
+        if (key.isBlank() || loginUrl.isBlank()) {
+            throw new IllegalArgumentException("酷狗二维码登录初始化失败");
+        }
+        return Map.of(
+            "key", key,
+            "loginUrl", loginUrl,
+            "status", SimpleJson.asInt(root.get("status"), 0)
+        );
+    }
+
+    @Override
+    public Map<String, Object> pollProviderLogin(String key) {
+        if (!"kugou".equals(id)) return Map.of("authenticated", false, "status", 0);
+        Map<String, String> params = new LinkedHashMap<>();
+        putIfPresent(params, "key", key);
+        Map<String, Object> root = SimpleJson.asMap(SimpleJson.parse(rawGet("/login/qr/check", params)));
+        if (root.containsKey("error") || root.isEmpty()) {
+            throw new IllegalStateException("酷狗登录状态暂时不可用");
+        }
+        Map<String, Object> data = SimpleJson.asMap(root.get("data"));
+        int status = SimpleJson.asInt(data.get("status"), 0);
+        return Map.of(
+            "authenticated", SimpleJson.asBoolean(data.get("authenticated"), status == 4),
+            "status", status
+        );
+    }
+
+    @Override
     public void clearBrowserSession() {
+        if ("kugou".equals(id)) rawJsonPost("/login/clear", Map.of());
         synchronized (session) {
             session.clear();
             cookieManager.getCookieStore().removeAll();
@@ -467,10 +535,22 @@ public class GenericMusicClient implements MusicProviderClient {
             );
         };
         Object root = SimpleJson.parse(raw);
+        boolean librarySourceSucceeded = providerPayloadSucceeded(root);
         List<Playlist> extracted = extractPlaylists(root);
-        if (!explicitProtocol && extracted.isEmpty() && "qq".equals(id)) {
-            root = SimpleJson.parse(rawGetAny(params, "/user/getUserDetail"));
-            extracted = extractPlaylists(root);
+        if ("qq".equals(id)) {
+            Object collectedRoot = SimpleJson.parse(rawGet("/user/getUserCollectedSongLists", params));
+            boolean collectedSourceSucceeded = providerPayloadSucceeded(collectedRoot);
+            List<Playlist> collected = extractPlaylists(collectedRoot);
+            if (!collected.isEmpty()) {
+                extracted = mergeUniquePlaylists(extracted, collected);
+            }
+            librarySourceSucceeded = librarySourceSucceeded || collectedSourceSucceeded;
+            if (extracted.isEmpty() && hasAuthSession()) {
+                Object detailRoot = SimpleJson.parse(rawGet("/user/getUserDetail", params));
+                boolean detailSourceSucceeded = providerPayloadSucceeded(detailRoot);
+                extracted = mergeUniquePlaylists(extracted, extractQqPrivatePlaylists(detailRoot));
+                librarySourceSucceeded = librarySourceSucceeded || detailSourceSucceeded;
+            }
         }
         if (!explicitProtocol && extracted.isEmpty() && "kugou".equals(id)) {
             root = SimpleJson.parse(rawGetAny(params, "/top/playlist"));
@@ -481,13 +561,17 @@ public class GenericMusicClient implements MusicProviderClient {
         Map<String, Object> body = new LinkedHashMap<>();
         Map<String, Object> rootMap = SimpleJson.asMap(root);
         boolean metadataOnly = "qishui".equals(id) && SimpleJson.asBoolean(rootMap.get("metadataOnly"), false);
-        body.put("ok", !rootMap.containsKey("error"));
+        boolean providerSessionAuthenticated = hasAuthSession()
+            || ("kugou".equals(id) && kugouProviderSessionAuthenticated());
+        boolean userLibrary = !metadataOnly && librarySourceSucceeded && providerSessionAuthenticated;
+        body.put("ok", librarySourceSucceeded);
         body.put("provider", id);
         body.put("label", label);
-        body.put("loggedIn", !metadataOnly && (!playlists.isEmpty() || hasAuthSession()));
+        body.put("loggedIn", !metadataOnly && (!playlists.isEmpty() || providerSessionAuthenticated));
+        body.put("userLibrary", userLibrary);
         if (metadataOnly) body.put("libraryAvailable", !playlists.isEmpty());
         body.put("playlists", playlists);
-        if (rootMap.containsKey("error")) body.put("error", rootMap.get("error"));
+        if (!librarySourceSucceeded && rootMap.containsKey("error")) body.put("error", rootMap.get("error"));
         return body;
     }
 
@@ -577,13 +661,17 @@ public class GenericMusicClient implements MusicProviderClient {
         if ("kugou".equals(id)) {
             root = Map.of();
             songs = List.of();
-            for (String path : protocolPaths(
-                ProviderProtocol.Operation.PLAYLIST_TRACKS,
-                "/playlist/track/all",
-                "/playlist/track/all/new",
-                "/playlist/detail",
-                "/playlist/tracks"
-            )) {
+            String normalizedPlaylistId = playlistId == null ? "" : playlistId.trim();
+            String[] paths = DECIMAL_ID.matcher(normalizedPlaylistId).matches()
+                ? new String[] { "/playlist/track/all/new" }
+                : protocolPaths(
+                    ProviderProtocol.Operation.PLAYLIST_TRACKS,
+                    "/playlist/track/all",
+                    "/playlist/track/all/new",
+                    "/playlist/detail",
+                    "/playlist/tracks"
+                );
+            for (String path : paths) {
                 Object candidate = SimpleJson.parse(rawGet(path, params));
                 List<Song> extracted = extractSongs(candidate, limit);
                 root = candidate;
@@ -826,18 +914,30 @@ public class GenericMusicClient implements MusicProviderClient {
 
         if ("kugou".equals(id)) {
             KugouSongIdentity encoded = parseKugouSongIdentity(songId);
-            String hash = firstNonBlank(sourceText(sourceRef, "hash"), encoded.hash());
-            String albumAudioId = firstNonBlank(
-                sourceText(sourceRef, "album_audio_id"),
-                sourceText(sourceRef, "albumAudioId"),
-                sourceText(sourceRef, "audio_id"),
-                encoded.albumAudioId()
+            boolean compoundIdentity = songId.startsWith("kg|");
+            String sourceHash = sourceText(sourceRef, "hash");
+            String sourceAlbumAudioId = firstNonBlank(
+                positiveKugouNumericId(sourceText(sourceRef, "album_audio_id")),
+                positiveKugouNumericId(sourceText(sourceRef, "albumAudioId")),
+                positiveKugouNumericId(sourceText(sourceRef, "mixsongid")),
+                positiveKugouNumericId(sourceText(sourceRef, "audio_id"))
             );
-            String albumId = firstNonBlank(
+            String sourceAlbumId = firstNonBlank(
                 sourceText(sourceRef, "album_id"),
-                sourceText(sourceRef, "albumId"),
-                encoded.albumId()
+                sourceText(sourceRef, "albumId")
             );
+            // A compound FE Monster id is the immutable row identity. sourceRef
+            // may supplement a hash-only/number-only legacy id, but stale cached
+            // metadata must never replace fields already encoded in the id.
+            String hash = compoundIdentity
+                ? firstNonBlank(encoded.hash(), sourceHash)
+                : firstNonBlank(sourceHash, encoded.hash());
+            String albumAudioId = compoundIdentity
+                ? firstNonBlank(encoded.albumAudioId(), sourceAlbumAudioId)
+                : firstNonBlank(sourceAlbumAudioId, encoded.albumAudioId());
+            String albumId = compoundIdentity
+                ? firstNonBlank(encoded.albumId(), sourceAlbumId)
+                : firstNonBlank(sourceAlbumId, encoded.albumId());
             putIfPresent(params, "hash", hash);
             putIfPresent(params, "album_audio_id", albumAudioId);
             putIfPresent(params, "audio_id", albumAudioId);
@@ -927,7 +1027,7 @@ public class GenericMusicClient implements MusicProviderClient {
                     StandardCharsets.UTF_8
                 ))
                 .build();
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            HttpResponse<String> response = httpClient().send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             rememberCookieHeaders(response.headers().allValues("Set-Cookie"));
             String payload = cleanJsonBody(response.body());
             if (response.statusCode() >= 400) {
@@ -956,7 +1056,7 @@ public class GenericMusicClient implements MusicProviderClient {
                 builder.GET();
             }
             HttpRequest request = builder.build();
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            HttpResponse<String> response = httpClient().send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             rememberCookieHeaders(response.headers().allValues("Set-Cookie"));
             String body = cleanJsonBody(response.body());
             if (response.statusCode() >= 400) {
@@ -967,6 +1067,22 @@ public class GenericMusicClient implements MusicProviderClient {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
             return errorPayload(label + " API unavailable at " + baseUrl + ": " + exceptionDetail(e));
         }
+    }
+
+    private HttpClient httpClient() {
+        HttpClient current = client;
+        if (current != null) return current;
+        synchronized (this) {
+            current = client;
+            if (current == null) {
+                current = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(3))
+                    .cookieHandler(cookieManager)
+                    .build();
+                client = current;
+            }
+        }
+        return current;
     }
 
     private Map<String, String> authParams() {
@@ -992,7 +1108,18 @@ public class GenericMusicClient implements MusicProviderClient {
         synchronized (session) {
             if ("qq".equals(id)) {
                 String cookie = sessionCookieStringLocked();
-                return !cookie.isBlank() && !normalizeQqUin(firstNonBlank(session.get("uin"), session.get("loginUin"), cookieValue(cookie, "uin"))).isBlank();
+                String uin = normalizeQqUin(firstNonBlank(
+                    session.get("uin"),
+                    session.get("loginUin"),
+                    cookieValue(cookie, "uin"),
+                    cookieValue(cookie, "p_uin"),
+                    cookieValue(cookie, "wxuin")
+                ));
+                String musicKey = firstNonBlank(
+                    cookieValue(cookie, "qm_keyst"),
+                    cookieValue(cookie, "qqmusic_key")
+                );
+                return !uin.isBlank() && !musicKey.isBlank();
             }
             if ("kugou".equals(id)) {
                 return !firstNonBlank(session.get("token"), cookieValue(sessionCookieStringLocked(), "token")).isBlank()
@@ -1002,12 +1129,27 @@ public class GenericMusicClient implements MusicProviderClient {
         }
     }
 
+    private boolean kugouProviderSessionAuthenticated() {
+        Map<String, Object> root = SimpleJson.asMap(SimpleJson.parse(rawGet("/login/status", Map.of())));
+        return kugouLoginStatusAuthenticated(root);
+    }
+
+    private static boolean kugouLoginStatusAuthenticated(Map<String, Object> root) {
+        if (root == null || root.isEmpty() || root.containsKey("error")) return false;
+        Map<String, Object> data = SimpleJson.asMap(root.get("data"));
+        return SimpleJson.asInt(data.get("status"), SimpleJson.asInt(root.get("status"), 0)) == 1;
+    }
+
     private void applySessionAccountFallback(Map<String, Object> account) {
         synchronized (session) {
             if ("qq".equals(id)) {
                 String cookie = sessionCookieStringLocked();
                 String uin = normalizeQqUin(firstNonBlank(session.get("uin"), session.get("loginUin"), cookieValue(cookie, "uin")));
-                if (SimpleJson.asString(account.get("userId"), "").isBlank() && !uin.isBlank()) account.put("userId", uin);
+                // QQ's profile endpoint commonly reports creator.uin=0 even for
+                // an authenticated account. The imported session UIN is the
+                // account identity that signed the request, so never let that
+                // placeholder collapse every QQ user into the same community ID.
+                if (!uin.isBlank()) account.put("userId", uin);
                 if (SimpleJson.asString(account.get("nickname"), "").isBlank() && !uin.isBlank()) account.put("nickname", "QQ " + uin);
             } else if ("kugou".equals(id)) {
                 String userid = firstNonBlank(session.get("userid"), cookieValue(sessionCookieStringLocked(), "userid"));
@@ -1113,26 +1255,6 @@ public class GenericMusicClient implements MusicProviderClient {
                     String value = entry.getValue();
                     if (value != null && !value.isBlank()) return value.trim();
                 }
-            }
-        }
-        return "";
-    }
-
-    private static String nestedCookieValue(String raw, String... names) {
-        if (raw == null || raw.isBlank() || names == null) return "";
-        String decoded;
-        try {
-            decoded = URLDecoder.decode(raw, StandardCharsets.UTF_8);
-        } catch (IllegalArgumentException ignored) {
-            decoded = raw;
-        }
-        for (String part : decoded.split("[&;]")) {
-            int separator = part.indexOf('=');
-            if (separator <= 0) continue;
-            String key = part.substring(0, separator).trim();
-            String value = part.substring(separator + 1).trim();
-            for (String name : names) {
-                if (key.equalsIgnoreCase(name) && !value.isBlank()) return value;
             }
         }
         return "";
@@ -1316,11 +1438,20 @@ public class GenericMusicClient implements MusicProviderClient {
         for (Object item : items) {
             Map<String, Object> map = SimpleJson.asMap(item);
             Playlist playlist = new Playlist();
+            int kugouDefaultKind = "kugou".equals(id)
+                ? SimpleJson.asInt(map.get("is_def"), SimpleJson.asInt(map.get("isDef"), 0))
+                : 0;
             playlist.id = "kugou".equals(id)
-                ? firstString(map, "global_collection_id", "specialid", "specialId", "id", "tid", "dissid", "dissId", "playlistId", "listid", "listId", "special_id")
+                ? kugouDefaultKind == 2
+                    ? firstString(map, "list_id", "listid", "listId", "global_collection_id", "globalCollectionId", "gid", "specialid", "specialId", "id", "special_id")
+                    : firstString(map, "global_collection_id", "globalCollectionId", "gid", "specialid", "specialId", "id", "tid", "dissid", "dissId", "playlistId", "list_id", "listid", "listId", "special_id")
                 : firstString(map, "id", "tid", "dissid", "dissId", "specialid", "specialId", "playlistId", "global_collection_id", "listid", "listId");
-            playlist.name = firstString(map, "name", "title", "dissname", "dissName", "specialname", "specialName", "listname", "listName");
-            playlist.cover = firstString(map, "cover", "pic", "img", "image", "coverImgUrl", "logo", "picurl", "picUrl", "imgurl", "imgUrl", "flexible_cover", "sizable_cover", "list_pic");
+            playlist.name = firstString(map, "name", "title", "dissname", "dissName", "diss_name", "specialname", "specialName", "list_name", "listname", "listName");
+            if ("kugou".equals(id)) {
+                if (kugouDefaultKind == 2) playlist.name = "我喜欢";
+                else if (kugouDefaultKind == 1 && playlist.name.isBlank()) playlist.name = "默认收藏";
+            }
+            playlist.cover = firstString(map, "cover", "pic", "pic_url", "img", "image", "coverImgUrl", "logo", "picurl", "picUrl", "imgurl", "imgUrl", "flexible_cover", "sizable_cover", "list_pic");
             if (playlist.cover.contains("{size}")) playlist.cover = playlist.cover.replace("{size}", "400");
             int count = SimpleJson.asInt(map.get("num0"), 0);
             count = SimpleJson.asInt(map.get("m_count"), count);
@@ -1328,6 +1459,8 @@ public class GenericMusicClient implements MusicProviderClient {
             count = SimpleJson.asInt(map.get("songcount"), count);
             count = SimpleJson.asInt(map.get("song_count"), count);
             count = SimpleJson.asInt(map.get("songnum"), count);
+            count = SimpleJson.asInt(map.get("song_cnt"), count);
+            count = SimpleJson.asInt(map.get("songCount"), count);
             playlist.trackCount = SimpleJson.asInt(map.get("trackCount"), count);
             playlist.playCount = SimpleJson.asLong(map.get("playCount"), SimpleJson.asLong(map.get("listennum"), SimpleJson.asLong(map.get("play_count"), 0)));
             playlist.creator = firstString(map, "creator", "nick", "nickname", "username", "userName", "uname");
@@ -1335,6 +1468,45 @@ public class GenericMusicClient implements MusicProviderClient {
             if (!playlist.id.isBlank() && !("qq".equals(id) && "0".equals(playlist.id))) playlists.add(playlist);
         }
         return playlists;
+    }
+
+    private List<Playlist> extractQqPrivatePlaylists(Object root) {
+        Map<String, Object> rootMap = SimpleJson.asMap(root);
+        Map<String, Object> envelope = SimpleJson.asMap(rootMap.get("response"));
+        if (envelope.isEmpty()) envelope = rootMap;
+        Map<String, Object> data = SimpleJson.asMap(envelope.get("data"));
+        if (data.isEmpty()) data = envelope;
+
+        Map<String, Playlist> unique = new LinkedHashMap<>();
+        for (String key : List.of(
+            "mymusic",
+            "mydiss",
+            "createdDissList",
+            "createdList",
+            "playlists",
+            "playlist",
+            "disslist"
+        )) {
+            for (Playlist playlist : extractPlaylists(data.get(key))) {
+                unique.putIfAbsent(playlist.id, playlist);
+            }
+        }
+        return new ArrayList<>(unique.values());
+    }
+
+    private static List<Playlist> mergeUniquePlaylists(List<Playlist> first, List<Playlist> second) {
+        Map<String, Playlist> unique = new LinkedHashMap<>();
+        if (first != null) {
+            for (Playlist playlist : first) {
+                if (playlist != null && !playlist.id.isBlank()) unique.put(playlist.id, playlist);
+            }
+        }
+        if (second != null) {
+            for (Playlist playlist : second) {
+                if (playlist != null && !playlist.id.isBlank()) unique.putIfAbsent(playlist.id, playlist);
+            }
+        }
+        return new ArrayList<>(unique.values());
     }
 
     private Song songFromGeneric(Object value) {
@@ -1474,17 +1646,10 @@ public class GenericMusicClient implements MusicProviderClient {
             directString(map, "filehash")
         );
         if (hash.isBlank()) hash = firstString(map, "hash", "Hash", "HASH", "fileHash", "FileHash", "filehash");
-        String albumAudioId = firstString(
-            map,
-            "album_audio_id",
-            "albumAudioId",
-            "audio_id",
-            "audioId",
-            "Audioid",
-            "AudioID",
-            "mixsongid",
-            "mixSongId",
-            "MixSongID"
+        String albumAudioId = firstNonBlank(
+            positiveKugouNumericId(firstString(map, "album_audio_id", "albumAudioId")),
+            positiveKugouNumericId(firstString(map, "mixsongid", "mixSongId", "MixSongID")),
+            positiveKugouNumericId(firstString(map, "audio_id", "audioId", "Audioid", "AudioID"))
         );
         String albumId = firstString(map, "album_id", "albumId", "albumid", "albumID", "AlbumID");
         String fallbackId = firstString(map, "songId", "songid", "id", "rid");
@@ -1504,10 +1669,19 @@ public class GenericMusicClient implements MusicProviderClient {
         return new KugouSongIdentity(raw, "", "");
     }
 
+    private static String positiveKugouNumericId(String value) {
+        String raw = value == null ? "" : value.trim();
+        if (!DECIMAL_ID.matcher(raw).matches()) return "";
+        for (int index = 0; index < raw.length(); index++) {
+            if (raw.charAt(index) != '0') return raw;
+        }
+        return "";
+    }
+
     private record KugouSongIdentity(String hash, String albumAudioId, String albumId) {
         private KugouSongIdentity {
             hash = hash == null ? "" : hash.trim();
-            albumAudioId = albumAudioId == null ? "" : albumAudioId.trim();
+            albumAudioId = positiveKugouNumericId(albumAudioId);
             albumId = albumId == null ? "" : albumId.trim();
         }
 
@@ -1525,21 +1699,148 @@ public class GenericMusicClient implements MusicProviderClient {
         }
     }
 
-    private static Map<String, Object> extractAccount(Map<String, Object> root) {
-        Map<String, Object> profile = SimpleJson.asMap(root.get("profile"));
-        if (profile.isEmpty()) profile = SimpleJson.asMap(SimpleJson.asMap(root.get("data")).get("profile"));
-        if (profile.isEmpty()) profile = SimpleJson.asMap(root.get("account"));
-        if (profile.isEmpty()) profile = SimpleJson.asMap(root.get("user"));
-        if (profile.isEmpty()) profile = SimpleJson.asMap(SimpleJson.asMap(root.get("data")).get("user"));
-        if (profile.isEmpty()) profile = SimpleJson.asMap(root.get("body"));
-        if (profile.isEmpty()) profile = SimpleJson.asMap(root.get("data"));
-        if (profile.isEmpty()) profile = root;
+    private static Map<String, Object> extractAccount(Map<String, Object> root, String providerId) {
+        Map<String, Object> envelope = SimpleJson.asMap(root.get("response"));
+        if (envelope.isEmpty()) envelope = root;
+        Map<String, Object> data = SimpleJson.asMap(envelope.get("data"));
+        Map<String, Object> profile = SimpleJson.asMap(envelope.get("profile"));
+        if (profile.isEmpty()) profile = SimpleJson.asMap(data.get("profile"));
+        if (profile.isEmpty()) profile = SimpleJson.asMap(envelope.get("account"));
+        if (profile.isEmpty()) profile = SimpleJson.asMap(data.get("account"));
+        if (profile.isEmpty()) profile = SimpleJson.asMap(envelope.get("creator"));
+        if (profile.isEmpty()) profile = SimpleJson.asMap(data.get("creator"));
+        if (profile.isEmpty()) profile = SimpleJson.asMap(envelope.get("user"));
+        if (profile.isEmpty()) profile = SimpleJson.asMap(data.get("user"));
+        if (profile.isEmpty()) profile = SimpleJson.asMap(envelope.get("body"));
+        if (profile.isEmpty()) profile = data;
+        if (profile.isEmpty()) profile = envelope;
         Map<String, Object> account = new LinkedHashMap<>();
         account.put("userId", firstString(profile, "userId", "uid", "uin", "id", "userid", "loginUin"));
         account.put("nickname", firstString(profile, "nickname", "nick", "name", "username", "userName", "nickName"));
-        account.put("avatarUrl", firstString(profile, "avatarUrl", "avatar", "headimg", "headimgurl", "head", "pic", "photo", "avatarUrl100", "avatarUrl150"));
-        account.put("vipType", firstString(profile, "vipType", "vip_type", "viptype", "vip", "isVip", "isVIP", "isVipUser", "vipLevel", "vip_level", "svip", "superVip", "musicPackage"));
+        account.put("avatarUrl", firstString(profile, "avatarUrl", "avatar", "headimg", "headimgurl", "headpic", "head", "pic", "pic_url", "photo", "imgurl", "imgUrl", "avatarUrl100", "avatarUrl150"));
+        account.put("vipType", firstString(profile, VIP_TYPE_KEYS));
+        int vipSignal = vipSignal(profile, 0, "kugou".equals(providerId));
+        if ("qq".equals(providerId) && qqBadgeVipSignal(profile) > 0) {
+            vipSignal = 1;
+            if (SimpleJson.asString(account.get("vipType"), "").isBlank()) account.put("vipType", "vip");
+        }
+        if (vipSignal >= 0) account.put("isVip", vipSignal > 0);
+        account.put("vipStatus", vipSignal > 0 ? "active" : vipSignal == 0 ? "inactive" : "unknown");
         return account;
+    }
+
+    private static int qqBadgeVipSignal(Map<String, Object> profile) {
+        Map<String, Object> userInfoUi = SimpleJson.asMap(profile.get("userInfoUI"));
+        if (userInfoUi.isEmpty()) userInfoUi = SimpleJson.asMap(profile.get("userinfoUI"));
+        for (Object item : SimpleJson.asList(userInfoUi.get("iconlist"))) {
+            Map<String, Object> icon = SimpleJson.asMap(item);
+            String description = SimpleJson.asString(icon.get("desc"), "").trim();
+            if (description.isBlank() || description.length() > 4096 || !description.startsWith("{")) continue;
+            try {
+                Map<String, Object> badge = SimpleJson.asMap(SimpleJson.parseStrict(description));
+                for (String key : List.of("string10", "string11")) {
+                    String value = SimpleJson.asString(badge.get(key), "")
+                        .trim()
+                        .toLowerCase(java.util.Locale.ROOT);
+                    if ("vip".equals(value) || "svip".equals(value)) return 1;
+                }
+            } catch (IllegalArgumentException ignored) {
+                // QQ occasionally returns non-JSON badge descriptions; ignore them safely.
+            }
+        }
+        return -1;
+    }
+
+    private static boolean providerPayloadSucceeded(Object value) {
+        Map<String, Object> root = SimpleJson.asMap(value);
+        if (root.isEmpty() || root.containsKey("error")) return false;
+        if (root.containsKey("ok") && !SimpleJson.asBoolean(root.get("ok"), true)) return false;
+        Map<String, Object> response = SimpleJson.asMap(root.get("response"));
+        return businessEnvelopeSucceeded(response.isEmpty() ? root : response);
+    }
+
+    private static boolean businessEnvelopeSucceeded(Map<String, Object> envelope) {
+        if (envelope.isEmpty() || envelope.containsKey("error")) return false;
+        if (envelope.containsKey("ok") && !SimpleJson.asBoolean(envelope.get("ok"), true)) return false;
+        if (envelope.containsKey("code")) {
+            String code = SimpleJson.asString(envelope.get("code"), "").trim();
+            if (!code.isBlank() && !"0".equals(code)) return false;
+        }
+        if (envelope.containsKey("subcode")) {
+            String subcode = SimpleJson.asString(envelope.get("subcode"), "").trim();
+            if (!subcode.isBlank() && !"0".equals(subcode)) return false;
+        }
+        return true;
+    }
+
+    private static void mergeAccount(
+        Map<String, Object> target,
+        Map<String, Object> source,
+        boolean preferSourceVip
+    ) {
+        if (target == null || source == null || source.isEmpty()) return;
+        for (String key : List.of("userId", "nickname", "avatarUrl")) {
+            String value = SimpleJson.asString(source.get(key), "");
+            if (!value.isBlank()) target.put(key, value);
+        }
+        String sourceVipStatus = SimpleJson.asString(source.get("vipStatus"), "unknown");
+        String targetVipStatus = SimpleJson.asString(target.get("vipStatus"), "unknown");
+        boolean useSourceVip = !"unknown".equals(sourceVipStatus)
+            && (preferSourceVip || "unknown".equals(targetVipStatus));
+        if (!useSourceVip) return;
+        target.put("vipStatus", sourceVipStatus);
+        if (source.containsKey("isVip")) target.put("isVip", source.get("isVip"));
+        String vipType = SimpleJson.asString(source.get("vipType"), "");
+        if (!vipType.isBlank()) target.put("vipType", vipType);
+    }
+
+    private static int vipSignal(Object root, int depth, boolean kugou) {
+        if (depth > 8) return -1;
+        if (root instanceof List<?>) {
+            int observed = -1;
+            for (Object item : SimpleJson.asList(root)) {
+                int signal = vipSignal(item, depth + 1, kugou);
+                if (signal > 0) return 1;
+                if (signal == 0) observed = 0;
+            }
+            return observed;
+        }
+        Map<String, Object> map = SimpleJson.asMap(root);
+        int observed = -1;
+        for (String key : VIP_STATUS_KEYS) {
+            if (!map.containsKey(key)) continue;
+            int signal = vipScalarSignal(key, map.get(key), kugou);
+            if (signal > 0) return 1;
+            if (signal == 0) observed = 0;
+        }
+        for (Object value : map.values()) {
+            if (!(value instanceof Map<?, ?>) && !(value instanceof List<?>)) continue;
+            int signal = vipSignal(value, depth + 1, kugou);
+            if (signal > 0) return 1;
+            if (signal == 0) observed = 0;
+        }
+        return observed;
+    }
+
+    private static int vipScalarSignal(String key, Object value, boolean kugou) {
+        String normalizedKey = key == null ? "" : key.trim().toLowerCase(java.util.Locale.ROOT);
+        boolean kugouVipType = kugou && ("vip_type".equals(normalizedKey) || "viptype".equals(normalizedKey));
+        if (value instanceof Boolean flag) return flag ? 1 : 0;
+        if (value instanceof Number number) {
+            double numeric = number.doubleValue();
+            if (kugouVipType && numeric == 5) return 0;
+            return numeric > 0 ? 1 : 0;
+        }
+        if (!(value instanceof String text) || text.isBlank()) return -1;
+        String normalized = text.trim().toLowerCase(java.util.Locale.ROOT);
+        if (kugouVipType && "5".equals(normalized)) return 0;
+        if (List.of("true", "yes", "active", "vip", "svip").contains(normalized)) return 1;
+        if (List.of("false", "no", "inactive", "expired", "none", "normal", "0").contains(normalized)) return 0;
+        try {
+            return Double.parseDouble(normalized) > 0 ? 1 : 0;
+        } catch (NumberFormatException ignored) {
+            return -1;
+        }
     }
 
     private static List<Object> firstList(Object root, String... keys) {

@@ -1,388 +1,444 @@
-import React, { useEffect, useRef } from 'https://esm.sh/react@19';
-import { createRoot } from 'https://esm.sh/react-dom@19/client?deps=react@19';
-import { Renderer, Program, Mesh, Triangle } from 'https://esm.sh/ogl@1.0.11';
+const BOOT_TARGET_FPS = 60;
+const BOOT_FRAME_BUDGET_MS = 1000 / BOOT_TARGET_FPS;
+const BOOT_RAF_LEAD_MS = 4;
+const BOOT_RENDER_SCALE = 0.76;
+const BOOT_REDUCED_RENDER_SCALE = 0.58;
+const BOOT_DPR_LIMIT = 1.25;
+const SOFTWARE_RENDERER_PATTERN = /swiftshader|llvmpipe|lavapipe|software|microsoft basic render|warp|reference/i;
 
-const MAX_COLORS = 8;
+// Official @react-bits/LiquidChrome-JS-CSS shader, adapted after the shadcn
+// registry install for FE Monster's framework-free browser ESM lifecycle. The
+// registry uniforms and liquid/ripple/supersampling model remain intact; only
+// the React/OGL component shell is replaced so the installed client is offline.
 
-const hexToRGB = hex => {
-  const c = hex.replace('#', '').padEnd(6, '0');
-  const r = parseInt(c.slice(0, 2), 16) / 255;
-  const g = parseInt(c.slice(2, 4), 16) / 255;
-  const b = parseInt(c.slice(4, 6), 16) / 255;
-  return [r, g, b];
-};
-
-const prepColors = input => {
-  const base = (input && input.length ? input : ['#A6C8FF', '#5227FF', '#FF9FFC']).slice(0, MAX_COLORS);
-  const count = base.length;
-  const arr = [];
-  for (let i = 0; i < MAX_COLORS; i++) arr.push(hexToRGB(base[Math.min(i, base.length - 1)]));
-  const avg = [0, 0, 0];
-  for (let i = 0; i < count; i++) {
-    avg[0] += arr[i][0];
-    avg[1] += arr[i][1];
-    avg[2] += arr[i][2];
+function publishBootGraphicsBackend(gl, canvas) {
+  let vendor = '';
+  let renderer = '';
+  try {
+    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+    vendor = String(debugInfo
+      ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL)
+      : gl.getParameter(gl.VENDOR) || '');
+    renderer = String(debugInfo
+      ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
+      : gl.getParameter(gl.RENDERER) || '');
+  } catch {
   }
-  avg[0] /= count;
-  avg[1] /= count;
-  avg[2] /= count;
-  return { arr, count, avg };
-};
+  const query = new URLSearchParams(window.location.search);
+  const requested = query.get('render') === 'directx11'
+    || query.get('client') === 'embedded'
+    || Boolean(window.chrome?.webview);
+  const description = `${vendor} ${renderer}`.trim();
+  const hardwareD3D11 = /(?:direct3d11|d3d11)/i.test(description)
+    && !SOFTWARE_RENDERER_PATTERN.test(description);
+  const backend = hardwareD3D11
+    ? 'd3d11-hardware'
+    : description && requested
+      ? 'safe-fallback'
+      : description
+        ? 'webgl-hardware'
+        : 'detecting';
+  document.documentElement.dataset.graphicsBackend = backend;
+  document.documentElement.dataset.directX11Hardware = String(hardwareD3D11);
+  canvas.dataset.renderPreset = requested ? 'directx11' : 'webgl';
+  canvas.dataset.graphicsBackend = backend;
+  window.dispatchEvent(new CustomEvent('fe-graphics-backend-detected', {
+    detail: { requested, backend, hardwareD3D11, vendor, renderer }
+  }));
+  return { requested, hardwareD3D11, backend, vendor, renderer };
+}
 
-const vertex = `
+const vertexShader100 = `
 attribute vec2 position;
-attribute vec2 uv;
 varying vec2 vUv;
 void main() {
-  vUv = uv;
+  vUv = position * 0.5 + 0.5;
   gl_Position = vec4(position, 0.0, 1.0);
 }
 `;
 
-const fragment = `
-precision highp float;
-
-uniform vec3  iResolution;
-uniform vec2  iMouse;
-uniform float iTime;
-
-uniform vec3  uColor0;
-uniform vec3  uColor1;
-uniform vec3  uColor2;
-uniform vec3  uColor3;
-uniform vec3  uColor4;
-uniform vec3  uColor5;
-uniform vec3  uColor6;
-uniform vec3  uColor7;
-uniform int   uColorCount;
-
-uniform vec3  uBgColor;
-uniform vec3  uMouseColor;
-uniform float uSpeed;
-uniform int   uStreakCount;
-uniform float uStreakWidth;
-uniform float uStreakLength;
-uniform float uGlow;
-uniform float uDensity;
-uniform float uTwinkle;
-uniform float uZoom;
-uniform float uBgGlow;
-uniform float uOpacity;
-uniform float uMouseEnabled;
-uniform float uMouseStrength;
-uniform float uMouseRadius;
-
-varying vec2 vUv;
-
-vec3 palette(float h) {
-  int count = uColorCount;
-  if (count < 1) count = 1;
-  int idx = int(floor(clamp(h, 0.0, 0.999999) * float(count)));
-  if (idx <= 0) return uColor0;
-  if (idx == 1) return uColor1;
-  if (idx == 2) return uColor2;
-  if (idx == 3) return uColor3;
-  if (idx == 4) return uColor4;
-  if (idx == 5) return uColor5;
-  if (idx == 6) return uColor6;
-  return uColor7;
-}
-
-vec3 tanhv(vec3 x) {
-  vec3 e = exp(-2.0 * x);
-  return (1.0 - e) / (1.0 + e);
-}
-
-vec2 sceneC(vec2 frag, vec2 r) {
-  vec2 P = (frag + frag - r) / r.x;
-  float z = 0.0;
-  float d = 1e3;
-  vec4 O = vec4(0.0);
-  for (int k = 0; k < 39; k++) {
-    if (d <= 1e-4) break;
-    O = z * normalize(vec4(P, uZoom, 0.0)) - vec4(0.0, 4.0, 1.0, 0.0) / 4.5;
-    d = 1.0 - sqrt(length(O * O));
-    z += d;
-  }
-  return vec2(O.x, atan(O.z, O.y));
-}
-
-void mainImage(out vec4 o, vec2 C) {
-  vec2 r = iResolution.xy;
-  vec2 uv0 = (C + C - r) / r.x;
-  float T = 0.1 * iTime * uSpeed + 9.0;
-  float angRings = max(1.0, floor(6.28318530718 * max(uDensity, 0.05) + 0.5));
-  vec2 Y = vec2(5e-3, 6.28318530718 / angRings);
-
-  vec2 c0 = sceneC(C, r);
-  vec2 cdx = sceneC(C + vec2(1.0, 0.0), r);
-  vec2 cdy = sceneC(C + vec2(0.0, 1.0), r);
-  vec2 dCx = cdx - c0;
-  vec2 dCy = cdy - c0;
-  dCx.y -= 6.28318530718 * floor(dCx.y / 6.28318530718 + 0.5);
-  dCy.y -= 6.28318530718 * floor(dCy.y / 6.28318530718 + 0.5);
-  vec2 fw = abs(dCx) + abs(dCy);
-  C = c0;
-
-  vec2 P = vec2(2.0, 1.0) * uv0 - (r / r.x) * vec2(0.0, 1.0);
-  vec4 O = vec4(uBgColor * 90.0 * uBgGlow / (1e3 * dot(P, P) + 6.0), 0.0);
-
-  float mGlow = 0.0;
-  if (uMouseEnabled > 0.5) {
-    vec2 mN = (iMouse + iMouse - r) / r.x;
-    float md = length(uv0 - mN);
-    mGlow = exp(-md * md / max(uMouseRadius * uMouseRadius, 1e-4)) * uMouseStrength;
-    O.rgb += uMouseColor * mGlow * 0.25;
-  }
-
-  float zr = 5e-4 * uStreakWidth;
-  vec2 rr = vec2(max(length(fw), 1e-5));
-  float tail = 19.0 / max(uStreakLength, 0.05);
-
-  for (int m = 0; m < 16; m++) {
-    if (m >= uStreakCount) break;
-    float jf = float(m) + 1.0;
-    float ic = fract(sin(dot(vec2(jf, floor(C.x / Y.x + 0.5)), vec2(7.0, 11.0)) * 73.0));
-    vec2 Pp = C - (T + T * ic) * vec2(0.0, 1.0);
-    Pp -= floor(Pp / Y + 0.5) * Y;
-    float h = fract(8663.0 * ic);
-    vec3 col = palette(h);
-    float weight = mix(1.5, 1.0 + sin(T + 7.0 * h + 4.0), uTwinkle);
-    weight *= (1.0 + mGlow * 2.0);
-    vec2 inner = vec2(length(max(Pp, vec2(-1.0, 0.0))), length(Pp) - zr) - zr;
-    vec2 sm = vec2(1.0) - smoothstep(-rr, rr, inner);
-    O.rgb += dot(sm, vec2(exp(tail * Pp.y), 3.0)) * col * weight;
-    C.x += Y.x / 8.0;
-  }
-
-  vec3 colr = sqrt(tanhv(max(O.rgb * uGlow - vec3(0.04, 0.08, 0.02), 0.0)));
-  o = vec4(colr, uOpacity);
-}
-
+const vertexShader300 = `#version 300 es
+in vec2 position;
+out vec2 vUv;
 void main() {
-  vec4 color;
-  mainImage(color, vUv * iResolution.xy);
-  gl_FragColor = color;
+  vUv = position * 0.5 + 0.5;
+  gl_Position = vec4(position, 0.0, 1.0);
 }
 `;
 
-function Lightfall({
-  className,
-  dpr,
-  paused = false,
-  colors = ['#A6C8FF', '#5227FF', '#FF9FFC'],
-  backgroundColor = '#0A29FF',
-  speed = 0.5,
-  streakCount = 2,
-  streakWidth = 1,
-  streakLength = 1,
-  glow = 1,
-  density = 0.6,
-  twinkle = 1,
-  zoom = 3,
-  backgroundGlow = 0.5,
-  opacity = 1,
-  mouseInteraction = true,
-  mouseStrength = 0.5,
-  mouseRadius = 1,
-  mouseDampening = 0.15,
-  mixBlendMode
-}) {
-  const containerRef = useRef(null);
-  const rafRef = useRef(null);
-  const programRef = useRef(null);
-  const meshRef = useRef(null);
-  const geometryRef = useRef(null);
-  const rendererRef = useRef(null);
-  const mouseTargetRef = useRef([0, 0]);
-  const lastTimeRef = useRef(0);
-  const readyRef = useRef(false);
+function liquidChromeFragment(webgl2) {
+  const version = webgl2 ? '#version 300 es\n' : '';
+  const varying = webgl2 ? 'in vec2 vUv;' : 'varying vec2 vUv;';
+  const output = webgl2 ? 'out vec4 liquidChromeColor;' : '';
+  const writeColor = webgl2
+    ? 'liquidChromeColor = col / float(samples);'
+    : 'gl_FragColor = col / float(samples);';
+  return `${version}
+precision highp float;
+uniform float uTime;
+uniform vec3 uResolution;
+uniform vec3 uBaseColor;
+uniform float uAmplitude;
+uniform float uFrequencyX;
+uniform float uFrequencyY;
+uniform vec2 uMouse;
+${varying}
+${output}
 
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return undefined;
+vec4 renderImage(vec2 uvCoord) {
+  vec2 fragCoord = uvCoord * uResolution.xy;
+  vec2 uv = (2.0 * fragCoord - uResolution.xy) / min(uResolution.x, uResolution.y);
 
-    const renderer = new Renderer({
-      dpr: dpr ?? (typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 1.35) : 1),
-      alpha: true,
-      antialias: true
-    });
-    rendererRef.current = renderer;
-    const gl = renderer.gl;
-    const canvas = gl.canvas;
+  for (float i = 1.0; i < 10.0; i++) {
+    uv.x += uAmplitude / i * cos(i * uFrequencyX * uv.y + uTime + uMouse.x * 3.14159);
+    uv.y += uAmplitude / i * cos(i * uFrequencyY * uv.x + uTime + uMouse.y * 3.14159);
+  }
 
-    canvas.style.width = '100%';
-    canvas.style.height = '100%';
-    canvas.style.display = 'block';
-    container.appendChild(canvas);
+  vec2 diff = uvCoord - uMouse;
+  float dist = length(diff);
+  float falloff = exp(-dist * 20.0);
+  float ripple = sin(10.0 * dist - uTime * 2.0) * 0.03;
+  uv += (diff / (dist + 0.0001)) * ripple * falloff;
 
-    const { arr, count, avg } = prepColors(colors);
+  vec3 color = uBaseColor / max(abs(sin(uTime - uv.y - uv.x)), 0.018);
+  color = color / (color + vec3(0.72));
+  return vec4(color, 1.0);
+}
 
-    const uniforms = {
-      iResolution: { value: [gl.drawingBufferWidth, gl.drawingBufferHeight, 1] },
-      iMouse: { value: [0, 0] },
-      iTime: { value: 0 },
-      uColor0: { value: arr[0] },
-      uColor1: { value: arr[1] },
-      uColor2: { value: arr[2] },
-      uColor3: { value: arr[3] },
-      uColor4: { value: arr[4] },
-      uColor5: { value: arr[5] },
-      uColor6: { value: arr[6] },
-      uColor7: { value: arr[7] },
-      uColorCount: { value: count },
-      uBgColor: { value: hexToRGB(backgroundColor) },
-      uMouseColor: { value: avg },
-      uSpeed: { value: speed },
-      uStreakCount: { value: Math.max(1, Math.min(16, Math.round(streakCount))) },
-      uStreakWidth: { value: streakWidth },
-      uStreakLength: { value: streakLength },
-      uGlow: { value: glow },
-      uDensity: { value: density },
-      uTwinkle: { value: twinkle },
-      uZoom: { value: zoom },
-      uBgGlow: { value: backgroundGlow },
-      uOpacity: { value: opacity },
-      uMouseEnabled: { value: mouseInteraction ? 1 : 0 },
-      uMouseStrength: { value: mouseStrength },
-      uMouseRadius: { value: mouseRadius }
-    };
-
-    const program = new Program(gl, { vertex, fragment, uniforms });
-    programRef.current = program;
-
-    const geometry = new Triangle(gl);
-    geometryRef.current = geometry;
-    const mesh = new Mesh(gl, { geometry, program });
-    meshRef.current = mesh;
-
-    const resize = () => {
-      const rect = container.getBoundingClientRect();
-      renderer.setSize(rect.width, rect.height);
-      uniforms.iResolution.value = [gl.drawingBufferWidth, gl.drawingBufferHeight, 1];
-    };
-
-    resize();
-    const ro = new ResizeObserver(resize);
-    ro.observe(container);
-
-    const onPointerMove = e => {
-      const rect = canvas.getBoundingClientRect();
-      const scale = renderer.dpr || 1;
-      const x = (e.clientX - rect.left) * scale;
-      const y = (rect.height - (e.clientY - rect.top)) * scale;
-      mouseTargetRef.current = [x, y];
-      if (mouseDampening <= 0) {
-        uniforms.iMouse.value = [x, y];
-      }
-    };
-    if (mouseInteraction) {
-      canvas.addEventListener('pointermove', onPointerMove);
+void main() {
+  vec4 col = vec4(0.0);
+  int samples = 0;
+  for (int i = -1; i <= 1; i++) {
+    for (int j = -1; j <= 1; j++) {
+      vec2 offset = vec2(float(i), float(j)) * (1.0 / min(uResolution.x, uResolution.y));
+      col += renderImage(vUv + offset);
+      samples++;
     }
+  }
+  ${writeColor}
+}
+`;
+}
 
-    const loop = t => {
+function compileShader(gl, type, source) {
+  const shader = gl.createShader(type);
+  if (!shader) throw new Error('Unable to allocate a boot shader');
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    const message = gl.getShaderInfoLog(shader) || 'LiquidChrome shader compilation failed';
+    gl.deleteShader(shader);
+    throw new Error(message);
+  }
+  return shader;
+}
+
+function createProgram(gl, webgl2) {
+  const vertexShader = compileShader(gl, gl.VERTEX_SHADER, webgl2 ? vertexShader300 : vertexShader100);
+  const fragmentShader = compileShader(gl, gl.FRAGMENT_SHADER, liquidChromeFragment(webgl2));
+  const program = gl.createProgram();
+  if (!program) {
+    gl.deleteShader(vertexShader);
+    gl.deleteShader(fragmentShader);
+    throw new Error('Unable to allocate the LiquidChrome program');
+  }
+  gl.attachShader(program, vertexShader);
+  gl.attachShader(program, fragmentShader);
+  gl.linkProgram(program);
+  gl.deleteShader(vertexShader);
+  gl.deleteShader(fragmentShader);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    const message = gl.getProgramInfoLog(program) || 'LiquidChrome program link failed';
+    gl.deleteProgram(program);
+    throw new Error(message);
+  }
+  return program;
+}
+
+function mountLiquidChrome(container) {
+  const canvas = document.createElement('canvas');
+  const contextOptions = {
+    alpha: false,
+    antialias: false,
+    depth: false,
+    stencil: false,
+    desynchronized: true,
+    preserveDrawingBuffer: false,
+    powerPreference: 'high-performance'
+  };
+  const gl = canvas.getContext('webgl2', contextOptions)
+    || canvas.getContext('webgl', contextOptions);
+  if (!gl) throw new Error('WebGL is unavailable for LiquidChrome');
+
+  const webgl2 = typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext;
+  const graphicsBackend = publishBootGraphicsBackend(gl, canvas);
+  if (graphicsBackend.requested && !graphicsBackend.hardwareD3D11) {
+    gl.getExtension('WEBGL_lose_context')?.loseContext();
+    throw new Error('DirectX 11 hardware rendering is unavailable');
+  }
+
+  const program = createProgram(gl, webgl2);
+  const positionBuffer = gl.createBuffer();
+  if (!positionBuffer) {
+    gl.deleteProgram(program);
+    throw new Error('Unable to allocate the LiquidChrome geometry');
+  }
+  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const position = gl.getAttribLocation(program, 'position');
+  gl.enableVertexAttribArray(position);
+  gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+
+  const uniforms = {
+    time: gl.getUniformLocation(program, 'uTime'),
+    resolution: gl.getUniformLocation(program, 'uResolution'),
+    baseColor: gl.getUniformLocation(program, 'uBaseColor'),
+    amplitude: gl.getUniformLocation(program, 'uAmplitude'),
+    frequencyX: gl.getUniformLocation(program, 'uFrequencyX'),
+    frequencyY: gl.getUniformLocation(program, 'uFrequencyY'),
+    mouse: gl.getUniformLocation(program, 'uMouse')
+  };
+
+  const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const rafRef = { current: null };
+  const timerRef = { current: null };
+  const frameClockRef = { current: 0 };
+  const frameCarryRef = { current: 0 };
+  const animationTimeRef = { current: 0 };
+  const pointerRef = { current: [0.5, 0.5], target: [0.5, 0.5] };
+  let reducedMotion = reducedMotionQuery.matches;
+  let disposed = false;
+  let ready = false;
+  let contextReleased = false;
+  let frameCount = 0;
+  let resizeObserver = null;
+  let width = 0;
+  let height = 0;
+
+  canvas.className = 'boot-liquid-chrome-canvas';
+  canvas.dataset.bootBackground = 'liquid-chrome';
+  canvas.dataset.renderer = webgl2 ? 'webgl2' : 'webgl';
+  canvas.setAttribute('aria-hidden', 'true');
+  container.dataset.bootBackground = 'liquid-chrome';
+  document.documentElement.dataset.bootBackground = 'liquid-chrome';
+  document.documentElement.dataset.bootRenderState = reducedMotion ? 'reduced-static' : 'animated';
+  container.appendChild(canvas);
+
+  gl.disable(gl.DEPTH_TEST);
+  gl.disable(gl.BLEND);
+  gl.clearColor(0.008, 0.0, 0.02, 1);
+  gl.useProgram(program);
+  gl.uniform3f(uniforms.baseColor, 0.082, 0.032, 0.128);
+  gl.uniform1f(uniforms.amplitude, 0.27);
+  gl.uniform1f(uniforms.frequencyX, 3.0);
+  gl.uniform1f(uniforms.frequencyY, 3.2);
+
+  const markReady = () => {
+    if (ready) return;
+    ready = true;
+    window.dispatchEvent(new CustomEvent('fe-lightfall-ready'));
+  };
+
+  const resize = () => {
+    if (disposed) return;
+    const rect = container.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, BOOT_DPR_LIMIT);
+    const scale = dpr * (reducedMotion ? BOOT_REDUCED_RENDER_SCALE : BOOT_RENDER_SCALE);
+    width = Math.max(2, Math.round(rect.width * scale));
+    height = Math.max(2, Math.round(rect.height * scale));
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+      gl.viewport(0, 0, width, height);
+      gl.uniform3f(uniforms.resolution, width, height, width / Math.max(1, height));
+    }
+  };
+
+  const render = timestamp => {
+    if (disposed || contextReleased) return false;
+    const now = Number.isFinite(timestamp) ? timestamp : performance.now();
+    if (!width || !height) resize();
+    const current = pointerRef.current;
+    const target = pointerRef.target;
+    const easing = reducedMotion ? 1 : 0.085;
+    current[0] += (target[0] - current[0]) * easing;
+    current[1] += (target[1] - current[1]) * easing;
+    gl.useProgram(program);
+    gl.uniform1f(uniforms.time, reducedMotion ? 0.9 : animationTimeRef.current * 0.001 * 0.18);
+    gl.uniform2f(uniforms.mouse, current[0], current[1]);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    frameCount += 1;
+    markReady();
+    return true;
+  };
+
+  const cancelScheduledFrame = () => {
+    if (timerRef.current !== null) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+  };
+
+  const scheduleFrame = (delay = BOOT_FRAME_BUDGET_MS) => {
+    if (disposed || reducedMotion || document.hidden || timerRef.current !== null || rafRef.current !== null) return;
+    const timerDelay = Math.max(0, delay - BOOT_RAF_LEAD_MS);
+    if (timerDelay < 1) {
       rafRef.current = requestAnimationFrame(loop);
-      uniforms.iTime.value = t * 0.001;
-      if (mouseDampening > 0) {
-        if (!lastTimeRef.current) lastTimeRef.current = t;
-        const dt = (t - lastTimeRef.current) / 1000;
-        lastTimeRef.current = t;
-        const tau = Math.max(1e-4, mouseDampening);
-        let factor = 1 - Math.exp(-dt / tau);
-        if (factor > 1) factor = 1;
-        const target = mouseTargetRef.current;
-        const cur = uniforms.iMouse.value;
-        cur[0] += (target[0] - cur[0]) * factor;
-        cur[1] += (target[1] - cur[1]) * factor;
-      } else {
-        lastTimeRef.current = t;
+      return;
+    }
+    timerRef.current = window.setTimeout(() => {
+      timerRef.current = null;
+      if (!disposed && !reducedMotion && !document.hidden && rafRef.current === null) {
+        rafRef.current = requestAnimationFrame(loop);
       }
-      if (!paused && programRef.current && meshRef.current) {
-        renderer.render({ scene: meshRef.current });
-        if (!readyRef.current) {
-          readyRef.current = true;
-          window.dispatchEvent(new CustomEvent('fe-lightfall-ready'));
-        }
-      }
-    };
-    rafRef.current = requestAnimationFrame(loop);
+    }, timerDelay);
+  };
 
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      if (mouseInteraction) canvas.removeEventListener('pointermove', onPointerMove);
-      ro.disconnect();
-      if (canvas.parentElement === container) {
-        container.removeChild(canvas);
-      }
-      const callIfFn = (obj, key) => {
-        if (obj && typeof obj[key] === 'function') {
-          obj[key].call(obj);
-        }
-      };
-      callIfFn(programRef.current, 'remove');
-      callIfFn(geometryRef.current, 'remove');
-      callIfFn(meshRef.current, 'remove');
-      callIfFn(rendererRef.current, 'destroy');
-      programRef.current = null;
-      geometryRef.current = null;
-      meshRef.current = null;
-      rendererRef.current = null;
-    };
-  }, [
-    dpr,
-    paused,
-    colors,
-    backgroundColor,
-    speed,
-    streakCount,
-    streakWidth,
-    streakLength,
-    glow,
-    density,
-    twinkle,
-    zoom,
-    backgroundGlow,
-    opacity,
-    mouseInteraction,
-    mouseStrength,
-    mouseRadius,
-    mouseDampening
-  ]);
+  const loop = timestamp => {
+    rafRef.current = null;
+    if (disposed || reducedMotion || document.hidden) return;
+    const elapsed = frameClockRef.current
+      ? Math.min(100, Math.max(0, timestamp - frameClockRef.current))
+      : BOOT_FRAME_BUDGET_MS;
+    frameClockRef.current = timestamp;
+    animationTimeRef.current += elapsed;
+    frameCarryRef.current = Math.min(BOOT_FRAME_BUDGET_MS * 2, frameCarryRef.current + elapsed);
+    if (frameCarryRef.current + 0.25 < BOOT_FRAME_BUDGET_MS) {
+      scheduleFrame(BOOT_FRAME_BUDGET_MS - frameCarryRef.current);
+      return;
+    }
+    frameCarryRef.current %= BOOT_FRAME_BUDGET_MS;
+    render(timestamp);
+    scheduleFrame();
+  };
 
-  return React.createElement('div', {
-    ref: containerRef,
-    className: `lightfall-container ${className ?? ''}`,
-    style: mixBlendMode ? { mixBlendMode } : undefined
+  const onPointerMove = event => {
+    if (reducedMotion || disposed) return;
+    const rect = container.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    pointerRef.target[0] = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    pointerRef.target[1] = 1 - Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
+  };
+
+  const onVisibilityChange = () => {
+    cancelScheduledFrame();
+    frameClockRef.current = 0;
+    frameCarryRef.current = 0;
+    if (!document.hidden && !reducedMotion) scheduleFrame(0);
+  };
+
+  const onReducedMotionChange = event => {
+    reducedMotion = event.matches;
+    cancelScheduledFrame();
+    frameClockRef.current = 0;
+    frameCarryRef.current = 0;
+    resize();
+    if (reducedMotion) {
+      animationTimeRef.current = 0;
+      document.documentElement.dataset.bootRenderState = 'reduced-static';
+      render(0);
+    } else {
+      document.documentElement.dataset.bootRenderState = 'animated';
+      scheduleFrame(0);
+    }
+  };
+
+  const release = () => {
+    if (contextReleased) return;
+    contextReleased = true;
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    gl.useProgram(null);
+    gl.deleteBuffer(positionBuffer);
+    gl.deleteProgram(program);
+    try {
+      gl.getExtension('WEBGL_lose_context')?.loseContext();
+    } catch {
+    }
+  };
+
+  const stop = () => {
+    if (disposed) return;
+    disposed = true;
+    cancelScheduledFrame();
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    window.removeEventListener('pointermove', onPointerMove);
+    reducedMotionQuery.removeEventListener?.('change', onReducedMotionChange);
+    resizeObserver?.disconnect();
+    if (canvas.parentElement === container) container.removeChild(canvas);
+    canvas.width = 1;
+    canvas.height = 1;
+    release();
+    document.documentElement.dataset.bootRenderState = 'stopped';
+  };
+
+  const status = () => ({
+    ready,
+    running: !disposed && !reducedMotion && !document.hidden,
+    reducedMotion,
+    frameCount,
+    width,
+    height,
+    contextReleased,
+    renderer: webgl2 ? 'webgl2' : 'webgl',
+    backend: graphicsBackend.backend,
+    background: 'liquid-chrome'
   });
+
+  resizeObserver = new ResizeObserver(() => {
+    resize();
+    if (reducedMotion) render(0);
+  });
+  resizeObserver.observe(container);
+  document.addEventListener('visibilitychange', onVisibilityChange);
+  window.addEventListener('pointermove', onPointerMove, { passive: true });
+  reducedMotionQuery.addEventListener?.('change', onReducedMotionChange);
+  resize();
+  render(0);
+  if (!reducedMotion) scheduleFrame(0);
+
+  return Object.freeze({ stop, status, renderOnce: render });
 }
 
 const mount = document.getElementById('bootLightfallMount');
+let controller = null;
+
+const bootApi = {
+  stop() {
+    controller?.stop();
+  },
+  status() {
+    return controller?.status() || {
+      ready: false,
+      running: false,
+      reducedMotion: false,
+      frameCount: 0,
+      contextReleased: true,
+      renderer: 'none',
+      backend: 'unavailable',
+      background: 'liquid-chrome'
+    };
+  },
+  renderOnce(timestamp = performance.now()) {
+    return controller?.renderOnce(timestamp) || false;
+  }
+};
+window.FeMonsterBootLiquidChrome = Object.freeze(bootApi);
 
 if (mount) {
-  const root = createRoot(mount);
-  root.render(
-    React.createElement(Lightfall, {
-      className: 'boot-lightfall-react',
-      colors: ['#A6C8FF', '#5227FF', '#FF9FFC'],
-      backgroundColor: '#830aff',
-      dpr: 1,
-      speed: 0.72,
-      streakCount: 4,
-      streakWidth: 0.16,
-      streakLength: 0.82,
-      glow: 0.76,
-      density: 0.58,
-      twinkle: 0.7,
-      zoom: 1.48,
-      backgroundGlow: 0.14,
-      opacity: 0.92,
-      mouseInteraction: false,
-      mouseStrength: 0.55,
-      mouseRadius: 0.44,
-      mouseDampening: 0.2
-    })
-  );
-  window.addEventListener('fe-lightfall-stop', () => root.unmount(), { once: true });
+  try {
+    controller = mountLiquidChrome(mount);
+  } catch (error) {
+    mount.dataset.bootBackground = 'css-fallback';
+    mount.dataset.bootRenderError = String(error?.message || error || 'LiquidChrome initialization failed').slice(0, 240);
+    document.documentElement.dataset.bootBackground = 'css-fallback';
+    document.documentElement.dataset.bootRenderState = 'fallback';
+    window.dispatchEvent(new CustomEvent('fe-lightfall-ready'));
+  }
+  window.addEventListener('fe-lightfall-stop', () => bootApi.stop(), { once: true });
 } else {
   window.dispatchEvent(new CustomEvent('fe-lightfall-ready'));
 }

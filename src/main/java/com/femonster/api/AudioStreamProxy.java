@@ -53,7 +53,7 @@ final class AudioStreamProxy {
         return thread;
     });
 
-    private final HttpClient client;
+    private volatile HttpClient client;
     private final Predicate<URI> uriPolicy;
     private final AtomicLong streams = new AtomicLong();
     private final AtomicLong bytesForwarded = new AtomicLong();
@@ -63,13 +63,8 @@ final class AudioStreamProxy {
     private final AtomicLong bodyIdleTimeouts = new AtomicLong();
 
     AudioStreamProxy() {
-        this(
-            HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(8))
-                .followRedirects(HttpClient.Redirect.NEVER)
-                .build(),
-            AudioStreamProxy::isPublicHttpUri
-        );
+        this.client = null;
+        this.uriPolicy = AudioStreamProxy::isPublicHttpUri;
     }
 
     AudioStreamProxy(HttpClient client, Predicate<URI> uriPolicy) {
@@ -182,7 +177,7 @@ final class AudioStreamProxy {
                 request.header("If-Range", ifRange);
             }
 
-            HttpResponse<InputStream> response = client.send(
+            HttpResponse<InputStream> response = httpClient().send(
                 request.build(),
                 HttpResponse.BodyHandlers.ofInputStream()
             );
@@ -198,6 +193,22 @@ final class AudioStreamProxy {
             }
         }
         throw new IOException("too many audio stream redirects");
+    }
+
+    private HttpClient httpClient() {
+        HttpClient current = client;
+        if (current != null) return current;
+        synchronized (this) {
+            current = client;
+            if (current == null) {
+                current = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(8))
+                    .followRedirects(HttpClient.Redirect.NEVER)
+                    .build();
+                client = current;
+            }
+        }
+        return current;
     }
 
     private void copyWithSafeResume(

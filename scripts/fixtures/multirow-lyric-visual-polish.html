@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../../web/styles.css">
+  <link rel="stylesheet" href="../../web/lyric-render-quality.css">
+  <style>
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #03070d;
+    }
+
+    .visual-test-scene {
+      --lyric-raster-scale: 2.5;
+      --lyric-primary: #b8efff;
+      --lyric-primary-rgb: 184, 239, 255;
+      --lyric-highlight: #ffffff;
+      --lyric-highlight-rgb: 255, 255, 255;
+      --lyric-depth: #56bfe8;
+      --lyric-depth-rgb: 86, 191, 232;
+      --lyric-glow: #d7f8ff;
+      --lyric-font-soft: #d2ecf5;
+      --text-preset-x: 0px;
+      --text-preset-y: 0px;
+      --lyric-z: 0px;
+      --scene-rotate-x: 0deg;
+      --scene-rotate-y: 0deg;
+      --text-preset-rotate-x: 0deg;
+      --text-preset-rotate-y: 0deg;
+      --text-preset-rotate-z: 4deg;
+      position: relative;
+      width: 100%;
+      height: 100%;
+      opacity: 1;
+      visibility: visible;
+      transition: none;
+    }
+
+    .visual-test-scene .multi-row-lyric-stage {
+      top: 50%;
+      width: min(820px, calc(100vw - 96px));
+      opacity: 1;
+      visibility: visible;
+      transition: none;
+    }
+  </style>
+</head>
+<body>
+  <main class="playback-lyric-scene is-multi-row-text visual-test-scene">
+    <section class="multi-row-lyric-stage" data-multi-lyric-stage="true">
+      <div class="multi-row-lyric-list" style="--multi-row-line-count: 7; --multi-row-center-slot: 4">
+        <div class="multi-row-lyric-line is-past" style="--multi-row-slot:1;--multi-row-fit-font-size:18px;--multi-row-line-opacity:.34;--multi-row-distance:3"><span class="multi-row-lyric-main" data-text="远处已经唱完的句子不应与邻近歌词粘连">远处已经唱完的句子不应与邻近歌词粘连</span></div>
+        <div class="multi-row-lyric-line is-past" style="--multi-row-slot:2;--multi-row-fit-font-size:22px;--multi-row-line-opacity:.42;--multi-row-distance:2"><span class="multi-row-lyric-main" data-text="Even a long previous lyric remains crisp after rotation">Even a long previous lyric remains crisp after rotation</span></div>
+        <div class="multi-row-lyric-line is-past" style="--multi-row-slot:3;--multi-row-fit-font-size:24px;--multi-row-line-opacity:.54;--multi-row-distance:1"><span class="multi-row-lyric-main" data-text="上一句缓慢离开但仍然有清楚的字形边界">上一句缓慢离开但仍然有清楚的字形边界</span><span class="multi-row-lyric-translation" data-text="The previous line stays readable">The previous line stays readable</span></div>
+        <div class="multi-row-lyric-line is-current" style="--multi-row-slot:4;--multi-row-fit-font-size:27px;--multi-row-line-opacity:1;--multi-row-distance:0;--multi-row-progress:48%"><span class="multi-row-lyric-main" data-text="当前播放的超长歌词始终固定在视觉黄金位并保持清晰">当前播放的超长歌词始终固定在视觉黄金位并保持清晰</span><span class="multi-row-lyric-translation" data-text="The current long lyric remains precise and readable">The current long lyric remains precise and readable</span></div>
+        <div class="multi-row-lyric-line is-future" style="--multi-row-slot:5;--multi-row-fit-font-size:24px;--multi-row-line-opacity:.54;--multi-row-distance:1"><span class="multi-row-lyric-main" data-text="下一句快速进入中心位置形成错位波浪">下一句快速进入中心位置形成错位波浪</span><span class="multi-row-lyric-translation" data-text="The next line moves toward the centre">The next line moves toward the centre</span></div>
+        <div class="multi-row-lyric-line is-future" style="--multi-row-slot:6;--multi-row-fit-font-size:22px;--multi-row-line-opacity:.42;--multi-row-distance:2"><span class="multi-row-lyric-main" data-text="Long future lyrics must not collide with another row">Long future lyrics must not collide with another row</span></div>
+        <div class="multi-row-lyric-line is-future" style="--multi-row-slot:7;--multi-row-fit-font-size:18px;--multi-row-line-opacity:.34;--multi-row-distance:3"><span class="multi-row-lyric-main" data-text="更远的句子仍有精准轮廓">更远的句子仍有精准轮廓</span></div>
+      </div>
+    </section>
+  </main>
+  <pre id="result"></pre>
+  <script>
+    addEventListener('load', () => requestAnimationFrame(() => requestAnimationFrame(() => {
+      const lines = [...document.querySelectorAll('.multi-row-lyric-line')];
+      const rects = lines.map((line) => line.getBoundingClientRect());
+      const localBoxes = lines.map((line) => ({ top: line.offsetTop, bottom: line.offsetTop + line.offsetHeight }));
+      const textNodes = [...document.querySelectorAll('.multi-row-lyric-main, .multi-row-lyric-translation')];
+      const stage = document.querySelector('.multi-row-lyric-stage');
+      const scene = document.querySelector('.visual-test-scene');
+      const list = document.querySelector('.multi-row-lyric-list');
+      const current = document.querySelector('.multi-row-lyric-line.is-current');
+      const adjacent = document.querySelector('.multi-row-lyric-line.is-future');
+      const far = lines.at(-1);
+      const style = (node, pseudo) => getComputedStyle(node, pseudo);
+      const hasOverlap = localBoxes.some((box, index) => index > 0 && box.top < localBoxes[index - 1].bottom - 0.75);
+      const overflows = textNodes.filter((node) => node.scrollWidth > node.clientWidth + 1).map((node) => node.textContent);
+      const stageStyle = style(stage);
+      const listStyle = style(list);
+      const lineStyle = style(current);
+      const separatorStyle = style(current, '::after');
+      const payload = {
+        dpr: devicePixelRatio,
+        sceneOpacity: parseFloat(style(scene).opacity),
+        sceneVisibility: style(scene).visibility,
+        hasOverlap,
+        overflows,
+        currentCenterDelta: Math.abs((rects[3].top + rects[3].bottom) / 2 - innerHeight / 2),
+        fontSizes: [parseFloat(style(current).fontSize), parseFloat(style(adjacent).fontSize), parseFloat(style(far).fontSize)],
+        opacities: [parseFloat(style(current).opacity), parseFloat(style(adjacent).opacity), parseFloat(style(far).opacity)],
+        stageBackground: stageStyle.backgroundColor,
+        listBackground: listStyle.backgroundColor,
+        stageBackdrop: stageStyle.backdropFilter || stageStyle.webkitBackdropFilter || 'none',
+        listBackdrop: listStyle.backdropFilter || listStyle.webkitBackdropFilter || 'none',
+        separatorContent: separatorStyle.content,
+        separatorHeight: parseFloat(separatorStyle.height),
+        fontSynthesis: style(current.querySelector('.multi-row-lyric-main')).fontSynthesis,
+        textRendering: lineStyle.textRendering,
+        overflowX: style(current.querySelector('.multi-row-lyric-main')).overflowX,
+        angle: stageStyle.transform,
+        layoutZoom: parseFloat(stageStyle.zoom)
+      };
+      document.querySelector('#result').textContent = JSON.stringify(payload);
+      document.documentElement.dataset.ready = 'true';
+    })));
+  </script>
+</body>
+</html>

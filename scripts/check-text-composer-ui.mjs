@@ -9,6 +9,7 @@ const webRoot = path.join(root, 'web');
 const edge = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const debugPort = 19000 + (process.pid % 10000);
 const profile = path.join(tmpdir(), `fe-monster-text-composer-${process.pid}`);
+const visualLanguageOnly = process.env.FE_TEST_SCOPE === 'visual-language';
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 const contentTypes = new Map([
@@ -197,17 +198,59 @@ try {
 
     const stage = document.getElementById('playlistShelfStage');
     const orbit = document.getElementById('orbPlaylists');
-    const orbitCard = orbit.querySelector('.orb-playlist-card');
+    let orbitCard = orbit.querySelector('.orb-playlist-card');
+    if (!orbitCard) {
+      orbitCard = document.createElement('button');
+      orbitCard.type = 'button';
+      orbitCard.className = 'orb-playlist-card is-focused';
+      orbitCard.setAttribute('aria-selected', 'true');
+      orbitCard.innerHTML = '<span class="orb-playlist-copy"><strong>Visual contract</strong><small>FE Monster QA</small></span>';
+      orbit.appendChild(orbitCard);
+    }
     const selected = document.getElementById('selectedPlaylistAlbum');
     const back = document.getElementById('playlistShelfBack');
-    const song = document.querySelector('#playlistSongStack .shelf-song-button');
+    const songsRendered = Array.from(document.querySelectorAll('#playlistSongStack .shelf-song-button'));
+    const song = songsRendered[0];
+    const neutralSong = songsRendered[1];
+    const currentSong = songsRendered[2];
+    currentSong?.classList.add('is-current');
     song?.focus();
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const stageStyle = getComputedStyle(stage);
     const orbitStyle = getComputedStyle(orbit);
     const orbitCardStyle = getComputedStyle(orbitCard);
     const selectedStyle = getComputedStyle(selected);
     const backStyle = getComputedStyle(back);
     const songStyle = getComputedStyle(song);
+    const neutralSongStyle = getComputedStyle(neutralSong);
+    const currentSongStyle = getComputedStyle(currentSong);
+    const serializeSongSurface = (style) => ({
+      backgroundColor: style.backgroundColor,
+      backgroundImage: style.backgroundImage,
+      borderColor: style.borderColor,
+      boxShadow: style.boxShadow,
+      backdropFilter: style.backdropFilter,
+      webkitBackdropFilter: style.webkitBackdropFilter
+    });
+    const songSurfaces = {
+      neutral: serializeSongSurface(neutralSongStyle),
+      focused: serializeSongSurface(songStyle),
+      current: serializeSongSurface(currentSongStyle)
+    };
+    const songSurfaceValues = Object.values(songSurfaces);
+    const songCardsUseExactTenPercentBlack = songSurfaceValues.every((surface) => (
+      surface.backgroundColor === 'rgba(0, 0, 0, 0.1)'
+      && surface.backgroundImage === 'none'
+    ));
+    const songCardsAvoidPerRowBackdropBlur = songSurfaceValues.every((surface) => (
+      surface.backdropFilter === 'none'
+      && (!surface.webkitBackdropFilter || surface.webkitBackdropFilter === 'none')
+    ));
+    const hasWarmExternalGlow = (surface) => (
+      /rgba?\\(255,\\s*246,\\s*232,\\s*0?\\.\\d+\\)\\s+0px\\s+0px\\s+(?:1[0-9]|[2-9]\\d)px/.test(surface.boxShadow)
+    );
+    const songCardsUseWarmNeutralGlow = songSurfaceValues.every(hasWarmExternalGlow)
+      && songSurfaceValues.every((surface) => !/(102,\\s*207,\\s*255|151,\\s*225,\\s*255)/.test(surface.boxShadow));
     const hasVisibleSurface = (style) => (
       style.backgroundImage !== 'none'
       || !/rgba?\\([^)]*,\\s*0(?:\\.0+)?\\)/.test(style.backgroundColor)
@@ -228,6 +271,21 @@ try {
       && Number.parseFloat(orbitCardStyle.borderTopWidth) > 0
       && Number.parseFloat(orbitCardStyle.borderRadius) > 0
       && orbitCardStyle.boxShadow !== 'none';
+    const playlistCardUsesExactFifteenPercentBlack = orbitCardStyle.backgroundColor === 'rgba(0, 0, 0, 0.15)'
+      && orbitCardStyle.backgroundImage === 'none'
+      && orbitCardStyle.backdropFilter === 'none'
+      && (!orbitCardStyle.webkitBackdropFilter || orbitCardStyle.webkitBackdropFilter === 'none');
+    const playlistCardUsesWarmNeutralGlow = orbitCardStyle.boxShadow.includes('255, 246, 232')
+      && !/(102,\\s*207,\\s*255|151,\\s*225,\\s*255)/.test(orbitCardStyle.boxShadow);
+    const selectedPlaylistUsesWarmNeutralGlow = selectedStyle.borderColor.includes('255, 246, 232')
+      && selectedStyle.boxShadow.includes('255, 246, 232')
+      && !/(102,\\s*207,\\s*255|151,\\s*225,\\s*255|218,\\s*241,\\s*255)/.test(
+        selectedStyle.borderColor + ' ' + selectedStyle.boxShadow
+      );
+    const selectedPlaylistUsesExactFifteenPercentBlack = selectedStyle.backgroundColor === 'rgba(0, 0, 0, 0.15)'
+      && selectedStyle.backgroundImage === 'none'
+      && selectedStyle.backdropFilter === 'none'
+      && (!selectedStyle.webkitBackdropFilter || selectedStyle.webkitBackdropFilter === 'none');
     const childrenFloat = hasVisibleSurface(selectedStyle)
       && hasVisibleSurface(backStyle)
       && hasVisibleSurface(songStyle)
@@ -238,12 +296,30 @@ try {
       && song.classList.contains('is-focused')
       && songStyle.boxShadow !== 'none';
     return {
-      pass: transparent && orbitTransparent && orbitCardPreserved && childrenFloat && keyboardFocus,
+      pass: transparent
+        && orbitTransparent
+        && orbitCardPreserved
+        && childrenFloat
+        && keyboardFocus
+        && playlistCardUsesExactFifteenPercentBlack
+        && playlistCardUsesWarmNeutralGlow
+        && selectedPlaylistUsesExactFifteenPercentBlack
+        && selectedPlaylistUsesWarmNeutralGlow
+        && songCardsUseExactTenPercentBlack
+        && songCardsAvoidPerRowBackdropBlur
+        && songCardsUseWarmNeutralGlow,
       transparent,
       orbitTransparent,
       orbitCardPreserved,
+      playlistCardUsesExactFifteenPercentBlack,
+      playlistCardUsesWarmNeutralGlow,
+      selectedPlaylistUsesExactFifteenPercentBlack,
+      selectedPlaylistUsesWarmNeutralGlow,
       childrenFloat,
       keyboardFocus,
+      songCardsUseExactTenPercentBlack,
+      songCardsAvoidPerRowBackdropBlur,
+      songCardsUseWarmNeutralGlow,
       stage: {
         backgroundColor: stageStyle.backgroundColor,
         backgroundImage: stageStyle.backgroundImage,
@@ -265,16 +341,90 @@ try {
       },
       children: {
         selectedBackground: selectedStyle.backgroundColor,
+        selectedBorderColor: selectedStyle.borderColor,
+        selectedBoxShadow: selectedStyle.boxShadow,
         backBackground: backStyle.backgroundColor,
         songBackground: songStyle.backgroundColor,
         songBoxShadow: songStyle.boxShadow
-      }
+      },
+      songSurfaces
+    };
+  })()`);
+
+  const visualLanguageSurfaces = await evaluate(`(() => {
+    const rootStyle = getComputedStyle(document.documentElement);
+    const panelStyle = getComputedStyle(document.getElementById('diySidebar'));
+    const pageSurfaces = [
+      'diyPresetPage',
+      'diyTextPage',
+      'diyWallpaperPage'
+    ].map((id) => {
+      const style = getComputedStyle(document.getElementById(id));
+      return {
+        id,
+        backgroundColor: style.backgroundColor,
+        backgroundImage: style.backgroundImage,
+        boxShadow: style.boxShadow,
+        backdropFilter: style.backdropFilter,
+        webkitBackdropFilter: style.webkitBackdropFilter
+      };
+    });
+    const modeButtonSurfaces = [
+      'diyPresetButton',
+      'diyTextModeButton',
+      'diyWallpaperModeButton'
+    ].map((id) => {
+      const style = getComputedStyle(document.getElementById(id));
+      return {
+        id,
+        backgroundColor: style.backgroundColor,
+        backgroundImage: style.backgroundImage,
+        boxShadow: style.boxShadow
+      };
+    });
+    const canonicalWarmNeutral = rootStyle
+      .getPropertyValue('--fe-primitive-rgb-warm-neutral')
+      .trim() === '255 246 232';
+    const panelUsesExactSevenPercentBlack = panelStyle.backgroundColor === 'rgba(0, 0, 0, 0.07)'
+      && panelStyle.backgroundImage === 'none'
+      && panelStyle.backdropFilter.includes('blur(20px)');
+    const childPagesAreStructuralOnly = pageSurfaces.every((surface) => (
+      surface.backgroundColor === 'rgba(0, 0, 0, 0)'
+      && surface.backgroundImage === 'none'
+      && surface.boxShadow === 'none'
+      && surface.backdropFilter === 'none'
+      && (!surface.webkitBackdropFilter || surface.webkitBackdropFilter === 'none')
+    ));
+    const modeButtonsUseExactWarmSurface = modeButtonSurfaces.every((surface) => (
+      surface.backgroundColor === 'rgba(255, 246, 232, 0.1)'
+      && surface.backgroundImage === 'none'
+      && surface.boxShadow.includes('255, 246, 232')
+    ));
+    return {
+      pass: canonicalWarmNeutral
+        && panelUsesExactSevenPercentBlack
+        && childPagesAreStructuralOnly
+        && modeButtonsUseExactWarmSurface,
+      canonicalWarmNeutral,
+      panelUsesExactSevenPercentBlack,
+      childPagesAreStructuralOnly,
+      modeButtonsUseExactWarmSurface,
+      panel: {
+        backgroundColor: panelStyle.backgroundColor,
+        backgroundImage: panelStyle.backgroundImage,
+        backdropFilter: panelStyle.backdropFilter,
+        boxShadow: panelStyle.boxShadow
+      },
+      pageSurfaces,
+      modeButtonSurfaces
     };
   })()`);
 
   const composerSemantics = await evaluate(`(() => {
     const required = [
       ['textLayoutMode', 'select'],
+      ['textLyricHighlightMode', 'select'],
+      ['textHandwrittenMoodToggle', 'checkbox'],
       ['textFlowIntensity', 'range'],
       ['textEchoLayers', 'range'],
       ['textEchoSpacing', 'range'],
@@ -311,7 +461,8 @@ try {
     const restoredTextPresetCards = textPresetCards.length === 2
       && textPresetIds.join('|') === 'depth|focus-echo'
       && document.getElementById('diyLyricPreset')?.dataset.textPreset === 'depth'
-      && document.getElementById('diyFocusEchoTextPreset')?.dataset.textPreset === 'focus-echo';
+      && document.getElementById('diyFocusEchoTextPreset')?.dataset.textPreset === 'focus-echo'
+      && !document.getElementById('diyWordGlowTextPreset');
     const layoutValues = Array.from(document.getElementById('textLayoutMode')?.options || [])
       .map((option) => option.value);
     const supportedLayoutsOnly = layoutValues.length === 2
@@ -771,14 +922,20 @@ try {
     mobile: false
   });
 
+  const visualLanguagePass = playlistSurface.pass === true
+    && visualLanguageSurfaces.pass === true;
+  const composerPass = composerSemantics.pass === true
+    && composerInteraction.pass === true
+    && composerPersistence.pass === true
+    && composerSliderLayout.pass === true
+    && composerNarrowLayout.pass === true;
   const result = {
-    pass: playlistSurface.pass === true
-      && composerSemantics.pass === true
-      && composerInteraction.pass === true
-      && composerPersistence.pass === true
-      && composerSliderLayout.pass === true
-      && composerNarrowLayout.pass === true,
+    pass: visualLanguagePass && (visualLanguageOnly || composerPass),
+    scope: visualLanguageOnly ? 'visual-language' : 'full',
+    visualLanguagePass,
+    composerPass,
     playlistSurface,
+    visualLanguageSurfaces,
     composerSemantics,
     composerInteraction,
     composerPersistence,

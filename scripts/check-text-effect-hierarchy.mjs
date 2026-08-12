@@ -191,10 +191,12 @@ const colorControlIds = [
 ];
 const animationControlIds = [
   'textLyricsToggle',
+  'textLyricHighlightMode',
   'textFlowIntensity',
   'textEchoLayers',
   'textEchoSpacing',
   'lyricSpeedRange',
+  'textHandwrittenMoodToggle',
   'textGlitchControl'
 ];
 const glitchControlIds = [
@@ -260,6 +262,8 @@ const expectedGlitchDataSettings = [
 ];
 const newControlStateKeys = {
   textLyricsToggle: 'lyricsEnabled',
+  textLyricHighlightMode: 'lyricHighlightMode',
+  textHandwrittenMoodToggle: 'handwrittenMoodEnabled',
   multiRowLineCount: 'multiRowLineCount',
   translationFontSize: 'translationFontSize',
   translationGap: 'translationGap',
@@ -304,6 +308,8 @@ const textComposerBinding = balancedBlock(app, 'if (els.textComposerControl)');
 
 const settingKeys = [
   'lyricsEnabled',
+  'lyricHighlightMode',
+  'handwrittenMoodEnabled',
   'multiRowLineCount',
   'translationFontSize',
   'translationGap',
@@ -405,6 +411,7 @@ const checks = {
     && textPresetCardTags.length === 2
     && textPresetCardValues.join('|') === 'depth|focus-echo'
     && textPresetCardIds.join('|') === 'diyFocusEchoTextPreset|diyLyricPreset'
+    && !/id=(["'])diyWordGlowTextPreset\1/.test(html)
     && glitchPresetTags.length === 0
     && allGlitchPresetTags.length === 0,
   glitchControlsStayInDedicatedContainer: groupContainsIds(
@@ -501,10 +508,12 @@ const checks = {
     && /textGlitch/.test(app)
     && /glitchEnabled/.test(app),
   focusEchoDisablesGlitchControls: /const\s+focusEchoLocked\s*=\s*state\.textPreset\s*===\s*['"]focus-echo['"]/.test(syncControls)
-    && /const\s+glitchControlsEnabled\s*=\s*enabled\s*&&\s*!focusEchoLocked\s*&&\s*settings\.glitchEnabled/.test(syncControls)
-    && /els\.textGlitchToggle\.disabled\s*=\s*!enabled\s*\|\|\s*focusEchoLocked/.test(syncControls),
+    && /const\s+singleRowLocked\s*=\s*singleRowOnlyTextPreset/.test(syncControls)
+    && /const\s+glitchControlsEnabled\s*=\s*enabled\s*&&\s*!singleRowLocked\s*&&\s*settings\.glitchEnabled/.test(syncControls)
+    && /els\.textGlitchToggle\.disabled\s*=\s*!enabled\s*\|\|\s*singleRowLocked/.test(syncControls),
   glitchExcludesBookFocusEchoAndReducedMotion: /state\.textPreset\s*!==\s*['"]book['"]/.test(glitchActive)
     && /state\.textPreset\s*!==\s*['"]focus-echo['"]/.test(glitchActive)
+    && /!wordGlowLyricActive\(settings\)/.test(glitchActive)
     && /settings\.glitchEnabled/.test(glitchActive)
     && /!reducedMotion/.test(glitchActive)
     && /glitchTextEffectActive\(settings\)/.test(syncGlitchLayers)
@@ -517,8 +526,8 @@ const checks = {
     && glitchVariables.every((variable) => styles.includes(`var(${variable}`)),
   glitchSpeedUsesPrecomputedDurationVariables: /settings\.glitchBeatDuration\s*\/\s*speed/.test(applyGlitchVars)
     && /--text-glitch-beat-duration/.test(applyGlitchVars)
-    && /animation-duration:\s*var\(--text-glitch-cyan-duration/.test(styles)
-    && /animation-duration:\s*var\(--text-glitch-magenta-duration/.test(styles),
+    && /animation-duration:[^;]*var\(--text-glitch-cyan-duration/.test(styles)
+    && /animation-duration:[^;]*var\(--text-glitch-magenta-duration/.test(styles),
   glitchUsesIndependentAriaHiddenClones: /\[['"]cyan['"],\s*['"]magenta['"]\]/.test(app)
     && /text-glitch-copy text-glitch-copy--\$\{variant\}/.test(app)
     && /setAttribute\(['"]aria-hidden['"],\s*['"]true['"]\)/.test(app)

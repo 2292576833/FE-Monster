@@ -8,6 +8,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using System.Windows.Forms;
+using Microsoft.Win32;
 
 namespace FeMonster.Setup;
 
@@ -391,7 +392,7 @@ internal sealed class SetupForm : Form
             }
             SetupEngine.ValidateInstallTarget(installDir, payload);
 
-            logPath = SetupEngine.CreateInstallerSessionLogPath();
+            logPath = SetupEngine.CreateInstallerSessionLogPath(installDir);
             lastLogLength = 0;
             statusLabel.Text = "Installing FE Monster...";
             logTimer.Start();
@@ -546,10 +547,41 @@ internal sealed class SetupOptions
 
     private static string GetDefaultInstallDir()
     {
+        string registered = GetRegisteredInstallDir();
+        if (!string.IsNullOrWhiteSpace(registered)) return registered;
         return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "FE Monster"
         );
+    }
+
+    private static string GetRegisteredInstallDir()
+    {
+        try
+        {
+            using RegistryKey? key = Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Uninstall\FE Monster"
+            );
+            string raw = key?.GetValue("InstallLocation") as string ?? "";
+            if (string.IsNullOrWhiteSpace(raw)) return "";
+            string candidate = Path.GetFullPath(Environment.ExpandEnvironmentVariables(raw));
+            bool recognized =
+                File.Exists(Path.Combine(candidate, "out", "fe-monster-java.jar")) &&
+                File.Exists(Path.Combine(candidate, "web", "index.html")) &&
+                File.Exists(Path.Combine(
+                    candidate,
+                    "native",
+                    "windows",
+                    "build",
+                    "winforms",
+                    "FE Monster.exe"
+                ));
+            return recognized ? candidate : "";
+        }
+        catch
+        {
+            return "";
+        }
     }
 
     private static bool IsInstallDirArg(string value)
@@ -657,7 +689,7 @@ internal static class SetupEngine
             }
 
             ValidateInstallTarget(options.InstallDir, payload);
-            string sessionLogPath = CreateInstallerSessionLogPath();
+            string sessionLogPath = CreateInstallerSessionLogPath(options.InstallDir);
             ProcessStartInfo startInfo = CreateInstallerStartInfo(
                 installScript,
                 options.InstallDir,
@@ -692,18 +724,43 @@ internal static class SetupEngine
         WriteDiagnosticLine("headless-target", $"installDir={installDir}; error={error}");
     }
 
-    public static string CreateInstallerSessionLogPath()
+    public static string CreateInstallerSessionLogPath(string? preferredInstallDir = null)
     {
-        string directory = Path.Combine(
+        string localDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "FE Monster Setup",
             "logs"
         );
+        string directory = localDirectory;
+        if (!string.IsNullOrWhiteSpace(preferredInstallDir))
+        {
+            try
+            {
+                string installDir = Path.GetFullPath(
+                    Environment.ExpandEnvironmentVariables(preferredInstallDir)
+                );
+                string? installParent = Path.GetDirectoryName(installDir);
+                string installRoot = Path.GetPathRoot(installDir) ?? "";
+                string localRoot = Path.GetPathRoot(localDirectory) ?? "";
+                if (!string.IsNullOrWhiteSpace(installParent) &&
+                    !string.Equals(installRoot, localRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    directory = Path.Combine(installParent, ".fe-monster-setup-state", "logs");
+                }
+            }
+            catch
+            {
+                directory = localDirectory;
+            }
+        }
         return Path.Combine(
             directory,
             $"install-{DateTime.Now:yyyyMMdd-HHmmss}-{Environment.ProcessId}-{Guid.NewGuid():N}.log"
         );
     }
+
+    public static string SelectInstallerSessionLogPathForTest(string preferredInstallDir) =>
+        CreateInstallerSessionLogPath(preferredInstallDir);
 
     public static string ExtractBundle(string exePath, string preferredInstallDir)
     {
@@ -1067,6 +1124,7 @@ internal static class SetupEngine
         {
             startInfo.ArgumentList.Add(argument);
         }
+        startInfo.ArgumentList.Add("-ConsumePayloadRoot");
         if (!launchAfterInstall) startInfo.ArgumentList.Add("-NoLaunch");
         foreach (string argument in forwardedArgs) startInfo.ArgumentList.Add(argument);
         return startInfo;

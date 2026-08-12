@@ -158,6 +158,8 @@ const snapshotExpression = `(() => {
   const card = document.getElementById('communityCard');
   const playbackCard = document.getElementById('qishuiPlaybackCard');
   const close = document.getElementById('communityCollapseButton');
+  const avatar = document.getElementById('communityAvatar');
+  const mailboxShortcut = document.getElementById('communityMailboxShortcut');
   const visible = (element) => {
     if (!element) return false;
     const style = getComputedStyle(element);
@@ -198,6 +200,11 @@ const snapshotExpression = `(() => {
     cardAriaHidden: card?.getAttribute('aria-hidden') || '',
     cardInert: Boolean(card?.inert),
     closeRect: rectOf(close),
+    avatarRect: rectOf(avatar),
+    mailboxShortcutRect: rectOf(mailboxShortcut),
+    mailboxShortcutVisible: visible(mailboxShortcut),
+    mailboxShortcutText: mailboxShortcut?.textContent?.trim() || '',
+    mailboxShortcutBackground: mailboxShortcut ? getComputedStyle(mailboxShortcut).backgroundColor : '',
     playbackRect: visible(playbackCard) ? rectOf(playbackCard) : null,
     rootClasses: card ? Array.from(card.classList) : [],
     hasGlassData: Boolean(card?.hasAttribute('data-glass-surface')),
@@ -292,6 +299,82 @@ try {
   const screenshotPath = path.join(artifactRoot, 'community-left-drawer-open-1440x900.png');
   writeFileSync(screenshotPath, Buffer.from(screenshot.data, 'base64'));
 
+  const collapsedMailboxHidden = await evaluate(`(() => {
+    const card = document.getElementById('communityCard');
+    const shortcut = document.getElementById('communityMailboxShortcut');
+    card.classList.add('is-collapsed');
+    const style = getComputedStyle(shortcut);
+    const rect = shortcut.getBoundingClientRect();
+    const hidden = style.display === 'none' || style.visibility === 'hidden' || rect.width === 0 || rect.height === 0;
+    card.classList.remove('is-collapsed');
+    return hidden;
+  })()`);
+
+  await clickPoint(finalOpen.mailboxShortcutRect);
+  await delay(360);
+  const mailboxOpened = await evaluate(`(() => ({
+    dialogHidden: document.getElementById('communityProfileDialog')?.hidden,
+    profileOpenState: state.community.profileOpen,
+    profilePage: state.community.profilePage
+  }))()`);
+  await evaluate(`setCommunityProfileOpen(false)`);
+  await delay(260);
+
+  const achievementEntry = await evaluate(`(() => {
+    const button = document.getElementById('communityAchievementButton');
+    const rect = button?.getBoundingClientRect();
+    if (!rect) return null;
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    const hit = document.elementFromPoint(x, y);
+    return {
+      x,
+      y,
+      hitId: hit?.id || '',
+      hitInsideButton: Boolean(hit && (hit === button || button.contains(hit)))
+    };
+  })()`);
+  await clickPoint(achievementEntry);
+  await delay(800);
+  const profileOpened = await evaluate(`(() => {
+    const dialog = document.getElementById('communityProfileDialog');
+    const close = document.getElementById('communityProfileClose');
+    const rect = close?.getBoundingClientRect();
+    if (!rect) return null;
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    const hit = document.elementFromPoint(x, y);
+    window.__communityProfileClosePointerTrace = [];
+    for (const type of ['pointerdown', 'pointerup', 'click']) {
+      document.addEventListener(type, (event) => {
+        window.__communityProfileClosePointerTrace.push({
+          type,
+          targetId: event.target?.id || '',
+          targetTag: event.target?.tagName || ''
+        });
+      }, { capture: true, once: true });
+    }
+    return {
+      x,
+      y,
+      dialogHidden: dialog?.hidden,
+      profileOpenState: state.community.profileOpen,
+      profilePage: state.community.profilePage,
+      hitId: hit?.id || '',
+      hitInsideClose: Boolean(hit && (hit === close || close.contains(hit))),
+      pointerEvents: getComputedStyle(close).pointerEvents
+    };
+  })()`);
+  await clickPoint(profileOpened);
+  await delay(320);
+  const profileClosed = await evaluate(`(() => ({
+    dialogHidden: document.getElementById('communityProfileDialog')?.hidden,
+    profileOpenState: state.community.profileOpen,
+    activeElementId: document.activeElement?.id || '',
+    achievementExpanded: document.getElementById('communityAchievementButton')?.getAttribute('aria-expanded') || '',
+    pointerTrace: window.__communityProfileClosePointerTrace || []
+  }))()`);
+
   const noPlaybackOverlap = !finalOpen.playbackRect
     || finalOpen.cardRect.right <= finalOpen.playbackRect.left
     || finalOpen.cardRect.left >= finalOpen.playbackRect.right
@@ -318,6 +401,17 @@ try {
       && finalOpen.cardRect.bottom <= 900
       && noPlaybackOverlap
       && !finalOpen.horizontalOverflow,
+    mailboxBelowAvatar: finalOpen.mailboxShortcutVisible
+      && finalOpen.mailboxShortcutText === '邮箱'
+      && finalOpen.mailboxShortcutRect.top >= finalOpen.avatarRect.bottom
+      && Math.abs(finalOpen.mailboxShortcutRect.left - finalOpen.avatarRect.left) <= 1
+      && Math.abs(finalOpen.mailboxShortcutRect.width - finalOpen.avatarRect.width) <= 1
+      && finalOpen.mailboxShortcutRect.height <= 20
+      && finalOpen.mailboxShortcutBackground === 'rgba(0, 0, 0, 0)',
+    mailboxShortcutOpensMailbox: mailboxOpened.dialogHidden === false
+      && mailboxOpened.profileOpenState === true
+      && mailboxOpened.profilePage === 'mailbox',
+    collapsedMailboxHidden,
     closesFromButton: !closedByButton.cardVisible
       && closedByButton.railVisible
       && closedByButton.railExpanded === 'false'
@@ -345,7 +439,16 @@ try {
       && chain.blend === 2
       && chain.blur === 1
       && materialActive,
-    hydrationStable: reopened.directFilterCount === 1 && finalOpen.directFilterCount === 1
+    hydrationStable: reopened.directFilterCount === 1 && finalOpen.directFilterCount === 1,
+    profileCloseReceivesMouseClick: achievementEntry?.hitInsideButton
+      && profileOpened?.dialogHidden === false
+      && profileOpened?.profileOpenState === true
+      && profileOpened?.profilePage === 'achievement'
+      && profileOpened?.hitInsideClose
+      && profileOpened?.pointerEvents !== 'none'
+      && profileClosed.dialogHidden === true
+      && profileClosed.profileOpenState === false
+      && profileClosed.achievementExpanded === 'false'
   };
   const result = {
     ok: Object.values(checks).every(Boolean),
@@ -363,6 +466,12 @@ try {
     },
     initial,
     finalOpen,
+    profileCloseTrace: {
+      mailboxOpened,
+      achievementEntry,
+      profileOpened,
+      profileClosed
+    },
     entryScreenshotPath,
     screenshotPath
   };

@@ -1,4 +1,7 @@
 const mount = document.getElementById('bootLightfallMount');
+const BOOT_TARGET_FPS = 60;
+const BOOT_FRAME_BUDGET_MS = 1000 / BOOT_TARGET_FPS;
+const BOOT_RAF_LEAD_MS = 4;
 
 if (!mount) {
   window.dispatchEvent(new CustomEvent('fe-lightfall-ready'));
@@ -22,9 +25,13 @@ if (!mount) {
   }));
   let width = 1;
   let height = 1;
-  let frame = 0;
-  let lastFrame = 0;
+  let frame = null;
+  let frameTimer = null;
   let ready = false;
+  let frameClock = 0;
+  let frameCarry = 0;
+  let animationTime = 0;
+  let disposed = false;
 
   function resize() {
     const rect = mount.getBoundingClientRect();
@@ -37,11 +44,52 @@ if (!mount) {
     context.setTransform(1, 0, 0, 1, 0, 0);
   }
 
+  function cancelScheduledFrame() {
+    if (frameTimer !== null) {
+      window.clearTimeout(frameTimer);
+      frameTimer = null;
+    }
+    if (frame !== null) {
+      cancelAnimationFrame(frame);
+      frame = null;
+    }
+  }
+
+  function scheduleFrame(delay = BOOT_FRAME_BUDGET_MS) {
+    if (disposed || document.hidden || frameTimer !== null || frame !== null) return;
+    const timerDelay = Math.max(0, delay - BOOT_RAF_LEAD_MS);
+    if (timerDelay < 1) {
+      frame = requestAnimationFrame(draw);
+      return;
+    }
+    frameTimer = window.setTimeout(() => {
+      frameTimer = null;
+      if (!disposed && !document.hidden && frame === null) {
+        frame = requestAnimationFrame(draw);
+      }
+    }, timerDelay);
+  }
+
   function draw(time) {
-    frame = requestAnimationFrame(draw);
-    if (time - lastFrame < 32) return;
-    lastFrame = time;
-    const seconds = time * 0.001;
+    frame = null;
+    if (document.hidden) {
+      frameClock = time;
+      frameCarry = 0;
+      return;
+    }
+    const elapsed = frameClock
+      ? Math.min(100, Math.max(0, time - frameClock))
+      : BOOT_FRAME_BUDGET_MS;
+    frameClock = time;
+    animationTime += elapsed;
+    frameCarry = Math.min(BOOT_FRAME_BUDGET_MS * 2, frameCarry + elapsed);
+    if (frameCarry + 0.25 < BOOT_FRAME_BUDGET_MS) {
+      scheduleFrame(BOOT_FRAME_BUDGET_MS - frameCarry);
+      return;
+    }
+    frameCarry %= BOOT_FRAME_BUDGET_MS;
+
+    const seconds = animationTime * 0.001;
     const cx = width * 0.5;
     const cy = height * 0.47;
     const radius = Math.hypot(width, height) * 0.62;
@@ -93,18 +141,36 @@ if (!mount) {
       ready = true;
       window.dispatchEvent(new CustomEvent('fe-lightfall-ready'));
     }
+    scheduleFrame();
   }
 
   resize();
   const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(resize) : null;
   observer?.observe(mount);
   window.addEventListener('resize', resize, { passive: true });
-  frame = requestAnimationFrame(draw);
+  document.documentElement.dataset.bootRenderState = 'animated';
+  scheduleFrame(0);
+
+  const onVisibilityChange = () => {
+    if (document.hidden) {
+      cancelScheduledFrame();
+      frameClock = 0;
+      frameCarry = 0;
+    } else {
+      scheduleFrame(0);
+    }
+  };
+  document.addEventListener('visibilitychange', onVisibilityChange);
 
   window.addEventListener('fe-lightfall-stop', () => {
-    cancelAnimationFrame(frame);
+    disposed = true;
+    cancelScheduledFrame();
     observer?.disconnect();
     window.removeEventListener('resize', resize);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    canvas.width = 1;
+    canvas.height = 1;
     container.remove();
+    document.documentElement.dataset.bootRenderState = 'stopped';
   }, { once: true });
 }

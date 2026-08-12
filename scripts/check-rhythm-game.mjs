@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -279,6 +279,10 @@ try {
       && fileChooserEvents > 0
       && readyState.startEnabled
       && readyState.beatCount >= 8
+      && readyState.hasAudioBuffer === true
+      && readyState.decodedPcmBytes > 0
+      && readyState.hasObjectUrl === true
+      && readyState.hasAudioSource === true
       && readyState.bpm >= 60
       && readyState.bpm <= 200
       && noInputFailure.mode === 'result'
@@ -308,6 +312,11 @@ try {
       && completedState.resultRank === 'S'
       && closedState.sceneHidden
       && closedState.shellClassRemoved
+      && closedState.hasAudioBuffer === false
+      && closedState.decodedPcmBytes === 0
+      && closedState.hasObjectUrl === false
+      && closedState.hasAudioSource === false
+      && closedState.audioContextState === 'released'
       && browserErrors.length === 0
   };
   console.log(JSON.stringify(report, null, 2));
@@ -315,7 +324,16 @@ try {
 } finally {
   if (socket?.readyState === WebSocket.OPEN) socket.close();
   const browserExited = new Promise((resolve) => browser.once('exit', resolve));
-  browser.kill();
+  if (browser.pid) {
+    spawnSync('taskkill.exe', ['/PID', String(browser.pid), '/T', '/F'], {
+      stdio: 'ignore',
+      windowsHide: true
+    });
+  }
   await Promise.race([browserExited, delay(1500)]);
-  rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 150 });
+  try {
+    rmSync(profile, { recursive: true, force: true, maxRetries: 8, retryDelay: 200 });
+  } catch {
+    // Chromium can retain profile locks briefly after its process tree exits.
+  }
 }

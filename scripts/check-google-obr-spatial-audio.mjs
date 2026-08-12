@@ -330,6 +330,7 @@ try {
         nativeStream: true,
         disposed: false,
         session: 77,
+        generation: 9,
         context: state.audioAnalysis.context,
         nativeQueueUnderruns: 0,
         nativeOutputLatencySeconds: 0.1875,
@@ -344,6 +345,7 @@ try {
         ? {
             active: true,
             session: 77,
+            generation: 9,
             running: true,
             sampleRate: 48000,
             buffersQueued: 20,

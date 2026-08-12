@@ -1,4 +1,4 @@
-FE Monster QQ 音乐 API 插件 2.4.0
+FE Monster QQ 音乐 API 插件 2.4.1
 
 导入方法：
 1. 打开 FE Monster 登录窗口。

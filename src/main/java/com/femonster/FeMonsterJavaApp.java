@@ -18,8 +18,11 @@ import java.net.SocketException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.util.Enumeration;
-import java.util.concurrent.Executors;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class FeMonsterJavaApp {
     private FeMonsterJavaApp() {
@@ -28,18 +31,28 @@ public final class FeMonsterJavaApp {
     public static void main(String[] args) throws Exception {
         int preferredPort = parsePort();
         String bindHost = parseBindHost();
+        ProcessHandle desktopParent = desktopParentProcess();
         ProjectPaths paths = ProjectPaths.detect();
         Files.createDirectories(paths.dataDir);
 
         AppContext context = new AppContext(paths);
         HttpServer server = createServer(preferredPort, bindHost);
         int port = server.getAddress().getPort();
-        server.setExecutor(Executors.newCachedThreadPool());
+        ExecutorService serverExecutor = Executors.newCachedThreadPool(task -> {
+            Thread worker = new Thread(task, "fe-monster-http-worker");
+            worker.setDaemon(true);
+            return worker;
+        });
+        server.setExecutor(serverExecutor);
         ApiRoutes.register(server, context);
         server.createContext("/components/", new StaticFileHandler(paths.root));
         server.createContext("/", new StaticFileHandler(paths.webRoot));
         server.start();
-        context.musicApis.startAutostart();
+        BackendLifetime lifetime = new BackendLifetime(server, serverExecutor, context);
+        Runtime.getRuntime().addShutdownHook(new Thread(lifetime::close, "fe-monster-backend-shutdown"));
+        if (desktopParent != null) {
+            desktopParent.onExit().thenRun(lifetime::close);
+        }
 
         String url = "http://127.0.0.1:" + port + "/";
         String remoteUrl = remoteAccessUrl(bindHost, port);
@@ -67,7 +80,65 @@ public final class FeMonsterJavaApp {
             openBrowser(url);
         }
 
-        new CountDownLatch(1).await();
+        lifetime.await();
+    }
+
+    private static ProcessHandle desktopParentProcess() {
+        String raw = System.getenv("FE_MONSTER_MAIN_PID");
+        if (raw == null || raw.isBlank()) return null;
+
+        final long pid;
+        try {
+            pid = Long.parseLong(raw.trim());
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException("FE_MONSTER_MAIN_PID must be a positive process id.", e);
+        }
+        if (pid <= 0 || pid == ProcessHandle.current().pid()) {
+            throw new IllegalStateException("FE_MONSTER_MAIN_PID must identify the desktop client process.");
+        }
+        return ProcessHandle.of(pid)
+            .filter(ProcessHandle::isAlive)
+            .orElseThrow(() -> new IllegalStateException(
+                "Desktop client process " + pid + " is no longer running; Java backend will not start."
+            ));
+    }
+
+    private static final class BackendLifetime implements AutoCloseable {
+        private final HttpServer server;
+        private final ExecutorService serverExecutor;
+        private final AppContext context;
+        private final CountDownLatch stopped = new CountDownLatch(1);
+        private final AtomicBoolean closing = new AtomicBoolean(false);
+
+        private BackendLifetime(HttpServer server, ExecutorService serverExecutor, AppContext context) {
+            this.server = server;
+            this.serverExecutor = serverExecutor;
+            this.context = context;
+        }
+
+        private void await() throws InterruptedException {
+            stopped.await();
+        }
+
+        @Override
+        public void close() {
+            if (!closing.compareAndSet(false, true)) return;
+            try {
+                server.stop(1);
+                serverExecutor.shutdown();
+                try {
+                    if (!serverExecutor.awaitTermination(2, TimeUnit.SECONDS)) {
+                        serverExecutor.shutdownNow();
+                    }
+                } catch (InterruptedException e) {
+                    serverExecutor.shutdownNow();
+                    Thread.currentThread().interrupt();
+                }
+                context.close();
+            } finally {
+                stopped.countDown();
+            }
+        }
     }
 
     private static HttpServer createServer(int preferredPort, String bindHost) throws IOException {

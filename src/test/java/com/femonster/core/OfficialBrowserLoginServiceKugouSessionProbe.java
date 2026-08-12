@@ -27,11 +27,23 @@ public final class OfficialBrowserLoginServiceKugouSessionProbe {
             invoke(authenticated, Map.of("userid", "42", "token", "current-account-token")),
             "Kugou login did not recognize explicit account fields"
         );
+        require(
+            !invoke(authenticated, "qq", Map.of("p_uin", "o10001", "p_skey", "generic-sso-key")),
+            "QQ generic SSO cookies were incorrectly accepted as a QQ Music session"
+        );
+        require(
+            invoke(authenticated, "qq", Map.of("uin", "10001", "qm_keyst", "music-session-key")),
+            "QQ Music session cookies were not recognized"
+        );
         System.out.println("OfficialBrowserLoginServiceKugouSessionProbe passed");
     }
 
     private static boolean invoke(Method authenticated, Map<String, String> cookies) throws Exception {
-        return (boolean) authenticated.invoke(null, "kugou", cookies);
+        return invoke(authenticated, "kugou", cookies);
+    }
+
+    private static boolean invoke(Method authenticated, String provider, Map<String, String> cookies) throws Exception {
+        return (boolean) authenticated.invoke(null, provider, cookies);
     }
 
     private static void require(boolean condition, String message) {

@@ -11,6 +11,11 @@ const coverRegionEnd = app.indexOf("function updatePlaybackQuality", coverRegion
 const coverRegion = coverRegionStart >= 0 && coverRegionEnd > coverRegionStart
   ? app.slice(coverRegionStart, coverRegionEnd)
   : "";
+const jitterHotLoopStart = coverRegion.indexOf("if (bassJitterActive)");
+const jitterHotLoopEnd = coverRegion.indexOf("const audioGate = motionGate;", jitterHotLoopStart);
+const jitterHotLoop = jitterHotLoopStart >= 0 && jitterHotLoopEnd > jitterHotLoopStart
+  ? coverRegion.slice(jitterHotLoopStart, jitterHotLoopEnd)
+  : "";
 
 const checks = {
   floatSpeedControl: /id="diyCoverParticleFloatSpeedRange"\s+type="range"\s+min="25"\s+max="200"\s+step="1"\s+value="100"/.test(html)
@@ -26,6 +31,14 @@ const checks = {
     && /floatRate:\s*\(coverParticleNoise\(x,\s*y,\s*8\)\s*<\s*0\.5\s*\?\s*-1\s*:\s*1\)/.test(coverRegion),
   gpuAndCpuUseSameNaturalFloat: /float naturalFloat = particleFloat \* 0\.64 \+ baseNaturalWave \* 0\.28 \+ microWave \* 0\.08;/.test(coverRegion)
     && /const naturalFloat = particleFloat \* 0\.64 \+ baseNaturalWave \* 0\.28 \+ microWave \* 0\.08;/.test(coverRegion),
+  simpleTravelingFlowGpuCpuParity: /float flowWave = sin\(position\.x \* 4\.2 \+ position\.y \* 2\.3 - sheetTime \* 0\.85\);/.test(coverRegion)
+    && /float flowStrength = uAudioActive \* \(0\.006 \+ uEnergy \* 0\.006\) \* min\(uMotionScale, 1\.4\);/.test(coverRegion)
+    && /source\.y \+= flowWave \* flowStrength \* 0\.28;/.test(coverRegion)
+    && /source\.z \+= flowWave \* flowStrength;/.test(coverRegion)
+    && /const flowWave = Math\.sin\(particle\.x \* 4\.2 \+ particle\.y \* 2\.3 - sheetTime \* 0\.85\);/.test(coverRegion)
+    && /const flowStrength = audioGate \* \(0\.006 \+ energy \* 0\.006\) \* Math\.min\(motionScale, 1\.4\);/.test(coverRegion)
+    && /const flowedSourceY = sourceY \+ flowWave \* flowStrength \* 0\.28;/.test(coverRegion)
+    && /const flowedSourceZ = sourceZ \+ flowWave \* flowStrength;/.test(coverRegion),
   floatSpeedGpuCpuParity: /uniform float uFloatSpeed;/.test(coverRegion)
     && /float sheetTime = uTime;/.test(coverRegion)
     && /float particleFloatTime = uTime \* uFloatSpeed;/.test(coverRegion)
@@ -46,6 +59,29 @@ const checks = {
     && !/source\.y \+= wholeJumpOffset;/.test(coverRegion)
     && /const sourceY = particle\.y \+ particle\.bumpDriftY \* lateralWave;/.test(coverRegion)
     && /const sourceZ = particle\.z \+ depthLayerOffset \+ dynamicDepth \+ wholeJumpOffset;/.test(coverRegion),
+  lowFrequencyPerParticleJitter: /bassJitter:\s*0,/.test(app)
+    && /const bassJitterTarget = audioActive/.test(coverRegion)
+    && /smoothstep\(0\.045, 0\.84, lowFrequencyTarget\)/.test(coverRegion)
+    && /uniform float uBassJitter;/.test(coverRegion)
+    && /uniforms\.uBassJitter\.value = cover\.bassJitter;/.test(coverRegion)
+    && /source\.xy \+= bassJitterOffset;/.test(coverRegion)
+    && /const jitteredSourceX = sourceX \+ bassJitterX;/.test(coverRegion)
+    && /const jitteredSourceY = flowedSourceY \+ bassJitterY;/.test(coverRegion),
+  independentJitterPhaseDirectionAndRate: /jitterDirectionX:\s*driftX,/.test(coverRegion)
+    && /jitterDirectionY:\s*driftY,/.test(coverRegion)
+    && /jitterRate:\s*COVER_PARTICLE_BASS_JITTER_BASE_RATE/.test(coverRegion)
+    && /sheetTime \* jitterRate \+ aFloatPhase \* 1\.83 \+ aWavePhase \* 0\.37/.test(coverRegion)
+    && /vec2 jitterPerpendicular = vec2\(-jitterDirection\.y, jitterDirection\.x\);/.test(coverRegion)
+    && /sheetTime \* particle\.jitterRate[\s\S]*?particle\.floatPhase \* 1\.83 \+ particle\.wavePhase \* 0\.37/.test(jitterHotLoop)
+    && /particle\.jitterDirectionX \* jitterA - particle\.jitterDirectionY \* jitterB \* 0\.62/.test(jitterHotLoop),
+  smoothBoundedJitterReturnsToRest: /bassJitterTarget > cover\.bassJitter \? 28 : 110/.test(coverRegion)
+    && /cover\.bassJitter = clamp\(/.test(coverRegion)
+    && /if \(bassJitterTarget === 0 && cover\.bassJitter < 0\.006\) cover\.bassJitter = 0;/.test(coverRegion)
+    && /float jitterLevel = clamp\(uBassJitter, 0\.0,/.test(coverRegion)
+    && /vec2\(-1\.25\),[\s\S]*?vec2\(1\.25\)/.test(coverRegion)
+    && /COVER_PARTICLE_BASS_JITTER_DEPTH_LIMIT/.test(coverRegion),
+  jitterHotLoopHasNoFrameAllocations: jitterHotLoop.length > 0
+    && !/\bnew\s+(?:Array|Float(?:32|64)Array)|Array\.from|\.map\(|\.filter\(|\{\s*[a-zA-Z_$][\w$]*\s*:/.test(jitterHotLoop),
   naturalFloatRemainsIndependentOfLowFrequency: /float naturalFloat = particleFloat \* 0\.64 \+ baseNaturalWave \* 0\.28 \+ microWave \* 0\.08;/.test(coverRegion)
     && /const naturalFloat = particleFloat \* 0\.64 \+ baseNaturalWave \* 0\.28 \+ microWave \* 0\.08;/.test(coverRegion)
     && !/naturalFloat\s*=.*(?:lowFrequency|uWholeJump)/.test(coverRegion),

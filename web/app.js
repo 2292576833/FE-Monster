@@ -8,7 +8,8 @@ const desktopSceneRuntime = {
   applying: false,
   queuedSnapshot: null,
   publishFrame: 0,
-  channel: null
+  channel: null,
+  lyricClock: null
 };
 
 const els = {
@@ -24,17 +25,24 @@ const els = {
   communityCard: $('#communityCard'),
   communityAvatar: $('#communityAvatar'),
   communityAvatarImage: $('#communityAvatarImage'),
+  communityMailboxShortcut: $('#communityMailboxShortcut'),
   communityName: $('#communityName'),
   communityMeta: $('#communityMeta'),
   communityFeId: $('#communityFeId'),
   communityListeningDuration: $('#communityListeningDuration'),
   communityListeningSongs: $('#communityListeningSongs'),
+  communityReportButton: $('#communityReportButton'),
   communityBroadcastButton: $('#communityBroadcastButton'),
   communityCollapseButton: $('#communityCollapseButton'),
   communityAddForm: $('#communityAddForm'),
   communitySearchInput: $('#communitySearchInput'),
   communityAddButton: $('#communityAddButton'),
+  communityFriendRequests: $('#communityFriendRequests'),
+  communityFriendRequestsCount: $('#communityFriendRequestsCount'),
+  communityFriendRequestList: $('#communityFriendRequestList'),
   communityMarketButton: $('#communityMarketButton'),
+  communityAchievementButton: $('#communityAchievementButton'),
+  communityOrnamentButton: $('#communityOrnamentButton'),
   communityMessageButton: $('#communityMessageButton'),
   communityDndButton: $('#communityDndButton'),
   communityOnlineCount: $('#communityOnlineCount'),
@@ -47,6 +55,16 @@ const els = {
   communityMessageTitle: $('#communityMessageTitle'),
   communityMessageMeta: $('#communityMessageMeta'),
   communityMessageClose: $('#communityMessageClose'),
+  communityMessageBackgroundButton: $('#communityMessageBackgroundButton'),
+  communityMessageBackgroundMenu: $('#communityMessageBackgroundMenu'),
+  communityMessageBackgroundStatus: $('#communityMessageBackgroundStatus'),
+  communityMessageBackgroundRefresh: $('#communityMessageBackgroundRefresh'),
+  communityMessageBackgroundChoices: $('#communityMessageBackgroundChoices'),
+  communityMessageStage: $('#communityMessageStage'),
+  communityMessageWallpaperSurface: $('#communityMessageWallpaperSurface'),
+  communityMessageWallpaperImage: $('#communityMessageWallpaperImage'),
+  communityMessageWallpaperVideo: $('#communityMessageWallpaperVideo'),
+  communityMessageWallpaperWebFrame: $('#communityMessageWallpaperWebFrame'),
   communityMessageList: $('#communityMessageList'),
   communityMessageForm: $('#communityMessageForm'),
   communityMessageInput: $('#communityMessageInput'),
@@ -63,11 +81,46 @@ const els = {
   communityProfileMeta: $('#communityProfileMeta'),
   communityProfileSelfTab: $('#communityProfileSelfTab'),
   communityProfileGroupTab: $('#communityProfileGroupTab'),
+  communityProfileReportTab: $('#communityProfileReportTab'),
   communityProfileMarketTab: $('#communityProfileMarketTab'),
+  communityProfileSquareTab: $('#communityProfileSquareTab'),
+  communityProfileMailboxTab: $('#communityProfileMailboxTab'),
+  communityProfileAchievementTab: $('#communityProfileAchievementTab'),
+  communityProfileOrnamentTab: $('#communityProfileOrnamentTab'),
   communityProfileClose: $('#communityProfileClose'),
   communityProfileSelfPage: $('#communityProfileSelfPage'),
   communityProfileNearbyPage: $('#communityProfileNearbyPage'),
+  communityProfileReportPage: $('#communityProfileReportPage'),
   communityProfileMarketPage: $('#communityProfileMarketPage'),
+  communityProfileSquarePage: $('#communityProfileSquarePage'),
+  communityProfileMailboxPage: $('#communityProfileMailboxPage'),
+  communityMailboxUnreadDot: $('#communityMailboxUnreadDot'),
+  communityMailboxMeta: $('#communityMailboxMeta'),
+  communityMailboxRefresh: $('#communityMailboxRefresh'),
+  communityMailboxList: $('#communityMailboxList'),
+  communityMailboxStatus: $('#communityMailboxStatus'),
+  communityProfileViewerPage: $('#communityProfileViewerPage'),
+  communityProfileAchievementPage: $('#communityProfileAchievementPage'),
+  communityProfileOrnamentPage: $('#communityProfileOrnamentPage'),
+  communityListenReportMeta: $('#communityListenReportMeta'),
+  communityListenReportRefresh: $('#communityListenReportRefresh'),
+  communityListenReportHighlight: $('#communityListenReportHighlight'),
+  communityListenReportAvatar: $('#communityListenReportAvatar'),
+  communityListenReportLongestName: $('#communityListenReportLongestName'),
+  communityListenReportLongestTime: $('#communityListenReportLongestTime'),
+  communityListenReportTotalTime: $('#communityListenReportTotalTime'),
+  communityListenReportSessions: $('#communityListenReportSessions'),
+  communityListenReportPartners: $('#communityListenReportPartners'),
+  communityListenReportList: $('#communityListenReportList'),
+  communityAchievementGrid: $('#communityAchievementGrid'),
+  communityAchievementMeta: $('#communityAchievementMeta'),
+  communityAchievementOrnamentsButton: $('#communityAchievementOrnamentsButton'),
+  communityOrnamentMeta: $('#communityOrnamentMeta'),
+  communityOrnamentUnequip: $('#communityOrnamentUnequip'),
+  communityOrnamentPreviewAvatar: $('#communityOrnamentPreviewAvatar'),
+  communityOrnamentEquippedName: $('#communityOrnamentEquippedName'),
+  communityOrnamentEquippedMeta: $('#communityOrnamentEquippedMeta'),
+  communityOrnamentList: $('#communityOrnamentList'),
   communityProfileAvatar: $('#communityProfileAvatar'),
   communityProfileDisplayName: $('#communityProfileDisplayName'),
   communityProfileId: $('#communityProfileId'),
@@ -140,10 +193,6 @@ const els = {
   renderClarityDetail: $('#renderClarityDetail'),
   xAudio2Toggle: $('#xAudio2Toggle'),
   x3DAudioToggle: $('#x3DAudioToggle'),
-  gestureControlToggle: $('#gestureControlToggle'),
-  gestureControlStatus: $('#gestureControlStatus'),
-  gestureWebcamButton: $('#gestureWebcamButton'),
-  gestureCameraButton: $('#gestureCameraButton'),
   cursorSkinSelect: $('#cursorSkinSelect'),
   cursorImportButton: $('#cursorImportButton'),
   cursorImportInput: $('#cursorImportInput'),
@@ -264,6 +313,10 @@ const els = {
   textAnimationSettingsGroup: $('#textAnimationSettingsGroup'),
   textLyricsToggle: $('#textLyricsToggle'),
   textLyricsValue: $('#textLyricsValue'),
+  textLyricHighlightMode: $('#textLyricHighlightMode'),
+  textLyricHighlightModeValue: $('#textLyricHighlightModeValue'),
+  textHandwrittenMoodToggle: $('#textHandwrittenMoodToggle'),
+  textHandwrittenMoodValue: $('#textHandwrittenMoodValue'),
   textLayoutMode: $('#textLayoutMode'),
   textLayoutModeValue: $('#textLayoutModeValue'),
   textFlowIntensity: $('#textFlowIntensity'),
@@ -359,7 +412,37 @@ const els = {
   sonicCenterColorInput: $('#sonicCenterColorInput'),
   sonicCoreColorInput: $('#sonicCoreColorInput'),
   sonicOuterColorInput: $('#sonicOuterColorInput'),
-  sonicAllGroundFloatToggle: $('#sonicAllGroundFloatToggle'),
+  sonicGroundMoundsToggle: $('#sonicGroundMoundsToggle'),
+  sonicGroundPaletteMode: $('#sonicGroundPaletteMode'),
+  sonicGroundFollowCoverButton: $('#sonicGroundFollowCoverButton'),
+  sonicGroundColorInput: $('#sonicGroundColorInput'),
+  sonicGroundEmissionRange: $('#sonicGroundEmissionRange'),
+  sonicGroundEmissionValue: $('#sonicGroundEmissionValue'),
+  sonicGroundMoundHeightRange: $('#sonicGroundMoundHeightRange'),
+  sonicGroundMoundHeightValue: $('#sonicGroundMoundHeightValue'),
+  sonicGroundMoundRadiusRange: $('#sonicGroundMoundRadiusRange'),
+  sonicGroundMoundRadiusValue: $('#sonicGroundMoundRadiusValue'),
+  sonicRainToggle: $('#sonicRainToggle'),
+  sonicRainIntensityRange: $('#sonicRainIntensityRange'),
+  sonicRainIntensityValue: $('#sonicRainIntensityValue'),
+  sonicRainSpeedRange: $('#sonicRainSpeedRange'),
+  sonicRainSpeedValue: $('#sonicRainSpeedValue'),
+  sonicRainWindRange: $('#sonicRainWindRange'),
+  sonicRainWindValue: $('#sonicRainWindValue'),
+  sonicRainLengthRange: $('#sonicRainLengthRange'),
+  sonicRainLengthValue: $('#sonicRainLengthValue'),
+  sonicRainWidthRange: $('#sonicRainWidthRange'),
+  sonicRainWidthValue: $('#sonicRainWidthValue'),
+  sonicRainRippleIntensityRange: $('#sonicRainRippleIntensityRange'),
+  sonicRainRippleIntensityValue: $('#sonicRainRippleIntensityValue'),
+  sonicRainRippleSizeRange: $('#sonicRainRippleSizeRange'),
+  sonicRainRippleSizeValue: $('#sonicRainRippleSizeValue'),
+  sonicRainRippleLifeRange: $('#sonicRainRippleLifeRange'),
+  sonicRainRippleLifeValue: $('#sonicRainRippleLifeValue'),
+  sonicRainWetReflectanceRange: $('#sonicRainWetReflectanceRange'),
+  sonicRainWetReflectanceValue: $('#sonicRainWetReflectanceValue'),
+  sonicRainWetGlowRange: $('#sonicRainWetGlowRange'),
+  sonicRainWetGlowValue: $('#sonicRainWetGlowValue'),
   sonicFountainToggle: $('#sonicFountainToggle'),
   sonicFountainColorInput: $('#sonicFountainColorInput'),
   sonicStarfieldToggle: $('#sonicStarfieldToggle'),
@@ -391,6 +474,10 @@ const els = {
   sonicFollowCoverButton: $('#sonicFollowCoverButton'),
   sonicBrightnessRange: $('#sonicBrightnessRange'),
   sonicBrightnessValue: $('#sonicBrightnessValue'),
+  sonicFluorescenceRange: $('#sonicFluorescenceRange'),
+  sonicFluorescenceValue: $('#sonicFluorescenceValue'),
+  sonicFluorescenceScatterRange: $('#sonicFluorescenceScatterRange'),
+  sonicFluorescenceScatterValue: $('#sonicFluorescenceScatterValue'),
   sonicExposureRange: $('#sonicExposureRange'),
   sonicExposureValue: $('#sonicExposureValue'),
   sonicColumnHeightRange: $('#sonicColumnHeightRange'),
@@ -530,6 +617,8 @@ const els = {
   blurLyricMount: $('#blurLyricMount'),
   playbackLyricText: $('#playbackLyricText'),
   playbackLyricBack: $('#playbackLyricBack'),
+  wordGlowLyricPrevious: $('#wordGlowLyricPrevious'),
+  wordGlowLyricKeyword: $('#wordGlowLyricKeyword'),
   playbackLyricSubtitle: $('#playbackLyricSubtitle'),
   qishuiPlaybackCard: $('#qishuiPlaybackCard'),
   qishuiPlaybackPhone: $('#qishuiPlaybackPhone'),
@@ -579,6 +668,7 @@ const els = {
   volumeRange: $('#volumeRange'),
   volumeLabel: $('#volumeLabel'),
   toast: $('#toast'),
+  updateNoticeButton: $('#updateNoticeButton'),
   updateDialog: $('#updateDialog'),
   updateVersion: $('#updateVersion'),
   updateNotes: $('#updateNotes'),
@@ -597,14 +687,36 @@ const MOBILE_RENDER_TARGET = Boolean(
   ANDROID_CLIENT || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '')
 );
 const RENDER_PROFILE = detectRenderProfile();
+// Sonic relies on hundreds of narrow, high-contrast column silhouettes. Keep
+// native MSAA on for desktop hardware, while preserving the existing economy
+// fallback for devices where the extra samples would reduce responsiveness.
+const SONIC_HARDWARE_ANTIALIAS = !MOBILE_RENDER_TARGET || RENDER_PROFILE.tier !== 'economy';
 document.documentElement.dataset.renderTier = RENDER_PROFILE.tier;
 const PLAYBACK_REST_YAW = 0.22;
 const PLAYBACK_REST_PITCH = -0.16;
 const COVER_PARTICLE_MICRO_WAVE_SEGMENTS = 200;
+const COVER_PARTICLE_BASS_JITTER_MAX = 1;
+const COVER_PARTICLE_BASS_JITTER_AMPLITUDE = 0.008;
+const CLIENT_UPDATE_GITHUB_API = 'https://api.github.com/repos/2292576833/FE-Monster/releases/latest';
+const CLIENT_UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
+const COVER_PARTICLE_BASS_JITTER_DEPTH = 0.004;
+const COVER_PARTICLE_BASS_JITTER_DEPTH_LIMIT = 0.0054;
+const COVER_PARTICLE_BASS_JITTER_BASE_RATE = 104;
+const COVER_PARTICLE_CPU_FALLBACK_MAX_PARTICLES = 4096;
+const COVER_PARTICLE_CPU_FALLBACK_REDUCED_MAX_PARTICLES = 2048;
+const COVER_PARTICLE_CPU_FALLBACK_MAX_FPS = 30;
+const COVER_PARTICLE_CPU_SAFE_FALLBACK_MAX_PARTICLES = 1600;
+const COVER_PARTICLE_CPU_SAFE_FALLBACK_MAX_FPS = 12;
 const PLAYLIST_SONG_RENDER_RADIUS = 5;
 const PLAYLIST_SONG_RENDER_BUFFER = 2;
+const PLAYLIST_SONG_SLOT_CLASSES = Object.freeze([
+  'song-slot-m5', 'song-slot-m4', 'song-slot-m3', 'song-slot-m2', 'song-slot-m1',
+  'song-slot-0',
+  'song-slot-p1', 'song-slot-p2', 'song-slot-p3', 'song-slot-p4', 'song-slot-p5'
+]);
 const PLAYLIST_COVER_HYDRATION_RADIUS = 3;
 const LOCAL_PLAYLIST_ID = 'local-import';
+const MARKET_MUSIC_LIBRARY_KEY = 'fe-monster-creative-market-music-v1';
 const LOCAL_AUDIO_EXTENSIONS = new Set([
   'mp3', 'flac', 'wav', 'wave', 'm4a', 'aac', 'ogg', 'oga', 'opus', 'webm', 'mp4', 'mka',
   'wma', 'ape', 'alac', 'aif', 'aiff', 'aifc', 'amr', 'caf', 'ac3', 'eac3', 'dts', 'tta',
@@ -623,6 +735,9 @@ const SONIC_TOPOGRAPHY_HALF = (SONIC_TOPOGRAPHY_GRID * SONIC_TOPOGRAPHY_SPACING)
 const SONIC_LOW_FREQUENCY_BAND_COUNT = 512;
 const SONIC_LOW_FREQUENCY_MIN_HZ = 20;
 const SONIC_LOW_FREQUENCY_MAX_HZ = 150;
+const AUDIO_SPECTRUM_BAND_COUNT = 8;
+const AUDIO_SPECTRUM_UNMAPPED = 255;
+const AUDIO_BYTE_TO_UNIT = 1 / 255;
 const SONIC_BASS_COLUMN_CLUSTER = Object.freeze({
   count: 1793,
   radius: 24,
@@ -630,12 +745,63 @@ const SONIC_BASS_COLUMN_CLUSTER = Object.freeze({
   feather: 6,
   coreRadius: 3,
   coreFeather: 6,
-  coreHeightScale: 3,
+  coreHeightScale: 4.2,
   innerHeightScale: 1.9,
   outerHeightScale: 0.58
 });
-const SONIC_BASS_COLUMN_ATTACK_SECONDS = 0.07;
+const SONIC_GROUND_MOUND_GRID_SPACING = 18;
+const SONIC_GROUND_MOUND_GRID_EXTENT = 90;
+const SONIC_GROUND_MOUND_GRID_SIZE = Math.round(
+  SONIC_GROUND_MOUND_GRID_EXTENT * 2 / SONIC_GROUND_MOUND_GRID_SPACING
+) + 1;
+// At the maximum width, a peak reaches less than two grid intervals. Looking
+// at the nearest 5x5 cells is therefore complete while avoiding 121 checks for
+// every terrain instance when the width slider changes.
+const SONIC_GROUND_MOUND_NEIGHBOR_CELLS = 2;
+const SONIC_GROUND_MOUND_CENTERS = Object.freeze((() => {
+  const centers = [];
+  let fixedIndex = 0;
+  for (
+    let z = -SONIC_GROUND_MOUND_GRID_EXTENT;
+    z <= SONIC_GROUND_MOUND_GRID_EXTENT;
+    z += SONIC_GROUND_MOUND_GRID_SPACING
+  ) {
+    for (
+      let x = -SONIC_GROUND_MOUND_GRID_EXTENT;
+      x <= SONIC_GROUND_MOUND_GRID_EXTENT;
+      x += SONIC_GROUND_MOUND_GRID_SPACING
+    ) {
+      const radiusNoise = sonicRainHash(x * 0.071 + fixedIndex, z * 0.063 - fixedIndex * 0.37);
+      const heightNoise = sonicRainHash(x * 0.093 - fixedIndex * 0.21, z * 0.081 + fixedIndex);
+      centers.push(Object.freeze({
+        x,
+        z,
+        // Even the smallest permitted radius overlaps the neighbouring peak.
+        radiusScale: 0.96 + radiusNoise * 0.24,
+        heightScale: 0.68 + heightNoise * 0.46
+      }));
+      fixedIndex += 1;
+    }
+  }
+  return centers;
+})());
+const SONIC_BASS_COLUMN_ATTACK_SECONDS = 0.05;
+const SONIC_BASS_COLUMN_IMPACT_ATTACK_SECONDS = 0.033;
 const SONIC_BASS_COLUMN_RELEASE_SECONDS = 0.22;
+const SONIC_LOW_FREQUENCY_IMPACT_CURVE_STRENGTH = 0.62;
+const SONIC_CENTER_COLUMN_CORE_LOW_FREQUENCY_GAIN = 2.45;
+const SONIC_CENTER_COLUMN_SOFT_KNEE_RATIO = 0.82;
+const SONIC_GROUND_ENTRANCE_SECONDS = MOBILE_RENDER_TARGET ? 1.65 : 2.15;
+const SONIC_AUDIO_COLUMN_MAX_LIFT = MOBILE_RENDER_TARGET ? 2.15 : 2.8;
+const SONIC_CENTER_COLUMN_MAX_LIFT = MOBILE_RENDER_TARGET ? 9.6 : 13.2;
+const SONIC_CENTER_COLUMN_PEDESTAL_MAX_LIFT = 8.45;
+const SONIC_GROUND_MOUND_COLUMN_LEVELS = 5;
+const SONIC_GROUND_MOUND_COLUMN_PHASE_BUCKETS = 4;
+const SONIC_GROUND_MOUND_COLUMN_STATIC_MIN = 0.42;
+const SONIC_GROUND_MOUND_COLUMN_STATIC_MAX = 1.62;
+const SONIC_GROUND_MOUND_COLUMN_AUDIO_MIN = 0.28;
+const SONIC_GROUND_MOUND_COLUMN_AUDIO_MAX = 1.12;
+const SONIC_GROUND_MOUND_COLUMN_MAX_RISE = 2.95;
 const SONIC_TOPOGRAPHY_RIPPLES = 10;
 const SONIC_TOPOGRAPHY_METEORS = reducedMotion ? Math.min(10, RENDER_PROFILE.topographyMeteors) : RENDER_PROFILE.topographyMeteors;
 const SONIC_TOPOGRAPHY_PARTICLES = 640;
@@ -648,6 +814,25 @@ const SONIC_STARFIELD_LAYERS = Object.freeze([
 const SONIC_GALAXY_PARTICLES = 5200;
 const SONIC_WATER_MIST_LAYER_COUNT = 8;
 const SONIC_TYNDALL_BEAM_COUNT = 9;
+const SONIC_RAIN_QUALITY = Object.freeze((() => {
+  if (reducedMotion) return { streaks: 160, ripples: 24, splashes: 32, splashPerImpact: 1 };
+  if (MOBILE_RENDER_TARGET && RENDER_PROFILE.tier === 'economy') {
+    return { streaks: 240, ripples: 28, splashes: 40, splashPerImpact: 1 };
+  }
+  if (MOBILE_RENDER_TARGET) return { streaks: 380, ripples: 36, splashes: 56, splashPerImpact: 2 };
+  if (RENDER_PROFILE.tier === 'high') return { streaks: 980, ripples: 80, splashes: 144, splashPerImpact: 3 };
+  if (RENDER_PROFILE.tier === 'economy') return { streaks: 420, ripples: 40, splashes: 64, splashPerImpact: 2 };
+  return { streaks: 720, ripples: 64, splashes: 104, splashPerImpact: 3 };
+})());
+const SONIC_RAIN_DROP_STRIDE = 6;
+const SONIC_RAIN_RIPPLE_STRIDE = 7;
+const SONIC_RAIN_SPLASH_STRIDE = 9;
+// The terrain shader is fully transparent at radius 78. Keep rain slightly
+// inside that edge so streaks, impacts and wet light never float over the void.
+const SONIC_RAIN_GROUND_RADIUS = Math.max(
+  SONIC_TOPOGRAPHY_SPACING,
+  Math.min(76, SONIC_TOPOGRAPHY_HALF - SONIC_TOPOGRAPHY_SPACING)
+);
 // One shared optical budget keeps the beam, halo, mist and bounced-light
 // receivers from flattening the scene when all controls are raised together.
 const SONIC_TYNDALL_TOTAL_ENERGY_CAP = 0.18;
@@ -718,6 +903,7 @@ const PLAYBACK_QUALITY_OPTIONS = {
   ]
 };
 const PLAYBACK_QUALITY_PREFS_KEY = 'fe-monster-playback-quality-prefs-v1';
+const ACTIVE_PROVIDER_PREFERENCE_KEY = 'fe-monster-active-provider-v1';
 const RENDER_CLARITY_PREFS_KEY = 'fe-monster-render-clarity-v1';
 const PRESET_FSR_PREFS_KEY = 'fe-monster-preset-fsr-v1';
 const TEXT_PALETTE_PREFS_KEY = 'fe-monster-text-preset-palettes-v1';
@@ -750,14 +936,15 @@ const CURSOR_SKINS = Object.freeze({
   pixel: Object.freeze({ label: '像素白', url: 'assets/cursors/pixel-arrow.svg', hotspot: '2 2' }),
   gold: Object.freeze({ label: '鎏金锐角', url: 'assets/cursors/gold-arrow.svg', hotspot: '3 2' })
 });
-const CURSOR_TRAIL_EFFECTS = Object.freeze(['off', 'glow', 'comet', 'stardust', 'ribbon', 'prism']);
+const CURSOR_TRAIL_EFFECTS = Object.freeze(['off', 'glow', 'comet', 'stardust', 'ribbon', 'prism', 'custom']);
 const CURSOR_TRAIL_LABELS = Object.freeze({
   off: '关闭',
   glow: '柔光轨迹',
   comet: '流星拖尾',
   stardust: '星尘粒子',
   ribbon: '双层丝带',
-  prism: '棱镜彩光'
+  prism: '棱镜彩光',
+  custom: '创作市场尾迹'
 });
 const CURSOR_MOTION_TARGET_SELECTOR = [
   'button:not(:disabled)',
@@ -767,7 +954,7 @@ const CURSOR_MOTION_TARGET_SELECTOR = [
   '[role="button"]:not([aria-disabled="true"])',
   '.runtime-cursor-preview'
 ].join(',');
-const SONIC_CAMERA_FRAMING_VERSION = 4;
+const SONIC_CAMERA_FRAMING_VERSION = 5;
 const GOOGLE_OBR_PREFS_KEY = 'fe-monster-google-obr-spatial-audio-v1';
 const GOOGLE_OBR_BACKEND = 'google-obr-official';
 const GOOGLE_OBR_NATIVE_BACKEND = 'native-rust-x3d-obr-xaudio2';
@@ -793,6 +980,8 @@ const DEFAULT_TEXT_PRESET = 'depth';
 const DEFAULT_TEXT_COMPOSER_SETTINGS = Object.freeze({
   lyricsEnabled: true,
   layoutMode: 'single',
+  lyricHighlightMode: 'rolling',
+  handwrittenMoodEnabled: false,
   flowIntensity: 24,
   echoLayers: 5,
   echoSpacing: 8,
@@ -826,6 +1015,10 @@ const TEXT_GLITCH_TUNING_SETTING_KEYS = Object.freeze([
   'glitchSliceDensity',
   'glitchBeatSensitivity',
   'glitchBeatDuration'
+]);
+const TEXT_SINGLE_ROW_ANIMATION_SETTING_KEYS = Object.freeze([
+  'lyricHighlightMode',
+  'handwrittenMoodEnabled'
 ]);
 const TEXT_GLITCH_BEAT_CLASSES = Object.freeze([
   'is-text-glitch-beat-a',
@@ -888,11 +1081,37 @@ const TEXT_COMPOSER_TEMPLATE_SETTINGS = Object.freeze({
     glitchEnabled: true
   })
 });
+const FOCUS_ECHO_LAYER_PROFILES = Object.freeze([
+  null,
+  Object.freeze({ x: -3, y: 1.5, z: 38, opacity: 0.24, blur: 4.8, scaleX: 1.09, scale: 1.17 }),
+  Object.freeze({ x: 2, y: 2.5, z: 16, opacity: 0.15, blur: 8.5, scaleX: 1.15, scale: 1.32 }),
+  Object.freeze({ x: 0, y: 3.5, z: -8, opacity: 0.09, blur: 13, scaleX: 1.22, scale: 1.48 }),
+  Object.freeze({ x: 1, y: 4.5, z: -30, opacity: 0.055, blur: 18, scaleX: 1.29, scale: 1.64 }),
+  Object.freeze({ x: -1, y: 5.5, z: -52, opacity: 0.035, blur: 24, scaleX: 1.36, scale: 1.8 })
+]);
+const FOCUS_ECHO_REFERENCE_SPACING = 22;
+const FOCUS_ECHO_REFERENCE_DEPTH = 90;
+const FOCUS_ECHO_TRANSITION_CLEANUP_MS = 1080;
 const DEFAULT_SONIC_SETTINGS = Object.freeze({
   centerColor: null,
   coreColor: null,
   outerColor: null,
-  allGroundFloatEnabled: false,
+  groundMoundsEnabled: true,
+  groundColor: null,
+  groundEmission: 0.4,
+  groundMoundHeight: 1.45,
+  groundMoundRadius: 18,
+  rainEnabled: true,
+  rainIntensity: 0.72,
+  rainSpeed: 1,
+  rainWind: 0.08,
+  rainLength: 1,
+  rainWidth: 0.72,
+  rainRippleIntensity: 0.72,
+  rainRippleSize: 1,
+  rainRippleLife: 1,
+  rainWetReflectance: 0.62,
+  rainWetGlow: 0.42,
   fountainEnabled: false,
   fountainColor: '#ffffff',
   starfieldEnabled: true,
@@ -914,6 +1133,8 @@ const DEFAULT_SONIC_SETTINGS = Object.freeze({
   coverBackgroundEnabled: true,
   coverBackgroundMix: 0.62,
   brightness: 1,
+  fluorescence: 0.72,
+  fluorescenceScatter: 0.55,
   exposure: 0,
   columnHeight: 1,
   fov: SONIC_TOPOGRAPHY_CAMERA.fov,
@@ -1040,7 +1261,35 @@ const PRESET_FSR_VERSIONS = Object.freeze(['1', '2', '3', '4']);
 const RENDER_CLARITY_MIN = 50;
 const RENDER_CLARITY_MAX = 125;
 const RENDER_CLARITY_AUTO_MAX = 100;
+const RENDER_CLARITY_SAFE_FALLBACK_MAX = 65;
 const RENDER_CLARITY_STEP = 5;
+
+function normalizeActiveProviderPreference(value) {
+  const provider = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return Object.prototype.hasOwnProperty.call(MUSIC_PROVIDERS, provider) ? provider : 'netease';
+}
+
+function loadActiveProviderPreference() {
+  try {
+    return normalizeActiveProviderPreference(
+      window.localStorage.getItem(ACTIVE_PROVIDER_PREFERENCE_KEY)
+    );
+  } catch (error) {
+    return 'netease';
+  }
+}
+
+function saveActiveProviderPreference(provider) {
+  const normalized = normalizeActiveProviderPreference(provider);
+  try {
+    window.localStorage.setItem(ACTIVE_PROVIDER_PREFERENCE_KEY, normalized);
+  } catch (error) {
+  }
+  scheduleClientPreferencesSync();
+  return normalized;
+}
+
+const INITIAL_ACTIVE_PROVIDER_PREFERENCE = loadActiveProviderPreference();
 
 function normalizeRenderClarityPercent(value, fallback = 100) {
   const numeric = Number(value);
@@ -1220,6 +1469,10 @@ function normalizeTextComposerSettings(source = {}) {
     layoutMode: ['single', 'multi'].includes(source?.layoutMode)
       ? source.layoutMode
       : DEFAULT_TEXT_COMPOSER_SETTINGS.layoutMode,
+    lyricHighlightMode: ['rolling', 'shine'].includes(source?.lyricHighlightMode)
+      ? source.lyricHighlightMode
+      : DEFAULT_TEXT_COMPOSER_SETTINGS.lyricHighlightMode,
+    handwrittenMoodEnabled: source?.handwrittenMoodEnabled === true,
     flowIntensity: bounded('flowIntensity', 0, 100),
     echoLayers: bounded('echoLayers', 0, 5),
     echoSpacing: bounded('echoSpacing', 0, 48),
@@ -1377,7 +1630,22 @@ function normalizeSonicSettings(source = {}) {
     centerColor: normalizeOptionalColor(source?.centerColor),
     coreColor: normalizeOptionalColor(source?.coreColor),
     outerColor: normalizeOptionalColor(source?.outerColor),
-    allGroundFloatEnabled: source?.allGroundFloatEnabled === true,
+    groundMoundsEnabled: source?.groundMoundsEnabled !== false,
+    groundColor: normalizeOptionalColor(source?.groundColor),
+    groundEmission: bounded(source?.groundEmission, DEFAULT_SONIC_SETTINGS.groundEmission, 0, 1.5),
+    groundMoundHeight: bounded(source?.groundMoundHeight, DEFAULT_SONIC_SETTINGS.groundMoundHeight, 0, 4),
+    groundMoundRadius: bounded(source?.groundMoundRadius, DEFAULT_SONIC_SETTINGS.groundMoundRadius, 16, 30),
+    rainEnabled: source?.rainEnabled !== false,
+    rainIntensity: bounded(source?.rainIntensity, DEFAULT_SONIC_SETTINGS.rainIntensity, 0, 1.5),
+    rainSpeed: bounded(source?.rainSpeed, DEFAULT_SONIC_SETTINGS.rainSpeed, 0.4, 2),
+    rainWind: bounded(source?.rainWind, DEFAULT_SONIC_SETTINGS.rainWind, -1, 1),
+    rainLength: bounded(source?.rainLength, DEFAULT_SONIC_SETTINGS.rainLength, 0.4, 2),
+    rainWidth: bounded(source?.rainWidth, DEFAULT_SONIC_SETTINGS.rainWidth, 0.35, 1.8),
+    rainRippleIntensity: bounded(source?.rainRippleIntensity, DEFAULT_SONIC_SETTINGS.rainRippleIntensity, 0, 1.5),
+    rainRippleSize: bounded(source?.rainRippleSize, DEFAULT_SONIC_SETTINGS.rainRippleSize, 0.4, 2),
+    rainRippleLife: bounded(source?.rainRippleLife, DEFAULT_SONIC_SETTINGS.rainRippleLife, 0.4, 2),
+    rainWetReflectance: bounded(source?.rainWetReflectance, DEFAULT_SONIC_SETTINGS.rainWetReflectance, 0, 1.5),
+    rainWetGlow: bounded(source?.rainWetGlow, DEFAULT_SONIC_SETTINGS.rainWetGlow, 0, 1.5),
     fountainEnabled: source?.fountainEnabled === true,
     fountainColor: normalizeColor(source?.fountainColor, DEFAULT_SONIC_SETTINGS.fountainColor),
     starfieldEnabled: source?.starfieldEnabled !== false,
@@ -1399,6 +1667,13 @@ function normalizeSonicSettings(source = {}) {
     coverBackgroundEnabled: source?.coverBackgroundEnabled !== false,
     coverBackgroundMix: bounded(source?.coverBackgroundMix, DEFAULT_SONIC_SETTINGS.coverBackgroundMix, 0, 1),
     brightness: bounded(source?.brightness, DEFAULT_SONIC_SETTINGS.brightness, 0.4, 2),
+    fluorescence: bounded(source?.fluorescence, DEFAULT_SONIC_SETTINGS.fluorescence, 0, 1.5),
+    fluorescenceScatter: bounded(
+      source?.fluorescenceScatter,
+      DEFAULT_SONIC_SETTINGS.fluorescenceScatter,
+      0,
+      1.5
+    ),
     exposure: bounded(source?.exposure, DEFAULT_SONIC_SETTINGS.exposure, -1.5, 1.5),
     columnHeight: bounded(source?.columnHeight, DEFAULT_SONIC_SETTINGS.columnHeight, 0.5, 2.5),
     fov: bounded(source?.fov, DEFAULT_SONIC_SETTINGS.fov, 42, 68),
@@ -1447,6 +1722,10 @@ function loadCoverParticlePreferences() {
 const INITIAL_COVER_PARTICLE_PREFERENCES = loadCoverParticlePreferences();
 
 function saveCoverParticlePreferences() {
+  if (communityScenePersistenceSuppressed()) {
+    scheduleCommunitySceneSync();
+    return;
+  }
   try {
     window.localStorage.setItem(COVER_PARTICLE_PREFS_KEY, JSON.stringify({
       backgroundEnabled: !!state.coverParticle.backgroundEnabled,
@@ -1456,26 +1735,97 @@ function saveCoverParticlePreferences() {
   } catch (error) {}
 }
 
+const VISUAL_SETTINGS_PREFS_KEY = 'fe-monster-visual-settings-v1';
+const VISUAL_SETTINGS_PREFS_VERSION = 1;
+
+function normalizeVisualSettingsPreferences(source = {}) {
+  const diyPage = ['wallpaper', 'text', 'preset'].includes(source.diyPage)
+    ? source.diyPage
+    : 'wallpaper';
+  const textPreset = TEXT_PALETTE_PRESET_IDS.includes(source.textPreset)
+    ? source.textPreset
+    : DEFAULT_TEXT_PRESET;
+  const diyCardYaw = Number(source.diyCardYaw);
+  const diyCardPitch = Number(source.diyCardPitch);
+  return {
+    version: VISUAL_SETTINGS_PREFS_VERSION,
+    lyricBrightness: clamp(Number(source.lyricBrightness) || 1.12, 0.6, 1.8),
+    lyricSpeed: clamp(Number(source.lyricSpeed) || 1, 0.6, 1.8),
+    cubeIntensity: clamp(Number(source.cubeIntensity) || 1.1, 0.4, 1.8),
+    diyPage,
+    diyPreset: normalizeDiyPreset(source.diyPreset || 'wallpaper'),
+    scenePreset: normalizeDiyPreset(source.scenePreset || 'lyric'),
+    textPreset,
+    lastSelectableTextPreset: TEXT_PALETTE_PRESET_IDS.includes(source.lastSelectableTextPreset)
+      ? source.lastSelectableTextPreset
+      : DEFAULT_TEXT_PRESET,
+    freeCubeMode: source.freeCubeMode === 'heart' ? 'heart' : 'free',
+    freeCubeBackgroundEnabled: source.freeCubeBackgroundEnabled !== false,
+    chladniMode: source.chladniMode === 'plane' ? 'plane' : 'cube',
+    stormLightingMode: ['day', 'sunset', 'evening', 'realtime'].includes(source.stormLightingMode)
+      ? source.stormLightingMode
+      : 'sunset',
+    stormWeatherMode: source.stormWeatherMode === 'on' ? 'on' : 'auto',
+    diyCardYaw: clamp(Number.isFinite(diyCardYaw) ? diyCardYaw : -8, -42, 42),
+    diyCardPitch: clamp(Number.isFinite(diyCardPitch) ? diyCardPitch : 2, -18, 18)
+  };
+}
+
+function loadVisualSettingsPreferences() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(VISUAL_SETTINGS_PREFS_KEY) || '{}');
+    return normalizeVisualSettingsPreferences(stored);
+  } catch (error) {
+    return normalizeVisualSettingsPreferences();
+  }
+}
+
+const INITIAL_VISUAL_SETTINGS_PREFERENCES = loadVisualSettingsPreferences();
+
 const FAVORITE_SONGS_KEY = 'fe-monster-favorite-songs-v1';
 const SEARCH_SUGGESTION_CACHE_MS = 60 * 1000;
 const QISHUI_GUEST_MATCH_CACHE_MS = 10 * 60 * 1000;
+const SEARCH_SUGGESTION_CACHE_LIMIT = 64;
+const QISHUI_GUEST_MATCH_CACHE_LIMIT = 128;
+
+function setBoundedCacheValue(cache, key, value, limit) {
+  if (!(cache instanceof Map) || !key) return;
+  cache.delete(key);
+  cache.set(key, value);
+  while (cache.size > limit) {
+    const oldestKey = cache.keys().next().value;
+    if (oldestKey === undefined) break;
+    cache.delete(oldestKey);
+  }
+}
 const QISHUI_GUEST_FALLBACK_PROVIDERS = Object.freeze(['netease', 'qq', 'kugou']);
 const PLAYLIST_FAVORITE_CACHE_MS = 60 * 1000;
-const COMMUNITY_BIO_KEY = 'fe-monster-community-bio-v1';
+const COMMUNITY_BIOS_KEY = 'fe-monster-community-bios-v2';
+const COMMUNITY_BIO_IDENTITY_LIMIT = 12;
 const COMMUNITY_MESSAGE_DND_KEY = 'fe-monster-community-message-dnd-v1';
+const COMMUNITY_MESSAGE_BACKGROUND_KEY = 'fe-monster-community-chat-wallpaper-v1';
 const COMMUNITY_CARD_COLLAPSED_KEY = 'fe-monster-community-card-collapsed-v1';
-const COMMUNITY_FAVORITE_LISTEN_KEY = 'fe-monster-community-favorite-listen-v1';
-const COMMUNITY_LISTENING_STATS_KEY = 'fe-monster-community-listening-stats-v1';
+const COMMUNITY_FAVORITE_LISTEN_KEY = 'fe-monster-community-favorite-listen-v2';
+const COMMUNITY_FAVORITE_LISTEN_LEGACY_KEY = 'fe-monster-community-favorite-listen-v1';
+const COMMUNITY_LISTENING_STATS_KEY = 'fe-monster-community-listening-stats-v2';
+const COMMUNITY_LISTENING_STATS_LEGACY_KEY = 'fe-monster-community-listening-stats-v1';
+const COMMUNITY_TOGETHER_REPORT_KEY = 'fe-monster-community-together-report-v2';
+const COMMUNITY_TOGETHER_REPORT_LEGACY_KEY = 'fe-monster-community-together-report-v1';
+const COMMUNITY_LOCAL_IDENTITY_LIMIT = 12;
+const COMMUNITY_ORNAMENT_CACHE_KEY = 'fe-monster-community-ornament-cache-v1';
 const COMMUNITY_HISTORY_LEDGER_KEY = 'fe-monster-community-history-ledger-v1';
 const COMMUNITY_HISTORY_IDENTITY_LIMIT = 6;
 const COMMUNITY_HISTORY_SEEN_LIMIT = 512;
 const COMMUNITY_API_RETRY_DELAYS = Object.freeze([120, 320, 700, 1400]);
 const COMMUNITY_API_TIMEOUT_MS = 8000;
+const COMMUNITY_STATE_RETRY_DELAYS = Object.freeze([300]);
+const COMMUNITY_STATE_TIMEOUT_MS = 5000;
 const COMMUNITY_EVENT_STALE_MS = 35000;
 const COMMUNITY_EVENT_HEARTBEAT_MS = 10000;
 const COMMUNITY_FAVORITE_LISTEN_THRESHOLD_MS = 2 * 60 * 60 * 1000;
 const COMMUNITY_FAVORITE_LISTEN_NOTIFY_MS = 24 * 60 * 60 * 1000;
 const COMMUNITY_FAVORITE_BUBBLE_MS = 2000;
+const COMMUNITY_ENTRANCE_DURATION_MS = 220;
 const SANDBOX_COMPONENTS_KEY = 'fe-monster-sandbox-components-v1';
 const SANDBOX_PRESETS_KEY = 'fe-monster-sandbox-presets-v1';
 const SANDBOX_DRAFT_KEY = 'fe-monster-sandbox-draft-v1';
@@ -1680,6 +2030,8 @@ const DIRECTX11_RENDER_PRESET = Object.freeze({
     preserveDrawingBuffer: false
   })
 });
+const SOFTWARE_WEBGL_RENDERER_PATTERN =
+  /swiftshader|llvmpipe|lavapipe|software|microsoft basic render|warp|reference/i;
 
 function detectRenderProfile() {
   const cores = Math.max(2, Number(navigator.hardwareConcurrency) || 4);
@@ -1710,8 +2062,6 @@ function detectRenderProfile() {
       playbackQualityMax: lowEndAndroid ? 0.42 : 0.56,
       orbParticleFloor: lowEndAndroid ? 110 : 160,
       playbackParticleFloor: lowEndAndroid ? 150 : 220,
-      cubeFrameGapMs: lowEndAndroid ? 42 : 34,
-      topographyFrameGapMs: lowEndAndroid ? 50 : 40,
       targetFrameMs: lowEndAndroid ? 42 : 34,
       ambientStreaks: false,
       orbGlow: false
@@ -1736,8 +2086,6 @@ function detectRenderProfile() {
       playbackQualityMax: 0.9,
       orbParticleFloor: 340,
       playbackParticleFloor: 560,
-      cubeFrameGapMs: 0,
-      topographyFrameGapMs: 0,
       targetFrameMs: 24,
       ambientStreaks: true,
       orbGlow: true
@@ -1762,8 +2110,6 @@ function detectRenderProfile() {
       playbackQualityMax: 0.68,
       orbParticleFloor: 220,
       playbackParticleFloor: 300,
-      cubeFrameGapMs: 24,
-      topographyFrameGapMs: 32,
       targetFrameMs: 34,
       ambientStreaks: true,
       orbGlow: true
@@ -1787,8 +2133,6 @@ function detectRenderProfile() {
     playbackQualityMax: 0.82,
     orbParticleFloor: 280,
     playbackParticleFloor: 440,
-    cubeFrameGapMs: 12,
-    topographyFrameGapMs: 18,
     targetFrameMs: 28,
     ambientStreaks: true,
     orbGlow: true
@@ -1798,6 +2142,9 @@ function detectRenderProfile() {
 const bootVisual = {
   ready: false,
   entering: false,
+  servicesStarted: false,
+  servicesPromise: null,
+  enhancementsScheduled: false,
   logoEnableTimer: 0,
   readyFallbackTimer: 0,
   exitTimer: 0
@@ -1947,6 +2294,8 @@ function initGlassSurfaces() {
 const state = {
   queue: [],
   queueIndex: -1,
+  queueLength: 0,
+  queueRevision: 0,
   currentSong: null,
   playerUrl: '',
   playbackQualityPreferences: INITIAL_PLAYBACK_QUALITY_PREFERENCES,
@@ -1986,7 +2335,8 @@ const state = {
     requestId: 0
   },
   audioPositionSync: {
-    rateResetTimer: 0
+    rateResetTimer: 0,
+    nativeSeekPromise: null
   },
   audioPlaybackContinuity: {
     lastMediaTime: Number.NaN,
@@ -2030,7 +2380,7 @@ const state = {
   },
   userPlaylists: [],
   recommendedPlaylists: [],
-  localPlaylistSongs: [],
+  localPlaylistSongs: loadMarketMusicLibrary(),
   localObjectUrls: new Set(),
   localQueueActive: false,
   activePlaylistId: '',
@@ -2081,15 +2431,15 @@ const state = {
   diyPeek: false,
   diyAutoHideTimer: 0,
   diyCardOpen: false,
-  diyCardYaw: -8,
-  diyCardPitch: 2,
+  diyCardYaw: INITIAL_VISUAL_SETTINGS_PREFERENCES.diyCardYaw,
+  diyCardPitch: INITIAL_VISUAL_SETTINGS_PREFERENCES.diyCardPitch,
   diyCardDrag: null,
   diyPageTransitionTimer: 0,
-  diyPage: 'wallpaper',
-  diyPreset: 'wallpaper',
-  scenePreset: 'lyric',
-  textPreset: DEFAULT_TEXT_PRESET,
-  lastSelectableTextPreset: DEFAULT_TEXT_PRESET,
+  diyPage: INITIAL_VISUAL_SETTINGS_PREFERENCES.diyPage,
+  diyPreset: INITIAL_VISUAL_SETTINGS_PREFERENCES.diyPreset,
+  scenePreset: INITIAL_VISUAL_SETTINGS_PREFERENCES.scenePreset,
+  textPreset: INITIAL_VISUAL_SETTINGS_PREFERENCES.textPreset,
+  lastSelectableTextPreset: INITIAL_VISUAL_SETTINGS_PREFERENCES.lastSelectableTextPreset,
   textPalettePreferences: INITIAL_TEXT_PALETTE_PREFERENCES,
   textFontPreferences: INITIAL_TEXT_FONT_PREFERENCES,
   textFontAvailability: {},
@@ -2119,9 +2469,9 @@ const state = {
   multiRowLyricsEnabled: INITIAL_MULTI_ROW_LYRICS_ENABLED,
   lyricClockOffsetSeconds: INITIAL_LYRIC_CLOCK_OFFSET_SECONDS,
   multiRowLyricSignature: '',
-  lyricBrightness: 1.12,
-  lyricSpeed: 1,
-  cubeIntensity: 1.1,
+  lyricBrightness: INITIAL_VISUAL_SETTINGS_PREFERENCES.lyricBrightness,
+  lyricSpeed: INITIAL_VISUAL_SETTINGS_PREFERENCES.lyricSpeed,
+  cubeIntensity: INITIAL_VISUAL_SETTINGS_PREFERENCES.cubeIntensity,
   wallpaperOpacity: 1,
   wallpaperBrightness: 1,
   wallpaperBlur: 0,
@@ -2138,6 +2488,8 @@ const state = {
   wallpaperLoading: false,
   sceneWallpaperCatalogLoading: false,
   wallpaperEngineCatalogLoaded: false,
+  wallpaperEngineCatalogRevision: '',
+  wallpaperEngineActiveId: '',
   sceneWallpaperSettings: {
     'cover-particles': { enabled: false, wallpaperId: '', wallpaperUrl: '', wallpaperName: '', opacity: 1 },
     topography: { enabled: false, wallpaperId: '', wallpaperUrl: '', wallpaperName: '', opacity: 1 },
@@ -2152,8 +2504,8 @@ const state = {
     playbackPreviewUrl: '',
     playbackKeepBackground: false,
     presetGroupExpanded: false,
-    stormLightingMode: 'sunset',
-    stormWeatherMode: 'auto',
+    stormLightingMode: INITIAL_VISUAL_SETTINGS_PREFERENCES.stormLightingMode,
+    stormWeatherMode: INITIAL_VISUAL_SETTINGS_PREFERENCES.stormWeatherMode,
     tab: 'library',
     sceneName: '我的音乐场景',
     components: loadSandboxComponents(),
@@ -2218,6 +2570,9 @@ const state = {
   lyricFramePreset: '',
   lyricFrameSignature: '',
   focusEchoAnimationFrame: 0,
+  focusEchoAnimationTimer: 0,
+  focusEchoGroupKey: '',
+  focusEchoGroupText: '',
   lyricBookScrollTarget: Number.NaN,
   lyricBookScrollFrameAt: 0,
   lyricBookLayoutVersion: 0,
@@ -2264,6 +2619,7 @@ const state = {
     waveTime: 0,
     motionGate: 0,
     wholeJump: 0,
+    bassJitter: 0,
     lastWidth: 0,
     lastHeight: 0,
     lastDpr: 0,
@@ -2274,6 +2630,7 @@ const state = {
     fallbackGlowCoverSize: 0,
     fallbackGlowBase: null,
     fallbackGlowEnergy: null,
+    fallbackLastFrameAt: 0,
     gpuRenderer: null,
     gpuScene: null,
     gpuCamera: null,
@@ -2281,6 +2638,7 @@ const state = {
     gpuMaterial: null,
     gpuPoints: null,
     gpuSignature: '',
+    gpuRenderSignature: '',
     gpuFailed: false,
     gpuWidth: 0,
     gpuHeight: 0,
@@ -2399,7 +2757,7 @@ const state = {
   windowDragLastY: 0,
   windowDragging: false,
   windowDragSuppressClick: false,
-  activeProvider: 'netease',
+  activeProvider: INITIAL_ACTIVE_PROVIDER_PREFERENCE,
   providers: Object.fromEntries(
     Object.entries(MUSIC_PROVIDERS).map(([id, provider]) => [id, { ...provider }])
   ),
@@ -2409,6 +2767,10 @@ const state = {
   officialBrowserLoginSession: '',
   officialBrowserLoginProvider: '',
   officialBrowserLoginTimer: 0,
+  officialBrowserLoginAbortController: null,
+  officialBrowserLoginLoopToken: 0,
+  officialBrowserLoginRevision: -1,
+  officialBrowserLoginRetryAttempt: 0,
   officialBrowserLoginLoading: false,
   officialBrowserSwitching: false,
   musicApiImporting: false,
@@ -2443,12 +2805,28 @@ const state = {
   community: {
     profile: null,
     friends: [],
+    friendRequests: { incoming: [], outgoing: [] },
+    mailbox: {
+      loading: false,
+      mails: [],
+      registry: {},
+      unreadCount: 0,
+      lastError: '',
+      appliedAttachments: new Set()
+    },
     serverUrl: '',
     loading: false,
     lastProvider: '',
+    refreshGeneration: 0,
     friendsSignature: '',
+    friendRequestsSignature: '',
     refreshTimer: 0,
+    refreshTimerDueAt: 0,
+    refreshRetryNotBefore: 0,
+    refreshQueued: false,
+    refreshQueuedDueAt: 0,
     refreshRetryDelay: 1200,
+    refreshAbortController: null,
     eventSource: null,
     eventKey: '',
     eventCursor: '',
@@ -2464,8 +2842,12 @@ const state = {
     eventHistoryBefore: 0,
     eventHistoryCalibrated: false,
     selectedFriendId: '',
+    selectedMessagePeer: null,
     messages: [],
     messageTimer: 0,
+    messageBackground: loadCommunityMessageBackground(),
+    messageBackgroundMenuOpen: false,
+    messageBackgroundCatalogError: '',
     messageBubbleTimer: 0,
     messageBubbleMuted: loadCommunityMessageDnd(),
     messageBubbles: [],
@@ -2477,8 +2859,17 @@ const state = {
     broadcastUnread: false,
     broadcastToastTimer: 0,
     cardCollapsed: false,
-    favoriteListening: loadCommunityFavoriteListening(),
-    listeningStats: loadCommunityListeningStats(),
+    localDataIdentity: '',
+    favoriteListening: emptyCommunityFavoriteListening(),
+    listeningStats: emptyCommunityListeningStats(),
+    togetherReport: emptyCommunityTogetherReport(),
+    togetherReportLastAt: 0,
+    togetherReportSessionId: '',
+    togetherReportSavedAt: 0,
+    togetherReportLoading: false,
+    ornamentCache: loadCommunityOrnamentCache(),
+    ornamentSyncTimer: 0,
+    ornamentSyncPending: false,
     listeningStatsLastAt: 0,
     listeningStatsSavedAt: 0,
     listeningStatsPlaying: false,
@@ -2497,7 +2888,8 @@ const state = {
     messagePanelStartRotateY: 0,
     profileOpen: false,
     profilePage: 'self',
-    profileBio: loadCommunityBio(),
+    profileBio: '',
+    profileBioIdentity: '',
     profileSaving: false,
     nearbyLoading: false,
     nearbyUsers: [],
@@ -2522,6 +2914,20 @@ const state = {
     lastListenReportAt: 0,
     pendingInvite: null,
     activeSession: null,
+    listenSceneSessionId: '',
+    listenSceneRevision: 0,
+    listenSceneSignature: '',
+    listenSceneLocalSnapshot: null,
+    listenSceneApplying: false,
+    listenSceneTimer: 0,
+    listenSceneDisconnectTimer: 0,
+    listenSceneInFlight: false,
+    listenSceneInFlightSignature: '',
+    listenScenePending: false,
+    listenSceneDirtySnapshot: null,
+    listenSceneDirtySignature: '',
+    listenSceneRequestToken: 0,
+    listenSceneRetryAttempt: 0,
     listenSyncSignature: '',
     listenSyncing: false,
     listenUnavailableSignature: '',
@@ -2557,6 +2963,8 @@ const state = {
   },
   update: {
     release: null,
+    checkPromise: null,
+    lastCheckedAt: 0,
     progressId: '',
     progressTimer: 0,
     installing: false
@@ -2612,14 +3020,7 @@ const state = {
       gpuAcceleration: true,
       directX11: true,
       xAudio2: true,
-      x3DAudio: true,
-      gestureControl: false,
-      gestureCameraSource: 'webcam'
-    },
-    gestureStatus: {
-      running: false,
-      state: 'stopped',
-      message: ''
+      x3DAudio: true
     },
     audioSampleRate: 0,
     webglVendor: '',
@@ -2654,10 +3055,13 @@ const state = {
     nativeHealthRequest: null,
     nativeQueueUnderruns: 0,
     nativeBuffersQueued: 0,
-    nativeOutputLatencySeconds: 0
+    nativeOutputLatencySeconds: 0,
+    timelineInvalidationPromise: null
   },
   audioAnalysis: {
     context: null,
+    contextShouldRun: false,
+    contextTransition: null,
     analyser: null,
     source: null,
     sourceMode: '',
@@ -2672,6 +3076,10 @@ const state = {
     bass: 0,
     lowFrequencyAmplitude: 0,
     lowFrequencyBands: new Float32Array(SONIC_LOW_FREQUENCY_BAND_COUNT),
+    lowFrequencyBinLower: new Uint16Array(SONIC_LOW_FREQUENCY_BAND_COUNT),
+    lowFrequencyBinMix: new Float64Array(SONIC_LOW_FREQUENCY_BAND_COUNT),
+    lowFrequencyLookupDataLength: 0,
+    lowFrequencyLookupSampleRate: 0,
     energy: 0,
     mid: 0,
     treble: 0,
@@ -2689,17 +3097,29 @@ const state = {
     density: 0,
     spectralCentroid: 0,
     previousData: null,
+    aggregateBandByBin: new Uint8Array(0),
+    aggregateBandSums: new Float64Array(AUDIO_SPECTRUM_BAND_COUNT),
+    aggregateBandCounts: new Uint16Array(AUDIO_SPECTRUM_BAND_COUNT),
+    aggregateLookupDataLength: 0,
+    aggregateLookupSampleRate: 0,
+    lowFrequencyRmsStart: 0,
+    lowFrequencyRmsEnd: 0,
     previousBrightness: 0,
     fluxPulse: 0,
     fluxMeteor: 0,
     previousBass: 0,
     silenceFrames: 0,
+    lastUpdateAt: 0,
     signature: ''
   },
   lowFrequencyGraph: {
-    history: Array.from({ length: 96 }, () => 0),
+    history: new Float32Array(96),
+    cursor: 0,
+    count: 96,
     lastValue: 0,
-    lastDrawAt: 0
+    lastDrawAt: 0,
+    surface: null,
+    resizeObserver: null
   },
   dynamicCube: {
     built: false,
@@ -2728,8 +3148,8 @@ const state = {
   },
   freeCube: {
     runtime: null,
-    mode: 'free',
-    backgroundEnabled: true,
+    mode: INITIAL_VISUAL_SETTINGS_PREFERENCES.freeCubeMode,
+    backgroundEnabled: INITIAL_VISUAL_SETTINGS_PREFERENCES.freeCubeBackgroundEnabled,
     palette: null,
     frame: {},
     lastDiagnostics: null
@@ -2744,7 +3164,7 @@ const state = {
   },
   chladni: {
     runtime: null,
-    mode: 'cube',
+    mode: INITIAL_VISUAL_SETTINGS_PREFERENCES.chladniMode,
     palette: null,
     frame: {},
     lastDiagnostics: null
@@ -2760,6 +3180,14 @@ const state = {
     terrain: null,
     material: null,
     uniforms: null,
+    bassColumnBandAttribute: null,
+    terrainSeedAttribute: null,
+    terrainSmallLocalAttribute: null,
+    groundMoundMaskAttribute: null,
+    groundMoundColumnProfileAttribute: null,
+    groundMoundSignature: '',
+    groundEntranceStartedAt: 0,
+    groundEntranceProgress: 0,
     lowFrequencySpectrum: null,
     lowFrequencySpectrumData: null,
     meteorMesh: null,
@@ -2794,7 +3222,9 @@ const state = {
     wallpaperSignature: '',
     backgroundTargetColors: [],
     atmosphereColor: null,
+    atmosphereAudioDrive: 0,
     starfieldAudio: 0,
+    rain: null,
     dummy: null,
     palette: null,
     theme: null,
@@ -2822,6 +3252,8 @@ const state = {
     energy: 0,
     audioPulse: 0,
     wasAudioDriving: false,
+    audioTerrainSource: '',
+    audioTerrainTime: 0,
     projectilesActive: false,
     projectilesNeedClear: false,
     settings: { ...INITIAL_SONIC_SETTINGS },
@@ -2879,9 +3311,9 @@ const state = {
     quality: RENDER_PROFILE.orbQualityMax,
     drawable: [],
     lastFrameTime: 0,
-    lastPaintAt: 0,
-    lastSpectrumAt: 0,
     animationFrame: 0,
+    frameBudgetAt: 0,
+    frameBudgetCarryMs: 0,
     context: null,
     canvasMetrics: { width: 0, height: 0 },
     resizeObserver: null,
@@ -2891,26 +3323,54 @@ const state = {
 };
 
 async function apiJson(path, options = {}) {
-  const { headers = {}, ...fetchOptions } = options;
-  const response = await fetch(path, {
-    ...fetchOptions,
-    headers: { 'Content-Type': 'application/json', ...headers }
-  });
-  const text = await response.text();
-  let json;
+  const {
+    headers = {},
+    timeoutMs = 0,
+    signal: externalSignal,
+    ...fetchOptions
+  } = options;
+  const controller = typeof AbortController === 'function' && timeoutMs > 0
+    ? new AbortController()
+    : null;
+  const abortFromExternal = () => controller?.abort(externalSignal?.reason);
+  if (controller && externalSignal?.aborted) abortFromExternal();
+  else if (controller) externalSignal?.addEventListener?.('abort', abortFromExternal, { once: true });
+  const timeout = controller
+    ? window.setTimeout(() => controller.abort(new DOMException('接口请求超时', 'TimeoutError')), timeoutMs)
+    : 0;
   try {
-    json = text ? JSON.parse(text) : {};
-  } catch (error) {
-    throw new Error(`接口返回不是 JSON: ${path}`);
+    const response = await fetch(path, {
+      ...fetchOptions,
+      signal: controller?.signal || externalSignal,
+      headers: { 'Content-Type': 'application/json', ...headers }
+    });
+    const text = await response.text();
+    let json;
+    try {
+      json = text ? JSON.parse(text) : {};
+    } catch (error) {
+      throw new Error(`接口返回不是 JSON: ${path}`);
+    }
+    if (!response.ok) {
+      const error = new Error(json.error || `接口失败: ${response.status}`);
+      error.status = response.status;
+      error.code = typeof json.code === 'string' ? json.code : '';
+      error.payload = json;
+      const retryAfter = safeText(response.headers.get('Retry-After'), '');
+      if (retryAfter) {
+        const seconds = Number(retryAfter);
+        const dateDelay = Date.parse(retryAfter) - Date.now();
+        error.retryAfterMs = Number.isFinite(seconds)
+          ? Math.max(0, Math.min(30_000, seconds * 1000))
+          : Math.max(0, Math.min(30_000, Number.isFinite(dateDelay) ? dateDelay : 0));
+      }
+      throw error;
+    }
+    return json;
+  } finally {
+    window.clearTimeout(timeout);
+    if (controller) externalSignal?.removeEventListener?.('abort', abortFromExternal);
   }
-  if (!response.ok) {
-    const error = new Error(json.error || `接口失败: ${response.status}`);
-    error.status = response.status;
-    error.code = typeof json.code === 'string' ? json.code : '';
-    error.payload = json;
-    throw error;
-  }
-  return json;
 }
 
 async function communityApiJson(path, options = {}) {
@@ -2946,7 +3406,11 @@ async function communityApiJson(path, options = {}) {
       if (externalSignal?.aborted || attempt >= delays.length || (!retryableStatus && !retryableNetwork)) {
         throw error;
       }
-      const delay = Math.max(0, Number(delays[attempt]) || 0);
+      const delay = Math.max(
+        0,
+        Number(delays[attempt]) || 0,
+        Number(error?.retryAfterMs) || 0
+      );
       if (delay) await new Promise((resolve) => window.setTimeout(resolve, delay));
     } finally {
       window.clearTimeout(timeout);
@@ -2962,8 +3426,8 @@ function applyRuntimeDataset() {
   document.documentElement.dataset.audioSpatialBackend = state.clientRuntime.audioSpatialBackend;
   document.documentElement.dataset.gpuAcceleration = String(state.clientRuntime.settings.gpuAcceleration);
   document.documentElement.dataset.directX11 = String(state.clientRuntime.settings.directX11);
-  document.documentElement.dataset.gestureControl = String(state.clientRuntime.settings.gestureControl);
   document.documentElement.dataset.upscaler = safeText(state.clientRuntime.renderCapabilities?.diagnostics?.mode, 'detecting');
+  syncGraphicsBackendStatus();
 }
 
 function syncRenderTechnologyStatus(diagnostics = state.clientRuntime.renderCapabilities?.diagnostics) {
@@ -3151,11 +3615,17 @@ function renderClaritySceneKey() {
 
 function renderClaritySoftwareRenderer() {
   const renderer = `${state.clientRuntime.webglVendor || ''} ${state.clientRuntime.webglRenderer || ''}`;
-  return /swiftshader|llvmpipe|software|microsoft basic render/i.test(renderer);
+  return SOFTWARE_WEBGL_RENDERER_PATTERN.test(renderer);
+}
+
+function renderClaritySafetyCeiling() {
+  return renderClaritySoftwareRenderer() || graphicsSafeFallbackActive()
+    ? RENDER_CLARITY_SAFE_FALLBACK_MAX
+    : RENDER_CLARITY_MAX;
 }
 
 function autoRenderClarityCeiling() {
-  return renderClaritySoftwareRenderer() ? 65 : RENDER_CLARITY_AUTO_MAX;
+  return Math.min(RENDER_CLARITY_AUTO_MAX, renderClaritySafetyCeiling());
 }
 
 function autoRenderClarityPercent(sceneKey = renderClaritySceneKey()) {
@@ -3172,7 +3642,10 @@ function autoRenderClarityPercent(sceneKey = renderClaritySceneKey()) {
 function effectiveRenderClarityPercent() {
   return state.renderClarity.auto
     ? autoRenderClarityPercent()
-    : normalizeRenderClarityPercent(state.renderClarity.manualPercent, 100);
+    : Math.min(
+        normalizeRenderClarityPercent(state.renderClarity.manualPercent, 100),
+        renderClaritySafetyCeiling()
+      );
 }
 
 function renderClarityLabel(percent) {
@@ -3210,7 +3683,8 @@ function syncRenderClarityControls(now = performance.now()) {
   if (els.renderClarityAutoToggle) els.renderClarityAutoToggle.checked = !!clarity.auto;
   if (els.renderClarityRange) {
     els.renderClarityRange.disabled = !!clarity.auto;
-    els.renderClarityRange.value = String(clarity.auto ? effectivePercent : clarity.manualPercent);
+    els.renderClarityRange.max = String(renderClaritySafetyCeiling());
+    els.renderClarityRange.value = String(effectivePercent);
     syncElasticRangeVisual(els.renderClarityRange);
   }
   if (els.renderClarityValue) {
@@ -3222,7 +3696,9 @@ function syncRenderClarityControls(now = performance.now()) {
     const samples = clarity.frameSamples;
     const recentMs = samples.length ? samples[samples.length - 1] : 0;
     const fps = recentMs > 0 ? Math.round(1000 / recentMs) : 0;
-    const device = renderClaritySoftwareRenderer() ? '软件渲染安全档' : `${Math.round(clarity.refreshHz)}Hz 屏幕`;
+    const device = renderClaritySoftwareRenderer() || graphicsSafeFallbackActive()
+      ? '软件渲染安全档'
+      : `${Math.round(clarity.refreshHz)}Hz 屏幕`;
     els.renderClarityDetail.textContent = clarity.auto
       ? `${device} · 当前${renderClarityLabel(effectivePercent)}${fps ? ` · 约 ${fps} FPS` : ''} · 按场景实时校准`
       : `手动固定 · ${renderClarityLabel(effectivePercent)} · 不随帧率自动变化`;
@@ -3488,7 +3964,6 @@ function applyRenderClarity(options = {}) {
     }
   }
   applyPresetUpscaler({ force: options.force === true });
-  state.orb.lastPaintAt = 0;
   requestOrbFrame();
   requestSandboxRender();
   syncRenderClarityControls();
@@ -3523,7 +3998,11 @@ function setRenderClarityManualPercent(value, options = {}) {
 }
 
 function refineAutoRenderClarityForRenderer() {
-  if (!state.renderClarity.auto || !renderClaritySoftwareRenderer()) return;
+  if (!renderClaritySoftwareRenderer() && !graphicsSafeFallbackActive()) return;
+  if (!state.renderClarity.auto) {
+    applyRenderClarity({ force: true });
+    return;
+  }
   const sceneKey = renderClaritySceneKey();
   const current = Number(state.renderClarity.autoPercentByScene[sceneKey]) || state.renderClarity.initialAutoPercent;
   if (current <= autoRenderClarityCeiling()) return;
@@ -3838,6 +4317,27 @@ async function importUserCursor(file) {
   }
 }
 
+function syncCustomCursorTrailOption() {
+  if (!els.cursorTrailSelect) return;
+  const existing = els.cursorTrailSelect.querySelector('option[value="custom"]');
+  let available = false;
+  try {
+    available = Boolean(
+      window.FeCursorTrails?.getCustom?.()
+      || window.localStorage?.getItem('fe-monster-custom-cursor-trail-v1')
+    );
+  } catch (error) {}
+  if (available && !existing) {
+    const option = document.createElement('option');
+    option.value = 'custom';
+    option.textContent = '创作市场尾迹';
+    option.dataset.marketCursorTrail = 'true';
+    els.cursorTrailSelect.appendChild(option);
+  } else if (!available && existing) {
+    existing.remove();
+  }
+}
+
 function applyCursorPreferences() {
   const preferences = normalizeCursorPreferences(state.cursorPreferences);
   state.cursorPreferences = preferences;
@@ -3855,6 +4355,7 @@ function applyCursorPreferences() {
   document.documentElement.dataset.feCursorTrail = preferences.trail;
   document.documentElement.style.setProperty('--fe-cursor-skin-default', skinCursor);
   document.documentElement.style.setProperty('--fe-cursor-skin-pointer', pointerCursor);
+  syncCustomCursorTrailOption();
   if (els.cursorSkinSelect) els.cursorSkinSelect.value = preferences.skin;
   if (els.cursorMotionSelect) els.cursorMotionSelect.value = preferences.motion;
   if (els.cursorTrailSelect) els.cursorTrailSelect.value = preferences.trail;
@@ -3887,84 +4388,37 @@ function initCursorPreferences() {
   applyCursorPreferences();
 }
 
-function setGestureStatusText(message, detail = '') {
-  if (!els.gestureControlStatus) return;
-  els.gestureControlStatus.textContent = message;
-  els.gestureControlStatus.title = detail ? `${message}\n${detail}` : message;
-}
-
-function normalizeGestureCameraSource(source) {
-  return source === 'camera' ? 'camera' : 'webcam';
-}
-
-function setGestureCameraSource(source) {
-  const normalized = normalizeGestureCameraSource(source);
-  if (state.clientRuntime.settings.gestureCameraSource === normalized) return;
-  state.clientRuntime.settings.gestureCameraSource = normalized;
-  syncRuntimeSettingsControls();
-  saveRuntimeSettings();
-}
-
-function renderGestureStatus() {
-  if (!els.gestureControlStatus) return;
-  const enabled = !!state.clientRuntime.settings.gestureControl;
-  const status = state.clientRuntime.gestureStatus || {};
-  if (!enabled) {
-    setGestureStatusText('摄像头关闭');
-    return;
-  }
-  if (status.running) {
-    const action = status.lastAction ? ` · ${status.lastAction}` : '';
-    setGestureStatusText(`摄像头运行中${action}`, status.detail || '');
-    return;
-  }
-  if (status.message) {
-    setGestureStatusText(status.message, status.detail || '');
-    return;
-  }
-  setGestureStatusText('正在打开摄像头');
-}
-
 function syncRuntimeSettingsControls() {
   const settings = state.clientRuntime.settings;
-  if (els.gpuAccelerationToggle) els.gpuAccelerationToggle.checked = settings.gpuAcceleration;
-  if (els.directX11Toggle) els.directX11Toggle.checked = settings.directX11;
+  const lockedD3D11 = directX11Requested();
+  if (els.gpuAccelerationToggle) {
+    els.gpuAccelerationToggle.checked = lockedD3D11 ? true : settings.gpuAcceleration;
+    els.gpuAccelerationToggle.disabled = lockedD3D11;
+    if (lockedD3D11) els.gpuAccelerationToggle.title = 'Windows rendering is locked to hardware acceleration';
+  }
+  if (els.directX11Toggle) {
+    els.directX11Toggle.checked = lockedD3D11 ? true : settings.directX11;
+    els.directX11Toggle.disabled = lockedD3D11;
+    if (lockedD3D11) els.directX11Toggle.title = 'Windows rendering is locked to ANGLE Direct3D 11';
+  }
   if (els.xAudio2Toggle) els.xAudio2Toggle.checked = settings.xAudio2;
   if (els.x3DAudioToggle) els.x3DAudioToggle.checked = settings.x3DAudio;
-  if (els.gestureControlToggle) els.gestureControlToggle.checked = settings.gestureControl;
-  const cameraSource = normalizeGestureCameraSource(settings.gestureCameraSource);
-  if (els.gestureWebcamButton) {
-    const active = cameraSource === 'webcam';
-    els.gestureWebcamButton.classList.toggle('is-active', active);
-    els.gestureWebcamButton.setAttribute('aria-pressed', String(active));
-  }
-  if (els.gestureCameraButton) {
-    const active = cameraSource === 'camera';
-    els.gestureCameraButton.classList.toggle('is-active', active);
-    els.gestureCameraButton.setAttribute('aria-pressed', String(active));
-  }
-  renderGestureStatus();
 }
 
-async function refreshGestureStatus() {
+async function activateInteractiveBackend(provider = state.activeProvider) {
   try {
-    const status = await apiJson('/api/app/gesture');
-    state.clientRuntime.gestureStatus = status;
-    if (typeof status.enabled === 'boolean') {
-      state.clientRuntime.settings.gestureControl = status.enabled;
-    }
-    if (status.cameraSource) {
-      state.clientRuntime.settings.gestureCameraSource = normalizeGestureCameraSource(status.cameraSource);
-    }
+    const payload = await apiJson('/api/app/interactive/activate', {
+      method: 'POST',
+      timeoutMs: COMMUNITY_API_TIMEOUT_MS,
+      body: JSON.stringify({ provider: providerInfo(provider).id })
+    });
+    return payload;
   } catch (error) {
-    state.clientRuntime.gestureStatus = {
-      running: false,
-      state: 'unavailable',
-      message: '手势服务不可用'
-    };
+    return null;
+  } finally {
+    syncRuntimeSettingsControls();
+    applyRuntimeDataset();
   }
-  syncRuntimeSettingsControls();
-  applyRuntimeDataset();
 }
 
 async function refreshClientRuntime() {
@@ -3990,16 +4444,13 @@ async function refreshClientRuntime() {
       gpuAcceleration: settings.gpuAcceleration !== false,
       directX11: settings.directX11 !== false,
       xAudio2: settings.xAudio2 !== false,
-      x3DAudio: settings.x3DAudio !== false,
-      gestureControl: settings.gestureControl === true,
-      gestureCameraSource: normalizeGestureCameraSource(settings.gestureCameraSource)
+      x3DAudio: settings.x3DAudio !== false
     });
   } catch (error) {
     // Keep the local DirectX11 preset defaults when the runtime API is unavailable.
   }
   syncRuntimeSettingsControls();
   applyRuntimeDataset();
-  await refreshGestureStatus();
 }
 
 function setRuntimeSettingsOpen(open) {
@@ -4008,16 +4459,6 @@ function setRuntimeSettingsOpen(open) {
   if (els.runtimeSettingsButton) {
     els.runtimeSettingsButton.setAttribute('aria-expanded', String(state.runtimeSettingsOpen));
   }
-  if (state.runtimeSettingsOpen) refreshGestureStatus().catch(() => {});
-}
-
-function primeGestureCameraOpening() {
-  state.clientRuntime.gestureStatus = {
-    running: false,
-    state: 'camera_opening',
-    message: '正在打开系统摄像头'
-  };
-  renderGestureStatus();
 }
 
 async function saveRuntimeSettings() {
@@ -4025,14 +4466,11 @@ async function saveRuntimeSettings() {
     gpuAcceleration: !!(els.gpuAccelerationToggle && els.gpuAccelerationToggle.checked),
     directX11: !!(els.directX11Toggle && els.directX11Toggle.checked),
     xAudio2: !!(els.xAudio2Toggle && els.xAudio2Toggle.checked),
-    x3DAudio: !!(els.x3DAudioToggle && els.x3DAudioToggle.checked),
-    gestureControl: !!(els.gestureControlToggle && els.gestureControlToggle.checked),
-    gestureCameraSource: normalizeGestureCameraSource(state.clientRuntime.settings.gestureCameraSource)
+    x3DAudio: !!(els.x3DAudioToggle && els.x3DAudioToggle.checked)
   };
   Object.assign(state.clientRuntime.settings, settings);
   syncRuntimeSettingsControls();
   applyRuntimeDataset();
-  if (settings.gestureControl) primeGestureCameraOpening();
   try {
     const saved = await apiJson('/api/app/runtime/settings', {
       method: 'POST',
@@ -4042,16 +4480,10 @@ async function saveRuntimeSettings() {
       gpuAcceleration: saved.gpuAcceleration !== false,
       directX11: saved.directX11 !== false,
       xAudio2: saved.xAudio2 !== false,
-      x3DAudio: saved.x3DAudio !== false,
-      gestureControl: saved.gestureControl === true,
-      gestureCameraSource: normalizeGestureCameraSource(saved.gestureCameraSource)
+      x3DAudio: saved.x3DAudio !== false
     });
-    if (saved.gestureStatus) state.clientRuntime.gestureStatus = saved.gestureStatus;
     syncRuntimeSettingsControls();
     applyRuntimeDataset();
-    [500, 1500, 3200].forEach((delay) => {
-      window.setTimeout(() => refreshGestureStatus().catch(() => {}), delay);
-    });
   } catch (error) {
     toast(error.message || 'Runtime settings unavailable');
   }
@@ -4405,6 +4837,8 @@ function closeRecordingDialog() {
     return;
   }
   cleanupRecordingStream();
+  resetRecordingPreview();
+  resetRecordingDownload();
   clearRecordingTimer();
   hideRecordingMiniFallback();
   postNativeRecordingToolbar('hide');
@@ -4577,32 +5011,113 @@ window.feMonsterRecording = {
 };
 
 function captureRendererInfo(renderer) {
+  captureWebGLContextInfo(renderer?.getContext?.());
+}
+
+function captureWebGLContextInfo(gl, fallbackRenderer = '') {
+  let vendor = '';
+  let renderer = fallbackRenderer;
   try {
-    const gl = renderer.getContext();
+    if (!gl) throw new Error('WebGL unavailable');
     const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-    state.clientRuntime.webglVendor = debugInfo
+    vendor = debugInfo
       ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL)
       : gl.getParameter(gl.VENDOR);
-    state.clientRuntime.webglRenderer = debugInfo
+    renderer = debugInfo
       ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
       : gl.getParameter(gl.RENDERER);
   } catch (error) {
-    state.clientRuntime.webglVendor = '';
-    state.clientRuntime.webglRenderer = '';
+    vendor = '';
   }
+  state.clientRuntime.webglVendor = String(vendor || '');
+  state.clientRuntime.webglRenderer = String(renderer || fallbackRenderer);
+  syncGraphicsBackendStatus();
   syncRenderTechnologyStatus();
   refineAutoRenderClarityForRenderer();
 }
 
+function directX11Requested() {
+  return !MOBILE_RENDER_TARGET && (
+    URL_PARAMS.get('render') === 'directx11'
+    || URL_PARAMS.get('client') === 'embedded'
+    || Boolean(window.chrome?.webview)
+  );
+}
+
+function directX11HardwareRendererActive() {
+  const renderer = `${state.clientRuntime.webglVendor || ''} ${state.clientRuntime.webglRenderer || ''}`;
+  return /(?:direct3d11|d3d11)/i.test(renderer)
+    && !SOFTWARE_WEBGL_RENDERER_PATTERN.test(renderer);
+}
+
+function graphicsSafeFallbackActive() {
+  const renderer = `${state.clientRuntime.webglVendor || ''} ${state.clientRuntime.webglRenderer || ''}`.trim();
+  return directX11Requested() && !!renderer && !directX11HardwareRendererActive();
+}
+
+function heavyWebGLRenderingAllowed() {
+  return !directX11Requested() || directX11HardwareRendererActive();
+}
+
+function probeRequestedDirectX11Renderer() {
+  if (!directX11Requested() || state.clientRuntime.webglRenderer) {
+    return heavyWebGLRenderingAllowed();
+  }
+  const canvas = document.createElement('canvas');
+  const contextOptions = {
+    alpha: false,
+    antialias: false,
+    powerPreference: 'high-performance',
+    failIfMajorPerformanceCaveat: true
+  };
+  const gl = canvas.getContext('webgl2', contextOptions) || canvas.getContext('webgl', contextOptions);
+  captureWebGLContextInfo(gl, 'WebGL unavailable');
+  gl?.getExtension?.('WEBGL_lose_context')?.loseContext?.();
+  return heavyWebGLRenderingAllowed();
+}
+
+function syncGraphicsBackendStatus() {
+  const renderer = `${state.clientRuntime.webglVendor || ''} ${state.clientRuntime.webglRenderer || ''}`.trim();
+  const hardwareD3D11 = directX11HardwareRendererActive();
+  const backend = hardwareD3D11
+    ? 'd3d11-hardware'
+    : renderer
+      ? 'safe-fallback'
+      : 'detecting';
+  document.documentElement.dataset.graphicsBackend = backend;
+  document.documentElement.dataset.directX11Hardware = String(hardwareD3D11);
+  const technologyCard = els.upscalerStatus?.closest('.runtime-render-technology');
+  if (technologyCard) technologyCard.dataset.graphicsBackend = backend;
+  return { backend, hardwareD3D11, renderer };
+}
+
 function createDirectX11Renderer(THREE, options = {}) {
+  if (directX11Requested() && state.clientRuntime.webglRenderer && !heavyWebGLRenderingAllowed()) {
+    throw new Error('硬件 ANGLE Direct3D 11 不可用，已阻止重型 WebGL 场景');
+  }
   const renderer = new THREE.WebGLRenderer({
     ...DIRECTX11_RENDER_PRESET.rendererOptions,
-    ...options
+    ...options,
+    failIfMajorPerformanceCaveat:
+      directX11Requested() || options.failIfMajorPerformanceCaveat === true
   });
   renderer.domElement.dataset.renderPreset = DIRECTX11_RENDER_PRESET.name;
   captureRendererInfo(renderer);
+  if (!heavyWebGLRenderingAllowed()) {
+    renderer.renderLists?.dispose?.();
+    renderer.dispose?.();
+    throw new Error('检测到软件或非 Direct3D 11 渲染器，已阻止重型 WebGL 场景');
+  }
   return renderer;
 }
+
+window.feMonsterGraphicsBackend = Object.freeze({
+  snapshot: () => ({
+    requested: directX11Requested(),
+    ...syncGraphicsBackendStatus(),
+    softwareRenderer: renderClaritySoftwareRenderer()
+  })
+});
 
 function query(params) {
   const search = new URLSearchParams();
@@ -4632,6 +5147,55 @@ function safeText(value, fallback = '') {
   return value === undefined || value === null || value === '' ? fallback : String(value);
 }
 
+function unlockAppAchievement(id, options = {}) {
+  try {
+    return window.feAchievements?.unlock?.(id, options) === true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function queueHighDifficultyAchievementEvidence(type, payload = {}) {
+  try {
+    const task = window.feAchievements?.queueChallengeEvidence?.(type, payload);
+    if (task && typeof task.catch === 'function') task.catch(() => {});
+    return task || false;
+  } catch (error) {
+    return false;
+  }
+}
+
+function currentAchievementTrackId(song = state.currentSong) {
+  const id = safeText(song?.id, '').trim();
+  const provider = safeText(song?.provider, state.activeProvider).trim().toLowerCase();
+  return id ? `${provider}:${id}` : '';
+}
+
+function queueHighDifficultyListenInterval(listenMsDelta, song = state.currentSong, endedAt = Date.now()) {
+  const trackId = currentAchievementTrackId(song);
+  const durationSec = Math.min(30, Math.max(0, Number(listenMsDelta) || 0) / 1000);
+  if (!trackId || durationSec < 1) return false;
+  const normalizedEndedAt = Math.max(1, Math.round(Number(endedAt) || Date.now()));
+  try {
+    return window.feAchievements?.observeChallengeListening?.({
+      trackId,
+      startedAt: Math.max(1, Math.round(normalizedEndedAt - durationSec * 1000)),
+      endedAt: normalizedEndedAt,
+      durationSec: Math.round(durationSec * 1000) / 1000
+    }) === true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function flushHighDifficultyListenInterval() {
+  try {
+    return window.feAchievements?.flushChallengeListening?.() === true;
+  } catch (error) {
+    return false;
+  }
+}
+
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
@@ -4653,7 +5217,7 @@ function isChladniPreset(preset = state.diyPreset) {
 }
 
 function playbackPresetsUseNativeRefresh() {
-  return !document.hidden;
+  return true;
 }
 
 function isRainGlassPreset(preset = state.diyPreset) {
@@ -4703,6 +5267,102 @@ function normalizeDiyPreset(preset) {
     return preset;
   }
   return 'lyric';
+}
+
+const PRESET_RUNTIME_SOURCES = Object.freeze({
+  'storm-ocean': Object.freeze({
+    src: 'storm-ocean-runtime.js?v=20260811-cache-audit-1',
+    globalName: 'FeStormOceanRuntime'
+  }),
+  'free-cubes': Object.freeze({
+    src: 'free-cube-runtime.js?v=20260811-cache-audit-1',
+    globalName: 'FeFreeCubeRuntime'
+  }),
+  'void-prism': Object.freeze({
+    src: 'void-prism-runtime.js?v=20260811-cache-audit-1',
+    globalName: 'FeVoidPrismRuntime'
+  }),
+  chladni: Object.freeze({
+    src: 'chladni-runtime.js?v=20260811-cache-audit-1',
+    globalName: 'FeChladniRuntime'
+  })
+});
+const presetRuntimePromises = new Map();
+let presetRuntimeActivationToken = 0;
+let presetSceneSelectionToken = 0;
+
+function stormOceanReactivityProfile(value) {
+  return safeText(value?.profile, '') === 'storm-ocean-v1';
+}
+
+function activePresetRuntimeKey(preset = state.diyPreset) {
+  if (preset === 'free-cubes' || preset === 'void-prism' || preset === 'chladni') return preset;
+  if (preset === 'sandbox-scene' && isStormOceanPreset(activeDiyScenePreset())) return 'storm-ocean';
+  return '';
+}
+
+function ensurePresetRuntime(runtimeKey) {
+  const descriptor = PRESET_RUNTIME_SOURCES[runtimeKey];
+  if (!descriptor) return Promise.resolve(null);
+  if (window[descriptor.globalName]) return Promise.resolve(window[descriptor.globalName]);
+  if (presetRuntimePromises.has(runtimeKey)) return presetRuntimePromises.get(runtimeKey);
+  const pending = loadScriptOnce(descriptor.src)
+    .then(() => {
+      const runtime = window[descriptor.globalName];
+      if (!runtime) throw new Error(`${runtimeKey} runtime did not register`);
+      return runtime;
+    })
+    .catch((error) => {
+      presetRuntimePromises.delete(runtimeKey);
+      throw error;
+    });
+  presetRuntimePromises.set(runtimeKey, pending);
+  return pending;
+}
+
+function mountLoadedPresetRuntime(preset) {
+  switch (preset) {
+    case 'free-cubes':
+      updateFreeCubeVisibility();
+      break;
+    case 'void-prism':
+      updateVoidPrismVisibility();
+      break;
+    case 'chladni':
+      updateChladniVisibility();
+      break;
+    case 'sandbox-scene':
+      syncSandboxPlaybackSurface();
+      break;
+    default:
+      break;
+  }
+  applyPresetUpscaler({ force: true });
+  requestOrbFrame();
+}
+
+function ensureActivePresetRuntime(
+  preset = state.diyPreset,
+  activationToken = presetRuntimeActivationToken
+) {
+  const runtimeKey = activePresetRuntimeKey(preset);
+  if (!runtimeKey || !state.playbackPage) return Promise.resolve(false);
+  return ensurePresetRuntime(runtimeKey)
+    .then(() => {
+      if (
+        activationToken !== presetRuntimeActivationToken
+        || state.diyPreset !== preset
+        || !state.playbackPage
+      ) return false;
+      mountLoadedPresetRuntime(preset);
+      return true;
+    })
+    .catch((error) => {
+      if (activationToken === presetRuntimeActivationToken && state.diyPreset === preset) {
+        console.warn(`[preset-runtime] ${runtimeKey} failed to load`, error);
+      }
+      return false;
+    });
 }
 
 function renderPixelRatio(kind = 'canvas') {
@@ -4761,6 +5421,7 @@ function enterMainFromBoot() {
   if (els.bootLogoButton) els.bootLogoButton.disabled = true;
   els.bootScreen.classList.add('is-exiting');
   window.dispatchEvent(new CustomEvent('fe-lightfall-stop'));
+  void startInteractiveRuntime();
   requestOrbFrame();
   window.clearTimeout(bootVisual.exitTimer);
   bootVisual.exitTimer = window.setTimeout(() => {
@@ -4780,6 +5441,32 @@ function initBootScreen() {
   window.addEventListener('fe-lightfall-ready', markBootReady, { once: true });
   window.clearTimeout(bootVisual.readyFallbackTimer);
   bootVisual.readyFallbackTimer = window.setTimeout(markBootReady, 1200);
+}
+
+function interactiveRuntimeAvailable() {
+  return !els.bootScreen || els.bootScreen.hidden || bootVisual.entering || DESKTOP_SCENE_CLIENT;
+}
+
+function startInteractiveRuntime() {
+  if (bootVisual.servicesStarted) return bootVisual.servicesPromise || Promise.resolve();
+  if (!interactiveRuntimeAvailable()) return Promise.resolve();
+  bootVisual.servicesStarted = true;
+  document.documentElement.dataset.interactiveServices = 'started';
+  window.dispatchEvent(new CustomEvent('fe-main-entered'));
+  scheduleButtonGlowEnhancement();
+  bootVisual.servicesPromise = (async () => {
+    await activateInteractiveBackend();
+    startBackgroundPolling();
+    scheduleCommunityRefresh(0);
+    await Promise.allSettled([
+      refreshLoginStatus(),
+      refreshUserPlaylists(),
+      checkGitHubClientUpdate()
+    ]);
+  })().finally(() => {
+    bootVisual.servicesPromise = null;
+  });
+  return bootVisual.servicesPromise;
 }
 
 function mediaIsSameOrigin(url) {
@@ -4826,15 +5513,19 @@ const WALLPAPER_PREFS_VERSION = 6;
 const WALLPAPER_FIT_MODES = new Set(['fill', 'fit', 'stretch', 'center', 'tile']);
 const SCENE_WALLPAPER_PRESETS = Object.freeze(['cover-particles', 'topography', 'chladni']);
 const SCENE_WALLPAPER_SOFT_GLOW_ID = 'soft-glow';
+const SCENE_WALLPAPER_ENGINE_CURRENT_ID = 'wallpaper-engine-current';
 const SCENE_WALLPAPER_PREFS_KEY = 'fe-monster-scene-wallpaper-prefs';
-const SCENE_WALLPAPER_PREFS_VERSION = 3;
+const SCENE_WALLPAPER_PREFS_VERSION = 4;
 const COVER_PARTICLE_WALLPAPER_SEGMENTS = 96;
+const SCENE_WALLPAPER_LIVE_REFRESH_MS = 6000;
+let sceneWallpaperLiveRefreshTimer = 0;
 
 function normalizeSceneWallpaperSetting(value) {
   const source = value && typeof value === 'object' ? value : {};
   const opacity = Number(source.opacity);
   return {
     enabled: source.enabled === true,
+    followWallpaperEngine: source.followWallpaperEngine === true,
     wallpaperId: safeText(source.wallpaperId, ''),
     wallpaperUrl: safeText(source.wallpaperUrl, ''),
     wallpaperName: safeText(source.wallpaperName, ''),
@@ -4867,6 +5558,7 @@ function saveSceneWallpaperPrefs() {
     }));
   } catch (error) {
   }
+  scheduleClientPreferencesSync();
 }
 
 function normalizeWallpaperFitMode(mode) {
@@ -4907,6 +5599,161 @@ function loadWallpaperPrefs() {
 
 const VISUAL_PREFERENCE_SAVE_DEBOUNCE_MS = 160;
 let wallpaperPreferenceSaveTimer = 0;
+let visualSettingsPreferenceSaveTimer = 0;
+const CLIENT_PREFERENCES_REVISION_KEY = 'fe-monster-client-preferences-revision';
+const CLIENT_PREFERENCES_SYNC_DEBOUNCE_MS = 480;
+const CLIENT_PREFERENCES_MAX_VALUE_BYTES = 1024 * 1024;
+const CLIENT_PREFERENCES_MAX_TOTAL_BYTES = 4 * 1024 * 1024;
+let clientPreferencesSyncTimer = 0;
+let clientPreferencesRevision = 0;
+
+function visualSettingsPreferenceSnapshot() {
+  return normalizeVisualSettingsPreferences({
+    lyricBrightness: state.lyricBrightness,
+    lyricSpeed: state.lyricSpeed,
+    cubeIntensity: state.cubeIntensity,
+    diyPage: state.diyPage,
+    diyPreset: state.diyPreset,
+    scenePreset: state.scenePreset,
+    textPreset: state.textPreset,
+    lastSelectableTextPreset: state.lastSelectableTextPreset,
+    freeCubeMode: state.freeCube.mode,
+    freeCubeBackgroundEnabled: state.freeCube.backgroundEnabled,
+    chladniMode: state.chladni.mode,
+    stormLightingMode: state.sandbox.stormLightingMode,
+    stormWeatherMode: state.sandbox.stormWeatherMode,
+    diyCardYaw: state.diyCardYaw,
+    diyCardPitch: state.diyCardPitch
+  });
+}
+
+function saveVisualSettingsPreferences({ immediate = false } = {}) {
+  if (communityScenePersistenceSuppressed()) {
+    scheduleCommunitySceneSync();
+    return;
+  }
+  window.clearTimeout(visualSettingsPreferenceSaveTimer);
+  visualSettingsPreferenceSaveTimer = 0;
+  const commit = () => {
+    visualSettingsPreferenceSaveTimer = 0;
+    try {
+      window.localStorage.setItem(
+        VISUAL_SETTINGS_PREFS_KEY,
+        JSON.stringify(visualSettingsPreferenceSnapshot())
+      );
+    } catch (error) {
+    }
+    scheduleClientPreferencesSync();
+  };
+  if (immediate) {
+    commit();
+    return;
+  }
+  visualSettingsPreferenceSaveTimer = window.setTimeout(
+    commit,
+    VISUAL_PREFERENCE_SAVE_DEBOUNCE_MS
+  );
+}
+
+function flushVisualSettingsPreferences() {
+  if (visualSettingsPreferenceSaveTimer) saveVisualSettingsPreferences({ immediate: true });
+}
+
+function collectClientPreferences() {
+  const encoder = new TextEncoder();
+  const values = {};
+  let totalBytes = 0;
+  const keys = [];
+  try {
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+      if (
+        key
+        && key.startsWith('fe-monster-')
+        && key !== CLIENT_PREFERENCES_REVISION_KEY
+      ) {
+        keys.push(key);
+      }
+    }
+  } catch (error) {
+    return values;
+  }
+  keys.sort().forEach((key) => {
+    let value = null;
+    try {
+      value = window.localStorage.getItem(key);
+    } catch (error) {
+      return;
+    }
+    if (typeof value !== 'string') return;
+    const valueBytes = encoder.encode(value).byteLength;
+    const entryBytes = encoder.encode(key).byteLength + valueBytes;
+    if (
+      valueBytes > CLIENT_PREFERENCES_MAX_VALUE_BYTES
+      || totalBytes + entryBytes > CLIENT_PREFERENCES_MAX_TOTAL_BYTES
+    ) return;
+    values[key] = value;
+    totalBytes += entryBytes;
+  });
+  return values;
+}
+
+function clientPreferencesPayload(updatedAt = clientPreferencesRevision || Date.now()) {
+  return {
+    version: 1,
+    updatedAt,
+    values: collectClientPreferences()
+  };
+}
+
+async function persistClientPreferences(updatedAt = clientPreferencesRevision || Date.now()) {
+  const payload = clientPreferencesPayload(updatedAt);
+  try {
+    await apiJson('/api/app/preferences', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  } catch (error) {
+    // localStorage remains the same-origin fallback when the backend is unavailable.
+  }
+}
+
+function scheduleClientPreferencesSync() {
+  clientPreferencesRevision = Date.now();
+  try {
+    window.localStorage.setItem(
+      CLIENT_PREFERENCES_REVISION_KEY,
+      String(clientPreferencesRevision)
+    );
+  } catch (error) {
+  }
+  window.clearTimeout(clientPreferencesSyncTimer);
+  clientPreferencesSyncTimer = window.setTimeout(() => {
+    clientPreferencesSyncTimer = 0;
+    void persistClientPreferences(clientPreferencesRevision);
+  }, CLIENT_PREFERENCES_SYNC_DEBOUNCE_MS);
+}
+
+function flushClientPreferencesSync() {
+  window.clearTimeout(clientPreferencesSyncTimer);
+  clientPreferencesSyncTimer = 0;
+  const updatedAt = clientPreferencesRevision || Date.now();
+  const body = JSON.stringify(clientPreferencesPayload(updatedAt));
+  try {
+    const accepted = navigator.sendBeacon('/api/app/preferences', new Blob(
+      [body],
+      { type: 'application/json' }
+    ));
+    if (accepted) return;
+  } catch (error) {
+  }
+  fetch('/api/app/preferences', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body,
+    keepalive: true
+  }).catch(() => {});
+}
 
 function saveWallpaperPrefs({ immediate = false } = {}) {
   window.clearTimeout(wallpaperPreferenceSaveTimer);
@@ -4927,6 +5774,7 @@ function saveWallpaperPrefs({ immediate = false } = {}) {
       }));
     } catch (error) {
     }
+    scheduleClientPreferencesSync();
   };
   if (immediate) {
     commit();
@@ -4971,7 +5819,8 @@ function resetSpectrumForSong(song = state.currentSong) {
     fluxMeteor: 0,
     previousBrightness: 0,
     previousBass: 0,
-    silenceFrames: 0
+    silenceFrames: 0,
+    lastUpdateAt: 0
   });
   if (state.audioAnalysis.previousData) state.audioAnalysis.previousData.fill(0);
   state.audioAnalysis.lowFrequencyBands.fill(0);
@@ -5004,6 +5853,18 @@ function writeLowFrequencyBands(target, source, fallback = 0) {
     const upper = clamp(Number(source[upperIndex]) || 0, 0, 1);
     target[index] = lower + (upper - lower) * mix;
   }
+}
+
+function lowFrequencyBandsHaveSignal(source, minimumSignal = 0.01) {
+  const sourceLength = source && typeof source !== 'string'
+    ? Math.max(0, Math.floor(Number(source.length) || 0))
+    : 0;
+  const threshold = Math.max(0, Number(minimumSignal) || 0);
+  for (let index = 0; index < sourceLength; index += 1) {
+    const amplitude = Number(source[index]);
+    if (Number.isFinite(amplitude) && amplitude >= threshold) return true;
+  }
+  return false;
 }
 
 function applyBridgeVisual() {
@@ -5160,12 +6021,15 @@ async function createNativeGoogleObrGraph(analysis) {
     algorithm: '2'
   });
   const start = await nativeSpatialRequest(`/api/audio/spatial/start?${startParams}`);
-  if (!start?.ok || !Number(start.session)) {
+  if (!start?.ok || !Number(start.session) || !Number(start.generation)) {
     throw new Error(safeText(start?.error, '原生空间音频链路初始化失败'));
   }
   const session = Number(start.session);
+  const generation = Number(start.generation);
   if (start.rustUpmixActive !== true) {
-    await nativeSpatialRequest(`/api/audio/spatial/stop?session=${encodeURIComponent(session)}`).catch(() => {});
+    await nativeSpatialRequest(
+      `/api/audio/spatial/stop?session=${encodeURIComponent(session)}&generation=${encodeURIComponent(generation)}`
+    ).catch(() => {});
     throw new Error('OxiMedia Rust 上混动态库未加载');
   }
 
@@ -5205,6 +6069,7 @@ async function createNativeGoogleObrGraph(analysis) {
       connected: true,
       nativeStream: true,
       session,
+      generation,
       streamController,
       streamAbort,
       disposed: false,
@@ -5260,6 +6125,7 @@ async function createNativeGoogleObrGraph(analysis) {
     wetGain.connect(analysis.context.destination);
     const streamParams = new URLSearchParams({
       session: String(session),
+      generation: String(generation),
       inputChannels: '2'
     });
     graph.streamPromise = fetch(`/api/audio/spatial/stream?${streamParams}`, {
@@ -5288,7 +6154,9 @@ async function createNativeGoogleObrGraph(analysis) {
     });
     return graph;
   } catch (error) {
-    await nativeSpatialRequest(`/api/audio/spatial/stop?session=${encodeURIComponent(session)}`).catch(() => {});
+    await nativeSpatialRequest(
+      `/api/audio/spatial/stop?session=${encodeURIComponent(session)}&generation=${encodeURIComponent(generation)}`
+    ).catch(() => {});
     throw error;
   }
 }
@@ -5300,7 +6168,11 @@ async function waitForNativeGoogleObrPreroll(graph) {
   );
   while (!graph.disposed && performance.now() - startedAt < 5000) {
     const status = await apiJson('/api/audio/spatial/status');
-    if (!status?.active || Number(status.session) !== Number(graph.session)) {
+    if (
+      !status?.active
+      || Number(status.session) !== Number(graph.session)
+      || Number(status.generation) !== Number(graph.generation)
+    ) {
       throw new Error('原生空间音频会话已中断');
     }
     if (
@@ -5415,7 +6287,11 @@ function refreshNativeGoogleObrHealth() {
       ) {
         return null;
       }
-      if (!status?.active || Number(status.session) !== Number(graph.session)) {
+      if (
+        !status?.active
+        || Number(status.session) !== Number(graph.session)
+        || Number(status.generation) !== Number(graph.generation)
+      ) {
         failGoogleObr(new Error('Native OBR session stopped'), { announce: false, graph });
         return status;
       }
@@ -5477,8 +6353,8 @@ function disconnectOfficialGoogleObrGraph(graph) {
   graph.connected = false;
 }
 
-function disposeOfficialGoogleObrGraph(graph = state.obrSpatialAudio.graph) {
-  if (!graph) return;
+function disposeOfficialGoogleObrGraph(graph = state.obrSpatialAudio.graph, options = {}) {
+  if (!graph) return Promise.resolve(null);
   window.clearTimeout(graph.disableTimer);
   graph.disableTimer = 0;
   // Keep the dry path audible while a failed/reconfigured OBR graph is rebuilt.
@@ -5508,9 +6384,10 @@ function disposeOfficialGoogleObrGraph(graph = state.obrSpatialAudio.graph) {
     disconnectOfficialGoogleObrGraph(graph);
     try { graph.streamController?.close(); } catch (error) {}
     graph.streamAbort?.abort();
-    nativeSpatialRequest(
-      `/api/audio/spatial/stop?session=${encodeURIComponent(graph.session)}`
-    ).catch(() => {});
+    const nativeAction = options.nativeAction === 'pause' ? 'pause' : 'stop';
+    const nativeRelease = nativeSpatialRequest(
+      `/api/audio/spatial/${nativeAction}?session=${encodeURIComponent(graph.session)}&generation=${encodeURIComponent(graph.generation)}`
+    ).catch(() => null);
     try { graph.node.port.close(); } catch (error) {}
     graph.node.onprocessorerror = null;
     graph.ready = false;
@@ -5520,7 +6397,7 @@ function disposeOfficialGoogleObrGraph(graph = state.obrSpatialAudio.graph) {
       state.obrSpatialAudio.nativeQueueUnderruns = 0;
       state.obrSpatialAudio.nativeOutputLatencySeconds = 0;
     }
-    return;
+    return nativeRelease;
   }
   if (graph.pendingProcess) {
     const pending = graph.pendingProcess;
@@ -5534,6 +6411,30 @@ function disposeOfficialGoogleObrGraph(graph = state.obrSpatialAudio.graph) {
   graph.node.onprocessorerror = null;
   graph.ready = false;
   if (state.obrSpatialAudio.graph === graph) state.obrSpatialAudio.graph = null;
+  return Promise.resolve(null);
+}
+
+async function invalidateNativeGoogleObrTimeline(reason = 'timeline-change') {
+  const spatial = state.obrSpatialAudio;
+  if (spatial.timelineInvalidationPromise) return spatial.timelineInvalidationPromise;
+  const graph = spatial.graph;
+  if (!graph?.nativeStream || graph.disposed) return false;
+
+  spatial.operationId += 1;
+  spatial.enabled = false;
+  spatial.loading = false;
+  spatial.backend = 'waiting-for-audio';
+  setGoogleObrRuntimeBackend(false);
+  syncGoogleObrToggle();
+  const invalidation = Promise.resolve(
+    disposeOfficialGoogleObrGraph(graph, { nativeAction: 'pause', reason })
+  ).then(() => true).finally(() => {
+    if (spatial.timelineInvalidationPromise === invalidation) {
+      spatial.timelineInvalidationPromise = null;
+    }
+  });
+  spatial.timelineInvalidationPromise = invalidation;
+  return invalidation;
 }
 
 function scheduleGoogleObrRecovery() {
@@ -5573,6 +6474,7 @@ function failGoogleObr(error, options = {}) {
     spatial.backend = 'unavailable';
   }
   saveGoogleObrPreference(true);
+  syncRealtimePolling();
   if (spatial.graph) {
     spatial.graph.node.port.postMessage({ type: 'set-enabled', enabled: false });
     setAudioParamSmoothly(spatial.graph.dryGain.gain, 1, spatial.graph.context);
@@ -5780,7 +6682,7 @@ async function activateOfficialGoogleObr(options = {}) {
     }
     if (graph.nativeStream) {
       const nativeActivation = await nativeSpatialRequest(
-        `/api/audio/spatial/activate?session=${encodeURIComponent(graph.session)}`
+        `/api/audio/spatial/activate?session=${encodeURIComponent(graph.session)}&generation=${encodeURIComponent(graph.generation)}`
       );
       if (!nativeActivation?.ok) {
         throw new Error(safeText(nativeActivation?.error, 'XAudio2 原生输出无法解除静音'));
@@ -5797,6 +6699,7 @@ async function activateOfficialGoogleObr(options = {}) {
     clearGoogleObrRecovery();
     setGoogleObrRuntimeBackend(true);
     saveGoogleObrPreference(true);
+    syncRealtimePolling();
     syncGoogleObrToggle();
     if (options.announce !== false) toast(`Google OBR ${GOOGLE_OBR_CHANNEL_LAYOUTS[graph.channelLayout].label} 空间音频已开启`);
     return true;
@@ -5828,6 +6731,7 @@ async function setGoogleObrSpatialAudioEnabled(enabled, options = {}) {
     spatial.error = '';
     setGoogleObrRuntimeBackend(false);
     saveGoogleObrPreference(false);
+    syncRealtimePolling();
     if (spatial.graph) {
       const graph = spatial.graph;
       window.clearTimeout(graph.disableTimer);
@@ -5851,7 +6755,7 @@ async function setGoogleObrSpatialAudioEnabled(enabled, options = {}) {
   spatial.requested = true;
   spatial.error = '';
   saveGoogleObrPreference(true);
-  if (!els.audio?.src) {
+  if (!els.audio?.src || !audioAnalysisPlaybackActive()) {
     spatial.backend = 'waiting-for-audio';
     spatial.loading = false;
     syncGoogleObrToggle();
@@ -5868,7 +6772,10 @@ async function setGoogleObrChannelLayout(value, options = {}) {
   const channelLayout = normalizeGoogleObrChannelLayout(value);
   if (channelLayout === spatial.channelLayout) {
     syncGoogleObrToggle();
-    return !spatial.requested || spatial.enabled || !els.audio?.src;
+    return !spatial.requested
+      || spatial.enabled
+      || !els.audio?.src
+      || !audioAnalysisPlaybackActive();
   }
 
   spatial.channelLayout = channelLayout;
@@ -5885,8 +6792,14 @@ async function setGoogleObrChannelLayout(value, options = {}) {
   spatial.error = '';
   setGoogleObrRuntimeBackend(false);
   saveGoogleObrPreference(spatial.requested);
+  syncRealtimePolling();
   syncGoogleObrToggle();
   if (!spatial.requested || !els.audio?.src) return true;
+  if (!audioAnalysisPlaybackActive()) {
+    spatial.backend = 'waiting-for-audio';
+    syncGoogleObrToggle();
+    return true;
+  }
   const ready = await ensureAudioAnalysis({ announceObrFailure: options.announce !== false });
   if (ready && options.announce !== false) {
     toast(`Google OBR 已切换到 ${GOOGLE_OBR_CHANNEL_LAYOUTS[channelLayout].label}`);
@@ -5915,6 +6828,10 @@ async function ensureAudioAnalysis(options = {}) {
   if (!AudioContextCtor || !els.audio) return false;
 
   const analysis = state.audioAnalysis;
+  if (!audioAnalysisPlaybackActive()) {
+    await suspendAudioAnalysis();
+    return false;
+  }
   try {
     if (!analysis.context) {
       analysis.context = new AudioContextCtor();
@@ -5925,8 +6842,14 @@ async function ensureAudioAnalysis(options = {}) {
     if (!state.clientRuntime.nativeAudioActive) state.clientRuntime.audioBackend = 'web-audio';
     state.clientRuntime.audioSampleRate = analysis.sampleRate;
     applyRuntimeDataset();
-    if (analysis.context.state === 'suspended') {
-      await analysis.context.resume();
+    if (!await resumeAudioAnalysis()) {
+      analysis.blocked = true;
+      updateSpectrumUi();
+      return false;
+    }
+    if (!audioAnalysisPlaybackActive()) {
+      await suspendAudioAnalysis();
+      return false;
     }
     if (!analysis.analyser) {
       analysis.analyser = analysis.context.createAnalyser();
@@ -5961,7 +6884,11 @@ async function ensureAudioAnalysis(options = {}) {
     }
     analysis.ready = true;
     analysis.blocked = false;
-    if (state.obrSpatialAudio.requested && !state.obrSpatialAudio.enabled) {
+    if (
+      audioAnalysisPlaybackActive()
+      && state.obrSpatialAudio.requested
+      && !state.obrSpatialAudio.enabled
+    ) {
       await activateOfficialGoogleObr({
         announce: options.announceObrFailure === true
       });
@@ -5978,27 +6905,77 @@ async function ensureAudioAnalysis(options = {}) {
   }
 }
 
-function rmsFrequencyBand(data, analyser, fromHz, toHz) {
-  const nyquist = (analyser.context && analyser.context.sampleRate ? analyser.context.sampleRate : 44100) / 2;
-  const from = clamp(Math.floor((fromHz / nyquist) * data.length), 0, data.length - 1);
-  const to = clamp(Math.ceil((toHz / nyquist) * data.length), from + 1, data.length);
-  let sumSquares = 0;
-  for (let index = from; index < to; index += 1) {
-    const value = (data[index] || 0) / 255;
-    sumSquares += value * value;
+function audioFrameResponse(baseResponse, responseScale) {
+  return 1 - Math.pow(1 - baseResponse, responseScale);
+}
+
+function ensureAudioSpectrumAggregateLookup(analysis, dataLength, sampleRate) {
+  const length = Math.max(1, Math.floor(Number(dataLength) || 1));
+  const resolvedSampleRate = Math.max(1, Number(sampleRate) || 44100);
+  if (
+    analysis.aggregateLookupDataLength === length
+    && analysis.aggregateLookupSampleRate === resolvedSampleRate
+    && analysis.aggregateBandByBin?.length === length
+  ) {
+    return;
   }
-  return clamp(Math.sqrt(sumSquares / Math.max(1, to - from)), 0, 1);
+
+  if (!analysis.aggregateBandByBin || analysis.aggregateBandByBin.length !== length) {
+    analysis.aggregateBandByBin = new Uint8Array(length);
+  }
+  if (!analysis.aggregateBandCounts || analysis.aggregateBandCounts.length !== AUDIO_SPECTRUM_BAND_COUNT) {
+    analysis.aggregateBandCounts = new Uint16Array(AUDIO_SPECTRUM_BAND_COUNT);
+  }
+  if (!analysis.aggregateBandSums || analysis.aggregateBandSums.length !== AUDIO_SPECTRUM_BAND_COUNT) {
+    analysis.aggregateBandSums = new Float64Array(AUDIO_SPECTRUM_BAND_COUNT);
+  }
+  const lookup = analysis.aggregateBandByBin;
+  const counts = analysis.aggregateBandCounts;
+  lookup.fill(AUDIO_SPECTRUM_UNMAPPED);
+  counts.fill(0);
+
+  const lastIndex = length - 1;
+  const scaleBin = length / 512;
+  const assignRange = (band, rawStart, rawEnd) => {
+    const start = clamp(Math.floor(rawStart), 0, lastIndex);
+    const end = clamp(Math.floor(rawEnd), start, lastIndex);
+    for (let index = start; index <= end; index += 1) lookup[index] = band;
+    counts[band] = end - start + 1;
+  };
+  assignRange(0, 0, scaleBin);
+  assignRange(1, 2 * scaleBin, 3 * scaleBin);
+  assignRange(2, 4 * scaleBin, 7 * scaleBin);
+  assignRange(3, 8 * scaleBin, 18 * scaleBin);
+  assignRange(4, 19 * scaleBin, 46 * scaleBin);
+  assignRange(5, 47 * scaleBin, 93 * scaleBin);
+  assignRange(6, 94 * scaleBin, 186 * scaleBin);
+  assignRange(7, 187 * scaleBin, 372 * scaleBin);
+
+  const nyquist = resolvedSampleRate / 2;
+  analysis.lowFrequencyRmsStart = clamp(
+    Math.floor((SONIC_LOW_FREQUENCY_MIN_HZ / nyquist) * length),
+    0,
+    lastIndex
+  );
+  analysis.lowFrequencyRmsEnd = clamp(
+    Math.ceil((SONIC_LOW_FREQUENCY_MAX_HZ / nyquist) * length),
+    analysis.lowFrequencyRmsStart + 1,
+    length
+  );
+  analysis.aggregateLookupDataLength = length;
+  analysis.aggregateLookupSampleRate = resolvedSampleRate;
 }
 
 function updateAudioSpectrum() {
   const analysis = state.audioAnalysis;
   if (state.clientRuntime.nativeAudioActive && state.clientRuntime.settings.xAudio2) {
+    analysis.lastUpdateAt = 0;
     analysis.live = false;
     analysis.blocked = false;
-    applyBridgeVisual();
     return true;
   }
   if (!analysis.analyser || !analysis.data || els.audio.paused) {
+    analysis.lastUpdateAt = 0;
     if (els.audio.paused) {
       analysis.live = false;
       applyBridgeVisual();
@@ -6006,50 +6983,40 @@ function updateAudioSpectrum() {
     return false;
   }
 
+  const now = performance.now();
+  const referenceFrameMs = Math.max(8, Number(RENDER_PROFILE.targetFrameMs) || 1000 / 60);
+  const elapsedMs = analysis.lastUpdateAt
+    ? clamp(now - analysis.lastUpdateAt, 0.5, 100)
+    : referenceFrameMs;
+  analysis.lastUpdateAt = now;
+  const responseScale = elapsedMs / referenceFrameMs;
+  const derivativeScale = clamp(referenceFrameMs / elapsedMs, 0.25, 4);
+  const standardResponse = audioFrameResponse(0.15, responseScale);
+  const lowFrequencyAttackResponse = audioFrameResponse(0.34, responseScale);
+  const lowFrequencyReleaseResponse = audioFrameResponse(0.075, responseScale);
+  const fluxResponse = audioFrameResponse(0.4, responseScale);
+  const beatResponse = audioFrameResponse(0.42, responseScale);
+
   analysis.analyser.getByteFrequencyData(analysis.data);
   if (!analysis.previousData || analysis.previousData.length !== analysis.data.length) {
     analysis.previousData = new Float32Array(analysis.data.length);
   }
 
   const data = analysis.data;
-  const scaleBin = data.length / 512;
+  const spectrumSampleRate = analysis.analyser.context?.sampleRate || analysis.sampleRate || 44100;
+  ensureAudioSpectrumAggregateLookup(analysis, data.length, spectrumSampleRate);
   const lastDataIndex = data.length - 1;
-  const subBassEnd = clamp(Math.floor(scaleBin), 0, lastDataIndex);
-  const bassStart = clamp(Math.floor(2 * scaleBin), 0, lastDataIndex);
-  const bassEnd = clamp(Math.floor(3 * scaleBin), 0, lastDataIndex);
-  const lowMidStart = clamp(Math.floor(4 * scaleBin), 0, lastDataIndex);
-  const lowMidEnd = clamp(Math.floor(7 * scaleBin), 0, lastDataIndex);
-  const midStart = clamp(Math.floor(8 * scaleBin), 0, lastDataIndex);
-  const midEnd = clamp(Math.floor(18 * scaleBin), 0, lastDataIndex);
-  const highMidStart = clamp(Math.floor(19 * scaleBin), 0, lastDataIndex);
-  const highMidEnd = clamp(Math.floor(46 * scaleBin), 0, lastDataIndex);
-  const presenceStart = clamp(Math.floor(47 * scaleBin), 0, lastDataIndex);
-  const presenceEnd = clamp(Math.floor(93 * scaleBin), 0, lastDataIndex);
-  const brillianceStart = clamp(Math.floor(94 * scaleBin), 0, lastDataIndex);
-  const brillianceEnd = clamp(Math.floor(186 * scaleBin), 0, lastDataIndex);
-  const airStart = clamp(Math.floor(187 * scaleBin), 0, lastDataIndex);
-  const airEnd = clamp(Math.floor(372 * scaleBin), 0, lastDataIndex);
-  let subBassSum = 0;
-  let subBassCount = 0;
-  let bassSum = 0;
-  let bassCount = 0;
-  let lowMidSum = 0;
-  let lowMidCount = 0;
-  let midSum = 0;
-  let midCount = 0;
-  let highMidSum = 0;
-  let highMidCount = 0;
-  let presenceSum = 0;
-  let presenceCount = 0;
-  let brillianceSum = 0;
-  let brillianceCount = 0;
-  let airSum = 0;
-  let airCount = 0;
+  const scaleBin = data.length / 512;
+  const aggregateBandByBin = analysis.aggregateBandByBin;
+  const aggregateBandSums = analysis.aggregateBandSums;
+  const aggregateBandCounts = analysis.aggregateBandCounts;
+  aggregateBandSums.fill(0);
 
   let energySum = 0;
   let centroidNum = 0;
   let centroidDen = 0;
   let jumpVolatilitySum = 0;
+  let lowFrequencySquareSum = 0;
   let fluxPulseRaw = 0;
   let fluxMeteorRaw = 0;
   const pulseStart = 0;
@@ -6058,7 +7025,7 @@ function updateAudioSpectrum() {
   const meteorEnd = clamp(Math.floor(174 * scaleBin), 0, lastDataIndex);
 
   for (let index = 0; index < data.length; index += 1) {
-    const value = (data[index] || 0) / 255;
+    const value = (data[index] || 0) * AUDIO_BYTE_TO_UNIT;
     const previous = analysis.previousData[index] || 0;
     const diff = value - previous;
     energySum += value;
@@ -6071,53 +7038,37 @@ function updateAudioSpectrum() {
     }
     analysis.previousData[index] = value;
 
-    if (index <= subBassEnd) {
-      subBassSum += value;
-      subBassCount += 1;
-    } else if (index >= bassStart && index <= bassEnd) {
-      bassSum += value;
-      bassCount += 1;
-    } else if (index >= lowMidStart && index <= lowMidEnd) {
-      lowMidSum += value;
-      lowMidCount += 1;
-    } else if (index >= midStart && index <= midEnd) {
-      midSum += value;
-      midCount += 1;
-    } else if (index >= highMidStart && index <= highMidEnd) {
-      highMidSum += value;
-      highMidCount += 1;
-    } else if (index >= presenceStart && index <= presenceEnd) {
-      presenceSum += value;
-      presenceCount += 1;
-    } else if (index >= brillianceStart && index <= brillianceEnd) {
-      brillianceSum += value;
-      brillianceCount += 1;
-    } else if (index >= airStart && index <= airEnd) {
-      airSum += value;
-      airCount += 1;
+    const aggregateBand = aggregateBandByBin[index];
+    if (aggregateBand !== AUDIO_SPECTRUM_UNMAPPED) aggregateBandSums[aggregateBand] += value;
+    if (index >= analysis.lowFrequencyRmsStart && index < analysis.lowFrequencyRmsEnd) {
+      lowFrequencySquareSum += value * value;
     }
   }
 
-  const subBassRaw = subBassSum / Math.max(1, subBassCount);
-  const bassOnlyRaw = bassSum / Math.max(1, bassCount);
-  const lowMidRaw = lowMidSum / Math.max(1, lowMidCount);
-  const midOnlyRaw = midSum / Math.max(1, midCount);
-  const highMidRaw = highMidSum / Math.max(1, highMidCount);
-  const presenceRaw = presenceSum / Math.max(1, presenceCount);
-  const brillianceRaw = brillianceSum / Math.max(1, brillianceCount);
-  const airRaw = airSum / Math.max(1, airCount);
-  const lowFrequencyRaw = rmsFrequencyBand(data, analysis.analyser, 20, 150);
+  const subBassRaw = aggregateBandSums[0] / Math.max(1, aggregateBandCounts[0]);
+  const bassOnlyRaw = aggregateBandSums[1] / Math.max(1, aggregateBandCounts[1]);
+  const lowMidRaw = aggregateBandSums[2] / Math.max(1, aggregateBandCounts[2]);
+  const midOnlyRaw = aggregateBandSums[3] / Math.max(1, aggregateBandCounts[3]);
+  const highMidRaw = aggregateBandSums[4] / Math.max(1, aggregateBandCounts[4]);
+  const presenceRaw = aggregateBandSums[5] / Math.max(1, aggregateBandCounts[5]);
+  const brillianceRaw = aggregateBandSums[6] / Math.max(1, aggregateBandCounts[6]);
+  const airRaw = aggregateBandSums[7] / Math.max(1, aggregateBandCounts[7]);
+  const lowFrequencyRaw = clamp(Math.sqrt(
+    lowFrequencySquareSum
+      / Math.max(1, analysis.lowFrequencyRmsEnd - analysis.lowFrequencyRmsStart)
+  ), 0, 1);
   const bassRaw = (subBassRaw + bassOnlyRaw + lowMidRaw) / 3;
   const midRaw = (midOnlyRaw + highMidRaw) / 2;
   const trebleRaw = (presenceRaw + brillianceRaw + airRaw) / 3;
   const energyRaw = energySum / Math.max(1, data.length);
   const warmthRaw = energySum > 0
-    ? (subBassSum + bassSum + lowMidSum + midSum) / energySum
+    ? (aggregateBandSums[0] + aggregateBandSums[1]
+      + aggregateBandSums[2] + aggregateBandSums[3]) / energySum
     : 0;
   const brightnessRaw = energySum > 0
-    ? (presenceSum + brillianceSum + airSum) / energySum
+    ? (aggregateBandSums[5] + aggregateBandSums[6] + aggregateBandSums[7]) / energySum
     : 0;
-  const sharpnessRaw = Math.max(0, brightnessRaw - analysis.previousBrightness) * 10;
+  const sharpnessRaw = Math.max(0, brightnessRaw - analysis.previousBrightness) * 10 * derivativeScale;
   analysis.previousBrightness = brightnessRaw;
   const smoothnessRaw = Math.max(0, 1 - (jumpVolatilitySum / Math.max(1, data.length)) * 2);
   const activeThreshold = energyRaw * 1.5;
@@ -6135,7 +7086,7 @@ function updateAudioSpectrum() {
   const active = bassRaw > 0.012 || midRaw > 0.012 || trebleRaw > 0.012;
 
   if (!active) {
-    analysis.silenceFrames += 1;
+    analysis.silenceFrames += responseScale;
     if (analysis.silenceFrames > 50) {
       analysis.live = false;
       analysis.blocked = true;
@@ -6149,13 +7100,14 @@ function updateAudioSpectrum() {
     analysis.blocked = false;
   }
 
-  const beatRaw = clamp((bassRaw - analysis.previousBass) * 4.6 + bassRaw * 0.38, 0, 1);
+  const beatRaw = clamp((bassRaw - analysis.previousBass) * 4.6 * derivativeScale + bassRaw * 0.38, 0, 1);
   analysis.previousBass = bassRaw;
-  const dt = 0.15;
+  const dt = standardResponse;
   analysis.bass += (bassRaw - analysis.bass) * dt;
-  const lowFrequencyRate = lowFrequencyRaw > analysis.lowFrequencyAmplitude ? 0.34 : 0.075;
+  const lowFrequencyRate = lowFrequencyRaw > analysis.lowFrequencyAmplitude
+    ? lowFrequencyAttackResponse
+    : lowFrequencyReleaseResponse;
   analysis.lowFrequencyAmplitude += (lowFrequencyRaw - analysis.lowFrequencyAmplitude) * lowFrequencyRate;
-  const spectrumSampleRate = analysis.analyser.context?.sampleRate || analysis.sampleRate || 44100;
   const spectrumNyquist = spectrumSampleRate / 2;
   const lowFrequencyBandDivisor = Math.max(1, SONIC_LOW_FREQUENCY_BAND_COUNT - 1);
   const lowFrequencySpan = SONIC_LOW_FREQUENCY_MAX_HZ - SONIC_LOW_FREQUENCY_MIN_HZ;
@@ -6187,7 +7139,9 @@ function updateAudioSpectrum() {
     );
     const targetAmplitude = clamp(rawAmplitude * 1.55, 0, 1);
     const currentAmplitude = analysis.lowFrequencyBands[index] || 0;
-    const response = targetAmplitude > currentAmplitude ? 0.34 : 0.075;
+    const response = targetAmplitude > currentAmplitude
+      ? lowFrequencyAttackResponse
+      : lowFrequencyReleaseResponse;
     const amplitude = currentAmplitude + (targetAmplitude - currentAmplitude) * response;
     analysis.lowFrequencyBands[index] = amplitude;
     state.visual.lowFrequencyBands[index] = amplitude;
@@ -6207,9 +7161,9 @@ function updateAudioSpectrum() {
   analysis.smoothness += (smoothnessRaw - analysis.smoothness) * dt;
   analysis.density += (densityRaw - analysis.density) * dt;
   analysis.spectralCentroid += (spectralCentroidRaw - analysis.spectralCentroid) * dt;
-  analysis.fluxPulse += (fluxPulseRaw - analysis.fluxPulse) * 0.4;
-  analysis.fluxMeteor += (fluxMeteorRaw - analysis.fluxMeteor) * 0.4;
-  analysis.beat += (beatRaw - analysis.beat) * 0.42;
+  analysis.fluxPulse += (fluxPulseRaw - analysis.fluxPulse) * fluxResponse;
+  analysis.fluxMeteor += (fluxMeteorRaw - analysis.fluxMeteor) * fluxResponse;
+  analysis.beat += (beatRaw - analysis.beat) * beatResponse;
   analysis.live = true;
 
   state.visual.lowFrequencyAmplitude = clamp(analysis.lowFrequencyAmplitude * 1.55, 0, 1);
@@ -6236,29 +7190,98 @@ function updateAudioSpectrum() {
   return true;
 }
 
+function ensureLowFrequencyGraphSurface(canvas) {
+  const graph = state.lowFrequencyGraph;
+  if (!graph.surface || graph.surface.canvas !== canvas) {
+    graph.resizeObserver?.disconnect?.();
+    const rect = canvas.getBoundingClientRect();
+    const surface = {
+      canvas,
+      context: canvas.getContext('2d'),
+      cssWidth: Math.max(1, Number(rect.width) || Number(canvas.width) || 202),
+      cssHeight: Math.max(1, Number(rect.height) || Number(canvas.height) || 64),
+      dpr: 0,
+      width: 0,
+      height: 0,
+      gradient: null,
+      dirty: true
+    };
+    graph.surface = surface;
+    const ResizeObserverCtor = window.ResizeObserver;
+    if (typeof ResizeObserverCtor === 'function') {
+      graph.resizeObserver = new ResizeObserverCtor((entries) => {
+        const contentRect = entries?.[0]?.contentRect;
+        const nextWidth = Number(contentRect?.width) || 0;
+        const nextHeight = Number(contentRect?.height) || 0;
+        if (nextWidth <= 0 || nextHeight <= 0) return;
+        if (surface.cssWidth === nextWidth && surface.cssHeight === nextHeight) return;
+        surface.cssWidth = nextWidth;
+        surface.cssHeight = nextHeight;
+        surface.dirty = true;
+      });
+      graph.resizeObserver.observe(canvas);
+    }
+  }
+
+  const surface = graph.surface;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const width = Math.max(1, Math.floor(surface.cssWidth * dpr));
+  const height = Math.max(1, Math.floor(surface.cssHeight * dpr));
+  if (surface.dirty || surface.dpr !== dpr || surface.width !== width || surface.height !== height) {
+    surface.dirty = false;
+    surface.dpr = dpr;
+    surface.width = width;
+    surface.height = height;
+    if (canvas.width !== width) canvas.width = width;
+    if (canvas.height !== height) canvas.height = height;
+    if (surface.context) {
+      surface.gradient = surface.context.createLinearGradient(0, 0, 0, height);
+      surface.gradient.addColorStop(0, 'rgba(131, 228, 255, 0.24)');
+      surface.gradient.addColorStop(1, 'rgba(131, 228, 255, 0.02)');
+    }
+  }
+  return surface;
+}
+
+function appendLowFrequencyGraphSample(value) {
+  const graph = state.lowFrequencyGraph;
+  const capacity = 96;
+  if (!(graph.history instanceof Float32Array) || graph.history.length !== capacity) {
+    const previous = Array.from(graph.history || []).slice(-capacity);
+    graph.history = new Float32Array(capacity);
+    graph.history.set(previous, 0);
+    graph.count = previous.length;
+    graph.cursor = previous.length % capacity;
+  }
+  const cursor = Math.max(0, Number(graph.cursor) || 0) % capacity;
+  graph.history[cursor] = clamp(value, 0, 1);
+  graph.cursor = (cursor + 1) % capacity;
+  graph.count = Math.min(capacity, Math.max(0, Number(graph.count) || 0) + 1);
+}
+
+function readLowFrequencyGraphSample(index) {
+  const graph = state.lowFrequencyGraph;
+  const history = graph.history;
+  const count = Math.min(history.length, Math.max(0, Number(graph.count) || 0));
+  const start = (Math.max(0, Number(graph.cursor) || 0) - count + history.length) % history.length;
+  return history[(start + index) % history.length] || 0;
+}
+
 function drawLowFrequencyGraph(value) {
   if (!els.lowFrequencyGraph) return;
   const canvas = els.lowFrequencyGraph;
-  const rect = canvas.getBoundingClientRect();
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const width = Math.max(1, Math.floor((rect.width || canvas.width || 202) * dpr));
-  const height = Math.max(1, Math.floor((rect.height || canvas.height || 64) * dpr));
-  if (canvas.width !== width || canvas.height !== height) {
-    canvas.width = width;
-    canvas.height = height;
-  }
-
-  const context = canvas.getContext('2d');
+  const surface = ensureLowFrequencyGraphSurface(canvas);
+  const context = surface.context;
   if (!context) return;
-  const history = state.lowFrequencyGraph.history;
-  history.push(clamp(value, 0, 1));
-  while (history.length > 96) history.shift();
+  const { width, height, dpr } = surface;
+  appendLowFrequencyGraphSample(value);
+  const historyCount = Math.min(
+    state.lowFrequencyGraph.history.length,
+    Math.max(0, Number(state.lowFrequencyGraph.count) || 0)
+  );
 
   context.clearRect(0, 0, width, height);
-  const gradient = context.createLinearGradient(0, 0, 0, height);
-  gradient.addColorStop(0, 'rgba(131, 228, 255, 0.24)');
-  gradient.addColorStop(1, 'rgba(131, 228, 255, 0.02)');
-  context.fillStyle = gradient;
+  context.fillStyle = surface.gradient;
   context.fillRect(0, 0, width, height);
 
   context.strokeStyle = 'rgba(232, 249, 255, 0.12)';
@@ -6272,12 +7295,13 @@ function drawLowFrequencyGraph(value) {
   }
 
   context.beginPath();
-  history.forEach((item, index) => {
-    const x = history.length <= 1 ? width : (index / (history.length - 1)) * width;
+  for (let index = 0; index < historyCount; index += 1) {
+    const item = readLowFrequencyGraphSample(index);
+    const x = historyCount <= 1 ? width : (index / (historyCount - 1)) * width;
     const y = height - item * (height - 6 * dpr) - 3 * dpr;
     if (index === 0) context.moveTo(x, y);
     else context.lineTo(x, y);
-  });
+  }
   context.strokeStyle = 'rgba(131, 228, 255, 0.96)';
   context.lineWidth = 2 * dpr;
   context.shadowBlur = 8 * dpr;
@@ -6295,12 +7319,22 @@ function updateSpectrumUi() {
     1
   );
   state.lowFrequencyGraph.lastValue = lowFrequency;
-  if (state.runtimeSettingsOpen && els.lowFrequencyValue) {
-    els.lowFrequencyValue.textContent = `${Math.round(lowFrequency * 100)}%`;
+  // The spectrum controls live in the runtime/settings surfaces. Keep the
+  // latest value in state while those surfaces are closed, but do not wake
+  // style/layout/paint for DOM that the user cannot see on every playback
+  // frame. The next animation frame paints the current value when opened.
+  if (!state.runtimeSettingsOpen) return;
+
+  if (els.lowFrequencyValue) {
+    const valueText = `${Math.round(lowFrequency * 100)}%`;
+    if (els.lowFrequencyValue.textContent !== valueText) {
+      els.lowFrequencyValue.textContent = valueText;
+    }
   }
-  if (state.runtimeSettingsOpen && els.lowFrequencyGraph) {
+  if (els.lowFrequencyGraph) {
     const now = performance.now();
-    if (now - state.lowFrequencyGraph.lastDrawAt > 80) {
+    const lastDrawAt = Number(state.lowFrequencyGraph.lastDrawAt) || 0;
+    if (now < lastDrawAt || now - lastDrawAt >= 80) {
       state.lowFrequencyGraph.lastDrawAt = now;
       drawLowFrequencyGraph(lowFrequency);
     }
@@ -6308,20 +7342,27 @@ function updateSpectrumUi() {
 
   if (els.spectrumBassFill) {
     const value = Math.max(state.audioAnalysis.live ? state.visual.bass : state.visualBridge.bass, lowFrequency);
-    els.spectrumBassFill.style.transform = `scaleX(${clamp(value, 0, 1).toFixed(3)})`;
+    setStylePropertyIfChanged(
+      els.spectrumBassFill,
+      'transform',
+      `scaleX(${clamp(value, 0, 1).toFixed(3)})`
+    );
   }
   if (els.spectrumStatus) {
-    if (state.visualBridge.source === 'xaudio2-native-loopback') {
-      els.spectrumStatus.textContent = 'XAudio2';
-      return;
-    }
-    const status = state.audioAnalysis.live ? '实时' : state.audioAnalysis.blocked ? '桥接' : '待机';
-    els.spectrumStatus.textContent = status;
+    const status = state.visualBridge.source === 'xaudio2-native-loopback'
+      ? 'XAudio2'
+      : state.audioAnalysis.live
+        ? '实时'
+        : state.audioAnalysis.blocked
+          ? '桥接'
+          : '待机';
+    if (els.spectrumStatus.textContent !== status) els.spectrumStatus.textContent = status;
   }
 }
 
 function buildDynamicCube() {
   if (!els.dynamicCubeCore || state.dynamicCube.built) return;
+  if (!heavyWebGLRenderingAllowed()) return;
   if (!window.THREE) {
     state.dynamicCube.built = true;
     return;
@@ -6540,8 +7581,6 @@ function updateDynamicCubeMotion() {
   const cube = state.dynamicCube;
   if (!state.playbackPage || state.diyPreset !== 'cube' || !cube.mesh || !cube.renderer || !cube.scene || !cube.camera) return;
   const nowMs = performance.now();
-  const frameGapMs = playbackPresetsUseNativeRefresh() ? 0 : RENDER_PROFILE.cubeFrameGapMs;
-  if (frameGapMs && cube.lastRenderAt && nowMs - cube.lastRenderAt < frameGapMs) return;
   cube.lastRenderAt = nowMs;
   const bass = Math.max(state.visual.bass, els.audio.paused ? 0.04 : 0.22);
   const energy = Math.max(state.visual.energy, els.audio.paused ? 0.04 : 0.18);
@@ -6612,6 +7651,7 @@ function applyFreeCubePalette(palette) {
 
 function buildFreeCube() {
   if (!els.freeCubeCore || state.freeCube.runtime || !window.FeFreeCubeRuntime || !window.THREE) return;
+  if (!heavyWebGLRenderingAllowed()) return;
   const lowEndAndroid = ANDROID_CLIENT && RENDER_PROFILE.tier === 'economy';
   const cubeCount = lowEndAndroid ? 720 : MOBILE_RENDER_TARGET ? 1100 : 1800;
   const particleCount = lowEndAndroid ? 480 : MOBILE_RENDER_TARGET ? 760 : 1400;
@@ -6662,6 +7702,7 @@ function setFreeCubeMode(mode) {
   }
   syncFreeCubeControls();
   renderDiySelectedPresetConfig();
+  saveVisualSettingsPreferences();
 }
 
 function toggleFreeCubeHeart() {
@@ -6677,6 +7718,7 @@ function setFreeCubeBackground(enabled) {
   }
   syncFreeCubeControls();
   renderDiySelectedPresetConfig();
+  saveVisualSettingsPreferences();
 }
 
 function updateFreeCubeMotion() {
@@ -6731,6 +7773,7 @@ function clearFreeCubeBassPreview() {
 
 function buildVoidPrism() {
   if (!els.voidPrismCore || state.voidPrism.runtime || !window.FeVoidPrismRuntime || !window.THREE) return;
+  if (!heavyWebGLRenderingAllowed()) return;
   const lyric = state.lyricDisplayText || playbackLyricText();
   const subtitle = state.lyricSubtitleText || playbackLyricSubtitle();
   const fontFamily = activeTextFontFamilyStack();
@@ -6859,6 +7902,7 @@ function setChladniMode(mode) {
 
 function buildChladni() {
   if (!els.chladniCore || state.chladni.runtime || !window.FeChladniRuntime || !window.THREE) return;
+  if (!heavyWebGLRenderingAllowed()) return;
   const lowEndAndroid = ANDROID_CLIENT && RENDER_PROFILE.tier === 'economy';
   const particleCount = lowEndAndroid
     ? 72000
@@ -6995,6 +8039,7 @@ function createSonicTopographyMaterial(THREE, theme) {
 
   const uniforms = {
     uTime: { value: 0 },
+    uAudioTime: { value: 0 },
     uSubBass: { value: 0 },
     uBass: { value: 0 },
     uLowFrequencyAmplitude: { value: 0 },
@@ -7032,21 +8077,34 @@ function createSonicTopographyMaterial(THREE, theme) {
     uCenterColumnColor: { value: theme.uWarmCore.clone() },
     uCoreColumnColor: { value: theme.uWarmCore.clone() },
     uOuterColumnColor: { value: theme.uCoolEdge.clone() },
+    uGroundColor: { value: theme.uCoolEdge.clone() },
+    uGroundEmission: { value: DEFAULT_SONIC_SETTINGS.groundEmission },
+    uRainEnabled: { value: DEFAULT_SONIC_SETTINGS.rainEnabled ? 1 : 0 },
+    uRainIntensity: { value: DEFAULT_SONIC_SETTINGS.rainIntensity },
+    uRainWetReflectance: { value: DEFAULT_SONIC_SETTINGS.rainWetReflectance },
+    uRainWetGlow: { value: DEFAULT_SONIC_SETTINGS.rainWetGlow },
+    uRainAudioLight: { value: 0 },
+    uGroundMoundHeight: { value: DEFAULT_SONIC_SETTINGS.groundMoundHeight },
+    uGroundEntrance: { value: 0 },
     uSonicBrightness: { value: DEFAULT_SONIC_SETTINGS.brightness },
+    uFluorescence: { value: DEFAULT_SONIC_SETTINGS.fluorescence },
+    uFluorescenceScatter: { value: DEFAULT_SONIC_SETTINGS.fluorescenceScatter },
     uSonicExposure: { value: DEFAULT_SONIC_SETTINGS.exposure },
     uColumnHeightScale: { value: DEFAULT_SONIC_SETTINGS.columnHeight },
-    uAllGroundFloat: { value: DEFAULT_SONIC_SETTINGS.allGroundFloatEnabled ? 1 : 0 },
     uRippleColor: { value: theme.uRippleColor.clone() },
     uGlowIntensity: { value: theme.uGlowIntensity },
     uTyndallBounceColor: { value: new THREE.Color(0xf4fbff) },
     uTyndallReceiverBounce: { value: 0 },
     uAtmosphereDaylightFill: { value: 0 },
+    uAtmosphereLightStrength: { value: 0 },
+    uAtmosphereAudioDrive: { value: 0 },
     uTyndallLightDirection: { value: new THREE.Vector2(72, -48).normalize() },
     uTyndallGoboPhase: { value: 0 }
   };
 
   const vertexShader = `
     uniform float uTime;
+    uniform float uAudioTime;
     uniform float uSubBass;
     uniform float uBass;
     uniform float uLowFrequencyAmplitude;
@@ -7060,8 +8118,13 @@ function createSonicTopographyMaterial(THREE, theme) {
     uniform float uAudioPulse;
     uniform float uIdleBreath;
     uniform float uColumnHeightScale;
-    uniform float uAllGroundFloat;
+    uniform float uGroundMoundHeight;
+    uniform float uGroundEntrance;
     attribute float aBassColumnBand;
+    attribute float aGroundMoundMask;
+    attribute vec4 aGroundMoundColumnProfile;
+    attribute vec4 aTerrainSeed;
+    attribute vec2 aTerrainSmallLocal;
 
     struct Ripple {
       vec2 pos;
@@ -7082,6 +8145,8 @@ function createSonicTopographyMaterial(THREE, theme) {
     varying float vBassColumnBlend;
     varying float vBassColumnRadialMix;
     varying float vBassColumnCoreMix;
+    varying vec3 vViewDirection;
+    varying vec3 vViewNormal;
 
     vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
     vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -7110,10 +8175,6 @@ function createSonicTopographyMaterial(THREE, theme) {
       return 130.0 * dot(m, g);
     }
 
-    float random(vec2 st) {
-      return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
-    }
-
     float sampleLowFrequencyBand(float bandIndex) {
       float sampleX = (clamp(bandIndex, 0.0, 511.0) + 0.5) / 512.0;
       return texture2D(uLowFrequencySpectrum, vec2(sampleX, 0.5)).r;
@@ -7129,12 +8190,12 @@ function createSonicTopographyMaterial(THREE, theme) {
 
       float centerDist = length(pos2D);
       vDistance = centerDist;
-      float rnd = random(pos2D);
+      float rnd = aTerrainSeed.x;
 
       vec2 movingPos = pos2D * 0.05 + vec2(uTime * 0.1, uTime * 0.05);
       float baseNoise = (snoise(movingPos) + 1.0) * 0.5;
       float wave = sin(pos2D.x * 0.15 + pos2D.y * 0.1 - uTime * 0.6) * 0.5 + 0.5;
-      float globalFalloff = smoothstep(70.0, 36.0, centerDist);
+      float globalFalloff = 1.0 - smoothstep(36.0, 70.0, centerDist);
       float idleField = (snoise(pos2D * 0.085 + vec2(uTime * 0.032, -uTime * 0.026)) + 1.0) * 0.5;
       float idleCluster = smoothstep(0.5, 0.96, idleField + rnd * 0.18);
       float idlePulse = 0.54 + sin(uTime * 0.72 + rnd * 6.283 + baseNoise * 2.4) * 0.46;
@@ -7183,6 +8244,23 @@ function createSonicTopographyMaterial(THREE, theme) {
       float bassColumnCenterMask = (1.0 - step(0.5, abs(bassColumnDelta.x)))
         * (1.0 - step(0.5, abs(bassColumnDelta.y)));
       float bassColumnBandIndex = aBassColumnBand;
+      float bassColumnLayerSeed = fract(
+        rnd * 7.91 + aTerrainSeed.y * 4.37
+          + aTerrainSeed.z * 2.13 + aTerrainSeed.w * 1.19
+      );
+      float bassColumnLayerTier = floor(bassColumnLayerSeed * 7.0) / 6.0;
+      float bassColumnPatchTier = floor(
+        fract(aTerrainSeed.y * 3.73 + aTerrainSeed.w * 2.11) * 4.0
+      ) / 3.0;
+      float bassColumnPedestalScale = mix(0.05, 5.8, bassColumnLayerTier)
+        * mix(0.82, 1.0, bassColumnPatchTier);
+      float bassColumnPedestalRadial = mix(
+        0.65,
+        1.45,
+        smoothstep(0.58, 4.2, bassColumnHeightProfile)
+      );
+      float bassColumnDynamicScale = 1.35 + bassColumnHeightProfile * 0.62
+        + bassColumnPatchTier * 0.12;
       float bassColumnDrive = 0.0;
       if (bassColumnBlend > 0.001) {
         float bassColumnBandDrive = sampleLowFrequencyBand(bassColumnBandIndex);
@@ -7192,85 +8270,144 @@ function createSonicTopographyMaterial(THREE, theme) {
           bassColumnCenterMask
         );
       }
-      float bassColumnLift = bassColumnBlend * bassColumnDrive * (6.5 + rnd * 3.5)
-        * bassColumnHeightProfile * uColumnHeightScale;
+      float bassColumnPedestalLift = bassColumnBlend
+        * bassColumnPedestalRadial * bassColumnPedestalScale
+        * min(uColumnHeightScale, 1.35);
+      float bassColumnCoreLowFrequencyGainMask = bassColumnCoreHeightMix
+        * bassColumnCoreHeightMix;
+      float bassColumnCoreLowFrequencyGain = mix(
+        1.0,
+        ${SONIC_CENTER_COLUMN_CORE_LOW_FREQUENCY_GAIN.toFixed(2)},
+        bassColumnCoreLowFrequencyGainMask
+      );
+      float bassColumnImpactDrive = bassColumnDrive * (
+        1.0 + ${SONIC_LOW_FREQUENCY_IMPACT_CURVE_STRENGTH.toFixed(2)}
+          * (1.0 - bassColumnDrive)
+      );
+      float bassColumnLift = bassColumnBlend * bassColumnImpactDrive * bassColumnDynamicScale
+        * bassColumnCoreLowFrequencyGain * uColumnHeightScale;
 
-      vec2 smallBassCell = floor(pos2D / 7.0);
-      vec2 smallBassLocal = fract(pos2D / 7.0) - 0.5;
-      float smallBassSeed = random(smallBassCell + vec2(23.7, 51.3));
-      vec2 smallBassCenter = (vec2(
-        random(smallBassCell + vec2(7.1, 19.7)),
-        random(smallBassCell + vec2(31.9, 11.3))
-      ) - 0.5) * 0.26;
+      vec2 smallBassLocal = aTerrainSmallLocal - 0.5;
+      float smallBassSeed = aTerrainSeed.y;
+      vec2 smallBassCenter = (aTerrainSeed.zw - 0.5) * 0.26;
       float smallBassDistance = length(smallBassLocal - smallBassCenter);
       float smallBassPresence = step(0.84, smallBassSeed);
       float smallBassShape = (1.0 - smoothstep(0.07, 0.31, smallBassDistance))
         * smallBassPresence * (1.0 - bassColumnBlend);
       float smallBassPulse = 0.72
-        + sin(uTime * (1.1 + smallBassSeed * 0.7) + smallBassSeed * 6.283) * 0.28;
+        + sin(uAudioTime * (1.1 + smallBassSeed * 0.7) + smallBassSeed * 6.283) * 0.28;
       float smallBassDrive = clamp(max(uLowFrequencyAmplitude, lowDrive) * lowGate, 0.0, 1.0);
       float smallBassLift = smallBassShape * smallBassDrive * smallBassPulse
         * (0.65 + smallBassSeed * 0.35) * 1.25 * uColumnHeightScale;
 
-      float subRegion = smoothstep(31.0, 0.0, centerDist);
-      float subLift = uSubBass * rhythmGate * subRegion * 4.15;
+      float subRegion = 1.0 - smoothstep(0.0, 31.0, centerDist);
+      float subLift = uSubBass * rhythmGate * subRegion * 1.05;
 
       float bassNoise = snoise(pos2D * 0.1 - vec2(0.0, uTime * 0.2));
-      float bassRegion = smoothstep(44.0, 6.0, centerDist + bassNoise * 5.0);
-      float bassLift = uBass * rhythmGate * bassRegion * smoothstep(0.0, 1.0, rnd + uDensity * 0.5) * 3.4;
+      float bassRegion = 1.0 - smoothstep(6.0, 44.0, centerDist + bassNoise * 5.0);
+      float bassLift = uBass * rhythmGate * bassRegion
+        * smoothstep(0.0, 1.0, rnd + uDensity * 0.5) * 0.9;
 
       float lowMidNoise = snoise(pos2D * 0.05 + vec2(uTime * 0.1, 0.0));
-      float lowMidLift = uLowMid * rhythmGate * (lowMidNoise * 0.5 + 0.5) * 0.95;
+      float lowMidLift = uLowMid * rhythmGate * (lowMidNoise * 0.5 + 0.5) * 0.42;
 
       float riverFlow = sin(pos2D.x * 0.2 + pos2D.y * 0.2 + snoise(pos2D * 0.1) * 2.0 - uTime * 2.0);
-      float midLift = uMid * rhythmGate * max(0.0, riverFlow) * 1.05;
+      float midLift = uMid * rhythmGate * max(0.0, riverFlow) * 0.42;
 
       float highMidRegion = smoothstep(10.0, 45.0, centerDist);
       float highMidLift = 0.0;
       if (fract(rnd * 13.3) > 0.8) {
-        highMidLift = uHighMid * rhythmGate * highMidRegion * fract(rnd * 7.7) * 0.8;
+        highMidLift = uHighMid * rhythmGate * highMidRegion * fract(rnd * 7.7) * 0.34;
       }
 
-      float kickSurface = mix(baseNoise, wave, uSmoothness * 0.5 + 0.2) * lowDrive * rhythmGate * 0.56;
-      float audioElevation = bassColumnLift + smallBassLift + subLift + bassLift
+      float kickSurface = mix(baseNoise, wave, uSmoothness * 0.5 + 0.2)
+        * lowDrive * rhythmGate * 0.28;
+      float terrainAudioElevation = smallBassLift + subLift + bassLift
         + lowMidLift + midLift + highMidLift + kickSurface;
       if (rnd > 0.99) {
-        audioElevation += uEnergy * rhythmGate * 0.72;
+        terrainAudioElevation += uEnergy * rhythmGate * 0.28;
       }
-      audioElevation *= globalFalloff;
-
-      // A four-colour lattice gives the field more depth than a two-level
-      // checkerboard. x + 2z changes for every direct neighbour, and the four
-      // non-overlapping height bands keep adjacent pillars visibly distinct.
-      vec2 groundGridCell = floor(bassColumnGrid + vec2(0.5));
-      float groundHeightBandIndex = mod(
-        groundGridCell.x + groundGridCell.y * 2.0 + 4096.0,
-        4.0
+      float audioColumnLiftCap = ${SONIC_AUDIO_COLUMN_MAX_LIFT.toFixed(2)}
+        * min(uColumnHeightScale, 1.35);
+      terrainAudioElevation = min(
+        terrainAudioElevation * globalFalloff,
+        audioColumnLiftCap
       );
-      // Deterministic phase disorder breaks up the diagonal stripes while two
-      // shared tempos keep the field rhythmic rather than jittering randomly.
-      float groundPhaseJitter = random(groundGridCell * 0.173 + vec2(19.7, 43.1)) * 2.4 - 1.2;
-      float groundPhase = dot(groundGridCell, vec2(0.47, 0.71)) + groundPhaseJitter;
-      float groundBeat = 0.5 + 0.5 * sin(uTime * 1.06 - groundPhase);
-      float groundPrimaryWave = groundBeat * groundBeat * (3.0 - 2.0 * groundBeat);
-      float groundSecondaryBeat = 0.5 + 0.5 * sin(uTime * 0.57 + groundPhase * 1.73);
-      float groundSecondaryWave = groundSecondaryBeat * groundSecondaryBeat
-        * (3.0 - 2.0 * groundSecondaryBeat);
-      float groundWave = mix(groundPrimaryWave, groundSecondaryWave, 0.24);
-      float groundHeightBand;
-      if (groundHeightBandIndex < 0.5) {
-        groundHeightBand = 0.38 + groundWave * 0.18;
-      } else if (groundHeightBandIndex < 1.5) {
-        groundHeightBand = 0.74 + groundWave * 0.20;
-      } else if (groundHeightBandIndex < 2.5) {
-        groundHeightBand = 1.12 + groundWave * 0.22;
-      } else {
-        groundHeightBand = 1.52 + groundWave * 0.25;
-      }
-      float groundEdgeFade = 1.0 - smoothstep(72.0, 78.0, centerDist);
-      float allGroundFloatLift = uAllGroundFloat * groundHeightBand * groundEdgeFade;
+      float centerColumnLiftCap = ${SONIC_CENTER_COLUMN_MAX_LIFT.toFixed(2)}
+        * min(uColumnHeightScale, 1.35);
+      float centerColumnRawLift = bassColumnLift * globalFalloff;
+      float centerColumnKnee = centerColumnLiftCap
+        * ${SONIC_CENTER_COLUMN_SOFT_KNEE_RATIO.toFixed(2)};
+      float centerColumnKneeSpan = max(centerColumnLiftCap - centerColumnKnee, 0.001);
+      float centerColumnAudioLift = centerColumnRawLift <= centerColumnKnee
+        ? centerColumnRawLift
+        : centerColumnKnee + centerColumnKneeSpan * (
+            1.0 - exp(-(centerColumnRawLift - centerColumnKnee) / centerColumnKneeSpan)
+          );
+      float audioElevation = terrainAudioElevation + centerColumnAudioLift;
 
-      float elevation = idleElevation + audioElevation + allGroundFloatLift;
+      // Every fixed peak is a dense column cluster. The compact static profile
+      // gives every terrain cell a persistent tier, a phase bucket and one of
+      // 512 low-frequency bands without adding another mesh or draw call.
+      vec2 groundGridCell = floor(bassColumnGrid + vec2(0.5));
+      float moundColumnLevel = floor(
+        aGroundMoundColumnProfile.x * ${Number(SONIC_GROUND_MOUND_COLUMN_LEVELS - 1).toFixed(1)} + 0.5
+      ) / ${Number(SONIC_GROUND_MOUND_COLUMN_LEVELS - 1).toFixed(1)};
+      float moundColumnPhase = floor(
+        aGroundMoundColumnProfile.y * ${Number(SONIC_GROUND_MOUND_COLUMN_PHASE_BUCKETS - 1).toFixed(1)} + 0.5
+      ) / ${Number(SONIC_GROUND_MOUND_COLUMN_PHASE_BUCKETS - 1).toFixed(1)};
+      float moundColumnBandIndex = floor(aGroundMoundColumnProfile.z * 255.0 + 0.5)
+        + floor(aGroundMoundColumnProfile.w + 0.5) * 256.0;
+      float moundColumnBandDrive = sampleLowFrequencyBand(moundColumnBandIndex);
+      float moundColumnStaticBase = mix(
+        ${SONIC_GROUND_MOUND_COLUMN_STATIC_MIN.toFixed(2)},
+        ${SONIC_GROUND_MOUND_COLUMN_STATIC_MAX.toFixed(2)},
+        moundColumnLevel
+      );
+      float groundPhaseJitter = rnd * 1.45 - 0.725
+        + (moundColumnPhase - 0.5) * 1.7;
+      float groundPhase = dot(groundGridCell, vec2(0.47, 0.71)) + groundPhaseJitter;
+      float groundRing = centerDist / ${SONIC_TOPOGRAPHY_SPACING.toFixed(2)};
+      float groundRingWaveA = 0.5 + 0.5 * sin(
+        groundRing * 0.42 - uAudioTime * 0.64 + groundPhaseJitter * 0.38
+      );
+      float groundRingWaveB = 0.5 + 0.5 * sin(
+        groundRing * 0.79 + uAudioTime * 0.37 + groundPhase * 1.31
+      );
+      float groundCrossWave = 0.5 + 0.5 * sin(
+        dot(groundGridCell, vec2(0.31, -0.27)) - uAudioTime * 0.49
+          + groundPhaseJitter * 0.7
+      );
+      float groundLayeredWave = groundRingWaveA * 0.48
+        + groundRingWaveB * 0.32 + groundCrossWave * 0.2;
+      float groundEntranceCursor = uGroundEntrance * 1.34
+        - clamp(centerDist / 78.0, 0.0, 1.0) * 0.24 - rnd * 0.06;
+      float groundEntrance = smoothstep(0.0, 1.0, groundEntranceCursor);
+      float moundLowDrive = clamp(
+        uLowFrequencyAmplitude * 0.72 + uSubBass * 0.18 + uBass * 0.1,
+        0.0,
+        1.0
+      );
+      float moundColumnAudioDrive = clamp(
+        moundColumnBandDrive * 0.78 + moundLowDrive * 0.22,
+        0.0,
+        1.0
+      );
+      float moundColumnImpactDrive = moundColumnAudioDrive * (
+        1.0 + ${SONIC_LOW_FREQUENCY_IMPACT_CURVE_STRENGTH.toFixed(2)}
+          * (1.0 - moundColumnAudioDrive)
+      );
+      float moundColumnAudioLift = moundColumnImpactDrive * mix(
+        ${SONIC_GROUND_MOUND_COLUMN_AUDIO_MIN.toFixed(2)},
+        ${SONIC_GROUND_MOUND_COLUMN_AUDIO_MAX.toFixed(2)},
+        moundColumnLevel
+      );
+      float groundMoundLift = aGroundMoundMask
+        * (1.0 - bassColumnBlend * 0.58) * uGroundMoundHeight
+        * (moundColumnStaticBase + moundColumnAudioLift + groundLayeredWave * 0.05)
+        * groundEntrance;
+
+      float elevation = idleElevation + bassColumnPedestalLift + audioElevation + groundMoundLift;
       float rippleElevation = 0.0;
       float rippleIntensityNormal = 0.0;
       float rippleIntensityWhite = 0.0;
@@ -7319,6 +8456,9 @@ function createSonicTopographyMaterial(THREE, theme) {
       pos.y = -0.5 + yPos * totalHeight;
 
       vec4 worldPosition = instanceMatrix * vec4(pos, 1.0);
+      vec3 viewPosition = (viewMatrix * worldPosition).xyz;
+      vViewDirection = normalize(-viewPosition);
+      vViewNormal = normalize(normalMatrix * normal);
       gl_Position = projectionMatrix * viewMatrix * worldPosition;
     }
   `;
@@ -7328,6 +8468,10 @@ function createSonicTopographyMaterial(THREE, theme) {
     uniform float uPresence;
     uniform float uBrilliance;
     uniform float uAir;
+    uniform float uSubBass;
+    uniform float uBass;
+    uniform float uMid;
+    uniform float uHighMid;
     uniform float uWarmth;
     uniform float uBrightness;
     uniform float uSharpness;
@@ -7340,11 +8484,23 @@ function createSonicTopographyMaterial(THREE, theme) {
     uniform vec3 uCenterColumnColor;
     uniform vec3 uCoreColumnColor;
     uniform vec3 uOuterColumnColor;
+    uniform vec3 uGroundColor;
+    uniform float uGroundEmission;
+    uniform float uRainEnabled;
+    uniform float uRainIntensity;
+    uniform float uRainWetReflectance;
+    uniform float uRainWetGlow;
+    uniform float uRainAudioLight;
     uniform float uSonicBrightness;
+    uniform float uFluorescence;
+    uniform float uFluorescenceScatter;
     uniform float uSonicExposure;
+    uniform float uAudioPulse;
     uniform vec3 uTyndallBounceColor;
     uniform float uTyndallReceiverBounce;
     uniform float uAtmosphereDaylightFill;
+    uniform float uAtmosphereLightStrength;
+    uniform float uAtmosphereAudioDrive;
     uniform vec2 uTyndallLightDirection;
     uniform float uTyndallGoboPhase;
     uniform vec3 uRippleColor;
@@ -7360,6 +8516,8 @@ function createSonicTopographyMaterial(THREE, theme) {
     varying float vBassColumnBlend;
     varying float vBassColumnRadialMix;
     varying float vBassColumnCoreMix;
+    varying vec3 vViewDirection;
+    varying vec3 vViewNormal;
 
     float random(vec2 st) {
       return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
@@ -7371,6 +8529,23 @@ function createSonicTopographyMaterial(THREE, theme) {
       float rnd = random(vInstancePos);
       float centerDist = length(vInstancePos);
       float normElevation = clamp(vElevation / 8.0, 0.0, 1.0);
+      float viewFacing = clamp(abs(dot(normalize(vViewNormal), normalize(vViewDirection))), 0.0, 1.0);
+      float fresnelGlow = pow(1.0 - viewFacing, 2.35);
+      float sheenTravel = fract(uTime * 0.075 + rnd * 0.37);
+      float sheenCoordinate = fract(vUv.x * 0.62 + vUv.y * 0.38 + rnd * 0.18);
+      float topSheen = isTop
+        ? (1.0 - smoothstep(0.0, 0.16, abs(sheenCoordinate - sheenTravel)))
+          * (0.28 + normElevation * 0.72)
+        : 0.0;
+      float sideLightRibs = isTop
+        ? 0.0
+        : pow(sin(vRelativeY * 22.0 + rnd * 6.283 + uTime * 0.45) * 0.5 + 0.5, 9.0)
+          * (0.18 + normElevation * 0.82);
+      float surfaceEdgeX = 1.0 - smoothstep(0.012, 0.065, vUv.x)
+        + smoothstep(0.935, 0.988, vUv.x);
+      float surfaceEdgeY = 1.0 - smoothstep(0.012, 0.065, vUv.y)
+        + smoothstep(0.935, 0.988, vUv.y);
+      float surfaceEdge = min(surfaceEdgeX + surfaceEdgeY, 1.0);
 
       vec3 cBase1 = uBaseColor1;
       vec3 cBase2 = uBaseColor2;
@@ -7388,17 +8563,40 @@ function createSonicTopographyMaterial(THREE, theme) {
       targetGlow = mix(targetGlow, sonicColumnColor, vBassColumnBlend * (0.78 + normElevation * 0.18));
       float distFade = 1.0 - smoothstep(46.0, 88.0, centerDist);
       targetGlow = mix(targetGlow, vec3(0.4, 0.8, 1.0), uBrightness * 0.6);
+      float groundSurfaceMask = 1.0 - vBassColumnBlend;
+      targetGlow = mix(targetGlow, uGroundColor, groundSurfaceMask * 0.86);
       float visualFloor = clamp(0.035 + uBrightness * 0.05 + uAir * 0.04, 0.035, 0.16);
       vec3 currentGlow = mix(cBase2, targetGlow, max(normElevation, visualFloor)) * uGlowIntensity * distFade;
       currentGlow = mix(currentGlow, uRippleColor, vRippleAnim.x);
       currentGlow = mix(currentGlow, vec3(1.0, 1.0, 1.0), vRippleAnim.y);
 
-      vec3 bodyColor = mix(cBase1, cBase2, vRelativeY * distFade);
+      vec3 terrainBodyColor = mix(cBase1, cBase2, vRelativeY * distFade);
+      vec3 groundBodyColor = mix(uGroundColor * 0.12, uGroundColor * 0.38, vRelativeY * distFade);
+      vec3 bodyColor = mix(terrainBodyColor, groundBodyColor, groundSurfaceMask * 0.9);
+      // A rising column exposes much more side area in a single frame. Keep a
+      // bass-coupled color floor over that whole body so the new surface never
+      // reads as a black rectangle between the lit cap and the ground.
+      float columnBodyEnergy = vBassColumnBlend * clamp(
+        max(uSubBass * 1.1, uBass) * 0.62 + uAudioPulse * 0.26 + normElevation * 0.34,
+        0.0,
+        1.0
+      );
+      vec3 columnBodyGlow = mix(
+        sonicColumnColor * 0.42,
+        currentGlow,
+        0.58 + vRelativeY * 0.18
+      );
+      bodyColor = mix(
+        bodyColor,
+        columnBodyGlow,
+        columnBodyEnergy * mix(0.32, 0.46, vRelativeY)
+      );
+      vec3 topBaseColor = mix(cBase2, uGroundColor * 0.28, groundSurfaceMask);
       vec3 finalColor;
 
       if (isTop) {
         float topIntensity = smoothstep(0.0, 0.4, normElevation);
-        float twinkleDistFalloff = smoothstep(72.0, 36.0, centerDist);
+        float twinkleDistFalloff = 1.0 - smoothstep(36.0, 72.0, centerDist);
         float twinkleMultiplier = mix(twinkleDistFalloff, 1.0, smoothstep(0.01, 0.1, normElevation));
 
         bool isSparkleTarget = fract(rnd * 31.0) > 0.95;
@@ -7406,12 +8604,9 @@ function createSonicTopographyMaterial(THREE, theme) {
           topIntensity += uAir * 2.0 * twinkleMultiplier;
         }
 
-        finalColor = mix(cBase2, currentGlow, topIntensity);
+        finalColor = mix(topBaseColor, currentGlow, topIntensity);
 
-        float edgeX = smoothstep(0.05, 0.01, vUv.x) + smoothstep(0.95, 0.99, vUv.x);
-        float edgeY = smoothstep(0.05, 0.01, vUv.y) + smoothstep(0.95, 0.99, vUv.y);
-        float edge = min(edgeX + edgeY, 1.0);
-        finalColor += currentGlow * edge * 0.8 * (topIntensity + 0.3);
+        finalColor += currentGlow * surfaceEdge * 0.8 * (topIntensity + 0.3);
 
         float flashChance = smoothstep(0.3, 1.0, uPresence);
         if (fract(rnd * 53.0) > 0.98 - flashChance * 0.1) {
@@ -7419,16 +8614,101 @@ function createSonicTopographyMaterial(THREE, theme) {
           finalColor += mix(vec3(1.0), vec3(0.5, 1.0, 1.0), rnd) * flashSync * uPresence * (1.0 + uSharpness * 2.0) * twinkleMultiplier;
         }
 
-        if (edge > 0.5 && fract(rnd * 89.0 + uTime * 2.0) > 0.98) {
-          finalColor += vec3(1.0) * uBrilliance * 3.0 * twinkleMultiplier;
+        if (surfaceEdge > 0.5 && fract(rnd * 89.0 + uTime * 2.0) > 0.98) {
+          finalColor += vec3(1.0) * uBrilliance * 0.45 * twinkleMultiplier;
         }
       } else {
         float verticalFalloff = mix(1.0, 3.0, uSharpness);
-        float sideGlow = smoothstep(0.5 / verticalFalloff, 0.0, distFromTop) * normElevation;
+        float sideGlow = (1.0 - smoothstep(0.0, 0.5 / verticalFalloff, distFromTop))
+          * normElevation;
         if (normElevation < 0.02) sideGlow = 0.0;
         finalColor = mix(bodyColor, currentGlow, sideGlow * 1.5);
-        float rimGlow = smoothstep(0.03, 0.0, distFromTop) * normElevation;
+        float rimGlow = (1.0 - smoothstep(0.0, 0.03, distFromTop)) * normElevation;
         finalColor += currentGlow * rimGlow;
+      }
+
+      // Fluorescence stays inside the existing terrain shader: grazing-angle
+      // emission, a narrow structural edge, travelling top sheen, and fine
+      // side-light ribs create four readable light layers without another draw
+      // call or a costly bloom post-process.
+      float fluorescenceEnergy = uFluorescence
+        * clamp(0.22 + normElevation * 0.58 + uAudioPulse * 0.28 + vRippleAnim.y * 0.24, 0.0, 1.35);
+      float fluorescenceHalo = pow(clamp(fresnelGlow, 0.0, 1.0), 0.78);
+      float fluorescenceEdgeCore = pow(surfaceEdge, 1.35)
+        * (isTop ? 0.72 : 0.3) * (0.68 + normElevation * 0.32);
+      vec3 fluorescentEmission = mix(
+        targetGlow,
+        vec3(0.94, 0.985, 1.0),
+        clamp(topSheen * 0.62 + fluorescenceHalo * 0.34 + fluorescenceEdgeCore * 0.24, 0.0, 0.72)
+      ) * fluorescenceEnergy;
+      float fluorescentDetail = fluorescenceHalo * (isTop ? 0.38 : 0.74)
+        + fluorescenceEdgeCore
+        + topSheen * 0.72
+        + sideLightRibs * 0.58;
+      fluorescentEmission /= 1.0 + max(0.0, max(
+        fluorescentEmission.r,
+        max(fluorescentEmission.g, fluorescentEmission.b)
+      ) - 0.72) * 1.15;
+      finalColor += fluorescentEmission * fluorescentDetail * 1.08;
+      float fluorescenceScatterEnergy = uFluorescenceScatter * clamp(
+        0.1 + fluorescenceEnergy * 0.44 + fluorescenceHalo * 0.18 + uAudioPulse * 0.08,
+        0.0,
+        1.35
+      );
+
+      // Ground emission stays in this terrain material and is explicitly
+      // masked away from the bass-column cluster. Small mounds therefore
+      // inherit the ground palette while remaining elevation-only geometry.
+      float groundEmissionDetail = isTop
+        ? 0.32 + surfaceEdge * 0.5 + fresnelGlow * 0.18 + topSheen * 0.26
+        : 0.16 + fresnelGlow * 0.46 + sideLightRibs * 0.14;
+      vec3 groundEmission = uGroundColor * uGroundEmission * groundSurfaceMask
+        * groundEmissionDetail * (0.42 + normElevation * 0.58) * distFade;
+      float groundEmissionPeak = max(groundEmission.r, max(groundEmission.g, groundEmission.b));
+      groundEmission /= 1.0 + max(0.0, groundEmissionPeak - 0.58) * 1.45;
+      finalColor += groundEmission;
+
+      // Wet optics are evaluated on the terrain top faces themselves. This
+      // removes the old detached floor plane, so wet light cannot appear in
+      // column gaps, outside the radial terrain edge, or over the wallpaper.
+      float rainAmount = uRainEnabled * clamp(uRainIntensity / 1.5, 0.0, 1.0);
+      float wetEnergy = rainAmount * min(
+        0.18,
+        uRainWetReflectance * 0.105 + uRainWetGlow * 0.065
+      );
+      if (isTop && wetEnergy > 0.0001) {
+        float filmPhase = vUv.x * 31.0 + vUv.y * 19.0 + uTime * 0.34 + rnd * 12.7;
+        float crossPhase = vUv.x * -17.0 + vUv.y * 37.0 - uTime * 0.23 + rnd * 21.4;
+        float filmFlow = sin(filmPhase) * 0.5 + 0.5;
+        float crossFlow = sin(crossPhase) * 0.5 + 0.5;
+        float microFilm = smoothstep(0.42, 0.92, filmFlow * 0.58 + crossFlow * 0.42);
+        float wetFresnel = pow(clamp(fresnelGlow, 0.0, 1.0), 0.72);
+        vec2 filmGradient = vec2(
+          cos(filmPhase) * 31.0 * 0.58 + cos(crossPhase) * -17.0 * 0.42,
+          cos(filmPhase) * 19.0 * 0.58 + cos(crossPhase) * 37.0 * 0.42
+        );
+        float directionalGlint = pow(
+          clamp(0.5 + 0.5 * dot(normalize(filmGradient + vec2(0.001)), normalize(uTyndallLightDirection)), 0.0, 1.0),
+          12.0
+        );
+        float wetSpecular = clamp(
+          wetFresnel * 0.62 + topSheen * 0.34 + microFilm * 0.12 + directionalGlint * 0.28,
+          0.0,
+          1.0
+        );
+        float wetDarkening = wetEnergy * (0.2 + (1.0 - wetFresnel) * 0.18);
+        finalColor *= 1.0 - wetDarkening;
+        vec3 wetTint = mix(
+          mix(uRippleColor, uTyndallBounceColor, 0.42),
+          vec3(0.93, 0.98, 1.0),
+          0.34
+        );
+        vec3 wetReflection = wetTint * wetEnergy
+          * (0.24 + wetSpecular * 1.15 + microFilm * uRainWetGlow * 0.18)
+          * (0.96 + uRainAudioLight * 0.08);
+        float wetPeak = max(wetReflection.r, max(wetReflection.g, wetReflection.b));
+        wetReflection /= 1.0 + max(0.0, wetPeak - 0.2) * 2.8;
+        finalColor += wetReflection;
       }
 
       finalColor += uRippleColor * vRippleAnim.x * 0.6;
@@ -7452,6 +8732,73 @@ function createSonicTopographyMaterial(THREE, theme) {
       float receiverPeak = max(receiverBounce.r, max(receiverBounce.g, receiverBounce.b));
       receiverBounce /= 1.0 + max(0.0, receiverPeak - 0.38) * 1.8;
       finalColor += receiverBounce;
+
+      // Layered Sonic atmosphere lives in this existing terrain draw. Bass
+      // opens a bounded local color return while the occluded facets breathe
+      // slightly darker; mid/high detail only catches stable edges and facets.
+      // uAtmosphereAudioDrive falls to zero while paused or in reduced-motion
+      // mode, so none of these audio accents keep flickering at rest.
+      float atmosphereStrength = clamp(uAtmosphereLightStrength, 0.0, 1.0);
+      float lowFrequencyLight = clamp(
+        (uSubBass * 0.64 + uBass * 0.46 + uAudioPulse * 0.28) * uAtmosphereAudioDrive,
+        0.0,
+        1.0
+      );
+      float highFrequencyLight = clamp(
+        (uMid * 0.12 + uHighMid * 0.36 + uPresence * 0.28 + uBrilliance * 0.3)
+          * uAtmosphereAudioDrive,
+        0.0,
+        1.0
+      );
+      vec2 localPoolDelta = (vInstancePos + receiverDirection * 18.0) * vec2(0.74, 1.08);
+      float localLightPool = 1.0 - smoothstep(10.0, 58.0, length(localPoolDelta));
+      float canopyShadow = 1.0 - receiverCanopy;
+      float bassShadowBreath = atmosphereStrength * lowFrequencyLight
+        * localLightPool * canopyShadow;
+      finalColor *= 1.0 - bassShadowBreath * 0.085;
+
+      vec3 paletteAtmosphereLight = mix(targetGlow, uTyndallBounceColor, 0.58);
+      float localReturnStrength = atmosphereStrength * localLightPool
+        * mix(0.5, 1.0, receiverCanopy)
+        * (isTop ? 0.026 + lowFrequencyLight * 0.095 : 0.011 + lowFrequencyLight * 0.04);
+      float staticFacetDetail = smoothstep(
+        0.62,
+        0.94,
+        random(floor(vInstancePos * 1.47) + vec2(17.3, 41.9))
+      );
+      float detailMask = isTop
+        ? clamp(surfaceEdge * 0.68 + staticFacetDetail * 0.24, 0.0, 1.0)
+        : clamp(fresnelGlow * 0.46 + surfaceEdge * 0.2, 0.0, 1.0);
+      float detailReturnStrength = atmosphereStrength * highFrequencyLight
+        * detailMask * mix(0.62, 1.0, receiverCanopy) * 0.13;
+      vec3 atmosphereReturn = paletteAtmosphereLight * localReturnStrength
+        + mix(targetGlow, vec3(0.96, 0.985, 1.0), 0.46) * detailReturnStrength;
+      float atmosphereReturnPeak = max(
+        atmosphereReturn.r,
+        max(atmosphereReturn.g, atmosphereReturn.b)
+      );
+      atmosphereReturn /= 1.0 + max(0.0, atmosphereReturnPeak - 0.24) * 2.4;
+      finalColor += atmosphereReturn;
+
+      // Reuse the same terrain draw as a soft receiver for fluorescence that
+      // escapes the Sonic columns. The broad falloff reads as nearby air and
+      // ground glow without a bloom pass or another mesh.
+      float fluorescenceReach = max(
+        localLightPool,
+        (1.0 - smoothstep(16.0, 82.0, centerDist)) * (0.42 + vBassColumnBlend * 0.38)
+      );
+      float fluorescenceScatterReceiver = fluorescenceScatterEnergy
+        * fluorescenceReach * mix(0.52, 1.0, receiverCanopy)
+        * (isTop ? 0.068 : 0.035);
+      vec3 fluorescenceScatterReturn = mix(targetGlow, uTyndallBounceColor, 0.3)
+        * fluorescenceScatterReceiver;
+      float fluorescenceScatterPeak = max(
+        fluorescenceScatterReturn.r,
+        max(fluorescenceScatterReturn.g, fluorescenceScatterReturn.b)
+      );
+      fluorescenceScatterReturn /= 1.0
+        + max(0.0, fluorescenceScatterPeak - 0.16) * 3.2;
+      finalColor += fluorescenceScatterReturn;
       // Sunlight also contributes a soft, directional daylight fill. Keep its
       // low-frequency canopy variation so raised atmosphere settings reveal
       // more midtones without flattening the terrain or creating a light spot.
@@ -7461,8 +8808,24 @@ function createSonicTopographyMaterial(THREE, theme) {
       finalColor += uTyndallBounceColor * uAtmosphereDaylightFill * daylightShape;
 
       float aerialFog = smoothstep(30.0, 65.0, vDistance);
+      float farLightGradient = smoothstep(
+        -52.0,
+        54.0,
+        dot(vInstancePos, receiverDirection)
+      );
       vec3 atmosphericColor = mix(cBase1, cBase2, 0.4);
-      finalColor = mix(finalColor, atmosphericColor, aerialFog * 0.5);
+      vec3 farPaletteHaze = mix(uTyndallBounceColor, targetGlow, 0.34);
+      atmosphericColor = mix(
+        atmosphericColor,
+        farPaletteHaze,
+        atmosphereStrength * (0.075 + farLightGradient * 0.105)
+      );
+      float spatialFogMix = aerialFog * clamp(
+        0.43 + atmosphereStrength * (0.045 + farLightGradient * 0.055),
+        0.43,
+        0.55
+      );
+      finalColor = mix(finalColor, atmosphericColor, spatialFogMix);
       finalColor *= uSonicBrightness * exp2(uSonicExposure);
 
       float alphaFade = 1.0 - smoothstep(55.0, 78.0, vDistance);
@@ -7502,9 +8865,101 @@ function resolvedSonicTopographyColors() {
   };
 }
 
+function resolvedSonicGroundColor() {
+  const topo = state.sonicTopography;
+  const paletteColors = sonicCoverBackgroundColors(topo.palette || fallbackLyricPalette(state.currentSong));
+  const automatic = rgbHexValue(mixRgb(
+    mixRgb(paletteColors[0], paletteColors[1], 0.58),
+    paletteColors[2],
+    0.18
+  ));
+  const settings = topo.settings || DEFAULT_SONIC_SETTINGS;
+  return settings.groundColor || automatic;
+}
+
+function sonicTerrainMoundFieldAt(x, z) {
+  const broad = Math.sin(x * 0.074 + z * 0.039 + 0.8) * 0.5 + 0.5;
+  const diagonal = Math.sin(x * -0.047 + z * 0.11 + 2.15) * 0.5 + 0.5;
+  const cross = Math.sin(x * 0.137 - z * 0.063 - 0.9) * 0.5 + 0.5;
+  const layered = broad * 0.48 + diagonal * 0.34 + cross * 0.18;
+  const ridge = Math.pow(clamp((layered - 0.24) / 0.76, 0, 1), 1.55);
+  const unevenHeight = 0.76 + sonicRainHash(x * 0.19 + 17.3, z * 0.19 - 9.7) * 0.24;
+  return 0.045 + ridge * 0.56 * unevenHeight;
+}
+
+function sonicGroundMoundMaskAt(x, z, settings) {
+  const radius = settings.groundMoundRadius;
+  let moundMask = sonicTerrainMoundFieldAt(x, z);
+  const nearestGridX = clamp(
+    Math.round((x + SONIC_GROUND_MOUND_GRID_EXTENT) / SONIC_GROUND_MOUND_GRID_SPACING),
+    0,
+    SONIC_GROUND_MOUND_GRID_SIZE - 1
+  );
+  const nearestGridZ = clamp(
+    Math.round((z + SONIC_GROUND_MOUND_GRID_EXTENT) / SONIC_GROUND_MOUND_GRID_SPACING),
+    0,
+    SONIC_GROUND_MOUND_GRID_SIZE - 1
+  );
+  const firstGridX = Math.max(0, nearestGridX - SONIC_GROUND_MOUND_NEIGHBOR_CELLS);
+  const lastGridX = Math.min(SONIC_GROUND_MOUND_GRID_SIZE - 1, nearestGridX + SONIC_GROUND_MOUND_NEIGHBOR_CELLS);
+  const firstGridZ = Math.max(0, nearestGridZ - SONIC_GROUND_MOUND_NEIGHBOR_CELLS);
+  const lastGridZ = Math.min(SONIC_GROUND_MOUND_GRID_SIZE - 1, nearestGridZ + SONIC_GROUND_MOUND_NEIGHBOR_CELLS);
+  for (let gridZ = firstGridZ; gridZ <= lastGridZ; gridZ += 1) {
+    for (let gridX = firstGridX; gridX <= lastGridX; gridX += 1) {
+      const center = SONIC_GROUND_MOUND_CENTERS[gridZ * SONIC_GROUND_MOUND_GRID_SIZE + gridX];
+      const moundRadius = radius * center.radiusScale;
+      const innerRadius = moundRadius * 0.28;
+      const transitionSpan = Math.max(0.001, moundRadius - innerRadius);
+      const dx = x - center.x;
+      const dz = z - center.z;
+      const distanceSquared = dx * dx + dz * dz;
+      if (distanceSquared >= moundRadius * moundRadius) continue;
+      const distance = Math.sqrt(distanceSquared);
+      const progress = clamp((distance - innerRadius) / transitionSpan, 0, 1);
+      const smoothProgress = progress * progress * (3 - 2 * progress);
+      const shape = 1 - smoothProgress;
+      moundMask = Math.max(moundMask, shape * shape * center.heightScale);
+    }
+  }
+  return moundMask;
+}
+
+function sonicGroundMoundMaskSignature(settings) {
+  return `fixed-adjoining-full-terrain-v4:${settings.groundMoundRadius.toFixed(2)}`;
+}
+
+function fillSonicGroundMoundMask(target, settings) {
+  const offset = (SONIC_TOPOGRAPHY_GRID * SONIC_TOPOGRAPHY_SPACING) / 2;
+  let targetIndex = 0;
+  for (let x = 0; x < SONIC_TOPOGRAPHY_GRID; x += 1) {
+    const px = x * SONIC_TOPOGRAPHY_SPACING - offset;
+    for (let z = 0; z < SONIC_TOPOGRAPHY_GRID; z += 1) {
+      const pz = z * SONIC_TOPOGRAPHY_SPACING - offset;
+      target[targetIndex] = sonicGroundMoundMaskAt(px, pz, settings);
+      targetIndex += 1;
+    }
+  }
+}
+
+function updateSonicGroundMoundMask(settings = state.sonicTopography.settings) {
+  const topo = state.sonicTopography;
+  const attribute = topo.groundMoundMaskAttribute
+    || topo.terrain?.geometry?.getAttribute?.('aGroundMoundMask');
+  if (!attribute?.array) return;
+  const signature = sonicGroundMoundMaskSignature(settings);
+  if (signature === topo.groundMoundSignature) return;
+  fillSonicGroundMoundMask(attribute.array, settings);
+  attribute.needsUpdate = true;
+  topo.groundMoundSignature = signature;
+}
+
 let sonicSettingsPreferenceSaveTimer = 0;
 
 function saveSonicSettingsPreferences({ immediate = false } = {}) {
+  if (communityScenePersistenceSuppressed()) {
+    scheduleCommunitySceneSync();
+    return;
+  }
   window.clearTimeout(sonicSettingsPreferenceSaveTimer);
   sonicSettingsPreferenceSaveTimer = 0;
   const commit = () => {
@@ -7535,11 +8990,14 @@ function flushSonicSettingsPreferences() {
 function syncSonicSettingsControls() {
   const settings = normalizeSonicSettings(state.sonicTopography.settings);
   const colors = resolvedSonicTopographyColors();
+  const groundColor = resolvedSonicGroundColor();
   const isAutomatic = !settings.centerColor && !settings.coreColor && !settings.outerColor;
   const isCustom = !!settings.centerColor && !!settings.coreColor && !!settings.outerColor;
+  const isGroundAutomatic = !settings.groundColor;
   if (els.sonicCenterColorInput) els.sonicCenterColorInput.value = colors.center;
   if (els.sonicCoreColorInput) els.sonicCoreColorInput.value = colors.core;
   if (els.sonicOuterColorInput) els.sonicOuterColorInput.value = colors.outer;
+  if (els.sonicGroundColorInput) els.sonicGroundColorInput.value = groundColor;
   if (els.sonicFountainColorInput) els.sonicFountainColorInput.value = settings.fountainColor;
   if (els.sonicStarfieldColorInput) els.sonicStarfieldColorInput.value = settings.starfieldColor;
   if (els.sonicGalaxyColorInput) els.sonicGalaxyColorInput.value = settings.galaxyColor;
@@ -7547,9 +9005,9 @@ function syncSonicSettingsControls() {
     els.sonicFountainToggle.checked = settings.fountainEnabled;
     els.sonicFountainToggle.setAttribute('aria-checked', String(settings.fountainEnabled));
   }
-  if (els.sonicAllGroundFloatToggle) {
-    els.sonicAllGroundFloatToggle.checked = settings.allGroundFloatEnabled;
-    els.sonicAllGroundFloatToggle.setAttribute('aria-checked', String(settings.allGroundFloatEnabled));
+  if (els.sonicGroundMoundsToggle) {
+    els.sonicGroundMoundsToggle.checked = settings.groundMoundsEnabled;
+    els.sonicGroundMoundsToggle.setAttribute('aria-checked', String(settings.groundMoundsEnabled));
   }
   if (els.sonicStarfieldToggle) {
     els.sonicStarfieldToggle.checked = settings.starfieldEnabled;
@@ -7563,6 +9021,7 @@ function syncSonicSettingsControls() {
   syncToggle(els.sonicGalaxyToggle, settings.galaxyEnabled);
   syncToggle(els.sonicAtmosphereToggle, settings.atmosphereEnabled);
   syncToggle(els.sonicCoverBackgroundToggle, settings.coverBackgroundEnabled);
+  syncToggle(els.sonicRainToggle, settings.rainEnabled);
   if (els.sonicTyndallToneSelect) els.sonicTyndallToneSelect.value = settings.tyndallTone;
   if (els.sonicPaletteMode) {
     els.sonicPaletteMode.textContent = isAutomatic
@@ -7573,6 +9032,15 @@ function syncSonicSettingsControls() {
     els.sonicFollowCoverButton.classList.toggle('is-active', isAutomatic);
     els.sonicFollowCoverButton.setAttribute('aria-pressed', String(isAutomatic));
   }
+  if (els.sonicGroundPaletteMode) {
+    els.sonicGroundPaletteMode.textContent = isGroundAutomatic
+      ? '随封面实时取色'
+      : '自定义地面颜色';
+  }
+  if (els.sonicGroundFollowCoverButton) {
+    els.sonicGroundFollowCoverButton.classList.toggle('is-active', isGroundAutomatic);
+    els.sonicGroundFollowCoverButton.setAttribute('aria-pressed', String(isGroundAutomatic));
+  }
   const syncRange = (input, output, rawValue, text) => {
     if (input) {
       input.value = String(rawValue);
@@ -7582,11 +9050,27 @@ function syncSonicSettingsControls() {
     if (output) output.textContent = text;
   };
   syncRange(els.sonicBrightnessRange, els.sonicBrightnessValue, Math.round(settings.brightness * 100), `${Math.round(settings.brightness * 100)}%`);
+  syncRange(els.sonicFluorescenceRange, els.sonicFluorescenceValue, Math.round(settings.fluorescence * 100), `${Math.round(settings.fluorescence * 100)}%`);
+  syncRange(els.sonicFluorescenceScatterRange, els.sonicFluorescenceScatterValue, Math.round(settings.fluorescenceScatter * 100), `${Math.round(settings.fluorescenceScatter * 100)}%`);
   const exposureText = `${settings.exposure > 0 ? '+' : ''}${settings.exposure.toFixed(2)} EV`;
   syncRange(els.sonicExposureRange, els.sonicExposureValue, Math.round(settings.exposure * 100), exposureText);
   syncRange(els.sonicColumnHeightRange, els.sonicColumnHeightValue, Math.round(settings.columnHeight * 100), `${Math.round(settings.columnHeight * 100)}%`);
   syncRange(els.sonicFovRange, els.sonicFovValue, Math.round(settings.fov), `${Math.round(settings.fov)}°`);
   syncRange(els.sonicSmoothingRange, els.sonicSmoothingValue, Math.round(settings.smoothing * 100), `${Math.round(settings.smoothing * 100)}%`);
+  syncRange(els.sonicGroundEmissionRange, els.sonicGroundEmissionValue, Math.round(settings.groundEmission * 100), `${Math.round(settings.groundEmission * 100)}%`);
+  syncRange(els.sonicGroundMoundHeightRange, els.sonicGroundMoundHeightValue, Math.round(settings.groundMoundHeight * 100), `${Math.round(settings.groundMoundHeight * 100)}%`);
+  syncRange(els.sonicGroundMoundRadiusRange, els.sonicGroundMoundRadiusValue, Math.round(settings.groundMoundRadius), `${Math.round(settings.groundMoundRadius)} 格`);
+  syncRange(els.sonicRainIntensityRange, els.sonicRainIntensityValue, Math.round(settings.rainIntensity * 100), `${Math.round(settings.rainIntensity * 100)}%`);
+  syncRange(els.sonicRainSpeedRange, els.sonicRainSpeedValue, Math.round(settings.rainSpeed * 100), `${Math.round(settings.rainSpeed * 100)}%`);
+  const rainWindPercent = Math.round(settings.rainWind * 100);
+  syncRange(els.sonicRainWindRange, els.sonicRainWindValue, rainWindPercent, `${rainWindPercent > 0 ? '+' : ''}${rainWindPercent}%`);
+  syncRange(els.sonicRainLengthRange, els.sonicRainLengthValue, Math.round(settings.rainLength * 100), `${Math.round(settings.rainLength * 100)}%`);
+  syncRange(els.sonicRainWidthRange, els.sonicRainWidthValue, Math.round(settings.rainWidth * 100), `${Math.round(settings.rainWidth * 100)}%`);
+  syncRange(els.sonicRainRippleIntensityRange, els.sonicRainRippleIntensityValue, Math.round(settings.rainRippleIntensity * 100), `${Math.round(settings.rainRippleIntensity * 100)}%`);
+  syncRange(els.sonicRainRippleSizeRange, els.sonicRainRippleSizeValue, Math.round(settings.rainRippleSize * 100), `${Math.round(settings.rainRippleSize * 100)}%`);
+  syncRange(els.sonicRainRippleLifeRange, els.sonicRainRippleLifeValue, Math.round(settings.rainRippleLife * 100), `${Math.round(settings.rainRippleLife * 100)}%`);
+  syncRange(els.sonicRainWetReflectanceRange, els.sonicRainWetReflectanceValue, Math.round(settings.rainWetReflectance * 100), `${Math.round(settings.rainWetReflectance * 100)}%`);
+  syncRange(els.sonicRainWetGlowRange, els.sonicRainWetGlowValue, Math.round(settings.rainWetGlow * 100), `${Math.round(settings.rainWetGlow * 100)}%`);
   syncRange(els.sonicGalaxyIntensityRange, els.sonicGalaxyIntensityValue, Math.round(settings.galaxyIntensity * 100), `${Math.round(settings.galaxyIntensity * 100)}%`);
   syncRange(els.sonicFogDensityRange, els.sonicFogDensityValue, Math.round(settings.fogDensity * 100), `${Math.round(settings.fogDensity * 100)}%`);
   syncRange(els.sonicFogSpeedRange, els.sonicFogSpeedValue, Math.round(settings.fogSpeed * 100), `${Math.round(settings.fogSpeed * 100)}%`);
@@ -7630,6 +9114,48 @@ function updateSonicTopographyCameraFit() {
   }
 }
 
+function audioAnalysisPlaybackActive() {
+  return !!els.audio?.src
+    && !els.audio.paused
+    && !els.audio.ended;
+}
+
+function setAudioAnalysisContextRunning(shouldRun) {
+  const analysis = state.audioAnalysis;
+  analysis.contextShouldRun = shouldRun === true;
+  const previous = analysis.contextTransition || Promise.resolve(false);
+  const transition = previous
+    .catch(() => false)
+    .then(async () => {
+      const context = analysis.context;
+      if (!context || context.state === 'closed') return false;
+      try {
+        if (analysis.contextShouldRun) {
+          if (context.state !== 'running') await context.resume();
+          return context.state === 'running';
+        }
+        if (context.state === 'running') await context.suspend();
+        return context.state !== 'running';
+      } catch (error) {
+        return false;
+      }
+    });
+  analysis.contextTransition = transition;
+  const clearTransition = () => {
+    if (analysis.contextTransition === transition) analysis.contextTransition = null;
+  };
+  transition.then(clearTransition, clearTransition);
+  return transition;
+}
+
+function resumeAudioAnalysis() {
+  return setAudioAnalysisContextRunning(true);
+}
+
+function suspendAudioAnalysis() {
+  return setAudioAnalysisContextRunning(false);
+}
+
 function applySonicTopographySettings(options = {}) {
   const topo = state.sonicTopography;
   topo.settings = normalizeSonicSettings(topo.settings);
@@ -7639,18 +9165,37 @@ function applySonicTopographySettings(options = {}) {
     topo.uniforms.uCenterColumnColor?.value?.set?.(colors.center);
     topo.uniforms.uCoreColumnColor?.value?.set?.(colors.core);
     topo.uniforms.uOuterColumnColor?.value?.set?.(colors.outer);
+    if (topo.uniforms.uGroundColor) topo.uniforms.uGroundColor.value.set(resolvedSonicGroundColor());
+    if (topo.uniforms.uGroundEmission) topo.uniforms.uGroundEmission.value = settings.groundEmission;
+    if (topo.uniforms.uRainEnabled) topo.uniforms.uRainEnabled.value = settings.rainEnabled ? 1 : 0;
+    if (topo.uniforms.uRainIntensity) topo.uniforms.uRainIntensity.value = settings.rainIntensity;
+    if (topo.uniforms.uRainWetReflectance) {
+      topo.uniforms.uRainWetReflectance.value = settings.rainWetReflectance;
+    }
+    if (topo.uniforms.uRainWetGlow) topo.uniforms.uRainWetGlow.value = settings.rainWetGlow;
+    if (topo.uniforms.uGroundMoundHeight) {
+      topo.uniforms.uGroundMoundHeight.value = settings.groundMoundsEnabled
+        ? settings.groundMoundHeight
+        : 0;
+    }
     if (topo.uniforms.uSonicBrightness) topo.uniforms.uSonicBrightness.value = settings.brightness;
+    if (topo.uniforms.uFluorescence) topo.uniforms.uFluorescence.value = settings.fluorescence;
+    if (topo.uniforms.uFluorescenceScatter) topo.uniforms.uFluorescenceScatter.value = settings.fluorescenceScatter;
     if (topo.uniforms.uSonicExposure) topo.uniforms.uSonicExposure.value = settings.exposure;
     if (topo.uniforms.uColumnHeightScale) topo.uniforms.uColumnHeightScale.value = settings.columnHeight;
-    if (topo.uniforms.uAllGroundFloat) topo.uniforms.uAllGroundFloat.value = settings.allGroundFloatEnabled ? 1 : 0;
   }
+  updateSonicGroundMoundMask(settings);
+  applySonicRainSettings(topo, settings);
   if (topo.particleMaterial?.color) topo.particleMaterial.color.set(settings.fountainColor);
   if (topo.starfield) topo.starfield.visible = settings.starfieldEnabled;
   if (topo.starfieldMaterial?.color) topo.starfieldMaterial.color.set(settings.starfieldColor);
   if (topo.galaxy) topo.galaxy.visible = settings.galaxyEnabled;
   if (topo.galaxyMaterial?.color) topo.galaxyMaterial.color.set(settings.galaxyColor);
   if (topo.galaxyMaterial) topo.galaxyMaterial.opacity = 0.08 + settings.galaxyIntensity * 0.56;
-  if (topo.fogGroup) topo.fogGroup.visible = settings.atmosphereEnabled;
+  const fluorescenceScatter = clamp(settings.fluorescenceScatter / 1.5, 0, 1);
+  if (topo.fogGroup) {
+    topo.fogGroup.visible = settings.atmosphereEnabled || fluorescenceScatter > 0.002;
+  }
   const toneColor = settings.tyndallTone === 'cold'
     ? 0xb9dcff
     : settings.tyndallTone === 'warm' ? 0xffd29a : 0xf4fbff;
@@ -7669,6 +9214,19 @@ function applySonicTopographySettings(options = {}) {
   const perceptualTyndallIntensity = settings.tyndallIntensity <= 0
     ? 0
     : Math.pow(clamp(settings.tyndallIntensity / 1.5, 0, 1), 0.72) * 1.5;
+  const atmosphereLightStrength = clamp(
+    (settings.atmosphereEnabled
+      ? (
+      0.36
+        + settings.fogGlow * 0.24
+        + perceptualTyndallIntensity * 0.14
+        + settings.mistReflectance * 0.11
+      )
+      : 0)
+      + fluorescenceScatter * 0.18,
+    0,
+    0.88
+  );
   const beamVisibility = 1 - smoothstep(0.34, 0.96, settings.mistEmission);
   const daylightFill = settings.atmosphereEnabled
     ? clamp(
@@ -7728,6 +9286,9 @@ function applySonicTopographySettings(options = {}) {
   if (topo.uniforms?.uAtmosphereDaylightFill) {
     topo.uniforms.uAtmosphereDaylightFill.value = atmosphereDaylightFill;
   }
+  if (topo.uniforms?.uAtmosphereLightStrength) {
+    topo.uniforms.uAtmosphereLightStrength.value = atmosphereLightStrength;
+  }
   if (topo.uniforms?.uTyndallLightDirection) {
     topo.uniforms.uTyndallLightDirection.value.set(72, -48).normalize();
   }
@@ -7760,9 +9321,10 @@ function applySonicTopographySettings(options = {}) {
     beam.scale.x = beam.userData.baseWidth * spreadScale;
     const halo = beam.userData.halo;
     if (!halo) return;
-    halo.visible = beam.visible;
+    halo.visible = beam.visible || fluorescenceScatter > 0.002;
     const haloUniforms = halo.material?.uniforms;
     haloUniforms?.uColor?.value?.set?.(toneColor);
+    haloUniforms?.uColor?.value?.lerp?.(topo.uniforms?.uOuterColumnColor?.value, fluorescenceScatter * 0.58);
     haloUniforms?.uForwardScatterColor?.value?.set?.(forwardScatterColor);
     haloUniforms?.uMistScatterColor?.value?.set?.(mistScatterColor);
     if (haloUniforms?.uMistReflectance) haloUniforms.uMistReflectance.value = settings.mistReflectance;
@@ -7772,10 +9334,22 @@ function applySonicTopographySettings(options = {}) {
   if (topo.backgroundMaterial?.uniforms?.uBackgroundMix) {
     topo.backgroundMaterial.uniforms.uBackgroundMix.value = settings.coverBackgroundMix;
     topo.backgroundMaterial.uniforms.uSkyAtmosphereColor?.value?.set?.(skyAtmosphereColor);
+    if (topo.backgroundMaterial.uniforms.uAtmosphereStrength) {
+      topo.backgroundMaterial.uniforms.uAtmosphereStrength.value = clamp(
+        atmosphereLightStrength + fluorescenceScatter * 0.035,
+        0,
+        0.9
+      );
+    }
     if (topo.backgroundMaterial.uniforms.uSkyContribution) {
-      topo.backgroundMaterial.uniforms.uSkyContribution.value = settings.atmosphereEnabled
-        ? 0.032 + settings.fogDensity * 0.052 + settings.mistEmission * 0.016
-        : 0;
+      topo.backgroundMaterial.uniforms.uSkyContribution.value = clamp(
+        (settings.atmosphereEnabled
+          ? 0.032 + settings.fogDensity * 0.052 + settings.mistEmission * 0.016
+          : 0)
+          + fluorescenceScatter * 0.012,
+        0,
+        0.12
+      );
     }
   }
   updateSonicTopographyCameraFit();
@@ -7873,7 +9447,10 @@ function createSonicBackgroundMaterial(THREE, colors) {
       uBackgroundMix: { value: DEFAULT_SONIC_SETTINGS.coverBackgroundMix },
       uBackgroundDither: { value: 0.82 / 255 },
       uSkyAtmosphereColor: { value: new THREE.Color(0xfff1d6) },
-      uSkyContribution: { value: 0.045 }
+      uSkyContribution: { value: 0.045 },
+      uAtmosphereStrength: { value: 0 },
+      uAtmosphereBass: { value: 0 },
+      uAtmosphereDetail: { value: 0 }
     },
     vertexShader: `
       varying vec3 vBackgroundDirection;
@@ -7890,6 +9467,9 @@ function createSonicBackgroundMaterial(THREE, colors) {
       uniform float uBackgroundDither;
       uniform vec3 uSkyAtmosphereColor;
       uniform float uSkyContribution;
+      uniform float uAtmosphereStrength;
+      uniform float uAtmosphereBass;
+      uniform float uAtmosphereDetail;
       varying vec3 vBackgroundDirection;
 
       float backgroundHash(vec2 point) {
@@ -7943,6 +9523,31 @@ function createSonicBackgroundMaterial(THREE, colors) {
         color = mix(color, uSkyAtmosphereColor, skyHeight * uSkyContribution);
         float vignette = 0.42 + (1.0 - abs(direction.y)) * 0.13;
         color *= horizonLight * vignette * (0.34 + uBackgroundMix * 0.48);
+
+        // A palette-tinted far light and horizon veil deepen the space without
+        // a bloom pass. The bass/detail uniforms are smoothed to zero when
+        // playback stops, leaving a stable environmental gradient at rest.
+        vec3 keyDirection = normalize(vec3(-0.66, 0.18, 0.73));
+        float keyLobe = smoothstep(0.08, 0.92, dot(warpedDirection, keyDirection) * 0.5 + 0.5);
+        keyLobe *= keyLobe;
+        float horizonVeil = 1.0 - smoothstep(0.08, 0.72, abs(direction.y - 0.04));
+        float shadowArc = smoothstep(
+          0.22,
+          0.82,
+          backgroundNoise(warpedDirection * 3.7 + vec3(4.2, 8.1, 2.6))
+        );
+        color *= 1.0 - uAtmosphereStrength * uAtmosphereBass
+          * (1.0 - shadowArc) * (0.018 + keyLobe * 0.034);
+        vec3 farLightColor = mix(uBackgroundColor2, uSkyAtmosphereColor, 0.68);
+        float farLightEnergy = uAtmosphereStrength * (
+          horizonVeil * 0.024
+          + keyLobe * (0.018 + uAtmosphereBass * 0.036)
+          + shadowArc * uAtmosphereDetail * 0.018
+        );
+        vec3 farLight = farLightColor * farLightEnergy;
+        float farLightPeak = max(farLight.r, max(farLight.g, farLight.b));
+        farLight /= 1.0 + max(0.0, farLightPeak - 0.12) * 2.8;
+        color += farLight;
         float dither = backgroundHash(gl_FragCoord.xy + direction.xy * 173.0) - 0.5;
         color += (vec3(dither)) * uBackgroundDither;
         gl_FragColor = vec4(max(color, vec3(0.0)), clamp(uBackgroundMix * 0.9, 0.0, 0.9));
@@ -8293,8 +9898,1108 @@ function orientSonicTyndallPlane(THREE, plane, camera) {
   plane.quaternion.setFromRotationMatrix(data.orientation);
 }
 
+function sonicRainHash(x, z) {
+  const value = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453123;
+  return value - Math.floor(value);
+}
+
+function sonicRainSimplexMod289(value) {
+  return value - Math.floor(value / 289) * 289;
+}
+
+function sonicRainSimplexPermute(value) {
+  return sonicRainSimplexMod289(((value * 34) + 1) * value);
+}
+
+function sonicRainSimplexCorner(permutation, x, z) {
+  let weight = Math.max(0.5 - x * x - z * z, 0);
+  weight *= weight;
+  weight *= weight;
+  const gradient = 2 * (
+    permutation * 0.024390243902439
+      - Math.floor(permutation * 0.024390243902439)
+  ) - 1;
+  const height = Math.abs(gradient) - 0.5;
+  const offset = Math.floor(gradient + 0.5);
+  const direction = gradient - offset;
+  weight *= 1.79284291400159
+    - 0.85373472095314 * (direction * direction + height * height);
+  return weight * (direction * x + height * z);
+}
+
+// Scalar port of the terrain vertex shader's 2D simplex noise. Keeping the
+// impact-height solver on the same field prevents rain ripples from being
+// buried when audio-driven columns rise, without raycasts or GPU readback.
+function sonicRainSimplexNoise2D(x, z) {
+  const skew = (x + z) * 0.366025403784439;
+  let gridX = Math.floor(x + skew);
+  let gridZ = Math.floor(z + skew);
+  const unskew = (gridX + gridZ) * 0.211324865405187;
+  const x0 = x - gridX + unskew;
+  const z0 = z - gridZ + unskew;
+  const stepX = x0 > z0 ? 1 : 0;
+  const stepZ = x0 > z0 ? 0 : 1;
+  const x1 = x0 + 0.211324865405187 - stepX;
+  const z1 = z0 + 0.211324865405187 - stepZ;
+  const x2 = x0 - 0.577350269189626;
+  const z2 = z0 - 0.577350269189626;
+  gridX = sonicRainSimplexMod289(gridX);
+  gridZ = sonicRainSimplexMod289(gridZ);
+  const firstPermutation = sonicRainSimplexPermute(gridZ);
+  const secondPermutation = sonicRainSimplexPermute(gridZ + stepZ);
+  const thirdPermutation = sonicRainSimplexPermute(gridZ + 1);
+  const corner0 = sonicRainSimplexPermute(firstPermutation + gridX);
+  const corner1 = sonicRainSimplexPermute(secondPermutation + gridX + stepX);
+  const corner2 = sonicRainSimplexPermute(thirdPermutation + gridX + 1);
+  return 130 * (
+    sonicRainSimplexCorner(corner0, x0, z0)
+      + sonicRainSimplexCorner(corner1, x1, z1)
+      + sonicRainSimplexCorner(corner2, x2, z2)
+  );
+}
+
+function sonicRainMoundMaskAt(x, z, settings) {
+  return sonicGroundMoundMaskAt(x, z, settings);
+}
+
+function sonicRainGroundFootprintAt(x, z) {
+  return x * x + z * z <= SONIC_RAIN_GROUND_RADIUS * SONIC_RAIN_GROUND_RADIUS;
+}
+
+// Matches the top faces of the instanced terrain boxes, including the small
+// spacing between cells. Impacts use this mask so no ripple can appear in a
+// transparent gap or beyond the radial edge of the visible Sonic ground.
+function sonicRainGroundSurfaceAt(x, z) {
+  if (!sonicRainGroundFootprintAt(x, z)) return false;
+  const minGrid = -SONIC_TOPOGRAPHY_GRID / 2;
+  const maxGrid = SONIC_TOPOGRAPHY_GRID / 2 - 1;
+  const gridX = Math.round(x / SONIC_TOPOGRAPHY_SPACING);
+  const gridZ = Math.round(z / SONIC_TOPOGRAPHY_SPACING);
+  if (gridX < minGrid || gridX > maxGrid || gridZ < minGrid || gridZ > maxGrid) return false;
+  const cellX = gridX * SONIC_TOPOGRAPHY_SPACING;
+  const cellZ = gridZ * SONIC_TOPOGRAPHY_SPACING;
+  const halfCell = SONIC_TOPOGRAPHY_SIZE * 0.5;
+  return Math.abs(x - cellX) <= halfCell && Math.abs(z - cellZ) <= halfCell;
+}
+
+function updateSonicRainViewProjection(rain) {
+  if (!rain?.camera || !rain.viewProjection) return;
+  rain.camera.updateMatrixWorld();
+  rain.viewProjection.multiplyMatrices(rain.camera.projectionMatrix, rain.camera.matrixWorldInverse);
+}
+
+// Manual clip-space projection avoids allocating vectors in the rain hot path.
+// A small margin prevents visible pop-in while still excluding wallpaper-only
+// and off-screen space where there is no rendered ground beneath the drop.
+function sonicRainGroundVisibleAt(rain, x, y, z) {
+  const elements = rain.viewProjection.elements;
+  const clipX = elements[0] * x + elements[4] * y + elements[8] * z + elements[12];
+  const clipY = elements[1] * x + elements[5] * y + elements[9] * z + elements[13];
+  const clipZ = elements[2] * x + elements[6] * y + elements[10] * z + elements[14];
+  const clipW = elements[3] * x + elements[7] * y + elements[11] * z + elements[15];
+  if (clipW <= 0.0001) return false;
+  const inverseW = 1 / clipW;
+  const ndcX = clipX * inverseW;
+  const ndcY = clipY * inverseW;
+  const ndcZ = clipZ * inverseW;
+  return ndcX >= -1.06 && ndcX <= 1.06
+    && ndcY >= -1.08 && ndcY <= 1.04
+    && ndcZ >= -1.02 && ndcZ <= 1.02;
+}
+
+// Rain collision uses the same deterministic grid, shared seeds, frequency
+// field and wave phases as the GPU terrain, without raycasts, readPixels calls
+// or frame allocations.
+function sonicLowFrequencyImpactDrive(value) {
+  const drive = clamp(Number(value) || 0, 0, 1);
+  return drive * (1 + SONIC_LOW_FREQUENCY_IMPACT_CURVE_STRENGTH * (1 - drive));
+}
+
+function sonicCenterColumnSoftLimit(value, limit) {
+  const safeValue = Math.max(0, Number(value) || 0);
+  const safeLimit = Math.max(0.001, Number(limit) || 0);
+  const knee = safeLimit * SONIC_CENTER_COLUMN_SOFT_KNEE_RATIO;
+  if (safeValue <= knee) return safeValue;
+  const kneeSpan = Math.max(0.001, safeLimit - knee);
+  return knee + kneeSpan * (1 - Math.exp(-(safeValue - knee) / kneeSpan));
+}
+
+function sonicRainCollisionHeight(topo, x, z, timeSeconds) {
+  const settings = topo.settings || DEFAULT_SONIC_SETTINGS;
+  if (!sonicRainGroundSurfaceAt(x, z)) return 0.04;
+  const gridX = Math.round(x / SONIC_TOPOGRAPHY_SPACING);
+  const gridZ = Math.round(z / SONIC_TOPOGRAPHY_SPACING);
+  const terrainGridHalf = SONIC_TOPOGRAPHY_GRID / 2;
+  const terrainIndex = (gridX + terrainGridHalf) * SONIC_TOPOGRAPHY_GRID
+    + gridZ + terrainGridHalf;
+  const terrainMatrix = topo.terrain?.instanceMatrix?.array;
+  const terrainMatrixOffset = terrainIndex * 16;
+  const matrixCellX = terrainMatrix?.[terrainMatrixOffset + 12];
+  const matrixCellZ = terrainMatrix?.[terrainMatrixOffset + 14];
+  const cellX = Number.isFinite(matrixCellX)
+    ? matrixCellX
+    : gridX * SONIC_TOPOGRAPHY_SPACING;
+  const cellZ = Number.isFinite(matrixCellZ)
+    ? matrixCellZ
+    : gridZ * SONIC_TOPOGRAPHY_SPACING;
+
+  const audio = topo.frameAudio;
+  const radius = Math.hypot(gridX, gridZ);
+  const centerDistance = Math.hypot(cellX, cellZ);
+  const terrainSeedValues = topo.terrainSeedAttribute?.array;
+  const terrainSeedOffset = terrainIndex * 4;
+  const randomValue = terrainSeedValues
+    ? terrainSeedValues[terrainSeedOffset] / 255
+    : sonicRainHash(cellX, cellZ);
+  const terrainSeedY = terrainSeedValues
+    ? terrainSeedValues[terrainSeedOffset + 1] / 255
+    : sonicRainHash(Math.floor(cellX / 7) + 23.7, Math.floor(cellZ / 7) + 51.3);
+  const terrainSeedZ = terrainSeedValues
+    ? terrainSeedValues[terrainSeedOffset + 2] / 255
+    : sonicRainHash(Math.floor(cellX / 7) + 7.1, Math.floor(cellZ / 7) + 19.7);
+  const terrainSeedW = terrainSeedValues
+    ? terrainSeedValues[terrainSeedOffset + 3] / 255
+    : sonicRainHash(Math.floor(cellX / 7) + 31.9, Math.floor(cellZ / 7) + 11.3);
+  const globalFalloff = smoothstep(70, 36, centerDistance);
+  const baseNoise = (sonicRainSimplexNoise2D(
+    cellX * 0.05 + timeSeconds * 0.1,
+    cellZ * 0.05 + timeSeconds * 0.05
+  ) + 1) * 0.5;
+  const wave = Math.sin(cellX * 0.15 + cellZ * 0.1 - timeSeconds * 0.6) * 0.5 + 0.5;
+  const idleField = (sonicRainSimplexNoise2D(
+    cellX * 0.085 + timeSeconds * 0.032,
+    cellZ * 0.085 - timeSeconds * 0.026
+  ) + 1) * 0.5;
+  const idleCluster = smoothstep(0.5, 0.96, idleField + randomValue * 0.18);
+  const idlePulse = 0.54
+    + Math.sin(timeSeconds * 0.72 + randomValue * 6.283 + baseNoise * 2.4) * 0.46;
+  const idleBreath = topo.uniforms?.uIdleBreath?.value ?? 0.14;
+  let elevation = idleBreath * globalFalloff
+    * (idleCluster * idlePulse * 0.76 + wave * 0.13);
+  const lowDrive = Math.max(audio.subBass * 1.35, audio.bass);
+  const lowGate = smoothstep(0.055, 0.22, lowDrive);
+  const audioPulse = clamp(topo.uniforms?.uAudioPulse?.value ?? topo.audioPulse ?? 0, 0, 1);
+  const rhythmGate = lowGate * (0.32 + audioPulse * 0.68);
+
+  const clusterCoreMask = radius * radius
+    < SONIC_BASS_COLUMN_CLUSTER.radius * SONIC_BASS_COLUMN_CLUSTER.radius + 0.5 ? 1 : 0;
+  const clusterTransition = 1 - smoothstep(
+    SONIC_BASS_COLUMN_CLUSTER.radius,
+    SONIC_BASS_COLUMN_CLUSTER.radius + SONIC_BASS_COLUMN_CLUSTER.feather,
+    radius
+  );
+  const clusterBlend = Math.max(clusterCoreMask, clusterTransition);
+  let bassColumnCoreMix = 0;
+  let bassColumnHeightProfile = SONIC_BASS_COLUMN_CLUSTER.outerHeightScale;
+  let bassColumnLift = 0;
+  if (clusterBlend > 0.001) {
+    const radialMix = smoothstep(
+      SONIC_BASS_COLUMN_CLUSTER.radius * 0.55,
+      SONIC_BASS_COLUMN_CLUSTER.radius + SONIC_BASS_COLUMN_CLUSTER.feather,
+      radius
+    );
+    let heightProfile = SONIC_BASS_COLUMN_CLUSTER.innerHeightScale
+      + (SONIC_BASS_COLUMN_CLUSTER.outerHeightScale - SONIC_BASS_COLUMN_CLUSTER.innerHeightScale) * radialMix;
+    bassColumnCoreMix = 1 - smoothstep(
+      SONIC_BASS_COLUMN_CLUSTER.coreRadius,
+      SONIC_BASS_COLUMN_CLUSTER.coreRadius + SONIC_BASS_COLUMN_CLUSTER.coreFeather,
+      radius
+    );
+    heightProfile += (SONIC_BASS_COLUMN_CLUSTER.coreHeightScale - heightProfile) * bassColumnCoreMix;
+    const bandValue = topo.bassColumnBandAttribute?.array?.[terrainIndex];
+    const bandIndex = clamp(Math.round(Number.isFinite(bandValue) ? bandValue : 0), 0,
+      SONIC_LOW_FREQUENCY_BAND_COUNT - 1);
+    const spectrumValue = topo.lowFrequencySpectrumData?.[bandIndex];
+    const bandDrive = gridX === 0 && gridZ === 0
+      ? audio.lowFrequencyAmplitude
+      : Number.isFinite(spectrumValue)
+        ? spectrumValue / 255
+        : audio.lowFrequencyBands[bandIndex] || 0;
+    const layerSeedValue = randomValue * 7.91 + terrainSeedY * 4.37
+      + terrainSeedZ * 2.13 + terrainSeedW * 1.19;
+    const layerSeed = layerSeedValue - Math.floor(layerSeedValue);
+    const layerTier = Math.floor(layerSeed * 7) / 6;
+    const patchTierValue = terrainSeedY * 3.73 + terrainSeedW * 2.11;
+    const patchTier = Math.floor((patchTierValue - Math.floor(patchTierValue)) * 4) / 3;
+    const dynamicScale = 1.35 + heightProfile * 0.62 + patchTier * 0.12;
+    bassColumnHeightProfile = heightProfile;
+    const centerColumnCoreLowFrequencyGainMask = bassColumnCoreMix * bassColumnCoreMix;
+    const centerColumnCoreLowFrequencyGain = 1
+      + (SONIC_CENTER_COLUMN_CORE_LOW_FREQUENCY_GAIN - 1)
+        * centerColumnCoreLowFrequencyGainMask;
+    const centerColumnImpactDrive = sonicLowFrequencyImpactDrive(bandDrive);
+    bassColumnLift = clusterBlend * centerColumnImpactDrive * dynamicScale
+      * centerColumnCoreLowFrequencyGain * settings.columnHeight;
+  }
+  const layerSeedValue = randomValue * 7.91 + terrainSeedY * 4.37
+    + terrainSeedZ * 2.13 + terrainSeedW * 1.19;
+  const layerSeed = layerSeedValue - Math.floor(layerSeedValue);
+  const layerTier = Math.floor(layerSeed * 7) / 6;
+  const patchTierValue = terrainSeedY * 3.73 + terrainSeedW * 2.11;
+  const patchTier = Math.floor((patchTierValue - Math.floor(patchTierValue)) * 4) / 3;
+  const pedestalScale = (0.05 + (5.8 - 0.05) * layerTier) * (0.82 + 0.18 * patchTier);
+  const pedestalRadial = 0.65 + (1.45 - 0.65)
+    * smoothstep(0.58, 4.2, bassColumnHeightProfile);
+  const bassColumnPedestalLift = clusterBlend
+    * pedestalRadial * pedestalScale * Math.min(settings.columnHeight, 1.35);
+
+  const smallCellX = Math.floor(cellX / 7);
+  const smallCellZ = Math.floor(cellZ / 7);
+  const terrainSmallLocalValues = topo.terrainSmallLocalAttribute?.array;
+  const terrainSmallLocalOffset = terrainIndex * 2;
+  const smallLocalX = terrainSmallLocalValues
+    ? terrainSmallLocalValues[terrainSmallLocalOffset] / 255 - 0.5
+    : cellX / 7 - smallCellX - 0.5;
+  const smallLocalZ = terrainSmallLocalValues
+    ? terrainSmallLocalValues[terrainSmallLocalOffset + 1] / 255 - 0.5
+    : cellZ / 7 - smallCellZ - 0.5;
+  const smallSeed = terrainSeedY;
+  const smallCenterX = (terrainSeedZ - 0.5) * 0.26;
+  const smallCenterZ = (terrainSeedW - 0.5) * 0.26;
+  const smallDistance = Math.hypot(smallLocalX - smallCenterX, smallLocalZ - smallCenterZ);
+  const smallShape = (1 - smoothstep(0.07, 0.31, smallDistance))
+    * (smallSeed >= 0.84 ? 1 : 0) * (1 - clusterBlend);
+  const audioTerrainTime = Number.isFinite(topo.audioTerrainTime)
+    ? topo.audioTerrainTime
+    : timeSeconds;
+  const smallPulse = 0.72
+    + Math.sin(audioTerrainTime * (1.1 + smallSeed * 0.7) + smallSeed * 6.283) * 0.28;
+  const smallBassDrive = clamp(
+    Math.max(audio.lowFrequencyAmplitude, lowDrive) * lowGate,
+    0,
+    1
+  );
+  const smallBassLift = smallShape * smallBassDrive * smallPulse
+    * (0.65 + smallSeed * 0.35) * 1.25 * settings.columnHeight;
+
+  const subRegion = smoothstep(31, 0, centerDistance);
+  const subLift = audio.subBass * rhythmGate * subRegion * 1.05;
+  const bassNoise = sonicRainSimplexNoise2D(
+    cellX * 0.1,
+    cellZ * 0.1 - timeSeconds * 0.2
+  );
+  const bassRegion = smoothstep(44, 6, centerDistance + bassNoise * 5);
+  const bassLift = audio.bass * rhythmGate * bassRegion
+    * smoothstep(0, 1, randomValue + audio.density * 0.5) * 0.9;
+  const lowMidNoise = sonicRainSimplexNoise2D(
+    cellX * 0.05 + timeSeconds * 0.1,
+    cellZ * 0.05
+  );
+  const lowMidLift = audio.lowMid * rhythmGate * (lowMidNoise * 0.5 + 0.5) * 0.42;
+  const riverFlow = Math.sin(
+    cellX * 0.2 + cellZ * 0.2
+      + sonicRainSimplexNoise2D(cellX * 0.1, cellZ * 0.1) * 2
+      - timeSeconds * 2
+  );
+  const midLift = audio.mid * rhythmGate * Math.max(0, riverFlow) * 0.42;
+  const highMidRegion = smoothstep(10, 45, centerDistance);
+  const highMidFraction = randomValue * 13.3 - Math.floor(randomValue * 13.3);
+  const highMidLift = highMidFraction > 0.8
+    ? audio.highMid * rhythmGate * highMidRegion
+      * (randomValue * 7.7 - Math.floor(randomValue * 7.7)) * 0.34
+    : 0;
+  const kickMix = audio.smoothness * 0.5 + 0.2;
+  const kickSurface = (baseNoise + (wave - baseNoise) * kickMix)
+    * lowDrive * rhythmGate * 0.28;
+  let terrainAudioElevation = smallBassLift + subLift + bassLift
+    + lowMidLift + midLift + highMidLift + kickSurface;
+  if (randomValue > 0.99) terrainAudioElevation += audio.energy * rhythmGate * 0.28;
+  terrainAudioElevation = Math.min(
+    terrainAudioElevation * globalFalloff,
+    SONIC_AUDIO_COLUMN_MAX_LIFT * Math.min(settings.columnHeight, 1.35)
+  );
+  const centerColumnLiftCap = SONIC_CENTER_COLUMN_MAX_LIFT
+    * Math.min(settings.columnHeight, 1.35);
+  const centerColumnAudioLift = sonicCenterColumnSoftLimit(
+    bassColumnLift * globalFalloff,
+    centerColumnLiftCap
+  );
+  elevation += bassColumnPedestalLift + terrainAudioElevation + centerColumnAudioLift;
+
+  const moundColumnProfiles = topo.groundMoundColumnProfileAttribute?.array;
+  const moundColumnProfileOffset = terrainIndex * 4;
+  const fallbackMoundPatchX = Math.floor((gridX + 2) / 4);
+  const fallbackMoundPatchZ = Math.floor((gridZ + 2) / 4);
+  const fallbackMoundPatchLevel = Math.floor(
+    sonicRainHash(fallbackMoundPatchX + 83.7, fallbackMoundPatchZ - 41.9)
+      * SONIC_GROUND_MOUND_COLUMN_LEVELS
+  );
+  const fallbackMoundMicroOffset = Math.floor(
+    sonicRainHash(gridX * 1.37 - 13.1, gridZ * 1.91 + 27.3) * 3
+  ) - 1;
+  const fallbackMoundLevel = clamp(
+    fallbackMoundPatchLevel + fallbackMoundMicroOffset,
+    0,
+    SONIC_GROUND_MOUND_COLUMN_LEVELS - 1
+  );
+  const encodedMoundLevel = moundColumnProfiles?.[moundColumnProfileOffset];
+  const moundColumnLevelIndex = Number.isFinite(encodedMoundLevel)
+    ? Math.round(encodedMoundLevel / 255 * (SONIC_GROUND_MOUND_COLUMN_LEVELS - 1))
+    : fallbackMoundLevel;
+  const moundColumnLevel = moundColumnLevelIndex / (SONIC_GROUND_MOUND_COLUMN_LEVELS - 1);
+  const encodedMoundPhase = moundColumnProfiles?.[moundColumnProfileOffset + 1];
+  const fallbackMoundPhase = Math.min(
+    SONIC_GROUND_MOUND_COLUMN_PHASE_BUCKETS - 1,
+    Math.floor(
+      sonicRainHash(gridX * 0.73 + 59.2, gridZ * 1.17 - 31.4)
+        * SONIC_GROUND_MOUND_COLUMN_PHASE_BUCKETS
+    )
+  );
+  const moundColumnPhaseIndex = Number.isFinite(encodedMoundPhase)
+    ? Math.round(encodedMoundPhase / 255 * (SONIC_GROUND_MOUND_COLUMN_PHASE_BUCKETS - 1))
+    : fallbackMoundPhase;
+  const moundColumnPhase = moundColumnPhaseIndex
+    / (SONIC_GROUND_MOUND_COLUMN_PHASE_BUCKETS - 1);
+  const fallbackMoundBand = Math.min(
+    SONIC_LOW_FREQUENCY_BAND_COUNT - 1,
+    Math.floor(
+      sonicRainHash(gridX * 2.71 - 7.9, gridZ * 3.17 + 19.6)
+        * SONIC_LOW_FREQUENCY_BAND_COUNT
+    )
+  );
+  const encodedMoundBandLow = moundColumnProfiles?.[moundColumnProfileOffset + 2];
+  const encodedMoundBandHigh = moundColumnProfiles?.[moundColumnProfileOffset + 3];
+  const moundColumnBandIndex = Number.isFinite(encodedMoundBandLow)
+    ? clamp(
+        Math.round(encodedMoundBandLow) + (encodedMoundBandHigh >= 128 ? 256 : 0),
+        0,
+        SONIC_LOW_FREQUENCY_BAND_COUNT - 1
+      )
+    : fallbackMoundBand;
+  const moundSpectrumValue = topo.lowFrequencySpectrumData?.[moundColumnBandIndex];
+  const moundColumnBandDrive = Number.isFinite(moundSpectrumValue)
+    ? moundSpectrumValue / 255
+    : audio.lowFrequencyBands[moundColumnBandIndex] || 0;
+  const moundColumnStaticBase = SONIC_GROUND_MOUND_COLUMN_STATIC_MIN
+    + (SONIC_GROUND_MOUND_COLUMN_STATIC_MAX - SONIC_GROUND_MOUND_COLUMN_STATIC_MIN)
+      * moundColumnLevel;
+  const phaseJitter = randomValue * 1.45 - 0.725 + (moundColumnPhase - 0.5) * 1.7;
+  const phase = gridX * 0.47 + gridZ * 0.71 + phaseJitter;
+  const ring = centerDistance / SONIC_TOPOGRAPHY_SPACING;
+  const ringWaveA = 0.5 + 0.5 * Math.sin(
+    ring * 0.42 - audioTerrainTime * 0.64 + phaseJitter * 0.38
+  );
+  const ringWaveB = 0.5 + 0.5 * Math.sin(
+    ring * 0.79 + audioTerrainTime * 0.37 + phase * 1.31
+  );
+  const crossWave = 0.5 + 0.5 * Math.sin(
+    gridX * 0.31 - gridZ * 0.27 - audioTerrainTime * 0.49 + phaseJitter * 0.7
+  );
+  const layeredWave = ringWaveA * 0.48 + ringWaveB * 0.32 + crossWave * 0.2;
+  const groundEntranceProgress = clamp(
+    topo.uniforms?.uGroundEntrance?.value ?? topo.groundEntranceProgress ?? 0,
+    0,
+    1
+  );
+  const entranceCursor = groundEntranceProgress * 1.34
+    - clamp(centerDistance / 78, 0, 1) * 0.24 - randomValue * 0.06;
+  const entrance = smoothstep(0, 1, entranceCursor);
+  const attributeMoundMask = topo.groundMoundMaskAttribute?.array?.[terrainIndex];
+  const moundMask = Number.isFinite(attributeMoundMask)
+    ? attributeMoundMask
+    : sonicRainMoundMaskAt(cellX, cellZ, settings);
+  if (settings.groundMoundsEnabled && moundMask > 0) {
+    const moundLowDrive = clamp(
+      audio.lowFrequencyAmplitude * 0.72 + audio.subBass * 0.18 + audio.bass * 0.1,
+      0,
+      1
+    );
+    const moundColumnAudioDrive = clamp(
+      moundColumnBandDrive * 0.78 + moundLowDrive * 0.22,
+      0,
+      1
+    );
+    const moundColumnImpactDrive = sonicLowFrequencyImpactDrive(moundColumnAudioDrive);
+    const moundColumnAudioLift = moundColumnImpactDrive
+      * (SONIC_GROUND_MOUND_COLUMN_AUDIO_MIN
+        + (SONIC_GROUND_MOUND_COLUMN_AUDIO_MAX - SONIC_GROUND_MOUND_COLUMN_AUDIO_MIN)
+          * moundColumnLevel);
+    elevation += moundMask * (1 - clusterBlend * 0.58) * settings.groundMoundHeight
+      * (moundColumnStaticBase + moundColumnAudioLift + layeredWave * 0.05)
+      * entrance;
+  }
+
+  let rippleElevation = 0;
+  const terrainRipples = topo.ripples;
+  if (terrainRipples) {
+    for (let index = 0; index < terrainRipples.length; index += 1) {
+      const ripple = terrainRipples[index];
+      if (!ripple || ripple.isActive <= 0) continue;
+      const whiteRipple = ripple.rippleType > 0.5;
+      const speed = whiteRipple ? 20 : 15;
+      const width = whiteRipple ? 1 : 3;
+      const fadeDistance = whiteRipple ? 8 : 15;
+      const elevationScale = whiteRipple ? 1 : 4;
+      const timeSince = timeSeconds - ripple.time;
+      const waveRadius = timeSince * speed;
+      const distance = Math.hypot(cellX - ripple.pos.x, cellZ - ripple.pos.y);
+      const delta = distance - waveRadius;
+      const pulse = Math.exp(-(delta * delta) / width)
+        * Math.exp(-waveRadius / fadeDistance) * ripple.strength;
+      rippleElevation += pulse * elevationScale;
+    }
+  }
+  return 1 + elevation + rippleElevation;
+}
+
+// One conservative ceiling per frame keeps the expensive exact height solver
+// limited to drops that are genuinely near the tallest possible surface. It
+// also follows interactive terrain ripples, whose peaks can rise well above the
+// old fixed y=8 collision gate.
+function sonicRainCollisionCeiling(topo, timeSeconds) {
+  const settings = topo.settings || DEFAULT_SONIC_SETTINGS;
+  const idleBreath = topo.uniforms?.uIdleBreath?.value ?? 0.14;
+  let ceiling = 1 + idleBreath * 0.89
+    + SONIC_AUDIO_COLUMN_MAX_LIFT * Math.min(settings.columnHeight, 1.35)
+    // Covers the tallest fixed mask, static column tier, audio tier and phase
+    // wave so rain cannot step through a user-maximized mound column cluster.
+    + (settings.groundMoundsEnabled
+      ? settings.groundMoundHeight * SONIC_GROUND_MOUND_COLUMN_MAX_RISE
+      : 0);
+  const terrainRipples = topo.ripples;
+  if (terrainRipples) {
+    for (let index = 0; index < terrainRipples.length; index += 1) {
+      const ripple = terrainRipples[index];
+      if (!ripple || ripple.isActive <= 0) continue;
+      const whiteRipple = ripple.rippleType > 0.5;
+      const speed = whiteRipple ? 20 : 15;
+      const fadeDistance = whiteRipple ? 8 : 15;
+      const elevationScale = whiteRipple ? 1 : 4;
+      const waveRadius = Math.max(0, timeSeconds - ripple.time) * speed;
+      ceiling += Math.exp(-waveRadius / fadeDistance)
+        * ripple.strength * elevationScale;
+    }
+  }
+  return ceiling + 0.25;
+}
+
+function resetSonicRainDrop(rain, index, initial = false) {
+  const offset = index * SONIC_RAIN_DROP_STRIDE;
+  const minGrid = -SONIC_TOPOGRAPHY_GRID / 2;
+  const maxGrid = SONIC_TOPOGRAPHY_GRID / 2 - 1;
+  const curtainLane = index % 7;
+  let x = 0;
+  let z = 0;
+  let found = false;
+  for (let attempt = 0; attempt < 14; attempt += 1) {
+    const laneCenter = (-0.82 + curtainLane / 6 * 1.64) * rain.groundRadius;
+    const candidateX = index % 4 === 0
+      ? (Math.random() * 2 - 1) * rain.groundRadius
+      : laneCenter + (Math.random() + Math.random() - 1) * rain.groundRadius * 0.18;
+    const candidateZ = (Math.random() * 2 - 1) * rain.groundRadius;
+    const gridX = clamp(Math.round(candidateX / SONIC_TOPOGRAPHY_SPACING), minGrid, maxGrid);
+    const gridZ = clamp(Math.round(candidateZ / SONIC_TOPOGRAPHY_SPACING), minGrid, maxGrid);
+    x = gridX * SONIC_TOPOGRAPHY_SPACING
+      + (Math.random() * 2 - 1) * SONIC_TOPOGRAPHY_SIZE * 0.44;
+    z = gridZ * SONIC_TOPOGRAPHY_SPACING
+      + (Math.random() * 2 - 1) * SONIC_TOPOGRAPHY_SIZE * 0.44;
+    if (sonicRainGroundSurfaceAt(x, z) && sonicRainGroundVisibleAt(rain, x, 1, z)) {
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    const fallbackGrid = (index % 9) - 4;
+    x = fallbackGrid * SONIC_TOPOGRAPHY_SPACING;
+    z = (Math.floor(index / 9) % 9 - 4) * SONIC_TOPOGRAPHY_SPACING;
+  }
+  rain.dropData[offset] = x;
+  rain.dropData[offset + 1] = initial ? 4 + Math.random() * 54 : 42 + Math.random() * 20;
+  rain.dropData[offset + 2] = z;
+  rain.dropData[offset + 3] = 0.72 + Math.random() * 0.72;
+  rain.dropData[offset + 4] = 0.66 + Math.random() * 0.72;
+  rain.dropData[offset + 5] = Math.random() * Math.PI * 2;
+}
+
+function spawnSonicRainRipple(rain, x, y, z, settings) {
+  if (!rain.rippleData.length || settings.rainRippleIntensity <= 0) return;
+  const index = rain.rippleIndex % SONIC_RAIN_QUALITY.ripples;
+  const offset = index * SONIC_RAIN_RIPPLE_STRIDE;
+  rain.rippleData[offset] = x;
+  rain.rippleData[offset + 1] = y + 0.035;
+  rain.rippleData[offset + 2] = z;
+  rain.rippleData[offset + 3] = 0;
+  rain.rippleData[offset + 4] = (0.68 + Math.random() * 0.34) * settings.rainRippleLife;
+  rain.rippleData[offset + 5] = (0.78 + Math.random() * 0.32) * settings.rainRippleSize;
+  rain.rippleData[offset + 6] = 0.78 + Math.random() * 0.22;
+  rain.rippleImpacts[index * 2] = x;
+  rain.rippleImpacts[index * 2 + 1] = z;
+  rain.rippleRadiusScales[index] = rain.rippleData[offset + 5];
+  rain.rippleImpactAttribute.needsUpdate = true;
+  rain.rippleRadiusAttribute.needsUpdate = true;
+  rain.rippleIndex = (index + 1) % SONIC_RAIN_QUALITY.ripples;
+}
+
+function spawnSonicRainSplash(rain, x, y, z, settings) {
+  if (!rain.splashData.length || settings.rainRippleIntensity <= 0 || reducedMotion) return;
+  const amount = SONIC_RAIN_QUALITY.splashPerImpact;
+  for (let splashIndex = 0; splashIndex < amount; splashIndex += 1) {
+    const index = rain.splashIndex % SONIC_RAIN_QUALITY.splashes;
+    const offset = index * SONIC_RAIN_SPLASH_STRIDE;
+    const angle = Math.random() * Math.PI * 2;
+    const horizontalSpeed = 0.45 + Math.random() * 1.15;
+    rain.splashData[offset] = x;
+    rain.splashData[offset + 1] = y + 0.08;
+    rain.splashData[offset + 2] = z;
+    rain.splashData[offset + 3] = Math.cos(angle) * horizontalSpeed;
+    rain.splashData[offset + 4] = 1.15 + Math.random() * 1.75;
+    rain.splashData[offset + 5] = Math.sin(angle) * horizontalSpeed;
+    rain.splashData[offset + 6] = 0;
+    rain.splashData[offset + 7] = (0.24 + Math.random() * 0.2) * settings.rainRippleLife;
+    rain.splashData[offset + 8] = 0.07 + Math.random() * 0.09;
+    rain.splashIndex = (index + 1) % SONIC_RAIN_QUALITY.splashes;
+  }
+}
+
+function createSonicRainStreakMaterial(THREE) {
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uOpacity: { value: 0.26 },
+      uGroundRadius: { value: SONIC_RAIN_GROUND_RADIUS },
+      uGroundY: { value: 1 },
+      uGroundSpacing: { value: SONIC_TOPOGRAPHY_SPACING },
+      uGroundHalfCell: { value: SONIC_TOPOGRAPHY_SIZE * 0.5 }
+    },
+    vertexShader: `
+      varying vec3 vRainColor;
+      varying float vRainLength;
+      varying vec3 vRainWorldPosition;
+      void main() {
+        vRainColor = instanceColor;
+        vRainLength = position.y + 0.5;
+        vec4 worldPosition = modelMatrix * instanceMatrix * vec4(position, 1.0);
+        vRainWorldPosition = worldPosition.xyz;
+        gl_Position = projectionMatrix * viewMatrix * worldPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform float uOpacity;
+      uniform float uGroundRadius;
+      uniform float uGroundY;
+      uniform float uGroundSpacing;
+      uniform float uGroundHalfCell;
+      varying vec3 vRainColor;
+      varying float vRainLength;
+      varying vec3 vRainWorldPosition;
+      void main() {
+        // Each instance is spawned above a real terrain top. Mask by that
+        // physical x/z landing column instead of re-projecting every fragment
+        // through the camera: camera-ray projection discarded most of the
+        // visible curtain whenever a drop was above the camera or near the
+        // horizon even though it still belonged to rendered ground.
+        vec3 groundPoint = vec3(vRainWorldPosition.x, uGroundY, vRainWorldPosition.z);
+        float groundMask = 1.0 - smoothstep(
+          uGroundRadius - 2.0,
+          uGroundRadius,
+          length(groundPoint.xz)
+        );
+        if (groundMask <= 0.001) discard;
+        // Project each streak pixel onto the same spaced grid as the terrain.
+        // The radial mask removes the outer void; this cell mask also removes
+        // every transparent seam between the individual column top faces.
+        vec2 nearestGroundCell = floor(
+          groundPoint.xz / uGroundSpacing + vec2(0.5)
+        ) * uGroundSpacing;
+        vec2 groundCellDelta = abs(groundPoint.xz - nearestGroundCell);
+        float groundCellEdge = max(groundCellDelta.x, groundCellDelta.y);
+        float groundCellMask = 1.0 - smoothstep(
+          uGroundHalfCell - 0.018,
+          uGroundHalfCell,
+          groundCellEdge
+        );
+        if (groundCellMask <= 0.001) discard;
+        float body = smoothstep(0.0, 0.2, vRainLength)
+          * (1.0 - smoothstep(0.72, 1.0, vRainLength));
+        float core = 0.52 + body * 0.48;
+        gl_FragColor = vec4(
+          vRainColor * (0.72 + body * 0.28),
+          uOpacity * core * groundMask * groundCellMask
+        );
+        #include <tonemapping_fragment>
+        #include <encodings_fragment>
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    blending: THREE.NormalBlending,
+    toneMapped: true
+  });
+  return material;
+}
+
+function createSonicRainMaterial(THREE, color) {
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uColor: { value: new THREE.Color(color) },
+      uIntensity: { value: DEFAULT_SONIC_SETTINGS.rainRippleIntensity }
+    },
+    vertexShader: `
+      attribute float aRainFade;
+      attribute float aRainProgress;
+      attribute vec2 aRainImpact;
+      attribute float aRainRadiusScale;
+      varying float vRainFade;
+      varying float vRainProgress;
+      varying vec3 vRainWorldPosition;
+      varying float vRainSeed;
+      varying vec2 vRainImpact;
+      varying float vRainRadiusScale;
+      void main() {
+        vRainFade = aRainFade;
+        vRainProgress = aRainProgress;
+        vRainImpact = aRainImpact;
+        vRainRadiusScale = aRainRadiusScale;
+        vec4 instancePosition = instanceMatrix * vec4(position, 1.0);
+        vec4 worldPosition = modelMatrix * instancePosition;
+        vRainWorldPosition = worldPosition.xyz;
+        vRainSeed = fract(sin(dot(aRainImpact, vec2(12.9898, 78.233))) * 43758.5453);
+        gl_Position = projectionMatrix * viewMatrix * worldPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uColor;
+      uniform float uIntensity;
+      varying float vRainFade;
+      varying float vRainProgress;
+      varying vec3 vRainWorldPosition;
+      varying float vRainSeed;
+      varying vec2 vRainImpact;
+      varying float vRainRadiusScale;
+
+      float rainBand(float radius, float center, float width) {
+        float antialiasWidth = max(fwidth(radius) * 1.35, 0.004);
+        return 1.0 - smoothstep(width, width + antialiasWidth, abs(radius - center));
+      }
+
+      void main() {
+        float expansion = 1.0 - exp(-vRainProgress * 3.2);
+        float maximumRadius = 0.13 + clamp(vRainRadiusScale, 0.4, 2.0) * 0.14;
+        float waveRadius = maximumRadius * (0.2 + expansion * 0.8);
+        vec2 point = (vRainWorldPosition.xz - vRainImpact) / max(waveRadius, 0.001);
+        float radius = length(point);
+        if (radius > 1.025) discard;
+
+        float angle = atan(point.y, point.x);
+        float angularNoise = sin(angle * 7.0 + vRainSeed * 19.0) * 0.55
+          + sin(angle * 13.0 - vRainSeed * 31.0) * 0.3
+          + sin(angle * 23.0 + vRainSeed * 47.0) * 0.15;
+        float breakup = smoothstep(
+          -0.42,
+          0.54,
+          sin(angle * 9.0 + vRainSeed * 37.0 + vRainProgress * 2.2)
+            + angularNoise * 0.48
+        );
+        float primary = rainBand(radius, 0.79 + angularNoise * 0.012, 0.018)
+          * (0.68 + breakup * 0.32);
+        float trailing = rainBand(radius, 0.57 + angularNoise * 0.018, 0.014)
+          * smoothstep(0.08, 0.32, vRainProgress)
+          * (0.44 + (1.0 - breakup) * 0.32);
+        float capillary = rainBand(radius, 0.92 - angularNoise * 0.009, 0.009)
+          * smoothstep(0.18, 0.58, vRainProgress) * breakup * 0.42;
+        float trough = rainBand(radius, 0.68 + angularNoise * 0.014, 0.026)
+          * smoothstep(0.05, 0.28, vRainProgress);
+        float impactMeniscus = (1.0 - smoothstep(0.02, 0.18, radius))
+          * (1.0 - smoothstep(0.02, 0.28, vRainProgress));
+
+        vec3 viewDirection = normalize(cameraPosition - vRainWorldPosition);
+        vec2 radialDirection = point / max(radius, 0.001);
+        float radialSlope = primary - trailing * 0.62 + capillary * 0.38 - trough * 0.24;
+        vec3 waveNormal = normalize(vec3(
+          -radialDirection.x * radialSlope * 0.34,
+          1.0,
+          -radialDirection.y * radialSlope * 0.34
+        ));
+        vec3 keyDirection = normalize(vec3(-0.52, 0.72, 0.45));
+        float viewFacing = clamp(dot(waveNormal, viewDirection), 0.0, 1.0);
+        float fresnel = 0.02 + 0.98 * pow(1.0 - viewFacing, 5.0);
+        float specular = pow(
+          max(dot(reflect(-keyDirection, waveNormal), viewDirection), 0.0),
+          24.0
+        );
+        float crest = primary + trailing * 0.58 + capillary + impactMeniscus * 0.7;
+        float opticalDetail = clamp(fresnel * 0.46 + specular * 0.86 + breakup * 0.1, 0.0, 1.0);
+        float intensity = min(uIntensity, 1.5);
+        float alpha = (crest * (0.24 + opticalDetail * 0.18) + trough * 0.045)
+          * vRainFade * intensity;
+        vec3 troughColor = uColor * 0.11;
+        vec3 crestColor = mix(uColor * 0.62, vec3(0.96, 0.99, 1.0), opticalDetail * 0.7);
+        vec3 waterColor = mix(crestColor, troughColor, clamp(trough * 0.72, 0.0, 0.72));
+        gl_FragColor = vec4(waterColor, min(alpha, 0.5));
+        #include <tonemapping_fragment>
+        #include <encodings_fragment>
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    blending: THREE.NormalBlending,
+    side: THREE.DoubleSide,
+    toneMapped: true
+  });
+  material.extensions.derivatives = true;
+  return material;
+}
+
+function createSonicRainSystem(THREE, scene, group, dummy, theme, camera) {
+  const streakGeometry = new THREE.BoxGeometry(1, 1, 1);
+  const streakMaterial = createSonicRainStreakMaterial(THREE);
+  const streakMesh = new THREE.InstancedMesh(
+    streakGeometry,
+    streakMaterial,
+    SONIC_RAIN_QUALITY.streaks
+  );
+  streakMesh.name = 'SonicRainStreakBatch';
+  streakMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  streakMesh.frustumCulled = false;
+  streakMesh.renderOrder = 12;
+  group.add(streakMesh);
+
+  const rippleGeometry = new THREE.PlaneGeometry(1, 1, 1, 1);
+  const rippleFades = new Float32Array(SONIC_RAIN_QUALITY.ripples);
+  const rippleProgresses = new Float32Array(SONIC_RAIN_QUALITY.ripples);
+  const rippleImpacts = new Float32Array(SONIC_RAIN_QUALITY.ripples * 2);
+  const rippleRadiusScales = new Float32Array(SONIC_RAIN_QUALITY.ripples);
+  const rippleFadeAttribute = new THREE.InstancedBufferAttribute(rippleFades, 1);
+  const rippleProgressAttribute = new THREE.InstancedBufferAttribute(rippleProgresses, 1);
+  const rippleImpactAttribute = new THREE.InstancedBufferAttribute(rippleImpacts, 2);
+  const rippleRadiusAttribute = new THREE.InstancedBufferAttribute(rippleRadiusScales, 1);
+  rippleFadeAttribute.setUsage(THREE.DynamicDrawUsage);
+  rippleProgressAttribute.setUsage(THREE.DynamicDrawUsage);
+  rippleImpactAttribute.setUsage(THREE.DynamicDrawUsage);
+  rippleRadiusAttribute.setUsage(THREE.DynamicDrawUsage);
+  rippleGeometry.setAttribute('aRainFade', rippleFadeAttribute);
+  rippleGeometry.setAttribute('aRainProgress', rippleProgressAttribute);
+  rippleGeometry.setAttribute('aRainImpact', rippleImpactAttribute);
+  rippleGeometry.setAttribute('aRainRadiusScale', rippleRadiusAttribute);
+  const rippleMaterial = createSonicRainMaterial(THREE, 0xbfeaff);
+  const rippleMesh = new THREE.InstancedMesh(
+    rippleGeometry,
+    rippleMaterial,
+    SONIC_RAIN_QUALITY.ripples
+  );
+  rippleMesh.name = 'SonicRainRippleBatch';
+  rippleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  rippleMesh.frustumCulled = false;
+  rippleMesh.renderOrder = 14;
+  group.add(rippleMesh);
+
+  const splashGeometry = new THREE.TetrahedronGeometry(0.1, 0);
+  const splashMaterial = new THREE.MeshBasicMaterial({
+    color: 0xd9f5ff,
+    transparent: true,
+    opacity: 0.56,
+    depthWrite: false,
+    depthTest: true,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false
+  });
+  const splashMesh = new THREE.InstancedMesh(
+    splashGeometry,
+    splashMaterial,
+    SONIC_RAIN_QUALITY.splashes
+  );
+  splashMesh.name = 'SonicRainSplashBatch';
+  splashMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  splashMesh.frustumCulled = false;
+  splashMesh.renderOrder = 15;
+  group.add(splashMesh);
+
+  const rainColor = new THREE.Color();
+  const coolWhiteColor = new THREE.Color(0xd8f4ff);
+  const colorTarget = new THREE.Color(0xc8efff);
+  const rain = {
+    quality: SONIC_RAIN_QUALITY,
+    groundRadius: SONIC_RAIN_GROUND_RADIUS,
+    enabled: false,
+    activeDropCount: 0,
+    impactSequence: 0,
+    rippleIndex: 0,
+    splashIndex: 0,
+    dropData: new Float32Array(SONIC_RAIN_QUALITY.streaks * SONIC_RAIN_DROP_STRIDE),
+    rippleData: new Float32Array(SONIC_RAIN_QUALITY.ripples * SONIC_RAIN_RIPPLE_STRIDE),
+    splashData: new Float32Array(SONIC_RAIN_QUALITY.splashes * SONIC_RAIN_SPLASH_STRIDE),
+    rippleFades,
+    rippleProgresses,
+    rippleImpacts,
+    rippleRadiusScales,
+    rippleFadeAttribute,
+    rippleProgressAttribute,
+    rippleImpactAttribute,
+    rippleRadiusAttribute,
+    streakMesh,
+    streakMaterial,
+    rippleMesh,
+    rippleMaterial,
+    splashMesh,
+    splashMaterial,
+    coolWhiteColor,
+    colorTarget,
+    camera,
+    viewProjection: new THREE.Matrix4(),
+    dummy
+  };
+  updateSonicRainViewProjection(rain);
+  for (let index = 0; index < SONIC_RAIN_QUALITY.streaks; index += 1) {
+    resetSonicRainDrop(rain, index, true);
+    const offset = index * SONIC_RAIN_DROP_STRIDE;
+    const brightness = 0.68 + sonicRainHash(index, index * 0.37) * 0.32;
+    rainColor.setRGB(brightness * 0.72, brightness * 0.9, brightness);
+    streakMesh.setColorAt(index, rainColor);
+    dummy.position.set(rain.dropData[offset], rain.dropData[offset + 1], rain.dropData[offset + 2]);
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.set(0.04, 1.6, 0.04);
+    dummy.updateMatrix();
+    streakMesh.setMatrixAt(index, dummy.matrix);
+  }
+  for (let index = 0; index < SONIC_RAIN_QUALITY.ripples; index += 1) {
+    dummy.position.set(0, -1000, 0);
+    dummy.rotation.set(-Math.PI / 2, 0, 0);
+    dummy.scale.set(0, 0, 0);
+    dummy.updateMatrix();
+    rippleMesh.setMatrixAt(index, dummy.matrix);
+  }
+  for (let index = 0; index < SONIC_RAIN_QUALITY.splashes; index += 1) {
+    dummy.position.set(0, -1000, 0);
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.set(0, 0, 0);
+    dummy.updateMatrix();
+    splashMesh.setMatrixAt(index, dummy.matrix);
+  }
+  streakMesh.instanceMatrix.needsUpdate = true;
+  if (streakMesh.instanceColor) streakMesh.instanceColor.needsUpdate = true;
+  rippleMesh.instanceMatrix.needsUpdate = true;
+  splashMesh.instanceMatrix.needsUpdate = true;
+  rippleFadeAttribute.needsUpdate = true;
+  rippleProgressAttribute.needsUpdate = true;
+  rippleImpactAttribute.needsUpdate = true;
+  rippleRadiusAttribute.needsUpdate = true;
+  if (theme?.uCoolEdge) {
+    colorTarget.copy(theme.uCoolEdge).lerp(coolWhiteColor, 0.72);
+    rippleMaterial.uniforms.uColor.value.copy(colorTarget);
+  }
+  return rain;
+}
+
+function applySonicRainSettings(topo, settings) {
+  const rain = topo.rain;
+  if (!rain) return;
+  const enabled = settings.rainEnabled === true;
+  if (rain.enabled && !enabled) {
+    rain.rippleData.fill(0);
+    rain.splashData.fill(0);
+    rain.rippleFades.fill(0);
+    rain.rippleProgresses.fill(0);
+    rain.rippleImpacts.fill(0);
+    rain.rippleRadiusScales.fill(0);
+    const dummy = rain.dummy;
+    for (let index = 0; index < SONIC_RAIN_QUALITY.ripples; index += 1) {
+      dummy.position.set(0, -1000, 0);
+      dummy.rotation.set(-Math.PI / 2, 0, 0);
+      dummy.scale.set(0, 0, 0);
+      dummy.updateMatrix();
+      rain.rippleMesh.setMatrixAt(index, dummy.matrix);
+    }
+    for (let index = 0; index < SONIC_RAIN_QUALITY.splashes; index += 1) {
+      dummy.position.set(0, -1000, 0);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(0, 0, 0);
+      dummy.updateMatrix();
+      rain.splashMesh.setMatrixAt(index, dummy.matrix);
+    }
+    rain.rippleMesh.instanceMatrix.needsUpdate = true;
+    rain.splashMesh.instanceMatrix.needsUpdate = true;
+    rain.rippleFadeAttribute.needsUpdate = true;
+    rain.rippleProgressAttribute.needsUpdate = true;
+    rain.rippleImpactAttribute.needsUpdate = true;
+    rain.rippleRadiusAttribute.needsUpdate = true;
+  }
+  rain.enabled = enabled;
+  rain.activeDropCount = Math.min(
+    SONIC_RAIN_QUALITY.streaks,
+    Math.max(0, Math.round(SONIC_RAIN_QUALITY.streaks * settings.rainIntensity / 1.5))
+  );
+  rain.streakMesh.count = rain.activeDropCount;
+  rain.streakMesh.visible = enabled && rain.activeDropCount > 0;
+  rain.rippleMesh.visible = enabled && settings.rainRippleIntensity > 0;
+  rain.splashMesh.visible = enabled && settings.rainRippleIntensity > 0 && !reducedMotion;
+  const streakOpacity = clamp(0.1 + settings.rainIntensity * 0.22, 0.08, 0.42);
+  rain.streakMaterial.opacity = streakOpacity;
+  rain.streakMaterial.uniforms.uOpacity.value = streakOpacity;
+  rain.rippleMaterial.uniforms.uIntensity.value = settings.rainRippleIntensity;
+  rain.splashMaterial.opacity = clamp(settings.rainRippleIntensity * 0.52, 0.04, 0.66);
+  if (topo.uniforms?.uRainEnabled) topo.uniforms.uRainEnabled.value = enabled ? 1 : 0;
+  if (topo.uniforms?.uRainIntensity) topo.uniforms.uRainIntensity.value = settings.rainIntensity;
+  if (topo.uniforms?.uRainWetReflectance) {
+    topo.uniforms.uRainWetReflectance.value = settings.rainWetReflectance;
+  }
+  if (topo.uniforms?.uRainWetGlow) topo.uniforms.uRainWetGlow.value = settings.rainWetGlow;
+}
+
+function updateSonicRain(topo, dt, timeSeconds, audioLight) {
+  const rain = topo.rain;
+  const settings = topo.settings || DEFAULT_SONIC_SETTINGS;
+  if (!rain || !rain.enabled || document.hidden) return;
+  updateSonicRainViewProjection(rain);
+  const dummy = rain.dummy;
+  const drops = rain.dropData;
+  const wind = settings.rainWind;
+  const windVelocity = wind * 8.5;
+  const streakLength = 2.1 * settings.rainLength;
+  const streakWidth = 0.18 * settings.rainWidth;
+  const activeCount = rain.activeDropCount;
+  const collisionCeiling = sonicRainCollisionCeiling(topo, timeSeconds);
+  const columnHeightScale = Math.min(settings.columnHeight, 1.35);
+  const centerCollisionCeiling = collisionCeiling
+    + (SONIC_CENTER_COLUMN_MAX_LIFT + SONIC_CENTER_COLUMN_PEDESTAL_MAX_LIFT)
+      * columnHeightScale;
+  const centerCollisionRadius = SONIC_BASS_COLUMN_CLUSTER.radius
+    + SONIC_BASS_COLUMN_CLUSTER.feather;
+  const centerCollisionRadiusSquared = centerCollisionRadius * centerCollisionRadius + 0.5;
+  const streakOpacity = clamp(
+    (0.1 + settings.rainIntensity * 0.22) * (0.96 + clamp(audioLight, 0, 1) * 0.08),
+    0.08,
+    0.44
+  );
+  rain.streakMaterial.opacity = streakOpacity;
+  rain.streakMaterial.uniforms.uOpacity.value = streakOpacity;
+  for (let index = 0; index < activeCount; index += 1) {
+    const offset = index * SONIC_RAIN_DROP_STRIDE;
+    const fallSpeed = 31 * settings.rainSpeed * drops[offset + 3];
+    drops[offset] += windVelocity * dt;
+    drops[offset + 1] -= fallSpeed * dt;
+    drops[offset + 2] += windVelocity * 0.22 * dt;
+    const overRenderedGround = sonicRainGroundFootprintAt(drops[offset], drops[offset + 2]);
+    if (!overRenderedGround) resetSonicRainDrop(rain, index, false);
+
+    let hasGroundSurface = false;
+    let collisionHeight = 0.04;
+    let dropCollisionCeiling = collisionCeiling;
+    if (drops[offset + 1] > collisionCeiling && drops[offset + 1] <= centerCollisionCeiling) {
+      const collisionGridX = Math.round(drops[offset] / SONIC_TOPOGRAPHY_SPACING);
+      const collisionGridZ = Math.round(drops[offset + 2] / SONIC_TOPOGRAPHY_SPACING);
+      const overCenterColumns = collisionGridX * collisionGridX + collisionGridZ * collisionGridZ
+        <= centerCollisionRadiusSquared;
+      if (overCenterColumns) dropCollisionCeiling = centerCollisionCeiling;
+    }
+    if (overRenderedGround && drops[offset + 1] <= dropCollisionCeiling) {
+      hasGroundSurface = sonicRainGroundSurfaceAt(drops[offset], drops[offset + 2]);
+    }
+    if (hasGroundSurface) {
+      collisionHeight = sonicRainCollisionHeight(
+        topo,
+        drops[offset],
+        drops[offset + 2],
+        timeSeconds
+      );
+    }
+    if (drops[offset + 1] <= collisionHeight) {
+      if (hasGroundSurface) {
+        rain.impactSequence += 1;
+        const rippleStride = settings.rainIntensity < 0.42 ? 3 : settings.rainIntensity < 0.9 ? 2 : 1;
+        if (rain.impactSequence % rippleStride === 0) {
+          spawnSonicRainRipple(rain, drops[offset], collisionHeight, drops[offset + 2], settings);
+          spawnSonicRainSplash(rain, drops[offset], collisionHeight, drops[offset + 2], settings);
+        }
+      }
+      resetSonicRainDrop(rain, index, false);
+    }
+    const length = streakLength * drops[offset + 4];
+    dummy.position.set(drops[offset], drops[offset + 1] + length * 0.5, drops[offset + 2]);
+    dummy.rotation.set(wind * 0.08, 0, -wind * 0.34);
+    dummy.scale.set(streakWidth, length, streakWidth * 0.72);
+    dummy.updateMatrix();
+    rain.streakMesh.setMatrixAt(index, dummy.matrix);
+  }
+  if (activeCount > 0) rain.streakMesh.instanceMatrix.needsUpdate = true;
+
+  const ripples = rain.rippleData;
+  let rippleChanged = false;
+  for (let index = 0; index < SONIC_RAIN_QUALITY.ripples; index += 1) {
+    const offset = index * SONIC_RAIN_RIPPLE_STRIDE;
+    const life = ripples[offset + 4];
+    if (life <= 0) continue;
+    ripples[offset + 3] += dt;
+    const progress = ripples[offset + 3] / life;
+    if (progress >= 1) {
+      ripples[offset + 4] = 0;
+      rain.rippleFades[index] = 0;
+      rain.rippleProgresses[index] = 0;
+      dummy.position.set(0, -1000, 0);
+      dummy.rotation.set(-Math.PI / 2, 0, 0);
+      dummy.scale.set(0, 0, 0);
+    } else {
+      const fadeIn = Math.min(1, progress * 10);
+      const fade = fadeIn * Math.pow(1 - progress, 1.35) * ripples[offset + 6];
+      rain.rippleFades[index] = fade;
+      rain.rippleProgresses[index] = progress;
+      const surfaceY = sonicRainCollisionHeight(
+        topo,
+        ripples[offset],
+        ripples[offset + 2],
+        timeSeconds
+      ) + 0.035;
+      ripples[offset + 1] = surfaceY;
+      const cellX = Math.round(ripples[offset] / SONIC_TOPOGRAPHY_SPACING)
+        * SONIC_TOPOGRAPHY_SPACING;
+      const cellZ = Math.round(ripples[offset + 2] / SONIC_TOPOGRAPHY_SPACING)
+        * SONIC_TOPOGRAPHY_SPACING;
+      dummy.position.set(cellX, surfaceY, cellZ);
+      dummy.rotation.set(-Math.PI / 2, 0, 0);
+      dummy.scale.set(SONIC_TOPOGRAPHY_SIZE, SONIC_TOPOGRAPHY_SIZE, SONIC_TOPOGRAPHY_SIZE);
+    }
+    dummy.updateMatrix();
+    rain.rippleMesh.setMatrixAt(index, dummy.matrix);
+    rippleChanged = true;
+  }
+  if (rippleChanged) {
+    rain.rippleMesh.instanceMatrix.needsUpdate = true;
+    rain.rippleFadeAttribute.needsUpdate = true;
+    rain.rippleProgressAttribute.needsUpdate = true;
+  }
+
+  const splashes = rain.splashData;
+  let splashChanged = false;
+  for (let index = 0; index < SONIC_RAIN_QUALITY.splashes; index += 1) {
+    const offset = index * SONIC_RAIN_SPLASH_STRIDE;
+    const life = splashes[offset + 7];
+    if (life <= 0) continue;
+    splashes[offset + 6] += dt;
+    const progress = splashes[offset + 6] / life;
+    if (progress >= 1) {
+      splashes[offset + 7] = 0;
+      dummy.position.set(0, -1000, 0);
+      dummy.scale.set(0, 0, 0);
+    } else {
+      splashes[offset] += splashes[offset + 3] * dt;
+      splashes[offset + 1] += splashes[offset + 4] * dt;
+      splashes[offset + 2] += splashes[offset + 5] * dt;
+      splashes[offset + 4] -= 8.8 * dt;
+      const scale = splashes[offset + 8] * (1 - progress);
+      dummy.position.set(splashes[offset], splashes[offset + 1], splashes[offset + 2]);
+      dummy.rotation.set(0, progress * 4.2, 0);
+      dummy.scale.set(scale, scale * 1.8, scale);
+    }
+    dummy.updateMatrix();
+    rain.splashMesh.setMatrixAt(index, dummy.matrix);
+    splashChanged = true;
+  }
+  if (splashChanged) rain.splashMesh.instanceMatrix.needsUpdate = true;
+
+  if (topo.uniforms?.uRainAudioLight) {
+    topo.uniforms.uRainAudioLight.value = clamp(audioLight, 0, 1);
+  }
+  const theme = topo.theme;
+  if (theme?.uCoolEdge) {
+    const colorResponse = clamp(dt * 2.2, 0, 1);
+    rain.colorTarget.copy(theme.uCoolEdge).lerp(rain.coolWhiteColor, 0.72);
+    rain.rippleMaterial.uniforms.uColor.value.lerp(rain.colorTarget, colorResponse);
+  }
+}
+
 function buildSonicTopography() {
   if (!els.sonicTopographyCore || state.sonicTopography.built) return;
+  if (!heavyWebGLRenderingAllowed()) return;
   if (!window.THREE) {
     state.sonicTopography.built = true;
     return;
@@ -8305,9 +11010,7 @@ function buildSonicTopography() {
   const offset = (SONIC_TOPOGRAPHY_GRID * SONIC_TOPOGRAPHY_SPACING) / 2;
   const theme = topo.theme || createSonicTopographyTheme(topo.palette || fallbackLyricPalette(state.currentSong));
 
-  const renderer = createDirectX11Renderer(THREE, {
-    antialias: ANDROID_CLIENT && RENDER_PROFILE.tier !== 'economy'
-  });
+  const renderer = createDirectX11Renderer(THREE, { antialias: SONIC_HARDWARE_ANTIALIAS });
   renderer.setClearColor(0x000000, 0);
   renderer.setPixelRatio(renderPixelRatio('webgl'));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -8448,17 +11151,23 @@ function buildSonicTopography() {
   }
   const bassColumnPointKey = (gridX, gridZ) => `${gridX},${gridZ}`;
   const bassColumnBandByPoint = new Map();
-  let nonCenterColumnIndex = 0;
-  bassColumnCorePoints.forEach((point) => {
-    if (point.x === 0 && point.z === 0) {
-      bassColumnBandByPoint.set(bassColumnPointKey(point.x, point.z), 0);
-      return;
-    }
+  bassColumnBandByPoint.set(bassColumnPointKey(0, 0), 0);
+  const spatiallyShuffledBassColumns = bassColumnCorePoints
+    .filter((point) => point.x !== 0 || point.z !== 0)
+    .map((point) => ({
+      point,
+      order: sonicRainHash(point.x * 1.731 + 17.3, point.z * 2.113 - 9.7)
+    }))
+    .sort((left, right) => (
+      left.order - right.order
+      || left.point.z - right.point.z
+      || left.point.x - right.point.x
+    ));
+  spatiallyShuffledBassColumns.forEach(({ point }, nonCenterColumnIndex) => {
     const bandIndex = Math.floor(
       nonCenterColumnIndex * SONIC_LOW_FREQUENCY_BAND_COUNT / (SONIC_BASS_COLUMN_CLUSTER.count - 1)
     );
     bassColumnBandByPoint.set(bassColumnPointKey(point.x, point.z), bandIndex);
-    nonCenterColumnIndex += 1;
   });
   const smoothstepNumber = (start, end, value) => {
     const progress = clamp((value - start) / Math.max(0.001, end - start), 0, 1);
@@ -8492,17 +11201,42 @@ function buildSonicTopography() {
       x,
       z,
       radius,
-      liftScale: (6.5 + randomScale * 3.5) * heightProfile
+      liftScale: (0.54 + randomScale * 0.42) * heightProfile
     };
   });
   const bassColumnBandValues = new Float32Array(count);
+  const terrainSeedValues = new Uint8Array(count * 4);
+  const terrainSmallLocalValues = new Uint8Array(count * 2);
+  const groundMoundMaskValues = new Float32Array(count);
+  const groundMoundColumnProfileValues = new Uint8Array(count * 4);
+  fillSonicGroundMoundMask(groundMoundMaskValues, topo.settings);
   const geometry = new THREE.BoxGeometry(SONIC_TOPOGRAPHY_SIZE, 1, SONIC_TOPOGRAPHY_SIZE);
   const bassColumnBandAttribute = new THREE.InstancedBufferAttribute(bassColumnBandValues, 1);
   bassColumnBandAttribute.setUsage(THREE.StaticDrawUsage);
   geometry.setAttribute('aBassColumnBand', bassColumnBandAttribute);
+  const terrainSeedAttribute = new THREE.InstancedBufferAttribute(terrainSeedValues, 4, true);
+  terrainSeedAttribute.setUsage(THREE.StaticDrawUsage);
+  geometry.setAttribute('aTerrainSeed', terrainSeedAttribute);
+  const terrainSmallLocalAttribute = new THREE.InstancedBufferAttribute(
+    terrainSmallLocalValues,
+    2,
+    true
+  );
+  terrainSmallLocalAttribute.setUsage(THREE.StaticDrawUsage);
+  geometry.setAttribute('aTerrainSmallLocal', terrainSmallLocalAttribute);
+  const groundMoundMaskAttribute = new THREE.InstancedBufferAttribute(groundMoundMaskValues, 1);
+  groundMoundMaskAttribute.setUsage(THREE.DynamicDrawUsage);
+  geometry.setAttribute('aGroundMoundMask', groundMoundMaskAttribute);
+  const groundMoundColumnProfileAttribute = new THREE.InstancedBufferAttribute(
+    groundMoundColumnProfileValues,
+    4,
+    true
+  );
+  groundMoundColumnProfileAttribute.setUsage(THREE.StaticDrawUsage);
+  geometry.setAttribute('aGroundMoundColumnProfile', groundMoundColumnProfileAttribute);
   const material = createSonicTopographyMaterial(THREE, theme);
   const terrain = new THREE.InstancedMesh(geometry, material, count);
-  terrain.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  terrain.instanceMatrix.setUsage(THREE.StaticDrawUsage);
   group.add(terrain);
   const tyndallColumnReceivers = [material];
 
@@ -8714,6 +11448,7 @@ function buildSonicTopography() {
   scene.add(fogGroup);
 
   const dummy = new THREE.Object3D();
+  const rain = createSonicRainSystem(THREE, scene, group, dummy, theme, camera);
   let index = 0;
   for (let x = 0; x < SONIC_TOPOGRAPHY_GRID; x += 1) {
     for (let z = 0; z < SONIC_TOPOGRAPHY_GRID; z += 1) {
@@ -8736,6 +11471,63 @@ function buildSonicTopography() {
         });
       }
       bassColumnBandValues[index] = Number.isFinite(bassColumnBand) ? bassColumnBand : 0;
+      const smallBassCellX = Math.floor(px / 7);
+      const smallBassCellZ = Math.floor(pz / 7);
+      const seedOffset = index * 4;
+      terrainSeedValues[seedOffset] = Math.round(sonicRainHash(px, pz) * 255);
+      terrainSeedValues[seedOffset + 1] = Math.round(
+        sonicRainHash(smallBassCellX + 23.7, smallBassCellZ + 51.3) * 255
+      );
+      terrainSeedValues[seedOffset + 2] = Math.round(
+        sonicRainHash(smallBassCellX + 7.1, smallBassCellZ + 19.7) * 255
+      );
+      terrainSeedValues[seedOffset + 3] = Math.round(
+        sonicRainHash(smallBassCellX + 31.9, smallBassCellZ + 11.3) * 255
+      );
+      const smallLocalOffset = index * 2;
+      terrainSmallLocalValues[smallLocalOffset] = Math.round(
+        (px / 7 - smallBassCellX) * 255
+      );
+      terrainSmallLocalValues[smallLocalOffset + 1] = Math.round(
+        (pz / 7 - smallBassCellZ) * 255
+      );
+      const moundColumnPatchX = Math.floor((gridX + 2) / 4);
+      const moundColumnPatchZ = Math.floor((gridZ + 2) / 4);
+      const moundColumnPatchLevel = Math.floor(
+        sonicRainHash(moundColumnPatchX + 83.7, moundColumnPatchZ - 41.9)
+          * SONIC_GROUND_MOUND_COLUMN_LEVELS
+      );
+      const moundColumnMicroOffset = Math.floor(
+        sonicRainHash(gridX * 1.37 - 13.1, gridZ * 1.91 + 27.3) * 3
+      ) - 1;
+      const moundColumnLevel = clamp(
+        moundColumnPatchLevel + moundColumnMicroOffset,
+        0,
+        SONIC_GROUND_MOUND_COLUMN_LEVELS - 1
+      );
+      const moundColumnPhase = Math.min(
+        SONIC_GROUND_MOUND_COLUMN_PHASE_BUCKETS - 1,
+        Math.floor(
+          sonicRainHash(gridX * 0.73 + 59.2, gridZ * 1.17 - 31.4)
+            * SONIC_GROUND_MOUND_COLUMN_PHASE_BUCKETS
+        )
+      );
+      const moundColumnBand = Math.min(
+        SONIC_LOW_FREQUENCY_BAND_COUNT - 1,
+        Math.floor(
+          sonicRainHash(gridX * 2.71 - 7.9, gridZ * 3.17 + 19.6)
+            * SONIC_LOW_FREQUENCY_BAND_COUNT
+        )
+      );
+      const moundColumnProfileOffset = index * 4;
+      groundMoundColumnProfileValues[moundColumnProfileOffset] = Math.round(
+        moundColumnLevel / (SONIC_GROUND_MOUND_COLUMN_LEVELS - 1) * 255
+      );
+      groundMoundColumnProfileValues[moundColumnProfileOffset + 1] = Math.round(
+        moundColumnPhase / (SONIC_GROUND_MOUND_COLUMN_PHASE_BUCKETS - 1) * 255
+      );
+      groundMoundColumnProfileValues[moundColumnProfileOffset + 2] = moundColumnBand & 0xff;
+      groundMoundColumnProfileValues[moundColumnProfileOffset + 3] = moundColumnBand >= 256 ? 255 : 0;
       dummy.position.set(px, 0.5, pz);
       dummy.rotation.set(0, 0, 0);
       dummy.scale.set(1, 1, 1);
@@ -8760,6 +11552,10 @@ function buildSonicTopography() {
 
   terrain.instanceMatrix.needsUpdate = true;
   bassColumnBandAttribute.needsUpdate = true;
+  terrainSeedAttribute.needsUpdate = true;
+  terrainSmallLocalAttribute.needsUpdate = true;
+  groundMoundMaskAttribute.needsUpdate = true;
+  groundMoundColumnProfileAttribute.needsUpdate = true;
   meteorMesh.instanceMatrix.needsUpdate = true;
   particleMesh.instanceMatrix.needsUpdate = true;
 
@@ -8772,6 +11568,12 @@ function buildSonicTopography() {
   topo.terrain = terrain;
   topo.material = material;
   topo.uniforms = material.uniforms;
+  topo.bassColumnBandAttribute = bassColumnBandAttribute;
+  topo.terrainSeedAttribute = terrainSeedAttribute;
+  topo.terrainSmallLocalAttribute = terrainSmallLocalAttribute;
+  topo.groundMoundMaskAttribute = groundMoundMaskAttribute;
+  topo.groundMoundColumnProfileAttribute = groundMoundColumnProfileAttribute;
+  topo.groundMoundSignature = sonicGroundMoundMaskSignature(topo.settings);
   topo.lowFrequencySpectrum = material.userData.lowFrequencySpectrum;
   topo.lowFrequencySpectrumData = material.userData.lowFrequencySpectrumData;
   topo.meteorMesh = meteorMesh;
@@ -8803,7 +11605,9 @@ function buildSonicTopography() {
   fitSonicWallpaperSurface(topo);
   topo.backgroundTargetColors = backgroundColors.map((color) => new THREE.Color(rgbHexValue(color)));
   topo.atmosphereColor = new THREE.Color();
+  topo.atmosphereAudioDrive = 0;
   topo.starfieldAudio = 0;
+  topo.rain = rain;
   topo.dummy = dummy;
   topo.meteorTargetColor = new THREE.Color();
   topo.whiteColor = new THREE.Color(0xffffff);
@@ -8854,6 +11658,14 @@ function disposeSonicTopography() {
     terrain: null,
     material: null,
     uniforms: null,
+    bassColumnBandAttribute: null,
+    terrainSeedAttribute: null,
+    terrainSmallLocalAttribute: null,
+    groundMoundMaskAttribute: null,
+    groundMoundColumnProfileAttribute: null,
+    groundMoundSignature: '',
+    groundEntranceStartedAt: 0,
+    groundEntranceProgress: 0,
     lowFrequencySpectrum: null,
     lowFrequencySpectrumData: null,
     meteorMesh: null,
@@ -8881,7 +11693,9 @@ function disposeSonicTopography() {
     wallpaperSignature: '',
     backgroundTargetColors: [],
     atmosphereColor: null,
+    atmosphereAudioDrive: 0,
     starfieldAudio: 0,
+    rain: null,
     dummy: null,
     theme: null,
     ripples: [],
@@ -8907,6 +11721,8 @@ function disposeSonicTopography() {
     energy: 0,
     audioPulse: 0,
     wasAudioDriving: false,
+    audioTerrainSource: '',
+    audioTerrainTime: 0,
     projectilesActive: false,
     projectilesNeedClear: false
   });
@@ -8917,6 +11733,7 @@ function disposeSonicTopography() {
 function sonicAtmosphereRuntimeSnapshot() {
   const topo = state.sonicTopography;
   return {
+    hardwareAntialias: topo.renderer?.getContext?.()?.getContextAttributes?.()?.antialias === true,
     mistLayerCount: topo.fogLayers?.length || 0,
     beamCount: topo.tyndallBeams?.length || 0,
     haloCount: topo.tyndallHalos?.length || 0,
@@ -8925,6 +11742,11 @@ function sonicAtmosphereRuntimeSnapshot() {
     highlightShoulder: topo.sonicHighlightShoulder || 0,
     blackLiftGuard: topo.mistBlackLiftGuard ?? 1,
     atmosphereContrast: topo.atmosphereContrast ?? 0,
+    terrainAtmosphereLightStrength: topo.uniforms?.uAtmosphereLightStrength?.value || 0,
+    atmosphereAudioDrive: topo.atmosphereAudioDrive || 0,
+    terrainUsesLayeredAtmosphere: !!topo.uniforms?.uAtmosphereAudioDrive,
+    backgroundUsesLayeredAtmosphere: !!topo.backgroundMaterial?.uniforms?.uAtmosphereBass
+      && !!topo.backgroundMaterial?.uniforms?.uAtmosphereDetail,
     groundUsesDirectionalSheen: !!topo.tyndallGroundSheenMaterial?.uniforms?.uSheenDirection,
     groundHasNoSpotGeometry: topo.tyndallGroundSheen?.geometry?.type === 'PlaneGeometry'
   };
@@ -8963,27 +11785,86 @@ function createSonicWallpaperSurface(THREE) {
   for (let index = 0; index < positions.count; index += 1) {
     const x = positions.getX(index);
     const y = positions.getY(index);
-    positions.setZ(index, -(x * x * 0.085 + y * y * 0.015));
+    const v = (y + 1) * 0.5;
+    const upper = clamp((v - 0.35) / 0.65, 0, 1);
+    const dome = upper * upper * (3 - 2 * upper);
+    const sideWrap = x * x * (0.26 + dome * 0.055);
+    const midRecline = -v * 0.075;
+    const topDome = dome * dome * 0.18;
+    const centerInset = -(1 - x * x) * (1 - dome) * 0.025;
+    positions.setZ(index, sideWrap + midRecline + topDome + centerInset);
   }
   positions.needsUpdate = true;
-  const material = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    map: null,
+  geometry.computeVertexNormals();
+
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uMap: { value: null },
+      uOpacity: { value: 0 },
+      uContainRegion: { value: new THREE.Vector2(0.9, 0.9) },
+      uCoverScale: { value: new THREE.Vector2(1, 1) },
+      uTexelSize: { value: new THREE.Vector2(1 / 1920, 1 / 1080) }
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      precision highp float;
+      uniform sampler2D uMap;
+      uniform float uOpacity;
+      uniform vec2 uContainRegion;
+      uniform vec2 uCoverScale;
+      uniform vec2 uTexelSize;
+      varying vec2 vUv;
+
+      vec4 sampleBlurredCover(vec2 uv) {
+        vec2 coverUv = (uv - 0.5) * uCoverScale + 0.5;
+        vec2 blurStep = max(uTexelSize * 3.2, vec2(0.0005));
+        vec4 color = texture2D(uMap, coverUv) * 0.36;
+        color += texture2D(uMap, clamp(coverUv + vec2(blurStep.x, 0.0), 0.0, 1.0)) * 0.16;
+        color += texture2D(uMap, clamp(coverUv - vec2(blurStep.x, 0.0), 0.0, 1.0)) * 0.16;
+        color += texture2D(uMap, clamp(coverUv + vec2(0.0, blurStep.y), 0.0, 1.0)) * 0.16;
+        color += texture2D(uMap, clamp(coverUv - vec2(0.0, blurStep.y), 0.0, 1.0)) * 0.16;
+        return color;
+      }
+
+      void main() {
+        vec4 blurredCover = sampleBlurredCover(vUv);
+        vec2 containUv = (vUv - 0.5) / max(uContainRegion, vec2(0.001)) + 0.5;
+        vec2 insideDistance = uContainRegion * 0.5 - abs(vUv - 0.5);
+        float containMask = smoothstep(-0.006, 0.006, min(insideDistance.x, insideDistance.y));
+        vec4 contained = texture2D(uMap, clamp(containUv, 0.0, 1.0));
+        float lowerDetail = smoothstep(0.07, 0.29, vUv.y);
+        float containMix = containMask * lowerDetail * contained.a;
+        vec3 color = mix(blurredCover.rgb, contained.rgb, containMix);
+        float bottomFeather = smoothstep(0.0, 0.28, vUv.y);
+        float alpha = max(blurredCover.a, contained.a * containMask) * uOpacity * bottomFeather;
+        gl_FragColor = vec4(color, alpha);
+      }
+    `,
     transparent: true,
-    opacity: 0,
     depthTest: false,
     depthWrite: false,
     side: THREE.FrontSide,
     toneMapped: false,
     fog: false
   });
+  material.map = null;
   const wallpaperSurface = new THREE.Mesh(geometry, material);
-  wallpaperSurface.name = 'SonicCameraCurvedFullscreenWallpaper';
+  wallpaperSurface.name = 'SonicCameraConcaveUpperDomeWallpaper';
   wallpaperSurface.position.set(0, 0, -360);
   wallpaperSurface.userData.distance = 360;
-  wallpaperSurface.userData.overscan = 1.1;
-  wallpaperSurface.userData.surface = 'camera-curved-fullscreen';
-  wallpaperSurface.renderOrder = -110;
+  wallpaperSurface.userData.overscan = 1.08;
+  wallpaperSurface.userData.bottomNdc = -0.08;
+  wallpaperSurface.userData.topNdc = 1.08;
+  wallpaperSurface.userData.verticalCoverage = 0.58;
+  wallpaperSurface.userData.safeContentScale = 0.9;
+  wallpaperSurface.userData.surface = 'camera-deep-concave-contain-dome';
+  wallpaperSurface.renderOrder = -90;
   wallpaperSurface.visible = false;
   wallpaperSurface.frustumCulled = false;
   return wallpaperSurface;
@@ -8994,28 +11875,56 @@ function fitSonicWallpaperSurface(topo = state.sonicTopography) {
   const camera = topo?.camera;
   if (!surface || !camera) return false;
   const distance = Number(surface.userData?.distance) || 360;
-  const overscan = Number(surface.userData?.overscan) || 1.1;
+  const overscan = Number(surface.userData?.overscan) || 1.08;
+  const bottomNdc = Number(surface.userData?.bottomNdc) || -0.08;
+  const topNdc = Number(surface.userData?.topNdc) || 1.08;
+  const centerNdc = (bottomNdc + topNdc) * 0.5;
+  const halfSpanNdc = Math.max(0.1, (topNdc - bottomNdc) * 0.5);
   const visibleHeight = 2 * Math.tan(camera.fov * Math.PI / 360) * distance;
   const visibleWidth = visibleHeight * Math.max(0.1, camera.aspect || 1);
-  surface.position.set(0, 0, -distance);
-  surface.scale.set(visibleWidth * 0.5 * overscan, visibleHeight * 0.5 * overscan, distance * 0.24);
+  surface.position.set(0, visibleHeight * 0.5 * centerNdc, -distance);
+  surface.scale.set(
+    visibleWidth * 0.5 * overscan,
+    visibleHeight * 0.5 * halfSpanNdc,
+    distance * 0.25
+  );
   return true;
 }
 
 function fitSonicWallpaperTexture(topo = state.sonicTopography, texture = topo?.wallpaperTexture) {
-  if (!topo?.camera || !texture?.repeat?.set || !texture?.offset?.set) return false;
+  const surface = topo?.wallpaperSurface;
+  const uniforms = surface?.material?.uniforms;
+  if (!topo?.camera || !texture?.repeat?.set || !texture?.offset?.set
+    || !uniforms?.uContainRegion?.value?.set || !uniforms?.uCoverScale?.value?.set) return false;
   const source = texture.image || texture.source?.data || null;
   const width = Number(source?.naturalWidth || source?.videoWidth || source?.width) || 0;
   const height = Number(source?.naturalHeight || source?.videoHeight || source?.height) || 0;
   if (!width || !height) return false;
   const sourceAspect = width / height;
   const viewportAspect = Math.max(0.1, topo.camera.aspect || 1);
-  let repeatX = 1;
-  let repeatY = 1;
-  if (sourceAspect > viewportAspect) repeatX = viewportAspect / sourceAspect;
-  else repeatY = sourceAspect / viewportAspect;
-  texture.repeat.set(repeatX, repeatY);
-  texture.offset.set((1 - repeatX) * 0.5, (1 - repeatY) * 0.5);
+  const overscan = Number(surface.userData?.overscan) || 1.08;
+  const verticalCoverage = Number(surface.userData?.verticalCoverage) || 0.58;
+  const safeContentScale = clamp(Number(surface.userData?.safeContentScale) || 0.9, 0.72, 1);
+  const targetAspect = viewportAspect * overscan / verticalCoverage;
+  let containX = safeContentScale;
+  let containY = safeContentScale;
+  let coverX = 1;
+  let coverY = 1;
+  if (sourceAspect > targetAspect) {
+    containY *= targetAspect / sourceAspect;
+    coverX = targetAspect / sourceAspect;
+  } else {
+    containX *= sourceAspect / targetAspect;
+    coverY = sourceAspect / targetAspect;
+  }
+  texture.repeat.set(1, 1);
+  texture.offset.set(0, 0);
+  uniforms.uContainRegion.value.set(containX, containY);
+  uniforms.uCoverScale.value.set(coverX, coverY);
+  uniforms.uTexelSize?.value?.set(1 / width, 1 / height);
+  surface.userData.sourceAspect = sourceAspect;
+  surface.userData.targetAspect = targetAspect;
+  surface.userData.containRegion = Object.freeze([containX, containY]);
   texture.needsUpdate = true;
   return true;
 }
@@ -9024,6 +11933,7 @@ function disposeSonicWallpaperSurface(topo = state.sonicTopography) {
   if (!topo) return;
   topo.wallpaperRequestId = (topo.wallpaperRequestId || 0) + 1;
   if (topo.wallpaperVideo) {
+    window.FeWallpaperVideoContinuity?.release?.(topo.wallpaperVideo);
     topo.wallpaperVideo.pause?.();
     topo.wallpaperVideo.removeAttribute?.('src');
     topo.wallpaperVideo.load?.();
@@ -9035,6 +11945,12 @@ function disposeSonicWallpaperSurface(topo = state.sonicTopography) {
   if (topo.wallpaperSurface?.material) {
     topo.wallpaperSurface.material.map = null;
     topo.wallpaperSurface.material.opacity = 0;
+    if (topo.wallpaperSurface.material.uniforms?.uMap) {
+      topo.wallpaperSurface.material.uniforms.uMap.value = null;
+    }
+    if (topo.wallpaperSurface.material.uniforms?.uOpacity) {
+      topo.wallpaperSurface.material.uniforms.uOpacity.value = 0;
+    }
     topo.wallpaperSurface.material.needsUpdate = true;
   }
   if (topo.wallpaperSurface) topo.wallpaperSurface.visible = false;
@@ -9052,14 +11968,16 @@ function setSonicWallpaperSurface(request) {
   const opacity = clamp(Number(config.opacity) || 0.68, 0.1, 1);
   const signature = enabled && url ? `${mediaKind}:${url}` : '';
   surface.material.opacity = opacity;
+  if (surface.material.uniforms?.uOpacity) surface.material.uniforms.uOpacity.value = opacity;
   if (!signature) {
     disposeSonicWallpaperSurface(topo);
     return true;
   }
   if (signature === topo.wallpaperSignature) {
     if (topo.wallpaperTexture) {
+      fitSonicWallpaperTexture(topo, topo.wallpaperTexture);
       surface.visible = true;
-      if (topo.background) topo.background.visible = false;
+      if (topo.background) topo.background.visible = true;
     }
     return true;
   }
@@ -9070,7 +11988,9 @@ function setSonicWallpaperSurface(request) {
   surface.visible = false;
   if (topo.background) topo.background.visible = true;
   surface.material.map = null;
+  if (surface.material.uniforms?.uMap) surface.material.uniforms.uMap.value = null;
   if (topo.wallpaperVideo) {
+    window.FeWallpaperVideoContinuity?.release?.(topo.wallpaperVideo);
     topo.wallpaperVideo.pause?.();
     topo.wallpaperVideo.removeAttribute?.('src');
     topo.wallpaperVideo.load?.();
@@ -9091,9 +12011,10 @@ function setSonicWallpaperSurface(request) {
     texture.needsUpdate = true;
     topo.wallpaperTexture = texture;
     surface.material.map = texture;
+    if (surface.material.uniforms?.uMap) surface.material.uniforms.uMap.value = texture;
     surface.material.needsUpdate = true;
     surface.visible = true;
-    if (topo.background) topo.background.visible = false;
+    if (topo.background) topo.background.visible = true;
     requestOrbFrame();
     return true;
   };
@@ -9101,6 +12022,8 @@ function setSonicWallpaperSurface(request) {
     if (topo.wallpaperRequestId !== requestId) return;
     topo.wallpaperSignature = '';
     surface.visible = false;
+    surface.material.map = null;
+    if (surface.material.uniforms?.uMap) surface.material.uniforms.uMap.value = null;
     if (topo.background) topo.background.visible = true;
   };
 
@@ -9110,8 +12033,8 @@ function setSonicWallpaperSurface(request) {
     video.preload = 'auto';
     video.muted = true;
     video.defaultMuted = true;
-    video.loop = true;
     video.playsInline = true;
+    window.FeWallpaperVideoContinuity?.prepare(video);
     const texture = new window.THREE.VideoTexture(video);
     texture.minFilter = window.THREE.LinearFilter;
     texture.magFilter = window.THREE.LinearFilter;
@@ -9121,6 +12044,7 @@ function setSonicWallpaperSurface(request) {
       video.play().catch(() => {});
     }, { once: true });
     video.addEventListener('error', () => {
+      window.FeWallpaperVideoContinuity?.release?.(video);
       texture.dispose?.();
       if (topo.wallpaperVideo === video) topo.wallpaperVideo = null;
       failTexture();
@@ -9165,26 +12089,86 @@ async function refreshSceneWallpaperCatalog(options = {}) {
   if (state.sceneWallpaperCatalogLoading) return;
   if (state.wallpaperEngineCatalogLoaded && options.force !== true) return;
   state.sceneWallpaperCatalogLoading = true;
+  state.community.messageBackgroundCatalogError = '';
   try {
     const payload = await apiJson(`/api/wallpapers?${query({ scan: true })}`);
+    if (options.live === true) {
+      state.wallpapers = state.wallpapers.filter((wallpaper) => wallpaper?.source !== 'wallpaper-engine');
+    }
     mergeWallpaperCatalog(payload.wallpapers);
+    state.wallpaperEngineCatalogRevision = safeText(payload.catalogRevision, '');
+    state.wallpaperEngineActiveId = safeText(
+      payload.activeWallpaperId,
+      safeText(Array.isArray(payload.activeWallpaperIds) ? payload.activeWallpaperIds[0] : '', '')
+    );
     state.wallpaperEngineCatalogLoaded = true;
+    syncAllSceneWallpaperSurfaces();
     syncSceneWallpaperControl();
+    syncCommunityMessageBackground();
     if (state.diyPage === 'wallpaper') renderWallpaperList();
   } catch (error) {
+    state.community.messageBackgroundCatalogError = error.message || 'Wallpaper Engine 壁纸读取失败';
     if (els.sceneWallpaperStatus && !sceneWallpaperDescriptor()?.wallpaperUrl) {
       els.sceneWallpaperStatus.textContent = error.message || 'Wallpaper Engine 壁纸读取失败';
     }
   } finally {
     state.sceneWallpaperCatalogLoading = false;
+    if (state.community.messageBackgroundMenuOpen) renderCommunityMessageBackgroundChoices();
   }
+}
+
+function sceneWallpaperLiveRefreshActive() {
+  if (document.hidden) return false;
+  const activeSetting = state.sceneWallpaperSettings?.[state.diyPreset];
+  const activeWallpaperEnginePreset = state.playbackPage
+    && SCENE_WALLPAPER_PRESETS.includes(state.diyPreset)
+    && activeSetting?.enabled === true
+    && (
+      activeSetting.followWallpaperEngine === true
+      || safeText(activeSetting.wallpaperId, '').startsWith('wallpaper-engine:')
+    );
+  const browsingWallpaperEngine = state.diyPage === 'wallpaper'
+    && state.wallpaperSource === 'live';
+  return activeWallpaperEnginePreset
+    || browsingWallpaperEngine
+    || communityMessageBackgroundLiveRefreshActive();
+}
+
+function clearSceneWallpaperLiveRefresh() {
+  window.clearTimeout(sceneWallpaperLiveRefreshTimer);
+  sceneWallpaperLiveRefreshTimer = 0;
+}
+
+function syncSceneWallpaperLiveRefresh() {
+  clearSceneWallpaperLiveRefresh();
+  if (!sceneWallpaperLiveRefreshActive()) return;
+  sceneWallpaperLiveRefreshTimer = window.setTimeout(async () => {
+    sceneWallpaperLiveRefreshTimer = 0;
+    await refreshSceneWallpaperCatalog({ force: true, live: true });
+    syncSceneWallpaperLiveRefresh();
+  }, SCENE_WALLPAPER_LIVE_REFRESH_MS);
+}
+
+function sceneWallpaperRuntimeUrl(wallpaper, url) {
+  const source = safeText(url, '');
+  const revision = safeText(state.wallpaperEngineCatalogRevision, '');
+  if (!source || wallpaper?.source !== 'wallpaper-engine' || !revision) return source;
+  const separator = source.includes('?') ? '&' : '?';
+  return `${source}${separator}catalogRevision=${encodeURIComponent(revision)}`;
 }
 
 function sceneWallpaperDescriptor(preset = state.diyPreset) {
   const setting = sceneWallpaperSetting(preset);
   if (!setting) return null;
-  const wallpaper = wallpaperById(setting.wallpaperId);
-  const resolvedUrl = sceneWallpaperTextureUrl(wallpaper) || setting.wallpaperUrl;
+  const wallpaper = wallpaperById(
+    setting.followWallpaperEngine
+      ? state.wallpaperEngineActiveId || setting.wallpaperId
+      : setting.wallpaperId
+  );
+  const resolvedUrl = sceneWallpaperRuntimeUrl(
+    wallpaper,
+    sceneWallpaperTextureUrl(wallpaper) || setting.wallpaperUrl
+  );
   return {
     ...setting,
     wallpaperUrl: resolvedUrl,
@@ -9203,8 +12187,10 @@ function syncSceneWallpaperSurface(preset = state.diyPreset) {
     opacity: descriptor.opacity
   };
   if (preset === 'cover-particles') {
-    els.coverParticleScene?.classList.toggle('has-scene-wallpaper', request.enabled);
-    setCoverParticleWallpaper(request);
+    const visible = coverParticlePresetVisible();
+    els.coverParticleScene?.classList.toggle('has-scene-wallpaper', request.enabled && visible);
+    if (visible) setCoverParticleWallpaper(request);
+    else setCoverParticleWallpaper({ enabled: false });
   }
   if (preset === 'topography') setSonicWallpaperSurface(request);
   if (preset === 'chladni' && state.chladni.runtime && window.FeChladniRuntime?.setWallpaper) {
@@ -9228,6 +12214,7 @@ function syncSceneWallpaperControl() {
   if (!state.wallpaperEngineCatalogLoaded && !state.sceneWallpaperCatalogLoading) {
     void refreshSceneWallpaperCatalog();
   }
+  syncSceneWallpaperLiveRefresh();
   const setting = sceneWallpaperSetting(preset);
   const descriptor = sceneWallpaperDescriptor(preset);
   const choices = sceneWallpaperChoices();
@@ -9238,10 +12225,17 @@ function syncSceneWallpaperControl() {
     empty.textContent = choices.length ? '未选择' : '暂无可用壁纸';
     empty.textContent = '柔光背景（跟随封面取色）';
     els.sceneWallpaperSelect.appendChild(empty);
+    const engineCurrent = document.createElement('option');
+    engineCurrent.value = SCENE_WALLPAPER_ENGINE_CURRENT_ID;
+    engineCurrent.textContent = state.wallpaperEngineActiveId
+      ? '跟随 Wallpaper Engine 当前壁纸'
+      : '跟随 Wallpaper Engine 当前壁纸（等待识别）';
+    engineCurrent.disabled = !state.wallpaperEngineActiveId;
+    els.sceneWallpaperSelect.appendChild(engineCurrent);
     choices.forEach((wallpaper) => {
       const option = document.createElement('option');
       option.value = safeText(wallpaper.id, '');
-      option.textContent = safeText(wallpaper.name, 'Wallpaper');
+      option.textContent = `${wallpaper.active === true ? '正在播放 · ' : ''}${safeText(wallpaper.name, 'Wallpaper')}`;
       els.sceneWallpaperSelect.appendChild(option);
     });
     if (setting.wallpaperId && !choices.some((item) => String(item.id) === String(setting.wallpaperId))) {
@@ -9250,9 +12244,11 @@ function syncSceneWallpaperControl() {
       persisted.textContent = setting.wallpaperName || '已保存的壁纸';
       els.sceneWallpaperSelect.appendChild(persisted);
     }
-    els.sceneWallpaperSelect.value = setting.enabled && setting.wallpaperId
-      ? setting.wallpaperId
-      : SCENE_WALLPAPER_SOFT_GLOW_ID;
+    els.sceneWallpaperSelect.value = setting.enabled && setting.followWallpaperEngine
+      ? SCENE_WALLPAPER_ENGINE_CURRENT_ID
+      : setting.enabled && setting.wallpaperId
+        ? setting.wallpaperId
+        : SCENE_WALLPAPER_SOFT_GLOW_ID;
   }
   if (els.sceneWallpaperEnabledToggle) {
     els.sceneWallpaperEnabledToggle.checked = setting.enabled;
@@ -9266,14 +12262,14 @@ function syncSceneWallpaperControl() {
     syncElasticRangeVisual(els.sceneWallpaperOpacityRange);
     if (els.sceneWallpaperOpacityValue) els.sceneWallpaperOpacityValue.textContent = `${percent}%`;
   }
-  const current = wallpaperById(state.activeWallpaperId);
+  const current = currentSceneWallpaperChoice();
   if (els.sceneWallpaperUseCurrentButton) {
     els.sceneWallpaperUseCurrentButton.disabled = !sceneWallpaperTextureUrl(current);
   }
   if (els.sceneWallpaperRemoveButton) els.sceneWallpaperRemoveButton.disabled = !descriptor.wallpaperUrl;
   if (els.sceneWallpaperStatus) {
     els.sceneWallpaperStatus.textContent = descriptor.wallpaperUrl
-      ? `${setting.enabled ? '正在使用' : '已停用'} · ${descriptor.wallpaperName}`
+      ? `${setting.enabled ? '正在使用' : '已停用'} · ${setting.followWallpaperEngine ? '跟随 Wallpaper Engine · ' : ''}${descriptor.wallpaperName}`
       : '未添加壁纸';
     if (!descriptor.wallpaperUrl) {
       els.sceneWallpaperStatus.textContent = '柔光背景 · 跟随封面取色';
@@ -9292,6 +12288,7 @@ function setSceneWallpaperForPreset(preset, wallpaper, enabled = true) {
   state.sceneWallpaperSettings[preset] = normalizeSceneWallpaperSetting({
     ...previous,
     enabled,
+    followWallpaperEngine: false,
     wallpaperId: safeText(wallpaper.id, ''),
     wallpaperUrl,
     wallpaperName: safeText(wallpaper.name, '场景壁纸'),
@@ -9301,6 +12298,39 @@ function setSceneWallpaperForPreset(preset, wallpaper, enabled = true) {
   saveSceneWallpaperPrefs();
   syncSceneWallpaperSurface(preset);
   syncSceneWallpaperControl();
+  renderDiySelectedPresetConfig();
+  requestOrbFrame();
+  saveVisualSettingsPreferences();
+  return true;
+}
+
+function currentSceneWallpaperChoice() {
+  return wallpaperById(state.wallpaperEngineActiveId)
+    || wallpaperById(state.activeWallpaperId);
+}
+
+function setSceneWallpaperFollowEngine(preset, enabled = true) {
+  if (!SCENE_WALLPAPER_PRESETS.includes(preset)) return false;
+  const wallpaper = wallpaperById(state.wallpaperEngineActiveId);
+  if (!wallpaper || !sceneWallpaperTextureUrl(wallpaper)) {
+    toast('暂未识别到 Wallpaper Engine 当前正在播放的壁纸');
+    void refreshSceneWallpaperCatalog({ force: true, live: true });
+    return false;
+  }
+  const previous = sceneWallpaperSetting(preset);
+  state.sceneWallpaperSettings[preset] = normalizeSceneWallpaperSetting({
+    ...previous,
+    enabled,
+    followWallpaperEngine: true,
+    wallpaperId: safeText(wallpaper.id, ''),
+    wallpaperUrl: sceneWallpaperTextureUrl(wallpaper),
+    wallpaperName: safeText(wallpaper.name, 'Wallpaper Engine 当前壁纸'),
+    mediaKind: safeText(wallpaper.kind, 'image') === 'video' ? 'video' : 'image'
+  });
+  saveSceneWallpaperPrefs();
+  syncSceneWallpaperSurface(preset);
+  syncSceneWallpaperControl();
+  syncSceneWallpaperLiveRefresh();
   renderDiySelectedPresetConfig();
   requestOrbFrame();
   return true;
@@ -9317,6 +12347,7 @@ function updateSceneWallpaperSetting(preset, patch) {
   syncSceneWallpaperControl();
   renderDiySelectedPresetConfig();
   requestOrbFrame();
+  saveVisualSettingsPreferences();
 }
 
 function removeSceneWallpaper(preset) {
@@ -9488,13 +12519,56 @@ function unloadWallpaperWebFrame() {
   }
 }
 
+function wallpaperPresetVisible() {
+  return state.playbackPage && state.diyPreset === 'wallpaper';
+}
+
+function releaseWallpaperMedia() {
+  if (els.wallpaperImage) {
+    els.wallpaperImage.onload = null;
+    els.wallpaperImage.onerror = null;
+    els.wallpaperImage.hidden = true;
+    els.wallpaperImage.removeAttribute('src');
+  }
+  if (els.wallpaperVideo) {
+    window.FeWallpaperVideoContinuity?.release?.(els.wallpaperVideo);
+    els.wallpaperVideo.oncanplay = null;
+    els.wallpaperVideo.onerror = null;
+    els.wallpaperVideo.onloadedmetadata = null;
+    els.wallpaperVideo.onloadeddata = null;
+    els.wallpaperVideo.pause();
+    els.wallpaperVideo.hidden = true;
+    els.wallpaperVideo.removeAttribute('src');
+    els.wallpaperVideo.load();
+  }
+  unloadWallpaperWebFrame();
+  if (els.wallpaperScene) delete els.wallpaperScene.dataset.mediaSignature;
+  els.wallpaperScene?.style.removeProperty('--wallpaper-tile-image');
+  setWallpaperMediaSize(0, 0);
+}
+
 async function activateNativeWallpaperScene(wallpaper) {
   if (!wallpaper || wallpaper.kind !== 'scene' || wallpaper.requiresNativeEngine !== true) return false;
   const wallpaperId = safeText(wallpaper.id, '');
   if (!wallpaperId || state.wallpaperNativeActivationPending === wallpaperId) return false;
   state.wallpaperNativeActivationPending = wallpaperId;
-  setWallpaperStatus(`正在通过 Wallpaper Engine 应用「${safeText(wallpaper.name, '场景壁纸')}」...`);
+  const wallpaperName = safeText(wallpaper.name, '场景壁纸');
+  setWallpaperStatus(`正在索引「${wallpaperName}」的场景文件、着色器与脚本资源...`);
   try {
+    const inventoryUrl = safeText(wallpaper.sceneInventoryUrl, '');
+    if (inventoryUrl.startsWith('/api/wallpapers/scene?')) {
+      try {
+        const inventory = await apiJson(`${inventoryUrl}&refresh=true&limit=0`);
+        const projectFiles = Math.max(0, Number(inventory.projectFileCount) || 0);
+        const packageEntries = Math.max(0, Number(inventory.packageEntryCount) || 0);
+        setWallpaperStatus(
+          `已索引 ${projectFiles} 个项目文件和 ${packageEntries} 个包内资源，正在提交给 Wallpaper Engine 原生运行时...`
+        );
+      } catch (inventoryError) {
+        console.warn('Wallpaper Engine scene inventory refresh failed; activating natively', inventoryError);
+        setWallpaperStatus(`场景资源索引暂未完成，正在直接提交给 Wallpaper Engine：${wallpaperName}`);
+      }
+    }
     const payload = await apiJson('/api/wallpapers/activate', {
       method: 'POST',
       body: JSON.stringify({ id: wallpaperId })
@@ -9525,24 +12599,22 @@ function applyWallpaperMedia(wallpaper) {
     || (wallpaperKind === 'scene' && (!!imageUrl || wallpaper.requiresNativeEngine === true))
     || !!imageUrl
   );
+  const signatureUrl = wallpaperKind === 'web' ? webEntryUrl : imageUrl;
+  const signature = hasWallpaper ? `${wallpaperKind}:${signatureUrl}` : '';
+  const mediaSignature = els.wallpaperScene?.dataset.mediaSignature || '';
   els.wallpaperEmpty.textContent = '导入或选择壁纸';
   els.wallpaperEmpty.hidden = hasWallpaper;
-  els.wallpaperImage.hidden = true;
-  els.wallpaperVideo.hidden = true;
-  els.wallpaperVideo.pause();
-  els.wallpaperVideo.onerror = null;
-  els.wallpaperVideo.oncanplay = null;
-  els.wallpaperVideo.onloadedmetadata = null;
-  els.wallpaperVideo.onloadeddata = null;
-  els.wallpaperImage.onload = null;
-  els.wallpaperImage.onerror = null;
-  els.wallpaperVideo.removeAttribute('src');
-  els.wallpaperVideo.load();
-  els.wallpaperImage.removeAttribute('src');
-  unloadWallpaperWebFrame();
-  els.wallpaperScene?.style.removeProperty('--wallpaper-tile-image');
-  setWallpaperMediaSize(0, 0);
+  if (hasWallpaper && mediaSignature === signature) {
+    if (wallpaperKind === 'video') {
+      window.FeWallpaperVideoContinuity?.prepare(els.wallpaperVideo);
+      els.wallpaperVideo.hidden = false;
+      els.wallpaperVideo.play().catch(() => {});
+    }
+    return;
+  }
+  releaseWallpaperMedia();
   if (!hasWallpaper) return;
+  if (els.wallpaperScene) els.wallpaperScene.dataset.mediaSignature = signature;
 
   if (wallpaperKind === 'web' && els.wallpaperWebFrame) {
     els.wallpaperWebFrame.onload = () => setWallpaperStatus(`网页壁纸「${safeText(wallpaper.name, 'Wallpaper')}」已加载`);
@@ -9554,10 +12626,10 @@ function applyWallpaperMedia(wallpaper) {
   }
 
   if (wallpaperKind === 'video') {
-    els.wallpaperVideo.preload = 'metadata';
+    els.wallpaperVideo.preload = 'auto';
     els.wallpaperVideo.muted = true;
-    els.wallpaperVideo.loop = true;
     els.wallpaperVideo.playsInline = true;
+    window.FeWallpaperVideoContinuity?.prepare(els.wallpaperVideo);
     els.wallpaperVideo.onloadedmetadata = () => setWallpaperMediaSize(els.wallpaperVideo.videoWidth, els.wallpaperVideo.videoHeight);
     els.wallpaperVideo.onerror = () => setWallpaperStatus('动态壁纸加载失败，可尝试切换实时壁纸或更换视频编码');
     els.wallpaperVideo.oncanplay = () => els.wallpaperVideo.play().catch(() => {});
@@ -9590,7 +12662,8 @@ function renderWallpaperList() {
   const active = wallpapers.find((wallpaper) => String(wallpaper.id) === String(state.activeWallpaperId)) || wallpapers[0] || null;
   if (active && active.id !== state.activeWallpaperId) state.activeWallpaperId = active.id;
   state.activeWallpaperIds[state.wallpaperSource] = active?.id || '';
-  applyWallpaperMedia(active);
+  if (wallpaperPresetVisible()) applyWallpaperMedia(active);
+  else releaseWallpaperMedia();
 
   if (!wallpapers.length) {
     const empty = document.createElement('div');
@@ -9635,7 +12708,9 @@ function renderWallpaperList() {
     const title = document.createElement('strong');
     title.textContent = safeText(wallpaper.name, 'Wallpaper');
     const source = document.createElement('small');
-    source.textContent = wallpaper.source === 'wallpaper-engine' ? 'Wallpaper Engine' : '已导入';
+    source.textContent = wallpaper.source === 'wallpaper-engine'
+      ? `${wallpaper.active === true ? '正在播放 · ' : ''}Wallpaper Engine`
+      : '已导入';
     copy.appendChild(title);
     copy.appendChild(source);
 
@@ -9646,7 +12721,7 @@ function renderWallpaperList() {
       : wallpaper.kind === 'web'
         ? '网页'
         : wallpaper.kind === 'scene'
-          ? '场景'
+          ? `场景${Number(wallpaper.packageEntryCount) > 0 ? ` · ${Number(wallpaper.packageEntryCount)} 资源` : ''}`
           : '图片';
 
     button.appendChild(thumb);
@@ -9686,13 +12761,27 @@ async function refreshWallpapers(options = {}) {
     if (state.wallpaperSource !== requestedSource) return;
     if (requestedSource === 'live') {
       state.wallpapers = Array.isArray(payload.wallpapers) ? payload.wallpapers : [];
+      state.wallpaperEngineCatalogRevision = safeText(payload.catalogRevision, '');
+      state.wallpaperEngineActiveId = safeText(
+        payload.activeWallpaperId,
+        safeText(Array.isArray(payload.activeWallpaperIds) ? payload.activeWallpaperIds[0] : '', '')
+      );
+      if (!state.activeWallpaperIds.live && state.wallpaperEngineActiveId) {
+        state.activeWallpaperIds.live = state.wallpaperEngineActiveId;
+        state.activeWallpaperId = state.wallpaperEngineActiveId;
+        saveWallpaperPrefs();
+      }
       state.wallpaperEngineCatalogLoaded = true;
+      syncAllSceneWallpaperSurfaces();
     } else {
       const engineItems = state.wallpapers.filter((wallpaper) => wallpaper?.source === 'wallpaper-engine');
       state.wallpapers = [];
       mergeWallpaperCatalog([...(Array.isArray(payload.wallpapers) ? payload.wallpapers : []), ...engineItems]);
     }
+    syncCommunityMessageBackground();
+    if (state.community.messageBackgroundMenuOpen) renderCommunityMessageBackgroundChoices();
     renderWallpaperList();
+    syncSceneWallpaperLiveRefresh();
   } catch (error) {
     if (state.wallpaperSource === requestedSource) setWallpaperStatus(error.message || '壁纸加载失败');
   } finally {
@@ -9726,7 +12815,7 @@ async function importWallpaperFiles(files) {
 }
 
 function updateWallpaperVisibility() {
-  const visible = state.playbackPage && state.diyPreset === 'wallpaper';
+  const visible = wallpaperPresetVisible();
   if (els.wallpaperScene) els.wallpaperScene.hidden = !visible;
   els.appShell.classList.toggle('has-wallpaper-mode', visible);
   if (visible) {
@@ -9737,8 +12826,7 @@ function updateWallpaperVisibility() {
     updateWallpaperAutoSize();
   }
   if (visible && !state.wallpapers.length && !state.wallpaperLoading) refreshWallpapers({ source: state.wallpaperSource });
-  if (!visible && els.wallpaperVideo) els.wallpaperVideo.pause();
-  if (!visible) unloadWallpaperWebFrame();
+  if (!visible) releaseWallpaperMedia();
   if (visible && els.wallpaperVideo && !els.wallpaperVideo.hidden) els.wallpaperVideo.play().catch(() => {});
 }
 
@@ -9766,6 +12854,77 @@ function pauseCoverParticleEngine(force = false) {
   cover.enginePlaying = false;
 }
 
+function disposeCoverParticleResources() {
+  const cover = state.coverParticle;
+  pauseCoverParticleEngine(true);
+  cover.imageSignature = '';
+  if (cover.image) {
+    cover.image.onload = null;
+    cover.image.onerror = null;
+    cover.image.removeAttribute?.('src');
+    cover.image = null;
+  }
+  const engineContainer = cover.engineContainer;
+  cover.engineContainer = null;
+  if (typeof engineContainer?.destroy === 'function') {
+    try {
+      engineContainer.destroy();
+    } catch (error) {}
+  }
+
+  if (cover.gpuPoints && cover.gpuScene) cover.gpuScene.remove(cover.gpuPoints);
+  cover.gpuGeometry?.dispose?.();
+  cover.gpuMaterial?.dispose?.();
+  cover.gpuRenderer?.renderLists?.dispose?.();
+  cover.gpuRenderer?.dispose?.();
+  cover.gpuRenderer = null;
+  cover.gpuScene = null;
+  cover.gpuCamera = null;
+  cover.gpuGeometry = null;
+  cover.gpuMaterial = null;
+  cover.gpuPoints = null;
+  cover.gpuSignature = '';
+  cover.gpuRenderSignature = '';
+  cover.gpuWidth = 0;
+  cover.gpuHeight = 0;
+  cover.gpuFailed = false;
+  cover.particles = [];
+  cover.sampleSignature = '';
+  cover.energy = 0;
+  cover.motionGate = 0;
+  cover.wholeJump = 0;
+  cover.bassJitter = 0;
+  cover.lastWidth = 0;
+  cover.lastHeight = 0;
+  cover.lastDpr = 0;
+  cover.fallbackGlowContext = null;
+  cover.fallbackGlowBase = null;
+  cover.fallbackGlowEnergy = null;
+  cover.fallbackGlowWidth = 0;
+  cover.fallbackGlowHeight = 0;
+  cover.fallbackGlowCoverSize = 0;
+  cover.fallbackLastFrameAt = 0;
+  cover.renderFrame = { canvas: null, cssWidth: 0, cssHeight: 0, width: 0, height: 0 };
+
+  const canvas = els.coverParticleCanvas;
+  if (canvas) {
+    canvas.width = 1;
+    canvas.height = 1;
+    canvas.style.width = '1px';
+    canvas.style.height = '1px';
+  }
+  state.coverParticle.wallpaperRequestId += 1;
+  disposeCoverParticleWallpaperMedia();
+  state.coverParticle.wallpaperSignature = '';
+  const wallpaperCanvas = els.coverParticleWallpaperCanvas;
+  if (wallpaperCanvas) {
+    wallpaperCanvas.width = 1;
+    wallpaperCanvas.height = 1;
+    wallpaperCanvas.hidden = true;
+  }
+  els.coverParticleScene?.classList.remove('has-scene-wallpaper');
+}
+
 function updateCoverParticleVisibility() {
   const visible = coverParticlePresetVisible();
   const visibilityChanged = visible !== state.coverParticle.engineVisible;
@@ -9777,10 +12936,14 @@ function updateCoverParticleVisibility() {
     applyCoverParticlePalette(state.coverParticle.palette || fallbackLyricPalette(state.currentSong));
     updateCoverParticleImage(state.currentSong);
     if (visibilityChanged) ensureCoverParticleEngine().then(playCoverParticleEngine);
-  } else if (visibilityChanged) {
-    pauseCoverParticleEngine();
-    state.coverParticle.motionGate = 0;
-    state.coverParticle.wholeJump = 0;
+    syncSceneWallpaperSurface('cover-particles');
+  } else if (
+    visibilityChanged
+    || state.coverParticle.gpuRenderer
+    || state.coverParticle.particles.length
+    || state.coverParticle.wallpaperImage
+  ) {
+    disposeCoverParticleResources();
   }
 }
 
@@ -10013,17 +13176,42 @@ function resetSonicTopographyAudioMotion(topo) {
   topo.pulseCooldown = 0;
   topo.meteorCooldown = 0;
   topo.lastFountainAt = 0;
+  topo.audioPulse = 0;
+  topo.audioTerrainSource = '';
+  topo.audioTerrainTime = 0;
+  topo.wasAudioDriving = false;
   if (topo.frameAudio) {
     topo.frameAudio.lowFrequencyAmplitude = 0;
     topo.frameAudio.subBass = 0;
     topo.frameAudio.bass = 0;
     topo.frameAudio.lowMid = 0;
+    topo.frameAudio.mid = 0;
+    topo.frameAudio.highMid = 0;
+    topo.frameAudio.energy = 0;
+    topo.frameAudio.beat = 0;
+    topo.frameAudio.fluxPulse = 0;
+    topo.frameAudio.fluxMeteor = 0;
     topo.frameAudio.lowFrequencyBands?.fill(0);
     topo.frameAudio.lowFrequencyBandTargets?.fill(0);
   }
   if (topo.lowFrequencySpectrumData && topo.lowFrequencySpectrum) {
     topo.lowFrequencySpectrumData.fill(0);
     topo.lowFrequencySpectrum.needsUpdate = true;
+  }
+  if (topo.uniforms) {
+    for (const uniformName of [
+      'uLowFrequencyAmplitude',
+      'uSubBass',
+      'uBass',
+      'uLowMid',
+      'uMid',
+      'uHighMid',
+      'uEnergy',
+      'uAudioPulse'
+    ]) {
+      if (topo.uniforms[uniformName]) topo.uniforms[uniformName].value = 0;
+    }
+    if (topo.uniforms.uAudioTime) topo.uniforms.uAudioTime.value = 0;
   }
   topo.ripples.forEach((ripple) => {
     ripple.strength = 0;
@@ -10042,21 +13230,47 @@ function resetSonicTopographyAudioMotion(topo) {
   topo.projectilesActive = true;
 }
 
+// A large bass jump reaches the fast response, while small fluctuations keep
+// the ordinary attack. This adds impact without hard-stepping the 512 bands or
+// changing the slower release that prevents black-frame dropouts.
+function sonicBassAttackResponse(current, target, attackResponse, impactAttackResponse) {
+  const rise = clamp((Number(target) || 0) - (Number(current) || 0), 0, 1);
+  const nonlinearRise = rise * (2 - rise);
+  return attackResponse + (impactAttackResponse - attackResponse) * nonlinearRise;
+}
+
 function updateSonicTopographyMotion() {
   const topo = state.sonicTopography;
   if (!state.playbackPage || !isSonicTopographyPreset() || !topo.uniforms || !topo.renderer || !topo.scene || !topo.camera) return;
   const nowMs = performance.now();
-  const frameGapMs = playbackPresetsUseNativeRefresh() ? 0 : RENDER_PROFILE.topographyFrameGapMs;
-  if (frameGapMs && topo.lastRenderAt && nowMs - topo.lastRenderAt < frameGapMs) return;
   topo.lastRenderAt = nowMs;
   const now = nowMs / 1000;
   const dt = topo.lastMotionAt ? clamp((nowMs - topo.lastMotionAt) / 1000, 1 / 360, 0.04) : 0.016;
-  const simulationStep = playbackPresetsUseNativeRefresh()
-    ? dt * (1000 / RENDER_PROFILE.targetFrameMs)
-    : 1;
+  const simulationStep = dt * (1000 / RENDER_PROFILE.targetFrameMs);
   topo.lastMotionAt = nowMs;
 
   const audioDriving = isPlaybackClockRunning();
+  const activeAudioSource = String(els.audio?.currentSrc || els.audio?.src || '');
+  const hasAudioSource = activeAudioSource.length > 0;
+  const audioEnded = els.audio?.ended === true;
+  const sourceChanged = Boolean(
+    topo.audioTerrainSource
+    && hasAudioSource
+    && topo.audioTerrainSource !== activeAudioSource
+  );
+  const sameSourcePaused = !audioDriving
+    && topo.wasAudioDriving
+    && hasAudioSource
+    && !audioEnded
+    && els.audio?.paused === true
+    && topo.audioTerrainSource === activeAudioSource;
+  const holdPausedAudio = sameSourcePaused;
+  const missingSource = !hasAudioSource;
+  if (audioDriving && sourceChanged) resetSonicTopographyAudioMotion(topo);
+  if (audioDriving) {
+    topo.audioTerrainSource = activeAudioSource;
+    topo.audioTerrainTime = (Number(topo.audioTerrainTime) || 0) + dt;
+  }
   const live = audioDriving
     ? (state.audioAnalysis.live ? state.audioAnalysis : state.visual)
     : null;
@@ -10081,45 +13295,78 @@ function updateSonicTopographyMotion() {
   const settings = topo.settings || DEFAULT_SONIC_SETTINGS;
   const smoothing = settings.smoothing;
   const attackResponse = 1 - Math.exp(-dt / (SONIC_BASS_COLUMN_ATTACK_SECONDS * smoothing));
+  const impactAttackResponse = 1 - Math.exp(
+    -dt / (SONIC_BASS_COLUMN_IMPACT_ATTACK_SECONDS * smoothing)
+  );
   const releaseResponse = 1 - Math.exp(-dt / (SONIC_BASS_COLUMN_RELEASE_SECONDS * smoothing));
   if (audioDriving) {
+    const lowFrequencyAttackResponse = sonicBassAttackResponse(
+      audio.lowFrequencyAmplitude,
+      lowFrequencyAmplitudeTarget,
+      attackResponse,
+      impactAttackResponse
+    );
+    const subBassAttackResponse = sonicBassAttackResponse(
+      audio.subBass,
+      subBassTarget,
+      attackResponse,
+      impactAttackResponse
+    );
+    const bassAttackResponse = sonicBassAttackResponse(
+      audio.bass,
+      bassTarget,
+      attackResponse,
+      impactAttackResponse
+    );
+    const lowMidAttackResponse = sonicBassAttackResponse(
+      audio.lowMid,
+      lowMidTarget,
+      attackResponse,
+      impactAttackResponse
+    );
     audio.lowFrequencyAmplitude += (lowFrequencyAmplitudeTarget - audio.lowFrequencyAmplitude)
-      * (lowFrequencyAmplitudeTarget > audio.lowFrequencyAmplitude ? attackResponse : releaseResponse);
+      * (lowFrequencyAmplitudeTarget > audio.lowFrequencyAmplitude
+        ? lowFrequencyAttackResponse
+        : releaseResponse);
     audio.subBass += (subBassTarget - audio.subBass)
-      * (subBassTarget > audio.subBass ? attackResponse : releaseResponse);
+      * (subBassTarget > audio.subBass ? subBassAttackResponse : releaseResponse);
     audio.bass += (bassTarget - audio.bass)
-      * (bassTarget > audio.bass ? attackResponse : releaseResponse);
+      * (bassTarget > audio.bass ? bassAttackResponse : releaseResponse);
     audio.lowMid += (lowMidTarget - audio.lowMid)
-      * (lowMidTarget > audio.lowMid ? attackResponse : releaseResponse);
+      * (lowMidTarget > audio.lowMid ? lowMidAttackResponse : releaseResponse);
+  } else if (holdPausedAudio) {
+    // Keep the exact last low-frequency terrain frame while the same source is paused.
   } else {
     audio.lowFrequencyAmplitude = 0;
     audio.subBass = 0;
     audio.bass = 0;
     audio.lowMid = 0;
   }
-  audio.mid = audioDriving ? clamp(live.mid || 0, 0, 1) : 0;
-  audio.highMid = audioDriving ? clamp(live.highMid || 0, 0, 1) : 0;
-  audio.presence = audioDriving ? clamp(live.presence || 0, 0, 1) : 0;
-  audio.brilliance = audioDriving ? clamp(live.brilliance || 0, 0, 1) : 0;
-  audio.air = audioDriving ? clamp(live.air || 0, 0, 1) : 0;
-  audio.energy = audioDriving ? clamp(live.energy || 0, 0, 1) : 0;
-  audio.warmth = audioDriving ? clamp(live.warmth || 0, 0, 1) : 0;
-  audio.brightness = audioDriving ? clamp(live.brightness || 0, 0, 1) : 0;
-  audio.sharpness = audioDriving ? clamp(live.sharpness || 0, 0, 1) : 0;
-  audio.smoothness = audioDriving ? clamp(live.smoothness == null ? 0.7 : live.smoothness, 0, 1) : 0.7;
-  audio.density = audioDriving ? clamp(live.density || 0, 0, 1) : 0;
-  audio.spectralCentroid = audioDriving ? Number(live.spectralCentroid) || 0 : 0;
-  audio.fluxPulse = audioDriving ? Number(live.fluxPulse) || 0 : 0;
-  audio.fluxMeteor = audioDriving ? Number(live.fluxMeteor) || 0 : 0;
-  audio.beat = audioDriving ? clamp(state.visual.beat || 0, 0, 1) : 0;
   if (audioDriving) {
+    audio.mid = clamp(live.mid || 0, 0, 1);
+    audio.highMid = clamp(live.highMid || 0, 0, 1);
+    audio.presence = clamp(live.presence || 0, 0, 1);
+    audio.brilliance = clamp(live.brilliance || 0, 0, 1);
+    audio.air = clamp(live.air || 0, 0, 1);
+    audio.energy = clamp(live.energy || 0, 0, 1);
+    audio.warmth = clamp(live.warmth || 0, 0, 1);
+    audio.brightness = clamp(live.brightness || 0, 0, 1);
+    audio.sharpness = clamp(live.sharpness || 0, 0, 1);
+    audio.smoothness = clamp(live.smoothness == null ? 0.7 : live.smoothness, 0, 1);
+    audio.density = clamp(live.density || 0, 0, 1);
+    audio.spectralCentroid = Number(live.spectralCentroid) || 0;
+    audio.fluxPulse = Number(live.fluxPulse) || 0;
+    audio.fluxMeteor = Number(live.fluxMeteor) || 0;
+    audio.beat = clamp(state.visual.beat || 0, 0, 1);
     topo.idleTone.presence = audio.presence;
     topo.idleTone.brilliance = audio.brilliance;
     topo.idleTone.air = audio.air;
     topo.idleTone.warmth = audio.warmth;
     topo.idleTone.brightness = audio.brightness;
-  } else {
+  } else if (!holdPausedAudio) {
     const idleTone = topo.idleTone || {};
+    audio.mid = 0;
+    audio.highMid = 0;
     audio.presence = clamp(idleTone.presence ?? 0.16, 0.08, 0.42);
     audio.brilliance = clamp(idleTone.brilliance ?? 0.12, 0.06, 0.36);
     audio.air = clamp(idleTone.air ?? 0.18, 0.08, 0.44);
@@ -10127,13 +13374,36 @@ function updateSonicTopographyMotion() {
     audio.warmth = clamp(idleTone.warmth ?? 0.46, 0.22, 0.72);
     audio.brightness = clamp(idleTone.brightness ?? 0.34, 0.18, 0.62);
     audio.smoothness = 0.86;
+    audio.sharpness = 0;
+    audio.density = 0;
+    audio.spectralCentroid = 0;
+    audio.fluxPulse = 0;
+    audio.fluxMeteor = 0;
+    audio.beat = 0;
   }
 
-  writeLowFrequencyBands(
-    audio.lowFrequencyBandTargets,
-    audioDriving && live ? live.lowFrequencyBands : null,
-    lowFrequencyAmplitudeTarget
-  );
+  if (audioDriving) {
+    const minimumUsefulBandSignal = Math.max(0.01, lowFrequencyAmplitudeTarget * 0.08);
+    const liveLowFrequencyBands = live ? live.lowFrequencyBands : null;
+    const visualLowFrequencyBands = state.visual.lowFrequencyBands;
+    const lowFrequencyBandSource = lowFrequencyBandsHaveSignal(
+      liveLowFrequencyBands,
+      minimumUsefulBandSignal
+    )
+      ? liveLowFrequencyBands
+      : lowFrequencyBandsHaveSignal(visualLowFrequencyBands, minimumUsefulBandSignal)
+        ? visualLowFrequencyBands
+        : null;
+    writeLowFrequencyBands(
+      audio.lowFrequencyBandTargets,
+      lowFrequencyBandSource,
+      lowFrequencyAmplitudeTarget
+    );
+  } else if (holdPausedAudio) {
+    // Hold both current and target bands so resume continues from the frozen frame.
+  } else {
+    writeLowFrequencyBands(audio.lowFrequencyBandTargets, null, 0);
+  }
   let fountainBand = -1;
   let fountainRise = 0;
   let fountainAmplitude = 0;
@@ -10144,8 +13414,17 @@ function updateSonicTopographyMotion() {
       let amplitude = audio.lowFrequencyBands[index] || 0;
       const previousAmplitude = amplitude;
       if (audioDriving) {
+        const bandAttackResponse = sonicBassAttackResponse(
+          amplitude,
+          targetAmplitude,
+          attackResponse,
+          impactAttackResponse
+        );
         amplitude += (targetAmplitude - amplitude)
-          * (targetAmplitude > amplitude ? attackResponse : releaseResponse);
+          * (targetAmplitude > amplitude ? bandAttackResponse : releaseResponse);
+      } else if (holdPausedAudio) {
+        // Keep the last encoded spectrum byte and per-band column height.
+        amplitude = previousAmplitude;
       } else {
         amplitude = 0;
       }
@@ -10166,7 +13445,24 @@ function updateSonicTopographyMotion() {
   }
 
   const uniforms = topo.uniforms;
+  if (uniforms.uGroundEntrance) {
+    if (reducedMotion) {
+      topo.groundEntranceProgress = 1;
+      uniforms.uGroundEntrance.value = 1;
+    } else if (topo.groundEntranceProgress < 1) {
+      if (!topo.groundEntranceStartedAt) topo.groundEntranceStartedAt = nowMs;
+      const groundEntranceTime = clamp(
+        (nowMs - topo.groundEntranceStartedAt) / (SONIC_GROUND_ENTRANCE_SECONDS * 1000),
+        0,
+        1
+      );
+      topo.groundEntranceProgress = groundEntranceTime * groundEntranceTime
+        * (3 - 2 * groundEntranceTime);
+      uniforms.uGroundEntrance.value = topo.groundEntranceProgress;
+    }
+  }
   uniforms.uTime.value = now;
+  if (uniforms.uAudioTime) uniforms.uAudioTime.value = topo.audioTerrainTime || 0;
   uniforms.uSubBass.value = audio.subBass;
   uniforms.uBass.value = audio.bass;
   uniforms.uLowFrequencyAmplitude.value = audio.lowFrequencyAmplitude;
@@ -10183,8 +13479,15 @@ function updateSonicTopographyMotion() {
   uniforms.uSmoothness.value = audio.smoothness;
   uniforms.uDensity.value = audio.density;
   uniforms.uSpectralCentroid.value = audio.spectralCentroid;
-  const targetIdleBreath = audioDriving ? 0.015 : (reducedMotion ? 0.035 : 0.145);
-  uniforms.uIdleBreath.value += (targetIdleBreath - uniforms.uIdleBreath.value) * clamp(dt * 3.5, 0, 1);
+  const targetIdleBreath = holdPausedAudio
+    ? uniforms.uIdleBreath.value
+    : audioDriving
+      ? 0.015
+      : (reducedMotion ? 0.035 : 0.145);
+  if (!holdPausedAudio) {
+    uniforms.uIdleBreath.value += (targetIdleBreath - uniforms.uIdleBreath.value)
+      * clamp(dt * 3.5, 0, 1);
+  }
 
   const theme = topo.theme || createSonicTopographyTheme(topo.palette || fallbackLyricPalette(state.currentSong));
   const lerpSpeed = clamp(3 * dt, 0, 1);
@@ -10218,9 +13521,17 @@ function updateSonicTopographyMotion() {
 
   const lowBassDrive = clamp(Math.max(audio.subBass * 1.25, audio.bass), 0, 1);
   if (!audioDriving) {
-    if (topo.wasAudioDriving) resetSonicTopographyAudioMotion(topo);
-    topo.wasAudioDriving = false;
-    topo.audioPulse += (0 - topo.audioPulse) * clamp(dt * 5.2, 0, 1);
+    if (holdPausedAudio) {
+      // Freeze the height envelope and audio time; ambient rain/fog still use uTime.
+    } else {
+      // Ended, sourceChanged and missingSource states must clear a held song once.
+      const shouldClearHeldAudio = (
+        audioEnded || sourceChanged || missingSource || !sameSourcePaused
+      ) && (topo.wasAudioDriving || Boolean(topo.audioTerrainSource));
+      if (shouldClearHeldAudio) resetSonicTopographyAudioMotion(topo);
+      topo.wasAudioDriving = false;
+      topo.audioPulse += (0 - topo.audioPulse) * clamp(dt * 5.2, 0, 1);
+    }
   } else {
     topo.wasAudioDriving = true;
     if (topo.pulseCooldown > 0) topo.pulseCooldown = Math.max(0, topo.pulseCooldown - simulationStep);
@@ -10265,6 +13576,43 @@ function updateSonicTopographyMotion() {
   }
   uniforms.uAudioPulse.value = clamp(topo.audioPulse || 0, 0, 1);
 
+  const atmosphereAudioDriveTarget = audioDriving && !reducedMotion ? 1 : 0;
+  const atmosphereAudioDriveResponse = clamp(
+    dt * (atmosphereAudioDriveTarget > topo.atmosphereAudioDrive ? 7.5 : 4.2),
+    0,
+    1
+  );
+  topo.atmosphereAudioDrive += (
+    atmosphereAudioDriveTarget - topo.atmosphereAudioDrive
+  ) * atmosphereAudioDriveResponse;
+  if (uniforms.uAtmosphereAudioDrive) {
+    uniforms.uAtmosphereAudioDrive.value = topo.atmosphereAudioDrive;
+  }
+  const backgroundAtmosphereUniforms = topo.backgroundMaterial?.uniforms;
+  if (backgroundAtmosphereUniforms?.uAtmosphereBass) {
+    const targetBassLight = lowBassDrive * topo.atmosphereAudioDrive;
+    const bassLight = backgroundAtmosphereUniforms.uAtmosphereBass;
+    bassLight.value += (targetBassLight - bassLight.value) * clamp(
+      dt * (targetBassLight > bassLight.value ? 8.5 : 4.4),
+      0,
+      1
+    );
+  }
+  if (backgroundAtmosphereUniforms?.uAtmosphereDetail) {
+    const targetDetailLight = clamp(
+      audio.mid * 0.14 + audio.highMid * 0.34
+        + audio.presence * 0.27 + audio.brilliance * 0.31,
+      0,
+      1
+    ) * topo.atmosphereAudioDrive;
+    const detailLight = backgroundAtmosphereUniforms.uAtmosphereDetail;
+    detailLight.value += (targetDetailLight - detailLight.value) * clamp(
+      dt * (targetDetailLight > detailLight.value ? 10 : 5),
+      0,
+      1
+    );
+  }
+
   if (!topo.resizeObserver) resizeSonicTopographyRenderer();
 
   const starfieldFlashTarget = audioDriving
@@ -10293,6 +13641,7 @@ function updateSonicTopographyMotion() {
   const perceptualTyndallIntensity = settings.tyndallIntensity <= 0
     ? 0
     : Math.pow(clamp(settings.tyndallIntensity / 1.5, 0, 1), 0.72) * 1.5;
+  const fluorescenceScatter = clamp(settings.fluorescenceScatter / 1.5, 0, 1);
   const maxMistSceneOpacity = SONIC_TYNDALL_TOTAL_ENERGY_CAP * 0.56;
   const mistBlackLiftGuard = clamp(
     1 - settings.mistEmission * 0.36 - settings.fogDensity * 0.14,
@@ -10300,7 +13649,9 @@ function updateSonicTopographyMotion() {
     1
   );
   topo.mistBlackLiftGuard = mistBlackLiftGuard;
-  topo.fogLayers?.forEach((mistLayer) => {
+  const fogLayers = topo.fogLayers;
+  for (let mistIndex = 0; mistIndex < fogLayers.length; mistIndex += 1) {
+    const mistLayer = fogLayers[mistIndex];
     if (settings.atmosphereEnabled && !reducedMotion) {
       mistLayer.position.x -= dt * (3.2 + settings.fogSpeed * 14)
         * mistLayer.userData.speedScale * mistLayer.userData.parallax;
@@ -10312,8 +13663,12 @@ function updateSonicTopographyMotion() {
       mistLayer.material.rotation = mistLayer.userData.baseRotation
         + Math.sin(mistClock * 0.052 + mistLayer.userData.phase) * 0.012;
     }
-    if (!mistLayer.material) return;
+    if (!mistLayer.material) continue;
     topo.atmosphereColor?.copy(theme.uBaseColor2);
+    topo.atmosphereColor?.lerp?.(
+      topo.uniforms?.uOuterColumnColor?.value,
+      fluorescenceScatter * 0.52
+    );
     if (settings.atmosphereEnabled && tyndallColor && topo.atmosphereColor) {
       const weakScatter = clamp(0.045 + settings.mistReflectance * 0.11 + settings.fogGlow * 0.045, 0, 0.28);
       topo.atmosphereColor.lerp(tyndallColor, weakScatter);
@@ -10322,20 +13677,23 @@ function updateSonicTopographyMotion() {
     const lightCoupling = settings.tyndallIntensity * settings.mistReflectance
       * (0.004 + settings.fogGlow * 0.006);
     const targetOpacity = (0.004 + settings.fogDensity * 0.03
-      + settings.mistEmission * 0.038 + lightCoupling) * mistLayer.userData.opacityScale;
+      + settings.mistEmission * 0.038 + lightCoupling
+      + fluorescenceScatter * 0.014) * mistLayer.userData.opacityScale;
     mistLayer.material.opacity += (Math.min(
       targetOpacity * mistBlackLiftGuard,
       maxMistSceneOpacity / SONIC_WATER_MIST_LAYER_COUNT
     ) - mistLayer.material.opacity) * clamp(dt * 2.7, 0, 1);
-    const emissionFill = 1 + settings.mistEmission * 0.52;
+    const emissionFill = 1 + settings.mistEmission * 0.52 + fluorescenceScatter * 0.1;
     mistLayer.scale.x += (mistLayer.userData.baseScaleX * emissionFill - mistLayer.scale.x) * clamp(dt * 2, 0, 1);
     mistLayer.scale.y += (
       mistLayer.userData.baseScaleY * (1 + settings.mistEmission * 0.38) - mistLayer.scale.y
     ) * clamp(dt * 2, 0, 1);
-  });
-  topo.tyndallBeams?.forEach((beam) => {
+  }
+  const tyndallBeams = topo.tyndallBeams;
+  for (let beamIndex = 0; beamIndex < tyndallBeams.length; beamIndex += 1) {
+    const beam = tyndallBeams[beamIndex];
     const beamUniforms = beam.material?.uniforms;
-    if (!beamUniforms) return;
+    if (!beamUniforms) continue;
     const atmosphereBreath = 0.5 + 0.5 * Math.sin(
       mistClock * beam.userData.driftRate + beam.userData.phase
     );
@@ -10357,14 +13715,16 @@ function updateSonicTopographyMotion() {
     beamUniforms.uAtmosphereVariation.value = atmosphereBreath;
 
     const halo = beam.userData.halo;
-    if (!halo?.material?.uniforms) return;
+    if (!halo?.material?.uniforms) continue;
     const haloBreath = 0.5 + 0.5 * Math.sin(
       mistClock * halo.userData.driftRate + halo.userData.phase
     );
     const haloEnergyCap = SONIC_TYNDALL_TOTAL_ENERGY_CAP * 0.42 / SONIC_TYNDALL_BEAM_COUNT;
     const haloTargetOpacity = Math.min(
       halo.userData.baseOpacity * perceptualTyndallIntensity
-        * mediumGain * (0.42 + settings.mistReflectance * 0.34) * beamVisibility,
+        * mediumGain * (0.42 + settings.mistReflectance * 0.34) * beamVisibility
+        + halo.userData.baseOpacity * fluorescenceScatter
+          * (0.18 + settings.fluorescence * 0.12),
       haloEnergyCap
     );
     halo.material.uniforms.uOpacity.value += (
@@ -10373,9 +13733,13 @@ function updateSonicTopographyMotion() {
     halo.material.uniforms.uTime.value = mistClock;
     halo.material.uniforms.uMistCoupling.value = mistCoupling;
     halo.material.uniforms.uMistReflectance.value = settings.mistReflectance;
-    halo.material.uniforms.uHaloStrength.value = clamp(0.09 + settings.fogGlow * 0.09, 0.08, 0.22);
+    halo.material.uniforms.uHaloStrength.value = clamp(
+      0.09 + settings.fogGlow * 0.09 + fluorescenceScatter * 0.1,
+      0.08,
+      0.28
+    );
     halo.material.uniforms.uAtmosphereVariation.value = haloBreath;
-  });
+  }
   const reflectionEnergyCap = SONIC_TYNDALL_TOTAL_ENERGY_CAP * 0.32;
   if (topo.tyndallGroundSheenMaterial?.uniforms) {
     const groundUniforms = topo.tyndallGroundSheenMaterial.uniforms;
@@ -10406,11 +13770,16 @@ function updateSonicTopographyMotion() {
     Math.cos(yaw) * horizontalRadius
   );
   topo.camera.lookAt(0, SONIC_TOPOGRAPHY_CAMERA.targetY, 0);
-  topo.tyndallBeams?.forEach((beam) => {
+  for (let beamIndex = 0; beamIndex < tyndallBeams.length; beamIndex += 1) {
+    const beam = tyndallBeams[beamIndex];
     orientSonicTyndallPlane(window.THREE, beam, topo.camera);
     if (beam.userData.halo) orientSonicTyndallPlane(window.THREE, beam.userData.halo, topo.camera);
-  });
+  }
 
+  const rainAudioLight = audioDriving
+    ? clamp(audio.energy * 0.58 + audio.brilliance * 0.24 + audio.beat * 0.18, 0, 1)
+    : 0;
+  updateSonicRain(topo, dt, now, rainAudioLight);
   updateSonicTopographyProjectiles(dt);
   if (topo.renderQuality) topo.renderQuality.render(topo.scene, topo.camera, nowMs);
   else topo.renderer.render(topo.scene, topo.camera);
@@ -11111,6 +14480,7 @@ function drawCoverParticleWallpaper() {
 
 function disposeCoverParticleWallpaperMedia() {
   if (state.coverParticle.wallpaperVideo) {
+    window.FeWallpaperVideoContinuity?.release?.(state.coverParticle.wallpaperVideo);
     state.coverParticle.wallpaperVideo.pause?.();
     state.coverParticle.wallpaperVideo.removeAttribute?.('src');
     state.coverParticle.wallpaperVideo.load?.();
@@ -11118,6 +14488,14 @@ function disposeCoverParticleWallpaperMedia() {
   }
   state.coverParticle.wallpaperImage = null;
   state.coverParticle.wallpaperDrawSignature = '';
+}
+
+function releaseCoverParticleWallpaperCanvas() {
+  const canvas = els.coverParticleWallpaperCanvas;
+  if (!canvas) return;
+  canvas.width = 1;
+  canvas.height = 1;
+  canvas.hidden = true;
 }
 
 function scheduleCoverParticleWallpaperVideoFrame(video, requestId, signature) {
@@ -11148,14 +14526,15 @@ function setCoverParticleWallpaper(request) {
     state.coverParticle.wallpaperRequestId += 1;
     disposeCoverParticleWallpaperMedia();
     state.coverParticle.wallpaperSignature = '';
-    const context = canvas.getContext('2d');
-    context?.clearRect(0, 0, canvas.width, canvas.height);
-    canvas.hidden = true;
+    releaseCoverParticleWallpaperCanvas();
     return;
   }
   canvas.hidden = false;
-  if (state.coverParticle.wallpaperSignature === signature && state.coverParticle.wallpaperImage) {
-    drawCoverParticleWallpaper();
+  if (
+    state.coverParticle.wallpaperSignature === signature
+    && (state.coverParticle.wallpaperImage || state.coverParticle.wallpaperVideo)
+  ) {
+    if (state.coverParticle.wallpaperImage) drawCoverParticleWallpaper();
     return;
   }
   const requestId = state.coverParticle.wallpaperRequestId + 1;
@@ -11169,8 +14548,8 @@ function setCoverParticleWallpaper(request) {
     video.preload = 'auto';
     video.muted = true;
     video.defaultMuted = true;
-    video.loop = true;
     video.playsInline = true;
+    window.FeWallpaperVideoContinuity?.prepare(video);
     state.coverParticle.wallpaperVideo = video;
     video.addEventListener('loadeddata', () => {
       if (state.coverParticle.wallpaperRequestId !== requestId
@@ -11191,7 +14570,7 @@ function setCoverParticleWallpaper(request) {
       if (state.coverParticle.wallpaperRequestId !== requestId) return;
       disposeCoverParticleWallpaperMedia();
       state.coverParticle.wallpaperSignature = '';
-      canvas.hidden = true;
+      releaseCoverParticleWallpaperCanvas();
       els.coverParticleScene?.classList.remove('has-scene-wallpaper');
     }, { once: true });
     video.src = url;
@@ -11201,6 +14580,7 @@ function setCoverParticleWallpaper(request) {
   }
 
   const image = new Image();
+  state.coverParticle.wallpaperImage = image;
   image.decoding = 'async';
   image.crossOrigin = 'anonymous';
   image.addEventListener('load', () => {
@@ -11212,7 +14592,7 @@ function setCoverParticleWallpaper(request) {
     if (state.coverParticle.wallpaperRequestId !== requestId) return;
     state.coverParticle.wallpaperImage = null;
     state.coverParticle.wallpaperSignature = '';
-    canvas.hidden = true;
+    releaseCoverParticleWallpaperCanvas();
     els.coverParticleScene?.classList.remove('has-scene-wallpaper');
   }, { once: true });
   image.src = url;
@@ -11222,38 +14602,49 @@ function resetCoverParticleSamples() {
   state.coverParticle.sampleSignature = '';
   state.coverParticle.particles = [];
   state.coverParticle.gpuSignature = '';
+  state.coverParticle.gpuRenderSignature = '';
 }
 
 function updateCoverParticleImage(song = state.currentSong) {
+  if (!coverParticlePresetVisible()) return false;
   const url = coverUrl(song);
   const signature = `${url}|${safeText(song && song.title, '')}`;
-  if (signature === state.coverParticle.imageSignature) return;
+  if (signature === state.coverParticle.imageSignature) return true;
+  const previousImage = state.coverParticle.image;
+  if (previousImage) {
+    previousImage.onload = null;
+    previousImage.onerror = null;
+    previousImage.removeAttribute?.('src');
+    state.coverParticle.image = null;
+  }
   state.coverParticle.imageSignature = signature;
   resetCoverParticleSamples();
   if (!url) {
     state.coverParticle.image = null;
-    return;
+    return false;
   }
   const image = new Image();
+  state.coverParticle.image = image;
   image.crossOrigin = 'anonymous';
   image.decoding = 'async';
-  image.addEventListener('load', () => {
+  image.onload = () => {
     if (state.coverParticle.imageSignature !== signature) return;
     state.coverParticle.image = image;
     resetCoverParticleSamples();
-  }, { once: true });
-  image.addEventListener('error', () => {
+  };
+  image.onerror = () => {
     if (state.coverParticle.imageSignature !== signature) return;
     state.coverParticle.image = null;
     resetCoverParticleSamples();
-  }, { once: true });
+  };
   image.src = url;
+  return true;
 }
 
 function updateLyricPalette(song = state.currentSong) {
   const url = coverUrl(song);
   const signature = `${url}|${safeText(song && song.title, '')}`;
-  updateCoverParticleImage(song);
+  if (coverParticlePresetVisible()) updateCoverParticleImage(song);
   if (signature === state.playbackVisual.coverSignature) return;
   state.playbackVisual.coverSignature = signature;
   applyLyricPalette(fallbackLyricPalette(song));
@@ -11286,8 +14677,12 @@ function updateBookLyricCover(song = state.currentSong) {
 function updateBookLyricArtist(subtitle = playbackLyricSubtitle()) {
   if (!els.bookLyricArtist) return;
   const text = safeText(subtitle, playbackLyricSubtitle());
-  els.bookLyricArtist.textContent = text;
-  els.bookLyricArtist.hidden = !text;
+  if (els.bookLyricArtist.__bookLyricArtistText !== text) {
+    els.bookLyricArtist.__bookLyricArtistText = text;
+    els.bookLyricArtist.textContent = text;
+  }
+  const hidden = !text;
+  if (els.bookLyricArtist.hidden !== hidden) els.bookLyricArtist.hidden = hidden;
 }
 
 function bookLyricDisplayLines() {
@@ -11356,10 +14751,12 @@ const BOOK_LYRIC_MIN_GLYPH_VISUAL_SECONDS = 0.08;
 const BOOK_LYRIC_GLYPH_SAMPLE_SECONDS = 0;
 const BOOK_LYRIC_ROLL_WINDOW_GLYPHS = 1.2;
 const LYRIC_TIMESTAMP_COMPENSATION_SECONDS = 0.22;
+const MULTI_ROW_LYRIC_VISUAL_LEAD_SECONDS = LYRIC_TIMESTAMP_COMPENSATION_SECONDS;
 const BOOK_LYRIC_SCROLL_SNAP_PX = 0.65;
-const BOOK_LYRIC_SCROLL_MIN_STEP_SECONDS = 1 / 240;
+const BOOK_LYRIC_SCROLL_MIN_STEP_SECONDS = 0;
 const BOOK_LYRIC_SCROLL_MAX_STEP_SECONDS = 0.08;
-const QISHUI_LYRIC_TRANSITION_SECONDS = 0.34;
+const QISHUI_LYRIC_TRANSITION_SECONDS = 0.18;
+const QISHUI_LYRIC_SCROLL_SETTLE_SECONDS = 0.024;
 const QISHUI_SEEK_HANDOFF_TOLERANCE_SECONDS = 0.08;
 const QISHUI_SEEK_HANDOFF_MAX_MS = 1600;
 
@@ -11459,16 +14856,24 @@ function syncBookLyricScroll(line, options = {}) {
   }
   if (usesMediaClock && dt <= 0) return false;
 
-  const activeLine = lines[activeIndex] || {};
-  const nextLine = lines[activeIndex + 1] || {};
-  const lineStart = Number(activeLine.time);
-  const nextStart = Number(nextLine.time);
-  const lineGap = Number.isFinite(lineStart) && Number.isFinite(nextStart) && nextStart > lineStart
-    ? nextStart - lineStart
-    : 2.4;
-  const responseSeconds = clamp(lineGap * 0.12, targetChanged ? 0.09 : 0.12, 0.26);
-  const step = clamp(dt / responseSeconds, targetChanged ? 0.28 : 0.08, 0.82);
-  const easedDelta = delta * bookGlyphEase(step);
+  const configuredResponseSeconds = Number(options.responseSeconds);
+  let easedDelta = 0;
+  if (usesMediaClock && Number.isFinite(configuredResponseSeconds) && configuredResponseSeconds > 0) {
+    const responseSeconds = Math.max(0.001, configuredResponseSeconds);
+    const step = clamp(1 - Math.exp(-dt / responseSeconds), 0, 0.94);
+    easedDelta = delta * step;
+  } else {
+    const activeLine = lines[activeIndex] || {};
+    const nextLine = lines[activeIndex + 1] || {};
+    const lineStart = Number(activeLine.time);
+    const nextStart = Number(nextLine.time);
+    const lineGap = Number.isFinite(lineStart) && Number.isFinite(nextStart) && nextStart > lineStart
+      ? nextStart - lineStart
+      : 2.4;
+    const responseSeconds = clamp(lineGap * 0.12, targetChanged ? 0.09 : 0.12, 0.26);
+    const step = clamp(dt / responseSeconds, targetChanged ? 0.28 : 0.08, 0.82);
+    easedDelta = delta * bookGlyphEase(step);
+  }
   list.scrollTop = current + easedDelta;
   const observed = Number(list.scrollTop) || 0;
   // Chromium can quantize a sub-pixel scroll write back to the same CSS pixel.
@@ -11514,6 +14919,12 @@ function setBookLyricGlyphProgress(line, progressPercent, currentTime = Number.N
     : `p:${progressValue.toFixed(2)}`;
   if (line.__bookGlyphProgress === progressKey) return;
   line.__bookGlyphProgress = progressKey;
+  const mainBase = line.querySelector('.book-lyric-copy--base');
+  const mainHot = line.querySelector('.book-lyric-copy--hot');
+  setSequentialLyricHighlight(mainHot, mainBase, progressValue);
+  const translationBase = line.querySelector('.book-lyric-translation-copy--base');
+  const translationHot = line.querySelector('.book-lyric-translation-copy--hot');
+  setSequentialLyricHighlight(translationHot, translationBase, progressValue);
   if (!glyphs.length) return;
 
   const head = progressValue / 100 * glyphs.length;
@@ -11596,6 +15007,7 @@ function fitBookLyricLinesToPage() {
     text.style.setProperty('--book-line-fit-width', `${fittedWidth}px`);
     text.style.setProperty('--book-line-fit-scale', scale.toFixed(5));
   });
+  invalidateSequentialLyricHighlights(els.bookLyricList);
   resetBookLyricScrollState();
 }
 
@@ -11690,7 +15102,10 @@ function updateBookLyricLines(progressPercent = state.lyricProgressPercent, curr
   const progress = `${progressValue.toFixed(2)}%`;
   const currentTimeValue = Number.isFinite(Number(currentTime))
     ? Number(currentTime)
-    : (els.audio && Number.isFinite(els.audio.currentTime) ? els.audio.currentTime : Number.NaN);
+    : effectivePlaybackLyricTime(
+        currentPlaybackLyricTime(),
+        BOOK_LYRIC_VISUAL_LEAD_SECONDS
+      );
   let current = state.lyricBookCurrentLine;
 
   if (state.lyricBookIndex !== active) {
@@ -11813,19 +15228,69 @@ function saveFavoriteDirectories() {
   }
 }
 
-function loadCommunityBio() {
+function loadCommunityBioRecords() {
   try {
-    return safeText(window.localStorage.getItem(COMMUNITY_BIO_KEY), '').slice(0, 180);
+    const parsed = JSON.parse(window.localStorage.getItem(COMMUNITY_BIOS_KEY) || '{}');
+    return parsed && typeof parsed.records === 'object' && !Array.isArray(parsed.records)
+      ? parsed.records
+      : {};
   } catch (error) {
-    return '';
+    return {};
   }
+}
+
+function communityBioIdentity(serverUrl, provider, account = {}, profile = {}) {
+  const server = safeText(serverUrl, '').replace(/\/+$/, '').toLowerCase();
+  const providerId = safeText(provider, state.activeProvider).toLowerCase();
+  const platformUserId = safeText(
+    profile.platformUserId || account.userId || account.platformUserId || profile.feId,
+    ''
+  );
+  if (!server || !providerId || !platformUserId) return '';
+  return JSON.stringify([server, providerId, platformUserId]);
+}
+
+function loadCommunityBio(identity = '') {
+  if (!identity) return '';
+  const record = loadCommunityBioRecords()[identity];
+  return safeText(record && record.bio, '').slice(0, 180);
+}
+
+function writeCommunityBio(identity, value) {
+  if (!identity) return;
+  const records = loadCommunityBioRecords();
+  records[identity] = {
+    bio: safeText(value, '').slice(0, 180),
+    updatedAt: Date.now()
+  };
+  const compactRecords = Object.fromEntries(
+    Object.entries(records)
+      .filter(([key, record]) => safeText(key, '') && record && typeof record === 'object')
+      .sort((left, right) => Number(right[1].updatedAt || 0) - Number(left[1].updatedAt || 0))
+      .slice(0, COMMUNITY_BIO_IDENTITY_LIMIT)
+  );
+  try {
+    window.localStorage.setItem(COMMUNITY_BIOS_KEY, JSON.stringify({ version: 2, records: compactRecords }));
+  } catch (error) {}
+}
+
+function syncCommunityBioIdentity(identity, remoteProfile = {}) {
+  const nextIdentity = safeText(identity, '');
+  state.community.profileBioIdentity = nextIdentity;
+  if (!nextIdentity) {
+    state.community.profileBio = '';
+    return;
+  }
+  const hasRemoteBio = Object.prototype.hasOwnProperty.call(remoteProfile, 'bio');
+  state.community.profileBio = hasRemoteBio
+    ? safeText(remoteProfile.bio, '').slice(0, 180)
+    : loadCommunityBio(nextIdentity);
+  if (hasRemoteBio) writeCommunityBio(nextIdentity, state.community.profileBio);
 }
 
 function saveCommunityBioLocal(value) {
   state.community.profileBio = safeText(value, '').slice(0, 180);
-  try {
-    window.localStorage.setItem(COMMUNITY_BIO_KEY, state.community.profileBio);
-  } catch (error) {}
+  writeCommunityBio(state.community.profileBioIdentity, state.community.profileBio);
 }
 
 function loadCommunityMessageDnd() {
@@ -11841,6 +15306,39 @@ function saveCommunityMessageDnd(value) {
   try {
     window.localStorage.setItem(COMMUNITY_MESSAGE_DND_KEY, String(state.community.messageBubbleMuted));
   } catch (error) {}
+}
+
+function normalizeCommunityMessageBackground(value = {}) {
+  const source = value && typeof value === 'object' ? value : {};
+  const mediaKind = safeText(source.mediaKind, 'image');
+  return {
+    enabled: source.enabled === true,
+    followWallpaperEngine: source.followWallpaperEngine === true,
+    wallpaperId: safeText(source.wallpaperId, ''),
+    wallpaperUrl: safeText(source.wallpaperUrl, ''),
+    wallpaperName: safeText(source.wallpaperName, ''),
+    mediaKind: mediaKind === 'video' || mediaKind === 'web' ? mediaKind : 'image'
+  };
+}
+
+function loadCommunityMessageBackground() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(COMMUNITY_MESSAGE_BACKGROUND_KEY) || '{}');
+    return normalizeCommunityMessageBackground(parsed);
+  } catch (error) {
+    return normalizeCommunityMessageBackground();
+  }
+}
+
+function saveCommunityMessageBackground() {
+  state.community.messageBackground = normalizeCommunityMessageBackground(state.community.messageBackground);
+  try {
+    window.localStorage.setItem(
+      COMMUNITY_MESSAGE_BACKGROUND_KEY,
+      JSON.stringify(state.community.messageBackground)
+    );
+  } catch (error) {}
+  scheduleClientPreferencesSync();
 }
 
 function normalizeCommunityEventCursor(value = '') {
@@ -11959,49 +15457,374 @@ function saveCommunityCardCollapsed(value) {
   } catch (error) {}
 }
 
-function loadCommunityFavoriteListening() {
+function emptyCommunityFavoriteListening() {
+  return { friends: {} };
+}
+
+function normalizeCommunityFavoriteListening(value = {}) {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    && value.friends && typeof value.friends === 'object' && !Array.isArray(value.friends)
+    ? { friends: { ...value.friends } }
+    : emptyCommunityFavoriteListening();
+}
+
+function emptyCommunityListeningStats() {
+  return { listenMs: 0, songKeys: [], songCountFloor: 0 };
+}
+
+function normalizeCommunityListeningStats(value = {}) {
+  const stored = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const songKeys = Array.isArray(stored.songKeys)
+    ? [...new Set(stored.songKeys.map((key) => safeText(key, '').trim()).filter(Boolean))]
+    : [];
+  return {
+    listenMs: Math.max(0, Math.round(Number(stored.listenMs) || 0)),
+    songKeys,
+    songCountFloor: Math.max(0, Math.round(Number(stored.songCountFloor) || 0))
+  };
+}
+
+function emptyCommunityScopedStore() {
+  return {
+    version: 2,
+    legacyMigrated: false,
+    legacyMigratedTo: '',
+    records: {}
+  };
+}
+
+function loadCommunityScopedStore(storageKey) {
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(COMMUNITY_FAVORITE_LISTEN_KEY) || '{}');
-    return parsed && typeof parsed === 'object' && parsed.friends && typeof parsed.friends === 'object'
-      ? parsed
-      : { friends: {} };
+    const parsed = JSON.parse(window.localStorage.getItem(storageKey) || '{}');
+    if (Number(parsed.version) !== 2 || !parsed.records || typeof parsed.records !== 'object') {
+      return emptyCommunityScopedStore();
+    }
+    return {
+      version: 2,
+      legacyMigrated: parsed.legacyMigrated === true,
+      legacyMigratedTo: safeText(parsed.legacyMigratedTo, ''),
+      records: { ...parsed.records }
+    };
+  } catch (error) {
+    return emptyCommunityScopedStore();
+  }
+}
+
+function compactCommunityScopedRecords(records = {}) {
+  return Object.fromEntries(
+    Object.entries(records)
+      .filter(([identity, record]) => (
+        safeText(identity, '') && record && typeof record === 'object'
+        && Object.prototype.hasOwnProperty.call(record, 'value')
+      ))
+      .sort((left, right) => Number(right[1].updatedAt || 0) - Number(left[1].updatedAt || 0))
+      .slice(0, COMMUNITY_LOCAL_IDENTITY_LIMIT)
+  );
+}
+
+function writeCommunityScopedStore(storageKey, root) {
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify({
+      version: 2,
+      legacyMigrated: root.legacyMigrated === true,
+      legacyMigratedTo: safeText(root.legacyMigratedTo, ''),
+      records: compactCommunityScopedRecords(root.records)
+    }));
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function loadCommunityScopedValue(storageKey, legacyKey, identity, normalize, emptyValue) {
+  const currentIdentity = safeText(identity, '');
+  if (!currentIdentity) return emptyValue();
+  const root = loadCommunityScopedStore(storageKey);
+  const record = root.records[currentIdentity];
+  if (record && typeof record === 'object' && Object.prototype.hasOwnProperty.call(record, 'value')) {
+    return normalize(record.value);
+  }
+  if (root.legacyMigrated) return emptyValue();
+
+  let migratedValue = emptyValue();
+  let hasLegacyValue = false;
+  try {
+    const raw = window.localStorage.getItem(legacyKey);
+    if (raw !== null) {
+      migratedValue = normalize(JSON.parse(raw || '{}'));
+      hasLegacyValue = true;
+    }
+  } catch (error) {}
+
+  root.legacyMigrated = true;
+  root.legacyMigratedTo = currentIdentity;
+  if (hasLegacyValue) {
+    root.records[currentIdentity] = {
+      updatedAt: Date.now(),
+      value: migratedValue
+    };
+  }
+  if (writeCommunityScopedStore(storageKey, root) && hasLegacyValue) {
+    try { window.localStorage.removeItem?.(legacyKey); } catch (error) {}
+  }
+  return migratedValue;
+}
+
+function saveCommunityScopedValue(storageKey, identity, value, normalize) {
+  const currentIdentity = safeText(identity, '');
+  if (!currentIdentity) return false;
+  const root = loadCommunityScopedStore(storageKey);
+  root.records[currentIdentity] = {
+    updatedAt: Date.now(),
+    value: normalize(value)
+  };
+  return writeCommunityScopedStore(storageKey, root);
+}
+
+function loadCommunityFavoriteListening(identity = '') {
+  return loadCommunityScopedValue(
+    COMMUNITY_FAVORITE_LISTEN_KEY,
+    COMMUNITY_FAVORITE_LISTEN_LEGACY_KEY,
+    identity,
+    normalizeCommunityFavoriteListening,
+    emptyCommunityFavoriteListening
+  );
+}
+
+function saveCommunityFavoriteListening() {
+  saveCommunityScopedValue(
+    COMMUNITY_FAVORITE_LISTEN_KEY,
+    state.community.localDataIdentity,
+    state.community.favoriteListening,
+    normalizeCommunityFavoriteListening
+  );
+}
+
+function loadCommunityListeningStats(identity = '') {
+  return loadCommunityScopedValue(
+    COMMUNITY_LISTENING_STATS_KEY,
+    COMMUNITY_LISTENING_STATS_LEGACY_KEY,
+    identity,
+    normalizeCommunityListeningStats,
+    emptyCommunityListeningStats
+  );
+}
+
+function saveCommunityListeningStats() {
+  if (saveCommunityScopedValue(
+    COMMUNITY_LISTENING_STATS_KEY,
+    state.community.localDataIdentity,
+    state.community.listeningStats,
+    normalizeCommunityListeningStats
+  )) {
+    state.community.listeningStatsSavedAt = Date.now();
+  }
+}
+
+function emptyCommunityTogetherReport() {
+  return {
+    version: 1,
+    partners: {}
+  };
+}
+
+function normalizeCommunityAvatarOrnament(value = null) {
+  if (!value || typeof value !== 'object') return null;
+  const achievementId = safeText(value.achievementId, '').slice(0, 64);
+  const id = safeText(value.id, achievementId ? `achievement-ornament-${achievementId}` : '').slice(0, 96);
+  if (!achievementId || !id) return null;
+  const accent = /^#[0-9a-f]{6}$/i.test(safeText(value.accent, ''))
+    ? safeText(value.accent, '').toLowerCase()
+    : '#9ce5ff';
+  return {
+    id,
+    achievementId,
+    name: safeText(value.name, '成就挂饰').slice(0, 80),
+    accent,
+    equippedAt: Math.max(0, Math.round(Number(value.equippedAt || value.changedAt) || 0))
+  };
+}
+
+function normalizeCommunityTogetherPartner(value = {}, fallbackId = '') {
+  const feId = safeText(value.feId || value.friendId || value.id || fallbackId, '').slice(0, 32);
+  if (!feId) return null;
+  const sessionIds = Array.isArray(value.sessionIds)
+    ? [...new Set(value.sessionIds.map((id) => safeText(id, '')).filter(Boolean))].slice(-40)
+    : [];
+  return {
+    feId,
+    username: safeText(value.username || value.name || value.displayName, `FE ${feId}`).slice(0, 80),
+    avatarUrl: safeText(value.avatarUrl || value.avatar, '').slice(0, 2048),
+    avatarOrnament: normalizeCommunityAvatarOrnament(value.avatarOrnament || value.ornament),
+    totalMs: Math.max(0, Math.round(Number(
+      value.totalMs || value.totalListenMs || value.totalDurationMs || value.listenMs || value.durationMs
+    ) || 0)),
+    sessionCount: Math.max(
+      sessionIds.length,
+      Math.round(Number(value.sessionCount || value.totalSessions || value.sessions) || 0)
+    ),
+    sessionIds,
+    lastListenedAt: Math.max(0, Math.round(Number(
+      value.lastListenedAt || value.lastTogetherAt || value.updatedAt
+    ) || 0))
+  };
+}
+
+function normalizeCommunityTogetherReport(value = {}) {
+  const normalized = emptyCommunityTogetherReport();
+  const source = value && typeof value === 'object' ? value : {};
+  const list = Array.isArray(source.partners)
+    ? source.partners
+    : Array.isArray(source.friends)
+      ? source.friends
+      : Object.entries(source.partners && typeof source.partners === 'object' ? source.partners : {})
+        .map(([feId, partner]) => ({ ...(partner || {}), feId }));
+  list.forEach((partner) => {
+    const next = normalizeCommunityTogetherPartner(partner);
+    if (next) normalized.partners[next.feId] = next;
+  });
+  return normalized;
+}
+
+function loadCommunityTogetherReport(identity = '') {
+  return loadCommunityScopedValue(
+    COMMUNITY_TOGETHER_REPORT_KEY,
+    COMMUNITY_TOGETHER_REPORT_LEGACY_KEY,
+    identity,
+    normalizeCommunityTogetherReport,
+    emptyCommunityTogetherReport
+  );
+}
+
+function saveCommunityTogetherReport() {
+  const report = normalizeCommunityTogetherReport(state.community.togetherReport);
+  const partners = Object.values(report.partners)
+    .sort((left, right) => right.totalMs - left.totalMs || right.lastListenedAt - left.lastListenedAt)
+    .slice(0, 64);
+  state.community.togetherReport = {
+    version: 1,
+    partners: Object.fromEntries(partners.map((partner) => [partner.feId, partner]))
+  };
+  if (saveCommunityScopedValue(
+    COMMUNITY_TOGETHER_REPORT_KEY,
+    state.community.localDataIdentity,
+    state.community.togetherReport,
+    normalizeCommunityTogetherReport
+  )) {
+    state.community.togetherReportSavedAt = Date.now();
+  }
+}
+
+function mergeCommunityTogetherReport(value = {}) {
+  const remote = normalizeCommunityTogetherReport(value);
+  const local = normalizeCommunityTogetherReport(state.community.togetherReport);
+  let changed = false;
+  Object.values(remote.partners).forEach((partner) => {
+    const current = local.partners[partner.feId];
+    if (!current) {
+      local.partners[partner.feId] = partner;
+      changed = true;
+      return;
+    }
+    const mergedSessionIds = [...new Set([
+      ...(current.sessionIds || []),
+      ...(partner.sessionIds || [])
+    ])].slice(-40);
+    const merged = {
+      ...current,
+      username: partner.username || current.username,
+      avatarUrl: partner.avatarUrl || current.avatarUrl,
+      avatarOrnament: partner.avatarOrnament || current.avatarOrnament,
+      totalMs: Math.max(current.totalMs, partner.totalMs),
+      sessionCount: Math.max(current.sessionCount, partner.sessionCount, mergedSessionIds.length),
+      sessionIds: mergedSessionIds,
+      lastListenedAt: Math.max(current.lastListenedAt, partner.lastListenedAt)
+    };
+    if (JSON.stringify(merged) !== JSON.stringify(current)) {
+      local.partners[partner.feId] = merged;
+      changed = true;
+    }
+  });
+  if (changed) {
+    state.community.togetherReport = local;
+    saveCommunityTogetherReport();
+  }
+  return changed;
+}
+
+function syncCommunityLocalStateIdentity(identity = '') {
+  const nextIdentity = safeText(identity, '');
+  const previousIdentity = safeText(state.community.localDataIdentity, '');
+  if (nextIdentity === previousIdentity) return false;
+
+  if (previousIdentity) {
+    saveCommunityFavoriteListening();
+    saveCommunityListeningStats();
+    saveCommunityTogetherReport();
+  }
+
+  state.community.localDataIdentity = nextIdentity;
+  state.community.favoriteListening = nextIdentity
+    ? loadCommunityFavoriteListening(nextIdentity)
+    : emptyCommunityFavoriteListening();
+  state.community.listeningStats = nextIdentity
+    ? loadCommunityListeningStats(nextIdentity)
+    : emptyCommunityListeningStats();
+  state.community.togetherReport = nextIdentity
+    ? loadCommunityTogetherReport(nextIdentity)
+    : emptyCommunityTogetherReport();
+  state.community.listeningStatsLastAt = 0;
+  state.community.listeningStatsSavedAt = 0;
+  state.community.togetherReportLastAt = 0;
+  state.community.togetherReportSessionId = '';
+  state.community.togetherReportSavedAt = 0;
+  return true;
+}
+
+function loadCommunityOrnamentCache() {
+  try {
+    const source = JSON.parse(window.localStorage.getItem(COMMUNITY_ORNAMENT_CACHE_KEY) || '{}');
+    const friends = source && source.friends && typeof source.friends === 'object' ? source.friends : {};
+    return {
+      friends: Object.fromEntries(Object.entries(friends).flatMap(([feId, value]) => {
+        const ornament = normalizeCommunityAvatarOrnament(value);
+        return ornament ? [[safeText(feId, ''), ornament]] : [];
+      }))
+    };
   } catch (error) {
     return { friends: {} };
   }
 }
 
-function saveCommunityFavoriteListening() {
+function saveCommunityOrnamentCache() {
   try {
-    window.localStorage.setItem(COMMUNITY_FAVORITE_LISTEN_KEY, JSON.stringify(state.community.favoriteListening || { friends: {} }));
-  } catch (error) {}
-}
-
-function loadCommunityListeningStats() {
-  try {
-    const stored = JSON.parse(window.localStorage.getItem(COMMUNITY_LISTENING_STATS_KEY) || '{}');
-    const songKeys = Array.isArray(stored.songKeys)
-      ? [...new Set(stored.songKeys.map((key) => safeText(key, '').trim()).filter(Boolean))]
-      : [];
-    return {
-      listenMs: Math.max(0, Math.round(Number(stored.listenMs) || 0)),
-      songKeys,
-      songCountFloor: Math.max(0, Math.round(Number(stored.songCountFloor) || 0))
-    };
-  } catch (error) {
-    return { listenMs: 0, songKeys: [], songCountFloor: 0 };
-  }
-}
-
-function saveCommunityListeningStats() {
-  try {
-    window.localStorage.setItem(COMMUNITY_LISTENING_STATS_KEY, JSON.stringify({
+    window.localStorage.setItem(COMMUNITY_ORNAMENT_CACHE_KEY, JSON.stringify({
       version: 1,
-      listenMs: state.community.listeningStats.listenMs,
-      songKeys: state.community.listeningStats.songKeys,
-      songCountFloor: state.community.listeningStats.songCountFloor
+      friends: state.community.ornamentCache?.friends || {}
     }));
-    state.community.listeningStatsSavedAt = Date.now();
   } catch (error) {}
+}
+
+function rememberCommunityFriendOrnament(friend = {}) {
+  const feId = safeText(friend.feId || friend.friendId, '');
+  if (!feId) return null;
+  const ornament = normalizeCommunityAvatarOrnament(friend.avatarOrnament || friend.ornament);
+  if (!state.community.ornamentCache || typeof state.community.ornamentCache !== 'object') {
+    state.community.ornamentCache = { friends: {} };
+  }
+  if (!state.community.ornamentCache.friends || typeof state.community.ornamentCache.friends !== 'object') {
+    state.community.ornamentCache.friends = {};
+  }
+  if (ornament) state.community.ornamentCache.friends[feId] = ornament;
+  else if ('avatarOrnament' in friend || 'ornament' in friend) delete state.community.ornamentCache.friends[feId];
+  return ornament;
+}
+
+function communityFriendOrnament(friend = {}) {
+  const direct = normalizeCommunityAvatarOrnament(friend.avatarOrnament || friend.ornament);
+  if (direct) return direct;
+  const feId = safeText(friend.feId || friend.friendId, '');
+  return normalizeCommunityAvatarOrnament(state.community.ornamentCache?.friends?.[feId]);
 }
 
 function communityListeningRemoteMaximum(profile = {}, keys = []) {
@@ -12071,7 +15894,10 @@ function recordCommunityListeningStats(listenMsDelta, song = state.currentSong) 
   const delta = Math.max(0, Math.min(30000, Math.round(Number(listenMsDelta) || 0)));
   const signature = communitySongSignature(song || {});
   const hadSong = !!signature && stats.songKeys.includes(signature);
-  if (delta > 0) stats.listenMs += delta;
+  if (delta > 0) {
+    stats.listenMs += delta;
+    queueHighDifficultyListenInterval(delta, song);
+  }
   if (signature && !hadSong) stats.songKeys.push(signature);
   if (delta <= 0 && (!signature || hadSong)) return;
   renderCommunityListeningStats();
@@ -12600,6 +16426,7 @@ function toggleFavoriteSong(song, options = {}) {
     toast(`已在${providerLabel}收藏目录：${safeText(normalized.title, '歌曲')}`);
   }
   saveFavoriteDirectories();
+  if (existingIndex < 0) unlockAppAchievement('first-favorite');
   updateFavoriteControls(state.currentSong);
   if (state.favoriteLibrary.open) renderFavoriteLibrary();
   return existingIndex < 0;
@@ -12851,10 +16678,20 @@ async function resolveQishuiMetadataViaGuestSearch(song) {
           guestSearchScore: Math.round(candidate.score)
         }
       };
-      state.qishuiGuestMatches.cache.set(cacheKey, { time: Date.now(), song: matched });
+      setBoundedCacheValue(
+        state.qishuiGuestMatches.cache,
+        cacheKey,
+        { time: Date.now(), song: matched },
+        QISHUI_GUEST_MATCH_CACHE_LIMIT
+      );
       return matched;
     }
-    state.qishuiGuestMatches.cache.set(cacheKey, { time: Date.now(), song: null });
+    setBoundedCacheValue(
+      state.qishuiGuestMatches.cache,
+      cacheKey,
+      { time: Date.now(), song: null },
+      QISHUI_GUEST_MATCH_CACHE_LIMIT
+    );
     return null;
   })();
   state.qishuiGuestMatches.requests.set(cacheKey, request);
@@ -12899,7 +16736,12 @@ async function fetchSearchSuggestions(keyword) {
     if (requestId !== state.searchSuggestions.requestId || (els.searchInput && els.searchInput.value.trim() !== keyword)) return;
     const songs = normalizeSearchResults(data.songs).slice(0, 8);
     state.searchSuggestions.songs = songs;
-    state.searchSuggestions.cache.set(cacheKey, { time: Date.now(), songs });
+    setBoundedCacheValue(
+      state.searchSuggestions.cache,
+      cacheKey,
+      { time: Date.now(), songs },
+      SEARCH_SUGGESTION_CACHE_LIMIT
+    );
     state.searchSuggestions.loading = false;
     renderSearchSuggestions();
     if (state.searchSuggestions.abortController === controller) state.searchSuggestions.abortController = null;
@@ -12953,6 +16795,92 @@ async function playFavoriteLibrarySong(song) {
     setFavoriteLibraryOpen(false);
     toast(`正在播放：${safeText(song.title, '歌曲')}`);
   }
+}
+
+function normalizeMarketMusicSong(value = {}) {
+  const workId = safeText(value.marketWorkId || value.workId, '').slice(0, 96);
+  const localUrl = safeText(value.localUrl || value.assetUrl, '');
+  if (!workId || !/^\/api\/creative-market\/assets\//.test(localUrl)) return null;
+  return {
+    id: `market-${workId}`,
+    title: safeText(value.title, '创作市场音乐').slice(0, 120),
+    artist: safeText(value.artist || value.authorName, 'FE 创作者').slice(0, 80),
+    album: safeText(value.album, '创作市场').slice(0, 100),
+    cover: safeText(value.cover || value.previewUrl, ''),
+    duration: Math.max(0, Number(value.duration) || 0),
+    provider: 'local',
+    source: 'local',
+    localUrl,
+    localFingerprint: `market|${workId}`,
+    fileName: safeText(value.fileName, `${workId}.mp3`).slice(0, 180),
+    fileSize: Math.max(0, Number(value.fileSize) || 0),
+    lastModified: Math.max(0, Number(value.updatedAt) || Number(value.publishedAt) || 0),
+    mimeType: safeText(value.mimeType, 'audio/mpeg').slice(0, 100),
+    extension: localAudioExtension(value.fileName || ''),
+    marketWorkId: workId,
+    marketInstalled: true
+  };
+}
+
+function loadMarketMusicLibrary() {
+  try {
+    const values = JSON.parse(window.localStorage?.getItem(MARKET_MUSIC_LIBRARY_KEY) || '[]');
+    return (Array.isArray(values) ? values : []).map(normalizeMarketMusicSong).filter(Boolean).slice(0, 300);
+  } catch (error) {
+    return [];
+  }
+}
+
+function saveMarketMusicLibrary() {
+  try {
+    const values = state.localPlaylistSongs
+      .filter((song) => song?.marketInstalled)
+      .map((song) => ({
+        marketWorkId: song.marketWorkId,
+        title: song.title,
+        artist: song.artist,
+        album: song.album,
+        cover: song.cover,
+        duration: song.duration,
+        localUrl: song.localUrl,
+        fileName: song.fileName,
+        fileSize: song.fileSize,
+        mimeType: song.mimeType,
+        updatedAt: song.lastModified
+      }));
+    window.localStorage?.setItem(MARKET_MUSIC_LIBRARY_KEY, JSON.stringify(values));
+  } catch (error) {}
+}
+
+function addCreativeMarketMusic(item = {}, options = {}) {
+  const workId = safeText(item.id || item.workId, '');
+  const assetUrl = safeText(item.assetUrl || item.asset?.url, '');
+  const song = normalizeMarketMusicSong({
+    marketWorkId: workId,
+    title: item.metadata?.title || item.title,
+    artist: item.metadata?.artist || item.author?.name,
+    album: item.metadata?.album || '创作市场',
+    cover: item.previewUrl,
+    duration: item.metadata?.duration,
+    localUrl: assetUrl,
+    fileName: item.asset?.fileName || item.metadata?.fileName || item.fileName,
+    fileSize: item.asset?.size || item.size,
+    mimeType: item.asset?.mimeType || item.mimeType,
+    updatedAt: item.updatedAt || item.publishedAt
+  });
+  if (!song) throw new Error('音乐作品没有可用的服务器音频地址');
+  const existingIndex = state.localPlaylistSongs.findIndex((entry) => entry.marketWorkId === workId);
+  if (existingIndex >= 0) state.localPlaylistSongs.splice(existingIndex, 1, song);
+  else state.localPlaylistSongs.push(song);
+  saveMarketMusicLibrary();
+  renderPlaylistOrbit(playbackPlaylists());
+  if (options.openShelf !== false) {
+    state.activePlaylistId = LOCAL_PLAYLIST_ID;
+    if (!state.playbackPage) enterPlaybackPage();
+    renderPlaylistShelf(localPlaylistDescriptor(), state.localPlaylistSongs);
+  }
+  unlockAppAchievement('local-import');
+  return song;
 }
 
 function localAudioExtension(name = '') {
@@ -13081,6 +17009,7 @@ async function importLocalAudioFiles(fileList, options = {}) {
     if (added > 0) toast(`已导入 ${added} 首本地歌曲${skipped ? `，跳过 ${skipped} 个重复或非音频文件` : ''}`);
     else toast(files.length ? '没有可新增的本地音频文件' : '未选择本地歌曲');
   }
+  if (added > 0) unlockAppAchievement('local-import');
   return { added, skipped, songs: state.localPlaylistSongs };
 }
 
@@ -13113,6 +17042,127 @@ function toast(message) {
   toast.timer = window.setTimeout(() => els.toast.classList.remove('show'), 2600);
 }
 
+function clientVersionDescriptor(value) {
+  const normalized = safeText(value, '').trim().replace(/^v(?=\d)/i, '');
+  const match = normalized.match(/^(\d+(?:\.\d+)*)(?:-([0-9A-Za-z.-]+))?$/);
+  if (!match) return null;
+  return {
+    parts: match[1].split('.').map((part) => Number(part)),
+    prerelease: Boolean(match[2])
+  };
+}
+
+function compareClientVersions(left, right) {
+  const next = clientVersionDescriptor(left);
+  const current = clientVersionDescriptor(right);
+  if (!next || !current) return 0;
+  const length = Math.max(next.parts.length, current.parts.length);
+  for (let index = 0; index < length; index += 1) {
+    const difference = (next.parts[index] || 0) - (current.parts[index] || 0);
+    if (difference) return difference > 0 ? 1 : -1;
+  }
+  if (next.prerelease === current.prerelease) return 0;
+  return next.prerelease ? -1 : 1;
+}
+
+function officialGitHubReleaseAsset(asset) {
+  const name = safeText(asset?.name, '').trim();
+  const url = safeText(asset?.browser_download_url, '').trim();
+  if (!name || !/^FE[-_. ]?Monster.*\.exe$/i.test(name)) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:'
+      && parsed.hostname.toLowerCase() === 'github.com'
+      && parsed.pathname.startsWith('/2292576833/FE-Monster/releases/download/');
+  } catch (error) {
+    return false;
+  }
+}
+
+function normalizeGitHubRelease(payload = {}) {
+  const version = safeText(payload.tag_name || payload.name, '').trim().replace(/^v(?=\d)/i, '');
+  if (!clientVersionDescriptor(version)) return null;
+  const assets = Array.isArray(payload.assets) ? payload.assets.filter(officialGitHubReleaseAsset) : [];
+  const installer = assets.find((asset) => /(?:setup|installer)/i.test(safeText(asset.name, '')))
+    || assets[0]
+    || null;
+  const digest = safeText(installer?.digest, '');
+  return {
+    source: 'github',
+    version,
+    releaseNotes: safeText(payload.body, '').trim() || safeText(payload.name, '').trim() || 'GitHub 已发布新客户端版本。',
+    downloadUrl: safeText(installer?.browser_download_url, ''),
+    htmlUrl: safeText(payload.html_url, ''),
+    fileSize: Number(installer?.size) || 0,
+    sha256: digest.toLowerCase().startsWith('sha256:') ? digest.slice(7) : '',
+    publishedAt: safeText(payload.published_at, '')
+  };
+}
+
+function setAvailableClientUpdate(release = {}) {
+  const version = safeText(release.version, '').trim();
+  if (!version) return false;
+  state.update.release = { ...release, version };
+  if (els.updateNoticeButton) {
+    els.updateNoticeButton.hidden = false;
+    els.updateNoticeButton.dataset.version = version;
+    els.updateNoticeButton.setAttribute('aria-label', `发现新版本 ${version}`);
+    els.updateNoticeButton.title = `发现新版本 ${version}`;
+  }
+  return true;
+}
+
+function clearAvailableClientUpdate(source = '') {
+  if (state.update.installing) return;
+  if (source && state.update.release?.source !== source) return;
+  state.update.release = null;
+  if (els.updateNoticeButton) {
+    els.updateNoticeButton.hidden = true;
+    delete els.updateNoticeButton.dataset.version;
+    els.updateNoticeButton.setAttribute('aria-label', '发现新版本');
+    els.updateNoticeButton.title = '发现新版本';
+  }
+}
+
+async function checkGitHubClientUpdate({ force = false } = {}) {
+  if (DESKTOP_SCENE_CLIENT || document.hidden || navigator.onLine === false) return state.update.release;
+  const now = Date.now();
+  if (!force && now - state.update.lastCheckedAt < CLIENT_UPDATE_CHECK_INTERVAL_MS) {
+    return state.update.release;
+  }
+  if (state.update.checkPromise) return state.update.checkPromise;
+  state.update.lastCheckedAt = now;
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timeout = controller
+    ? window.setTimeout(() => controller.abort(new DOMException('GitHub update check timed out', 'TimeoutError')), 8000)
+    : 0;
+  state.update.checkPromise = (async () => {
+    const [installed, response] = await Promise.all([
+      apiJson('/api/app/version', { timeoutMs: 5000 }),
+      fetch(CLIENT_UPDATE_GITHUB_API, {
+        cache: 'no-store',
+        signal: controller?.signal,
+        headers: {
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28'
+        }
+      })
+    ]);
+    if (!response.ok) throw new Error(`GitHub release check failed: ${response.status}`);
+    const release = normalizeGitHubRelease(await response.json());
+    if (release && compareClientVersions(release.version, installed.version) > 0) {
+      setAvailableClientUpdate(release);
+      return release;
+    }
+    clearAvailableClientUpdate('github');
+    return null;
+  })().catch(() => null).finally(() => {
+    window.clearTimeout(timeout);
+    state.update.checkPromise = null;
+  });
+  return state.update.checkPromise;
+}
+
 function updateProgress(percent = 0, text = '') {
   const next = clamp(Number(percent) || 0, 0, 100);
   if (els.updateProgressBar) els.updateProgressBar.style.transform = `scaleX(${(next / 100).toFixed(3)})`;
@@ -13123,15 +17173,15 @@ function showUpdateDialog(release = {}) {
   if (!els.updateDialog) return;
   const version = safeText(release.version, '');
   const downloadUrl = safeText(release.downloadUrl, '');
-  if (!version || !downloadUrl) return;
+  if (!version) return;
   state.update.release = release;
   state.update.progressId = '';
   state.update.installing = false;
   if (els.updateVersion) els.updateVersion.textContent = version;
   if (els.updateNotes) els.updateNotes.textContent = safeText(release.releaseNotes || release.notes, '服务器已发布新客户端版本。');
   if (els.updateInstallButton) {
-    els.updateInstallButton.disabled = false;
-    els.updateInstallButton.textContent = '立即更新';
+    els.updateInstallButton.disabled = !downloadUrl;
+    els.updateInstallButton.textContent = downloadUrl ? '立即更新' : '暂无安装包';
   }
   if (els.updateLaterButton) els.updateLaterButton.disabled = false;
   updateProgress(0, '等待确认');
@@ -13141,11 +17191,14 @@ function showUpdateDialog(release = {}) {
 function hideUpdateDialog() {
   if (!els.updateDialog || state.update.installing) return;
   els.updateDialog.hidden = true;
-  state.update.release = null;
 }
 
 async function startClientUpdate() {
   if (!state.update.release || state.update.installing) return;
+  if (!safeText(state.update.release.downloadUrl, '')) {
+    updateProgress(0, 'GitHub 发布页暂未提供可安装文件');
+    return;
+  }
   state.update.installing = true;
   if (els.updateInstallButton) {
     els.updateInstallButton.disabled = true;
@@ -13193,6 +17246,7 @@ async function pollClientUpdateProgress() {
         els.updateLaterButton.disabled = false;
         els.updateLaterButton.textContent = '关闭';
       }
+      if (status === 'completed' && els.updateNoticeButton) els.updateNoticeButton.hidden = true;
     }
   } catch (error) {
     updateProgress(0, error.message || '读取更新进度失败');
@@ -13265,6 +17319,134 @@ function communityAvatarUrl(source = {}) {
   return raw;
 }
 
+const communityEntranceAnimations = new WeakMap();
+
+function playCommunityEntrance(element, kind = 'page') {
+  if (!element || reducedMotion || typeof element.animate !== 'function') return null;
+  const previous = communityEntranceAnimations.get(element);
+  if (previous) previous.cancel();
+  const frames = kind === 'panel'
+    ? [
+        { opacity: 0.32, scale: 0.985 },
+        { opacity: 1, scale: 1 }
+      ]
+    : kind === 'mini'
+      ? [
+          { opacity: 0.24, translate: '0 8px', scale: 0.99 },
+          { opacity: 1, translate: '0 0', scale: 1 }
+        ]
+      : [
+          { opacity: 0.28, translate: '10px 0', filter: 'blur(2px)' },
+          { opacity: 1, translate: '0 0', filter: 'blur(0)' }
+        ];
+  const animation = element.animate(frames, {
+    duration: kind === 'page' ? 190 : COMMUNITY_ENTRANCE_DURATION_MS,
+    easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+    fill: 'none'
+  });
+  communityEntranceAnimations.set(element, animation);
+  const release = () => {
+    if (communityEntranceAnimations.get(element) === animation) {
+      communityEntranceAnimations.delete(element);
+    }
+  };
+  animation.addEventListener('finish', release, { once: true });
+  animation.addEventListener('cancel', release, { once: true });
+  return animation;
+}
+
+const COMMUNITY_ACHIEVEMENT_ORNAMENT_DESIGNS = Object.freeze({
+  'first-block': Object.freeze({ frame: 'brick-crown', label: '砖块冠' }),
+  'gap-runner': Object.freeze({ frame: 'leap-arc', label: '跃空弧' }),
+  'monster-stomp': Object.freeze({ frame: 'stomp-teeth', label: '踏怪齿' }),
+  'all-platforms': Object.freeze({ frame: 'four-gates', label: '四平台节点' }),
+  'world-peace': Object.freeze({ frame: 'peace-laurel', label: '和平月桂' }),
+  'first-play': Object.freeze({ frame: 'play-wave', label: '播放声波' }),
+  'track-finished': Object.freeze({ frame: 'finish-flag', label: '终点进度环' }),
+  'first-favorite': Object.freeze({ frame: 'heart-pocket', label: '爱心口袋' }),
+  'local-import': Object.freeze({ frame: 'import-folder', label: '导入文件夹' }),
+  'lyric-council': Object.freeze({ frame: 'lyric-stack', label: '多排歌词' }),
+  'manual-sync': Object.freeze({ frame: 'sync-clock', label: '校时时钟' }),
+  'visual-first': Object.freeze({ frame: 'visual-prism', label: '视觉棱镜' }),
+  'scene-smith': Object.freeze({ frame: 'orbit-forge', label: '宇宙锻环' }),
+  'bio-written': Object.freeze({ frame: 'profile-scroll', label: '资料卷轴' }),
+  'first-friend': Object.freeze({ frame: 'linked-friends', label: '好友节点' }),
+  'listen-together': Object.freeze({ frame: 'shared-headphones', label: '共享耳机' }),
+  'first-danmaku': Object.freeze({ frame: 'danmaku-bubble', label: '弹幕气泡' }),
+  'completionist': Object.freeze({ frame: 'legend-crown', label: '终极王冠' }),
+  'secret-left': Object.freeze({ frame: 'secret-left-door', label: '左侧隐藏门' })
+});
+const COMMUNITY_ACHIEVEMENT_ORNAMENT_FALLBACK = Object.freeze({
+  frame: 'achievement-seal',
+  label: '成就徽记'
+});
+
+function communityOrnamentDesign(ornament = {}) {
+  const achievementId = safeText(ornament.achievementId, '');
+  return COMMUNITY_ACHIEVEMENT_ORNAMENT_DESIGNS[achievementId]
+    || COMMUNITY_ACHIEVEMENT_ORNAMENT_FALLBACK;
+}
+
+function currentAchievementOrnamentPayload() {
+  const api = window.feAchievements;
+  const ornament = api?.getEquippedOrnament?.();
+  const equipment = api?.getOrnamentState?.().equipped;
+  if (!ornament || !equipment?.achievementId) return null;
+  return normalizeCommunityAvatarOrnament({
+    ...ornament,
+    equippedAt: equipment.changedAt
+  });
+}
+
+function currentCommunityAvatarOrnament(source = {}) {
+  if (window.feAchievements?.getEquippedOrnament) {
+    return currentAchievementOrnamentPayload();
+  }
+  return normalizeCommunityAvatarOrnament(source.avatarOrnament || source.ornament);
+}
+
+function applyCommunityAvatarOrnament(host, ornament = null) {
+  if (!host) return;
+  host.querySelectorAll(':scope > .community-avatar-ornament').forEach(removeElement);
+  const normalized = normalizeCommunityAvatarOrnament(ornament);
+  host.classList.toggle('has-avatar-ornament', !!normalized);
+  if (!normalized) {
+    host.removeAttribute('data-avatar-ornament');
+    return;
+  }
+  const decoration = document.createElement('span');
+  decoration.className = 'community-avatar-ornament';
+  const design = communityOrnamentDesign(normalized);
+  decoration.dataset.ornamentId = normalized.id;
+  decoration.dataset.ornamentDesign = design.frame;
+  decoration.dataset.ornamentAchievement = normalized.achievementId;
+  decoration.setAttribute('aria-label', `${safeText(normalized.name, '成就挂饰')} · ${design.label}`);
+  decoration.style.setProperty('--ornament-accent', normalized.accent);
+  const sigil = document.createElement('span');
+  sigil.className = 'community-avatar-ornament__sigil';
+  sigil.setAttribute('aria-hidden', 'true');
+  decoration.appendChild(sigil);
+  host.dataset.avatarOrnament = normalized.id;
+  host.appendChild(decoration);
+}
+
+function renderAvatarInto(host, source = {}, ornament = null) {
+  if (!host) return;
+  clearElement(host);
+  const avatarUrl = communityAvatarUrl(source);
+  if (avatarUrl) {
+    const image = document.createElement('img');
+    image.alt = '';
+    image.loading = 'lazy';
+    image.decoding = 'async';
+    image.src = avatarUrl;
+    host.appendChild(image);
+  } else {
+    host.appendChild(document.createTextNode('FE'));
+  }
+  applyCommunityAvatarOrnament(host, ornament);
+}
+
 function renderCommunityAvatar(source = {}) {
   if (!els.communityAvatar || !els.communityAvatarImage) return;
   const avatarUrl = communityAvatarUrl(source);
@@ -13274,6 +17456,7 @@ function renderCommunityAvatar(source = {}) {
   } else {
     els.communityAvatarImage.removeAttribute('src');
   }
+  applyCommunityAvatarOrnament(els.communityAvatar, currentCommunityAvatarOrnament(source));
 }
 
 function createCommunityCertBadge(certification) {
@@ -13438,6 +17621,332 @@ function currentCommunitySongPayload() {
   };
 }
 
+function normalizeCommunitySharedScene(scene = {}) {
+  if (!scene || typeof scene !== 'object' || Array.isArray(scene)) return null;
+  const allowedPresets = new Set([
+    'lyric', 'cube', 'free-cubes', 'void-prism', 'topography', 'chladni',
+    'rain-glass', 'cover-particles', 'sandbox-scene', 'wallpaper', 'book'
+  ]);
+  const allowedTextPresets = new Set([
+    'depth', 'flow', 'book-effect', 'focus-echo', 'glitch', 'book', 'none'
+  ]);
+  const preset = safeText(scene.preset, '');
+  if (!allowedPresets.has(preset)) return null;
+  const normalized = { preset };
+  const sandboxPresetId = safeText(scene.sandboxPresetId, '');
+  if (preset === 'sandbox-scene' && /^[a-z0-9][a-z0-9._-]{0,95}$/i.test(sandboxPresetId)) {
+    normalized.sandboxPresetId = sandboxPresetId;
+  }
+  const textPreset = safeText(scene.textPreset, '');
+  if (allowedTextPresets.has(textPreset)) normalized.textPreset = textPreset;
+  if (Number.isFinite(Number(scene.lyricBrightness))) {
+    normalized.lyricBrightness = clamp(Number(scene.lyricBrightness), 0.6, 1.8);
+  }
+  if (Number.isFinite(Number(scene.lyricSpeed))) {
+    normalized.lyricSpeed = clamp(Number(scene.lyricSpeed), 0.6, 1.8);
+  }
+  if (Number.isFinite(Number(scene.cubeIntensity))) {
+    normalized.cubeIntensity = clamp(Number(scene.cubeIntensity), 0.4, 1.8);
+  }
+  if (scene.sonic && typeof scene.sonic === 'object' && !Array.isArray(scene.sonic)) {
+    normalized.sonic = normalizeSonicSettings({
+      ...state.sonicTopography.settings,
+      ...scene.sonic
+    });
+  }
+  if (scene.freeCube && typeof scene.freeCube === 'object' && !Array.isArray(scene.freeCube)) {
+    normalized.freeCube = {
+      mode: scene.freeCube.mode === 'heart' ? 'heart' : 'free',
+      backgroundEnabled: scene.freeCube.backgroundEnabled !== false
+    };
+  }
+  if (['cube', 'plane', 'radial'].includes(scene.chladniMode)) {
+    normalized.chladniMode = scene.chladniMode;
+  }
+  if (scene.storm && typeof scene.storm === 'object' && !Array.isArray(scene.storm)) {
+    normalized.storm = {
+      lightingMode: ['day', 'sunset', 'evening', 'realtime'].includes(scene.storm.lightingMode)
+        ? scene.storm.lightingMode
+        : 'sunset',
+      weatherMode: scene.storm.weatherMode === 'on' ? 'on' : 'auto'
+    };
+  }
+  if (scene.coverParticle && typeof scene.coverParticle === 'object' && !Array.isArray(scene.coverParticle)) {
+    normalized.coverParticle = {
+      backgroundEnabled: scene.coverParticle.backgroundEnabled !== false,
+      motionAmplitude: clamp(Number(scene.coverParticle.motionAmplitude) || 0, 0, 2),
+      floatSpeed: normalizeCoverParticleFloatSpeed(scene.coverParticle.floatSpeed)
+    };
+  }
+  // wallpaperUrl, local file paths, media sources, tokens and arbitrary extension fields are never shared.
+  return normalized;
+}
+
+function communitySharedSceneSnapshot() {
+  return normalizeCommunitySharedScene({
+    preset: state.diyPreset,
+    sandboxPresetId: state.diyPreset === 'sandbox-scene'
+      ? safeText(state.sandbox.playbackPresetId || state.sandbox.selectedPresetId, '')
+      : '',
+    textPreset: state.textPreset,
+    lyricBrightness: state.lyricBrightness,
+    lyricSpeed: state.lyricSpeed,
+    cubeIntensity: state.cubeIntensity,
+    sonic: normalizeSonicSettings(state.sonicTopography.settings),
+    freeCube: {
+      mode: state.freeCube.mode,
+      backgroundEnabled: state.freeCube.backgroundEnabled
+    },
+    chladniMode: state.chladni.mode,
+    storm: {
+      lightingMode: state.sandbox.stormLightingMode,
+      weatherMode: state.sandbox.stormWeatherMode
+    },
+    coverParticle: {
+      backgroundEnabled: state.coverParticle.backgroundEnabled,
+      motionAmplitude: state.coverParticle.motionAmplitude,
+      floatSpeed: state.coverParticle.floatSpeed
+    }
+  });
+}
+
+function communitySharedSceneSignature(scene = {}) {
+  const normalized = normalizeCommunitySharedScene(scene);
+  return normalized ? JSON.stringify(normalized) : '';
+}
+
+function communityScenePersistenceSuppressed() {
+  return !!state.community.listenSceneLocalSnapshot;
+}
+
+function beginCommunitySceneOverride(session = {}) {
+  const sessionId = safeText(session && session.id, '');
+  if (!sessionId) return false;
+  if (state.community.listenSceneSessionId === sessionId && state.community.listenSceneLocalSnapshot) {
+    return false;
+  }
+  if (visualSettingsPreferenceSaveTimer) flushVisualSettingsPreferences();
+  if (sonicSettingsPreferenceSaveTimer) flushSonicSettingsPreferences();
+  if (state.community.listenSceneLocalSnapshot) void restoreCommunitySceneOverride();
+  state.community.listenSceneSessionId = sessionId;
+  state.community.listenSceneRevision = 0;
+  state.community.listenSceneSignature = '';
+  state.community.listenSceneLocalSnapshot = communitySharedSceneSnapshot();
+  state.community.listenScenePending = false;
+  state.community.listenSceneDirtySnapshot = null;
+  state.community.listenSceneDirtySignature = '';
+  state.community.listenSceneInFlight = false;
+  state.community.listenSceneInFlightSignature = '';
+  state.community.listenSceneRequestToken += 1;
+  state.community.listenSceneRetryAttempt = 0;
+  return true;
+}
+
+async function applyCommunitySharedScene(scene = {}, options = {}) {
+  const normalized = normalizeCommunitySharedScene(scene);
+  if (!normalized) return false;
+  const previousApplying = state.community.listenSceneApplying;
+  state.community.listenSceneApplying = true;
+  try {
+    if (normalized.preset === 'sandbox-scene' && normalized.sandboxPresetId) {
+      const localPreset = state.sandbox.presets.find((item) => (
+        String(item && item.id) === normalized.sandboxPresetId
+      ));
+      if (localPreset) await enterDiyScenePresetPlayback(localPreset.id);
+      else setDiyPreset('lyric', { persist: false });
+    } else {
+      setDiyPreset(normalized.preset, { persist: false });
+      enterPlaybackPage();
+    }
+    if (normalized.textPreset) setTextPreset(normalized.textPreset, { persist: false });
+    if (Number.isFinite(normalized.lyricBrightness)) state.lyricBrightness = normalized.lyricBrightness;
+    if (Number.isFinite(normalized.lyricSpeed)) state.lyricSpeed = normalized.lyricSpeed;
+    if (Number.isFinite(normalized.cubeIntensity)) state.cubeIntensity = normalized.cubeIntensity;
+    if (normalized.sonic) state.sonicTopography.settings = normalizeSonicSettings(normalized.sonic);
+    if (normalized.freeCube) {
+      setFreeCubeMode(normalized.freeCube.mode);
+      setFreeCubeBackground(normalized.freeCube.backgroundEnabled);
+    }
+    if (normalized.chladniMode) setChladniMode(normalized.chladniMode);
+    if (normalized.storm) {
+      setStormLightingMode(normalized.storm.lightingMode);
+      setStormThunderstormMode(normalized.storm.weatherMode);
+    }
+    if (normalized.coverParticle) {
+      state.coverParticle.backgroundEnabled = normalized.coverParticle.backgroundEnabled;
+      state.coverParticle.motionAmplitude = normalized.coverParticle.motionAmplitude;
+      state.coverParticle.floatSpeed = normalized.coverParticle.floatSpeed;
+      updateCoverParticleBackgroundMode();
+    }
+    updateLyricDiyVars();
+    applySonicTopographySettings({ persist: false, sync: true, renderConfig: false });
+    syncDiyPresetAdjustmentVisibility();
+    renderDiySelectedPresetConfig();
+    requestOrbFrame();
+    return true;
+  } finally {
+    state.community.listenSceneApplying = previousApplying;
+  }
+}
+
+async function applyCommunitySharedSceneSession(session = {}) {
+  const sessionId = safeText(session && session.id, '');
+  const activeSessionId = safeText(state.community.activeSession && state.community.activeSession.id, '');
+  if (!sessionId || (activeSessionId && sessionId !== activeSessionId)) return false;
+  beginCommunitySceneOverride(session);
+  const incomingRevision = Math.max(0, Math.round(Number(session.sceneRevision) || 0));
+  if (incomingRevision <= state.community.listenSceneRevision) return false;
+  const scene = normalizeCommunitySharedScene(session.scene);
+  if (!scene) return false;
+  const canonicalSignature = communitySharedSceneSignature(scene);
+  state.community.listenSceneSessionId = sessionId;
+  state.community.listenSceneRevision = incomingRevision;
+  state.community.listenSceneSignature = canonicalSignature;
+  if (state.community.listenSceneDirtySnapshot) {
+    if (state.community.listenSceneDirtySignature === canonicalSignature) {
+      state.community.listenSceneDirtySnapshot = null;
+      state.community.listenSceneDirtySignature = '';
+      state.community.listenScenePending = false;
+    } else {
+      state.community.listenScenePending = true;
+      scheduleCommunitySceneSync({ immediate: true, preserveDirty: true });
+    }
+    return false;
+  }
+  const applied = await applyCommunitySharedScene(scene, { remote: true });
+  if (!applied) return false;
+  return true;
+}
+
+async function restoreCommunitySceneOverride() {
+  const snapshot = state.community.listenSceneLocalSnapshot;
+  window.clearTimeout(state.community.listenSceneTimer);
+  window.clearTimeout(state.community.listenSceneDisconnectTimer);
+  state.community.listenSceneTimer = 0;
+  state.community.listenSceneDisconnectTimer = 0;
+  state.community.listenScenePending = false;
+  state.community.listenSceneDirtySnapshot = null;
+  state.community.listenSceneDirtySignature = '';
+  state.community.listenSceneInFlight = false;
+  state.community.listenSceneInFlightSignature = '';
+  state.community.listenSceneRequestToken += 1;
+  state.community.listenSceneRetryAttempt = 0;
+  if (snapshot) await applyCommunitySharedScene(snapshot, { restore: true });
+  state.community.listenSceneSessionId = '';
+  state.community.listenSceneRevision = 0;
+  state.community.listenSceneSignature = '';
+  state.community.listenSceneLocalSnapshot = null;
+  state.community.listenSceneApplying = false;
+}
+
+function clearCommunitySceneDisconnectRestore() {
+  window.clearTimeout(state.community.listenSceneDisconnectTimer);
+  state.community.listenSceneDisconnectTimer = 0;
+}
+
+function scheduleCommunitySceneDisconnectRestore(delayMs = 8000) {
+  clearCommunitySceneDisconnectRestore();
+  if (!state.community.listenSceneLocalSnapshot || !state.community.activeSession) return;
+  state.community.listenSceneDisconnectTimer = window.setTimeout(() => {
+    state.community.listenSceneDisconnectTimer = 0;
+    if (state.community.eventConnected || !state.community.listenSceneLocalSnapshot) return;
+    const sessionId = safeText(state.community.activeSession && state.community.activeSession.id, '');
+    resetCommunityListenState({ sessionId });
+    if (sessionId) {
+      apiJson(`/api/community/listen/leave?${query({ provider: state.activeProvider })}`, {
+        method: 'POST',
+        body: JSON.stringify({ sessionId })
+      }).catch(() => {});
+    }
+    toast('一起听连接已断开，已恢复加入前的本地场景');
+  }, Math.max(0, Number(delayMs) || 0));
+}
+
+async function publishCommunitySharedScene() {
+  state.community.listenSceneTimer = 0;
+  if (state.community.listenSceneApplying || state.community.listenSceneInFlight) {
+    state.community.listenScenePending = true;
+    return;
+  }
+  const sessionId = safeText(state.community.activeSession && state.community.activeSession.id, '');
+  if (!sessionId || sessionId !== state.community.listenSceneSessionId) return;
+  const scene = state.community.listenSceneDirtySnapshot || communitySharedSceneSnapshot();
+  const signature = communitySharedSceneSignature(scene);
+  if (!signature || signature === state.community.listenSceneSignature) {
+    state.community.listenSceneDirtySnapshot = null;
+    state.community.listenSceneDirtySignature = '';
+    return;
+  }
+  const requestToken = state.community.listenSceneRequestToken;
+  state.community.listenSceneInFlight = true;
+  state.community.listenSceneInFlightSignature = signature;
+  state.community.listenScenePending = false;
+  try {
+    const payload = await apiJson(`/api/community/listen/scene?${query({ provider: state.activeProvider })}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        sessionId,
+        baseRevision: state.community.listenSceneRevision,
+        scene
+      })
+    });
+    if (requestToken !== state.community.listenSceneRequestToken) return;
+    if (payload.session) {
+      state.community.activeSession = payload.session;
+      await applyCommunitySharedSceneSession(payload.session);
+    }
+    state.community.listenSceneRetryAttempt = 0;
+  } catch (error) {
+    if (requestToken === state.community.listenSceneRequestToken) {
+      state.community.listenScenePending = true;
+      state.community.listenSceneRetryAttempt = Math.min(
+        4,
+        state.community.listenSceneRetryAttempt + 1
+      );
+    }
+  } finally {
+    if (requestToken === state.community.listenSceneRequestToken) {
+      state.community.listenSceneInFlight = false;
+      state.community.listenSceneInFlightSignature = '';
+      if (state.community.listenScenePending || state.community.listenSceneDirtySnapshot) {
+        state.community.listenScenePending = false;
+        const retryDelays = [0, 250, 500, 1000, 2000];
+        scheduleCommunitySceneSync({
+          immediate: state.community.listenSceneRetryAttempt === 0,
+          preserveDirty: true,
+          delayMs: retryDelays[state.community.listenSceneRetryAttempt] || 2000
+        });
+      }
+    }
+  }
+}
+
+function scheduleCommunitySceneSync(options = {}) {
+  if (state.community.listenSceneApplying || !state.community.listenSceneLocalSnapshot) return;
+  const sessionId = safeText(state.community.activeSession && state.community.activeSession.id, '');
+  if (!sessionId || sessionId !== state.community.listenSceneSessionId) return;
+  if (!options.preserveDirty) {
+    const scene = communitySharedSceneSnapshot();
+    const signature = communitySharedSceneSignature(scene);
+    if (!signature || signature === state.community.listenSceneSignature) {
+      state.community.listenSceneDirtySnapshot = null;
+      state.community.listenSceneDirtySignature = '';
+      return;
+    }
+    state.community.listenSceneDirtySnapshot = scene;
+    state.community.listenSceneDirtySignature = signature;
+  }
+  window.clearTimeout(state.community.listenSceneTimer);
+  const requestedDelay = Number(options.delayMs);
+  const delay = Number.isFinite(requestedDelay)
+    ? Math.max(0, requestedDelay)
+    : options.immediate ? 0 : 70;
+  state.community.listenSceneTimer = window.setTimeout(
+    () => { void publishCommunitySharedScene(); },
+    delay
+  );
+}
+
 function communitySongSignature(song = {}) {
   const provider = safeText(song.provider, '');
   const id = safeText(song.id, '');
@@ -13537,6 +18046,7 @@ function showCommunityLoveBubble(friend = {}, songRecord = {}) {
       friendId: safeText(friend.feId, ''),
       name,
       avatarUrl: communityAvatarUrl(friend),
+      avatarOrnament: communityFriendOrnament(friend),
       title: safeText(songRecord.title, '当前歌曲'),
       artist: safeText(songRecord.artist, '')
     },
@@ -13566,6 +18076,7 @@ function renderCommunityLoveBubbles() {
     } else {
       avatar.textContent = 'FE';
     }
+    applyCommunityAvatarOrnament(avatar, bubble.avatarOrnament);
 
     const copy = document.createElement('span');
     copy.className = 'community-love-copy';
@@ -13628,6 +18139,85 @@ function communityFriendById(feId) {
   return state.community.friends.find((friend) => String(friend.feId) === String(feId)) || null;
 }
 
+function communitySessionPartner(session = state.community.activeSession) {
+  if (!session || typeof session !== 'object') return null;
+  const me = safeText(state.community.profile && state.community.profile.feId, '');
+  const members = Array.isArray(session.members) ? session.members : [];
+  const member = members.find((item) => item && safeText(item.feId || item.id, '') !== me);
+  const fallbackId = safeText(
+    member?.feId || member?.id || session.targetId || session.friendId || session.peerId,
+    ''
+  );
+  const friend = communityFriendById(fallbackId) || {};
+  if (!fallbackId) return null;
+  return {
+    feId: fallbackId,
+    username: safeText(
+      member?.username || member?.name || friend.username || friend.name,
+      `FE ${fallbackId}`
+    ),
+    avatarUrl: communityAvatarUrl({ ...friend, ...(member || {}) }),
+    avatarOrnament: communityFriendOrnament({ ...friend, ...(member || {}) })
+  };
+}
+
+function updateCommunityTogetherListeningClock(nowMs = performance.now(), options = {}) {
+  const session = state.community.activeSession;
+  const sessionId = safeText(session && session.id, '');
+  const partner = communitySessionPartner(session);
+  if (!sessionId || !partner) {
+    state.community.togetherReportLastAt = 0;
+    state.community.togetherReportSessionId = '';
+    return false;
+  }
+
+  const report = normalizeCommunityTogetherReport(state.community.togetherReport);
+  const existing = report.partners[partner.feId] || normalizeCommunityTogetherPartner(partner);
+  if (!existing) return false;
+  const sessionChanged = state.community.togetherReportSessionId !== sessionId;
+  const alreadyCounted = existing.sessionIds.includes(sessionId);
+  let delta = 0;
+  if (!sessionChanged && state.community.togetherReportLastAt > 0) {
+    delta = clamp(nowMs - state.community.togetherReportLastAt, 0, 30000);
+  }
+
+  existing.username = partner.username || existing.username;
+  existing.avatarUrl = partner.avatarUrl || existing.avatarUrl;
+  existing.avatarOrnament = partner.avatarOrnament || existing.avatarOrnament;
+  existing.lastListenedAt = Date.now();
+  if (!alreadyCounted) {
+    existing.sessionIds.push(sessionId);
+    existing.sessionIds = existing.sessionIds.slice(-40);
+    existing.sessionCount = Math.max(existing.sessionCount + 1, existing.sessionIds.length);
+  }
+  if (delta > 0) existing.totalMs += Math.round(delta);
+  report.partners[partner.feId] = existing;
+  state.community.togetherReport = report;
+  state.community.togetherReportSessionId = sessionId;
+  state.community.togetherReportLastAt = options.stop ? 0 : nowMs;
+
+  if (
+    !alreadyCounted
+    || options.stop
+    || Date.now() - state.community.togetherReportSavedAt >= 12000
+  ) {
+    saveCommunityTogetherReport();
+  }
+  if (state.community.profileOpen && state.community.profilePage === 'report') {
+    renderCommunityListenReport();
+  }
+  return delta > 0 || !alreadyCounted;
+}
+
+function flushCommunityTogetherListening() {
+  if (state.community.activeSession) {
+    updateCommunityTogetherListeningClock(performance.now(), { stop: true });
+  }
+  state.community.togetherReportLastAt = 0;
+  state.community.togetherReportSessionId = '';
+  saveCommunityTogetherReport();
+}
+
 function communityFriendsSignature(friends = []) {
   return JSON.stringify(friends.map((friend) => ({
     feId: safeText(friend && friend.feId, ''),
@@ -13637,6 +18227,10 @@ function communityFriendsSignature(friends = []) {
     likes: Number(friend && friend.likes) || 0,
     likedByMe: !!(friend && friend.likedByMe),
     certification: friend && friend.certification ? `${safeText(friend.certification.label, '')}:${friend.certification.level || 1}` : '',
+    avatarOrnament: safeText(
+      friend && (friend.avatarOrnament?.id || friend.ornament?.id),
+      ''
+    ),
     currentSongId: safeText(friend && friend.currentSong && friend.currentSong.id, '')
   })));
 }
@@ -13656,7 +18250,7 @@ function renderCommunityFriends(friends = []) {
     return;
   }
 
-  visibleFriends.slice(0, 8).forEach((friend) => {
+  visibleFriends.forEach((friend) => {
     const item = document.createElement('span');
     item.className = 'community-friend';
     item.classList.toggle('is-certified', !!friend.certification);
@@ -13664,6 +18258,10 @@ function renderCommunityFriends(friends = []) {
 
     const avatar = document.createElement('span');
     avatar.className = 'community-friend-avatar';
+    avatar.dataset.communityProfileId = safeText(friend.feId, '');
+    avatar.setAttribute('role', 'button');
+    avatar.setAttribute('aria-label', `查看 ${safeText(friend.username, friend.feId)} 的个人主页`);
+    avatar.tabIndex = 0;
     const avatarUrl = communityAvatarUrl(friend);
     if (avatarUrl) {
       const image = document.createElement('img');
@@ -13673,6 +18271,7 @@ function renderCommunityFriends(friends = []) {
     } else {
       avatar.textContent = 'FE';
     }
+    applyCommunityAvatarOrnament(avatar, communityFriendOrnament(friend));
 
     const copy = document.createElement('span');
     copy.className = 'community-friend-copy';
@@ -13718,15 +18317,184 @@ function renderCommunityFriends(friends = []) {
     likeButton.textContent = friend.likedByMe ? '已赞' : '点赞';
     likeButton.addEventListener('pointerdown', (event) => event.stopPropagation());
     likeButton.addEventListener('click', handleCommunityFriendAction);
+    const identityCardButton = document.createElement('button');
+    identityCardButton.className = 'community-friend-action';
+    identityCardButton.type = 'button';
+    identityCardButton.dataset.communityAction = 'identity-card';
+    identityCardButton.dataset.friendId = friend.feId;
+    identityCardButton.textContent = '身份卡';
+    identityCardButton.title = `展示 ${safeText(friend.username, friend.feId)} 的身份卡`;
+    identityCardButton.addEventListener('pointerdown', (event) => event.stopPropagation());
+    identityCardButton.addEventListener('click', handleCommunityFriendAction);
     actions.appendChild(messageButton);
     actions.appendChild(listenButton);
     actions.appendChild(likeButton);
+    actions.appendChild(identityCardButton);
 
     item.appendChild(avatar);
     item.appendChild(copy);
     item.appendChild(actions);
     els.communityFriendsList.appendChild(item);
   });
+}
+
+function normalizeCommunityFriendRequests(value = {}) {
+  const source = value && typeof value === 'object' ? value : {};
+  const normalizeList = (items, direction) => (Array.isArray(items) ? items : [])
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const id = safeText(item.id, '');
+      const fromId = safeText(item.from || item.sourceId || item.fromId, '');
+      const toId = safeText(item.to || item.targetId || item.toId, '');
+      if (!id || !fromId || !toId) return null;
+      const peer = direction === 'incoming'
+        ? (item.fromUser || item.source || {})
+        : (item.toUser || item.target || {});
+      return {
+        ...item,
+        id,
+        from: fromId,
+        to: toId,
+        peer: {
+          ...(peer && typeof peer === 'object' ? peer : {}),
+          feId: safeText(peer?.feId, direction === 'incoming' ? fromId : toId)
+        }
+      };
+    })
+    .filter(Boolean);
+  return {
+    incoming: normalizeList(source.incoming, 'incoming'),
+    outgoing: normalizeList(source.outgoing, 'outgoing')
+  };
+}
+
+function communityFriendRequestsSignature(requests = state.community.friendRequests) {
+  const normalized = normalizeCommunityFriendRequests(requests);
+  return JSON.stringify([
+    ...normalized.incoming.map((request) => ['in', request.id, request.from, request.createdAt || 0]),
+    ...normalized.outgoing.map((request) => ['out', request.id, request.to, request.createdAt || 0])
+  ]);
+}
+
+function renderCommunityFriendRequests(requests = state.community.friendRequests) {
+  if (!els.communityFriendRequests || !els.communityFriendRequestList) return;
+  const normalized = normalizeCommunityFriendRequests(requests);
+  const all = [
+    ...normalized.incoming.map((request) => ({ ...request, direction: 'incoming' })),
+    ...normalized.outgoing.map((request) => ({ ...request, direction: 'outgoing' }))
+  ];
+  state.community.friendRequests = normalized;
+  els.communityFriendRequests.hidden = !all.length;
+  if (els.communityFriendRequestsCount) {
+    els.communityFriendRequestsCount.textContent = String(normalized.incoming.length);
+    els.communityFriendRequestsCount.title = normalized.incoming.length
+      ? `${normalized.incoming.length} 个申请等待确认`
+      : '没有待确认申请';
+  }
+  clearElement(els.communityFriendRequestList);
+  all.forEach((request) => {
+    const peer = request.peer || {};
+    const row = document.createElement('article');
+    row.className = `community-friend-request is-${request.direction}`;
+
+    const avatar = document.createElement('button');
+    avatar.className = 'community-friend-request-avatar';
+    avatar.type = 'button';
+    avatar.dataset.communityProfileId = safeText(peer.feId, '');
+    avatar.setAttribute('aria-label', `查看 ${safeText(peer.username, peer.feId)} 的个人主页`);
+    const avatarUrl = communityAvatarUrl(peer);
+    if (avatarUrl) {
+      const image = document.createElement('img');
+      image.alt = '';
+      image.src = avatarUrl;
+      avatar.appendChild(image);
+    } else {
+      avatar.textContent = 'FE';
+    }
+
+    const copy = document.createElement('span');
+    copy.className = 'community-friend-request-copy';
+    const name = document.createElement('strong');
+    name.textContent = safeText(peer.username, `FE ${peer.feId || ''}`);
+    const meta = document.createElement('small');
+    meta.textContent = request.direction === 'incoming'
+      ? `${safeText(peer.feId, '')} · 请求添加你为好友`
+      : `${safeText(peer.feId, '')} · 等待对方确认`;
+    copy.append(name, meta);
+
+    row.append(avatar, copy);
+    if (request.direction === 'incoming') {
+      const actions = document.createElement('span');
+      actions.className = 'community-friend-request-actions';
+      const accept = document.createElement('button');
+      accept.type = 'button';
+      accept.className = 'is-primary';
+      accept.dataset.friendRequestId = request.id;
+      accept.dataset.friendRequestAccepted = 'true';
+      accept.textContent = '接受';
+      accept.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        respondCommunityFriendRequest(request.id, true);
+      });
+      const reject = document.createElement('button');
+      reject.type = 'button';
+      reject.dataset.friendRequestId = request.id;
+      reject.dataset.friendRequestAccepted = 'false';
+      reject.textContent = '忽略';
+      reject.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        respondCommunityFriendRequest(request.id, false);
+      });
+      actions.append(accept, reject);
+      row.appendChild(actions);
+    }
+    els.communityFriendRequestList.appendChild(row);
+  });
+}
+
+async function respondCommunityFriendRequest(requestId, accepted, options = {}) {
+  const id = safeText(requestId, '');
+  if (!id) {
+    if (options.throwOnError) throw new Error('好友申请标识无效');
+    return null;
+  }
+  const pending = normalizeCommunityFriendRequests(state.community.friendRequests)
+    .incoming.find((request) => request.id === id);
+  if (!pending) {
+    const error = new Error('该好友申请不在当前待确认列表中');
+    error.code = 'friend_request_not_pending';
+    if (options.throwOnError) throw error;
+    toast(error.message);
+    return null;
+  }
+  const buttons = els.communityFriendRequestList?.querySelectorAll(`[data-friend-request-id="${CSS.escape(id)}"]`) || [];
+  buttons.forEach((button) => { button.disabled = true; });
+  try {
+    const payload = await apiJson(`/api/community/friends/respond?${query({ provider: state.activeProvider })}`, {
+      method: 'POST',
+      body: JSON.stringify({ requestId: id, accepted: !!accepted })
+    });
+    if (!payload.ok) throw new Error(payload.error || '处理好友申请失败');
+    if (Array.isArray(payload.friends)) {
+      state.community.friends = payload.friends;
+      state.community.friendsSignature = '';
+      renderCommunityFriends(payload.friends);
+    }
+    state.community.friendRequests = normalizeCommunityFriendRequests(payload.friendRequests);
+    state.community.friendRequestsSignature = communityFriendRequestsSignature(state.community.friendRequests);
+    renderCommunityFriendRequests(state.community.friendRequests);
+    if (accepted) unlockAppAchievement('first-friend');
+    toast(accepted ? '已接受好友申请' : '已忽略好友申请');
+    scheduleCommunityRefresh(120);
+    return payload;
+  } catch (error) {
+    buttons.forEach((button) => { button.disabled = false; });
+    toast(error.message || '处理好友申请失败');
+    if (options.throwOnError) throw error;
+    return null;
+  }
 }
 
 function renderCommunityState(payload = {}) {
@@ -13736,30 +18504,80 @@ function renderCommunityState(payload = {}) {
   const account = payload.account || {};
   const profile = payload.profile || {};
   const friends = Array.isArray(payload.friends) ? payload.friends : [];
+  const requestPayloadPresent = Object.prototype.hasOwnProperty.call(payload, 'friendRequests');
   const displayName = safeText(profile.username || account.nickname || account.userId, '');
-  const serverFailed = payload.serverOnline === false || payload.ok === false;
+  const serverFailed = payload.serverOnline === false;
+  const requestFailed = payload.ok === false;
+  const providerError = safeText(payload.error, '');
+  const providerUnavailable = !serverFailed && !loggedIn && !!providerError;
+  const identityUnavailable = !serverFailed && loggedIn && requestFailed;
   const nextServerUrl = safeText(payload.serverUrl, '');
   if (nextServerUrl) state.community.serverUrl = nextServerUrl;
-  const hasCommunityIdentity = loggedIn && !serverFailed && !!profile.feId;
+  const hasCommunityIdentity = loggedIn && !serverFailed && !requestFailed && !!profile.feId;
+  const friendRequests = hasCommunityIdentity
+    ? normalizeCommunityFriendRequests(requestPayloadPresent ? payload.friendRequests : state.community.friendRequests)
+    : { incoming: [], outgoing: [] };
+  const nextLocalDataIdentity = loggedIn
+    ? communityBioIdentity(
+      state.community.serverUrl,
+      provider.id || payload.provider || state.activeProvider,
+      account,
+      profile
+    )
+    : '';
+  if (hasCommunityIdentity) {
+    const nextBioIdentity = nextLocalDataIdentity;
+    const identityChanged = nextBioIdentity !== state.community.profileBioIdentity;
+    if (identityChanged || document.activeElement !== els.communityProfileBio) {
+      syncCommunityBioIdentity(nextBioIdentity, profile);
+    }
+  } else if (!loggedIn) {
+    syncCommunityBioIdentity('', {});
+  }
   els.communityCard.classList.toggle('is-server-offline', serverFailed);
-  els.communityCard.dataset.serverState = serverFailed ? 'offline' : hasCommunityIdentity ? 'online' : 'login-required';
+  els.communityCard.dataset.serverState = serverFailed
+    ? 'offline'
+    : hasCommunityIdentity
+      ? 'online'
+      : identityUnavailable
+        ? 'identity-unavailable'
+        : providerUnavailable
+        ? 'provider-unavailable'
+        : 'login-required';
   const nextFriendsSignature = hasCommunityIdentity ? communityFriendsSignature(friends) : '';
+  const nextFriendRequestsSignature = hasCommunityIdentity
+    ? communityFriendRequestsSignature(friendRequests)
+    : '';
   state.community.profile = hasCommunityIdentity ? profile : null;
   state.community.friends = friends;
-  renderCommunityListeningStats(hasCommunityIdentity ? profile : null);
-  if (hasCommunityIdentity) {
-    const remoteBio = safeText(profile.bio, '').slice(0, 180);
-    if (remoteBio && remoteBio !== state.community.profileBio && document.activeElement !== els.communityProfileBio) {
-      state.community.profileBio = remoteBio;
-    }
+  state.community.friendRequests = friendRequests;
+  if (hasCommunityIdentity && (payload.mailbox || payload.mailboxUnreadCount != null || payload.unreadMailCount != null)) {
+    applyCommunityMailboxPayload(payload.mailbox || {
+      unreadCount: payload.mailboxUnreadCount ?? payload.unreadMailCount
+    });
+  } else if (!hasCommunityIdentity) {
+    state.community.mailbox.mails = [];
+    state.community.mailbox.unreadCount = 0;
+    updateCommunityMailboxUnreadDot();
   }
-
+  syncCommunityLocalStateIdentity(nextLocalDataIdentity);
+  const friendsWithOrnaments = friends.filter((friend) => (
+    friend && ('avatarOrnament' in friend || 'ornament' in friend)
+  ));
+  friendsWithOrnaments.forEach(rememberCommunityFriendOrnament);
+  if (friendsWithOrnaments.length) saveCommunityOrnamentCache();
+  mergeCommunityTogetherReport(
+    payload.togetherListeningReport || payload.listenReport || payload.report || {}
+  );
+  renderCommunityListeningStats(hasCommunityIdentity ? profile : null);
   if (els.communityName) {
     clearElement(els.communityName);
     els.communityName.classList.add('community-profile-name');
     const nameText = document.createElement('span');
     nameText.textContent = serverFailed
       ? '社区离线'
+      : providerUnavailable
+        ? `${provider.label}服务未就绪`
       : loggedIn
         ? displayName || `${provider.label}用户`
         : '登录后启用社区';
@@ -13770,6 +18588,10 @@ function renderCommunityState(payload = {}) {
   if (els.communityMeta) {
     els.communityMeta.textContent = serverFailed
       ? '服务器未启动或无法连接'
+      : identityUnavailable
+      ? providerError || '社区身份同步失败，正在自动重试'
+      : providerUnavailable
+      ? providerError
       : loggedIn
       ? `${provider.label} · ${safeText(profile.platformUserId || account.userId, '已登录')}`
       : '同步音乐平台账号';
@@ -13788,6 +18610,8 @@ function renderCommunityState(payload = {}) {
   if (els.loginCommunityId) els.loginCommunityId.textContent = hasCommunityIdentity ? `FE ID ${profile.feId}` : 'FE ID --------';
   if (els.communityStatus) {
     if (serverFailed) els.communityStatus.textContent = payload.error || '服务器连接失败';
+    else if (identityUnavailable) els.communityStatus.textContent = providerError || '社区身份同步失败，正在自动重试';
+    else if (providerUnavailable) els.communityStatus.textContent = '音乐平台服务正在恢复，社区会自动重连';
     else if (!loggedIn) els.communityStatus.textContent = '登录音乐平台后生成专属 8 位 ID';
     else els.communityStatus.textContent = '社区在线，好友状态实时同步';
   }
@@ -13801,11 +18625,22 @@ function renderCommunityState(payload = {}) {
   if (els.communityDndButton) els.communityDndButton.disabled = serverFailed;
   if (els.communityAvatar) els.communityAvatar.setAttribute('aria-disabled', String(serverFailed));
   renderCommunityAvatar(loggedIn ? { ...account, ...(hasCommunityIdentity ? profile : {}) } : {});
+  if (hasCommunityIdentity && window.feAchievements?.getEquippedOrnament) {
+    const localOrnament = currentAchievementOrnamentPayload();
+    const remoteOrnament = normalizeCommunityAvatarOrnament(profile.avatarOrnament || profile.ornament);
+    if (JSON.stringify(localOrnament) !== JSON.stringify(remoteOrnament)) {
+      scheduleCommunityAvatarOrnamentSync();
+    }
+  }
   renderCommunityDndButton();
   renderCommunityProfilePanel();
   if (state.community.friendsSignature !== nextFriendsSignature) {
     state.community.friendsSignature = nextFriendsSignature;
     renderCommunityFriends(hasCommunityIdentity ? friends : []);
+  }
+  if (state.community.friendRequestsSignature !== nextFriendRequestsSignature) {
+    state.community.friendRequestsSignature = nextFriendRequestsSignature;
+    renderCommunityFriendRequests(hasCommunityIdentity ? friendRequests : { incoming: [], outgoing: [] });
   }
   if (els.communityMessageButton) els.communityMessageButton.disabled = serverFailed || !hasCommunityIdentity || !friends.length;
   updateCommunityFriendListening(hasCommunityIdentity ? friends : []);
@@ -13818,47 +18653,149 @@ function renderCommunityState(payload = {}) {
     state.community.messageBubbleSeenReady = false;
     renderCommunityMessageBubbles();
   }
+  const communityProfileDetail = Object.freeze({
+    loggedIn,
+    hasCommunityIdentity,
+    provider: provider.id || payload.provider || state.activeProvider,
+    profile: hasCommunityIdentity ? Object.freeze({ ...profile }) : null,
+    account: loggedIn ? Object.freeze({ ...account }) : null,
+    isNewRegistration: payload.isNewRegistration === true
+      || payload.newRegistration === true
+      || profile.isNewRegistration === true,
+    registeredAt: safeText(profile.registeredAt, '')
+  });
+  window.__feMonsterCommunityProfileSnapshot = communityProfileDetail;
+  window.dispatchEvent(new CustomEvent('fe-monster-community-profile', {
+    detail: communityProfileDetail
+  }));
+}
+
+function communityStateNeedsRetry(payload = {}) {
+  if (payload.ok === false || payload.serverOnline === false) return true;
+  if (!payload.loggedIn) return loginStatusNeedsRetry(payload);
+  return !safeText(payload.profile?.feId, '');
 }
 
 async function refreshCommunityState(provider = state.activeProvider) {
   if (document.hidden || !els.communityCard) return null;
+  const requestGeneration = (Number(state.community.refreshGeneration) || 0) + 1;
+  state.community.refreshGeneration = requestGeneration;
+  state.community.lastProvider = provider;
+  const requestIsCurrent = () => (
+    requestGeneration === state.community.refreshGeneration
+    && provider === state.activeProvider
+  );
   if (state.community.loading) {
     state.community.refreshQueued = true;
+    if (!(Number(state.community.refreshQueuedDueAt) > 0)) {
+      state.community.refreshQueuedDueAt = performance.now();
+    }
+    state.community.refreshAbortController?.abort(
+      new DOMException('社区刷新已被新请求替代', 'AbortError')
+    );
     return null;
   }
   state.community.loading = true;
   state.community.refreshQueued = false;
-  state.community.lastProvider = provider;
+  state.community.refreshQueuedDueAt = 0;
+  const requestController = typeof AbortController === 'function'
+    ? new AbortController()
+    : null;
+  state.community.refreshAbortController = requestController;
   try {
-    const payload = await communityApiJson(`/api/community/state?${query({ provider })}`);
-    state.community.refreshRetryDelay = 1200;
-    renderCommunityState(payload);
+    const payload = await communityApiJson(`/api/community/state?${query({ provider })}`, {
+      signal: requestController?.signal,
+      timeoutMs: COMMUNITY_STATE_TIMEOUT_MS,
+      retryDelays: COMMUNITY_STATE_RETRY_DELAYS
+    });
+    if (!requestIsCurrent()) return null;
+    const retryPending = communityStateNeedsRetry(payload);
+    const retainLastGoodIdentity = payload.ok === false
+      && payload.loggedIn === true
+      && !!state.community.profile?.feId
+      && /too many requests|rate.?limit/i.test(safeText(payload.error, ''));
+    if (!retainLastGoodIdentity) renderCommunityState(payload);
+    if (retryPending) {
+      const retryDelay = clamp(state.community.refreshRetryDelay || 1200, 800, 15000);
+      state.community.refreshRetryDelay = Math.min(15000, Math.round(retryDelay * 1.6));
+      scheduleCommunityRefresh(
+        Math.round(retryDelay * (0.9 + Math.random() * 0.2)),
+        { backoff: true }
+      );
+    } else {
+      state.community.refreshRetryDelay = 1200;
+      state.community.refreshRetryNotBefore = 0;
+    }
     return payload;
   } catch (error) {
-    renderCommunityState({
-      ok: false,
-      loggedIn: state.loginLoggedIn,
-      provider,
-      error: error.message || '社区服务器未连接'
-    });
+    if (!requestIsCurrent()) return null;
+    const retainLastGoodIdentity = Number(error?.status) === 429
+      && state.loginLoggedIn
+      && !!state.community.profile?.feId;
+    if (!retainLastGoodIdentity) {
+      renderCommunityState({
+        ok: false,
+        loggedIn: state.loginLoggedIn,
+        provider,
+        error: error.message || '社区服务器未连接'
+      });
+    }
     const retryDelay = clamp(state.community.refreshRetryDelay || 1200, 1000, 15000);
     state.community.refreshRetryDelay = Math.min(15000, Math.round(retryDelay * 1.6));
-    scheduleCommunityRefresh(Math.round(retryDelay * (0.85 + Math.random() * 0.3)));
+    scheduleCommunityRefresh(
+      Math.round(retryDelay * (0.85 + Math.random() * 0.3)),
+      { backoff: true }
+    );
     return null;
   } finally {
+    if (state.community.refreshAbortController === requestController) {
+      state.community.refreshAbortController = null;
+    }
     state.community.loading = false;
     if (state.community.refreshQueued && !document.hidden) {
+      const queuedDueAt = Number(state.community.refreshQueuedDueAt) || performance.now();
       state.community.refreshQueued = false;
-      scheduleCommunityRefresh(40);
+      state.community.refreshQueuedDueAt = 0;
+      scheduleCommunityRefresh(Math.max(0, queuedDueAt - performance.now()));
     }
   }
 }
 
-function scheduleCommunityRefresh(delay = 400) {
+function scheduleCommunityRefresh(delay = 400, options = {}) {
+  const now = performance.now();
+  const requestedDueAt = now + Math.max(0, Number(delay) || 0);
+  if (options.backoff === true) {
+    state.community.refreshRetryNotBefore = Math.max(
+      Number(state.community.refreshRetryNotBefore) || 0,
+      requestedDueAt
+    );
+  }
+  const dueAt = Math.max(
+    requestedDueAt,
+    Number(state.community.refreshRetryNotBefore) || 0
+  );
+  if (state.community.loading) {
+    state.community.refreshQueued = true;
+    const queuedDueAt = Number(state.community.refreshQueuedDueAt) || 0;
+    state.community.refreshQueuedDueAt = queuedDueAt > 0
+      ? Math.min(queuedDueAt, dueAt)
+      : dueAt;
+    return;
+  }
+  const existingDueAt = Number(state.community.refreshTimerDueAt) || 0;
+  if (
+    state.community.refreshTimer
+    && existingDueAt > 0
+    && existingDueAt <= dueAt
+    && existingDueAt >= (Number(state.community.refreshRetryNotBefore) || 0)
+  ) return;
   window.clearTimeout(state.community.refreshTimer);
+  state.community.refreshTimerDueAt = dueAt;
   state.community.refreshTimer = window.setTimeout(() => {
+    state.community.refreshTimer = 0;
+    state.community.refreshTimerDueAt = 0;
     refreshCommunityState(state.activeProvider);
-  }, delay);
+  }, Math.max(0, dueAt - performance.now()));
 }
 
 function communityEventIdentityKey() {
@@ -13905,6 +18842,17 @@ function scheduleCommunityEventReconnect() {
   }, jitteredDelay);
 }
 
+function emitPetStreamState(streamState, detail = {}) {
+  window.dispatchEvent(new CustomEvent('fe-monster-pet-stream-state', {
+    detail: {
+      state: safeText(streamState, 'unknown'),
+      connected: state.community.eventConnected === true,
+      activityAt: Date.now(),
+      ...detail
+    }
+  }));
+}
+
 function touchCommunityEventStream() {
   state.community.eventLastActivityAt = performance.now();
   window.clearTimeout(state.community.eventHeartbeatTimer);
@@ -13912,6 +18860,7 @@ function touchCommunityEventStream() {
     checkCommunityEventHeartbeat,
     COMMUNITY_EVENT_HEARTBEAT_MS
   );
+  emitPetStreamState('connected');
 }
 
 function checkCommunityEventHeartbeat() {
@@ -13920,7 +18869,9 @@ function checkCommunityEventHeartbeat() {
   if (!state.community.eventSource || document.hidden) return;
   const idleFor = performance.now() - state.community.eventLastActivityAt;
   if (!state.community.eventLastActivityAt || idleFor >= COMMUNITY_EVENT_STALE_MS) {
+    emitPetStreamState('stale', { idleFor: Math.max(0, Math.round(idleFor || COMMUNITY_EVENT_STALE_MS)) });
     stopCommunityEventStream(false);
+    scheduleCommunitySceneDisconnectRestore();
     scheduleCommunityRefresh(80);
     if (state.community.eventKey || communityEventIdentityKey()) scheduleCommunityEventReconnect();
     return;
@@ -14033,11 +18984,13 @@ function ensureCommunityEventStream() {
       if (state.community.eventSource !== source) return;
       state.community.eventConnected = true;
       state.community.eventReconnectDelay = 1200;
+      clearCommunitySceneDisconnectRestore();
       touchCommunityEventStream();
     });
     source.addEventListener('community-ready', (event) => {
       if (state.community.eventSource !== source) return;
       state.community.eventConnected = true;
+      clearCommunitySceneDisconnectRestore();
       if (!state.community.eventHistoryCalibrated) {
         let ready = {};
         try {
@@ -14050,7 +19003,14 @@ function ensureCommunityEventStream() {
         state.community.eventHistoryCalibrated = true;
       }
       touchCommunityEventStream();
+      window.dispatchEvent(new CustomEvent('fe-monster-pet-stream-ready'));
       scheduleCommunityRefresh(80);
+    });
+    source.addEventListener('community-heartbeat', () => {
+      if (state.community.eventSource !== source) return;
+      state.community.eventConnected = true;
+      clearCommunitySceneDisconnectRestore();
+      touchCommunityEventStream();
     });
     source.addEventListener('community', (event) => {
       if (state.community.eventSource !== source) return;
@@ -14062,6 +19022,8 @@ function ensureCommunityEventStream() {
       source.close();
       state.community.eventSource = null;
       state.community.eventConnected = false;
+      emitPetStreamState('reconnecting');
+      scheduleCommunitySceneDisconnectRestore();
       scheduleCommunityRefresh(80);
       if (communityEventIdentityKey()) scheduleCommunityEventReconnect();
     });
@@ -14092,6 +19054,17 @@ function handleCommunityServerEvent(event) {
   if (ledgerChanged) saveCommunityHistoryLedger();
   if (duplicate && !historical) return;
 
+  window.dispatchEvent(new CustomEvent('fe-creative-community-event', {
+    detail: { ...envelope, historical }
+  }));
+
+  if (type.startsWith('pet.ai.')) {
+    window.dispatchEvent(new CustomEvent('fe-monster-pet-event', {
+      detail: { ...envelope, historical }
+    }));
+    return;
+  }
+
   if (type === 'message.sent') {
     const message = payload.message || {};
     const me = state.community.profile && state.community.profile.feId ? String(state.community.profile.feId) : '';
@@ -14113,6 +19086,23 @@ function handleCommunityServerEvent(event) {
   if (type === 'listen.sync') {
     if (historical) refreshCommunityListenState().catch(() => {});
     else applyCommunityListenSync(payload).catch(() => {});
+    scheduleCommunityRefresh(120);
+    return;
+  }
+
+  if (type === 'listen.scene') {
+    if (historical) {
+      refreshCommunityListenState().catch(() => {});
+    } else {
+      const session = payload.session || {};
+      const activeId = safeText(state.community.activeSession && state.community.activeSession.id, '');
+      const incomingId = safeText(session.id, '');
+      if (incomingId && (!activeId || activeId === incomingId)) {
+        beginCommunitySceneOverride(session);
+        state.community.activeSession = session;
+        applyCommunitySharedSceneSession(session).catch(() => {});
+      }
+    }
     scheduleCommunityRefresh(120);
     return;
   }
@@ -14153,7 +19143,7 @@ function handleCommunityServerEvent(event) {
   }
 
   if (type === 'update.available') {
-    if (!historical) showUpdateDialog(payload.release || {});
+    if (!historical) setAvailableClientUpdate(payload.release || {});
     return;
   }
 
@@ -14172,7 +19162,14 @@ function handleCommunityServerEvent(event) {
     return;
   }
 
-  if (type === 'friend.added' || type === 'like.added' || type === 'presence.updated' || type === 'profile.updated') {
+  if (
+    type === 'friend.added'
+    || type === 'friend.requested'
+    || type === 'friend.request.responded'
+    || type === 'like.added'
+    || type === 'presence.updated'
+    || type === 'profile.updated'
+  ) {
     scheduleCommunityRefresh(120);
   }
 }
@@ -14193,8 +19190,13 @@ async function addCommunityFriend(event) {
       method: 'POST',
       body: JSON.stringify({ targetId })
     });
-    if (!payload.ok) throw new Error(payload.error || '添加好友失败');
+    if (!payload.ok) throw new Error(payload.error || '发送好友申请失败');
     els.communitySearchInput.value = '';
+    if (payload.friendRequests) {
+      state.community.friendRequests = normalizeCommunityFriendRequests(payload.friendRequests);
+      state.community.friendRequestsSignature = communityFriendRequestsSignature(state.community.friendRequests);
+      renderCommunityFriendRequests(state.community.friendRequests);
+    }
     renderCommunityState({
       ok: true,
       loggedIn: true,
@@ -14202,10 +19204,16 @@ async function addCommunityFriend(event) {
       profile: state.community.profile || {},
       friends: Array.isArray(payload.friends) ? payload.friends : state.community.friends
     });
-    toast('好友已添加');
+    toast(
+      payload.status === 'friends'
+        ? '你们已经是好友'
+        : payload.status === 'incoming'
+          ? '对方已经发来申请，请在好友栏确认'
+          : '好友申请已发送，等待对方确认'
+    );
     scheduleCommunityRefresh(220);
   } catch (error) {
-    toast(error.message || '添加好友失败');
+    toast(error.message || '发送好友申请失败');
   } finally {
     els.communityAddButton.disabled = !(state.community.profile && state.community.profile.feId);
   }
@@ -14236,16 +19244,790 @@ function communityProfileDisplayName() {
 
 function renderCommunityProfileAvatar() {
   if (!els.communityProfileAvatar) return;
-  clearElement(els.communityProfileAvatar);
   const profile = state.community.profile || {};
-  const avatarUrl = communityAvatarUrl(profile);
-  if (avatarUrl) {
-    const image = document.createElement('img');
-    image.alt = '';
-    image.src = avatarUrl;
-    els.communityProfileAvatar.appendChild(image);
-  } else {
-    els.communityProfileAvatar.textContent = 'FE';
+  renderAvatarInto(
+    els.communityProfileAvatar,
+    profile,
+    currentCommunityAvatarOrnament(profile)
+  );
+}
+
+function formatCommunityReportDate(value) {
+  const timestamp = Number(value);
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return '最近一起听时间未知';
+  return new Date(timestamp).toLocaleString('zh-CN', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+}
+
+function communityTogetherPartners() {
+  return Object.values(normalizeCommunityTogetherReport(state.community.togetherReport).partners)
+    .sort((left, right) => (
+      right.totalMs - left.totalMs
+      || right.sessionCount - left.sessionCount
+      || right.lastListenedAt - left.lastListenedAt
+    ));
+}
+
+function renderCommunityListenReport() {
+  if (!els.communityListenReportList) return;
+  const partners = communityTogetherPartners();
+  const longest = partners[0] || null;
+  const totalMs = partners.reduce((sum, partner) => sum + partner.totalMs, 0);
+  const sessionCount = partners.reduce((sum, partner) => sum + partner.sessionCount, 0);
+  if (els.communityListenReportTotalTime) {
+    els.communityListenReportTotalTime.textContent = formatCommunityListeningDuration(totalMs);
+  }
+  if (els.communityListenReportSessions) {
+    els.communityListenReportSessions.textContent = `${sessionCount} 次`;
+  }
+  if (els.communityListenReportPartners) {
+    els.communityListenReportPartners.textContent = `${partners.length} 位`;
+  }
+  if (els.communityListenReportMeta) {
+    els.communityListenReportMeta.textContent = state.community.togetherReportLoading
+      ? '正在同步一起听记录'
+      : partners.length
+        ? `记录了 ${partners.length} 位好友的共同听歌时间`
+        : '邀请好友一起听后自动记录';
+  }
+  if (els.communityListenReportRefresh) {
+    els.communityListenReportRefresh.disabled = state.community.togetherReportLoading;
+    els.communityListenReportRefresh.textContent = state.community.togetherReportLoading ? '同步中' : '刷新';
+  }
+  if (els.communityListenReportLongestName) {
+    els.communityListenReportLongestName.textContent = longest
+      ? longest.username
+      : '还没有一起听记录';
+  }
+  if (els.communityListenReportLongestTime) {
+    els.communityListenReportLongestTime.textContent = longest
+      ? `${formatCommunityListeningDuration(longest.totalMs)} · ${longest.sessionCount} 次一起听`
+      : '邀请好友一起听后，这里会开始累计';
+  }
+  if (els.communityListenReportAvatar) {
+    renderAvatarInto(
+      els.communityListenReportAvatar,
+      longest || {},
+      communityFriendOrnament(longest || {})
+    );
+    if (longest?.feId) {
+      els.communityListenReportAvatar.dataset.communityProfileId = longest.feId;
+      els.communityListenReportAvatar.setAttribute('role', 'button');
+      els.communityListenReportAvatar.setAttribute('aria-label', `查看 ${longest.username} 的个人主页`);
+      els.communityListenReportAvatar.tabIndex = 0;
+    } else {
+      delete els.communityListenReportAvatar.dataset.communityProfileId;
+      els.communityListenReportAvatar.removeAttribute('role');
+      els.communityListenReportAvatar.removeAttribute('aria-label');
+      els.communityListenReportAvatar.removeAttribute('tabindex');
+    }
+  }
+
+  clearElement(els.communityListenReportList);
+  if (!partners.length) {
+    const empty = document.createElement('span');
+    empty.className = 'community-empty';
+    empty.textContent = '还没有一起听记录';
+    els.communityListenReportList.appendChild(empty);
+    return;
+  }
+  partners.forEach((partner) => {
+    const item = document.createElement('article');
+    item.className = 'community-listen-report-item';
+    item.dataset.friendId = partner.feId;
+
+    const avatar = document.createElement('span');
+    avatar.className = 'community-listen-report-item-avatar';
+    avatar.dataset.communityProfileId = partner.feId;
+    avatar.setAttribute('role', 'button');
+    avatar.setAttribute('aria-label', `查看 ${partner.username} 的个人主页`);
+    avatar.tabIndex = 0;
+    renderAvatarInto(avatar, partner, communityFriendOrnament(partner));
+
+    const copy = document.createElement('span');
+    copy.className = 'community-listen-report-item-copy';
+    const name = document.createElement('strong');
+    name.textContent = partner.username;
+    const meta = document.createElement('small');
+    meta.textContent = `${partner.sessionCount} 次 · ${formatCommunityReportDate(partner.lastListenedAt)}`;
+    copy.appendChild(name);
+    copy.appendChild(meta);
+
+    const duration = document.createElement('time');
+    duration.textContent = formatCommunityListeningDuration(partner.totalMs);
+    duration.dateTime = `PT${Math.max(0, Math.round(partner.totalMs / 1000))}S`;
+
+    item.appendChild(avatar);
+    item.appendChild(copy);
+    item.appendChild(duration);
+    els.communityListenReportList.appendChild(item);
+  });
+}
+
+async function refreshCommunityListenReport() {
+  if (state.community.togetherReportLoading) return;
+  const hasProfile = !!safeText(state.community.profile && state.community.profile.feId, '');
+  if (!hasProfile) {
+    renderCommunityListenReport();
+    return;
+  }
+  state.community.togetherReportLoading = true;
+  renderCommunityListenReport();
+  try {
+    const payload = await communityApiJson(
+      `/api/community/listen/report?${query({ provider: state.activeProvider })}`
+    );
+    mergeCommunityTogetherReport(
+      payload.togetherListeningReport || payload.report || payload
+    );
+  } catch (error) {
+    if (!communityTogetherPartners().length) {
+      toast(error.message || '一起听报告暂时无法同步');
+    }
+  } finally {
+    state.community.togetherReportLoading = false;
+    renderCommunityListenReport();
+  }
+}
+
+const COMMUNITY_MAILBOX_REWARD_TYPES = Object.freeze({
+  'avatar-ornament': Object.freeze({ label: '头像挂饰', action: 'profile' }),
+  'identity-card': Object.freeze({ label: '身份卡', action: 'identity-card' }),
+  badge: Object.freeze({ label: '社区徽章', action: 'profile' }),
+  points: Object.freeze({ label: '社区积分', action: 'profile' }),
+  'creative-work': Object.freeze({ label: '创作市场作品', action: 'work' }),
+  wallpaper: Object.freeze({ label: '壁纸作品', action: 'work' }),
+  'live-wallpaper': Object.freeze({ label: '实时壁纸', action: 'work' }),
+  music: Object.freeze({ label: '音乐作品', action: 'work' }),
+  cursor: Object.freeze({ label: '鼠标光标', action: 'work' }),
+  'cursor-trail': Object.freeze({ label: '鼠标尾迹', action: 'work' }),
+  character: Object.freeze({ label: '登录角色', action: 'work' }),
+  'login-character': Object.freeze({ label: '登录角色', action: 'work' }),
+  preset: Object.freeze({ label: '场景预设', action: 'work' }),
+  component: Object.freeze({ label: '场景组件', action: 'work' }),
+  achievement: Object.freeze({ label: '成就', action: 'achievement' }),
+  credits: Object.freeze({ label: '社区代币', action: 'profile' }),
+  vip: Object.freeze({ label: 'VIP 权益', action: 'profile' })
+});
+
+const COMMUNITY_MAILBOX_REWARD_ALIASES = Object.freeze({
+  ornament: 'avatar-ornament',
+  avatar_ornament: 'avatar-ornament',
+  avatarornament: 'avatar-ornament',
+  card: 'identity-card',
+  identity_card: 'identity-card',
+  work: 'creative-work',
+  creative_work: 'creative-work',
+  trail: 'cursor-trail',
+  cursor_trail: 'cursor-trail',
+  role: 'character'
+});
+
+function normalizeCommunityMailboxRewardType(value) {
+  const raw = safeText(value, '').toLowerCase().replace(/\s+/g, '-');
+  return COMMUNITY_MAILBOX_REWARD_ALIASES[raw] || raw;
+}
+
+function normalizeCommunityMailboxRegistry(value = {}) {
+  const entries = Array.isArray(value)
+    ? value.map((item) => [item?.type || item?.id, item])
+    : Object.entries(value && typeof value === 'object' ? value : {});
+  const registry = {};
+  entries.forEach(([rawType, definition]) => {
+    const type = normalizeCommunityMailboxRewardType(rawType);
+    if (!type) return;
+    registry[type] = {
+      type,
+      label: safeText(definition?.label || definition?.name, COMMUNITY_MAILBOX_REWARD_TYPES[type]?.label || type),
+      enabled: definition?.enabled !== false
+    };
+  });
+  return registry;
+}
+
+function normalizeCommunityMailboxAttachment(value = {}, index = 0) {
+  const source = value && typeof value === 'object' ? value : {};
+  const metadata = source.metadata && typeof source.metadata === 'object' && !Array.isArray(source.metadata)
+    ? source.metadata
+    : {};
+  const type = normalizeCommunityMailboxRewardType(source.type || source.kind || source.rewardType);
+  const staticDefinition = COMMUNITY_MAILBOX_REWARD_TYPES[type] || null;
+  const registryDefinition = state.community.mailbox.registry[type] || null;
+  return {
+    id: safeText(source.attachmentId || source.id, `attachment-${index + 1}`),
+    assetId: safeText(source.id || source.assetId || metadata.assetId, ''),
+    type,
+    label: safeText(source.label || source.name || source.title, registryDefinition?.label || staticDefinition?.label || type || '未知附件'),
+    description: safeText(source.description || source.text || source.summary, ''),
+    claimed: !!(source.claimed || source.claimedAt),
+    claimedAt: Math.max(0, Number(source.claimedAt) || 0),
+    workId: safeText(source.workId || source.itemId || metadata.workId || metadata.itemId || source.value?.workId, ''),
+    achievementId: safeText(source.achievementId || metadata.achievementId || source.value?.achievementId || source.value?.id, ''),
+    metadata: { ...metadata },
+    amount: Math.max(0, Number(source.quantity || source.amount || source.points || metadata.amount || source.value?.amount) || 0),
+    supported: !!staticDefinition && registryDefinition?.enabled !== false,
+    action: staticDefinition?.action || 'unsupported'
+  };
+}
+
+function normalizeCommunityMailboxMail(value = {}, index = 0) {
+  const source = value && typeof value === 'object' ? value : {};
+  const attachments = Array.isArray(source.attachments)
+    ? source.attachments
+    : Array.isArray(source.rewards)
+      ? source.rewards
+      : source.attachment
+        ? [source.attachment]
+        : [];
+  const expiresAt = Math.max(0, Number(source.expiresAt || source.expireAt) || 0);
+  const claimedAttachmentIds = new Set(
+    (Array.isArray(source.claimedAttachmentIds) ? source.claimedAttachmentIds : [])
+      .map((id) => safeText(id, ''))
+      .filter(Boolean)
+  );
+  const status = safeText(source.status, '').toLowerCase();
+  return {
+    id: safeText(source.id || source.mailId, `mail-${index + 1}`),
+    title: safeText(source.title || source.subject, '系统邮件'),
+    body: safeText(source.body || source.bodyPreview || source.text || source.content, ''),
+    createdAt: Math.max(0, Number(source.createdAt || source.sentAt) || 0),
+    expiresAt,
+    read: !!(source.read || source.readAt || ['read', 'claimed', 'partially-claimed', 'expired', 'revoked'].includes(status)),
+    readAt: Math.max(0, Number(source.readAt) || 0),
+    expired: !!source.expired || ['expired', 'revoked'].includes(status) || (expiresAt > 0 && expiresAt <= Date.now()),
+    attachments: attachments.map(normalizeCommunityMailboxAttachment).map((attachment) => ({
+      ...attachment,
+      claimed: attachment.claimed || claimedAttachmentIds.has(attachment.id)
+    }))
+  };
+}
+
+function communityMailboxAttachmentKey(mailId, attachmentId) {
+  return `${safeText(mailId, '')}:${safeText(attachmentId, '')}`;
+}
+
+function updateCommunityMailboxUnreadDot() {
+  const count = Math.max(0, Number(state.community.mailbox.unreadCount) || 0);
+  if (!els.communityMailboxUnreadDot) return;
+  els.communityMailboxUnreadDot.hidden = count < 1;
+  els.communityMailboxUnreadDot.setAttribute('aria-label', count ? `${count} 封未读邮件` : '没有未读邮件');
+  if (els.communityProfileMailboxTab) {
+    els.communityProfileMailboxTab.classList.toggle('has-unread', count > 0);
+    els.communityProfileMailboxTab.setAttribute('aria-label', count ? `邮箱，${count} 封未读邮件` : '邮箱');
+  }
+}
+
+function applyCommunityMailboxPayload(payload = {}) {
+  const mailbox = payload.mailbox && typeof payload.mailbox === 'object' ? payload.mailbox : payload;
+  const registry = mailbox.rewardRegistry || mailbox.registry || payload.rewardRegistry || payload.registry;
+  if (registry) state.community.mailbox.registry = normalizeCommunityMailboxRegistry(registry);
+  const mails = mailbox.mails || mailbox.messages || mailbox.items;
+  if (Array.isArray(mails)) state.community.mailbox.mails = mails.map(normalizeCommunityMailboxMail);
+  const singleMail = mailbox.mail || payload.mail;
+  if (singleMail && typeof singleMail === 'object') {
+    const normalizedMail = normalizeCommunityMailboxMail(singleMail);
+    const index = state.community.mailbox.mails.findIndex((mail) => mail.id === normalizedMail.id);
+    if (index >= 0) state.community.mailbox.mails[index] = normalizedMail;
+    else state.community.mailbox.mails.unshift(normalizedMail);
+  }
+  const computedUnread = state.community.mailbox.mails.filter((mail) => !mail.read).length;
+  state.community.mailbox.unreadCount = Math.max(0, Number(mailbox.unreadCount ?? payload.unreadCount) || computedUnread);
+  state.community.mailbox.lastError = '';
+  if (payload.profile && typeof payload.profile === 'object') {
+    state.community.profile = { ...(state.community.profile || {}), ...payload.profile };
+    renderCommunityAvatar(state.community.profile);
+    renderCommunityProfilePanel();
+  }
+  updateCommunityMailboxUnreadDot();
+}
+
+function communityMailboxTime(value) {
+  const timestamp = Number(value) || 0;
+  if (!timestamp) return '时间未知';
+  return new Date(timestamp).toLocaleString('zh-CN', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+function renderCommunityMailbox() {
+  if (!els.communityMailboxList) return;
+  const mailbox = state.community.mailbox;
+  els.communityMailboxList.setAttribute('aria-busy', String(!!mailbox.loading));
+  if (els.communityMailboxMeta) {
+    els.communityMailboxMeta.textContent = mailbox.loading
+      ? '正在同步系统邮件…'
+      : `${mailbox.mails.length} 封邮件 · ${mailbox.unreadCount} 封未读`;
+  }
+  if (els.communityMailboxStatus) els.communityMailboxStatus.textContent = mailbox.lastError || '';
+  clearElement(els.communityMailboxList);
+  if (!mailbox.mails.length) {
+    const empty = document.createElement('span');
+    empty.className = 'community-empty';
+    empty.textContent = mailbox.loading ? '正在读取社区邮箱' : '暂时没有系统邮件';
+    els.communityMailboxList.appendChild(empty);
+    return;
+  }
+  mailbox.mails.forEach((mail) => {
+    const article = document.createElement('article');
+    article.className = `community-mailbox-mail${mail.read ? ' is-read' : ' is-unread'}${mail.expired ? ' is-expired' : ''}`;
+    article.dataset.mailId = mail.id;
+    const head = document.createElement('header');
+    const copy = document.createElement('span');
+    const title = document.createElement('strong');
+    title.textContent = mail.title;
+    const time = document.createElement('time');
+    time.textContent = communityMailboxTime(mail.createdAt);
+    if (mail.createdAt) time.dateTime = new Date(mail.createdAt).toISOString();
+    copy.append(title, time);
+    const status = document.createElement('em');
+    status.textContent = mail.expired ? '已到期' : mail.read ? '已读' : '未读';
+    head.append(copy, status);
+    const body = document.createElement('p');
+    body.textContent = mail.body || '这封邮件没有正文。';
+    article.append(head, body);
+
+    if (mail.expiresAt) {
+      const expiry = document.createElement('small');
+      expiry.className = 'community-mailbox-expiry';
+      expiry.textContent = `${mail.expired ? '已于' : '有效期至'} ${communityMailboxTime(mail.expiresAt)}`;
+      article.appendChild(expiry);
+    }
+
+    if (mail.attachments.length) {
+      const attachments = document.createElement('div');
+      attachments.className = 'community-mailbox-attachments';
+      mail.attachments.forEach((attachment) => {
+        const applied = state.community.mailbox.appliedAttachments.has(
+          communityMailboxAttachmentKey(mail.id, attachment.id)
+        );
+        const item = document.createElement('section');
+        item.className = `community-mailbox-attachment${attachment.claimed ? ' is-claimed' : ''}${attachment.supported ? '' : ' is-unsupported'}`;
+        const itemCopy = document.createElement('span');
+        const name = document.createElement('strong');
+        name.textContent = attachment.label;
+        const description = document.createElement('small');
+        description.textContent = attachment.supported
+          ? (attachment.description || (attachment.amount ? `数量 ${attachment.amount}` : COMMUNITY_MAILBOX_REWARD_TYPES[attachment.type]?.label || attachment.type))
+          : `当前版本不支持附件类型：${attachment.type || 'unknown'}`;
+        itemCopy.append(name, description);
+        const claim = document.createElement('button');
+        claim.type = 'button';
+        claim.dataset.mailboxClaimMail = mail.id;
+        claim.dataset.mailboxClaimAttachment = attachment.id;
+        claim.disabled = !attachment.supported || applied || (mail.expired && !attachment.claimed);
+        claim.textContent = applied
+          ? '已领取并应用'
+          : attachment.claimed
+            ? '已领取，重新应用'
+            : mail.expired
+            ? '已到期'
+            : attachment.supported
+              ? '领取并应用'
+              : '版本不支持';
+        item.append(itemCopy, claim);
+        attachments.appendChild(item);
+      });
+      article.appendChild(attachments);
+    }
+
+    if (!mail.read) {
+      const read = document.createElement('button');
+      read.className = 'community-mailbox-read-button';
+      read.type = 'button';
+      read.dataset.mailboxRead = mail.id;
+      read.textContent = '标记已读';
+      article.appendChild(read);
+    }
+    els.communityMailboxList.appendChild(article);
+  });
+}
+
+async function refreshCommunityMailbox() {
+  if (state.community.mailbox.loading) return;
+  if (!safeText(state.community.profile?.feId, '')) {
+    state.community.mailbox.lastError = '登录音乐账号后启用社区邮箱';
+    renderCommunityMailbox();
+    return;
+  }
+  state.community.mailbox.loading = true;
+  state.community.mailbox.lastError = '';
+  renderCommunityMailbox();
+  try {
+    const payload = await communityApiJson(`/api/community/mailbox?${query({ provider: state.activeProvider })}`);
+    if (payload.ok === false) throw new Error(payload.error || '邮箱同步失败');
+    applyCommunityMailboxPayload(payload);
+  } catch (error) {
+    state.community.mailbox.lastError = error.message || '邮箱同步失败';
+  } finally {
+    state.community.mailbox.loading = false;
+    renderCommunityMailbox();
+  }
+}
+
+async function markCommunityMailboxRead(mailId) {
+  const id = safeText(mailId, '');
+  if (!id) return;
+  try {
+    const payload = await apiJson(`/api/community/mailbox/read?${query({ provider: state.activeProvider })}`, {
+      method: 'POST',
+      body: JSON.stringify({ mailId: id })
+    });
+    if (payload.ok === false) throw new Error(payload.error || '标记已读失败');
+    const local = state.community.mailbox.mails.find((mail) => mail.id === id);
+    if (local) local.read = true;
+    applyCommunityMailboxPayload(payload);
+    state.community.mailbox.unreadCount = state.community.mailbox.mails.filter((mail) => !mail.read).length;
+    updateCommunityMailboxUnreadDot();
+    renderCommunityMailbox();
+  } catch (error) {
+    state.community.mailbox.lastError = error.message || '标记已读失败';
+    renderCommunityMailbox();
+  }
+}
+
+async function applyCommunityMailboxReward(attachment, payload = {}) {
+  const definition = COMMUNITY_MAILBOX_REWARD_TYPES[attachment.type];
+  if (!definition) throw new Error(`当前版本不支持 ${attachment.type || 'unknown'} 奖励`);
+  const grant = payload.grant && typeof payload.grant === 'object' ? payload.grant : {};
+  const grantMetadata = grant.metadata && typeof grant.metadata === 'object' && !Array.isArray(grant.metadata)
+    ? grant.metadata
+    : {};
+  if (definition.action === 'work') {
+    const workId = safeText(
+      grant.workId
+        || grant.creativeWork?.id
+        || grant.work?.id
+        || grantMetadata.workId
+        || payload.work?.id
+        || payload.item?.id
+        || payload.application?.workId
+        || attachment.workId
+        || attachment.assetId,
+      ''
+    );
+    if (!/^[A-Za-z0-9._~-]{1,120}$/.test(workId)) throw new Error('奖励作品标识无效，已停止应用');
+    if (!window.FeCreativeCommunity?.installWorkById) throw new Error('创作市场模块尚未就绪，请稍后再试');
+    await window.FeCreativeCommunity.installWorkById(workId);
+    return;
+  }
+  if (definition.action === 'achievement') {
+    const achievementId = safeText(
+      grant.achievementId
+        || grant.achievement?.id
+        || grantMetadata.achievementId
+        || payload.achievement?.id
+        || payload.application?.achievementId
+        || attachment.achievementId
+        || attachment.assetId,
+      ''
+    );
+    if (!/^[a-z0-9][a-z0-9._-]{0,79}$/i.test(achievementId)) throw new Error('成就标识无效，已停止应用');
+    unlockAppAchievement(achievementId, { source: 'community-mailbox' });
+    return;
+  }
+  if (definition.action === 'identity-card') {
+    await window.FeMonsterIdentityCard?.refresh?.({ suppressAnnouncement: true });
+    return;
+  }
+  const grantedProfile = grant.profile && typeof grant.profile === 'object' ? grant.profile : payload.profile;
+  if (grantedProfile && typeof grantedProfile === 'object') {
+    state.community.profile = { ...(state.community.profile || {}), ...grantedProfile };
+  }
+  const balances = grant.balances && typeof grant.balances === 'object' ? grant.balances : payload.balances;
+  if (balances && typeof balances === 'object') {
+    if (!state.community.profile || typeof state.community.profile !== 'object') state.community.profile = {};
+    const points = Number(balances.points);
+    const credits = Number(balances.credits);
+    if (Number.isFinite(points) && points >= 0) state.community.profile.points = points;
+    if (Number.isFinite(credits) && credits >= 0) state.community.profile.credits = credits;
+    const vipUntil = Number(balances.vipUntil);
+    if (Number.isFinite(vipUntil) && vipUntil >= 0) {
+      state.community.profile.vip = {
+        active: vipUntil > Date.now(),
+        level: Math.max(0, Number(state.community.profile.vip?.level) || 1),
+        expiresAt: vipUntil
+      };
+    }
+  }
+  if (grant.badge && typeof grant.badge === 'object') {
+    state.community.profile.certification = {
+      id: safeText(grant.badge.id, 'mail-reward'),
+      label: safeText(grant.badge.label || grant.badge.name, '社区徽章'),
+      level: Math.max(1, Math.min(3, Number(grant.badge.level) || 1))
+    };
+  }
+  if (grant.avatarOrnament && typeof grant.avatarOrnament === 'object') {
+    state.community.profile.avatarOrnament = normalizeCommunityAvatarOrnament(grant.avatarOrnament);
+  }
+  if (grant.vip && typeof grant.vip === 'object') {
+    if (!state.community.profile || typeof state.community.profile !== 'object') state.community.profile = {};
+    state.community.profile.vip = {
+      active: grant.vip.active !== false,
+      level: Math.max(0, Number(grant.vip.level) || 0),
+      expiresAt: Math.max(0, Number(grant.vip.expiresAt) || 0)
+    };
+  }
+  renderCommunityAvatar(state.community.profile || {});
+  renderCommunityProfilePanel();
+  scheduleCommunityRefresh(120);
+}
+
+function resolveCommunityMailboxRewardAnimations(attachment, payload = {}) {
+  const grant = payload.grant && typeof payload.grant === 'object' ? payload.grant : {};
+  const byAttachment = grant.attachmentAnimations && typeof grant.attachmentAnimations === 'object'
+    ? grant.attachmentAnimations[attachment.id]
+    : null;
+  const animations = byAttachment && typeof byAttachment === 'object' ? byAttachment : grant;
+  return {
+    mailAnimation: animations.mailAnimation && typeof animations.mailAnimation === 'object'
+      ? animations.mailAnimation
+      : null,
+    claimAnimation: animations.claimAnimation && typeof animations.claimAnimation === 'object'
+      ? animations.claimAnimation
+      : null,
+    displayAnimation: animations.displayAnimation && typeof animations.displayAnimation === 'object'
+      ? animations.displayAnimation
+      : null
+  };
+}
+
+async function playCommunityMailboxRewardSequence(attachment, payload = {}) {
+  const animations = resolveCommunityMailboxRewardAnimations(attachment, payload);
+  const runtime = window.FeMonsterRewardRuntime;
+  if (!runtime?.play) return { status: 'unavailable' };
+  const task = runtime.play({
+    attachmentId: attachment.id,
+    itemType: attachment.type,
+    itemId: attachment.assetId,
+    label: attachment.label,
+    ...animations
+  });
+  const started = await task.started;
+  if (started?.status === 'cancelled' || started?.status === 'failed') return started;
+  return task.finished;
+}
+
+async function claimCommunityMailboxAttachment(mailId, attachmentId) {
+  const id = safeText(mailId, '');
+  const rewardId = safeText(attachmentId, '');
+  const mail = state.community.mailbox.mails.find((item) => item.id === id);
+  const attachment = mail?.attachments.find((item) => item.id === rewardId);
+  if (!mail || !attachment || (mail.expired && !attachment.claimed)) return;
+  if (!attachment.supported) {
+    toast('当前版本不支持此附件，未执行领取或应用');
+    return;
+  }
+  const button = els.communityMailboxList?.querySelector(
+    `[data-mailbox-claim-mail="${CSS.escape(id)}"][data-mailbox-claim-attachment="${CSS.escape(rewardId)}"]`
+  );
+  if (button) button.disabled = true;
+  try {
+    const payload = await apiJson(`/api/community/mailbox/claim?${query({ provider: state.activeProvider })}`, {
+      method: 'POST',
+      body: JSON.stringify({ mailId: id, attachmentId: rewardId })
+    });
+    if (payload.ok === false) throw new Error(payload.error || '领取附件失败');
+    attachment.claimed = true;
+    attachment.claimedAt = Date.now();
+    applyCommunityMailboxPayload(payload);
+    await applyCommunityMailboxReward(attachment, payload);
+    await playCommunityMailboxRewardSequence(attachment, payload);
+    state.community.mailbox.appliedAttachments.add(communityMailboxAttachmentKey(id, rewardId));
+    renderCommunityMailbox();
+    toast(payload.duplicate || payload.alreadyClaimed ? '附件此前已领取，状态已同步' : `${attachment.label} 已领取并应用`);
+  } catch (error) {
+    attachment.claimed = attachment.claimed || !!state.community.mailbox.mails
+      .find((item) => item.id === id)?.attachments
+      .find((item) => item.id === rewardId)?.claimed;
+    if (button?.isConnected) button.disabled = false;
+    state.community.mailbox.lastError = error.message || '领取附件失败';
+    renderCommunityMailbox();
+    toast(state.community.mailbox.lastError);
+  }
+}
+
+function handleCommunityMailboxClick(event) {
+  const claim = event.target.closest('[data-mailbox-claim-mail][data-mailbox-claim-attachment]');
+  if (claim) {
+    event.preventDefault();
+    claimCommunityMailboxAttachment(claim.dataset.mailboxClaimMail, claim.dataset.mailboxClaimAttachment);
+    return;
+  }
+  const read = event.target.closest('[data-mailbox-read]');
+  if (read) {
+    event.preventDefault();
+    markCommunityMailboxRead(read.dataset.mailboxRead);
+  }
+}
+
+function renderCommunityOrnaments() {
+  if (!els.communityOrnamentList) return;
+  const api = window.feAchievements;
+  const ornaments = Array.isArray(api?.ornaments) ? api.ornaments : [];
+  const ornamentState = api?.getOrnamentState?.() || {
+    claimed: {},
+    equipped: { achievementId: null, changedAt: 0 }
+  };
+  const equipped = api?.getEquippedOrnament?.() || null;
+  const unlockedCount = ornaments.filter((ornament) => api?.isUnlocked?.(ornament.achievementId)).length;
+  const claimedCount = ornaments.filter((ornament) => api?.isOrnamentClaimed?.(ornament.achievementId)).length;
+
+  if (els.communityOrnamentMeta) {
+    els.communityOrnamentMeta.textContent = ornaments.length
+      ? `已领取 ${claimedCount} / ${unlockedCount} · 完成成就后点击成就领取`
+      : '正在读取成就挂饰';
+  }
+  if (els.communityOrnamentEquippedName) {
+    els.communityOrnamentEquippedName.textContent = equipped?.name || '尚未佩戴挂饰';
+  }
+  if (els.communityOrnamentEquippedMeta) {
+    els.communityOrnamentEquippedMeta.textContent = equipped
+      ? '已佩戴到社区头像，并同步展示给好友'
+      : '佩戴后所有好友都能在社区头像上看到';
+  }
+  if (els.communityOrnamentUnequip) {
+    els.communityOrnamentUnequip.hidden = !equipped;
+    els.communityOrnamentUnequip.disabled = !equipped;
+  }
+  if (els.communityOrnamentPreviewAvatar) {
+    const profile = state.community.profile || {};
+    renderAvatarInto(
+      els.communityOrnamentPreviewAvatar,
+      profile,
+      equipped ? { ...equipped, equippedAt: ornamentState.equipped?.changedAt } : null
+    );
+  }
+
+  clearElement(els.communityOrnamentList);
+  if (!ornaments.length) {
+    const loading = document.createElement('span');
+    loading.className = 'community-empty';
+    loading.textContent = '正在读取成就挂饰';
+    els.communityOrnamentList.appendChild(loading);
+    return;
+  }
+
+  ornaments.forEach((ornament) => {
+    const unlocked = !!api.isUnlocked?.(ornament.achievementId);
+    const claimed = !!api.isOrnamentClaimed?.(ornament.achievementId);
+    const isEquipped = ornamentState.equipped?.achievementId === ornament.achievementId;
+    const item = document.createElement('article');
+    item.className = 'community-ornament-item';
+    item.classList.toggle('is-locked', !unlocked);
+    item.classList.toggle('is-equipped', isEquipped);
+    item.style.setProperty('--ornament-accent', ornament.accent);
+
+    const preview = document.createElement('span');
+    preview.className = 'community-ornament-item-preview';
+    preview.textContent = 'FE';
+    applyCommunityAvatarOrnament(preview, ornament);
+
+    const copy = document.createElement('span');
+    copy.className = 'community-ornament-item-copy';
+    const name = document.createElement('strong');
+    name.textContent = ornament.name;
+    const meta = document.createElement('small');
+    meta.textContent = !unlocked
+      ? '对应成就尚未完成'
+      : claimed
+        ? (isEquipped ? '正在社区头像上展示' : '已领取，可直接佩戴')
+        : '点击已完成的成就领取';
+    copy.appendChild(name);
+    copy.appendChild(meta);
+
+    const action = document.createElement('button');
+    action.className = `community-ornament-action${isEquipped ? ' is-equipped' : ''}`;
+    action.type = 'button';
+    action.dataset.ornamentAchievementId = ornament.achievementId;
+    action.dataset.ornamentAction = !claimed ? 'claim' : 'equip';
+    action.disabled = !unlocked || isEquipped;
+    action.textContent = !unlocked ? '未完成' : !claimed ? '领取' : isEquipped ? '佩戴中' : '佩戴';
+
+    item.appendChild(preview);
+    item.appendChild(copy);
+    item.appendChild(action);
+    els.communityOrnamentList.appendChild(item);
+  });
+}
+
+function handleCommunityOrnamentAction(event) {
+  const button = event.target.closest('[data-ornament-action]');
+  if (!button || !window.feAchievements) return;
+  const achievementId = safeText(button.dataset.ornamentAchievementId, '');
+  const action = button.dataset.ornamentAction;
+  const changed = action === 'claim'
+    ? window.feAchievements.claimOrnament(achievementId)
+    : window.feAchievements.equipOrnament(achievementId);
+  if (!changed) return;
+  const ornament = window.feAchievements.ornaments.find(
+    (item) => item.achievementId === achievementId
+  );
+  toast(action === 'claim'
+    ? `已领取：${safeText(ornament?.name, '成就挂饰')}`
+    : `已佩戴：${safeText(ornament?.name, '成就挂饰')}`);
+}
+
+function handleAchievementOrnamentClaim(event) {
+  const node = event.target.closest('.community-achievement-node[data-achievement-id]');
+  if (!node || !window.feAchievements) return;
+  const achievementId = safeText(node.dataset.achievementId, '');
+  if (!window.feAchievements.isUnlocked?.(achievementId)) return;
+  if (!window.feAchievements.claimOrnament?.(achievementId)) return;
+  const ornament = window.feAchievements.ornaments.find(
+    (item) => item.achievementId === achievementId
+  );
+  toast(`成就挂饰已领取：${safeText(ornament?.name, '专属挂饰')}`);
+}
+
+async function syncCommunityAvatarOrnament() {
+  state.community.ornamentSyncTimer = 0;
+  if (state.community.ornamentSyncPending) return;
+  const profile = state.community.profile || {};
+  if (!profile.feId) return;
+  state.community.ornamentSyncPending = true;
+  const ornament = currentAchievementOrnamentPayload();
+  try {
+    const payload = await apiJson(`/api/community/profile?${query({ provider: state.activeProvider })}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        bio: state.community.profileBio || safeText(profile.bio, ''),
+        avatarOrnament: ornament || {}
+      })
+    });
+    if (payload.profile) state.community.profile = payload.profile;
+    scheduleCommunityRefresh(180);
+  } catch (error) {
+    toast('挂饰已在本机佩戴，好友展示将在社区恢复后同步');
+  } finally {
+    state.community.ornamentSyncPending = false;
+  }
+}
+
+function scheduleCommunityAvatarOrnamentSync() {
+  window.clearTimeout(state.community.ornamentSyncTimer);
+  state.community.ornamentSyncTimer = window.setTimeout(syncCommunityAvatarOrnament, 180);
+}
+
+function handleCommunityOrnamentChange(event = {}) {
+  const reason = safeText(event.detail && event.detail.reason, '');
+  renderCommunityAvatar(state.community.profile || {});
+  renderCommunityProfileAvatar();
+  renderCommunityOrnaments();
+  if (
+    reason === 'equip'
+    || reason === 'unequip'
+    || reason === 'hydrate'
+    || reason === 'server-merge'
+  ) {
+    scheduleCommunityAvatarOrnamentSync();
   }
 }
 
@@ -14256,10 +20038,30 @@ function renderCommunityProfilePanel() {
   if (els.communityProfileTitle) {
     els.communityProfileTitle.textContent = state.community.profilePage === 'nearby'
       ? '社区集体'
-      : state.community.profilePage === 'market' ? '预设市场' : '个人资料';
+      : state.community.profilePage === 'report'
+        ? '一起听报告'
+      : state.community.profilePage === 'market'
+        ? '创作市场'
+        : state.community.profilePage === 'square'
+          ? '社交广场'
+          : state.community.profilePage === 'mailbox'
+            ? '社区邮箱'
+          : state.community.profilePage === 'viewer'
+            ? '个人主页'
+        : state.community.profilePage === 'achievement'
+          ? '成就'
+          : state.community.profilePage === 'ornament' ? '头像挂饰' : '个人资料';
   }
   if (els.communityProfileMeta) {
-    els.communityProfileMeta.textContent = hasProfile ? `FE ID ${profile.feId}` : '登录音乐账号后启用社区资料';
+    els.communityProfileMeta.textContent = state.community.profilePage === 'achievement'
+      ? '本机冒险进度 · 不依赖社区登录'
+      : state.community.profilePage === 'ornament'
+        ? '成就专属装饰 · 好友可见'
+        : state.community.profilePage === 'report'
+          ? '共同听歌时间与历史好友'
+          : state.community.profilePage === 'mailbox'
+            ? '系统邮件与安全奖励附件'
+          : hasProfile ? `FE ID ${profile.feId}` : '登录音乐账号后启用社区资料';
   }
   if (els.communityProfileDisplayName) els.communityProfileDisplayName.textContent = communityProfileDisplayName();
   if (els.communityProfileId) els.communityProfileId.textContent = hasProfile ? `FE ID ${profile.feId}` : 'FE ID --------';
@@ -14274,51 +20076,162 @@ function renderCommunityProfilePanel() {
   }
   if (els.communityProfileSave) els.communityProfileSave.disabled = !hasProfile || state.community.profileSaving;
   renderCommunityProfileAvatar();
+  if (state.community.profileOpen && state.community.profilePage === 'report') {
+    renderCommunityListenReport();
+  }
+  if (state.community.profileOpen && state.community.profilePage === 'ornament') {
+    renderCommunityOrnaments();
+  }
+  if (state.community.profileOpen && state.community.profilePage === 'mailbox') {
+    renderCommunityMailbox();
+  }
   setCommunityProfilePage(state.community.profilePage, { refresh: false });
   setCommunityFloatingPanelPosition('profile');
 }
 
+let communityProfileReturnFocus = null;
+
 function setCommunityProfilePage(page = 'self', options = {}) {
-  const nextPage = ['nearby', 'market'].includes(page) ? page : 'self';
+  const previousPage = state.community.profilePage;
+  const nextPage = ['self', 'nearby', 'report', 'market', 'square', 'mailbox', 'viewer', 'achievement', 'ornament'].includes(page)
+    ? page
+    : 'self';
   state.community.profilePage = nextPage;
-  const isNearby = nextPage === 'nearby';
-  const isMarket = nextPage === 'market';
-  if (els.communityProfileSelfTab) els.communityProfileSelfTab.classList.toggle('is-active', !isNearby && !isMarket);
-  if (els.communityProfileGroupTab) els.communityProfileGroupTab.classList.toggle('is-active', isNearby);
-  if (els.communityProfileMarketTab) els.communityProfileMarketTab.classList.toggle('is-active', isMarket);
-  if (els.communityProfileSelfTab) els.communityProfileSelfTab.setAttribute('aria-selected', String(!isNearby && !isMarket));
-  if (els.communityProfileGroupTab) els.communityProfileGroupTab.setAttribute('aria-selected', String(isNearby));
-  if (els.communityProfileMarketTab) els.communityProfileMarketTab.setAttribute('aria-selected', String(isMarket));
-  if (els.communityProfileSelfPage) {
-    els.communityProfileSelfPage.hidden = isNearby || isMarket;
-    els.communityProfileSelfPage.classList.toggle('is-active', !isNearby && !isMarket);
+  const pageBindings = [
+    ['self', els.communityProfileSelfTab, els.communityProfileSelfPage],
+    ['nearby', els.communityProfileGroupTab, els.communityProfileNearbyPage],
+    ['report', els.communityProfileReportTab, els.communityProfileReportPage],
+    ['market', els.communityProfileMarketTab, els.communityProfileMarketPage],
+    ['square', els.communityProfileSquareTab, els.communityProfileSquarePage],
+    ['mailbox', els.communityProfileMailboxTab, els.communityProfileMailboxPage],
+    ['viewer', null, els.communityProfileViewerPage],
+    ['achievement', els.communityProfileAchievementTab, els.communityProfileAchievementPage],
+    ['ornament', els.communityProfileOrnamentTab, els.communityProfileOrnamentPage]
+  ];
+  pageBindings.forEach(([name, tab, pageElement]) => {
+    const selected = name === nextPage;
+    if (tab) {
+      tab.classList.toggle('is-active', selected);
+      tab.setAttribute('aria-selected', String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+    }
+    if (pageElement) {
+      pageElement.hidden = !selected;
+      pageElement.classList.toggle('is-active', selected);
+    }
+  });
+  if (els.communityProfilePanel) {
+    els.communityProfilePanel.classList.toggle('is-achievement-page', nextPage === 'achievement');
+    els.communityProfilePanel.classList.toggle('is-ornament-page', nextPage === 'ornament');
   }
-  if (els.communityProfileNearbyPage) {
-    els.communityProfileNearbyPage.hidden = !isNearby;
-    els.communityProfileNearbyPage.classList.toggle('is-active', isNearby);
-  }
-  if (els.communityProfileMarketPage) {
-    els.communityProfileMarketPage.hidden = !isMarket;
-    els.communityProfileMarketPage.classList.toggle('is-active', isMarket);
-  }
+  [
+    [els.communityReportButton, 'report'],
+    [els.communityMarketButton, 'market'],
+    [els.communityAchievementButton, 'achievement'],
+    [els.communityOrnamentButton, 'ornament']
+  ].forEach(([button, name]) => {
+    if (button) {
+      button.setAttribute(
+        'aria-expanded',
+        String(state.community.profileOpen && nextPage === name)
+      );
+    }
+  });
   if (els.communityProfileTitle) {
-    els.communityProfileTitle.textContent = isNearby ? '社区集体' : isMarket ? '创作市场' : '个人资料';
+    els.communityProfileTitle.textContent = {
+      self: '个人资料',
+      nearby: '社区集体',
+      report: '一起听报告',
+      market: '创作市场',
+      square: '社交广场',
+      mailbox: '社区邮箱',
+      viewer: '个人主页',
+      achievement: '成就',
+      ornament: '头像挂饰'
+    }[nextPage];
   }
-  if (isNearby && options.refresh !== false) refreshCommunityNearby().catch(() => {});
-  if (isMarket && options.refresh !== false) refreshPresetMarket().catch(() => {});
+  if (els.communityProfileMeta) {
+    const profile = state.community.profile || {};
+    els.communityProfileMeta.textContent = {
+      achievement: '本机冒险进度 · 不依赖社区登录',
+      ornament: '成就专属装饰 · 好友可见',
+      report: '共同听歌时间与历史好友',
+      mailbox: '系统邮件与安全奖励附件'
+    }[nextPage] || (profile.feId ? `FE ID ${profile.feId}` : '登录音乐账号后启用社区资料');
+  }
+  if (nextPage === 'nearby' && options.refresh !== false) refreshCommunityNearby().catch(() => {});
+  if (nextPage === 'report' && options.refresh !== false) refreshCommunityListenReport().catch(() => {});
+  if (nextPage === 'market' && options.refresh !== false) {
+    if (window.FeCreativeCommunity?.openMarket) window.FeCreativeCommunity.openMarket();
+    else refreshPresetMarket().catch(() => {});
+  }
+  if (nextPage === 'square' && options.refresh !== false) window.FeCreativeCommunity?.openSquare?.();
+  if (nextPage === 'mailbox' && options.refresh !== false) refreshCommunityMailbox().catch(() => {});
+  if (nextPage === 'viewer') window.FeCreativeCommunity?.renderViewer?.();
+  if (
+    nextPage === 'achievement'
+    && (previousPage !== 'achievement' || !els.communityAchievementGrid?.childElementCount)
+  ) {
+    window.feAchievements?.render?.();
+  }
+  if (nextPage === 'ornament') renderCommunityOrnaments();
+  if (state.community.profileOpen) {
+    setCommunityFloatingPanelPosition('profile');
+    if (previousPage !== nextPage && options.animate !== false) {
+      const activePage = pageBindings.find(([name]) => name === nextPage)?.[2];
+      playCommunityEntrance(activePage, 'page');
+    }
+  }
 }
 
 function setCommunityProfileOpen(open, page = state.community.profilePage) {
   if (!els.communityProfileDialog) return;
+  const wasOpen = state.community.profileOpen;
+  if (open && !wasOpen) {
+    communityProfileReturnFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+  }
   state.community.profileOpen = !!open;
   els.communityProfileDialog.hidden = !state.community.profileOpen;
-  if (els.communityMarketButton) {
-    els.communityMarketButton.setAttribute('aria-expanded', String(state.community.profileOpen && page === 'market'));
-  }
+  [
+    [els.communityReportButton, 'report'],
+    [els.communityMarketButton, 'market'],
+    [els.communityAchievementButton, 'achievement'],
+    [els.communityOrnamentButton, 'ornament']
+  ].forEach(([button, name]) => {
+    if (button) {
+      button.setAttribute('aria-expanded', String(state.community.profileOpen && page === name));
+    }
+  });
   if (state.community.profileOpen) {
-    setCommunityProfilePage(page, { refresh: page === 'nearby' || page === 'market' });
+    scheduleCommunityRefresh(0);
+    setCommunityProfilePage(page, {
+      refresh: ['nearby', 'report', 'market', 'square', 'mailbox'].includes(page),
+      animate: wasOpen
+    });
     renderCommunityProfilePanel();
-    if (els.communityProfileBio && page === 'self') els.communityProfileBio.focus();
+    if (!wasOpen) {
+      const selectedTab = [
+        els.communityProfileSelfTab,
+        els.communityProfileGroupTab,
+        els.communityProfileSquareTab,
+        els.communityProfileReportTab,
+        els.communityProfileMarketTab,
+        els.communityProfileAchievementTab,
+        els.communityProfileOrnamentTab
+      ].find((tab) => tab?.getAttribute('aria-selected') === 'true');
+      playCommunityEntrance(els.communityProfilePanel, 'panel');
+      window.setTimeout(() => selectedTab?.focus({ preventScroll: true }), 0);
+    }
+  } else if (wasOpen) {
+    const returnFocus = communityProfileReturnFocus;
+    communityProfileReturnFocus = null;
+    window.setTimeout(() => {
+      if (returnFocus instanceof HTMLElement && returnFocus.isConnected) {
+        returnFocus.focus({ preventScroll: true });
+      }
+    }, 0);
   }
 }
 
@@ -14336,6 +20249,7 @@ async function saveCommunityProfileBio() {
     if (!payload.ok) throw new Error(payload.error || '保存个人资料失败');
     if (payload.profile) state.community.profile = payload.profile;
     if (els.communityProfileStatus) els.communityProfileStatus.textContent = '个人描述已保存';
+    if (bio) unlockAppAchievement('bio-written');
     toast('个人资料已保存');
     scheduleCommunityRefresh(220);
   } catch (error) {
@@ -14373,6 +20287,10 @@ function renderCommunityNearby(users = state.community.nearbyUsers) {
     item.className = 'community-nearby-item';
     const avatar = document.createElement('span');
     avatar.className = 'community-friend-avatar';
+    avatar.dataset.communityProfileId = safeText(user.feId, '');
+    avatar.setAttribute('role', 'button');
+    avatar.setAttribute('aria-label', `查看 ${safeText(user.username, user.feId)} 的个人主页`);
+    avatar.tabIndex = 0;
     const avatarUrl = communityAvatarUrl(user);
     if (avatarUrl) {
       const image = document.createElement('img');
@@ -14382,6 +20300,7 @@ function renderCommunityNearby(users = state.community.nearbyUsers) {
     } else {
       avatar.textContent = 'FE';
     }
+    applyCommunityAvatarOrnament(avatar, communityFriendOrnament(user));
     const copy = document.createElement('span');
     copy.className = 'community-nearby-copy';
     const name = document.createElement('strong');
@@ -14450,6 +20369,10 @@ function marketItemPreviewUrl(item = {}) {
 }
 
 function renderPresetMarket() {
+  if (window.FeCreativeCommunity?.renderMarket) {
+    window.FeCreativeCommunity.renderMarket();
+    return;
+  }
   if (!els.communityMarketList) return;
   clearElement(els.communityMarketList);
   els.communityMarketList.setAttribute('aria-busy', String(state.community.marketLoading));
@@ -14539,6 +20462,9 @@ function renderPresetMarket() {
 }
 
 async function refreshPresetMarket() {
+  if (window.FeCreativeCommunity?.refreshMarket) {
+    return window.FeCreativeCommunity.refreshMarket();
+  }
   window.clearTimeout(state.community.marketRefreshTimer);
   state.community.marketRefreshTimer = 0;
   state.community.marketLoading = true;
@@ -14561,6 +20487,10 @@ async function refreshPresetMarket() {
 }
 
 function schedulePresetMarketRefresh() {
+  if (window.FeCreativeCommunity?.handleSearch) {
+    window.FeCreativeCommunity.handleSearch(state.community.marketQuery);
+    return;
+  }
   window.clearTimeout(state.community.marketRefreshTimer);
   state.community.marketRefreshTimer = window.setTimeout(() => {
     refreshPresetMarket().catch(() => {});
@@ -14834,6 +20764,75 @@ function communityMessageKey(message = {}) {
   ])}`;
 }
 
+async function addCommunityFriendById(targetId) {
+  const id = safeText(targetId, '').trim();
+  if (!/^\d{8}$/.test(id)) throw new Error('请输入有效的 8 位 FE ID');
+  const mine = safeText(state.community.profile?.feId, '');
+  if (!mine) throw new Error('请先登录音乐账号后再添加好友');
+  if (id === mine) throw new Error('不能添加自己为好友');
+  const payload = await apiJson(`/api/community/friends/add?${query({ provider: state.activeProvider })}`, {
+    method: 'POST',
+    body: JSON.stringify({ targetId: id })
+  });
+  if (!payload.ok) throw new Error(payload.error || '发送好友申请失败');
+  if (Array.isArray(payload.friends)) {
+    state.community.friends = payload.friends;
+    state.community.friendsSignature = '';
+    renderCommunityFriends(state.community.friends);
+  }
+  if (payload.friendRequests) {
+    state.community.friendRequests = normalizeCommunityFriendRequests(payload.friendRequests);
+    state.community.friendRequestsSignature = communityFriendRequestsSignature(state.community.friendRequests);
+    renderCommunityFriendRequests(state.community.friendRequests);
+  }
+  scheduleCommunityRefresh(220);
+  return payload;
+}
+
+async function installCreativeMarketCursor(file) {
+  if (!(file instanceof Blob)) throw new Error('光标作品文件无效');
+  const normalizedPng = await normalizeCursorImport(file);
+  const name = safeText(file.name, 'creative-market-cursor.png');
+  const payload = await apiJson(`/api/user-cursors/import?${query({ name })}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'image/png',
+      'X-FE-Monster-Cursor': '1'
+    },
+    body: normalizedPng
+  });
+  const id = safeText(payload.cursor?.id, '').toLowerCase();
+  if (!USER_CURSOR_ID_PATTERN.test(id)) throw new Error('光标服务返回了无效标识');
+  await refreshUserCursors();
+  setCursorPreferences({ skin: `user:${id}` });
+  return payload.cursor;
+}
+
+async function prepareCreativeMarketCursor(file) {
+  const normalizedPng = await normalizeCursorImport(file);
+  const sourceName = safeText(file?.name, 'creative-market-cursor').replace(/\.[^.]+$/, '');
+  return new File([normalizedPng], `${sourceName || 'creative-market-cursor'}.png`, {
+    type: 'image/png',
+    lastModified: Date.now()
+  });
+}
+
+async function installCreativeMarketWallpaper(file) {
+  if (!(file instanceof Blob)) throw new Error('壁纸作品文件无效');
+  await importWallpaperFiles([file]);
+  const installed = wallpaperById(state.activeWallpaperId);
+  if (installed) selectWallpaper(installed.id);
+  return installed || null;
+}
+
+function installCreativeMarketTrail(config) {
+  const installed = window.FeCursorTrails?.installCustom?.(config);
+  if (!installed) throw new Error('尾迹参数无效或无法保存');
+  syncCustomCursorTrailOption();
+  setCursorPreferences({ trail: 'custom' });
+  return installed;
+}
+
 function dedupeCommunityMessages(messages = []) {
   const seen = new Set();
   return (Array.isArray(messages) ? messages : []).filter((message) => {
@@ -14963,6 +20962,10 @@ async function pollCommunityMessageBubbles() {
   const me = state.community.profile && state.community.profile.feId ? String(state.community.profile.feId) : '';
   const friends = state.community.friends.filter((friend) => friend && friend.feId).slice(0, 8);
   if (!me || !friends.length) return;
+  if (state.community.eventConnected && state.community.eventHistoryCalibrated) {
+    state.community.messageBubbleSeenReady = true;
+    return;
+  }
   if (
     !state.community.messageBubbleSeenReady &&
     !state.community.eventHistoryCalibrated &&
@@ -15002,26 +21005,466 @@ async function pollCommunityMessageBubbles() {
   if (ledgerChanged) saveCommunityHistoryLedger();
 }
 
-function setCommunityMessageOpen(open) {
-  if (!els.communityMessageDialog) return;
-  els.communityMessageDialog.hidden = !open;
-  if (open) setCommunityFloatingPanelPosition('message');
-  if (!open) {
-    window.clearInterval(state.community.messageTimer);
-    state.community.messageTimer = 0;
+function communityMessageWallpaperUrl(wallpaper = {}) {
+  const kind = safeText(wallpaper?.kind, 'image');
+  if (kind === 'web') return safeText(wallpaper?.entryUrl || wallpaper?.previewUrl, '');
+  return sceneWallpaperTextureUrl(wallpaper);
+}
+
+function communityMessageWallpaperKind(wallpaper = {}, fallback = 'image') {
+  const kind = safeText(wallpaper?.kind, fallback);
+  if (kind === 'video' || kind === 'web') return kind;
+  return 'image';
+}
+
+function communityMessageWallpaperChoices() {
+  const seen = new Set();
+  return state.wallpapers
+    .filter((wallpaper) => {
+      const id = safeText(wallpaper?.id, '');
+      if (
+        !id
+        || seen.has(id)
+        || wallpaper?.source !== 'wallpaper-engine'
+        || !communityMessageWallpaperUrl(wallpaper)
+      ) return false;
+      seen.add(id);
+      return true;
+    })
+    .sort((left, right) => (
+      Number(right?.active === true) - Number(left?.active === true)
+      || safeText(left?.name, '').localeCompare(safeText(right?.name, ''), 'zh-CN')
+    ));
+}
+
+function communityMessageBackgroundDescriptor() {
+  const setting = normalizeCommunityMessageBackground(state.community.messageBackground);
+  state.community.messageBackground = setting;
+  const requestedId = setting.followWallpaperEngine
+    ? state.wallpaperEngineActiveId || setting.wallpaperId
+    : setting.wallpaperId;
+  const wallpaper = wallpaperById(requestedId);
+  const directWallpaperUrl = communityMessageWallpaperUrl(wallpaper);
+  const wallpaperUrl = sceneWallpaperRuntimeUrl(
+    wallpaper,
+    directWallpaperUrl || (wallpaper ? '' : setting.wallpaperUrl)
+  );
+  return {
+    ...setting,
+    wallpaperId: safeText(requestedId, setting.wallpaperId),
+    wallpaperUrl,
+    wallpaperName: safeText(wallpaper?.name || setting.wallpaperName, '聊天背景'),
+    mediaKind: communityMessageWallpaperKind(wallpaper, setting.mediaKind),
+    unsupported: !!wallpaper && !directWallpaperUrl
+  };
+}
+
+function communityMessageBackgroundLiveRefreshActive() {
+  if (!els.communityMessageDialog || els.communityMessageDialog.hidden) return false;
+  if (state.community.messageBackgroundMenuOpen) return true;
+  const setting = normalizeCommunityMessageBackground(state.community.messageBackground);
+  return setting.enabled === true && setting.followWallpaperEngine === true;
+}
+
+function releaseCommunityMessageBackgroundMedia() {
+  const image = els.communityMessageWallpaperImage;
+  const video = els.communityMessageWallpaperVideo;
+  const frame = els.communityMessageWallpaperWebFrame;
+  if (image) {
+    image.hidden = true;
+    if (image.hasAttribute('src')) image.removeAttribute('src');
+  }
+  if (video) {
+    window.FeWallpaperVideoContinuity?.release?.(video);
+    video.hidden = true;
+    video.pause();
+    if (video.hasAttribute('src')) {
+      video.removeAttribute('src');
+      video.load();
+    }
+    delete video.dataset.activeSrc;
+  }
+  if (frame) {
+    frame.hidden = true;
+    if (frame.dataset.activeSrc) frame.src = 'about:blank';
+    delete frame.dataset.activeSrc;
+  }
+  if (els.communityMessageWallpaperSurface) {
+    els.communityMessageWallpaperSurface.hidden = true;
+    delete els.communityMessageWallpaperSurface.dataset.mediaSignature;
+  }
+  els.communityMessageStage?.classList.remove('is-wallpaper');
+}
+
+function syncCommunityMessageBackground() {
+  if (!els.communityMessageStage || !els.communityMessageWallpaperSurface) return;
+  const descriptor = communityMessageBackgroundDescriptor();
+  const messageOpen = !!(els.communityMessageDialog && !els.communityMessageDialog.hidden);
+  if (!messageOpen || !descriptor.enabled || !descriptor.wallpaperUrl) {
+    releaseCommunityMessageBackgroundMedia();
+    if (els.communityMessageBackgroundStatus && !state.community.messageBackgroundMenuOpen) {
+      els.communityMessageBackgroundStatus.textContent = descriptor.enabled
+        ? descriptor.unsupported
+          ? '当前壁纸缺少可用预览，等待切换'
+          : '等待 Wallpaper Engine 返回可用壁纸'
+        : '默认消息背景';
+    }
+    return;
+  }
+
+  const signature = `${descriptor.mediaKind}:${descriptor.wallpaperUrl}`;
+  if (els.communityMessageWallpaperSurface.dataset.mediaSignature !== signature) {
+    releaseCommunityMessageBackgroundMedia();
+    els.communityMessageWallpaperSurface.dataset.mediaSignature = signature;
+    if (descriptor.mediaKind === 'video' && els.communityMessageWallpaperVideo) {
+      const video = els.communityMessageWallpaperVideo;
+      window.FeWallpaperVideoContinuity?.prepare(video);
+      video.dataset.activeSrc = descriptor.wallpaperUrl;
+      video.src = descriptor.wallpaperUrl;
+      video.hidden = false;
+      video.load();
+    } else if (descriptor.mediaKind === 'web' && els.communityMessageWallpaperWebFrame) {
+      const frame = els.communityMessageWallpaperWebFrame;
+      frame.dataset.activeSrc = descriptor.wallpaperUrl;
+      frame.src = descriptor.wallpaperUrl;
+      frame.hidden = false;
+    } else if (els.communityMessageWallpaperImage) {
+      els.communityMessageWallpaperImage.src = descriptor.wallpaperUrl;
+      els.communityMessageWallpaperImage.hidden = false;
+    }
+  }
+
+  els.communityMessageWallpaperSurface.hidden = false;
+  els.communityMessageStage.classList.add('is-wallpaper');
+  if (descriptor.mediaKind === 'video') {
+    els.communityMessageWallpaperVideo?.play().catch(() => {});
+  }
+  if (els.communityMessageBackgroundStatus) {
+    els.communityMessageBackgroundStatus.textContent = descriptor.followWallpaperEngine
+      ? `跟随当前 · ${descriptor.wallpaperName}`
+      : `正在使用 · ${descriptor.wallpaperName}`;
   }
 }
 
-async function openCommunityMessages(friendId = '') {
-  const friend = communityFriendById(friendId) || state.community.friends.find((item) => item && item.feId);
-  if (!friend) {
-    toast('暂无好友可发送消息');
+async function updateCommunityProfileData(argumentsValue = {}) {
+  const args = petAssistantArguments(argumentsValue);
+  if (!safeText(state.community.profile?.feId, '')) {
+    const error = new Error('请先登录社区后再修改个人资料');
+    error.code = 'login_required';
+    throw error;
+  }
+  const body = {};
+  const previousBio = state.community.profileBio;
+  const previousOrnamentId = safeText(
+    window.feAchievements?.getOrnamentState?.().equipped?.achievementId,
+    ''
+  );
+  const restoreLocalProfileState = () => {
+    if (args.bio !== undefined) saveCommunityBioLocal(previousBio);
+    if (args.avatarOrnament === undefined && args.ornament === undefined) return;
+    const currentId = safeText(window.feAchievements?.getOrnamentState?.().equipped?.achievementId, '');
+    if (currentId === previousOrnamentId) return;
+    if (previousOrnamentId) window.feAchievements?.equipOrnament?.(previousOrnamentId);
+    else window.feAchievements?.unequipOrnament?.();
+  };
+  try {
+  if (args.bio !== undefined) {
+    body.bio = safeText(args.bio, '').trim().slice(0, 180);
+    saveCommunityBioLocal(body.bio);
+  }
+  if (args.avatarOrnament !== undefined || args.ornament !== undefined) {
+    const requested = safeText(args.avatarOrnament ?? args.ornament, '');
+    if (!window.feAchievements) throw new Error('成就挂饰模块尚未就绪');
+    if (requested) {
+      const ornament = window.feAchievements.ornaments?.find((item) => (
+        safeText(item.achievementId || item.id, '') === requested
+      ));
+      if (!ornament) throw new Error('只能佩戴客户端已注册的成就挂饰');
+      const current = window.feAchievements.getOrnamentState?.();
+      if (current?.equipped?.achievementId !== ornament.achievementId) {
+        if (!window.feAchievements.equipOrnament?.(ornament.achievementId)) {
+          throw new Error('该挂饰尚未领取，不能佩戴');
+        }
+      }
+    } else {
+      window.feAchievements.unequipOrnament?.();
+    }
+    body.avatarOrnament = currentAchievementOrnamentPayload() || {};
+  }
+  if (!Object.keys(body).length) throw new Error('请提供 bio 或 avatarOrnament');
+  const payload = await apiJson(`/api/community/profile?${query({ provider: state.activeProvider })}`, {
+    method: 'POST',
+    body: JSON.stringify(body)
+  });
+  if (!payload.ok) throw new Error(payload.error || '保存个人资料失败');
+  if (payload.profile) state.community.profile = payload.profile;
+  renderCommunityProfilePanel();
+  scheduleCommunityRefresh(220);
+  return payload.profile || { ...state.community.profile };
+  } catch (error) {
+    restoreLocalProfileState();
+    renderCommunityProfilePanel();
+    throw error;
+  }
+}
+
+function appendCommunityMessageBackgroundChoice({
+  mode,
+  wallpaper = null,
+  title,
+  meta,
+  kind,
+  selected = false
+}) {
+  if (!els.communityMessageBackgroundChoices) return;
+  const button = document.createElement('button');
+  button.className = 'community-message-background-choice';
+  button.classList.toggle('is-active', selected);
+  button.type = 'button';
+  button.dataset.communityMessageBackgroundMode = mode;
+  if (wallpaper?.id) button.dataset.wallpaperId = safeText(wallpaper.id, '');
+  button.setAttribute('role', 'option');
+  button.setAttribute('aria-selected', String(selected));
+
+  const thumb = document.createElement('span');
+  thumb.className = 'community-message-background-choice-thumb';
+  const thumbnailUrl = sceneWallpaperRuntimeUrl(
+    wallpaper,
+    safeText(wallpaper?.previewUrl || (wallpaper?.kind === 'image' ? wallpaper?.url : ''), '')
+  );
+  if (thumbnailUrl) {
+    const image = document.createElement('img');
+    image.alt = '';
+    image.loading = 'lazy';
+    image.decoding = 'async';
+    image.src = thumbnailUrl;
+    thumb.appendChild(image);
+  } else {
+    thumb.textContent = mode === 'none' ? '默认' : 'WE';
+  }
+
+  const copy = document.createElement('span');
+  copy.className = 'community-message-background-choice-copy';
+  const heading = document.createElement('strong');
+  heading.textContent = title;
+  const detail = document.createElement('small');
+  detail.textContent = meta;
+  copy.appendChild(heading);
+  copy.appendChild(detail);
+
+  const type = document.createElement('span');
+  type.className = 'community-message-background-choice-kind';
+  type.textContent = kind;
+  button.appendChild(thumb);
+  button.appendChild(copy);
+  button.appendChild(type);
+  els.communityMessageBackgroundChoices.appendChild(button);
+}
+
+function renderCommunityMessageBackgroundChoices() {
+  if (!els.communityMessageBackgroundChoices) return;
+  const setting = normalizeCommunityMessageBackground(state.community.messageBackground);
+  const descriptor = communityMessageBackgroundDescriptor();
+  const activeWallpaper = wallpaperById(state.wallpaperEngineActiveId);
+  clearElement(els.communityMessageBackgroundChoices);
+  appendCommunityMessageBackgroundChoice({
+    mode: 'none',
+    title: '默认消息背景',
+    meta: '恢复聊天窗口原有背景',
+    kind: '默认',
+    selected: !setting.enabled
+  });
+  appendCommunityMessageBackgroundChoice({
+    mode: 'follow',
+    wallpaper: activeWallpaper,
+    title: '跟随 Wallpaper Engine 当前壁纸',
+    meta: activeWallpaper
+      ? safeText(activeWallpaper.name, '已识别当前壁纸')
+      : '等待识别当前正在播放的壁纸',
+    kind: '实时',
+    selected: setting.enabled && setting.followWallpaperEngine
+  });
+  const kindLabels = { image: '图片', video: '动态', web: '网页', scene: '场景预览' };
+  const wallpapers = communityMessageWallpaperChoices();
+  wallpapers.forEach((wallpaper) => {
+    appendCommunityMessageBackgroundChoice({
+      mode: 'wallpaper',
+      wallpaper,
+      title: safeText(wallpaper.name, 'Wallpaper Engine 壁纸'),
+      meta: `${wallpaper.active === true ? '当前播放 · ' : ''}Wallpaper Engine`,
+      kind: kindLabels[safeText(wallpaper.kind, 'image')] || '壁纸',
+      selected: setting.enabled
+        && !setting.followWallpaperEngine
+        && String(setting.wallpaperId) === String(wallpaper.id)
+    });
+  });
+  if (!wallpapers.length) {
+    const empty = document.createElement('span');
+    empty.className = 'community-empty';
+    empty.setAttribute('role', 'status');
+    empty.textContent = state.community.messageBackgroundCatalogError
+      ? 'Wallpaper Engine 壁纸读取失败，可点击刷新重试'
+      : '暂未识别到可用于聊天背景的 Wallpaper Engine 壁纸';
+    els.communityMessageBackgroundChoices.appendChild(empty);
+  }
+  if (els.communityMessageBackgroundStatus) {
+    els.communityMessageBackgroundStatus.textContent = state.sceneWallpaperCatalogLoading
+      ? '正在读取 Wallpaper Engine 壁纸…'
+      : state.community.messageBackgroundCatalogError
+        ? state.community.messageBackgroundCatalogError
+        : descriptor.unsupported
+          ? '当前壁纸缺少可用预览，等待 Wallpaper Engine 切换'
+      : descriptor.enabled && descriptor.wallpaperUrl
+        ? `${descriptor.followWallpaperEngine ? '跟随当前' : '已选择'} · ${descriptor.wallpaperName}`
+        : descriptor.enabled
+          ? '等待 Wallpaper Engine 返回可用壁纸'
+          : '默认消息背景';
+  }
+}
+
+function setCommunityMessageBackgroundMenuOpen(open) {
+  const nextOpen = !!open;
+  state.community.messageBackgroundMenuOpen = nextOpen;
+  if (els.communityMessageBackgroundMenu) els.communityMessageBackgroundMenu.hidden = !nextOpen;
+  if (els.communityMessageBackgroundButton) {
+    els.communityMessageBackgroundButton.setAttribute('aria-expanded', String(nextOpen));
+  }
+  if (nextOpen) {
+    renderCommunityMessageBackgroundChoices();
+    void refreshSceneWallpaperCatalog({ force: true, live: true });
+  }
+  syncSceneWallpaperLiveRefresh();
+}
+
+function selectCommunityMessageBackground(mode, wallpaperId = '') {
+  if (mode === 'none') {
+    state.community.messageBackground = normalizeCommunityMessageBackground({ enabled: false });
+    saveCommunityMessageBackground();
+    syncCommunityMessageBackground();
+    renderCommunityMessageBackgroundChoices();
+    toast('已恢复默认聊天背景');
+    return true;
+  }
+
+  const wallpaper = mode === 'follow'
+    ? wallpaperById(state.wallpaperEngineActiveId)
+    : wallpaperById(wallpaperId);
+  if (mode !== 'follow' && (!wallpaper || wallpaper.source !== 'wallpaper-engine')) {
+    toast('这张 Wallpaper Engine 壁纸暂时不可用');
+    return false;
+  }
+  const previous = normalizeCommunityMessageBackground(state.community.messageBackground);
+  state.community.messageBackground = normalizeCommunityMessageBackground({
+    enabled: true,
+    followWallpaperEngine: mode === 'follow',
+    wallpaperId: safeText(wallpaper?.id, mode === 'follow' ? previous.wallpaperId : ''),
+    wallpaperUrl: communityMessageWallpaperUrl(wallpaper)
+      || (mode === 'follow' && !wallpaper ? previous.wallpaperUrl : ''),
+    wallpaperName: safeText(wallpaper?.name, mode === 'follow' ? 'Wallpaper Engine 当前壁纸' : '聊天背景'),
+    mediaKind: communityMessageWallpaperKind(wallpaper, previous.mediaKind)
+  });
+  saveCommunityMessageBackground();
+  syncCommunityMessageBackground();
+  renderCommunityMessageBackgroundChoices();
+  syncSceneWallpaperLiveRefresh();
+  toast(mode === 'follow' ? '聊天背景将实时跟随 Wallpaper Engine' : '聊天背景已更换');
+  return true;
+}
+
+function handleCommunityMessageBackgroundChoice(event) {
+  const choice = event.target.closest('[data-community-message-background-mode]');
+  if (!choice || !els.communityMessageBackgroundChoices?.contains(choice)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const applied = selectCommunityMessageBackground(
+    choice.dataset.communityMessageBackgroundMode,
+    choice.dataset.wallpaperId || ''
+  );
+  if (applied) setCommunityMessageBackgroundMenuOpen(false);
+}
+
+function normalizeCommunityMessagePeer(value = {}) {
+  const source = typeof value === 'string' || typeof value === 'number'
+    ? { feId: value }
+    : value && typeof value === 'object' ? value : {};
+  const feId = safeText(source.feId || source.id, '');
+  if (!/^\d{8}$/.test(feId)) return null;
+  return {
+    ...source,
+    feId,
+    username: safeText(source.username || source.name, `FE ${feId}`),
+    avatarUrl: communityAvatarUrl(source)
+  };
+}
+
+function communityMessagePeerById(feId) {
+  const targetId = safeText(feId, '');
+  if (!targetId) return null;
+  const local = communityFriendById(targetId)
+    || state.community.nearbyUsers.find((user) => String(user?.feId) === targetId)
+    || (String(state.community.selectedMessagePeer?.feId) === targetId
+      ? state.community.selectedMessagePeer
+      : null);
+  return normalizeCommunityMessagePeer(local || targetId);
+}
+
+async function resolveCommunityMessagePeer(target = '') {
+  const direct = normalizeCommunityMessagePeer(target);
+  const requestedId = direct?.feId || safeText(target, '');
+  if (!requestedId) return normalizeCommunityMessagePeer(state.community.friends.find((friend) => friend?.feId));
+  const local = communityMessagePeerById(requestedId);
+  const directHasProfile = direct && safeText(
+    typeof target === 'object' ? target?.username || target?.name : '',
+    ''
+  );
+  if (directHasProfile) return { ...local, ...direct };
+  if (local && !local.username.startsWith('FE ')) return local;
+  try {
+    const payload = await apiJson(`/api/community/user?${query({ provider: state.activeProvider, id: requestedId })}`);
+    return normalizeCommunityMessagePeer(payload.user || payload.profile || local || requestedId);
+  } catch (error) {
+    return local || normalizeCommunityMessagePeer(requestedId);
+  }
+}
+
+function setCommunityMessageOpen(open) {
+  if (!els.communityMessageDialog) return;
+  const wasHidden = els.communityMessageDialog.hidden;
+  els.communityMessageDialog.hidden = !open;
+  if (open) {
+    setCommunityFloatingPanelPosition('message');
+    if (wasHidden) playCommunityEntrance(els.communityMessagePanel, 'panel');
+    syncCommunityMessageBackground();
+    if (
+      state.community.messageBackground.enabled
+      && (
+        state.community.messageBackground.followWallpaperEngine
+        || !state.wallpaperEngineCatalogLoaded
+      )
+    ) {
+      void refreshSceneWallpaperCatalog({ force: true, live: true });
+    }
+  }
+  if (!open) {
+    setCommunityMessageBackgroundMenuOpen(false);
+    releaseCommunityMessageBackgroundMedia();
+    window.clearInterval(state.community.messageTimer);
+    state.community.messageTimer = 0;
+  }
+  syncSceneWallpaperLiveRefresh();
+}
+
+async function openCommunityMessages(target = '') {
+  const peer = await resolveCommunityMessagePeer(target);
+  if (!peer) {
+    toast('请选择要私信的社区用户');
     return;
   }
-  state.community.selectedFriendId = friend.feId;
-  dismissCommunityMessageBubbleByFriend(friend.feId);
-  if (els.communityMessageTitle) els.communityMessageTitle.textContent = safeText(friend.username, `FE ${friend.feId}`);
-  if (els.communityMessageMeta) els.communityMessageMeta.textContent = `FE ID ${friend.feId}`;
+  state.community.selectedFriendId = peer.feId;
+  state.community.selectedMessagePeer = peer;
+  dismissCommunityMessageBubbleByFriend(peer.feId);
+  if (els.communityMessageTitle) els.communityMessageTitle.textContent = safeText(peer.username, `FE ${peer.feId}`);
+  if (els.communityMessageMeta) els.communityMessageMeta.textContent = `FE ID ${peer.feId}`;
   setCommunityMessageOpen(true);
   await refreshCommunityMessages();
   window.clearInterval(state.community.messageTimer);
@@ -15061,6 +21504,38 @@ async function refreshCommunityMessages() {
   }
 }
 
+async function sendCommunityMessageTo(targetId, messageText) {
+  const target = safeText(targetId, '').trim();
+  const text = safeText(messageText, '').trim().slice(0, 500);
+  if (!safeText(state.community.profile?.feId, '')) {
+    const error = new Error('请先登录社区后再发送私信');
+    error.code = 'login_required';
+    throw error;
+  }
+  if (!/^\d{8}$/.test(target)) {
+    const error = new Error('私信对象必须是有效的 8 位 FE ID');
+    error.code = 'invalid_friend_id';
+    throw error;
+  }
+  if (!text) {
+    const error = new Error('私信内容不能为空');
+    error.code = 'invalid_message';
+    throw error;
+  }
+  const payload = await apiJson(`/api/community/messages/send?${query({ provider: state.activeProvider })}`, {
+    method: 'POST',
+    body: JSON.stringify({ targetId: target, text })
+  });
+  if (!payload.ok) throw new Error(payload.error || '消息发送失败');
+  if (String(state.community.selectedFriendId) === target) {
+    state.community.messages = Array.isArray(payload.messages)
+      ? dedupeCommunityMessages(payload.messages)
+      : state.community.messages;
+    renderCommunityMessages(state.community.messages);
+  }
+  return payload;
+}
+
 async function sendCommunityMessage(event) {
   event.preventDefault();
   if (!state.community.selectedFriendId || !els.communityMessageInput) return;
@@ -15068,11 +21543,7 @@ async function sendCommunityMessage(event) {
   if (!text) return;
   els.communityMessageSend.disabled = true;
   try {
-    const payload = await apiJson(`/api/community/messages/send?${query({ provider: state.activeProvider })}`, {
-      method: 'POST',
-      body: JSON.stringify({ targetId: state.community.selectedFriendId, text })
-    });
-    if (!payload.ok) throw new Error(payload.error || '消息发送失败');
+    const payload = await sendCommunityMessageTo(state.community.selectedFriendId, text);
     els.communityMessageInput.value = '';
     state.community.messages = Array.isArray(payload.messages)
       ? dedupeCommunityMessages(payload.messages)
@@ -15086,7 +21557,14 @@ async function sendCommunityMessage(event) {
   }
 }
 
-async function likeCommunityFriend(friendId) {
+async function likeCommunityFriend(friendId, options = {}) {
+  if (!communityFriendById(friendId)) {
+    const error = new Error('只能点赞已确认的社区好友');
+    error.code = 'friend_required';
+    if (options.throwOnError) throw error;
+    toast(error.message);
+    return null;
+  }
   try {
     const payload = await apiJson(`/api/community/likes/add?${query({ provider: state.activeProvider })}`, {
       method: 'POST',
@@ -15098,25 +21576,39 @@ async function likeCommunityFriend(friendId) {
       renderCommunityFriends(state.community.friends);
     }
     toast('已点赞');
+    return payload;
   } catch (error) {
     toast(error.message || '点赞失败');
+    if (options.throwOnError) throw error;
+    return null;
   }
 }
 
-async function inviteCommunityListen(friendId) {
+async function inviteCommunityListen(friendId, options = {}) {
   const friend = communityFriendById(friendId);
+  if (!friend) {
+    const error = new Error('一起听只能邀请已确认的社区好友');
+    error.code = 'friend_required';
+    if (options.throwOnError) throw error;
+    toast(error.message);
+    return null;
+  }
   if (friend && !friend.online) {
-    toast('好友离线，无法发起一起听');
-    return;
+    const error = new Error('好友离线，无法发起一起听');
+    if (options.throwOnError) throw error;
+    toast(error.message);
+    return null;
   }
   if (!state.currentSong || !state.currentSong.id) {
-    toast('先播放一首歌再发起一起听');
-    return;
+    const error = new Error('先播放一首歌再发起一起听');
+    if (options.throwOnError) throw error;
+    toast(error.message);
+    return null;
   }
   try {
     const payload = await apiJson(`/api/community/listen/invite?${query({ provider: state.activeProvider })}`, {
       method: 'POST',
-      body: JSON.stringify({ targetId: friendId, song: currentCommunitySongPayload() })
+      body: JSON.stringify({ targetId: friendId, song: currentCommunitySongPayload(), scene: communitySharedSceneSnapshot() })
     });
     if (!payload.ok) throw new Error(payload.error || '邀请失败');
     state.community.pendingInvite = payload.invite || null;
@@ -15127,8 +21619,43 @@ async function inviteCommunityListen(friendId) {
       song: currentCommunitySongPayload()
     });
     toast('已发送一起听邀请');
+    return payload;
   } catch (error) {
     toast(error.message || '邀请失败');
+    if (options.throwOnError) throw error;
+    return null;
+  }
+}
+
+async function showCommunityFriendIdentityCard(friendId, options = {}) {
+  const targetId = safeText(friendId, '');
+  const friend = state.community.friends.find((entry) => safeText(entry && entry.feId, '') === targetId);
+  if (!friend || !/^\d{8}$/.test(targetId)) {
+    const error = new Error('只能展示已确认好友的身份卡');
+    if (options.throwOnError) throw error;
+    toast(error.message);
+    return null;
+  }
+  try {
+    const payload = await apiJson(`/api/community/friends/identity-card?${query({
+      provider: state.activeProvider,
+      targetId
+    })}`);
+    if (!payload.ok) throw new Error(payload.error || '好友身份卡读取失败');
+    const identityCard = window.FeMonsterIdentityCard;
+    if (!identityCard || typeof identityCard.showExternal !== 'function') {
+      throw new Error('身份卡展示组件尚未就绪');
+    }
+    identityCard.showExternal({
+      owner: payload.owner || { feId: targetId, username: friend.username || '' },
+      card: payload.card,
+      displayAnimation: payload.displayAnimation
+    });
+    return payload;
+  } catch (error) {
+    if (!options.throwOnError) toast(error.message || '好友身份卡读取失败');
+    if (options.throwOnError) throw error;
+    return null;
   }
 }
 
@@ -15142,11 +21669,13 @@ function handleCommunityFriendAction(event) {
   if (button.dataset.communityAction === 'message') openCommunityMessages(friendId);
   else if (button.dataset.communityAction === 'listen') inviteCommunityListen(friendId);
   else if (button.dataset.communityAction === 'like') likeCommunityFriend(friendId);
+  else if (button.dataset.communityAction === 'identity-card') showCommunityFriendIdentityCard(friendId);
 }
 
 function showListenMini({ title = '一起听歌', status = '', song = null } = {}) {
   if (!els.listenMini) return;
   if (!state.community.pendingInvite && !state.community.activeSession) return;
+  const wasHidden = els.listenMini.hidden;
   els.listenMini.hidden = false;
   if (els.listenMiniTitle) els.listenMiniTitle.textContent = title;
   if (els.listenMiniStatus) els.listenMiniStatus.textContent = status || '一起听连接中';
@@ -15155,6 +21684,7 @@ function showListenMini({ title = '一起听歌', status = '', song = null } = {
     els.listenMiniTrack.textContent = `${safeText(track.title, '当前歌曲')} ${safeText(track.artist, '')}`.trim();
   }
   setListenMiniPosition();
+  if (wasHidden) playCommunityEntrance(els.listenMini.querySelector('.listen-mini-body'), 'mini');
 }
 
 function setListenMiniCollapsed(collapsed) {
@@ -15207,6 +21737,8 @@ function rememberDismissedCommunityListenId(id = '') {
 }
 
 function resetCommunityListenState({ sessionId = '', inviteId = '' } = {}) {
+  flushCommunityTogetherListening();
+  if (state.community.listenSceneLocalSnapshot) void restoreCommunitySceneOverride();
   const activeId = safeText(sessionId || (state.community.activeSession && state.community.activeSession.id), '');
   const pendingId = safeText(inviteId || (state.community.pendingInvite && state.community.pendingInvite.id), '');
   rememberDismissedCommunityListenId(activeId);
@@ -15274,6 +21806,7 @@ function endListenMiniDrag(event) {
 
 async function applyCommunityListenSync(payload = {}) {
   const session = payload.session || {};
+  if (session.id) await applyCommunitySharedSceneSession(session);
   const song = payload.song || session.song || {};
   const signature = communitySongSignature(song);
   if (!signature) return;
@@ -15315,21 +21848,24 @@ async function applyCommunityListenSync(payload = {}) {
   }
 }
 
-async function leaveCommunityListen() {
+async function leaveCommunityListen(options = {}) {
   const invite = state.community.pendingInvite;
   if (invite && invite.id && !state.community.activeSession) {
     resetCommunityListenState({ inviteId: invite.id });
-    apiJson(`/api/community/listen/respond?${query({ provider: state.activeProvider })}`, {
+    const payload = await apiJson(`/api/community/listen/respond?${query({ provider: state.activeProvider })}`, {
       method: 'POST',
       body: JSON.stringify({ inviteId: invite.id, accepted: false })
-    }).catch(() => {});
-    return;
+    }).catch((error) => {
+      if (options.throwOnError) throw error;
+      return null;
+    });
+    return payload;
   }
 
   const session = state.community.activeSession;
   if (!session || !session.id) {
     resetCommunityListenState();
-    return;
+    return { left: false, reason: 'no_active_session' };
   }
 
   resetCommunityListenState({ sessionId: session.id });
@@ -15341,23 +21877,34 @@ async function leaveCommunityListen() {
     if (!payload.ok) throw new Error(payload.error || '退出一起听失败');
     if (payload.state) renderCommunityListenState(payload.state);
     toast('已退出一起听');
+    return payload;
   } catch (error) {
     toast(error.message || '已在本地退出，一起听服务器未响应');
+    if (options.throwOnError) throw error;
+    return null;
   }
 }
 
 function renderCommunityListenState(payload = {}) {
+  mergeCommunityTogetherReport(
+    payload.togetherListeningReport || payload.listenReport || payload.report || {}
+  );
   const incoming = (Array.isArray(payload.incoming) ? payload.incoming : [])
     .filter((invite) => !communityListenIdDismissed(invite && invite.id));
   const sessions = (Array.isArray(payload.sessions) ? payload.sessions : [])
     .filter((session) => !communityListenIdDismissed(session && session.id));
   const incomingInvite = incoming[0] || null;
   const activeSession = sessions[0] || null;
+  const previousActiveSessionId = safeText(state.community.activeSession && state.community.activeSession.id, '');
+  if (activeSession) beginCommunitySceneOverride(activeSession);
   state.community.pendingInvite = incomingInvite;
   state.community.activeSession = activeSession;
   syncCommunityDanmakuControls();
 
   if (!incomingInvite && !activeSession) {
+    if (previousActiveSessionId || state.community.listenSceneLocalSnapshot) {
+      void restoreCommunitySceneOverride();
+    }
     hideListenMini({ clearSession: true });
     return;
   }
@@ -15374,6 +21921,8 @@ function renderCommunityListenState(payload = {}) {
     if (els.listenCallButton) els.listenCallButton.hidden = true;
     if (els.listenHangupButton) els.listenHangupButton.hidden = true;
   } else if (activeSession) {
+    updateCommunityTogetherListeningClock();
+    unlockAppAchievement('listen-together');
     showListenMini({
       title: '一起听进行中',
       status: '自动同步播放中',
@@ -15388,6 +21937,8 @@ function renderCommunityListenState(payload = {}) {
     const sessionSignature = communitySongSignature(activeSession.song || {});
     if (sessionSignature && !state.community.listenSyncing) {
       applyCommunityListenSync({ session: activeSession, song: activeSession.song }).catch(() => {});
+    } else {
+      void applyCommunitySharedSceneSession(activeSession);
     }
   }
 }
@@ -15404,9 +21955,14 @@ async function refreshCommunityListenState() {
   }
 }
 
-async function respondCommunityListen(accepted) {
+async function respondCommunityListen(accepted, options = {}) {
   const invite = state.community.pendingInvite;
-  if (!invite || !invite.id) return;
+  if (!invite || !invite.id) {
+    const error = new Error('当前没有待处理的一起听邀请');
+    error.code = 'listen_invite_not_pending';
+    if (options.throwOnError) throw error;
+    return null;
+  }
   if (!accepted) {
     resetCommunityListenState({ inviteId: invite.id });
     try {
@@ -15416,10 +21972,12 @@ async function respondCommunityListen(accepted) {
       });
       if (!payload.ok) throw new Error(payload.error || '拒绝邀请失败');
       toast('已拒绝邀请');
+      return payload;
     } catch (error) {
       toast(error.message || '已在本地关闭邀请');
+      if (options.throwOnError) throw error;
+      return null;
     }
-    return;
   }
   try {
     const payload = await apiJson(`/api/community/listen/respond?${query({ provider: state.activeProvider })}`, {
@@ -15428,11 +21986,18 @@ async function respondCommunityListen(accepted) {
     });
     if (!payload.ok) throw new Error(payload.error || '处理邀请失败');
     state.community.pendingInvite = null;
-    if (payload.session) state.community.activeSession = payload.session;
+    if (payload.session) {
+      beginCommunitySceneOverride(payload.session);
+      state.community.activeSession = payload.session;
+      await applyCommunitySharedSceneSession(payload.session);
+    }
     if (payload.state) renderCommunityListenState(payload.state);
     toast('已加入一起听');
+    return payload;
   } catch (error) {
     toast(error.message || '处理邀请失败');
+    if (options.throwOnError) throw error;
+    return null;
   }
 }
 
@@ -15611,6 +22176,7 @@ async function sendCommunityDanmaku(event) {
       body: JSON.stringify({ targetId, type: 'listen.danmaku', payload })
     });
     if (response && response.ok === false) throw new Error(response.error || '弹幕发送失败');
+    unlockAppAchievement('first-danmaku');
   } catch (error) {
     toast(error.message || '弹幕发送失败');
   } finally {
@@ -15692,10 +22258,12 @@ async function ensureCommunityPeer() {
   return peer;
 }
 
-async function startCommunityCall() {
+async function startCommunityCall(options = {}) {
   if (!state.community.activeSession) {
-    toast('先和好友进入一起听');
-    return;
+    const error = new Error('先和好友进入一起听');
+    if (options.throwOnError) throw error;
+    toast(error.message);
+    return null;
   }
   try {
     const peer = await ensureCommunityPeer();
@@ -15703,9 +22271,12 @@ async function startCommunityCall() {
     await peer.setLocalDescription(offer);
     await sendCommunityCallSignal('offer', peer.localDescription.toJSON());
     if (els.listenMiniStatus) els.listenMiniStatus.textContent = '连麦邀请已发送';
+    return { active: true, targetId: state.community.call.targetId, sessionId: state.community.call.sessionId };
   } catch (error) {
     toast(error.message || '连麦启动失败');
     stopCommunityCall(false);
+    if (options.throwOnError) throw error;
+    return null;
   }
 }
 
@@ -15757,10 +22328,12 @@ async function reportCommunityListening(force = false) {
   const previousLocalTick = state.community.listeningStatsLastAt;
   state.community.listeningStatsLastAt = nowMs;
   if (document.hidden) {
+    updateCommunityTogetherListeningClock(nowMs, { stop: true });
     state.community.listeningStatsPlaying = false;
     state.community.lastListenReportAt = nowMs;
     return;
   }
+  updateCommunityTogetherListeningClock(nowMs);
   const hasSong = !!(state.currentSong && state.currentSong.id);
   const activeSession = !!state.community.activeSession;
   const playing = !els.audio.paused && !!els.audio.src && hasSong;
@@ -15776,7 +22349,7 @@ async function reportCommunityListening(force = false) {
     !els.audio.src &&
     state.community.listenUnavailableSignature &&
     state.community.listenUnavailableSignature === communitySongSignature(state.currentSong || {});
-  if (!hasSong || unavailableSync || (!playing && !activeSession)) {
+  if (!hasSong || unavailableSync || (!playing && !activeSession && !force)) {
     state.community.lastListenReportAt = nowMs;
     return;
   }
@@ -15791,6 +22364,9 @@ async function reportCommunityListening(force = false) {
       method: 'POST',
       body: JSON.stringify({ listenMsDelta: Math.round(playing ? delta : 0), song: currentCommunitySongPayload() })
     });
+    mergeCommunityTogetherReport(
+      payload.togetherListeningReport || payload.listenReport || payload.report || {}
+    );
     if (payload.profile) {
       renderCommunityState({
         ok: true,
@@ -15805,7 +22381,10 @@ async function reportCommunityListening(force = false) {
       .filter((session) => !communityListenIdDismissed(session && session.id));
     if (syncedSessions.length) {
       const activeId = safeText(state.community.activeSession && state.community.activeSession.id, '');
-      state.community.activeSession = syncedSessions.find((session) => safeText(session.id, '') === activeId) || syncedSessions[0];
+      const syncedSession = syncedSessions.find((session) => safeText(session.id, '') === activeId) || syncedSessions[0];
+      beginCommunitySceneOverride(syncedSession);
+      state.community.activeSession = syncedSession;
+      void applyCommunitySharedSceneSession(syncedSession);
       state.community.listenSyncSignature = communitySongSignature(currentCommunitySongPayload());
     }
   } catch (error) {
@@ -15818,9 +22397,22 @@ function setOfficialBrowserLoginStatus(message = '', hidden = false) {
   els.officialBrowserLoginStatus.hidden = hidden || !message;
 }
 
+function cancelOfficialBrowserLoginSession(provider, session) {
+  if (!provider || !session) return;
+  void apiJson(`${providerPath('/login/browser/cancel', provider)}?${query({ session })}`, {
+    method: 'POST',
+    headers: { 'X-FE-Monster-Login': '1' }
+  }).catch(() => {});
+}
+
 function clearOfficialBrowserLoginTimer(options = {}) {
-  window.clearInterval(state.officialBrowserLoginTimer);
+  window.clearTimeout(state.officialBrowserLoginTimer);
   state.officialBrowserLoginTimer = 0;
+  state.officialBrowserLoginAbortController?.abort();
+  state.officialBrowserLoginAbortController = null;
+  state.officialBrowserLoginLoopToken += 1;
+  state.officialBrowserLoginRevision = -1;
+  state.officialBrowserLoginRetryAttempt = 0;
   const session = state.officialBrowserLoginSession;
   const provider = state.officialBrowserLoginProvider;
   state.officialBrowserLoginSession = '';
@@ -15831,36 +22423,88 @@ function clearOfficialBrowserLoginTimer(options = {}) {
     els.officialBrowserLoginButton.textContent = '打开官方扫码登录';
   }
   if (options.cancel && session && provider) {
-    void apiJson(`${providerPath('/login/browser/cancel', provider)}?${query({ session })}`, {
-      method: 'POST',
-      headers: { 'X-FE-Monster-Login': '1' }
-    }).catch(() => {});
+    cancelOfficialBrowserLoginSession(provider, session);
   }
 }
 
-async function checkOfficialBrowserLogin() {
+function officialBrowserLoginRetryDelay(attempt) {
+  return [350, 500, 800][Math.min(2, Math.max(0, attempt))];
+}
+
+function scheduleOfficialBrowserLoginCheck(delay = 0, loopToken = state.officialBrowserLoginLoopToken) {
+  window.clearTimeout(state.officialBrowserLoginTimer);
+  if (!state.officialBrowserLoginSession || loopToken !== state.officialBrowserLoginLoopToken) return;
+  state.officialBrowserLoginTimer = window.setTimeout(
+    () => void checkOfficialBrowserLogin(loopToken),
+    Math.max(0, delay)
+  );
+}
+
+async function checkOfficialBrowserLogin(loopToken = state.officialBrowserLoginLoopToken) {
   const session = state.officialBrowserLoginSession;
   const provider = state.officialBrowserLoginProvider;
-  if (!session || !provider || document.hidden) return;
+  if (!session || !provider || loopToken !== state.officialBrowserLoginLoopToken) return;
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  state.officialBrowserLoginAbortController?.abort();
+  state.officialBrowserLoginAbortController = controller;
   try {
-    const payload = await apiJson(`${providerPath('/login/browser/status', provider)}?${query({ session })}`);
-    if (session !== state.officialBrowserLoginSession || provider !== state.officialBrowserLoginProvider) return;
+    const payload = await apiJson(`${providerPath('/login/browser/status', provider)}?${query({
+      session,
+      after: state.officialBrowserLoginRevision,
+      waitMs: 15000
+    })}`, {
+      signal: controller?.signal,
+      timeoutMs: 17_000
+    });
+    if (controller === state.officialBrowserLoginAbortController) {
+      state.officialBrowserLoginAbortController = null;
+    }
+    if (session !== state.officialBrowserLoginSession
+      || provider !== state.officialBrowserLoginProvider
+      || loopToken !== state.officialBrowserLoginLoopToken) return;
+    const revision = Number(payload.revision);
+    const supportsEventWait = Number.isFinite(revision) && revision >= 0;
+    if (supportsEventWait) state.officialBrowserLoginRevision = revision;
+    state.officialBrowserLoginRetryAttempt = 0;
     setOfficialBrowserLoginStatus(payload.message || '请在官方窗口中完成登录');
     if (payload.loggedIn) {
       clearOfficialBrowserLoginTimer();
       setOfficialBrowserLoginStatus(`${providerInfo(provider).label}官方登录成功，正在同步账号与歌单`);
-      const account = await refreshLoginStatus(provider);
-      await refreshUserPlaylists();
-      if (account?.loggedIn) window.setTimeout(closeLoginDialog, 700);
+      const [accountResult] = await Promise.allSettled([
+        refreshLoginStatus(provider),
+        refreshUserPlaylists()
+      ]);
+      if (provider !== state.activeProvider) return;
+      const account = accountResult.status === 'fulfilled' ? accountResult.value : null;
+      scheduleCommunityRefresh(0);
+      if (account?.loggedIn) {
+        setOfficialBrowserLoginStatus(`${providerInfo(provider).label}官方登录成功，账号与歌单已同步`);
+        window.setTimeout(closeLoginDialog, 700);
+      } else {
+        scheduleLoginStatusRetry(provider);
+        setOfficialBrowserLoginStatus(`${providerInfo(provider).label}官方登录成功，账号资料将在后台自动同步`);
+        window.setTimeout(closeLoginDialog, 1100);
+      }
       return;
     }
     if (payload.terminal) {
       clearOfficialBrowserLoginTimer();
       setOfficialBrowserLoginStatus(payload.message || '官方浏览器登录未完成');
+      return;
     }
+    scheduleOfficialBrowserLoginCheck(supportsEventWait ? 0 : 650, loopToken);
   } catch (error) {
-    clearOfficialBrowserLoginTimer();
-    setOfficialBrowserLoginStatus(error.message || '官方浏览器登录连接失败');
+    if (controller === state.officialBrowserLoginAbortController) {
+      state.officialBrowserLoginAbortController = null;
+    }
+    if (controller?.signal.aborted
+      || session !== state.officialBrowserLoginSession
+      || provider !== state.officialBrowserLoginProvider
+      || loopToken !== state.officialBrowserLoginLoopToken) return;
+    const retryDelay = officialBrowserLoginRetryDelay(state.officialBrowserLoginRetryAttempt);
+    state.officialBrowserLoginRetryAttempt = Math.min(2, state.officialBrowserLoginRetryAttempt + 1);
+    setOfficialBrowserLoginStatus(`${error.message || '官方浏览器登录连接暂时中断'}，正在重新连接`);
+    scheduleOfficialBrowserLoginCheck(retryDelay, loopToken);
   }
 }
 
@@ -15872,6 +22516,7 @@ async function startOfficialBrowserLogin() {
     return;
   }
   clearOfficialBrowserLoginTimer({ cancel: true });
+  const operationToken = state.officialBrowserLoginLoopToken;
   state.officialBrowserLoginLoading = true;
   if (els.officialBrowserLoginButton) {
     els.officialBrowserLoginButton.disabled = true;
@@ -15883,7 +22528,12 @@ async function startOfficialBrowserLogin() {
       method: 'POST',
       headers: { 'X-FE-Monster-Login': '1' }
     });
-    state.officialBrowserLoginSession = safeText(payload.session, '');
+    const session = safeText(payload.session, '');
+    if (operationToken !== state.officialBrowserLoginLoopToken || provider !== state.activeProvider) {
+      cancelOfficialBrowserLoginSession(provider, session);
+      return;
+    }
+    state.officialBrowserLoginSession = session;
     state.officialBrowserLoginProvider = provider;
     state.officialBrowserLoginLoading = false;
     if (!state.officialBrowserLoginSession) throw new Error(payload.error || '未创建官方浏览器登录会话');
@@ -15892,9 +22542,11 @@ async function startOfficialBrowserLogin() {
       els.officialBrowserLoginButton.textContent = '关闭官方登录窗口';
     }
     setOfficialBrowserLoginStatus(payload.message || `请在${providerInfo(provider).label}官方窗口中扫码登录`);
-    state.officialBrowserLoginTimer = window.setInterval(checkOfficialBrowserLogin, 1500);
-    window.setTimeout(checkOfficialBrowserLogin, 450);
+    const revision = Number(payload.revision);
+    state.officialBrowserLoginRevision = Number.isFinite(revision) ? revision : -1;
+    scheduleOfficialBrowserLoginCheck(0);
   } catch (error) {
+    if (operationToken !== state.officialBrowserLoginLoopToken || provider !== state.activeProvider) return;
     clearOfficialBrowserLoginTimer();
     setOfficialBrowserLoginStatus(error.message || '无法打开官方浏览器登录');
   }
@@ -15906,6 +22558,7 @@ async function switchOfficialBrowserAccount() {
     || state.officialBrowserSwitching
     || state.officialBrowserLoginLoading) return;
   clearOfficialBrowserLoginTimer();
+  const operationToken = state.officialBrowserLoginLoopToken;
   state.officialBrowserSwitching = true;
   if (els.officialBrowserLoginButton) els.officialBrowserLoginButton.disabled = true;
   if (els.officialBrowserSwitchAccountButton) {
@@ -15920,11 +22573,8 @@ async function switchOfficialBrowserAccount() {
     });
     const session = safeText(payload.session, '');
     if (!session) throw new Error(payload.error || '未创建新的官方浏览器登录会话');
-    if (provider !== state.activeProvider) {
-      void apiJson(`${providerPath('/login/browser/cancel', provider)}?${query({ session })}`, {
-        method: 'POST',
-        headers: { 'X-FE-Monster-Login': '1' }
-      }).catch(() => {});
+    if (operationToken !== state.officialBrowserLoginLoopToken || provider !== state.activeProvider) {
+      cancelOfficialBrowserLoginSession(provider, session);
       return;
     }
     state.officialBrowserLoginSession = session;
@@ -15933,9 +22583,11 @@ async function switchOfficialBrowserAccount() {
     delete state.loginStatusByProvider[provider];
     renderLoginStatus({ provider, loggedIn: false });
     setOfficialBrowserLoginStatus(payload.message || `当前账号已清除，请在${providerInfo(provider).label}官方窗口中使用新账号扫码登录`);
-    state.officialBrowserLoginTimer = window.setInterval(checkOfficialBrowserLogin, 1500);
-    window.setTimeout(checkOfficialBrowserLogin, 450);
+    const revision = Number(payload.revision);
+    state.officialBrowserLoginRevision = Number.isFinite(revision) ? revision : -1;
+    scheduleOfficialBrowserLoginCheck(0);
   } catch (error) {
+    if (operationToken !== state.officialBrowserLoginLoopToken || provider !== state.activeProvider) return;
     clearOfficialBrowserLoginTimer();
     setOfficialBrowserLoginStatus(error.message || '切换账号失败，请重试');
   } finally {
@@ -16159,6 +22811,7 @@ async function importQishuiLibraryMetadataFile(file) {
 
 function closeLoginDialog() {
   clearOfficialBrowserLoginTimer({ cancel: true });
+  window.fePixelLogin?.close?.();
   els.loginDialog.hidden = true;
   els.loginButton.setAttribute('aria-expanded', 'false');
 }
@@ -16254,6 +22907,9 @@ function syncMusicApiProviderTabs() {
   if (!els.loginProviderTabs) return;
   const loginProviders = Object.values(state.providers)
     .filter((provider) => loginProviderVisible(provider));
+  const focusedProvider = els.loginProviderTabs.contains(document.activeElement)
+    ? document.activeElement?.dataset?.loginProvider || ''
+    : '';
   els.loginProviderTabs.replaceChildren();
   loginProviders.forEach((provider) => {
     const tab = document.createElement('button');
@@ -16264,7 +22920,9 @@ function syncMusicApiProviderTabs() {
     tab.dataset.loginProvider = provider.id;
     tab.dataset.providerConfigured = String(configured);
     tab.dataset.providerReady = String(configured && provider.apiStatus === 'ready');
-    tab.setAttribute('aria-pressed', String(active));
+    tab.setAttribute('role', 'tab');
+    tab.setAttribute('aria-selected', String(active));
+    tab.tabIndex = active ? 0 : -1;
     tab.setAttribute('aria-label', provider.id === 'qishui' && !configured
       ? `${provider.label}，插件未导入`
       : provider.label);
@@ -16272,6 +22930,12 @@ function syncMusicApiProviderTabs() {
     els.loginProviderTabs.appendChild(tab);
   });
   els.loginProviderTabs.hidden = loginProviders.length === 0;
+  window.fePixelLogin?.syncProviders?.();
+  if (focusedProvider) {
+    const replacement = els.loginProviderTabs.querySelector('[aria-selected="true"]')
+      || els.loginProviderTabs.querySelector(`[data-login-provider="${focusedProvider}"]`);
+    window.setTimeout(() => replacement?.focus({ preventScroll: true }), 0);
+  }
 }
 
 function mergeMusicApiProviders(payload = {}) {
@@ -16316,54 +22980,105 @@ async function refreshMusicApiProviders(options = {}) {
   }
 }
 
-async function importMusicApiFile(file) {
-  if (!file || state.musicApiImporting) return;
-  const isZip = /\.zip$/i.test(file.name || '') || /zip/i.test(file.type || '');
-  const maximum = isZip ? 25 * 1024 * 1024 : 64 * 1024;
-  if (file.size > maximum) {
-    setMusicApiImportStatus(isZip ? 'ZIP 包不能超过 25 MB' : 'API 配置不能超过 64 KB');
-    return;
+function normalizeMusicApiClientInspection(value) {
+  const items = value?.providers;
+  if (!Array.isArray(items) || items.length < 1 || items.length > 4) {
+    throw new Error('客户端识别到的平台数量无效');
   }
-  if (isZip && !window.confirm('ZIP API 包会在本机运行其中的服务代码。仅导入你信任的来源，是否继续？')) {
-    setMusicApiImportStatus('已取消导入未确认的 ZIP 包');
-    return;
-  }
+  const seen = new Set();
+  const providers = items.map((item) => {
+    const id = safeText(typeof item === 'string' ? item : item?.id, '').trim().toLowerCase();
+    if (!MUSIC_PROVIDERS[id] || seen.has(id)) {
+      throw new Error('客户端识别结果包含未知或重复的音乐平台');
+    }
+    seen.add(id);
+    return {
+      id,
+      label: safeText(item?.label, MUSIC_PROVIDERS[id].label).trim().slice(0, 32)
+        || MUSIC_PROVIDERS[id].label
+    };
+  });
+  return { ...value, providers };
+}
 
+function assertMusicApiApplyMatches(clientProviders, importedProviders) {
+  if (!Array.isArray(importedProviders) || importedProviders.length < 1) {
+    throw new Error('本地应用未返回可核对的平台');
+  }
+  const expected = clientProviders.map((item) => item.id).sort();
+  const applied = importedProviders.map((item) => (
+    safeText(typeof item === 'string' ? item : item?.id, '').trim().toLowerCase()
+  )).sort();
+  if (expected.length !== applied.length
+    || applied.some((id, index) => !MUSIC_PROVIDERS[id] || id !== expected[index])) {
+    throw new Error(`本地应用结果与客户端识别不一致（识别：${expected.join('、')}；回执：${applied.join('、')}）`);
+  }
+}
+
+async function importMusicApiFile(file, options = {}) {
+  if (!file) return { ok: false, error: '未选择音乐 API 包' };
+  if (state.musicApiImporting) return { ok: false, error: '另一个音乐 API 包正在导入' };
+  const looksLikeZip = /\.zip$/i.test(file.name || '') || /zip/i.test(file.type || '');
+  const maximum = looksLikeZip ? 25 * 1024 * 1024 : 64 * 1024;
+  if (file.size > maximum) {
+    const message = looksLikeZip ? 'ZIP 包不能超过 25 MB' : 'API 配置不能超过 64 KB';
+    setMusicApiImportStatus(message);
+    return { ok: false, error: message };
+  }
   state.musicApiImporting = true;
   if (els.musicApiImportButton) els.musicApiImportButton.disabled = true;
-  setMusicApiImportStatus(`正在解析 ${safeText(file.name, 'API 文件')}`);
   try {
+    if (typeof window.feMusicApiPackageClient?.inspect !== 'function') {
+      throw new Error('客户端音乐 API 包识别器尚未就绪');
+    }
+    setMusicApiImportStatus(`客户端正在识别 ${safeText(file.name, 'API 文件')}`);
+    const inspection = normalizeMusicApiClientInspection(
+      options.inspection || await window.feMusicApiPackageClient.inspect(file)
+    );
+    const isZip = inspection.packageType === 'zip';
+    const clientLabels = inspection.providers.map((item) => item.label).join('、');
+    if (isZip && !window.confirm(`客户端识别为：${clientLabels}\n\nZIP API 包会在本机运行其中的服务代码。仅导入你信任的来源，是否继续？`)) {
+      const message = '已取消导入未确认的 ZIP 包';
+      setMusicApiImportStatus(message);
+      return { ok: false, error: message, cancelled: true };
+    }
+    setMusicApiImportStatus(`客户端已识别：${clientLabels} · 正在应用`);
     const payload = await apiJson(`/api/music-apis/import?${query({
       name: file.name || (isZip ? 'music-api.zip' : 'music-api.json'),
       trusted: String(isZip)
     })}`, {
       method: 'POST',
       headers: {
-        'Content-Type': file.type || 'application/octet-stream',
+        'Content-Type': isZip ? 'application/zip' : 'application/json',
         'X-FE-Monster-Import': '1'
       },
-      body: file
+      body: file,
+      timeoutMs: isZip ? 120_000 : 30_000
     });
     if (payload?.ok === false) throw new Error(payload.error || '音乐 API 导入失败');
-    mergeMusicApiProviders(payload);
     const imported = Array.isArray(payload.importedProviders) ? payload.importedProviders : [];
-    const importedId = safeText(imported[0]?.id || imported[0], '');
-    setMusicApiImportStatus(imported.length
-      ? `已识别并启用：${imported.map((item) => safeText(item?.label || item?.id || item, '')).filter(Boolean).join('、')}`
-      : 'API 配置已导入');
+    assertMusicApiApplyMatches(inspection.providers, imported);
+    mergeMusicApiProviders(payload);
+    const importedId = inspection.providers[0].id;
+    setMusicApiImportStatus(`客户端已识别并启用：${clientLabels}`);
     await refreshMusicApiProviders({ silent: true });
     if (importedId && providerConfigured(importedId)) {
       setActiveProvider(importedId);
     }
     toast('音乐 API 已导入并应用');
+    return { ...payload, clientInspection: inspection };
   } catch (error) {
-    setMusicApiImportStatus(error.message || '音乐 API 导入失败');
+    const message = error.message || '音乐 API 导入失败';
+    setMusicApiImportStatus(message);
+    return { ok: false, error: message };
   } finally {
     state.musicApiImporting = false;
     if (els.musicApiImportButton) els.musicApiImportButton.disabled = false;
     if (els.musicApiImportInput) els.musicApiImportInput.value = '';
   }
 }
+
+window.feMusicApiImportFile = importMusicApiFile;
 
 function providerPath(path, provider = state.activeProvider) {
   return `/api/${providerInfo(provider).id}${path}`;
@@ -16406,9 +23121,15 @@ function valueLooksVip(value) {
     && !['0', 'false', 'free', 'normal', 'none', 'null', 'undefined', 'no'].includes(normalized);
 }
 
-function accountHasVip(payload = {}) {
+function accountVipStatus(payload = {}) {
   const account = payload.account || {};
   const roots = [payload, account, payload.profile, account.profile].filter(Boolean);
+  for (const root of roots) {
+    const explicit = safeText(root.vipStatus || root.vip_status || root.membershipStatus, '').trim().toLowerCase();
+    if (['active', 'enabled', 'valid', 'vip'].includes(explicit)) return 'active';
+    if (['inactive', 'disabled', 'expired', 'free', 'normal', 'non-vip'].includes(explicit)) return 'inactive';
+    if (explicit === 'unknown') return 'unknown';
+  }
   const keys = [
     'vipType',
     'vip_type',
@@ -16425,7 +23146,20 @@ function accountHasVip(payload = {}) {
     'superVip',
     'musicPackage'
   ];
-  return roots.some((root) => keys.some((key) => valueLooksVip(root[key])));
+  let knownInactive = false;
+  for (const root of roots) {
+    for (const key of keys) {
+      if (!Object.prototype.hasOwnProperty.call(root, key)) continue;
+      const value = root[key];
+      if (valueLooksVip(value)) return 'active';
+      if (value === false || value === 0 || value === '0') knownInactive = true;
+    }
+  }
+  return knownInactive ? 'inactive' : 'unknown';
+}
+
+function accountHasVip(payload = {}) {
+  return accountVipStatus(payload) === 'active';
 }
 
 function accountVipLabel(payload = {}) {
@@ -16449,6 +23183,13 @@ function accountVipLabel(payload = {}) {
     }
   }
   return 'VIP';
+}
+
+function accountVipStatusLabel(payload = {}) {
+  const vipStatus = accountVipStatus(payload);
+  if (vipStatus === 'active') return accountVipLabel(payload) || 'VIP';
+  if (vipStatus === 'inactive') return '\u975e VIP';
+  return 'VIP \u72b6\u6001\u672a\u77e5';
 }
 
 function providerHasPlaybackVip(provider = playbackQualityProvider()) {
@@ -16604,6 +23345,21 @@ async function selectPlaybackQuality(quality) {
   }
 }
 
+function notifyAchievementAccountChange(provider, payload = {}) {
+  if (typeof window.CustomEvent !== 'function') return;
+  const normalizedProvider = providerInfo(provider).id;
+  const account = payload.account && typeof payload.account === 'object'
+    ? payload.account
+    : {};
+  window.dispatchEvent(new window.CustomEvent('fe-community-account-change', {
+    detail: {
+      provider: normalizedProvider,
+      loggedIn: payload.loggedIn === true,
+      account
+    }
+  }));
+}
+
 function setActiveProvider(provider) {
   const requestedProvider = safeText(provider, 'netease');
   if (!MUSIC_PROVIDERS[requestedProvider] || !loginProviderVisible(MUSIC_PROVIDERS[requestedProvider])) {
@@ -16615,6 +23371,10 @@ function setActiveProvider(provider) {
   const changed = state.activeProvider !== nextProvider;
   if (changed) clearOfficialBrowserLoginTimer({ cancel: true });
   state.activeProvider = nextProvider;
+  if (changed) saveActiveProviderPreference(nextProvider);
+  if (changed && state.loginStatusByProvider[nextProvider]) {
+    notifyAchievementAccountChange(nextProvider, state.loginStatusByProvider[nextProvider]);
+  }
   const info = providerInfo(nextProvider);
 
   const browserLogin = OFFICIAL_BROWSER_LOGIN_PROVIDERS.has(nextProvider);
@@ -16657,8 +23417,13 @@ function setActiveProvider(provider) {
     stopCommunityEventStream(true);
     renderPlaylistOrbit(playbackPlaylists());
   }
-  refreshLoginStatus(nextProvider);
-  if (changed) scheduleUserPlaylistsRefresh(180);
+  if (bootVisual.servicesStarted) {
+    void activateInteractiveBackend(nextProvider).finally(() => {
+      if (state.activeProvider !== nextProvider) return;
+      refreshLoginStatus(nextProvider);
+      if (changed) scheduleUserPlaylistsRefresh(0);
+    });
+  }
   syncQishuiPlaybackCard();
   return true;
 }
@@ -16667,7 +23432,10 @@ function renderLoginStatus(payload = {}) {
   const loggedIn = !!payload.loggedIn;
   const provider = providerInfo(payload.provider || state.activeProvider);
   const vip = loggedIn && accountHasVip(payload);
+  const showVipStatus = loggedIn && ['qq', 'kugou'].includes(provider.id);
   state.loginStatusByProvider[provider.id] = payload;
+  if (provider.id === state.activeProvider) notifyAchievementAccountChange(provider.id, payload);
+  window.fePixelLogin?.syncProviders?.();
   if (playbackCardVisible() && playbackCardProvider(playbackCardSong()).id === provider.id) {
     renderQishuiPlaybackIdentity(provider);
   }
@@ -16678,9 +23446,13 @@ function renderLoginStatus(payload = {}) {
   els.loginLabel.textContent = loggedIn
     ? accountName(payload) || `${provider.label}\u5df2\u767b\u5f55`
     : `${provider.label}\u767b\u5f55`;
-  if (els.loginVipBadge) els.loginVipBadge.hidden = !vip;
+  if (els.loginVipBadge) {
+    els.loginVipBadge.hidden = !(vip || showVipStatus);
+    els.loginVipBadge.textContent = accountVipStatusLabel(payload);
+    els.loginVipBadge.dataset.vipStatus = accountVipStatus(payload);
+  }
   els.loginButton.setAttribute('aria-label', loggedIn
-    ? `${provider.label}\u5df2\u767b\u5f55\uff1a${els.loginLabel.textContent}${vip ? '\uff0cVIP\u4f1a\u5458' : ''}`
+    ? `${provider.label}\u5df2\u767b\u5f55\uff1a${els.loginLabel.textContent}${showVipStatus ? `\uff0c${accountVipStatusLabel(payload)}` : vip ? '\uff0cVIP\u4f1a\u5458' : ''}`
     : provider.id === 'qishui'
       ? '打开汽水音乐插件与 OpenAPI 授权'
       : `\u6253\u5f00${provider.label}\u4e8c\u7ef4\u7801\u767b\u5f55`);
@@ -16691,13 +23463,15 @@ function renderLoginStatus(payload = {}) {
   renderDockQualityMenu();
 }
 
-const LOGIN_STATUS_RETRY_DELAYS = Object.freeze([320, 700, 1400, 2600]);
+const LOGIN_STATUS_RETRY_DELAYS = Object.freeze([320, 700, 1400, 2600, 4200, 6500, 9000]);
 function loginStatusNeedsRetry(payload = {}) {
   const code = safeText(payload.code, '').toUpperCase();
   const gatewayState = safeText(payload.gatewayState || payload.status, '').toLowerCase();
+  const error = safeText(payload.error, '').toLowerCase();
   return payload.retryable === true
     || gatewayState === 'starting'
-    || code.includes('STARTING');
+    || code.includes('STARTING')
+    || /api unavailable|closedchannel(?:exception)?|connectexception|connection refused/.test(error);
 }
 
 function clearLoginStatusRetry(provider = state.activeProvider) {
@@ -16729,14 +23503,21 @@ async function refreshLoginStatus(provider = state.activeProvider) {
     return payload;
   }
   try {
-    const payload = await apiJson(`/api/login/status?${query({ provider: id })}`);
+    const payload = await apiJson(`/api/login/status?${query({ provider: id })}`, {
+      timeoutMs: COMMUNITY_API_TIMEOUT_MS
+    });
     const retryable = loginStatusNeedsRetry(payload);
     renderLoginStatus(payload);
     if (payload.loggedIn || !retryable) clearLoginStatusRetry(id);
     else scheduleLoginStatusRetry(id);
     if (id !== state.activeProvider) return payload;
     if (payload.loggedIn) scheduleCommunityRefresh(120);
-    else renderCommunityState({ provider: id, loggedIn: false, account: payload.account || {} });
+    else renderCommunityState({
+      provider: id,
+      loggedIn: false,
+      account: payload.account || {},
+      error: payload.error || ''
+    });
     return payload;
   } catch (error) {
     const previous = state.loginStatusByProvider[id];
@@ -16750,12 +23531,17 @@ async function refreshLoginStatus(provider = state.activeProvider) {
 }
 
 async function showLoginDialog() {
+  if (els.communityProfileDialog && !els.communityProfileDialog.hidden) setCommunityProfileOpen(false);
+  if (els.communityMessageDialog && !els.communityMessageDialog.hidden) setCommunityMessageOpen(false);
   els.loginDialog.hidden = false;
   els.loginButton.setAttribute('aria-expanded', 'true');
   setOfficialBrowserLoginStatus('', true);
+  window.fePixelLogin?.open?.();
+  await startInteractiveRuntime();
   await refreshMusicApiProviders({ silent: true });
   if (els.loginDialog.hidden) return;
   if (setActiveProvider(state.activeProvider)) syncBrowserLoginSurface(state.activeProvider);
+  window.fePixelLogin?.syncProviders?.();
 }
 
 function hidePlaylistOrbit() {
@@ -16901,12 +23687,29 @@ function updateSongButtonFocusVisual(button, itemIndex, focusIndex) {
   const distance = Math.abs(offset);
   const focused = itemIndex === focusIndex;
   const activeWindow = distance <= PLAYLIST_SONG_RENDER_RADIUS;
-  button.classList.toggle('is-song-virtual-hidden', !activeWindow);
-  button.classList.toggle('is-focused', focused);
-  button.classList.toggle('is-muted', activeWindow && !focused);
-  button.style.setProperty('--song-offset', String(offset));
-  button.style.setProperty('--song-distance', String(distance));
-  button.style.setProperty('--song-scale', String(clamp(1 - distance * 0.09, 0.62, 1)));
+  const muted = activeWindow && !focused;
+  const visualFlags = (activeWindow ? 1 : 0) | (focused ? 2 : 0) | (muted ? 4 : 0);
+  const previousFlags = Number(button.__feSongVisualFlags);
+  if (visualFlags !== previousFlags) {
+    button.classList.toggle('is-song-virtual-hidden', !activeWindow);
+    button.classList.toggle('is-focused', focused);
+    button.classList.toggle('is-muted', muted);
+    button.__feSongVisualFlags = visualFlags;
+  }
+  if (!activeWindow) {
+    if (visualFlags !== previousFlags) {
+      if (button.getAttribute('aria-selected') !== 'false') button.setAttribute('aria-selected', 'false');
+      if (button.tabIndex !== -1) button.tabIndex = -1;
+    }
+    return;
+  }
+  const slotClass = PLAYLIST_SONG_SLOT_CLASSES[offset + PLAYLIST_SONG_RENDER_RADIUS];
+  const previousSlotClass = button.__feSongSlotClass;
+  if (slotClass !== previousSlotClass) {
+    if (previousSlotClass) button.classList.replace(previousSlotClass, slotClass);
+    else button.classList.add(slotClass);
+    button.__feSongSlotClass = slotClass;
+  }
   const selected = String(focused);
   if (button.getAttribute('aria-selected') !== selected) {
     button.setAttribute('aria-selected', selected);
@@ -16915,12 +23718,19 @@ function updateSongButtonFocusVisual(button, itemIndex, focusIndex) {
   if (button.tabIndex !== tabIndex) button.tabIndex = tabIndex;
 }
 
+function shelfSongButtonIndex(button) {
+  const cached = Number(button?.__feSongIndex);
+  if (Number.isFinite(cached)) return cached;
+  const parsed = Number(button?.dataset?.songIndex);
+  return Number.isFinite(parsed) ? parsed : -1;
+}
+
 function hydrateVisibleShelfSongCovers() {
   state.songCoverHydrationTimer = 0;
   const buttons = state.songButtonCache;
   if (!buttons.length) return;
   for (const button of buttons) {
-    const itemIndex = Number(button.dataset.songIndex);
+    const itemIndex = shelfSongButtonIndex(button);
     if (Math.abs(itemIndex - state.songFocusIndex) > PLAYLIST_SONG_RENDER_RADIUS) continue;
     const image = button.querySelector('.shelf-song-cover img[data-src]');
     if (!image || image.hasAttribute('src')) continue;
@@ -16938,32 +23748,25 @@ function setSongFocus(index, options = {}) {
   if (!count) return;
   state.songFocusIndex = ((Math.round(index) % count) + count) % count;
 
-  let renderedStart = Number.POSITIVE_INFINITY;
-  let renderedEnd = -1;
-  for (const button of state.songButtonCache) {
-    const itemIndex = Number(button.dataset.songIndex);
-    if (!Number.isFinite(itemIndex)) continue;
-    renderedStart = Math.min(renderedStart, itemIndex);
-    renderedEnd = Math.max(renderedEnd, itemIndex);
-  }
-  if (!Number.isFinite(renderedStart)) renderedStart = -1;
+  const renderedStart = shelfSongButtonIndex(state.songButtonCache[0]);
+  const renderedEnd = shelfSongButtonIndex(state.songButtonCache[state.songButtonCache.length - 1]);
   const visibleStart = Math.max(0, state.songFocusIndex - PLAYLIST_SONG_RENDER_RADIUS);
   const visibleEnd = Math.min(count - 1, state.songFocusIndex + PLAYLIST_SONG_RENDER_RADIUS);
   if (options.forceAll || renderedStart < 0 || visibleStart < renderedStart || visibleEnd > renderedEnd) {
-    renderShelfSongWindow(state.songFocusIndex);
+    recycleShelfSongWindow(state.songFocusIndex);
   } else {
     for (const button of state.songButtonCache) {
-      updateSongButtonFocusVisual(button, Number(button.dataset.songIndex), state.songFocusIndex);
+      updateSongButtonFocusVisual(button, shelfSongButtonIndex(button), state.songFocusIndex);
     }
     for (const button of state.songButtonBackCache) {
-      updateSongButtonFocusVisual(button, Number(button.dataset.songIndex), state.songFocusIndex);
+      updateSongButtonFocusVisual(button, shelfSongButtonIndex(button), state.songFocusIndex);
     }
     updateShelfCurrentSong();
   }
   scheduleVisibleShelfSongCoverHydration();
   if (options.focus !== false) {
     for (const button of state.songButtonCache) {
-      if (Number(button.dataset.songIndex) !== state.songFocusIndex) continue;
+      if (shelfSongButtonIndex(button) !== state.songFocusIndex) continue;
       button.focus({ preventScroll: true });
       break;
     }
@@ -16996,21 +23799,23 @@ function renderPlaylistOrbit(playlists) {
   window.requestAnimationFrame(updateActivePlaylistCard);
 }
 
-async function refreshUserPlaylists() {
-  if (document.hidden || state.playlistsLoading) return;
+async function refreshUserPlaylists(options = {}) {
+  if ((document.hidden && options.force !== true) || state.playlistsLoading) return playbackPlaylists();
   const provider = state.activeProvider;
   if (!providerConfigured(provider)) {
     state.playlistsLoggedIn = false;
     state.userPlaylists = [];
     state.recommendedPlaylists = [];
     renderPlaylistOrbit(playbackPlaylists());
-    return;
+    return playbackPlaylists();
   }
   state.playlistsLoading = true;
   try {
     const [libraryResult, recommendationResult] = await Promise.allSettled([
-      apiJson(providerPath('/user/playlists', provider)),
-      apiJson(`/api/recommend/playlists?${query({ provider, limit: 12 })}`)
+      apiJson(providerPath('/user/playlists', provider), { timeoutMs: COMMUNITY_API_TIMEOUT_MS }),
+      apiJson(`/api/recommend/playlists?${query({ provider, limit: 12 })}`, {
+        timeoutMs: COMMUNITY_API_TIMEOUT_MS
+      })
     ]);
     if (provider !== state.activeProvider) return;
     const library = libraryResult.status === 'fulfilled' ? libraryResult.value : {};
@@ -17037,6 +23842,7 @@ async function refreshUserPlaylists() {
   } finally {
     state.playlistsLoading = false;
   }
+  return playbackPlaylists();
 }
 
 function scheduleUserPlaylistsRefresh(delay = 0) {
@@ -17212,6 +24018,7 @@ function showCommunityPageFromPlayback() {
   state.playbackChrome.communityVisible = true;
   setCommunityCardCollapsed(false);
   syncPlaybackChromeClasses();
+  scheduleCommunityRefresh(0);
 }
 
 function focusCommunityDrawerControl(open) {
@@ -17225,7 +24032,10 @@ function focusCommunityDrawerControl(open) {
 function toggleCommunityPageFromPlayback() {
   const visible = !state.playbackChrome.communityVisible;
   state.playbackChrome.communityVisible = visible;
-  if (visible) setCommunityCardCollapsed(false);
+  if (visible) {
+    setCommunityCardCollapsed(false);
+    scheduleCommunityRefresh(0);
+  }
   syncPlaybackChromeClasses();
   focusCommunityDrawerControl(visible);
 }
@@ -17288,6 +24098,7 @@ const PLAYBACK_CARD_PROVIDER_ACCENTS = Object.freeze({
   local: '#7dd3fc'
 });
 const PLAYBACK_CARD_VISIBILITY_TRANSITION_MS = 240;
+const PLAYBACK_CARD_EXPANSION_TRANSITION_MS = 360;
 
 function playbackCardSong(song = state.currentSong) {
   return song || null;
@@ -17317,9 +24128,57 @@ function syncQishuiPlaybackExpansion() {
   }
 }
 
+function cancelQishuiPlaybackExpansionAnimations() {
+  [els.qishuiPlaybackPhone, els.qishuiPlaybackPhone?.querySelector('.qishui-playback-content')]
+    .filter(Boolean)
+    .forEach((element) => {
+      element.getAnimations().forEach((animation) => {
+        if (animation.id?.startsWith('fe-qishui-playback-expand-')) animation.cancel();
+      });
+    });
+}
+
+function animateQishuiPlaybackExpansion(previousBounds) {
+  if (!els.qishuiPlaybackPhone || reducedMotion || !previousBounds) return;
+  const nextBounds = els.qishuiPlaybackPhone.getBoundingClientRect();
+  if (previousBounds.width <= 0 || nextBounds.width <= 0) return;
+  const inlineScale = previousBounds.width / nextBounds.width;
+  if (!Number.isFinite(inlineScale) || Math.abs(inlineScale - 1) < 0.01) return;
+
+  cancelQishuiPlaybackExpansionAnimations();
+  const options = {
+    duration: PLAYBACK_CARD_EXPANSION_TRANSITION_MS,
+    easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+    fill: 'both'
+  };
+  const surfaceAnimation = els.qishuiPlaybackPhone.animate([
+    { transform: `scaleX(${inlineScale.toFixed(5)})`, opacity: 0.96 },
+    { transform: 'scaleX(1)', opacity: 1 }
+  ], options);
+  surfaceAnimation.id = 'fe-qishui-playback-expand-surface';
+
+  const content = els.qishuiPlaybackPhone.querySelector('.qishui-playback-content');
+  const contentAnimation = content?.animate([
+    { transform: `translate3d(${state.qishuiPlaybackCard.expanded ? 10 : -10}px, 0, 0)`, opacity: 0.42 },
+    { offset: 0.34, transform: 'translate3d(0, 0, 0)', opacity: 0.72 },
+    { transform: 'translate3d(0, 0, 0)', opacity: 1 }
+  ], options);
+  if (contentAnimation) contentAnimation.id = 'fe-qishui-playback-expand-content';
+
+  Promise.allSettled([
+    surfaceAnimation.finished,
+    contentAnimation?.finished || Promise.resolve()
+  ]).then(() => {
+    surfaceAnimation.cancel();
+    contentAnimation?.cancel();
+  });
+}
+
 function setQishuiPlaybackExpanded(expanded) {
+  const previousBounds = els.qishuiPlaybackPhone?.getBoundingClientRect();
   state.qishuiPlaybackCard.expanded = !!expanded;
   syncQishuiPlaybackExpansion();
+  animateQishuiPlaybackExpansion(previousBounds);
   scheduleQishuiPlaybackLyricLayout();
 }
 
@@ -17663,12 +24522,8 @@ function qishuiPlaybackBookFrame(lines, playbackTime = Number.NaN) {
   const currentTime = Number.isFinite(Number(playbackTime))
     ? Math.max(0, Number(playbackTime))
     : currentPlaybackLyricTime();
-  const activeIndex = findLyricIndexAtTime(
-    lines,
-    currentTime,
-    BOOK_LYRIC_VISUAL_LEAD_SECONDS
-  );
-  const displayTime = lyricTimelineTime(currentTime, BOOK_LYRIC_VISUAL_LEAD_SECONDS);
+  const displayTime = effectivePlaybackLyricTime(currentTime, BOOK_LYRIC_VISUAL_LEAD_SECONDS);
+  const activeIndex = findLyricIndexAtDisplayTime(lines, displayTime);
   const line = lines[activeIndex] || {};
   const nextLine = lines[activeIndex + 1];
   const timedEnd = Number(line.endTime);
@@ -17683,8 +24538,7 @@ function qishuiPlaybackBookFrame(lines, playbackTime = Number.NaN) {
   const progressPercent = lyricProgressForLineAtTime(
     line,
     displayTime,
-    progressEndTime,
-    { linear: true }
+    progressEndTime
   ) * 100;
   return { activeIndex, currentTime: displayTime, progressPercent };
 }
@@ -17694,6 +24548,7 @@ function scheduleQishuiPlaybackLyricLayout() {
   state.qishuiPlaybackCard.lyricBookLayoutFrame = window.requestAnimationFrame(() => {
     state.qishuiPlaybackCard.lyricBookLayoutFrame = 0;
     resetBookLyricScrollState({ store: state.qishuiPlaybackCard });
+    invalidateSequentialLyricHighlights(els.qishuiPlaybackLyricPage);
     updateQishuiPlaybackLyrics(state.lyricDisplayText, state.lyricSubtitleText);
   });
 }
@@ -17822,7 +24677,8 @@ function updateQishuiPlaybackLyrics(
           activeIndex,
           reducedMotion: reducedMotion,
           playbackRunning,
-          clockTime: currentTime
+          clockTime: currentTime,
+          responseSeconds: QISHUI_LYRIC_SCROLL_SETTLE_SECONDS
         })
       : false;
   // Once the line reaches the reading position, keep its highlight latched
@@ -17837,7 +24693,10 @@ function updateQishuiPlaybackLyrics(
   list.dataset.scrollDirection = direction;
 
   if (!current) return;
-  const visibleProgress = arrived ? clamp(Number(progressPercent) || 0, 0, 100) : 0;
+  // Keep the media-clock progress live while the new row glides into place.
+  // Otherwise a slow layout frame holds the mask at zero and then makes it
+  // jump forward as soon as centring completes.
+  const visibleProgress = clamp(Number(progressPercent) || 0, 0, 100);
   current.classList.toggle('is-arriving', !arrived);
   current.classList.toggle('is-current', arrived);
   current.classList.toggle('is-scroll-arrived', arrived);
@@ -17974,6 +24833,8 @@ async function commitQishuiPlaybackSeek() {
     updateQishuiPlaybackProgress();
     return false;
   }
+  const resumeNativeAfterSeek = !!els.audio?.src && !els.audio.paused && !els.audio.ended;
+  await invalidateNativeGoogleObrTimeline('seek');
   const audioDuration = Number(els.audio && els.audio.duration);
   if (Number.isFinite(audioDuration) && audioDuration > 0) {
     state.qishuiPlaybackCard.seekHandoffTarget = target;
@@ -17991,6 +24852,7 @@ async function commitQishuiPlaybackSeek() {
   updateQishuiPlaybackProgress(target, duration, { forceRange: true });
   resetLyricFrameSync();
   syncPlaybackLyricAtTime(target);
+  if (resumeNativeAfterSeek) ensureAudioAnalysis({ announceObrFailure: false }).catch(() => {});
   if (!state.localQueueActive) {
     const requestId = state.qishuiPlaybackCard.seekRequestId + 1;
     state.qishuiPlaybackCard.seekRequestId = requestId;
@@ -18336,8 +25198,10 @@ function updatePlaybackPageClass() {
 }
 
 function enterPlaybackPage() {
+  const activationToken = ++presetRuntimeActivationToken;
   state.playbackPage = true;
   updatePlaybackPageClass();
+  void ensureActivePresetRuntime(state.diyPreset, activationToken);
   renderPlaylistOrbit(playbackPlaylists());
   requestOrbFrame();
 }
@@ -18349,10 +25213,12 @@ function enterPresetPlaybackPage(preset) {
   setDiyOpen(false);
   setDiyPreset(preset);
   enterPlaybackPage();
+  if (normalizeDiyPreset(preset) !== 'lyric') unlockAppAchievement('visual-first');
 }
 
 function returnHomePage() {
   state.playbackPage = false;
+  clearRainGlassOverlay();
   state.playbackPlaylistPickerOpen = false;
   closePlaylistShelf({ reopenPicker: false });
   if (state.diyOpen) setDiyOpen(false);
@@ -18419,15 +25285,39 @@ function shelfMeta(playlist, songs) {
   return creator ? `${count} 首 · ${creator}` : `${count} 首`;
 }
 
+function createReusableShelfSongCoverImage(cover) {
+  const image = document.createElement('img');
+  image.alt = '';
+  image.loading = 'lazy';
+  image.decoding = 'async';
+  image.addEventListener('load', () => {
+    if (image.getAttribute('src') === image.dataset.src) cover.classList.add('has-cover');
+  });
+  image.addEventListener('error', () => {
+    if (!image.getAttribute('src') || image.getAttribute('src') !== image.dataset.src) return;
+    cover.classList.remove('has-cover');
+    image.removeAttribute('src');
+    delete image.dataset.src;
+    image.hidden = true;
+  });
+  cover.appendChild(image);
+  return image;
+}
+
 function createShelfSongButton(song, index) {
   const button = document.createElement('button');
   button.className = 'shelf-song-button';
   button.type = 'button';
   button.dataset.songIndex = String(index);
+  button.__feSongIndex = index;
   button.dataset.songId = safeText(song.id, '');
   button.style.setProperty('--song-depth', `${8 + Math.min(index % 5, 4) * 9}px`);
   button.style.setProperty('--song-delay', `${Math.min(index, 8) * 28}ms`);
   button.setAttribute('role', 'option');
+  button.setAttribute('aria-selected', 'false');
+  button.setAttribute('aria-posinset', String(index + 1));
+  button.setAttribute('aria-setsize', String(state.activePlaylistSongs.length));
+  button.tabIndex = -1;
   button.setAttribute('aria-label', `播放：${safeText(song.title, '未命名歌曲')}`);
 
   const number = document.createElement('span');
@@ -18440,15 +25330,10 @@ function createShelfSongButton(song, index) {
   coverFallback.textContent = 'FE';
   cover.appendChild(coverFallback);
   const coverUrl = proxiedImageUrl(song.cover || '');
+  let coverImage = null;
   if (coverUrl) {
-    const image = document.createElement('img');
-    image.alt = '';
-    image.loading = 'lazy';
-    image.decoding = 'async';
-    image.dataset.src = coverUrl;
-    image.addEventListener('load', () => cover.classList.add('has-cover'));
-    image.addEventListener('error', () => removeElement(image));
-    cover.appendChild(image);
+    coverImage = createReusableShelfSongCoverImage(cover);
+    coverImage.dataset.src = coverUrl;
   }
 
   const copy = document.createElement('span');
@@ -18475,7 +25360,63 @@ function createShelfSongButton(song, index) {
   button.appendChild(copy);
   button.appendChild(duration);
   button.appendChild(play);
+  button.__feShelfSongRefs = {
+    number,
+    cover,
+    coverImage,
+    title,
+    meta,
+    duration
+  };
   return button;
+}
+
+function updateShelfSongButtonContent(button, song, index) {
+  button.__feSongIndex = index;
+  button.dataset.songIndex = String(index);
+  button.dataset.songId = safeText(song.id, '');
+  button.style.setProperty('--song-depth', `${8 + Math.min(index % 5, 4) * 9}px`);
+  button.style.setProperty('--song-delay', `${Math.min(index, 8) * 28}ms`);
+  button.setAttribute('aria-label', `\u64ad\u653e\uff1a${safeText(song.title, '\u672a\u547d\u540d\u6b4c\u66f2')}`);
+  button.setAttribute('aria-posinset', String(index + 1));
+  button.setAttribute('aria-setsize', String(state.activePlaylistSongs.length));
+  button.classList.remove('is-current');
+  button.removeAttribute('aria-current');
+
+  const refs = button.__feShelfSongRefs || {};
+  const number = refs.number || button.querySelector('.shelf-song-index');
+  if (number) number.textContent = String(index + 1).padStart(2, '0');
+  const title = refs.title || button.querySelector('.shelf-song-copy strong');
+  if (title) title.textContent = safeText(song.title, '\u672a\u547d\u540d\u6b4c\u66f2');
+  const meta = refs.meta || button.querySelector('.shelf-song-copy small');
+  if (meta) meta.textContent = shelfSongSubtitle(song);
+  const duration = refs.duration || button.querySelector('.shelf-song-duration');
+  if (duration) duration.textContent = song.duration ? formatTime(Number(song.duration)) : '--:--';
+
+  const cover = refs.cover || button.querySelector('.shelf-song-cover');
+  if (!cover) return;
+  cover.classList.remove('has-cover');
+  const coverUrl = proxiedImageUrl(song.cover || '');
+  let image = refs.coverImage || cover.querySelector('img');
+  if (!coverUrl) {
+    if (image) {
+      delete image.dataset.src;
+      image.removeAttribute('src');
+      image.hidden = true;
+    }
+    return;
+  }
+  if (!image) {
+    image = createReusableShelfSongCoverImage(cover);
+    refs.coverImage = image;
+  }
+  image.hidden = false;
+  if (image.dataset.src !== coverUrl) {
+    image.removeAttribute('src');
+    image.dataset.src = coverUrl;
+  } else if (image.complete && image.naturalWidth > 0 && image.hasAttribute('src')) {
+    cover.classList.add('has-cover');
+  }
 }
 
 function setShelfCurrentSongButtonState(button, current) {
@@ -18514,6 +25455,16 @@ function updateShelfCurrentSong() {
   state.shelfCurrentSongId = currentId;
 }
 
+function shelfSongPoolRange(focusIndex) {
+  const songCount = state.activePlaylistSongs.length;
+  const radius = PLAYLIST_SONG_RENDER_RADIUS + PLAYLIST_SONG_RENDER_BUFFER;
+  const capacity = Math.min(songCount, radius * 2 + 1);
+  const start = capacity
+    ? clamp(Math.round(focusIndex) - radius, 0, songCount - capacity)
+    : 0;
+  return { start, end: start + capacity - 1, capacity };
+}
+
 function renderShelfSongsInto(stack, focusIndex) {
   if (!stack) return [];
   clearElement(stack);
@@ -18526,9 +25477,7 @@ function renderShelfSongsInto(stack, focusIndex) {
   }
 
   const fragment = document.createDocumentFragment();
-  const radius = PLAYLIST_SONG_RENDER_RADIUS + PLAYLIST_SONG_RENDER_BUFFER;
-  const start = Math.max(0, focusIndex - radius);
-  const end = Math.min(state.activePlaylistSongs.length - 1, focusIndex + radius);
+  const { start, end } = shelfSongPoolRange(focusIndex);
   const buttons = [];
   for (let index = start; index <= end; index += 1) {
     const song = state.activePlaylistSongs[index];
@@ -18542,9 +25491,71 @@ function renderShelfSongsInto(stack, focusIndex) {
   return buttons;
 }
 
+function recycleShelfSongsInto(stack, buttons, focusIndex) {
+  const range = shelfSongPoolRange(focusIndex);
+  if (!stack || buttons.length !== range.capacity || !range.capacity) {
+    return renderShelfSongsInto(stack, focusIndex);
+  }
+
+  const currentStart = shelfSongButtonIndex(buttons[0]);
+  const currentEnd = shelfSongButtonIndex(buttons[buttons.length - 1]);
+  const canRotateForward = range.start > currentStart
+    && range.start <= currentEnd
+    && currentEnd - currentStart + 1 === buttons.length;
+  const canRotateBackward = range.start < currentStart
+    && range.end >= currentStart
+    && currentEnd - currentStart + 1 === buttons.length;
+
+  if (canRotateForward) {
+    const shift = range.start - currentStart;
+    for (let offset = 0; offset < shift; offset += 1) {
+      const button = buttons.shift();
+      const itemIndex = currentEnd + offset + 1;
+      updateShelfSongButtonContent(button, state.activePlaylistSongs[itemIndex], itemIndex);
+      buttons.push(button);
+    }
+  } else if (canRotateBackward) {
+    const shift = currentStart - range.start;
+    for (let offset = 0; offset < shift; offset += 1) {
+      const button = buttons.pop();
+      const itemIndex = currentStart - offset - 1;
+      updateShelfSongButtonContent(button, state.activePlaylistSongs[itemIndex], itemIndex);
+      buttons.unshift(button);
+    }
+  } else if (currentStart !== range.start || currentEnd !== range.end) {
+    buttons.forEach((button, offset) => {
+      const itemIndex = range.start + offset;
+      updateShelfSongButtonContent(button, state.activePlaylistSongs[itemIndex], itemIndex);
+    });
+  }
+
+  for (const button of buttons) {
+    updateSongButtonFocusVisual(button, shelfSongButtonIndex(button), focusIndex);
+  }
+  return buttons;
+}
+
 function renderShelfSongWindow(focusIndex) {
   state.songButtonBackCache = renderShelfSongsInto(els.playlistSongStackBack, focusIndex);
   state.songButtonCache = renderShelfSongsInto(els.playlistSongStack, focusIndex);
+  rebuildShelfSongButtonLookup();
+  state.shelfCurrentSongButtons = [];
+  state.shelfCurrentSongId = '';
+  updateShelfCurrentSong();
+}
+
+function recycleShelfSongWindow(focusIndex) {
+  state.shelfCurrentSongButtons.forEach((button) => setShelfCurrentSongButtonState(button, false));
+  state.songButtonBackCache = recycleShelfSongsInto(
+    els.playlistSongStackBack,
+    state.songButtonBackCache,
+    focusIndex
+  );
+  state.songButtonCache = recycleShelfSongsInto(
+    els.playlistSongStack,
+    state.songButtonCache,
+    focusIndex
+  );
   rebuildShelfSongButtonLookup();
   state.shelfCurrentSongButtons = [];
   state.shelfCurrentSongId = '';
@@ -18731,65 +25742,91 @@ async function loadPlaylistFromCard(card) {
   }
 }
 
-async function playShelfSong(button) {
-  const index = Number(button.dataset.songIndex);
-  let song = state.activePlaylistSongs[index];
-  if (!song) return;
-  if (index !== state.songFocusIndex) {
-    setSongFocus(index);
+async function playlistTracksForPlayback(playlist = {}) {
+  if (playlist.local || playlist.provider === 'local' || String(playlist.id) === LOCAL_PLAYLIST_ID) {
+    return state.localPlaylistSongs.slice();
   }
+  if (
+    String(state.activePlaylist?.id || '') === String(playlist.id || '')
+    && safeText(state.activePlaylist?.provider, state.activeProvider) === safeText(playlist.provider, state.activeProvider)
+    && state.activePlaylistSongs.length
+  ) {
+    return state.activePlaylistSongs.slice();
+  }
+  const provider = safeText(playlist.provider, state.activeProvider);
+  const data = await apiJson(`${providerPath('/playlist/tracks', provider)}?${query({ id: playlist.id })}`);
+  return Array.isArray(data.songs) ? data.songs.slice(0, 2000) : [];
+}
 
-  button.classList.add('is-loading');
-  button.disabled = true;
-  try {
-    if (isLocalSong(song)) {
-      state.queue = state.activePlaylistSongs;
-      state.queueIndex = index;
-      state.localQueueActive = true;
-      const loaded = await loadSong(song);
-      if (loaded) {
-        updateShelfCurrentSong();
-        setSongFocus(index);
-        closePlaylistShelf({ reopenPicker: false });
-        toast(`正在播放：${safeText(song.title, '本地歌曲')}`);
-      }
-      return;
-    }
-    let playbackQueue = state.activePlaylistSongs;
+async function playPlaylistTracks(playlist, songs, requestedIndex = 0, options = {}) {
+  const tracks = Array.isArray(songs) ? songs.filter(Boolean).slice(0, 2000) : [];
+  if (!tracks.length) throw new Error('The selected playlist has no playable songs.');
+  const index = clamp(Math.floor(Number(requestedIndex) || 0), 0, tracks.length - 1);
+  let song = tracks[index];
+  state.activePlaylistId = safeText(playlist?.id, '');
+  state.activePlaylist = playlist ? { ...playlist } : null;
+  state.activePlaylistSongs = tracks;
+
+  if (isLocalSong(song)) {
+    state.queue = tracks;
+    state.queueLength = tracks.length;
+    state.queueIndex = index;
+    state.localQueueActive = true;
+    const loaded = await loadSong(song, { silent: options.silent === true });
+    if (!loaded) throw new Error('The local song could not be played.');
+  } else {
+    let playbackQueue = tracks;
     let playbackQueueIndex = index;
     if (isQishuiMetadataSong(song)) {
       const matched = await resolveQishuiMetadataViaGuestSearch(song);
       if (!matched) {
-        throw new Error('未找到可公开播放的游客搜索匹配；未读取或解密汽水受保护音源');
+        throw new Error('No public guest-search match was found; protected Qishui audio was not read or decrypted.');
       }
       song = matched;
       playbackQueue = [matched];
       playbackQueueIndex = 0;
     }
-    await apiJson('/api/player/queue', {
+    const queueState = await apiJson('/api/player/queue', {
       method: 'POST',
       body: JSON.stringify({ songs: playbackQueue, currentIndex: playbackQueueIndex })
     });
     state.queue = playbackQueue;
+    state.queueLength = Number.isInteger(queueState?.queueLength) ? queueState.queueLength : playbackQueue.length;
+    state.queueRevision = Number.isInteger(queueState?.queueRevision) ? queueState.queueRevision : state.queueRevision;
     state.queueIndex = playbackQueueIndex;
-    let loaded = await loadSong(song, { silent: true });
-    if (!loaded) {
-      loaded = await transport('/api/player/next', {
-        maxAttempts: playbackQueue.length,
-        autoSkipUnavailable: true,
-        unavailableReason: `${safeText(song.title, '当前歌曲')}没有可用音源`
-      });
-    }
-    if (loaded) {
-      await refreshPlayerState();
-      updateShelfCurrentSong();
-      const playingIndex = state.activePlaylistSongs.findIndex((item) => (
-        String(item.id || '') === String(state.currentSong?.id || '')
-      ));
-      setSongFocus(playingIndex >= 0 ? playingIndex : index);
-      closePlaylistShelf({ reopenPicker: false });
-      toast(`正在播放：${safeText(song.title, '歌曲')}`);
-    }
+    state.localQueueActive = false;
+    const loaded = await loadSong(song, { silent: true });
+    if (!loaded) throw new Error(
+      `${safeText(song.title, '\u6240\u9009\u6b4c\u66f2')} \u5f53\u524d\u8d26\u53f7\u65e0\u64ad\u653e\u6743\u9650\uff0c\u53ef\u80fd\u9700\u8981 VIP \u6216\u53d7\u7248\u6743\u9650\u5236\u3002`
+    );
+    await refreshPlayerState().catch(() => {});
+  }
+
+  updateShelfCurrentSong();
+  const playingIndex = tracks.findIndex((item) => String(item.id || '') === String(state.currentSong?.id || ''));
+  if (options.updateShelf !== false) setSongFocus(playingIndex >= 0 ? playingIndex : index);
+  if (options.closeShelf === true) closePlaylistShelf({ reopenPicker: false });
+  return {
+    started: state.currentSong ? petAssistantSongSummary(state.currentSong) : petAssistantSongSummary(song),
+    index: playingIndex >= 0 ? playingIndex : index,
+    playlist: { id: safeText(playlist?.id, ''), name: safeText(playlist?.name, '') },
+    queueLength: state.queueLength
+  };
+}
+
+async function playShelfSong(button) {
+  const index = Number(button.dataset.songIndex);
+  const song = state.activePlaylistSongs[index];
+  if (!song) return;
+  if (index !== state.songFocusIndex) setSongFocus(index);
+  button.classList.add('is-loading');
+  button.disabled = true;
+  try {
+    const result = await playPlaylistTracks(state.activePlaylist, state.activePlaylistSongs, index, {
+      closeShelf: true,
+      updateShelf: true
+    });
+    toast(`正在播放：${safeText(result.started?.title, safeText(song.title, '歌曲'))}`);
   } catch (error) {
     toast(error.message);
   } finally {
@@ -18824,6 +25861,7 @@ const LYRIC_TIME_PATTERN = /^(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?$/;
 const LYRIC_INLINE_MARKER_PATTERN = /<(\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?)>/g;
 const LYRIC_LRC_TIMESTAMP_PATTERN = /\[([0-9:.]+)\]/g;
 const LYRIC_LRC_TAG_PATTERN = /\[[^\]]+\]/g;
+const LYRIC_LRC_OFFSET_PATTERN = /\[offset\s*:\s*([+-]?\d+(?:\.\d+)?)\s*\]/i;
 const LYRIC_KARAOKE_LINE_PATTERN = /^\[(\d+)\s*,\s*(\d+)\](.*)$/;
 const LYRIC_KARAOKE_TOKEN_PATTERN = /(?:\((\d+)\s*,\s*(\d+)(?:\s*,\s*[^)]*)?\)|<(\d+)\s*,\s*(\d+)(?:\s*,\s*[^>]*)?>)([^()<]*)/g;
 
@@ -18981,6 +26019,12 @@ function completeLineWordTimings(lines) {
 
 function parseLrc(text, trackId = LYRIC_TRACK_MAIN) {
   if (!text || typeof text !== 'string') return [];
+  const offsetMilliseconds = Number(LYRIC_LRC_OFFSET_PATTERN.exec(text)?.[1]);
+  const offsetSeconds = Number.isFinite(offsetMilliseconds) ? offsetMilliseconds / 1000 : 0;
+  const shiftTimestamp = (value) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? Math.max(0, numeric + offsetSeconds) : value;
+  };
   const lines = [];
   text.split(/\r?\n/).forEach((rawLine) => {
     const stamps = Array.from(rawLine.matchAll(LYRIC_LRC_TIMESTAMP_PATTERN));
@@ -18988,16 +26032,25 @@ function parseLrc(text, trackId = LYRIC_TRACK_MAIN) {
     const times = stamps
       .map((stamp) => parseLyricTime(stamp[1]))
       .filter((time) => Number.isFinite(time));
-    const time = times[times.length - 1];
-    if (!Number.isFinite(time)) return;
+    const rawTime = times[times.length - 1];
+    if (!Number.isFinite(rawTime)) return;
+    const time = shiftTimestamp(rawTime);
     const parsed = parseInlineLrcLyric(rawLine.replace(LYRIC_LRC_TAG_PATTERN, ''), trackId);
     if (!parsed.text || isLyricCreditLine(parsed.text)) return;
     lines.push({
       time,
       text: parsed.text,
       trackId,
-      wordTimings: parsed.wordTimings,
-      glyphTimings: parsed.glyphTimings
+      wordTimings: parsed.wordTimings.map((timing) => ({
+        ...timing,
+        startTime: shiftTimestamp(timing.startTime)
+      })),
+      glyphTimings: parsed.glyphTimings.map((timing) => ({
+        ...timing,
+        start: shiftTimestamp(timing.start),
+        end: shiftTimestamp(timing.end),
+        startTime: shiftTimestamp(timing.startTime)
+      }))
     });
   });
   return completeLineWordTimings(normalizeParsedLyricLines(lines));
@@ -19406,17 +26459,636 @@ function lyricAutoSpeedScale(lines, song = state.currentSong) {
 }
 
 function autoDetectLyricSpeed(lines, song = state.currentSong) {
-  const scale = lyricAutoSpeedScale(lines, song);
-  state.lyricTimingScale = scale;
-  if (scale === 1) return autoFitPlainLyricLinePacing(lines, song);
-  const anchorTime = Math.max(0, Number(lines[0] && lines[0].time) || 0);
-  return autoFitPlainLyricLinePacing(lines.map((line) => scaleLyricLineTiming(line, anchorTime, scale)), song);
+  // Provider timestamps are authoritative; track duration can include untimed intros and outros.
+  state.lyricTimingScale = 1;
+  return autoFitPlainLyricLinePacing(lines, song);
 }
 
-function setPlaybackLayerText(layer, text) {
+function lyricLineVisualUnits(text) {
+  const value = String(text || '');
+  let graphemes;
+  if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
+    const segmenter = lyricLineVisualUnits.segmenter
+      || (lyricLineVisualUnits.segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' }));
+    graphemes = Array.from(segmenter.segment(value), (entry) => entry.segment);
+  } else {
+    graphemes = Array.from(value);
+  }
+  return graphemes.reduce((total, grapheme) => {
+    if (/^\s+$/u.test(grapheme)) return total + 0.32;
+    if (isCjkLyricGlyph(grapheme) || /\p{Extended_Pictographic}/u.test(grapheme)) {
+      return total + 1;
+    }
+    if (/^[A-Z0-9]$/u.test(grapheme)) return total + 0.78;
+    if (/^[a-z]$/u.test(grapheme)) return total + 0.6;
+    if (/^[\p{P}\p{S}]$/u.test(grapheme)) return total + 0.34;
+    return total + 0.72;
+  }, 0);
+}
+
+function lyricLineFitMode(text) {
+  const visualUnits = lyricLineVisualUnits(text);
+  if (visualUnits > 42) return 'compact';
+  if (visualUnits > 24) return 'long';
+  return 'standard';
+}
+
+function lyricLineFitMetrics(text, letterSpacing = 0) {
+  const value = String(text || '');
+  const cached = lyricLineFitMetrics.__cached;
+  const viewportWidth = Math.max(320, Number(window.innerWidth) || 1280);
+  const spacing = clamp(Number(letterSpacing) || 0, 0, 12);
+  if (
+    cached?.text === value
+    && cached.viewportWidth === viewportWidth
+    && cached.letterSpacing === spacing
+  ) return cached;
+  const visualUnits = Math.max(1, lyricLineVisualUnits(value));
+  const availableWidth = Math.max(240, Math.min(1080, viewportWidth - 96));
+  const graphemeCount = Math.max(1, Array.from(value).length);
+  const glyphWidth = Math.max(80, availableWidth - Math.max(0, graphemeCount - 1) * spacing);
+  const nominalFontSize = clamp(viewportWidth * 0.05, 38, 64);
+  const fontSize = clamp(
+    Math.min(nominalFontSize, glyphWidth / (visualUnits * 1.12)),
+    7.5,
+    nominalFontSize
+  );
+  const metrics = {
+    text: value,
+    viewportWidth,
+    letterSpacing: spacing,
+    visualUnits,
+    fontSize,
+    mode: visualUnits > 42 ? 'compact' : visualUnits > 24 ? 'long' : 'standard'
+  };
+  lyricLineFitMetrics.__cached = metrics;
+  return metrics;
+}
+
+function focusEchoFitMetrics(text, letterSpacing = 0) {
+  const value = String(text || '');
+  const cached = focusEchoFitMetrics.__cached;
+  const viewportWidth = Math.max(320, Number(window.innerWidth) || 1280);
+  const spacing = clamp(Number(letterSpacing) || 0, 0, 12);
+  if (
+    cached?.text === value
+    && cached.viewportWidth === viewportWidth
+    && cached.letterSpacing === spacing
+  ) return cached;
+  const visualUnits = Math.max(1, lyricLineVisualUnits(value));
+  const availableWidth = Math.max(240, Math.min(1080, viewportWidth - 96));
+  const graphemeCount = Math.max(1, Array.from(value).length);
+  const glyphWidth = Math.max(80, availableWidth - Math.max(0, graphemeCount - 1) * spacing);
+  const nominalFontSize = clamp(viewportWidth * 0.102, 42, 96);
+  const metrics = {
+    text: value,
+    viewportWidth,
+    letterSpacing: spacing,
+    visualUnits,
+    fontSize: clamp(
+      Math.min(nominalFontSize, glyphWidth / (visualUnits * 1.12)),
+      12,
+      nominalFontSize
+    ),
+    mode: visualUnits > 32 ? 'compact' : visualUnits > 18 ? 'long' : 'standard'
+  };
+  focusEchoFitMetrics.__cached = metrics;
+  return metrics;
+}
+
+function lyricSubtitleFitMetrics(text, letterSpacing = 0, fontScale = 1) {
+  const value = String(text || '');
+  const cached = lyricSubtitleFitMetrics.__cached;
+  const viewportWidth = Math.max(320, Number(window.innerWidth) || 1280);
+  const spacing = clamp(Number(letterSpacing) || 0, 0, 12);
+  const scale = clamp(Number(fontScale) || 1, 0.5, 1.8);
+  if (
+    cached?.text === value
+    && cached.viewportWidth === viewportWidth
+    && cached.letterSpacing === spacing
+    && cached.fontScale === scale
+  ) return cached;
+  const visualUnits = Math.max(1, lyricLineVisualUnits(value));
+  const availableWidth = Math.max(240, Math.min(1080, viewportWidth - 96));
+  const graphemeCount = Math.max(1, Array.from(value).length);
+  const glyphWidth = Math.max(80, availableWidth - Math.max(0, graphemeCount - 1) * spacing);
+  const nominalFontSize = clamp(viewportWidth * 0.0205, 20, 30) * scale;
+  const metrics = {
+    text: value,
+    viewportWidth,
+    letterSpacing: spacing,
+    fontScale: scale,
+    visualUnits,
+    fontSize: clamp(
+      Math.min(nominalFontSize, glyphWidth / (visualUnits * 1.12)),
+      6,
+      nominalFontSize
+    )
+  };
+  lyricSubtitleFitMetrics.__cached = metrics;
+  return metrics;
+}
+
+function setPlaybackLayerText(
+  layer,
+  text,
+  fit = lyricLineFitMetrics(text, state.textComposerSettings?.letterSpacing)
+) {
+  const metrics = typeof fit === 'string'
+    ? { ...lyricLineFitMetrics(text), mode: fit }
+    : fit;
   clearElement(layer);
   layer.textContent = text;
   layer.setAttribute('data-text', text);
+  layer.classList.toggle('is-lyric-long', metrics.mode === 'long');
+  layer.classList.toggle('is-lyric-compact', metrics.mode === 'compact');
+  layer.style.setProperty('--lyric-fit-font-size', `${metrics.fontSize.toFixed(3)}px`);
+  layer.__wordGlow = null;
+}
+
+function focusEchoFallbackText(text) {
+  const source = safeText(text, '').replace(/\s+/g, ' ').trim();
+  if (!source) return '';
+  const cjkGlyphs = source.match(
+    /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu
+  ) || [];
+  if (cjkGlyphs.length) {
+    if (cjkGlyphs.length <= 4) return cjkGlyphs.join('');
+    const start = Math.max(0, Math.floor((cjkGlyphs.length - 2) / 2));
+    return cjkGlyphs.slice(start, start + Math.min(3, cjkGlyphs.length - start)).join('');
+  }
+
+  const words = source.match(/[A-Za-z0-9]+(?:[\u0027\u2019][A-Za-z0-9]+)*/g) || [];
+  if (!words.length) return source;
+  if (words.length === 1) return words[0];
+  const lower = words.map((word) => word.toLocaleLowerCase());
+  const first = lower[0];
+  if (/^(?:wait|hold|listen|look)$/.test(first)) {
+    const phrase = words[1] && words[1].length <= 3
+      ? `${first} ${words[1]}`
+      : first;
+    return phrase;
+  }
+  if (/^(?:i|i['\u2019](?:m|ve|d|ll)|we['\u2019](?:re|ve|d|ll))$/.test(first)) {
+    return words[0];
+  }
+
+  const stopwords = new Set([
+    'a', 'an', 'and', 'are', 'as', 'at', 'be', 'been', 'but', 'can', 'did', 'do',
+    'does', 'ever', 'for', 'from', 'had', 'has', 'have', 'he', 'her', 'him', 'his',
+    'how', 'i', 'if', 'in', 'is', 'it', 'its', 'me', 'my', 'of', 'on', 'or', 'our',
+    'she', 'that', 'the', 'their', 'them', 'they', 'this', 'to', 'us', 'was', 'we',
+    'were', 'what', 'when', 'where', 'which', 'who', 'why', 'will', 'with', 'would',
+    'you', 'your'
+  ]);
+  const center = (words.length - 1) / 2;
+  const candidates = words
+    .map((word, index) => {
+      const normalized = lower[index];
+      if (stopwords.has(normalized)) return null;
+      const centerScore = Math.max(0, 8 - Math.abs(index - center) * 2);
+      const lengthScore = normalized.length >= 8 ? 4 : normalized.length >= 6 ? 3 : 1;
+      const motionScore = /(?:ing|ed|en)$/.test(normalized) ? 5 : 0;
+      const edgePenalty = words.length > 3 && index === words.length - 1 ? 4 : 0;
+      return { word, index, score: centerScore + lengthScore + motionScore - edgePenalty };
+    })
+    .filter(Boolean)
+    .sort((left, right) => right.score - left.score || left.index - right.index);
+  if (candidates.length) return candidates[0].word;
+  const middle = Math.max(0, Math.floor((words.length - 1) / 2));
+  return words.slice(middle, Math.min(words.length, middle + 2)).join(' ');
+}
+
+function focusEchoExplicitText(line) {
+  return safeText(
+    line?.focusText
+      ?? line?.focus_text
+      ?? line?.focus
+      ?? line?.keyword
+      ?? line?.emphasisText,
+    ''
+  ).trim();
+}
+
+function focusEchoKeywordText(line, fallbackText = '') {
+  const explicit = focusEchoExplicitText(line);
+  if (explicit) return explicit;
+  return focusEchoFallbackText(safeText(line?.text, fallbackText));
+}
+
+function resolvedFocusEchoText(line, fallbackText = '', lineIndex = state.lyricIndex) {
+  const explicit = focusEchoExplicitText(line);
+  const group = safeText(
+    line?.focusGroup
+      ?? line?.focus_group
+      ?? line?.groupId
+      ?? line?.group,
+    ''
+  ).trim();
+  const groupKey = group ? `${state.lyricSignature}|${group}` : '';
+  if (groupKey && !explicit && state.focusEchoGroupKey === groupKey && state.focusEchoGroupText) {
+    return state.focusEchoGroupText;
+  }
+  const focusText = explicit || focusEchoKeywordText(line, fallbackText);
+  state.focusEchoGroupKey = groupKey || `${state.lyricSignature}|line:${lineIndex}`;
+  state.focusEchoGroupText = focusText;
+  return focusText;
+}
+
+function syncFocusEchoLayerText(
+  text = state.lyricDisplayText,
+  fit = lyricLineFitMetrics(text, state.textComposerSettings?.letterSpacing)
+) {
+  if (!els.playbackLyricScene || !els.playbackLyricText) return;
+  const mainText = safeText(text, playbackLyricText());
+  const focusActive = state.textPreset === 'focus-echo';
+  const activeLine = state.lyricLines[state.lyricIndex];
+  const focusText = focusActive
+    ? resolvedFocusEchoText(activeLine, mainText)
+    : mainText;
+  const focusFit = focusActive
+    ? focusEchoFitMetrics(focusText, state.textComposerSettings?.letterSpacing)
+    : fit;
+  setPlaybackLayerText(els.playbackLyricText, mainText, fit);
+  els.playbackLyricScene
+    .querySelectorAll('.lyric-depth-1, .lyric-depth-2, .lyric-depth-3, .lyric-depth-4, .lyric-depth-5')
+    .forEach((layer) => setPlaybackLayerText(layer, focusText, focusFit));
+  if (els.playbackLyricBack) setPlaybackLayerText(els.playbackLyricBack, focusText, focusFit);
+  els.playbackLyricScene.dataset.focusEchoText = focusActive ? focusText : '';
+  if (!focusActive) {
+    state.focusEchoGroupKey = '';
+    state.focusEchoGroupText = '';
+  }
+}
+
+function syncPlaybackLyricSingleLineFit(text = state.lyricDisplayText) {
+  if (!els.playbackLyricScene) return;
+  const line = safeText(text, playbackLyricText());
+  const letterSpacing = Number(state.textComposerSettings?.letterSpacing) || 0;
+  const metrics = lyricLineFitMetrics(line, letterSpacing);
+  const focusText = safeText(els.playbackLyricScene.dataset.focusEchoText, line);
+  const focusMetrics = state.textPreset === 'focus-echo'
+    ? focusEchoFitMetrics(focusText, letterSpacing)
+    : metrics;
+  els.playbackLyricScene.querySelectorAll('.playback-lyric-layer').forEach((layer) => {
+    const layerMetrics = state.textPreset === 'focus-echo' && layer !== els.playbackLyricText
+      ? focusMetrics
+      : metrics;
+    layer.classList.toggle('is-lyric-long', layerMetrics.mode === 'long');
+    layer.classList.toggle('is-lyric-compact', layerMetrics.mode === 'compact');
+    setStylePropertyIfChanged(
+      layer,
+      '--lyric-fit-font-size',
+      `${layerMetrics.fontSize.toFixed(3)}px`
+    );
+  });
+  if (els.blurLyricMount) {
+    setStylePropertyIfChanged(
+      els.blurLyricMount,
+      '--lyric-fit-font-size',
+      `${metrics.fontSize.toFixed(3)}px`
+    );
+  }
+  if (els.playbackLyricSubtitle) {
+    const subtitleMetrics = lyricSubtitleFitMetrics(
+      state.lyricSubtitleText,
+      letterSpacing,
+      (Number(state.textComposerSettings?.translationFontSize) || 72) / 72
+    );
+    setStylePropertyIfChanged(
+      els.playbackLyricSubtitle,
+      '--lyric-subtitle-fit-font-size',
+      `${subtitleMetrics.fontSize.toFixed(3)}px`
+    );
+  }
+  if (state.multiRowLyricsEnabled) {
+    state.multiRowLyricSignature = '';
+    renderMultiRowLyrics(true);
+  }
+}
+
+function singleRowLyricEffectsAvailable(settings = state.textComposerSettings) {
+  const source = settings || DEFAULT_TEXT_COMPOSER_SETTINGS;
+  return textLyricsEnabled()
+    && state.textPreset !== 'book'
+    && source.layoutMode === 'single';
+}
+
+function wordGlowLyricActive(settings = state.textComposerSettings) {
+  const source = settings || DEFAULT_TEXT_COMPOSER_SETTINGS;
+  return singleRowLyricEffectsAvailable(source)
+    && state.textPreset !== 'focus-echo'
+    && source.lyricHighlightMode === 'shine';
+}
+
+function handwrittenMoodLyricActive(settings = state.textComposerSettings) {
+  const source = settings || DEFAULT_TEXT_COMPOSER_SETTINGS;
+  return singleRowLyricEffectsAvailable(source)
+    && state.textPreset !== 'focus-echo'
+    && source.handwrittenMoodEnabled;
+}
+
+function wordGlowTokenWeight(text) {
+  const glyphs = Array.from(String(text || '')).filter((glyph) => glyph.trim());
+  return Math.max(1, glyphs.length);
+}
+
+function segmentWordGlowTokens(text) {
+  const source = safeText(text, '');
+  if (!source) return [];
+  let segments = [];
+  if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
+    try {
+      const segmenter = new Intl.Segmenter(undefined, { granularity: 'word' });
+      segments = Array.from(segmenter.segment(source), (entry) => ({
+        text: entry.segment,
+        isWord: entry.isWordLike === true || /[\p{L}\p{N}]/u.test(entry.segment)
+      }));
+    } catch (error) {
+      segments = [];
+    }
+  }
+  if (!segments.length) {
+    const fallback = source.match(
+      /\s+|[A-Za-z0-9]+(?:[\u0027\u2019][A-Za-z0-9]+)*|[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]|[^\s]/gu
+    ) || [];
+    segments = fallback.map((segment) => ({
+      text: segment,
+      isWord: /[\p{L}\p{N}]/u.test(segment)
+    }));
+  }
+
+  return segments.reduce((tokens, segment) => {
+    if (!segment.text) return tokens;
+    const punctuation = !segment.isWord && !/\s/u.test(segment.text);
+    const previous = tokens[tokens.length - 1];
+    if (punctuation && previous?.isWord) {
+      previous.text += segment.text;
+      previous.weight = wordGlowTokenWeight(previous.text);
+      return tokens;
+    }
+    tokens.push({
+      text: segment.text,
+      isWord: segment.isWord,
+      weight: segment.isWord ? wordGlowTokenWeight(segment.text) : 0
+    });
+    return tokens;
+  }, []);
+}
+
+function wordGlowKeywordText(segments) {
+  const words = segments
+    .filter((segment) => segment.isWord)
+    .map((segment) => segment.text.replace(/[\p{P}\p{S}]+/gu, ''))
+    .filter(Boolean);
+  if (!words.length) return '';
+  const last = words[words.length - 1];
+  const cjkTail = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(last);
+  let selected = [last];
+  const previous = words[words.length - 2];
+  if (previous) {
+    const combinedLength = Array.from(`${previous}${last}`).length;
+    if ((cjkTail && combinedLength <= 4) || (!cjkTail && combinedLength <= 12)) {
+      selected = [previous, last];
+    }
+  }
+  const keyword = selected.join(cjkTail ? '' : ' ');
+  if (!cjkTail && keyword === keyword.toLocaleUpperCase()) {
+    return keyword.toLocaleLowerCase().replace(
+      /(^|[\s\u0027\u2019])\p{L}/gu,
+      (glyph) => glyph.toLocaleUpperCase()
+    );
+  }
+  return keyword;
+}
+
+function setWordGlowTokenProgress(token, value) {
+  if (!token) return;
+  const progress = `${clamp(Number(value) || 0, 0, 100).toFixed(2)}%`;
+  if (token.__wordGlowProgress === progress) return;
+  token.__wordGlowProgress = progress;
+  const sweep = 140 - clamp((Number(value) || 0) / 78, 0, 1) * 180;
+  token.style.setProperty('--word-glow-sweep-position', `${sweep.toFixed(2)}%`);
+}
+
+function updateWordGlowProgress(progress = 0) {
+  if (!wordGlowLyricActive() || !els.playbackLyricText?.__wordGlow) return;
+  const cache = els.playbackLyricText.__wordGlow;
+  const normalized = clamp(Number(progress) || 0, 0, 1);
+  if (Math.abs(normalized - cache.lastProgress) < 0.0002) return;
+  const scaledProgress = normalized * cache.totalWeight;
+  let cursor = 0;
+  let activeIndex = cache.tokens.length;
+  let localProgress = 1;
+  if (normalized < 1) {
+    for (let index = 0; index < cache.tokens.length; index += 1) {
+      const weight = cache.weights[index];
+      const end = cursor + weight;
+      if (scaledProgress < end || index === cache.tokens.length - 1) {
+        activeIndex = index;
+        localProgress = clamp((scaledProgress - cursor) / weight, 0, 1);
+        break;
+      }
+      cursor = end;
+    }
+  }
+
+  if (activeIndex !== cache.activeIndex) {
+    cache.tokens.forEach((token, index) => {
+      const stateName = index < activeIndex || activeIndex === cache.tokens.length
+        ? 'complete'
+        : index === activeIndex
+          ? 'active'
+          : 'pending';
+      if (token.dataset.wordGlowState !== stateName) {
+        token.dataset.wordGlowState = stateName;
+        token.classList.toggle('is-complete', stateName === 'complete');
+        token.classList.toggle('is-active', stateName === 'active');
+      }
+      setWordGlowTokenProgress(
+        token,
+        stateName === 'complete' ? 100 : stateName === 'active' ? localProgress * 100 : 0
+      );
+    });
+    cache.activeIndex = activeIndex;
+  } else if (activeIndex < cache.tokens.length) {
+    setWordGlowTokenProgress(cache.tokens[activeIndex], localProgress * 100);
+  }
+
+  cache.lastProgress = normalized;
+}
+
+function cancelWordGlowElementAnimation(element) {
+  if (!element?.__wordGlowAnimation) return;
+  element.__wordGlowAnimation.onfinish = null;
+  element.__wordGlowAnimation.oncancel = null;
+  element.__wordGlowAnimation.cancel();
+  element.__wordGlowAnimation = null;
+}
+
+function triggerWordGlowTransition(previousText = '') {
+  if (!wordGlowLyricActive() || !els.playbackLyricText) return;
+  const outgoing = els.wordGlowLyricPrevious;
+  [els.playbackLyricText, outgoing].forEach(cancelWordGlowElementAnimation);
+  const prior = safeText(previousText, '');
+  if (outgoing) {
+    outgoing.textContent = prior;
+    outgoing.hidden = !prior || prior === els.playbackLyricText.dataset.text;
+  }
+  if (reducedMotion || typeof els.playbackLyricText.animate !== 'function') {
+    if (outgoing) outgoing.hidden = true;
+    return;
+  }
+
+  const incomingAnimation = els.playbackLyricText.animate([
+    { opacity: 0.22, translate: '-13px 0', letterSpacing: '0.015em' },
+    { opacity: 1, translate: '0 0', letterSpacing: 'inherit' }
+  ], {
+    duration: 320,
+    easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+    fill: 'none'
+  });
+  els.playbackLyricText.__wordGlowAnimation = incomingAnimation;
+  incomingAnimation.onfinish = () => {
+    if (els.playbackLyricText.__wordGlowAnimation === incomingAnimation) {
+      els.playbackLyricText.__wordGlowAnimation = null;
+    }
+  };
+  incomingAnimation.oncancel = incomingAnimation.onfinish;
+
+  if (outgoing && !outgoing.hidden && typeof outgoing.animate === 'function') {
+    const outgoingAnimation = outgoing.animate([
+      { opacity: 0.56, translate: '0 0' },
+      { opacity: 0, translate: '12px -2px' }
+    ], {
+      duration: 250,
+      easing: 'cubic-bezier(0.4, 0, 0.8, 0.4)',
+      fill: 'none'
+    });
+    outgoing.__wordGlowAnimation = outgoingAnimation;
+    const finishOutgoing = () => {
+      if (outgoing.__wordGlowAnimation !== outgoingAnimation) return;
+      outgoing.__wordGlowAnimation = null;
+      outgoing.hidden = true;
+      outgoing.textContent = '';
+    };
+    outgoingAnimation.onfinish = finishOutgoing;
+    outgoingAnimation.oncancel = finishOutgoing;
+  }
+
+}
+
+function syncHandwrittenMoodText(text, segments = null) {
+  if (!els.wordGlowLyricKeyword) return;
+  els.wordGlowLyricKeyword.textContent = handwrittenMoodLyricActive()
+    ? wordGlowKeywordText(segments || segmentWordGlowTokens(text))
+    : '';
+}
+
+function triggerHandwrittenMoodTransition() {
+  const keyword = els.wordGlowLyricKeyword;
+  cancelWordGlowElementAnimation(keyword);
+  if (!handwrittenMoodLyricActive() || !keyword?.textContent) return;
+  if (reducedMotion || typeof keyword.animate !== 'function') return;
+  const keywordAnimation = keyword.animate([
+    { opacity: 0, translate: '-18px 8px', rotate: '-7deg' },
+    { opacity: 0.58, translate: '0 0', rotate: '-3deg' }
+  ], {
+    duration: 420,
+    delay: 70,
+    easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+    fill: 'none'
+  });
+  keyword.__wordGlowAnimation = keywordAnimation;
+  keywordAnimation.onfinish = () => {
+    if (keyword.__wordGlowAnimation === keywordAnimation) keyword.__wordGlowAnimation = null;
+  };
+  keywordAnimation.oncancel = keywordAnimation.onfinish;
+}
+
+function renderWordGlowLyric(text, options = {}) {
+  if (!els.playbackLyricText) return;
+  const line = safeText(text, playbackLyricText());
+  const cached = els.playbackLyricText.__wordGlow;
+  if (
+    cached?.line === line
+    && cached.tokens.length
+    && cached.tokens.every((token) => token.isConnected)
+  ) {
+    updateWordGlowProgress(options.progress);
+    if (options.animate !== false) triggerWordGlowTransition(options.previousText);
+    return;
+  }
+  const segments = options.segments || segmentWordGlowTokens(line);
+  clearElement(els.playbackLyricText);
+  els.playbackLyricText.dataset.text = line;
+  const fragment = document.createDocumentFragment();
+  const tokens = [];
+  const weights = [];
+  segments.forEach((segment) => {
+    if (!segment.isWord) {
+      fragment.appendChild(document.createTextNode(segment.text));
+      return;
+    }
+    const token = document.createElement('span');
+    token.className = 'word-glow-token';
+    token.dataset.word = segment.text;
+    token.textContent = segment.text;
+    token.setAttribute('aria-hidden', 'true');
+    fragment.appendChild(token);
+    tokens.push(token);
+    weights.push(segment.weight);
+  });
+  els.playbackLyricText.appendChild(fragment);
+  els.playbackLyricText.setAttribute('aria-label', line);
+  const glyphCount = Array.from(line.replace(/\s+/gu, '')).length;
+  els.playbackLyricText.classList.toggle('is-word-glow-short', glyphCount <= 14);
+  els.playbackLyricText.classList.toggle('is-word-glow-long', glyphCount > 28 && glyphCount <= 44);
+  els.playbackLyricText.classList.toggle('is-word-glow-compact', glyphCount > 44);
+  els.playbackLyricText.__wordGlow = {
+    line,
+    tokens,
+    weights,
+    totalWeight: Math.max(1, weights.reduce((sum, weight) => sum + weight, 0)),
+    activeIndex: -1,
+    lastProgress: -1
+  };
+  updateWordGlowProgress(options.progress);
+  if (options.animate !== false) triggerWordGlowTransition(options.previousText);
+}
+
+function syncSingleRowLyricEffects() {
+  const line = safeText(state.lyricDisplayText, playbackLyricText());
+  const shineActive = wordGlowLyricActive();
+  const moodActive = handwrittenMoodLyricActive();
+  els.playbackLyricScene?.classList.toggle('is-word-glow-text', shineActive);
+  els.playbackLyricScene?.classList.toggle('is-handwritten-mood-text', moodActive);
+  if (shineActive) {
+    if (els.playbackLyricText?.__wordGlow?.line !== line) {
+      renderWordGlowLyric(line, {
+        progress: clamp((Number(state.lyricProgressPercent) || 0) / 100, 0, 1),
+        animate: false
+      });
+    } else {
+      updateWordGlowProgress(clamp((Number(state.lyricProgressPercent) || 0) / 100, 0, 1));
+    }
+  } else {
+    [els.playbackLyricText, els.wordGlowLyricPrevious].forEach(cancelWordGlowElementAnimation);
+    if (els.wordGlowLyricPrevious) {
+      els.wordGlowLyricPrevious.hidden = true;
+      els.wordGlowLyricPrevious.textContent = '';
+    }
+    if (els.playbackLyricText?.__wordGlow) {
+      setPlaybackLayerText(els.playbackLyricText, line);
+      els.playbackLyricText.removeAttribute('aria-label');
+    }
+  }
+  if (moodActive) {
+    syncHandwrittenMoodText(line);
+  } else if (els.wordGlowLyricKeyword) {
+    cancelWordGlowElementAnimation(els.wordGlowLyricKeyword);
+    els.wordGlowLyricKeyword.textContent = '';
+  }
 }
 
 function triggerFocusEchoTransition() {
@@ -19425,12 +27097,20 @@ function triggerFocusEchoTransition() {
     window.cancelAnimationFrame(state.focusEchoAnimationFrame);
     state.focusEchoAnimationFrame = 0;
   }
+  if (state.focusEchoAnimationTimer) {
+    window.clearTimeout(state.focusEchoAnimationTimer);
+    state.focusEchoAnimationTimer = 0;
+  }
   els.playbackLyricScene.classList.remove('is-focus-echo-entering');
   if (state.textPreset !== 'focus-echo' || reducedMotion) return;
   state.focusEchoAnimationFrame = window.requestAnimationFrame(() => {
     state.focusEchoAnimationFrame = 0;
     if (state.textPreset === 'focus-echo') {
       els.playbackLyricScene.classList.add('is-focus-echo-entering');
+      state.focusEchoAnimationTimer = window.setTimeout(() => {
+        state.focusEchoAnimationTimer = 0;
+        els.playbackLyricScene?.classList.remove('is-focus-echo-entering');
+      }, FOCUS_ECHO_TRANSITION_CLEANUP_MS);
     }
   });
 }
@@ -19507,18 +27187,33 @@ function syncPlaybackLyricSubtitleLayout() {
   }
 }
 
-function setPlaybackLyricLine(text, subtitle, progress = 0, currentTime = Number.NaN) {
+function setPlaybackLyricLine(
+  text,
+  subtitle,
+  progress = 0,
+  currentTime = Number.NaN,
+  authoritativeTime = Number.NaN
+) {
   const line = safeText(text, playbackLyricText());
   const nextSubtitle = safeText(subtitle, playbackLyricSubtitle());
   const progressPercent = clamp(progress, 0, 1) * 100;
+  const previousLine = state.lyricDisplayText;
   const lineChanged = line !== state.lyricDisplayText;
   const subtitleChanged = nextSubtitle !== state.lyricSubtitleText;
+  const shineActive = wordGlowLyricActive();
+  const moodActive = handwrittenMoodLyricActive();
   if (!textLyricsEnabled()) {
     state.lyricDisplayText = line;
     state.lyricSubtitleText = nextSubtitle;
     state.lyricProgressPercent = progressPercent;
     if (playbackCardLyricsVisible()) {
-      updateQishuiPlaybackLyrics(line, nextSubtitle, currentPlaybackLyricTime());
+      updateQishuiPlaybackLyrics(
+        line,
+        nextSubtitle,
+        Number.isFinite(Number(authoritativeTime))
+          ? Math.max(0, Number(authoritativeTime))
+          : currentPlaybackLyricTime()
+      );
     }
     return;
   }
@@ -19543,15 +27238,40 @@ function setPlaybackLyricLine(text, subtitle, progress = 0, currentTime = Number
     : null;
 
   if (lineChanged) {
-    els.playbackLyricScene.querySelectorAll('.playback-lyric-layer').forEach((layer) => {
-      setPlaybackLayerText(layer, line);
-    });
+    const letterSpacing = Number(state.textComposerSettings?.letterSpacing) || 0;
+    const fitMetrics = lyricLineFitMetrics(line, letterSpacing);
+    syncFocusEchoLayerText(line, fitMetrics);
     state.lyricDisplayText = line;
     if (state.textPreset === 'focus-echo') triggerFocusEchoTransition();
+    const wordGlowSegments = shineActive || moodActive
+      ? segmentWordGlowTokens(line)
+      : null;
+    if (shineActive) {
+      renderWordGlowLyric(line, {
+        previousText: previousLine,
+        progress,
+        segments: wordGlowSegments,
+        animate: true
+      });
+    }
+    if (moodActive) {
+      syncHandwrittenMoodText(line, wordGlowSegments);
+      triggerHandwrittenMoodTransition();
+    }
   }
 
   if (subtitleChanged) {
     els.playbackLyricSubtitle.textContent = nextSubtitle;
+    const subtitleFitMetrics = lyricSubtitleFitMetrics(
+      nextSubtitle,
+      Number(state.textComposerSettings?.letterSpacing) || 0,
+      (Number(state.textComposerSettings?.translationFontSize) || 72) / 72
+    );
+    setStylePropertyIfChanged(
+      els.playbackLyricSubtitle,
+      '--lyric-subtitle-fit-font-size',
+      `${subtitleFitMetrics.fontSize.toFixed(3)}px`
+    );
     state.lyricSubtitleText = nextSubtitle;
   }
   if (els.playbackLyricSubtitle.dataset.text !== nextSubtitle) {
@@ -19560,7 +27280,12 @@ function setPlaybackLyricLine(text, subtitle, progress = 0, currentTime = Number
   if (lineChanged || subtitleChanged) syncGlitchTextLayers(line);
   if (lineChanged || subtitleChanged) {
     syncPlaybackLyricSubtitleLayout();
-    if (lineChanged && !rigidLyricMotionActive) {
+    if (
+      lineChanged
+      && !rigidLyricMotionActive
+      && !shineActive
+      && state.textPreset !== 'focus-echo'
+    ) {
       animateLyricGeometryFlip(els.playbackLyricText, previousMainRect, {
         contentChanged: true,
         enterY: 7,
@@ -19581,14 +27306,21 @@ function setPlaybackLyricLine(text, subtitle, progress = 0, currentTime = Number
     els.playbackLyricScene.style.setProperty('--lyric-line-progress', `${progressPercent.toFixed(2)}%`);
     state.lyricProgressPercent = progressPercent;
   }
+  if (shineActive) updateWordGlowProgress(progress);
 
   if (state.textPreset === 'flow') syncBlurLyricComponent(line);
   if (state.textPreset === 'book') updateBookLyricLines(progressPercent, currentTime);
-  if (state.multiRowLyricsEnabled) renderMultiRowLyrics();
+  if (state.multiRowLyricsEnabled) renderMultiRowLyrics(false, currentTime);
   if (playbackCardLyricsVisible()) {
     // The playback-card renderer applies lyricTimelineTime itself. Feed it the
     // authoritative media clock so latency/offset calibration is applied once.
-    updateQishuiPlaybackLyrics(line, nextSubtitle, currentPlaybackLyricTime());
+    updateQishuiPlaybackLyrics(
+      line,
+      nextSubtitle,
+      Number.isFinite(Number(authoritativeTime))
+        ? Math.max(0, Number(authoritativeTime))
+        : currentPlaybackLyricTime()
+    );
   }
   if (lineChanged || subtitleChanged) scheduleDesktopSceneSnapshot();
 }
@@ -19645,11 +27377,42 @@ function lyricTimelineTime(currentTime, visualLead = 0) {
   );
 }
 
-function findLyricIndexAtTime(lines, currentTime, visualLead = 0) {
+function desktopSceneEffectiveLyricTimeAt(clock, _nowMs = 0, visualLead = 0) {
+  const base = Number(clock?.time);
+  if (!Number.isFinite(base)) return Number.NaN;
+  const lead = Number(visualLead);
+  return Math.max(0, base + (Number.isFinite(lead) ? lead : 0));
+}
+
+function updateDesktopSceneLyricClock(effectiveTime, duration = 0, playing = false) {
+  const time = Number(effectiveTime);
+  desktopSceneRuntime.lyricClock = DESKTOP_SCENE_CLIENT && Number.isFinite(time)
+    ? {
+        time: Math.max(0, time),
+        duration: Math.max(0, Number(duration) || 0),
+        updatedAt: performance.now(),
+        playing: playing === true
+      }
+    : null;
+}
+
+function effectivePlaybackLyricTime(currentTime, visualLead = 0) {
+  if (DESKTOP_SCENE_CLIENT) {
+    const mirroredTime = desktopSceneEffectiveLyricTimeAt(
+      desktopSceneRuntime.lyricClock,
+      performance.now(),
+      visualLead
+    );
+    if (Number.isFinite(mirroredTime)) return mirroredTime;
+  }
+  return lyricTimelineTime(currentTime, visualLead);
+}
+
+function findLyricIndexAtDisplayTime(lines, displayTime) {
   let low = 0;
   let high = lines.length - 1;
   let found = -1;
-  const time = lyricTimelineTime(currentTime, visualLead);
+  const time = Number(displayTime);
   while (low <= high) {
     const mid = Math.floor((low + high) / 2);
     if (lines[mid].time <= time) {
@@ -19662,8 +27425,18 @@ function findLyricIndexAtTime(lines, currentTime, visualLead = 0) {
   return found;
 }
 
+function findLyricIndexAtTime(lines, currentTime, visualLead = 0) {
+  return findLyricIndexAtDisplayTime(
+    lines,
+    effectivePlaybackLyricTime(currentTime, visualLead)
+  );
+}
+
 function playbackLyricVisualLeadSeconds() {
-  return state.textPreset === 'book' ? BOOK_LYRIC_VISUAL_LEAD_SECONDS : 0;
+  if (state.textPreset === 'book') return BOOK_LYRIC_VISUAL_LEAD_SECONDS;
+  return state.multiRowLyricsEnabled
+    ? MULTI_ROW_LYRIC_VISUAL_LEAD_SECONDS
+    : LYRIC_TIMESTAMP_COMPENSATION_SECONDS;
 }
 
 function updatePlayerClock(position, duration, playing = false) {
@@ -19702,11 +27475,16 @@ function currentPlaybackLyricTime(fallback = 0) {
   if (cardState.progressDragging && Number.isFinite(previewTarget)) {
     return Math.max(0, previewTarget);
   }
+  const audioTime = Number(els.audio?.currentTime);
+  if (els.audio?.src && Number.isFinite(audioTime)) {
+    cardState.seekHandoffTarget = null;
+    cardState.seekHandoffStartedAt = 0;
+    return Math.max(0, audioTime);
+  }
   const handoffTarget = cardState.seekHandoffTarget == null
     ? Number.NaN
     : Number(cardState.seekHandoffTarget);
   if (Number.isFinite(handoffTarget)) {
-    const audioTime = Number(els.audio?.currentTime);
     const handoffAge = performance.now() - (Number(cardState.seekHandoffStartedAt) || 0);
     if (
       Number.isFinite(audioTime)
@@ -19722,9 +27500,6 @@ function currentPlaybackLyricTime(fallback = 0) {
     cardState.seekHandoffTarget = null;
     cardState.seekHandoffStartedAt = 0;
   }
-  if (els.audio && els.audio.src && Number.isFinite(els.audio.currentTime)) {
-    return Math.max(0, els.audio.currentTime);
-  }
   if (state.playerClock && state.playerClock.updatedAt > 0 && Number.isFinite(Number(state.playerClock.position))) {
     return estimatedPlayerClockTime(fallback);
   }
@@ -19734,10 +27509,9 @@ function currentPlaybackLyricTime(fallback = 0) {
 }
 
 function syncPlaybackLyricAtTime(currentTime = Number.NaN) {
-  const time = Number.isFinite(Number(currentTime))
-    ? Math.max(0, Number(currentTime))
-    : currentPlaybackLyricTime();
+  const time = currentPlaybackLyricTime(currentTime);
   updatePlaybackLyricAtTime(time, playbackLyricVisualLeadSeconds());
+  scheduleDesktopSceneSnapshot();
 }
 
 function syncPlaybackLyricToCurrentTime() {
@@ -19747,7 +27521,7 @@ function syncPlaybackLyricToCurrentTime() {
 function syncPlaybackLyricAnimationFrame() {
   if (!state.lyricLines.length || !isPlaybackClockRunning()) return;
   const time = currentPlaybackLyricTime();
-  const signature = `${state.lyricSignature}|${state.textPreset}`;
+  const signature = `${state.lyricSignature}|${state.textPreset}|${state.multiRowLyricsEnabled ? 1 : 0}`;
   if (
     state.lyricFrameSignature === signature &&
     state.lyricFramePreset === state.textPreset &&
@@ -19804,17 +27578,29 @@ function bookLyricProgressEndTime(line, fallbackEndTime) {
 function updatePlaybackLyricAtTime(currentTime = els.audio.currentTime || 0, visualLead = 0) {
   const lines = state.lyricLines;
   if (!lines.length) {
-    setPlaybackLyricLine(playbackLyricText(), playbackLyricSubtitle(), 0);
+    setPlaybackLyricLine(
+      playbackLyricText(),
+      playbackLyricSubtitle(),
+      0,
+      Number.NaN,
+      currentTime
+    );
     state.lyricIndex = -1;
     return;
   }
 
-  const displayTime = lyricTimelineTime(currentTime, visualLead);
-  const index = findLyricIndexAtTime(lines, currentTime, visualLead);
+  const displayTime = effectivePlaybackLyricTime(currentTime, visualLead);
+  const index = findLyricIndexAtDisplayTime(lines, displayTime);
 
   if (index < 0) {
     if (state.lyricIndex !== -1) state.lyricIndex = -1;
-    setPlaybackLyricLine(playbackLyricText(), playbackLyricSubtitle(), 0, displayTime);
+    setPlaybackLyricLine(
+      playbackLyricText(),
+      playbackLyricSubtitle(),
+      0,
+      displayTime,
+      currentTime
+    );
     return;
   }
 
@@ -19829,7 +27615,13 @@ function updatePlaybackLyricAtTime(currentTime = els.audio.currentTime || 0, vis
   const progressEndTime = state.textPreset === 'book' ? bookLyricProgressEndTime(line, endTime) : endTime;
   const progress = lyricProgressForLineAtTime(line, displayTime, progressEndTime, { linear: state.textPreset === 'book' });
   if (state.lyricIndex !== index) state.lyricIndex = index;
-  setPlaybackLyricLine(line.text, playbackLyricSecondaryText(line), progress, displayTime);
+  setPlaybackLyricLine(
+    line.text,
+    playbackLyricSecondaryText(line),
+    progress,
+    displayTime,
+    currentTime
+  );
 }
 
 function lyricSignatureForSong(song = state.currentSong) {
@@ -20035,6 +27827,10 @@ function selectableTextPreset(preset) {
   return ['depth', 'focus-echo'].includes(preset) ? preset : DEFAULT_TEXT_PRESET;
 }
 
+function singleRowOnlyTextPreset(preset = state.textPreset) {
+  return preset === 'focus-echo';
+}
+
 function textPresetButtons() {
   const root = els.diySidebar || document;
   return Array.from(root.querySelectorAll('[data-text-preset]'));
@@ -20060,7 +27856,11 @@ function textComposerTemplateSettings(preset = state.textPreset, options = {}) {
   const template = TEXT_COMPOSER_TEMPLATE_SETTINGS[preset] || DEFAULT_TEXT_COMPOSER_SETTINGS;
   if (options.preserveIndependent === false) return normalizeTextComposerSettings(template);
   const current = normalizeTextComposerSettings(state.textComposerSettings);
-  const independent = [...TEXT_TRANSLATION_SETTING_KEYS, ...TEXT_GLITCH_TUNING_SETTING_KEYS]
+  const independent = [
+    ...TEXT_TRANSLATION_SETTING_KEYS,
+    ...TEXT_GLITCH_TUNING_SETTING_KEYS,
+    ...TEXT_SINGLE_ROW_ANIMATION_SETTING_KEYS
+  ]
     .reduce((settings, key) => {
       settings[key] = current[key];
       return settings;
@@ -20104,6 +27904,9 @@ function textComposerOutputText(key, value) {
   if (key === 'layoutMode') {
     return ({ single: '单排', multi: '多排' })[value] || '单排';
   }
+  if (key === 'lyricHighlightMode') {
+    return value === 'shine' ? '擦亮扫光' : '滚动高亮';
+  }
   if (key === 'echoLayers') return `${value} 层`;
   if (key === 'echoSpacing' || key === 'unsungBlur' || key === 'letterSpacing'
       || key === 'glitchRgbOffset' || key === 'translationGap') {
@@ -20122,14 +27925,19 @@ function syncTextComposerControls() {
   const editable = state.textPreset !== 'book';
   const enabled = editable && textLyricsEnabled();
   const focusEchoLocked = state.textPreset === 'focus-echo';
-  if (focusEchoLocked && settings.layoutMode !== 'single') {
+  const singleRowLocked = singleRowOnlyTextPreset();
+  if (singleRowLocked && settings.layoutMode !== 'single') {
     settings = normalizeTextComposerSettings({ ...settings, layoutMode: 'single' });
   }
   state.textComposerSettings = settings;
-  const glitchControlsEnabled = enabled && !focusEchoLocked && settings.glitchEnabled;
+  const singleRowEffectsEnabled = enabled
+    && settings.layoutMode === 'single'
+    && !focusEchoLocked;
+  const glitchControlsEnabled = enabled && !singleRowLocked && settings.glitchEnabled;
   const translationControlsEnabled = enabled && state.bilingualLyricsEnabled !== false;
   const controls = [
     ['layoutMode', els.textLayoutMode, els.textLayoutModeValue],
+    ['lyricHighlightMode', els.textLyricHighlightMode, els.textLyricHighlightModeValue],
     ['flowIntensity', els.textFlowIntensity, els.textFlowIntensityValue],
     ['echoLayers', els.textEchoLayers, els.textEchoLayersValue],
     ['echoSpacing', els.textEchoSpacing, els.textEchoSpacingValue],
@@ -20158,6 +27966,7 @@ function syncTextComposerControls() {
     'glitchBeatDuration'
   ]);
   const translationKeys = new Set(['translationFontSize', 'translationGap', 'translationOpacity']);
+  const singleRowEffectKeys = new Set(['lyricHighlightMode']);
   els.textComposerControl.disabled = !editable;
   els.textComposerControl.classList.toggle('is-disabled', !editable);
   els.textTranslationSettingsGroup?.classList.toggle('is-disabled', !enabled);
@@ -20170,8 +27979,8 @@ function syncTextComposerControls() {
   const multiLayoutOption = Array.from(els.textLayoutMode?.options || [])
     .find((option) => option.value === 'multi');
   if (multiLayoutOption) {
-    multiLayoutOption.hidden = focusEchoLocked;
-    multiLayoutOption.disabled = focusEchoLocked;
+    multiLayoutOption.hidden = singleRowLocked;
+    multiLayoutOption.disabled = singleRowLocked;
   }
   if (els.textLyricsToggle) {
     els.textLyricsToggle.checked = settings.lyricsEnabled;
@@ -20181,9 +27990,20 @@ function syncTextComposerControls() {
   if (els.textLyricsValue) {
     els.textLyricsValue.textContent = settings.lyricsEnabled ? 'ON' : 'OFF';
   }
+  if (els.textHandwrittenMoodToggle) {
+    els.textHandwrittenMoodToggle.checked = settings.handwrittenMoodEnabled;
+    els.textHandwrittenMoodToggle.disabled = !singleRowEffectsEnabled;
+    els.textHandwrittenMoodToggle.setAttribute(
+      'aria-checked',
+      String(settings.handwrittenMoodEnabled)
+    );
+  }
+  if (els.textHandwrittenMoodValue) {
+    els.textHandwrittenMoodValue.textContent = settings.handwrittenMoodEnabled ? 'ON' : 'OFF';
+  }
   if (els.textGlitchToggle) {
     els.textGlitchToggle.checked = settings.glitchEnabled;
-    els.textGlitchToggle.disabled = !enabled || focusEchoLocked;
+    els.textGlitchToggle.disabled = !enabled || singleRowLocked;
     els.textGlitchToggle.setAttribute('aria-checked', String(settings.glitchEnabled));
   }
   if (els.textGlitchValue) {
@@ -20194,7 +28014,8 @@ function syncTextComposerControls() {
     const value = settings[key];
     if (control.value !== String(value)) control.value = String(value);
     control.disabled = !enabled
-      || (key === 'unsungBlur' && focusEchoLocked)
+      || (key === 'unsungBlur' && singleRowLocked)
+      || (singleRowEffectKeys.has(key) && !singleRowEffectsEnabled)
       || (glitchKeys.has(key) && !glitchControlsEnabled)
       || (translationKeys.has(key) && !translationControlsEnabled);
     control.setAttribute('aria-valuetext', textComposerOutputText(key, value));
@@ -20233,6 +28054,7 @@ function glitchTextEffectActive(settings = state.textComposerSettings || DEFAULT
   return textLyricsEnabled()
     && state.textPreset !== 'book'
     && state.textPreset !== 'focus-echo'
+    && !wordGlowLyricActive(settings)
     && settings.glitchEnabled
     && !reducedMotion;
 }
@@ -20251,27 +28073,32 @@ function applyGlitchTextCssVars(target, settings) {
   setStylePropertyIfChanged(target, '--text-glitch-beat-duration', `${beatDuration}ms`);
   setStylePropertyIfChanged(target, '--text-glitch-cyan-duration', `${beatDuration}ms`);
   setStylePropertyIfChanged(target, '--text-glitch-magenta-duration', `${Math.round(beatDuration * 1.08)}ms`);
+  const idleDuration = Math.round(1180 / speed);
+  setStylePropertyIfChanged(target, '--text-glitch-idle-cyan-duration', `${idleDuration}ms`);
+  setStylePropertyIfChanged(target, '--text-glitch-idle-magenta-duration', `${Math.round(idleDuration * 1.13)}ms`);
 }
 
 function syncGlitchTextLayers(text = state.lyricDisplayText) {
   const settings = normalizeTextComposerSettings(state.textComposerSettings);
   const active = glitchTextEffectActive(settings);
-  syncGlitchTextElement(els.playbackLyricText, text, active);
+  const singleRowActive = active && !state.multiRowLyricsEnabled;
+  const multiRowActive = active && state.multiRowLyricsEnabled;
+  syncGlitchTextElement(els.playbackLyricText, text, singleRowActive);
   syncGlitchTextElement(
     els.playbackLyricSubtitle,
     state.lyricSubtitleText || els.playbackLyricSubtitle?.dataset.text || '',
-    active && state.bilingualLyricsEnabled !== false
+    singleRowActive && state.bilingualLyricsEnabled !== false
   );
   els.multiRowLyricList?.querySelectorAll('.multi-row-lyric-main').forEach((main) => {
     const current = main.closest('.multi-row-lyric-line')?.classList.contains('is-current');
-    syncGlitchTextElement(main, main.dataset.text || main.textContent, active && current);
+    syncGlitchTextElement(main, main.dataset.text || main.textContent, multiRowActive && current);
   });
   els.multiRowLyricList?.querySelectorAll('.multi-row-lyric-translation').forEach((translation) => {
     const current = translation.closest('.multi-row-lyric-line')?.classList.contains('is-current');
     syncGlitchTextElement(
       translation,
       translation.dataset.text || translation.textContent,
-      active && current
+      multiRowActive && current
     );
   });
 }
@@ -20287,8 +28114,11 @@ function applyTextComposerSettings({
   state.textComposerSettings = settings;
   const textEnabled = textLyricsEnabled() && state.textPreset !== 'book';
   const glitchActive = glitchTextEffectActive(settings);
-  const effectiveUnsungBlur = state.textPreset === 'focus-echo' ? 0 : settings.unsungBlur;
-  const multiRow = textEnabled && settings.layoutMode === 'multi';
+  const shineActive = wordGlowLyricActive(settings);
+  const moodActive = handwrittenMoodLyricActive(settings);
+  const singleRowLocked = singleRowOnlyTextPreset();
+  const effectiveUnsungBlur = singleRowLocked ? 0 : settings.unsungBlur;
+  const multiRow = textEnabled && !singleRowLocked && settings.layoutMode === 'multi';
   if (state.multiRowLyricsEnabled !== multiRow) {
     state.multiRowLyricsEnabled = multiRow;
     state.multiRowLyricSignature = '';
@@ -20303,6 +28133,8 @@ function applyTextComposerSettings({
     scene.classList.toggle('has-text-composer-flow', textEnabled && settings.flowIntensity > 0);
     scene.classList.toggle('has-text-composer-echo', textEnabled && settings.echoLayers > 0);
     scene.classList.toggle('is-book-effect-text', false);
+    scene.classList.toggle('is-word-glow-text', shineActive);
+    scene.classList.toggle('is-handwritten-mood-text', moodActive);
     scene.classList.toggle(
       'is-text-glitch-active',
       glitchActive
@@ -20311,10 +28143,18 @@ function applyTextComposerSettings({
     scene.style.setProperty('--text-flow-transition-duration', `${150 - settings.flowIntensity}ms`);
     scene.style.setProperty('--text-echo-spacing', `${settings.echoSpacing.toFixed(1)}px`);
     scene.style.setProperty('--text-depth-strength', (settings.depth / 100).toFixed(3));
+    scene.style.setProperty(
+      '--text-depth-outline',
+      `${(0.24 + settings.depth / 100 * 0.44).toFixed(2)}px`
+    );
     scene.style.setProperty('--text-highlight-intensity', (settings.highlightIntensity / 100).toFixed(3));
     scene.style.setProperty('--text-highlight-softness', `${settings.highlightSoftness.toFixed(2)}%`);
     scene.style.setProperty('--text-highlight-gloss', (settings.gloss / 100).toFixed(3));
     scene.style.setProperty('--text-unplayed-blur', `${effectiveUnsungBlur.toFixed(2)}px`);
+    scene.style.setProperty(
+      '--text-unplayed-blur-effective',
+      `${Math.min(1.25, effectiveUnsungBlur * 0.18).toFixed(2)}px`
+    );
     scene.style.setProperty('--text-letter-spacing', `${settings.letterSpacing.toFixed(2)}px`);
     scene.style.setProperty('--text-bass-spread', (settings.lowBassGlow / 100).toFixed(3));
     applyGlitchTextCssVars(scene, settings);
@@ -20322,6 +28162,9 @@ function applyTextComposerSettings({
     scene.style.setProperty('--translation-font-size', `${settings.translationFontSize.toFixed(0)}%`);
     scene.style.setProperty('--translation-gap', `${settings.translationGap.toFixed(1)}px`);
     scene.style.setProperty('--translation-opacity', (settings.translationOpacity / 100).toFixed(3));
+    const focusEchoActive = state.textPreset === 'focus-echo';
+    const focusEchoSpacingRatio = settings.echoSpacing / FOCUS_ECHO_REFERENCE_SPACING;
+    const focusEchoDepthRatio = settings.depth / FOCUS_ECHO_REFERENCE_DEPTH;
     scene.querySelectorAll('.playback-lyric-layer').forEach((layer) => {
       const match = layer.className.match(/\blyric-depth-(\d)\b/);
       const layerIndex = match ? Number(match[1]) : 0;
@@ -20350,6 +28193,37 @@ function applyTextComposerSettings({
           '--text-echo-blur',
           `${(effectiveUnsungBlur + layerIndex * 0.8).toFixed(2)}px`
         );
+        const focusProfile = focusEchoActive
+          ? FOCUS_ECHO_LAYER_PROFILES[layerIndex]
+          : null;
+        if (focusProfile) {
+          const focusOpacity = focusProfile.opacity * (0.45 + focusEchoDepthRatio * 0.55);
+          layer.style.setProperty(
+            '--focus-echo-x',
+            `${(focusProfile.x * focusEchoSpacingRatio).toFixed(2)}px`
+          );
+          layer.style.setProperty(
+            '--focus-echo-y',
+            `${(focusProfile.y * focusEchoSpacingRatio).toFixed(2)}px`
+          );
+          layer.style.setProperty(
+            '--focus-echo-z',
+            `${(70 + (focusProfile.z - 70) * focusEchoDepthRatio).toFixed(2)}px`
+          );
+          layer.style.setProperty('--focus-echo-opacity', clamp(focusOpacity, 0.04, 0.72).toFixed(3));
+          layer.style.setProperty(
+            '--focus-echo-blur',
+            `${Math.max(0, focusProfile.blur * focusEchoDepthRatio).toFixed(2)}px`
+          );
+          layer.style.setProperty(
+            '--focus-echo-scale-x',
+            (1 + (focusProfile.scaleX - 1) * focusEchoDepthRatio).toFixed(3)
+          );
+          layer.style.setProperty(
+            '--focus-echo-scale',
+            (1 + (focusProfile.scale - 1) * focusEchoDepthRatio).toFixed(3)
+          );
+        }
       }
     });
   }
@@ -20358,6 +28232,7 @@ function applyTextComposerSettings({
     applyGlitchTextCssVars(els.appShell, settings);
   }
   applyGlitchTextCssVars(els.textGlitchControl, settings);
+  syncSingleRowLyricEffects();
   if (syncGlitch) syncGlitchTextLayers();
   syncTextComposerControls();
   syncMultiRowLyricsControl();
@@ -20383,7 +28258,7 @@ function shiftPlaybackLyricSubtitleGap(previousGap, nextGap) {
 
 function setTextComposerSetting(key, value, options = {}) {
   if (!Object.prototype.hasOwnProperty.call(DEFAULT_TEXT_COMPOSER_SETTINGS, key)) return;
-  if (key === 'layoutMode' && state.textPreset === 'focus-echo' && value !== 'single') {
+  if (key === 'layoutMode' && singleRowOnlyTextPreset() && value !== 'single') {
     syncTextComposerControls();
     return;
   }
@@ -20404,13 +28279,24 @@ function setTextComposerSetting(key, value, options = {}) {
   }
   state.textComposerSettings = next;
   const structural = key === 'lyricsEnabled' || key === 'layoutMode' || key === 'multiRowLineCount';
+  const highlightLayoutChanged = structural
+    || key === 'letterSpacing'
+    || key === 'translationFontSize';
   applyTextComposerSettings({
     persist: true,
     persistImmediately: options.commit === true,
     renderLyrics: structural,
     measureSubtitle: key === 'layoutMode' || (key === 'translationGap' && options.commit === true),
-    syncGlitch: key === 'glitchEnabled' || key === 'layoutMode'
+    syncGlitch: key === 'glitchEnabled'
+      || key === 'layoutMode'
+      || key === 'lyricHighlightMode'
   });
+  if (highlightLayoutChanged) {
+    syncPlaybackLyricSingleLineFit();
+    invalidateSequentialLyricHighlights(els.multiRowLyricList);
+    invalidateSequentialLyricHighlights(els.bookLyricList);
+    invalidateSequentialLyricHighlights(els.qishuiPlaybackLyricPage);
+  }
   if (key === 'lyricsEnabled') syncPlaybackLyricVisibility();
 }
 
@@ -20777,6 +28663,18 @@ function setPlaybackLyricPalettePreference(mode, color) {
   requestOrbFrame();
 }
 
+function restoreSavedVisualWorkspace() {
+  setTextPreset(state.textPreset, { applyTemplate: false, persist: false });
+  commitDiyPage(state.diyPage, { persist: false });
+  if (state.diyPage !== 'wallpaper') {
+    setDiyPreset(state.diyPreset, { persist: false });
+    enterPlaybackPage();
+  }
+  updateDiyCardRotation();
+  syncFreeCubeControls();
+  syncChladniModeControls();
+}
+
 function saveLyricClockOffsetPreference() {
   try {
     window.localStorage.setItem(LYRIC_CLOCK_OFFSET_PREFERENCE_KEY, JSON.stringify({
@@ -20808,13 +28706,26 @@ function syncLyricClockControls() {
 }
 
 function setLyricClockOffsetSeconds(value) {
-  state.lyricClockOffsetSeconds = normalizeLyricClockOffsetSeconds(value);
+  const previousOffset = lyricClockOffsetSeconds();
+  const nextOffset = normalizeLyricClockOffsetSeconds(value);
+  state.lyricClockOffsetSeconds = nextOffset;
   saveLyricClockOffsetPreference();
   syncLyricClockControls();
   resetLyricFrameSync();
   syncPlaybackLyricToCurrentTime();
   scheduleDesktopSceneSnapshot();
   requestOrbFrame();
+  if (nextOffset !== previousOffset && Math.abs(nextOffset) > 0.0001) {
+    unlockAppAchievement('manual-sync');
+    const trackId = currentAchievementTrackId();
+    if (trackId) {
+      queueHighDifficultyAchievementEvidence('lyric-calibrated', {
+        trackId,
+        revisionId: `clock-offset:${nextOffset.toFixed(1)}`,
+        changedLineCount: 1
+      });
+    }
+  }
 }
 
 function adjustLyricClockOffsetSeconds(delta) {
@@ -20881,8 +28792,12 @@ function saveMultiRowLyricsPreference() {
 }
 
 function syncMultiRowLyricsControl() {
+  if (els.multiRowLyricStage?.dataset.multiLyricStage !== 'true') {
+    els.multiRowLyricStage.dataset.multiLyricStage = 'true';
+  }
   const focusEchoLocked = state.textPreset === 'focus-echo';
-  if (focusEchoLocked) {
+  const singleRowLocked = singleRowOnlyTextPreset();
+  if (singleRowLocked) {
     state.multiRowLyricsEnabled = false;
     if (state.textComposerSettings?.layoutMode !== 'single') {
       state.textComposerSettings = normalizeTextComposerSettings({
@@ -20892,45 +28807,502 @@ function syncMultiRowLyricsControl() {
     }
   }
   const enabled = state.multiRowLyricsEnabled === true;
+  const textEnabled = textLyricsEnabled();
+  const signature = `${state.textPreset}|${singleRowLocked ? 1 : 0}|${enabled ? 1 : 0}|${textEnabled ? 1 : 0}`;
+  if (syncMultiRowLyricsControl.__multiRowControlSignature === signature) return;
+  syncMultiRowLyricsControl.__multiRowControlSignature = signature;
   if (els.qishuiPlaybackMultiRowToggle) {
-    const label = focusEchoLocked
-      ? '焦点回声仅支持单排歌词'
+    const label = singleRowLocked
+      ? `${focusEchoLocked ? '焦点回声' : '逐词擦亮'}仅支持单排歌词`
       : enabled ? '关闭多排歌词' : '开启多排歌词';
     els.qishuiPlaybackMultiRowToggle.classList.toggle('is-active', enabled);
     els.qishuiPlaybackMultiRowToggle.setAttribute('aria-pressed', String(enabled));
-    els.qishuiPlaybackMultiRowToggle.disabled = focusEchoLocked;
-    els.qishuiPlaybackMultiRowToggle.setAttribute('aria-disabled', String(focusEchoLocked));
+    els.qishuiPlaybackMultiRowToggle.disabled = singleRowLocked;
+    els.qishuiPlaybackMultiRowToggle.setAttribute('aria-disabled', String(singleRowLocked));
     els.qishuiPlaybackMultiRowToggle.setAttribute('aria-label', label);
     els.qishuiPlaybackMultiRowToggle.title = label;
     const glyph = els.qishuiPlaybackMultiRowToggle.querySelector('b');
     if (glyph) glyph.textContent = enabled ? '单' : '多';
   }
   if (els.playbackLyricScene) {
-    els.playbackLyricScene.classList.toggle('is-multi-row-text', enabled && textLyricsEnabled());
+    els.playbackLyricScene.classList.toggle('is-multi-row-text', enabled && textEnabled);
   }
   if (els.multiRowLyricStage) {
-    els.multiRowLyricStage.setAttribute('aria-hidden', String(!enabled || !textLyricsEnabled()));
+    els.multiRowLyricStage.setAttribute('aria-hidden', String(!enabled || !textEnabled));
   }
+}
+
+function normalizeMultiLyricEventText(value) {
+  return String(value || '')
+    .normalize('NFKC')
+    .replace(/[\u200b-\u200d\ufeff]/gu, '')
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function areAdjacentMultiLyricEventsDuplicate(previous, next) {
+  const previousTime = Number(previous?.time);
+  const nextTime = Number(next?.time);
+  if (!Number.isFinite(previousTime) || !Number.isFinite(nextTime)) return false;
+  if (Math.abs(nextTime - previousTime) > 0.12) return false;
+  const previousText = normalizeMultiLyricEventText(previous?.text);
+  return previousText !== '' && previousText === normalizeMultiLyricEventText(next?.text);
+}
+
+function multiRowDisplayModel() {
+  const source = state.lyricLines;
+  const fallbackText = source.length ? '' : playbackLyricText();
+  const fallbackTranslation = source.length || !state.bilingualLyricsEnabled
+    ? ''
+    : playbackLyricSubtitle();
+  const cached = multiRowDisplayModel.cache;
+  if (
+    cached
+    && cached.source === source
+    && cached.lyricSignature === state.lyricSignature
+    && cached.length === source.length
+    && cached.first === source[0]
+    && cached.last === source[source.length - 1]
+    && cached.fallbackText === fallbackText
+    && cached.fallbackTranslation === fallbackTranslation
+  ) return cached;
+
+  if (!source.length) {
+    const model = {
+      source,
+      lyricSignature: state.lyricSignature,
+      length: 0,
+      first: null,
+      last: null,
+      fallbackText,
+      fallbackTranslation,
+      lines: [{
+        time: 0,
+        text: fallbackText,
+        translationText: fallbackTranslation,
+        fallback: true
+      }],
+      sourceToDisplay: [0]
+    };
+    multiRowDisplayModel.cache = model;
+    return model;
+  }
+
+  const lines = [];
+  const sourceToDisplay = new Array(source.length);
+  let previousAccepted = null;
+  for (let sourceIndex = 0; sourceIndex < source.length; sourceIndex += 1) {
+    const line = source[sourceIndex];
+    if (previousAccepted && areAdjacentMultiLyricEventsDuplicate(previousAccepted, line)) {
+      const displayIndex = lines.length - 1;
+      sourceToDisplay[sourceIndex] = displayIndex;
+      const existingTranslation = safeText(lines[displayIndex]?.translationText, '');
+      const duplicateTranslation = safeText(line?.translationText, '');
+      if (!existingTranslation && duplicateTranslation) {
+        lines[displayIndex] = {
+          ...lines[displayIndex],
+          translationText: duplicateTranslation
+        };
+      }
+      continue;
+    }
+    sourceToDisplay[sourceIndex] = lines.length;
+    lines.push(line);
+    previousAccepted = line;
+  }
+  const model = {
+    source,
+    lyricSignature: state.lyricSignature,
+    length: source.length,
+    first: source[0],
+    last: source[source.length - 1],
+    fallbackText: '',
+    fallbackTranslation: '',
+    lines,
+    sourceToDisplay
+  };
+  multiRowDisplayModel.cache = model;
+  return model;
 }
 
 function multiRowDisplayLines() {
-  if (state.lyricLines.length) return state.lyricLines;
-  return [{
-    time: 0,
-    text: playbackLyricText(),
-    translationText: state.bilingualLyricsEnabled ? playbackLyricSubtitle() : '',
-    fallback: true
-  }];
+  return multiRowDisplayModel().lines;
 }
 
-function updateMultiRowLyricLine(item, line, index, active, maxDistance = 4) {
+function multiRowLyricLineKey(line, index, scope = state.lyricSignature) {
+  return `${safeText(scope, 'fallback')}|${index}|${(Number(line?.time) || 0).toFixed(3)}`;
+}
+
+function lyricHighlightGraphemeWeight(grapheme) {
+  const value = String(grapheme || '');
+  if (!value || /[\r\n]/u.test(value)) return 0;
+  if (/^\s+$/u.test(value)) return 0.28;
+  const code = value.codePointAt(0) || 0;
+  const cjk = (code >= 0x3040 && code <= 0x30ff)
+    || (code >= 0x3400 && code <= 0x4dbf)
+    || (code >= 0x4e00 && code <= 0x9fff)
+    || (code >= 0xf900 && code <= 0xfaff);
+  if (cjk || /\p{Extended_Pictographic}/u.test(value)) return 1;
+  if (/^[A-Z0-9]$/u.test(value)) return 0.78;
+  if (/^[a-z]$/u.test(value)) return 0.6;
+  if (/^[\p{P}\p{S}]$/u.test(value)) return 0.34;
+  return 0.72;
+}
+
+function lyricHighlightTextNodes(element) {
+  if (!element) return [];
+  if (typeof document.createTreeWalker === 'function') {
+    const walker = document.createTreeWalker(element, 4);
+    const nodes = [];
+    let node = walker.nextNode();
+    while (node) {
+      if (safeText(node.textContent, '')) nodes.push(node);
+      node = walker.nextNode();
+    }
+    return nodes;
+  }
+  const nodes = [];
+  const visit = (node) => {
+    Array.from(node?.childNodes || []).forEach((child) => {
+      if (child?.nodeType === 3) {
+        if (safeText(child.textContent, '')) nodes.push(child);
+      } else {
+        visit(child);
+      }
+    });
+  };
+  visit(element);
+  return nodes;
+}
+
+function lyricHighlightGraphemes(text) {
+  const value = String(text || '');
+  if (!value) return [];
+  if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
+    const segmenter = lyricHighlightGraphemes.segmenter
+      || (lyricHighlightGraphemes.segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' }));
+    return Array.from(segmenter.segment(value), (entry) => ({
+      text: entry.segment,
+      start: entry.index,
+      end: entry.index + entry.segment.length
+    }));
+  }
+  let offset = 0;
+  return Array.from(value, (textValue) => {
+    const segment = { text: textValue, start: offset, end: offset + textValue.length };
+    offset = segment.end;
+    return segment;
+  });
+}
+
+function lyricHighlightVisualLines(element) {
+  if (!element || typeof document.createRange !== 'function') return [];
+  const elementRect = element.getBoundingClientRect();
+  if (!(elementRect.width > 0) || !(elementRect.height > 0)) return [];
+  const range = document.createRange();
+  try {
+    const fragments = [];
+    lyricHighlightTextNodes(element).forEach((textNode) => {
+      lyricHighlightGraphemes(textNode.textContent).forEach((segment) => {
+        const weight = lyricHighlightGraphemeWeight(segment.text);
+        if (weight <= 0) return;
+        range.setStart(textNode, segment.start);
+        range.setEnd(textNode, segment.end);
+        const rects = Array.from(range.getClientRects())
+          .filter((rect) => rect.width > 0.25 && rect.height > 0.25);
+        const totalWidth = rects.reduce((total, rect) => total + rect.width, 0) || 1;
+        rects.forEach((rect) => fragments.push({
+          rect,
+          weight: weight * rect.width / totalWidth
+        }));
+      });
+    });
+    if (!fragments.length) {
+      range.selectNodeContents(element);
+      Array.from(range.getClientRects())
+        .filter((rect) => rect.width > 0.25 && rect.height > 0.25)
+        .forEach((rect) => fragments.push({ rect, weight: rect.width }));
+    }
+    fragments.sort((left, right) => (
+      left.rect.top - right.rect.top || left.rect.left - right.rect.left
+    ));
+    const lines = [];
+    fragments.forEach(({ rect, weight }) => {
+      const top = clamp(rect.top - elementRect.top, 0, elementRect.height);
+      const bottom = clamp(rect.bottom - elementRect.top, top, elementRect.height);
+      const left = clamp(rect.left - elementRect.left, 0, elementRect.width);
+      const right = clamp(rect.right - elementRect.left, left, elementRect.width);
+      const center = (top + bottom) / 2;
+      const previous = lines[lines.length - 1];
+      const sameVisualLine = previous
+        && Math.abs(center - previous.center) <= Math.max(2, Math.min(bottom - top, previous.bottom - previous.top) * 0.45);
+      if (sameVisualLine) {
+        previous.top = Math.min(previous.top, top);
+        previous.bottom = Math.max(previous.bottom, bottom);
+        previous.left = Math.min(previous.left, left);
+        previous.right = Math.max(previous.right, right);
+        previous.center = (previous.top + previous.bottom) / 2;
+        previous.weight += weight;
+        return;
+      }
+      lines.push({ top, bottom, left, right, center, weight });
+    });
+    return lines
+      .map((line) => ({
+        ...line,
+        width: Math.max(1, line.right - line.left),
+        weight: Math.max(0.001, line.weight)
+      }))
+      .filter((line) => line.bottom > line.top);
+  } finally {
+    range.detach?.();
+  }
+}
+
+function invalidateSequentialLyricHighlight(element) {
+  if (!element) return;
+  element.__sequentialLyricGeometry = null;
+  element.__sequentialLyricClipSignature = '';
+  element.classList.remove('has-sequential-lyric-lines');
+  element.style.removeProperty('--lyric-wrap-highlight-clip');
+}
+
+function invalidateSequentialLyricHighlights(root) {
+  if (!root) return;
+  root.querySelectorAll('.book-lyric-line').forEach((line) => {
+    line.__bookGlyphProgress = '';
+  });
+  root.querySelectorAll([
+    '.book-lyric-copy--hot',
+    '.book-lyric-translation-copy--hot',
+    '.multi-row-lyric-main',
+    '.multi-row-lyric-translation'
+  ].join(',')).forEach(invalidateSequentialLyricHighlight);
+}
+
+function setSequentialLyricHighlight(target, measureElement, progressPercent) {
+  if (!target || !measureElement) return;
+  const progress = clamp(Number(progressPercent) || 0, 0, 100);
+  if (progress <= 0.001) {
+    if (target.__sequentialLyricClipSignature === 'fallback') return;
+    target.__sequentialLyricClipSignature = 'fallback';
+    target.style.removeProperty('--lyric-wrap-highlight-clip');
+    return;
+  }
+
+  let geometry = target.__sequentialLyricGeometry;
+  if (!geometry || geometry.measureElement !== measureElement) {
+    const lines = lyricHighlightVisualLines(measureElement);
+    geometry = {
+      measureElement,
+      lines,
+      totalWeight: lines.reduce((total, line) => total + line.weight, 0)
+    };
+    target.__sequentialLyricGeometry = geometry;
+  }
+  target.classList.toggle('has-sequential-lyric-lines', geometry.lines.length > 1);
+  if (geometry.lines.length <= 1 || geometry.totalWeight <= 0) {
+    if (target.__sequentialLyricClipSignature === 'fallback') return;
+    target.__sequentialLyricClipSignature = 'fallback';
+    target.style.removeProperty('--lyric-wrap-highlight-clip');
+    return;
+  }
+
+  if (progress >= 99.999) {
+    const clip = 'inset(0)';
+    if (target.__sequentialLyricClipSignature === clip) return;
+    target.__sequentialLyricClipSignature = clip;
+    target.style.setProperty('--lyric-wrap-highlight-clip', clip);
+    return;
+  }
+
+  let distance = geometry.totalWeight * progress / 100;
+  let activeLine = geometry.lines[geometry.lines.length - 1];
+  for (const line of geometry.lines) {
+    activeLine = line;
+    if (distance <= line.weight) break;
+    distance -= line.weight;
+  }
+  const lineProgress = clamp(distance / activeLine.weight, 0, 1);
+  const revealX = clamp(
+    activeLine.left + activeLine.width * lineProgress,
+    activeLine.left,
+    activeLine.right
+  );
+  const clip = [
+    'polygon(0 0, 100% 0,',
+    `100% ${activeLine.top.toFixed(2)}px,`,
+    `${revealX.toFixed(2)}px ${activeLine.top.toFixed(2)}px,`,
+    `${revealX.toFixed(2)}px ${activeLine.bottom.toFixed(2)}px,`,
+    `0 ${activeLine.bottom.toFixed(2)}px)`
+  ].join(' ');
+  if (target.__sequentialLyricClipSignature === clip) return;
+  target.__sequentialLyricClipSignature = clip;
+  target.style.setProperty('--lyric-wrap-highlight-clip', clip);
+}
+
+function multiRowLyricVisualUnits(text) {
+  return Array.from(String(text || '')).reduce((total, grapheme) => {
+    if (/^\s+$/u.test(grapheme)) return total + 0.32;
+    if (/^[\u3400-\u9fff\uf900-\ufaff]$/u.test(grapheme) || /\p{Extended_Pictographic}/u.test(grapheme)) {
+      return total + 1;
+    }
+    if (/^[A-Z0-9]$/u.test(grapheme)) return total + 0.78;
+    if (/^[a-z]$/u.test(grapheme)) return total + 0.6;
+    if (/^[\p{P}\p{S}]$/u.test(grapheme)) return total + 0.34;
+    return total + 0.72;
+  }, 0);
+}
+
+function multiRowLyricLayoutMetrics(lineCount, settings = normalizeTextComposerSettings(state.textComposerSettings)) {
+  const rows = clamp(Number(lineCount) || 7, 3, 11);
+  const viewportHeight = Math.max(360, Number(window.innerHeight) || 720);
+  const availableHeight = Math.max(rows * 36, Math.min(580, viewportHeight - 188));
+  const translationScale = clamp(Number(settings.translationFontSize) || 72, 50, 120) / 100;
+  const translationGap = Math.max(0, Number(settings.translationGap) || 0);
+  const translationBonus = state.bilingualLyricsEnabled
+    ? clamp(10 + translationScale * 8 + translationGap * 0.35, 12, 22)
+    : 0;
+  const preferredPitch = Math.max(54, 76 - (rows - 3) * 2.5 + translationBonus);
+  const rowPitch = Math.max(36, Math.min(preferredPitch, availableHeight / rows));
+  return {
+    rows,
+    rowPitch,
+    listHeight: rowPitch * rows
+  };
+}
+
+function multiRowLyricFontSize(line, isCurrent, distance, lineCount) {
+  const settings = normalizeTextComposerSettings(state.textComposerSettings);
+  const mainText = safeText(line?.text, playbackLyricText());
+  const translation = state.bilingualLyricsEnabled
+    ? playbackLyricTranslationText(line)
+    : '';
+  const viewportWidth = Math.max(320, Number(window.innerWidth) || 1280);
+  const layout = multiRowLyricLayoutMetrics(lineCount, settings);
+  const availableWidth = Math.max(180, Math.min(752, viewportWidth - 164));
+  const slotHeight = layout.rowPitch;
+  const translationScale = translation
+    ? clamp(Number(settings.translationFontSize) || 72, 50, 120) / 100
+    : 0;
+  const mainUnits = Math.max(1, multiRowLyricVisualUnits(mainText));
+  const translationUnits = translation
+    ? multiRowLyricVisualUnits(translation) * translationScale
+    : 0;
+  const widthUnits = Math.max(mainUnits, translationUnits);
+  const mainGlyphCount = Array.from(mainText).length;
+  const translationGlyphCount = translation ? Array.from(translation).length : 0;
+  const spacingWidth = Math.max(0, Math.max(mainGlyphCount, translationGlyphCount) - 1)
+    * (Number(settings.letterSpacing) || 0);
+  const widthFit = Math.max(1, availableWidth - spacingWidth) / (widthUnits * 1.08);
+  const lineBoxScale = 1.08 + (translation ? translationScale * 1.12 : 0);
+  const heightFit = Math.max(1, slotHeight - (translation ? Number(settings.translationGap) || 0 : 0) - 6)
+    / lineBoxScale;
+  const nominal = isCurrent
+    ? clamp(viewportWidth * 0.04, 36, 56)
+    : Math.max(17, clamp(viewportWidth * 0.0255, 25, 38) - distance * 4.2);
+  return clamp(Math.min(nominal, widthFit, heightFit), isCurrent ? 18 : 14, nominal);
+}
+
+function computeMultiLyricHighlightProgress(startTime, endTime, currentTime) {
+  const start = Number(startTime);
+  const end = Number(endTime);
+  const current = Number(currentTime);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+    return Number.isFinite(current) && Number.isFinite(end) && current >= end ? 1 : 0;
+  }
+  if (!Number.isFinite(current)) return 0;
+  return Math.min(1, Math.max(0, (current - start) / (end - start)));
+}
+
+function multiRowLyricHighlightProgress(model, active, currentTime = Number.NaN) {
+  const fallback = clamp((Number(state.lyricProgressPercent) || 0) / 100, 0, 1);
+  const line = model?.lines?.[active];
+  if (!line || line.fallback) return fallback;
+  const startTime = Number(line.time);
+  if (!Number.isFinite(startTime)) return fallback;
+  const nextStart = Number(model.lines[active + 1]?.time);
+  const timedEnd = Number(line.endTime);
+  const fallbackDuration = playbackDurationForLyricSpeed();
+  const fallbackEnd = Number.isFinite(nextStart) && nextStart > startTime
+    ? nextStart
+    : Math.max(startTime + 4, fallbackDuration || startTime + 4);
+  const endTime = Number.isFinite(timedEnd) && timedEnd > startTime
+    ? (Number.isFinite(nextStart) && nextStart > startTime ? Math.min(timedEnd, nextStart) : timedEnd)
+    : fallbackEnd;
+  const sampledDisplayTime = Number(currentTime);
+  const displayTime = Number.isFinite(sampledDisplayTime)
+    ? Math.max(0, sampledDisplayTime)
+    : effectivePlaybackLyricTime(
+        currentPlaybackLyricTime(),
+        playbackLyricVisualLeadSeconds()
+      );
+  const glyphTimings = Array.isArray(line.glyphTimings) ? line.glyphTimings : [];
+  const autoVocalEnd = Number(line.autoVocalEndTime);
+  const hasDetailedTiming = glyphTimings.length > 0
+    || (Number.isFinite(autoVocalEnd) && autoVocalEnd > startTime && autoVocalEnd < endTime);
+  if (hasDetailedTiming && state.textPreset !== 'book') {
+    return lyricProgressForLineAtTime(line, displayTime, endTime);
+  }
+  return computeMultiLyricHighlightProgress(startTime, endTime, displayTime);
+}
+
+function multiRowLyricMotionDuration(baseDuration) {
+  const flowIntensity = clamp(Number(state.textComposerSettings?.flowIntensity) || 24, 0, 100);
+  const flowScale = clamp(1 - (flowIntensity - 24) * 0.0033, 0.75, 1.1);
+  return `${Math.round(Math.max(1, Number(baseDuration) || 1) * flowScale)}ms`;
+}
+
+function updateMultiRowLyricLine(item, line, index, active, maxDistance = 4, scope = state.lyricSignature) {
+  const centerIndex = Math.max(0, active);
+  const offset = index - centerIndex;
+  const distance = Math.min(maxDistance, Math.abs(offset));
+  const curveMagnitude = Math.min(12, 4 + distance * 1.6);
   item.dataset.multiRowLyricIndex = String(index);
+  item.dataset.multiRowLyricKey = multiRowLyricLineKey(line, index, scope);
+  item.dataset.multiRowLyricScope = safeText(scope, 'fallback');
+  item.dataset.multiRowLyricOffset = String(offset);
+  item.dataset.multiRowLyricDistance = String(distance);
   item.classList.toggle('is-past', index < active);
   item.classList.toggle('is-current', index === active);
   item.classList.toggle('is-future', index > active);
+  item.style.setProperty('--multi-row-distance', String(distance));
+  item.style.setProperty('--multi-row-slot', String(maxDistance + 1 + offset));
+  item.style.setProperty('--multi-row-size-reduction', `${(distance * 4.2).toFixed(1)}px`);
   item.style.setProperty(
-    '--multi-row-distance',
-    String(Math.min(maxDistance, Math.abs(index - active)))
+    '--multi-row-line-opacity',
+    (index === active ? 1 : Math.max(0.3, 0.58 - distance * 0.08)).toFixed(3)
+  );
+  item.style.setProperty(
+    '--multi-row-curve-x',
+    index === active ? '0px' : `${index < active ? curveMagnitude : -curveMagnitude}px`
+  );
+  item.style.setProperty(
+    '--multi-row-tilt',
+    index === active
+      ? '0deg'
+      : `${((index < active ? 1 : -1) * Math.min(1.8, 0.7 + distance * 0.22)).toFixed(2)}deg`
+  );
+  item.style.setProperty(
+    '--multi-row-motion-duration',
+    multiRowLyricMotionDuration(index === active ? 240 : index < active ? 420 : 320)
+  );
+  item.style.setProperty(
+    '--multi-row-motion-delay',
+    `${index < active
+      ? Math.max(0, distance - 1) * 18
+      : index > active
+        ? Math.max(0, distance - 1) * 10
+        : 0}ms`
+  );
+  item.style.setProperty(
+    '--multi-row-trail-x',
+    index === active ? '0px' : `${index < active ? 10 : -10}px`
+  );
+  item.style.setProperty(
+    '--multi-row-trail-rotate',
+    index === active ? '0deg' : `${index < active ? 1.5 : -1.5}deg`
   );
   if (index === active) item.setAttribute('aria-current', 'true');
   else item.removeAttribute('aria-current');
@@ -20941,13 +29313,28 @@ function updateMultiRowLyricLine(item, line, index, active, maxDistance = 4) {
     main.className = 'multi-row-lyric-main';
     item.appendChild(main);
   }
+  item.__multiRowMain = main;
   const mainText = safeText(line?.text, playbackLyricText());
-  if (main.dataset.text !== mainText) main.textContent = mainText;
+  const fittedFontSize = multiRowLyricFontSize(
+    line,
+    index === active,
+    distance,
+    maxDistance * 2 + 1
+  );
+  const fittedFontSizeCss = `${fittedFontSize.toFixed(3)}px`;
+  if (item.style.getPropertyValue('--multi-row-fit-font-size') !== fittedFontSizeCss) {
+    item.style.setProperty('--multi-row-fit-font-size', fittedFontSizeCss);
+  }
+  if (main.dataset.text !== mainText) {
+    main.textContent = mainText;
+    invalidateSequentialLyricHighlight(main);
+  }
   main.dataset.text = mainText;
+  item.dataset.trailText = mainText;
   syncGlitchTextElement(main, mainText, index === active && glitchTextEffectActive());
 
   const translation = state.bilingualLyricsEnabled
-    ? safeText(line?.translationText, '')
+    ? playbackLyricTranslationText(line)
     : '';
   if (translation) {
     let subtitle = item.querySelector('.multi-row-lyric-translation');
@@ -20957,8 +29344,12 @@ function updateMultiRowLyricLine(item, line, index, active, maxDistance = 4) {
       subtitle.className = 'multi-row-lyric-translation';
       item.appendChild(subtitle);
     }
+    item.__multiRowTranslation = subtitle;
     const translationChanged = subtitle.dataset.text !== translation;
-    if (translationChanged) subtitle.textContent = translation;
+    if (translationChanged) {
+      subtitle.textContent = translation;
+      invalidateSequentialLyricHighlight(subtitle);
+    }
     subtitle.dataset.text = translation;
     syncGlitchTextElement(subtitle, translation, index === active && glitchTextEffectActive());
     if (translationChanged) {
@@ -20970,83 +29361,230 @@ function updateMultiRowLyricLine(item, line, index, active, maxDistance = 4) {
     }
   } else {
     item.querySelector('.multi-row-lyric-translation')?.remove();
+    item.__multiRowTranslation = null;
   }
   return item;
 }
 
-function createMultiRowLyricLine(line, index, active, maxDistance) {
+function createMultiRowLyricLine(line, index, active, maxDistance, scope) {
   const item = document.createElement('div');
   item.className = 'multi-row-lyric-line';
-  return updateMultiRowLyricLine(item, line, index, active, maxDistance);
+  return updateMultiRowLyricLine(item, line, index, active, maxDistance, scope);
 }
 
-function renderMultiRowLyrics(force = false) {
+function clearMultiRowLyricMotionTimer(item, key) {
+  if (!item?.[key]) return;
+  window.clearTimeout(item[key]);
+  item[key] = 0;
+}
+
+function removeMultiRowLyricLine(item) {
+  if (!item) return;
+  clearMultiRowLyricMotionTimer(item, '__multiRowLeaveTimer');
+  clearMultiRowLyricMotionTimer(item, '__multiRowMotionTimer');
+  item.remove();
+}
+
+function beginMultiRowLyricExit(item, itemRect, listRect, direction = 1) {
+  if (!item || item.classList.contains('is-leaving')) return;
+  const top = Number(itemRect?.top) - Number(listRect?.top);
+  const left = Number(itemRect?.left) - Number(listRect?.left);
+  item.style.setProperty('--multi-row-leave-top', `${(Number.isFinite(top) ? top : 0).toFixed(2)}px`);
+  item.style.setProperty('--multi-row-leave-left', `${(Number.isFinite(left) ? left : 0).toFixed(2)}px`);
+  item.style.setProperty('--multi-row-leave-width', `${Math.max(1, Number(itemRect?.width) || Number(listRect?.width) || 1).toFixed(2)}px`);
+  item.style.setProperty('--multi-row-flip-y', '0px');
+  item.style.setProperty('--multi-row-exit-y', `${direction >= 0 ? -12 : 12}px`);
+  item.style.setProperty('--multi-row-motion-duration', multiRowLyricMotionDuration(420));
+  item.style.setProperty('--multi-row-motion-delay', '0ms');
+  item.style.setProperty('--multi-row-trail-x', `${direction >= 0 ? 10 : -10}px`);
+  item.style.setProperty('--multi-row-trail-rotate', `${direction >= 0 ? 1.5 : -1.5}deg`);
+  item.classList.remove('is-entering', 'is-flip-primed');
+  item.classList.add('is-leaving', 'is-lyric-transitioning');
+  item.setAttribute('aria-hidden', 'true');
+
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    item.removeEventListener('transitionend', onTransitionEnd);
+    removeMultiRowLyricLine(item);
+  };
+  const onTransitionEnd = (event) => {
+    if (event.target !== item || !['opacity', 'transform', 'translate'].includes(event.propertyName)) return;
+    finish();
+  };
+  item.addEventListener('transitionend', onTransitionEnd);
+  item.__multiRowLeaveTimer = window.setTimeout(finish, reducedMotion ? 34 : 520);
+}
+
+function beginMultiRowLyricFlip(item, delta) {
+  if (!item || Math.abs(delta) < 0.5) return false;
+  clearMultiRowLyricMotionTimer(item, '__multiRowMotionTimer');
+  item.classList.add('is-flip-primed', 'is-lyric-transitioning');
+  item.style.setProperty('--multi-row-flip-y', `${delta.toFixed(2)}px`);
+  return true;
+}
+
+function settleMultiRowLyricMotion(item) {
+  if (!item) return;
+  item.classList.remove('is-flip-primed', 'is-entering');
+  item.style.setProperty('--multi-row-flip-y', '0px');
+  const finish = (event) => {
+    if (event && event.target !== item) return;
+    if (event && !['opacity', 'transform', 'translate'].includes(event.propertyName)) return;
+    item.removeEventListener('transitionend', finish);
+    clearMultiRowLyricMotionTimer(item, '__multiRowMotionTimer');
+    item.classList.remove('is-lyric-transitioning');
+  };
+  item.addEventListener('transitionend', finish);
+  item.__multiRowMotionTimer = window.setTimeout(() => finish(), reducedMotion ? 34 : 520);
+}
+
+function renderMultiRowLyrics(force = false, currentTime = Number.NaN) {
   if (!els.multiRowLyricList) return;
   syncMultiRowLyricsControl();
   if (!state.multiRowLyricsEnabled || !textLyricsEnabled()) return;
-  const lines = multiRowDisplayLines();
-  const active = state.lyricLines.length
-    ? clamp(state.lyricIndex, -1, Math.max(0, lines.length - 1))
+  const displayModel = multiRowDisplayModel();
+  const lines = displayModel.lines;
+  const sourceActive = state.lyricLines.length
+    ? clamp(state.lyricIndex, -1, Math.max(0, state.lyricLines.length - 1))
     : 0;
+  const active = state.lyricLines.length && sourceActive >= 0
+    ? clamp(displayModel.sourceToDisplay[sourceActive], 0, Math.max(0, lines.length - 1))
+    : sourceActive;
   const settings = normalizeTextComposerSettings(state.textComposerSettings);
   const lineCount = settings.multiRowLineCount;
-  const maxDistance = Math.max(2, Math.floor(lineCount / 2));
+  const maxDistance = Math.floor(lineCount / 2);
+  const layout = multiRowLyricLayoutMetrics(lineCount, settings);
+  const activeCenter = Math.max(0, active);
+  const list = els.multiRowLyricList;
+  list.style.setProperty('--multi-row-line-count', String(lineCount));
+  list.style.setProperty('--multi-row-center-slot', String(maxDistance + 1));
+  list.style.setProperty('--multi-row-row-pitch', `${layout.rowPitch.toFixed(2)}px`);
+  list.style.setProperty('--multi-row-list-height', `${layout.listHeight.toFixed(2)}px`);
   const signature = `${state.lyricSignature}|${active}|${state.bilingualLyricsEnabled ? 1 : 0}|${lines.length}|${lineCount}`;
   if (force || signature !== state.multiRowLyricSignature) {
     state.multiRowLyricSignature = signature;
-    const activeCenter = Math.max(0, active);
-    const start = Math.max(
-      0,
-      Math.min(activeCenter - Math.floor(lineCount / 2), lines.length - lineCount)
-    );
-    const end = Math.min(lines.length, start + lineCount);
-    const existing = new Map(Array.from(els.multiRowLyricList.children).map((item) => [
-      Number(item.dataset.multiRowLyricIndex),
-      item
-    ]));
-    const previousTops = new Map(Array.from(existing.entries()).map(([index, item]) => [
-      index,
-      item.getBoundingClientRect().top
-    ]));
-    const retained = new Set();
-    for (let index = start; index < end; index += 1) {
-      const item = existing.get(index)
-        || createMultiRowLyricLine(lines[index], index, active, maxDistance);
-      updateMultiRowLyricLine(item, lines[index], index, active, maxDistance);
-      retained.add(index);
-      els.multiRowLyricList.appendChild(item);
+    const scope = safeText(state.lyricSignature, 'fallback');
+    const liveChildren = Array.from(list.children).filter((item) => !item.classList.contains('is-leaving'));
+    const previousScope = liveChildren[0]?.dataset.multiRowLyricScope || '';
+    const previousActive = Number(list.dataset.multiRowLyricActive);
+    const sameScope = !previousScope || previousScope === scope;
+    const animateShift = !force
+      && sameScope
+      && Number.isFinite(previousActive)
+      && active !== previousActive;
+    const shiftDirection = animateShift ? Math.sign(active - previousActive) || 1 : 1;
+
+    if (!sameScope) {
+      Array.from(list.children).forEach(removeMultiRowLyricLine);
+    } else if (force) {
+      Array.from(list.querySelectorAll('.multi-row-lyric-line.is-leaving')).forEach(removeMultiRowLyricLine);
     }
-    existing.forEach((item, index) => {
-      if (!retained.has(index)) item.remove();
+
+    const start = activeCenter;
+    const end = Math.min(lines.length, activeCenter + maxDistance + 1);
+    const available = Array.from(list.children).filter((item) => !item.classList.contains('is-leaving'));
+    const existing = new Map(available.map((item) => [item.dataset.multiRowLyricKey, item]));
+    const previousRects = new Map(Array.from(existing.entries()).map(([key, item]) => [
+      key,
+      item.getBoundingClientRect()
+    ]));
+    const listRect = list.getBoundingClientRect();
+    const retained = new Set();
+    const mounted = [];
+    for (let index = start; index < end; index += 1) {
+      const key = multiRowLyricLineKey(lines[index], index, scope);
+      const existingItem = existing.get(key);
+      const item = existingItem
+        || createMultiRowLyricLine(lines[index], index, active, maxDistance, scope);
+      updateMultiRowLyricLine(item, lines[index], index, active, maxDistance, scope);
+      retained.add(key);
+      mounted.push({ item, key, existing: !!existingItem });
+    }
+
+    existing.forEach((item, key) => {
+      if (retained.has(key)) return;
+      if (animateShift) beginMultiRowLyricExit(item, previousRects.get(key), listRect, shiftDirection);
+      else removeMultiRowLyricLine(item);
     });
 
+    mounted.forEach(({ item }) => list.appendChild(item));
+    list.__multiRowCurrentLine = mounted.find(({ item }) => (
+      item.classList.contains('is-current') && !item.classList.contains('is-leaving')
+    ))?.item || null;
     const movedItems = [];
-    retained.forEach((index) => {
-      const item = existing.get(index);
-      const previousTop = previousTops.get(index);
-      if (!item || !Number.isFinite(previousTop)) return;
-      const delta = previousTop - item.getBoundingClientRect().top;
-      if (Math.abs(delta) < 0.5) return;
-      item.style.transition = 'none';
-      item.style.setProperty('--multi-row-flip-y', `${delta.toFixed(2)}px`);
-      movedItems.push(item);
-    });
-    if (movedItems.length) {
-      void els.multiRowLyricList.offsetHeight;
+    if (animateShift) {
+      mounted.forEach(({ item, key, existing: wasExisting }) => {
+        const index = Number(item.dataset.multiRowLyricIndex);
+        const distance = Number(item.dataset.multiRowLyricDistance) || 0;
+        if (index === active) {
+          item.style.setProperty('--multi-row-motion-duration', multiRowLyricMotionDuration(240));
+          item.style.setProperty('--multi-row-motion-delay', '0ms');
+          item.style.setProperty('--multi-row-trail-x', `${shiftDirection >= 0 ? -12 : 12}px`);
+          item.style.setProperty('--multi-row-trail-rotate', `${shiftDirection >= 0 ? -1.8 : 1.8}deg`);
+        } else if (index < active) {
+          item.style.setProperty('--multi-row-motion-duration', multiRowLyricMotionDuration(420));
+          item.style.setProperty('--multi-row-motion-delay', `${Math.max(0, distance - 1) * 18}ms`);
+          item.style.setProperty('--multi-row-trail-x', '10px');
+          item.style.setProperty('--multi-row-trail-rotate', '1.5deg');
+        }
+        if (!wasExisting) {
+          item.style.setProperty('--multi-row-enter-y', `${shiftDirection >= 0 ? 16 : -16}px`);
+          item.classList.add('is-entering', 'is-flip-primed', 'is-lyric-transitioning');
+          return;
+        }
+        const previousTop = previousRects.get(key)?.top;
+        if (!Number.isFinite(previousTop)) return;
+        const delta = previousTop - item.getBoundingClientRect().top;
+        if (beginMultiRowLyricFlip(item, delta)) movedItems.push(item);
+      });
+    }
+
+    list.dataset.multiRowLyricActive = String(active);
+    list.dataset.multiRowLyricScope = scope;
+    const transitioningItems = mounted
+      .map(({ item }) => item)
+      .filter((item) => item.classList.contains('is-entering') || movedItems.includes(item));
+    if (transitioningItems.length) {
+      void list.offsetHeight;
       window.requestAnimationFrame(() => {
-        movedItems.forEach((item) => {
-          item.style.removeProperty('transition');
-          item.style.setProperty('--multi-row-flip-y', '0px');
-        });
+        transitioningItems.forEach(settleMultiRowLyricMotion);
       });
     }
   }
-  const current = els.multiRowLyricList.querySelector('.multi-row-lyric-line.is-current');
-  if (current) current.style.setProperty('--multi-row-progress', `${clamp(state.lyricProgressPercent, 0, 100).toFixed(2)}%`);
+  let current = list.__multiRowCurrentLine;
+  if (
+    !current
+    || !current.classList.contains('is-current')
+    || current.classList.contains('is-leaving')
+  ) {
+    current = list.querySelector('.multi-row-lyric-line.is-current:not(.is-leaving)');
+    list.__multiRowCurrentLine = current;
+  }
+  if (current) {
+    const progress = multiRowLyricHighlightProgress(displayModel, active, currentTime) * 100;
+    const progressText = `${progress.toFixed(2)}%`;
+    if (current.__multiRowProgress !== progressText) {
+      current.__multiRowProgress = progressText;
+      current.style.setProperty('--multi-row-progress', progressText);
+    }
+    const main = current.__multiRowMain || current.querySelector('.multi-row-lyric-main');
+    const translation = current.__multiRowTranslation
+      || current.querySelector('.multi-row-lyric-translation');
+    current.__multiRowMain = main;
+    current.__multiRowTranslation = translation;
+    if (force) {
+      invalidateSequentialLyricHighlight(main);
+      invalidateSequentialLyricHighlight(translation);
+    }
+    setSequentialLyricHighlight(main, main, progress);
+    setSequentialLyricHighlight(translation, translation, progress);
+  }
 }
 
 function setMultiRowLyricsEnabled(enabled) {
-  if (state.textPreset === 'focus-echo') {
+  if (singleRowOnlyTextPreset()) {
     state.multiRowLyricsEnabled = false;
     state.textComposerSettings = normalizeTextComposerSettings({
       ...state.textComposerSettings,
@@ -21058,6 +29596,7 @@ function setMultiRowLyricsEnabled(enabled) {
     renderMultiRowLyrics(true);
     return false;
   }
+  const wasEnabled = state.multiRowLyricsEnabled === true;
   const nextEnabled = !!enabled;
   state.multiRowLyricsEnabled = nextEnabled;
   if (state.multiRowLyricsEnabled && !textLyricsEnabled()) {
@@ -21088,6 +29627,7 @@ function setMultiRowLyricsEnabled(enabled) {
   renderMultiRowLyrics(true);
   scheduleDesktopSceneSnapshot();
   requestOrbFrame();
+  if (nextEnabled && !wasEnabled) unlockAppAchievement('lyric-council');
   return true;
 }
 
@@ -21416,7 +29956,7 @@ function textPresetTargets() {
   });
 }
 
-function textPresetHitTest(event, padding = 18) {
+function textPresetHitTest(event, padding = 18, { allowTransformedBounds = false } = {}) {
   const source = event.target instanceof Element ? event.target : null;
   const interactive = source?.closest(
     'button, input, select, textarea, a, [role="button"], [role="slider"], #qishuiPlaybackCard'
@@ -21440,14 +29980,22 @@ function textPresetHitTest(event, padding = 18) {
     const scale = Math.max(0.1, Number(textPresetTransform().scale) || 1);
     const stableWidth = Math.max(1, Math.min(rect.width, target.offsetWidth * scale || rect.width));
     const stableHeight = Math.max(1, Math.min(rect.height, target.offsetHeight * scale || rect.height));
+    // Single-row lyrics deliberately ignore pointer events, so a real press lands on the stage.
+    // Only pointerdown may reach toward the transformed AABB, with a cap that preserves blank-stage orbiting.
+    const hitWidth = allowTransformedBounds
+      ? Math.min(rect.width, stableWidth + Math.min(96, stableWidth * 0.12) * 2)
+      : stableWidth;
+    const hitHeight = allowTransformedBounds
+      ? Math.min(rect.height, stableHeight + Math.min(48, stableHeight * 0.5) * 2)
+      : stableHeight;
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    const left = centerX - stableWidth / 2;
-    const right = centerX + stableWidth / 2;
+    const left = centerX - hitWidth / 2;
+    const right = centerX + hitWidth / 2;
     const inside = event.clientX >= left - padding
-      && event.clientX <= centerX + stableWidth / 2 + padding
-      && event.clientY >= centerY - stableHeight / 2 - padding
-      && event.clientY <= centerY + stableHeight / 2 + padding;
+      && event.clientX <= right + padding
+      && event.clientY >= centerY - hitHeight / 2 - padding
+      && event.clientY <= centerY + hitHeight / 2 + padding;
     if (!inside) continue;
     const normalizedX = clamp((event.clientX - left) / Math.max(1, right - left), 0, 1);
     return {
@@ -21472,7 +30020,7 @@ function clearTextPresetHoldTimer() {
 
 function beginTextPresetGesture(event) {
   if (event.shiftKey) return false;
-  const hit = textPresetHitTest(event, 12);
+  const hit = textPresetHitTest(event, 12, { allowTransformedBounds: true });
   if (!hit) return false;
   cancelPlaybackLyricGeometryFlips();
   const gesture = state.textPresetGesture;
@@ -21645,7 +30193,7 @@ function setWallpaperSource(source) {
   refreshWallpapers({ source: state.wallpaperSource });
 }
 
-function commitDiyPage(page) {
+function commitDiyPage(page, options = {}) {
   state.diyPage = page === 'wallpaper' ? 'wallpaper' : page === 'text' ? 'text' : 'preset';
   const presetPage = state.diyPage === 'preset';
   const textPage = state.diyPage === 'text';
@@ -21670,11 +30218,12 @@ function commitDiyPage(page) {
   if (els.diyTextPage) els.diyTextPage.hidden = !textPage;
   if (els.diyWallpaperPage) els.diyWallpaperPage.hidden = !wallpaperPage;
   if (wallpaperPage) {
-    setDiyPreset('wallpaper');
+    setDiyPreset('wallpaper', { persist: options.persist });
     enterPlaybackPage();
     setWallpaperSource(state.wallpaperSource);
   }
   syncPlaybackCardPanelState();
+  if (options.persist !== false) saveVisualSettingsPreferences();
 }
 
 function setDiyCardOpen(open) {
@@ -21754,6 +30303,11 @@ const DIY_PRESET_CONFIG_LABELS = Object.freeze({
   sonicCenterColor: '核心音柱颜色',
   sonicCoreColor: '中间音柱颜色',
   sonicOuterColor: '外围音柱颜色',
+  sonicGroundMounds: '全地形波峰',
+  sonicGroundColor: '地面颜色',
+  sonicGroundEmission: '地面自发光',
+  sonicGroundMoundHeight: '隆起高度',
+  sonicGroundMoundRadius: '隆起宽度',
   sonicFountain: '粒子喷泉',
   sonicFountainColor: '喷泉颜色',
   sonicStarfield: '星空粒子',
@@ -21773,6 +30327,8 @@ const DIY_PRESET_CONFIG_LABELS = Object.freeze({
   sonicCoverBackground: '封面三色背景',
   sonicCoverBackgroundMix: '背景混合强度',
   sonicBrightness: 'Sonic 亮度',
+  sonicFluorescence: 'Sonic 荧光质感',
+  sonicFluorescenceScatter: 'Sonic 荧光散射',
   sonicExposure: 'Sonic 曝光',
   sonicColumnHeight: '音柱高度',
   sonicFov: '广角视野',
@@ -21820,7 +30376,11 @@ function builtinDiyPresetConfiguration() {
     runtimeControls.sonicCenterColor = settings.centerColor || `跟随封面 · ${colors.center}`;
     runtimeControls.sonicCoreColor = settings.coreColor || `跟随封面 · ${colors.core}`;
     runtimeControls.sonicOuterColor = settings.outerColor || `跟随封面 · ${colors.outer}`;
-    runtimeControls.sonicAllGroundFloat = settings.allGroundFloatEnabled;
+    runtimeControls.sonicGroundMounds = settings.groundMoundsEnabled;
+    runtimeControls.sonicGroundColor = settings.groundColor || `跟随封面 · ${resolvedSonicGroundColor()}`;
+    runtimeControls.sonicGroundEmission = `${Math.round(settings.groundEmission * 100)}%`;
+    runtimeControls.sonicGroundMoundHeight = `${Math.round(settings.groundMoundHeight * 100)}%`;
+    runtimeControls.sonicGroundMoundRadius = `${Math.round(settings.groundMoundRadius)} 格`;
     runtimeControls.sonicFountain = settings.fountainEnabled;
     runtimeControls.sonicFountainColor = settings.fountainColor;
     runtimeControls.sonicStarfield = settings.starfieldEnabled;
@@ -21840,6 +30400,8 @@ function builtinDiyPresetConfiguration() {
     runtimeControls.sonicCoverBackground = settings.coverBackgroundEnabled;
     runtimeControls.sonicCoverBackgroundMix = `${Math.round(settings.coverBackgroundMix * 100)}%`;
     runtimeControls.sonicBrightness = `${Math.round(settings.brightness * 100)}%`;
+    runtimeControls.sonicFluorescence = `${Math.round(settings.fluorescence * 100)}%`;
+    runtimeControls.sonicFluorescenceScatter = `${Math.round(settings.fluorescenceScatter * 100)}%`;
     runtimeControls.sonicExposure = `${settings.exposure > 0 ? '+' : ''}${settings.exposure.toFixed(2)} EV`;
     runtimeControls.sonicColumnHeight = `${Math.round(settings.columnHeight * 100)}%`;
     runtimeControls.sonicFov = `${Math.round(settings.fov)}°`;
@@ -21877,7 +30439,8 @@ function isStormOceanPreset(preset) {
   return !!preset && (
     preset.id === 'preset-storm-ocean-horizon'
     || preset.sceneItems?.some((item) => (
-      window.FeStormOceanRuntime?.isProfile?.(item.component?.asset?.reactivity) === true
+      stormOceanReactivityProfile(item.component?.asset?.reactivity)
+      || window.FeStormOceanRuntime?.isProfile?.(item.component?.asset?.reactivity) === true
     ))
   );
 }
@@ -22076,7 +30639,7 @@ function renderDiySandboxPresets() {
       const name = document.createElement('strong');
       name.textContent = preset.name;
       const meta = document.createElement('small');
-      meta.textContent = window.FeStormOceanRuntime?.isProfile?.(preset.sceneItems[0]?.component?.asset?.reactivity)
+      meta.textContent = isStormOceanPreset(preset)
         ? '实时海浪 · 光照可切换'
         : '本地 3D 场景';
       button.append(name, meta);
@@ -22130,20 +30693,36 @@ function renderDiySandboxPresets() {
   renderDiySelectedPresetConfig();
 }
 
-function enterDiyScenePresetPlayback(id) {
+async function enterDiyScenePresetPlayback(id) {
   const preset = state.sandbox.presets.find((item) => item.id === id);
   if (!preset) return;
+  const selectionToken = ++presetSceneSelectionToken;
   state.sandbox.selectedPresetId = preset.id;
   if (preset.presetType === 'playback' && preset.playbackPreset) {
     enterPresetPlaybackPage(preset.playbackPreset);
     return;
   }
   if (state.sandbox.open) setSandboxOpen(false);
+  const stormOcean = isStormOceanPreset(preset);
+  if (stormOcean) {
+    try {
+      await ensurePresetRuntime('storm-ocean');
+    } catch (error) {
+      if (selectionToken === presetSceneSelectionToken) {
+        toast('风暴海域运行时加载失败，请重试');
+        console.warn('[preset-runtime] storm-ocean failed to load', error);
+      }
+      return;
+    }
+    if (
+      selectionToken !== presetSceneSelectionToken
+      || state.sandbox.selectedPresetId !== preset.id
+    ) return;
+  }
   state.sandbox.playbackPresetId = preset.id;
   state.sandbox.playbackAssetReady = false;
   state.sandbox.playbackAssetFailed = false;
   const playbackAsset = preset.sceneItems[0]?.component?.asset || {};
-  const stormOcean = window.FeStormOceanRuntime?.isProfile?.(playbackAsset.reactivity) === true;
   if (stormOcean) {
     state.sandbox.stormLightingMode = 'sunset';
     state.sandbox.stormWeatherMode = 'auto';
@@ -22163,8 +30742,10 @@ function enterDiyScenePresetPlayback(id) {
   if (stormOcean) resetPlaybackView();
 }
 
-function setDiyPreset(preset) {
+function setDiyPreset(preset, options = {}) {
   const wasBookPreset = state.diyPreset === 'book';
+  presetSceneSelectionToken += 1;
+  const activationToken = ++presetRuntimeActivationToken;
   state.diyPreset = normalizeDiyPreset(preset);
   if (state.diyPreset !== 'sandbox-scene') state.sandbox.selectedPresetId = '';
   if (state.diyPreset !== 'wallpaper') state.scenePreset = state.diyPreset;
@@ -22191,9 +30772,9 @@ function setDiyPreset(preset) {
   updateWallpaperVisibility();
   if (state.diyPreset === 'book' && state.textPreset !== 'book') {
     state.lastSelectableTextPreset = selectableTextPreset(state.textPreset);
-    setTextPreset('book');
+    setTextPreset('book', { persist: options.persist });
   } else if (wasBookPreset && state.diyPreset !== 'book' && state.textPreset === 'book') {
-    setTextPreset(state.lastSelectableTextPreset);
+    setTextPreset(state.lastSelectableTextPreset, { persist: options.persist });
   }
   updateTextPresetAvailability();
   updateLyricDiyVars();
@@ -22204,6 +30785,8 @@ function setDiyPreset(preset) {
   renderDiySelectedPresetConfig();
   applyPresetUpscaler({ force: true });
   scheduleDesktopSceneSnapshot();
+  if (options.persist !== false) saveVisualSettingsPreferences();
+  void ensureActivePresetRuntime(state.diyPreset, activationToken);
 }
 
 function setTextPreset(preset, options = {}) {
@@ -22225,7 +30808,7 @@ function setTextPreset(preset, options = {}) {
       lyricsEnabled: true
     });
   }
-  if (state.textPreset === 'focus-echo' && state.textComposerSettings.layoutMode !== 'single') {
+  if (singleRowOnlyTextPreset() && state.textComposerSettings.layoutMode !== 'single') {
     state.textComposerSettings = normalizeTextComposerSettings({
       ...state.textComposerSettings,
       layoutMode: 'single'
@@ -22250,6 +30833,8 @@ function setTextPreset(preset, options = {}) {
     els.playbackLyricScene.classList.toggle('is-rain-glass-text', isRainGlassPreset() && state.textPreset === 'depth');
     els.playbackLyricScene.dataset.textPreset = state.textPreset;
   }
+  syncFocusEchoLayerText(state.lyricDisplayText || playbackLyricText());
+  syncSingleRowLyricEffects();
   if (els.appShell) els.appShell.classList.toggle('has-book-lyric-text', state.textPreset === 'book');
   if (els.appShell) els.appShell.classList.toggle('has-rain-glass-scene', isRainGlassPreset());
   applyTextFontPreference();
@@ -22285,16 +30870,27 @@ function setTextPreset(preset, options = {}) {
   renderDiySelectedPresetConfig();
   requestOrbFrame();
   scheduleDesktopSceneSnapshot();
+  if (options.persist !== false) saveVisualSettingsPreferences();
 }
 
 function syncBlurLyricComponent(text = state.lyricDisplayText) {
   if (!els.playbackLyricScene || !els.blurLyricMount) return;
+  const line = safeText(text, playbackLyricText());
+  const fitMetrics = lyricLineFitMetrics(
+    line,
+    Number(state.textComposerSettings?.letterSpacing) || 0
+  );
+  setStylePropertyIfChanged(
+    els.blurLyricMount,
+    '--lyric-fit-font-size',
+    `${fitMetrics.fontSize.toFixed(3)}px`
+  );
   const enabled = false;
   els.playbackLyricScene.classList.toggle('has-blur-lyrics', enabled);
   if (!enabled) return;
   const controller = window.FEBlurLyrics;
   controller.mount(els.blurLyricMount);
-  controller.setText(safeText(text, playbackLyricText()), els.blurLyricMount);
+  controller.setText(line, els.blurLyricMount);
 }
 
 function clearDiyAutoHideTimer() {
@@ -23053,7 +31649,7 @@ function ensureSandboxGltfLoader() {
   if (sandboxGltfLoaderPromise) return sandboxGltfLoaderPromise;
   sandboxGltfLoaderPromise = new Promise((resolve, reject) => {
     const script = document.createElement('script');
-    script.src = 'vendor/GLTFLoader.r128.js?v=20260712-ui-performance-audit';
+    script.src = 'vendor/GLTFLoader.r128.js?v=20260811-cache-audit-1';
     script.async = true;
     script.dataset.sandboxGltfLoader = 'true';
     script.addEventListener('load', () => {
@@ -23467,6 +32063,7 @@ function setStormLightingMode(mode) {
   syncStormLightingControls(true);
   renderDiySelectedPresetConfig();
   requestSandboxRender();
+  saveVisualSettingsPreferences();
 }
 
 function setStormThunderstormMode(mode) {
@@ -23476,6 +32073,7 @@ function setStormThunderstormMode(mode) {
   syncStormLightingControls(true);
   renderDiySelectedPresetConfig();
   requestSandboxRender();
+  saveVisualSettingsPreferences();
 }
 
 function syncSandboxPlaybackAssetState() {
@@ -23627,6 +32225,7 @@ function syncSandboxPlaybackSurface() {
 
 function initSandboxRenderer() {
   if (state.sandbox.renderer || !window.THREE || !els.sandboxCanvas) return;
+  if (!heavyWebGLRenderingAllowed()) return;
   const THREE = window.THREE;
   const renderer = createDirectX11Renderer(THREE, {
     canvas: els.sandboxCanvas,
@@ -23724,6 +32323,7 @@ function initSandboxRenderer() {
 
 function initSandboxPreviewRenderer() {
   if (state.sandbox.previewRenderer || !window.THREE || !els.sandboxComponentPreview) return;
+  if (!heavyWebGLRenderingAllowed()) return;
   const THREE = window.THREE;
   const renderer = createDirectX11Renderer(THREE, {
     canvas: els.sandboxComponentPreview,
@@ -24258,10 +32858,6 @@ function animateSandboxMesh(item, mesh, now) {
   if (component.primitive === 'gltf') animateSandboxGltfReactivity(item, mesh, now, musicSignal);
 }
 
-function sandboxFrameInterval() {
-  return 0;
-}
-
 function sandboxHasContinuousMotion(previewComponent = null) {
   if (!sandboxRendererActive() || document.hidden) return false;
   if (!reducedMotion && state.sandbox.sceneItems.some((item) => item.component.motion !== 'none')) return true;
@@ -24286,10 +32882,6 @@ function renderSandboxFrame(now = performance.now()) {
   const frameStep = sandbox.lastFrameAt ? clamp(elapsed / 20, 0.05, 2.5) : 1;
   const previewComponent = previewActive ? readSandboxComponentForm() : null;
   const continuous = sandboxHasContinuousMotion(previewComponent);
-  if (!sandbox.renderRequested && elapsed < sandboxFrameInterval()) {
-    if (continuous) sandbox.animationFrame = window.requestAnimationFrame(renderSandboxFrame);
-    return;
-  }
 
   if (sandbox.resizePending) {
     resizeSandboxRenderer();
@@ -24464,12 +33056,14 @@ async function saveSandboxPreset() {
       method: 'POST',
       body: JSON.stringify({ preset })
     });
+    if (response && response.ok === false) throw new Error(response.error || '预设服务不可用');
     state.sandbox.presets = Array.isArray(response.presets) ? response.presets.map(normalizeSandboxPreset) : state.sandbox.presets;
     state.sandbox.presetFolder = safeText(response.folder, state.sandbox.presetFolder);
     saveSandboxPresets();
     saveSandboxDraft();
     renderSandboxPresets();
     if (els.sandboxSaveStatus) els.sandboxSaveStatus.textContent = `已写入预设文件夹：${name}`;
+    if (preset.sceneItems.length > 0) unlockAppAchievement('scene-smith');
     toast('场景已保存到客户端预设文件夹');
   } catch (error) {
     setSandboxStageStatus(`保存失败：${error.message || '预设服务不可用'}`);
@@ -24918,8 +33512,10 @@ async function commitCodexDraft() {
   renderSandboxCodexResponse(response);
   appendSandboxCodexMessage('assistant', sandboxCodexReply(response));
   renderSandboxCodexPipeline(response);
-  if (response.status === 'saved' && applySavedCodexPreset(response)) {
+  const saved = response.status === 'saved' && applySavedCodexPreset(response);
+  if (saved) {
     if (els.sandboxSaveStatus) els.sandboxSaveStatus.textContent = 'Codex 成品已写入预设文件夹';
+    if (state.sandbox.sceneItems.length > 0) unlockAppAchievement('scene-smith');
   } else if (response.status !== 'saved') {
     setSandboxStageStatus(safeText(response.message, 'Codex 成品未能保存'));
   }
@@ -25342,6 +33938,7 @@ function endDiyCardRotation(event) {
   state.diyCardDrag = null;
   els.diySidebar?.classList.remove('is-rotating');
   els.diySidebar?.releasePointerCapture?.(event.pointerId);
+  saveVisualSettingsPreferences();
 }
 
 function postNativeWindowAction(action, payload = {}) {
@@ -25369,6 +33966,21 @@ function desktopSceneSnapshot() {
   const audioDuration = Number(els.audio?.duration);
   const fallbackDuration = Number(state.playerClock?.duration) || Number(state.currentSong?.duration) || 0;
   const duration = Number.isFinite(audioDuration) && audioDuration > 0 ? audioDuration : fallbackDuration;
+  const position = currentPlaybackLyricTime(Number(state.currentSong?.position) || 0);
+  const effectiveLyricTime = lyricTimelineTime(position, 0);
+  const activeLine = state.lyricLines[state.lyricIndex];
+  const nextLine = state.lyricLines[state.lyricIndex + 1];
+  const lineStart = Number(activeLine?.time);
+  const nextStart = Number(nextLine?.time);
+  const timedEnd = Number(activeLine?.endTime);
+  const fallbackEnd = Number.isFinite(nextStart) && nextStart > lineStart
+    ? nextStart
+    : Math.max(lineStart + 4, duration || lineStart + 4);
+  const lineEnd = Number.isFinite(timedEnd) && timedEnd > lineStart
+    ? (Number.isFinite(nextStart) && nextStart > lineStart ? Math.min(timedEnd, nextStart) : timedEnd)
+    : fallbackEnd;
+  const lyricLineStartTime = Number.isFinite(lineStart) ? lineStart : null;
+  const lyricLineEndTime = Number.isFinite(lineEnd) && lineEnd > lineStart ? lineEnd : null;
   return {
     diyPreset: state.diyPreset,
     textPreset: state.textPreset,
@@ -25414,7 +34026,10 @@ function desktopSceneSnapshot() {
       displayText: state.lyricDisplayText,
       subtitleText: state.lyricSubtitleText,
       progressPercent: state.lyricProgressPercent,
-      position: currentPlaybackLyricTime(Number(state.currentSong?.position) || 0),
+      position,
+      effectiveLyricTime,
+      lyricLineStartTime,
+      lyricLineEndTime,
       duration,
       playing: isPlaybackClockRunning(),
       bilingualLyricsEnabled: state.bilingualLyricsEnabled !== false,
@@ -25447,6 +34062,10 @@ function handleDesktopSceneBridgeMessage(event) {
     try { payload = JSON.parse(payload); } catch (error) { return; }
   }
   if (!payload || typeof payload !== 'object') return;
+  if (payload.type === 'fe-pet-desktop-result') {
+    handlePetDesktopBridgeResult(payload);
+    return;
+  }
   if (payload.type === 'fe-desktop-scene-result' && !DESKTOP_SCENE_CLIENT) {
     desktopSceneRuntime.pending = false;
     desktopSceneRuntime.enabled = payload.enabled === true;
@@ -25542,6 +34161,11 @@ async function applyDesktopSceneSnapshot(snapshot = {}) {
         Number(lyricPlayback.duration) || 0,
         lyricPlayback.playing === true
       );
+      updateDesktopSceneLyricClock(
+        lyricPlayback.effectiveLyricTime,
+        lyricPlayback.duration,
+        lyricPlayback.playing
+      );
       resetLyricFrameSync();
     }
     state.sonicTopography.settings = normalizeSonicSettings(snapshot.sonicSettings || state.sonicTopography.settings);
@@ -25580,16 +34204,24 @@ async function applyDesktopSceneSnapshot(snapshot = {}) {
       renderCurrent(state.currentSong);
       syncBilingualLyricsControl();
       syncMultiRowLyricsControl();
+      const snapshotEffectiveLyricTime = Number(lyricPlayback.effectiveLyricTime);
+      const initialEffectiveLyricTime = Number.isFinite(snapshotEffectiveLyricTime)
+        ? Math.max(0, snapshotEffectiveLyricTime + playbackLyricVisualLeadSeconds())
+        : effectivePlaybackLyricTime(
+            Number(lyricPlayback.position) || 0,
+            playbackLyricVisualLeadSeconds()
+          );
       setPlaybackLyricLine(
         lyricPlayback.displayText,
         lyricPlayback.subtitleText,
         clamp((Number(lyricPlayback.progressPercent) || 0) / 100, 0, 1),
+        initialEffectiveLyricTime,
         Number(lyricPlayback.position) || 0
       );
       if (state.textPreset === 'book') {
         state.lyricBookSignature = '';
         renderBookLyricLines(true);
-        updateBookLyricLines(state.lyricProgressPercent, Number(lyricPlayback.position) || 0);
+        updateBookLyricLines(state.lyricProgressPercent, initialEffectiveLyricTime);
       }
       renderMultiRowLyrics(true);
       updatePlayState();
@@ -25714,6 +34346,17 @@ async function minimizeAppWindow() {
 }
 
 async function quitAppWindow() {
+  flushWallpaperPrefs();
+  flushVisualSettingsPreferences();
+  flushSonicSettingsPreferences();
+  try {
+    await persistClientPreferences(clientPreferencesRevision || Date.now());
+  } catch (error) {
+  }
+  try {
+    await window.feAchievements?.flush?.({ timeout: 4000 });
+  } catch (error) {
+  }
   const payload = await requestAppWindowAction('quit');
   if (!payload.ok) {
     window.close();
@@ -25799,7 +34442,15 @@ async function refreshPlayerState() {
     || seekRevision !== state.qishuiPlaybackCard.seekRequestId
   );
   state.localQueueActive = false;
-  state.queue = Array.isArray(data.queue) ? data.queue : [];
+  if (Array.isArray(data.queue)) state.queue = data.queue;
+  state.queueLength = Math.max(0, Number.isInteger(data.queueLength)
+    ? data.queueLength
+    : Array.isArray(data.queue)
+      ? data.queue.length
+      : state.queueLength || state.queue.length);
+  state.queueRevision = Math.max(0, Number.isInteger(data.queueRevision)
+    ? data.queueRevision
+    : state.queueRevision);
   state.queueIndex = Number.isInteger(data.queueIndex) ? data.queueIndex : -1;
   const playerPosition = Number(data.position);
   const playerDuration = Number(data.duration);
@@ -25880,6 +34531,7 @@ async function refreshPlayerState() {
     }
   }
   renderCurrent();
+  syncRealtimePolling();
 }
 
 function applyAudioBridgePayload(audio = {}) {
@@ -25933,6 +34585,16 @@ function resetAudioPlaybackContinuity(position = Number.NaN, now = performance.n
   continuity.softRecoveryAt = 0;
   continuity.retryAfter = 0;
   return continuity;
+}
+
+function cancelStalledAudioPlaybackRecovery() {
+  const continuity = state.audioPlaybackContinuity;
+  continuity.sourceGeneration += 1;
+  continuity.pendingLoadGeneration = 0;
+  continuity.playingIntent = false;
+  continuity.stallHintAt = 0;
+  continuity.retryAfter = 0;
+  return continuity.sourceGeneration;
 }
 
 function prepareAudioPlaybackSource(position = 0, autoplay = true, recoveryToken = 0) {
@@ -26020,6 +34682,161 @@ function noteAudioPlaybackProgress(now = performance.now()) {
   }
   return false;
 }
+
+const petDesktopBridgeState = {
+  enabled: false,
+  visible: false,
+  supported: false,
+  bounds: null,
+  sequence: 0,
+  pending: new Map()
+};
+
+function petDesktopBridgeAvailable() {
+  const bridge = window.chrome?.webview;
+  return Boolean(bridge && typeof bridge.postMessage === 'function');
+}
+
+function petDesktopBridgeError(message, code = 'unsupported_platform') {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
+function requestNativeDesktopPet(action, parameters = {}) {
+  const bridge = window.chrome?.webview;
+  if (!bridge || typeof bridge.postMessage !== 'function') {
+    return Promise.reject(petDesktopBridgeError('桌面宠物模式仅支持 Windows 正式客户端，当前浏览器不支持。'));
+  }
+  const requestId = `pet-desktop-${Date.now().toString(36)}-${(++petDesktopBridgeState.sequence).toString(36)}`;
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      petDesktopBridgeState.pending.delete(requestId);
+      reject(petDesktopBridgeError('当前桌面壳不支持原生桌宠模式。', 'unsupported_platform'));
+    }, 4_000);
+    petDesktopBridgeState.pending.set(requestId, { resolve, reject, timeout });
+    bridge.postMessage({ type: 'fe-pet-desktop', action, requestId, ...parameters });
+  });
+}
+
+function handlePetDesktopBridgeResult(payload) {
+  petDesktopBridgeState.supported = payload.supported === true;
+  petDesktopBridgeState.enabled = payload.enabled === true;
+  petDesktopBridgeState.visible = payload.visible === true;
+  if (payload.bounds && typeof payload.bounds === 'object') petDesktopBridgeState.bounds = payload.bounds;
+  window.dispatchEvent(new CustomEvent('fe-monster-pet-desktop-state', {
+    detail: {
+      supported: petDesktopBridgeState.supported,
+      enabled: petDesktopBridgeState.enabled,
+      visible: petDesktopBridgeState.visible,
+      bounds: petDesktopBridgeState.bounds,
+      hostMode: safeText(payload.hostMode, '')
+    }
+  }));
+  const requestId = safeText(payload.requestId, '');
+  const pending = requestId ? petDesktopBridgeState.pending.get(requestId) : null;
+  if (!pending) return;
+  petDesktopBridgeState.pending.delete(requestId);
+  window.clearTimeout(pending.timeout);
+  if (payload.error) {
+    pending.reject(petDesktopBridgeError(safeText(payload.error, '原生桌宠操作失败'), 'native_pet_failed'));
+  } else {
+    pending.resolve({
+      supported: true,
+      enabled: petDesktopBridgeState.enabled,
+      visible: petDesktopBridgeState.visible,
+      bounds: petDesktopBridgeState.bounds,
+      hostMode: safeText(payload.hostMode, 'single-webview-reparent')
+    });
+  }
+}
+
+async function petAssistantDesktopStateQuery() {
+  if (!petDesktopBridgeAvailable()) {
+    return {
+      supported: false,
+      enabled: false,
+      visible: false,
+      platform: 'browser',
+      reason: '桌面宠物模式仅支持 Windows 正式客户端。'
+    };
+  }
+  try {
+    return await requestNativeDesktopPet('query');
+  } catch (error) {
+    return {
+      supported: false,
+      enabled: false,
+      visible: false,
+      platform: 'unsupported-native-host',
+      reason: safeText(error?.message, '当前桌面壳不支持原生桌宠模式。')
+    };
+  }
+}
+
+async function petAssistantSetDesktopMode(argumentsValue = {}) {
+  const args = petAssistantArguments(argumentsValue);
+  const enabled = petAssistantBoolean(args.enabled ?? args.value, true);
+  return requestNativeDesktopPet(enabled ? 'enable' : 'disable');
+}
+
+async function petAssistantSetDesktopVisibility(argumentsValue = {}) {
+  const args = petAssistantArguments(argumentsValue);
+  const visible = petAssistantBoolean(args.visible ?? args.enabled ?? args.value, true);
+  return requestNativeDesktopPet(visible ? 'show' : 'hide');
+}
+
+async function petAssistantDesktopPositionQuery() {
+  if (!petDesktopBridgeAvailable()) return petAssistantDesktopStateQuery();
+  return requestNativeDesktopPet('position-query');
+}
+
+async function petAssistantDesktopPositionSet(argumentsValue = {}) {
+  const args = petAssistantArguments(argumentsValue);
+  const anchor = safeText(args.anchor, '').trim().toLowerCase();
+  const anchors = new Set([
+    'top-left', 'top-center', 'top-right',
+    'center-left', 'center', 'center-right',
+    'bottom-left', 'bottom-center', 'bottom-right'
+  ]);
+  const hasPercent = args.xPercent !== undefined || args.yPercent !== undefined;
+  if (anchor && !anchors.has(anchor)) throw new Error('Unsupported desktop pet anchor.');
+  if (!anchor && (!hasPercent || args.xPercent === undefined || args.yPercent === undefined)) {
+    throw new Error('Provide an anchor or both xPercent and yPercent.');
+  }
+  const xPercent = args.xPercent === undefined ? undefined : Math.max(0, Math.min(1, Number(args.xPercent)));
+  const yPercent = args.yPercent === undefined ? undefined : Math.max(0, Math.min(1, Number(args.yPercent)));
+  if ((xPercent !== undefined && !Number.isFinite(xPercent)) || (yPercent !== undefined && !Number.isFinite(yPercent))) {
+    throw new Error('Desktop pet percentages must be finite numbers.');
+  }
+  const durationMs = Math.max(250, Math.min(1_200, Math.round(Number(args.durationMs) || 500)));
+  return requestNativeDesktopPet('position-set', {
+    ...(anchor ? { anchor } : { xPercent, yPercent }),
+    durationMs
+  });
+}
+
+async function petAssistantDesktopPositionSmart(argumentsValue = {}) {
+  const args = petAssistantArguments(argumentsValue);
+  let current = petDesktopBridgeState.bounds;
+  if (!current && petDesktopBridgeAvailable()) {
+    const queried = await requestNativeDesktopPet('position-query');
+    current = queried.bounds;
+  }
+  const anchor = Number(current?.xPercent) > 0.5 ? 'bottom-left' : 'bottom-right';
+  return petAssistantDesktopPositionSet({ ...args, anchor });
+}
+
+window.FeMonsterNativePetBridge = Object.freeze({
+  available: petDesktopBridgeAvailable,
+  request: requestNativeDesktopPet,
+  state: () => ({
+    supported: petDesktopBridgeState.supported,
+    enabled: petDesktopBridgeState.enabled,
+    visible: petDesktopBridgeState.visible,
+    bounds: petDesktopBridgeState.bounds
+  })
+});
 
 function markAudioPlaybackStallHint(now = performance.now()) {
   const continuity = state.audioPlaybackContinuity;
@@ -26291,7 +35108,8 @@ async function applyCommunityPlaybackControls(song = {}) {
     maxRateDelta: 0.04
   });
   if (song.playing === false) {
-    state.audioPlaybackContinuity.playingIntent = false;
+    cancelStalledAudioPlaybackRecovery();
+    await invalidateNativeGoogleObrTimeline('pause');
     els.audio.pause();
     await apiJson('/api/player/pause').catch(() => {});
   } else if (els.audio.paused) {
@@ -26323,7 +35141,10 @@ async function loadLocalSong(song, options = {}) {
   state.localQueueActive = true;
   state.playerUrl = song.localUrl;
   state.currentSong = { ...song, duration: requestedDuration, position: targetPosition };
-  if (els.audio.src !== song.localUrl) els.audio.src = song.localUrl;
+  if (els.audio.src !== song.localUrl) {
+    await invalidateNativeGoogleObrTimeline('source-change');
+    els.audio.src = song.localUrl;
+  }
   els.audio.volume = Number(els.volumeRange.value) / 100;
   if (targetPosition > 0) {
     const applyPosition = () => setAudioPlaybackPosition(targetPosition, 0.25);
@@ -26398,6 +35219,7 @@ async function loadSong(song, options = {}) {
     };
     state.playbackQuality = safeText(data.quality, quality);
     state.playerUrl = data.url;
+    await invalidateNativeGoogleObrTimeline('source-change');
     els.audio.src = browserAudioUrl(data.url);
     if (state.audioPlaybackContinuity.pendingLoadGeneration === sourceGeneration) {
       state.audioPlaybackContinuity.pendingLoadGeneration = 0;
@@ -26501,6 +35323,23 @@ async function playQueueIndex(index) {
 }
 
 async function transport(path, options = {}) {
+  if (
+    !options.completed
+    && !options.autoSkipUnavailable
+    && els.audio?.src
+    && (path.endsWith('/next') || path.endsWith('/previous'))
+  ) {
+    const durationSeconds = Number(els.audio.duration) || Number(state.currentSong?.duration) || 0;
+    const positionSeconds = Number(els.audio.currentTime) || 0;
+    if (!(durationSeconds > 0 && positionSeconds / durationSeconds >= 0.9)) {
+      notifyPlaybackIntelligence('track-skip', {
+        song: playbackIntelligenceSongPayload(),
+        positionSeconds,
+        durationSeconds
+      });
+    }
+    playbackIntelligenceTrackSignature = '';
+  }
   if (state.localQueueActive) {
     if (!state.queue.length) {
       toast('本地歌单暂无歌曲');
@@ -26528,6 +35367,7 @@ async function transport(path, options = {}) {
       state.currentSong = data.song || state.currentSong;
       state.playerUrl = data.url;
       if (data.quality) state.playbackQuality = safeText(data.quality, state.playbackQuality);
+      await invalidateNativeGoogleObrTimeline('source-change');
       els.audio.src = browserAudioUrl(data.url);
       resetSpectrumForSong(state.currentSong);
       renderCurrent(state.currentSong);
@@ -26581,7 +35421,8 @@ async function togglePlay() {
         toast(error.message || '本地歌曲无法播放');
       }
     } else {
-      state.audioPlaybackContinuity.playingIntent = false;
+      cancelStalledAudioPlaybackRecovery();
+      await invalidateNativeGoogleObrTimeline('pause');
       els.audio.pause();
     }
     updatePlayState();
@@ -26599,7 +35440,8 @@ async function togglePlay() {
       toast(error.message);
     }
   } else {
-    state.audioPlaybackContinuity.playingIntent = false;
+    cancelStalledAudioPlaybackRecovery();
+    await invalidateNativeGoogleObrTimeline('pause');
     els.audio.pause();
     await apiJson('/api/player/pause').catch(() => {});
     if (state.community.activeSession) reportCommunityListening(true).catch(() => {});
@@ -26784,7 +35626,7 @@ function canStartWindowDrag(event) {
   if (event.button !== 0) return false;
   const target = event.target instanceof Element ? event.target : null;
   if (!target) return false;
-  if (target.closest('.runtime-settings-panel, .recording-dialog, .netease-login-dialog, .community-card, .community-message-dialog, .community-message-bubbles, .community-broadcast-toast, .listen-mini, .playlist-song-page, .orb-playlists, .player-dock, .diy-sidebar, .search-suggestions, .favorite-library')) {
+  if (target.closest('.runtime-settings-panel, .recording-dialog, .netease-login-dialog, .community-card, .community-message-dialog, .community-profile-dialog, .community-message-bubbles, .community-broadcast-toast, .listen-mini, .playlist-song-page, .orb-playlists, .player-dock, .diy-sidebar, .search-suggestions, .favorite-library, .pet-assistant')) {
     return false;
   }
   if (target.closest('.runtime-topbar')) return true;
@@ -26853,9 +35695,10 @@ function dismissTopUiLayer() {
   else if (els.searchSuggestions && !els.searchSuggestions.hidden) setSearchSuggestionsOpen(false);
   else if (state.favoriteLibrary.open) setFavoriteLibraryOpen(false);
   else if (els.recordingDialog && !els.recordingDialog.hidden) closeRecordingDialog();
-  else if (els.communityProfileDialog && !els.communityProfileDialog.hidden) setCommunityProfileOpen(false);
-  else if (els.communityMessageDialog && !els.communityMessageDialog.hidden) setCommunityMessageOpen(false);
   else if (!els.loginDialog.hidden) closeLoginDialog();
+  else if (els.communityProfileDialog && !els.communityProfileDialog.hidden) setCommunityProfileOpen(false);
+  else if (state.community.messageBackgroundMenuOpen) setCommunityMessageBackgroundMenuOpen(false);
+  else if (els.communityMessageDialog && !els.communityMessageDialog.hidden) setCommunityMessageOpen(false);
   else if (state.runtimeSettingsOpen) setRuntimeSettingsOpen(false);
   else if (state.sandbox.open) setSandboxOpen(false);
   else if (state.diyOpen) setDiyOpen(false);
@@ -27025,6 +35868,7 @@ function bindEvents() {
   }
   if (els.communityCard) {
     els.communityCard.addEventListener('pointerdown', (event) => event.stopPropagation());
+    els.communityCard.addEventListener('click', (event) => event.stopPropagation());
   }
   if (els.communityCollapseButton) {
     els.communityCollapseButton.addEventListener('click', (event) => {
@@ -27047,6 +35891,33 @@ function bindEvents() {
       if (state.playbackPage) showCommunityPageFromPlayback();
       setCommunityCardCollapsed(false);
       setCommunityProfileOpen(true, 'market');
+      event.preventDefault();
+      event.stopPropagation();
+    });
+  }
+  if (els.communityReportButton) {
+    els.communityReportButton.addEventListener('click', (event) => {
+      if (state.playbackPage) showCommunityPageFromPlayback();
+      setCommunityCardCollapsed(false);
+      setCommunityProfileOpen(true, 'report');
+      event.preventDefault();
+      event.stopPropagation();
+    });
+  }
+  if (els.communityAchievementButton) {
+    els.communityAchievementButton.addEventListener('click', (event) => {
+      if (state.playbackPage) showCommunityPageFromPlayback();
+      setCommunityCardCollapsed(false);
+      setCommunityProfileOpen(true, 'achievement');
+      event.preventDefault();
+      event.stopPropagation();
+    });
+  }
+  if (els.communityOrnamentButton) {
+    els.communityOrnamentButton.addEventListener('click', (event) => {
+      if (state.playbackPage) showCommunityPageFromPlayback();
+      setCommunityCardCollapsed(false);
+      setCommunityProfileOpen(true, 'ornament');
       event.preventDefault();
       event.stopPropagation();
     });
@@ -27077,9 +35948,64 @@ function bindEvents() {
   if (els.communityMessageButton) els.communityMessageButton.addEventListener('click', () => openCommunityMessages());
   if (els.communityDndButton) els.communityDndButton.addEventListener('click', toggleCommunityMessageDnd);
   if (els.communityMessageClose) els.communityMessageClose.addEventListener('click', () => setCommunityMessageOpen(false));
+  if (els.communityMessageBackgroundButton) {
+    els.communityMessageBackgroundButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setCommunityMessageBackgroundMenuOpen(!state.community.messageBackgroundMenuOpen);
+    });
+  }
+  if (els.communityMailboxShortcut) {
+    els.communityMailboxShortcut.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setCommunityProfileOpen(true, 'mailbox');
+    });
+  }
+  if (els.communityMessageBackgroundRefresh) {
+    els.communityMessageBackgroundRefresh.addEventListener('click', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      els.communityMessageBackgroundRefresh.disabled = true;
+      if (els.communityMessageBackgroundStatus) {
+        els.communityMessageBackgroundStatus.textContent = '正在读取 Wallpaper Engine 壁纸…';
+      }
+      try {
+        await refreshSceneWallpaperCatalog({ force: true, live: true });
+      } finally {
+        els.communityMessageBackgroundRefresh.disabled = false;
+        renderCommunityMessageBackgroundChoices();
+      }
+    });
+  }
+  if (els.communityMessageBackgroundChoices) {
+    els.communityMessageBackgroundChoices.addEventListener('click', handleCommunityMessageBackgroundChoice);
+  }
+  if (els.communityMessageWallpaperImage) {
+    els.communityMessageWallpaperImage.addEventListener('error', () => {
+      if (els.communityMessageBackgroundStatus) els.communityMessageBackgroundStatus.textContent = '壁纸预览加载失败，请刷新后重试';
+    });
+  }
+  if (els.communityMessageWallpaperVideo) {
+    els.communityMessageWallpaperVideo.addEventListener('canplay', () => {
+      if (!els.communityMessageDialog?.hidden) els.communityMessageWallpaperVideo.play().catch(() => {});
+    });
+    els.communityMessageWallpaperVideo.addEventListener('error', () => {
+      if (els.communityMessageBackgroundStatus) els.communityMessageBackgroundStatus.textContent = '动态壁纸无法播放，请更换壁纸';
+    });
+  }
   if (els.communityMessageForm) els.communityMessageForm.addEventListener('submit', sendCommunityMessage);
   if (els.communityMessageDialog) {
     els.communityMessageDialog.addEventListener('pointerdown', (event) => event.stopPropagation());
+    els.communityMessageDialog.addEventListener('click', (event) => {
+      if (
+        state.community.messageBackgroundMenuOpen
+        && !event.target.closest('#communityMessageBackgroundMenu, #communityMessageBackgroundButton')
+      ) {
+        setCommunityMessageBackgroundMenuOpen(false);
+      }
+      event.stopPropagation();
+    });
   }
   if (els.communityMessageHead) {
     els.communityMessageHead.addEventListener('pointerdown', (event) => beginCommunityFloatingPanelDrag('message', 'move', event));
@@ -27132,6 +36058,7 @@ function bindEvents() {
   }
   if (els.communityProfileDialog) {
     els.communityProfileDialog.addEventListener('pointerdown', (event) => event.stopPropagation());
+    els.communityProfileDialog.addEventListener('click', (event) => event.stopPropagation());
   }
   if (els.communityProfileHead) {
     els.communityProfileHead.addEventListener('pointerdown', (event) => beginCommunityFloatingPanelDrag('profile', 'move', event));
@@ -27147,9 +36074,61 @@ function bindEvents() {
   }
   if (els.communityProfileSelfTab) els.communityProfileSelfTab.addEventListener('click', () => setCommunityProfilePage('self'));
   if (els.communityProfileGroupTab) els.communityProfileGroupTab.addEventListener('click', () => setCommunityProfilePage('nearby'));
+  if (els.communityProfileReportTab) els.communityProfileReportTab.addEventListener('click', () => setCommunityProfilePage('report'));
   if (els.communityProfileMarketTab) els.communityProfileMarketTab.addEventListener('click', () => setCommunityProfilePage('market'));
+  if (els.communityProfileSquareTab) els.communityProfileSquareTab.addEventListener('click', () => setCommunityProfilePage('square'));
+  if (els.communityProfileMailboxTab) els.communityProfileMailboxTab.addEventListener('click', () => setCommunityProfilePage('mailbox'));
+  if (els.communityProfileAchievementTab) els.communityProfileAchievementTab.addEventListener('click', () => setCommunityProfilePage('achievement'));
+  if (els.communityProfileOrnamentTab) els.communityProfileOrnamentTab.addEventListener('click', () => setCommunityProfilePage('ornament'));
+  const communityProfileTabs = [
+    els.communityProfileSelfTab,
+    els.communityProfileGroupTab,
+    els.communityProfileSquareTab,
+    els.communityProfileMailboxTab,
+    els.communityProfileReportTab,
+    els.communityProfileMarketTab,
+    els.communityProfileAchievementTab,
+    els.communityProfileOrnamentTab
+  ].filter(Boolean);
+  communityProfileTabs.forEach((tab, index) => {
+    tab.addEventListener('keydown', (event) => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      let nextIndex = index;
+      if (event.key === 'Home') nextIndex = 0;
+      else if (event.key === 'End') nextIndex = communityProfileTabs.length - 1;
+      else nextIndex = (index + (event.key === 'ArrowRight' ? 1 : -1) + communityProfileTabs.length)
+        % communityProfileTabs.length;
+      event.preventDefault();
+      const nextTab = communityProfileTabs[nextIndex];
+      setCommunityProfilePage(nextTab.dataset.communityProfilePage);
+      nextTab.focus({ preventScroll: true });
+    });
+  });
   if (els.communityProfileClose) els.communityProfileClose.addEventListener('click', () => setCommunityProfileOpen(false));
   if (els.communityProfileSave) els.communityProfileSave.addEventListener('click', saveCommunityProfileBio);
+  if (els.communityListenReportRefresh) {
+    els.communityListenReportRefresh.addEventListener('click', () => refreshCommunityListenReport());
+  }
+  if (els.communityMailboxRefresh) {
+    els.communityMailboxRefresh.addEventListener('click', () => refreshCommunityMailbox());
+  }
+  if (els.communityMailboxList) {
+    els.communityMailboxList.addEventListener('click', handleCommunityMailboxClick);
+  }
+  if (els.communityAchievementOrnamentsButton) {
+    els.communityAchievementOrnamentsButton.addEventListener('click', () => setCommunityProfilePage('ornament'));
+  }
+  if (els.communityAchievementGrid) {
+    els.communityAchievementGrid.addEventListener('click', handleAchievementOrnamentClaim);
+  }
+  if (els.communityOrnamentList) {
+    els.communityOrnamentList.addEventListener('click', handleCommunityOrnamentAction);
+  }
+  if (els.communityOrnamentUnequip) {
+    els.communityOrnamentUnequip.addEventListener('click', () => {
+      if (window.feAchievements?.unequipOrnament?.()) toast('已取消头像挂饰');
+    });
+  }
   if (els.communityMarketRefresh) els.communityMarketRefresh.addEventListener('click', () => refreshPresetMarket().catch(() => {}));
   if (els.communityMarketSearch) {
     els.communityMarketSearch.addEventListener('input', () => {
@@ -27170,6 +36149,13 @@ function bindEvents() {
   }
   if (els.updateDialog) {
     els.updateDialog.addEventListener('pointerdown', (event) => event.stopPropagation());
+    els.updateDialog.addEventListener('click', (event) => event.stopPropagation());
+  }
+  if (els.updateNoticeButton) {
+    els.updateNoticeButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      showUpdateDialog(state.update.release || {});
+    });
   }
   if (els.updateInstallButton) els.updateInstallButton.addEventListener('click', startClientUpdate);
   if (els.updateLaterButton) els.updateLaterButton.addEventListener('click', hideUpdateDialog);
@@ -27179,7 +36165,10 @@ function bindEvents() {
     els.listenMiniHandle.addEventListener('pointerup', endListenMiniDrag);
     els.listenMiniHandle.addEventListener('pointercancel', endListenMiniDrag);
   }
-  if (els.listenMini) els.listenMini.addEventListener('pointerdown', (event) => event.stopPropagation());
+  if (els.listenMini) {
+    els.listenMini.addEventListener('pointerdown', (event) => event.stopPropagation());
+    els.listenMini.addEventListener('click', (event) => event.stopPropagation());
+  }
   if (els.listenMiniCollapse) els.listenMiniCollapse.addEventListener('click', toggleListenMiniCollapsed);
   if (els.listenMiniClose) els.listenMiniClose.addEventListener('click', leaveCommunityListen);
   if (els.listenAcceptButton) els.listenAcceptButton.addEventListener('click', () => respondCommunityListen(true));
@@ -27449,7 +36438,7 @@ function bindEvents() {
   }
   if (els.sceneWallpaperUseCurrentButton) {
     els.sceneWallpaperUseCurrentButton.addEventListener('click', () => {
-      const current = wallpaperById(state.activeWallpaperId);
+      const current = currentSceneWallpaperChoice();
       if (current) setSceneWallpaperForPreset(state.diyPreset, current, true);
     });
   }
@@ -27463,6 +36452,10 @@ function bindEvents() {
   }
   if (els.sceneWallpaperSelect) {
     els.sceneWallpaperSelect.addEventListener('change', () => {
+      if (els.sceneWallpaperSelect.value === SCENE_WALLPAPER_ENGINE_CURRENT_ID) {
+        setSceneWallpaperFollowEngine(state.diyPreset, true);
+        return;
+      }
       if (els.sceneWallpaperSelect.value === SCENE_WALLPAPER_SOFT_GLOW_ID) {
         selectSoftGlowBackground(state.diyPreset);
         return;
@@ -27482,17 +36475,20 @@ function bindEvents() {
     state.lyricBrightness = clamp(Number(els.lyricBrightnessRange.value) / 100, 0.6, 1.8);
     updateLyricDiyVars();
     renderDiySelectedPresetConfig();
+    saveVisualSettingsPreferences();
   });
   els.lyricSpeedRange.addEventListener('input', () => {
     state.lyricSpeed = clamp(Number(els.lyricSpeedRange.value) / 100, 0.6, 1.8);
     updateLyricDiyVars();
     renderDiySelectedPresetConfig();
+    saveVisualSettingsPreferences();
   });
   if (els.cubeIntensityRange) {
     els.cubeIntensityRange.addEventListener('input', () => {
       state.cubeIntensity = clamp(Number(els.cubeIntensityRange.value) / 100, 0.4, 1.8);
       updateLyricDiyVars();
       renderDiySelectedPresetConfig();
+      saveVisualSettingsPreferences();
     });
   }
   if (els.sonicCenterColorInput) {
@@ -27519,9 +36515,21 @@ function bindEvents() {
       applySonicTopographySettings({ persistImmediately: true });
     });
   }
-  if (els.sonicAllGroundFloatToggle) {
-    els.sonicAllGroundFloatToggle.addEventListener('change', () => {
-      state.sonicTopography.settings.allGroundFloatEnabled = els.sonicAllGroundFloatToggle.checked;
+  if (els.sonicGroundMoundsToggle) {
+    els.sonicGroundMoundsToggle.addEventListener('change', () => {
+      state.sonicTopography.settings.groundMoundsEnabled = els.sonicGroundMoundsToggle.checked;
+      applySonicTopographySettings({ persistImmediately: true });
+    });
+  }
+  if (els.sonicGroundColorInput) {
+    els.sonicGroundColorInput.addEventListener('input', () => {
+      state.sonicTopography.settings.groundColor = els.sonicGroundColorInput.value;
+      applySonicTopographySettings();
+    });
+  }
+  if (els.sonicGroundFollowCoverButton) {
+    els.sonicGroundFollowCoverButton.addEventListener('click', () => {
+      state.sonicTopography.settings.groundColor = null;
       applySonicTopographySettings({ persistImmediately: true });
     });
   }
@@ -27561,6 +36569,13 @@ function bindEvents() {
       applySonicTopographySettings({ persistImmediately: true });
     });
   }
+  if (els.sonicRainToggle) {
+    els.sonicRainToggle.addEventListener('change', () => {
+      state.sonicTopography.settings.rainEnabled = els.sonicRainToggle.checked;
+      applySonicTopographySettings({ persistImmediately: true });
+      requestOrbFrame();
+    });
+  }
   if (els.sonicTyndallToneSelect) {
     els.sonicTyndallToneSelect.addEventListener('change', () => {
       state.sonicTopography.settings.tyndallTone = els.sonicTyndallToneSelect.value;
@@ -27589,6 +36604,26 @@ function bindEvents() {
   bindSonicPercentRange(els.sonicTyndallIntensityRange, 'tyndallIntensity');
   bindSonicPercentRange(els.sonicTyndallSpreadRange, 'tyndallSpread');
   bindSonicPercentRange(els.sonicCoverBackgroundMixRange, 'coverBackgroundMix');
+  bindSonicPercentRange(els.sonicFluorescenceRange, 'fluorescence');
+  bindSonicPercentRange(els.sonicFluorescenceScatterRange, 'fluorescenceScatter');
+  bindSonicPercentRange(els.sonicGroundEmissionRange, 'groundEmission');
+  bindSonicPercentRange(els.sonicGroundMoundHeightRange, 'groundMoundHeight');
+  bindSonicPercentRange(els.sonicRainIntensityRange, 'rainIntensity');
+  bindSonicPercentRange(els.sonicRainSpeedRange, 'rainSpeed');
+  bindSonicPercentRange(els.sonicRainWindRange, 'rainWind');
+  bindSonicPercentRange(els.sonicRainLengthRange, 'rainLength');
+  bindSonicPercentRange(els.sonicRainWidthRange, 'rainWidth');
+  bindSonicPercentRange(els.sonicRainRippleIntensityRange, 'rainRippleIntensity');
+  bindSonicPercentRange(els.sonicRainRippleSizeRange, 'rainRippleSize');
+  bindSonicPercentRange(els.sonicRainRippleLifeRange, 'rainRippleLife');
+  bindSonicPercentRange(els.sonicRainWetReflectanceRange, 'rainWetReflectance');
+  bindSonicPercentRange(els.sonicRainWetGlowRange, 'rainWetGlow');
+  if (els.sonicGroundMoundRadiusRange) {
+    els.sonicGroundMoundRadiusRange.addEventListener('input', () => {
+      state.sonicTopography.settings.groundMoundRadius = Number(els.sonicGroundMoundRadiusRange.value);
+      applySonicTopographySettings();
+    });
+  }
   if (els.sonicFollowCoverButton) {
     els.sonicFollowCoverButton.addEventListener('click', () => {
       state.sonicTopography.settings.centerColor = null;
@@ -27631,6 +36666,21 @@ function bindEvents() {
     els.sonicCenterColorInput,
     els.sonicCoreColorInput,
     els.sonicOuterColorInput,
+    els.sonicGroundColorInput,
+    els.sonicGroundEmissionRange,
+    els.sonicGroundMoundHeightRange,
+    els.sonicGroundMoundRadiusRange,
+    els.sonicFluorescenceScatterRange,
+    els.sonicRainIntensityRange,
+    els.sonicRainSpeedRange,
+    els.sonicRainWindRange,
+    els.sonicRainLengthRange,
+    els.sonicRainWidthRange,
+    els.sonicRainRippleIntensityRange,
+    els.sonicRainRippleSizeRange,
+    els.sonicRainRippleLifeRange,
+    els.sonicRainWetReflectanceRange,
+    els.sonicRainWetGlowRange,
     els.sonicFountainColorInput,
     els.sonicStarfieldColorInput,
     els.sonicGalaxyColorInput,
@@ -27644,6 +36694,7 @@ function bindEvents() {
     els.sonicTyndallSpreadRange,
     els.sonicCoverBackgroundMixRange,
     els.sonicBrightnessRange,
+    els.sonicFluorescenceRange,
     els.sonicExposureRange,
     els.sonicColumnHeightRange,
     els.sonicFovRange,
@@ -27730,7 +36781,7 @@ function bindEvents() {
       setRenderClarityManualPercent(els.renderClarityRange.value);
     });
     els.renderClarityRange.addEventListener('change', () => {
-      if (!state.renderClarity.auto) toast(`清晰度已设为 ${state.renderClarity.manualPercent}%`);
+      if (!state.renderClarity.auto) toast(`清晰度已设为 ${effectiveRenderClarityPercent()}%`);
     });
   }
   if (els.presetFsrToggle) {
@@ -27742,14 +36793,8 @@ function bindEvents() {
   if (els.presetFsrMode) {
     els.presetFsrMode.addEventListener('change', () => setPresetFsrMode(els.presetFsrMode.value));
   }
-  for (const input of [els.gpuAccelerationToggle, els.directX11Toggle, els.xAudio2Toggle, els.x3DAudioToggle, els.gestureControlToggle]) {
+  for (const input of [els.gpuAccelerationToggle, els.directX11Toggle, els.xAudio2Toggle, els.x3DAudioToggle]) {
     if (input) input.addEventListener('change', saveRuntimeSettings);
-  }
-  if (els.gestureWebcamButton) {
-    els.gestureWebcamButton.addEventListener('click', () => setGestureCameraSource('webcam'));
-  }
-  if (els.gestureCameraButton) {
-    els.gestureCameraButton.addEventListener('click', () => setGestureCameraSource('camera'));
   }
   if (els.cursorSkinSelect) {
     els.cursorSkinSelect.addEventListener('change', () => {
@@ -27792,6 +36837,20 @@ function bindEvents() {
       const tab = event.target.closest('[data-login-provider]');
       if (!tab) return;
       setActiveProvider(tab.dataset.loginProvider);
+    });
+    els.loginProviderTabs.addEventListener('keydown', (event) => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      const current = event.target.closest('[data-login-provider]');
+      if (!current) return;
+      const tabs = Array.from(els.loginProviderTabs.querySelectorAll('[data-login-provider]'));
+      const currentIndex = tabs.indexOf(current);
+      if (currentIndex < 0 || tabs.length === 0) return;
+      let nextIndex = currentIndex;
+      if (event.key === 'Home') nextIndex = 0;
+      else if (event.key === 'End') nextIndex = tabs.length - 1;
+      else nextIndex = (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+      event.preventDefault();
+      setActiveProvider(tabs[nextIndex].dataset.loginProvider);
     });
   }
   els.loginDialog.addEventListener('click', (event) => {
@@ -27970,6 +37029,8 @@ function bindEvents() {
   window.addEventListener('fe-monster-community-relay', (event) => {
     handleCommunityDanmakuRelay(event.detail || {});
   });
+  window.addEventListener('fe-achievement-ornament-change', handleCommunityOrnamentChange);
+  window.addEventListener('fe-client-preferences-change', scheduleClientPreferencesSync);
   window.addEventListener('pointermove', scheduleCommunityDanmakuRepulsion, { passive: true });
   window.addEventListener('pointerout', (event) => {
     if (event.relatedTarget) return;
@@ -28046,6 +37107,8 @@ function bindEvents() {
   window.addEventListener('fe-blur-lyrics-ready', () => syncBlurLyricComponent());
   document.addEventListener('input', scheduleDesktopSceneSnapshot, { passive: true });
   document.addEventListener('change', scheduleDesktopSceneSnapshot, { passive: true });
+  document.addEventListener('input', scheduleClientPreferencesSync, { passive: true });
+  document.addEventListener('change', scheduleClientPreferencesSync, { passive: true });
   window.addEventListener('pointermove', scheduleUiPointerUpdates, { passive: true });
   window.addEventListener('pointerleave', () => {
     cancelUiPointerUpdates();
@@ -28055,16 +37118,21 @@ function bindEvents() {
     });
   }, { passive: true });
   window.addEventListener('focus', () => {
+    if (!bootVisual.servicesStarted) return;
     refreshLoginStatus();
     scheduleUserPlaylistsRefresh(160);
     scheduleCommunityRefresh(220);
+    void checkGitHubClientUpdate();
   }, { passive: true });
   window.addEventListener('online', () => {
-    scheduleUserPlaylistsRefresh(160);
+    if (bootVisual.servicesStarted) scheduleUserPlaylistsRefresh(160);
     state.community.eventReconnectDelay = 1200;
     state.community.refreshRetryDelay = 1200;
-    scheduleCommunityRefresh(160);
-    ensureCommunityEventStream();
+    if (bootVisual.servicesStarted) {
+      scheduleCommunityRefresh(160);
+      ensureCommunityEventStream();
+      void checkGitHubClientUpdate();
+    }
     if (state.obrSpatialAudio.requested && !state.obrSpatialAudio.enabled) scheduleGoogleObrRecovery();
   }, { passive: true });
   window.addEventListener('offline', () => {
@@ -28072,6 +37140,8 @@ function bindEvents() {
     clearGoogleObrRecovery();
   }, { passive: true });
   window.addEventListener('beforeunload', () => {
+    flushCommunityListeningStats();
+    flushHighDifficultyListenInterval();
     clearBackgroundPolling();
     clearOfficialBrowserLoginTimer();
     stopCommunityEventStream(false);
@@ -28086,24 +37156,43 @@ function bindEvents() {
     wallpaperResizeFrame = 0;
     wallpaperResizeObserver?.disconnect?.();
     wallpaperResizeObserver = null;
+    clearSceneWallpaperLiveRefresh();
+    releaseCommunityMessageBackgroundMedia();
     flushWallpaperPrefs();
+    flushVisualSettingsPreferences();
     flushSonicSettingsPreferences();
     commitPlayerVolume();
     saveCommunityListeningStats();
+    flushCommunityTogetherListening();
     window.cancelAnimationFrame(desktopSceneRuntime.publishFrame);
     desktopSceneRuntime.publishFrame = 0;
     desktopSceneRuntime.channel?.close?.();
     revokeLocalObjectUrls();
+    flushClientPreferencesSync();
   }, { once: true });
-  window.addEventListener('pageshow', () => scheduleUserPlaylistsRefresh(160), { passive: true });
+  window.addEventListener('pagehide', () => {
+    flushCommunityListeningStats();
+    flushHighDifficultyListenInterval();
+    clearSceneWallpaperLiveRefresh();
+    releaseCommunityMessageBackgroundMedia();
+    flushWallpaperPrefs();
+    flushVisualSettingsPreferences();
+    flushSonicSettingsPreferences();
+    flushClientPreferencesSync();
+  });
+  window.addEventListener('pageshow', () => {
+    if (bootVisual.servicesStarted) scheduleUserPlaylistsRefresh(160);
+  }, { passive: true });
   window.addEventListener('resize', () => {
     invalidateOrbCanvasMetrics();
+    syncPlaybackLyricSingleLineFit();
     syncPlaybackCardPanelState();
     scheduleWallpaperAutoSize();
     drawCoverParticleWallpaper();
     resetBookLyricScrollState();
     scheduleBookLyricFit();
     scheduleQishuiPlaybackLyricLayout();
+    invalidateSequentialLyricHighlights(els.multiRowLyricList);
     syncPlaybackLyricSubtitleLayout();
     setListenMiniPosition();
     setCommunityFloatingPanelPosition('message');
@@ -28115,30 +37204,44 @@ function bindEvents() {
   }, { passive: true });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
+      clearSceneWallpaperLiveRefresh();
+      releaseCommunityMessageBackgroundMedia();
       flushWallpaperPrefs();
+      flushVisualSettingsPreferences();
       flushSonicSettingsPreferences();
       commitPlayerVolume();
       if (!els.audio.paused && !!els.audio.src) flushCommunityListeningStats();
       else state.community.listeningStatsLastAt = performance.now();
+      flushHighDifficultyListenInterval();
       saveCommunityListeningStats();
+      flushCommunityTogetherListening();
       clearBackgroundPolling();
+      resetOrbFrameBudget();
       state.renderClarity.lastFrameAt = 0;
       stopCommunityEventStream(false);
       clearGoogleObrRecovery();
+      flushClientPreferencesSync();
       return;
     }
     state.community.listeningStatsLastAt = performance.now();
+    syncCommunityMessageBackground();
+    syncSceneWallpaperLiveRefresh();
     state.community.listeningStatsPlaying = !els.audio.paused && !!els.audio.src;
-    startBackgroundPolling();
-    ensureCommunityEventStream();
+    if (bootVisual.servicesStarted) {
+      startBackgroundPolling();
+      ensureCommunityEventStream();
+    }
     if (state.obrSpatialAudio.requested && !state.obrSpatialAudio.enabled) scheduleGoogleObrRecovery();
     resetRenderClaritySampling(renderClaritySceneKey(), 30);
     refreshPlayerState().catch(() => {});
     refreshVisualBridge();
     refreshNativeAudioSample();
-    refreshLoginStatus();
-    scheduleUserPlaylistsRefresh(160);
-    scheduleCommunityRefresh(220);
+    if (bootVisual.servicesStarted) {
+      refreshLoginStatus();
+      scheduleUserPlaylistsRefresh(160);
+      scheduleCommunityRefresh(220);
+    }
+    requestOrbFrame();
   });
   document.addEventListener('fullscreenchange', () => {
     if (!document.fullscreenElement && state.appWindowFullscreen) {
@@ -28147,18 +37250,35 @@ function bindEvents() {
     }
   });
 
-  els.progressRange.addEventListener('input', () => {
+  els.progressRange.addEventListener('input', async () => {
     const duration = Number.isFinite(els.audio.duration) ? els.audio.duration : 0;
     if (!duration) return;
-    els.audio.currentTime = (Number(els.progressRange.value) / 1000) * duration;
-    updateProgress();
+    const target = (Number(els.progressRange.value) / 1000) * duration;
+    const nativeSeek = (async () => {
+      await invalidateNativeGoogleObrTimeline('seek');
+      els.audio.currentTime = target;
+      updateProgress();
+    })();
+    state.audioPositionSync.nativeSeekPromise = nativeSeek;
+    try {
+      await nativeSeek;
+    } finally {
+      if (state.audioPositionSync.nativeSeekPromise === nativeSeek) {
+        state.audioPositionSync.nativeSeekPromise = null;
+      }
+    }
   });
 
-  els.progressRange.addEventListener('change', () => {
+  els.progressRange.addEventListener('change', async () => {
+    const nativeSeek = state.audioPositionSync.nativeSeekPromise;
+    if (nativeSeek) await nativeSeek.catch(() => {});
     if (!state.localQueueActive) {
-      apiJson(`/api/player/seek?${query({ position: Math.round(els.audio.currentTime || 0) })}`).catch(() => {});
+      await apiJson(`/api/player/seek?${query({ position: Math.round(els.audio.currentTime || 0) })}`).catch(() => {});
     }
     if (state.community.activeSession) reportCommunityListening(true).catch(() => {});
+    if (!els.audio.paused && !els.audio.ended) {
+      await ensureAudioAnalysis({ announceObrFailure: false }).catch(() => false);
+    }
   });
 
   els.volumeRange.addEventListener('input', () => {
@@ -28169,11 +37289,17 @@ function bindEvents() {
   });
   els.volumeRange.addEventListener('change', () => {
     schedulePlayerVolumeCommit(Number(els.volumeRange.value) / 100, { immediate: true });
+    notifyPlaybackIntelligence('volume-change', { volume: Number(els.volumeRange.value) });
   });
 
   els.audio.addEventListener('timeupdate', () => {
     noteAudioPlaybackProgress();
     updateProgress();
+    notifyPlaybackIntelligence('progress', {
+      songId: safeText(state.currentSong?.id, ''),
+      positionSeconds: Number(els.audio.currentTime) || 0,
+      durationSeconds: Number(els.audio.duration) || Number(state.currentSong?.duration) || 0
+    });
   });
   els.audio.addEventListener('durationchange', updateProgress);
   els.audio.addEventListener('seeking', updateProgress);
@@ -28208,41 +37334,68 @@ function bindEvents() {
     state.community.listeningStatsLastAt = nowMs;
     state.community.listeningStatsPlaying = true;
     recordCommunityListeningStats(0, state.currentSong);
+    syncRealtimePolling();
     updatePlayState();
     requestOrbFrame();
+    notePlaybackIntelligenceTrackStart();
+    notifyPlaybackIntelligence('play', { song: playbackIntelligenceSongPayload() });
   });
   els.audio.addEventListener('playing', () => {
     state.audioPlaybackContinuity.playingIntent = true;
     resetAudioPlaybackContinuity(els.audio.currentTime);
+    syncRealtimePolling();
+    window.feAchievements?.handlePlaybackStarted?.(state.currentSong);
   });
   els.audio.addEventListener('canplay', () => {
     if (state.audioPlaybackContinuity.playingIntent) {
       resetAudioPlaybackContinuity(els.audio.currentTime);
     }
+    if (!els.audio.paused && !els.audio.ended) {
+      ensureAudioAnalysis({ announceObrFailure: false }).catch(() => {});
+    }
   });
   els.audio.addEventListener('waiting', () => markAudioPlaybackStallHint());
   els.audio.addEventListener('stalled', () => markAudioPlaybackStallHint());
   els.audio.addEventListener('pause', () => {
-    if (!state.audioPlaybackContinuity.recovering) {
-      state.audioPlaybackContinuity.playingIntent = false;
-    }
+    state.audioPlaybackContinuity.playingIntent = false;
+    invalidateNativeGoogleObrTimeline('pause').catch(() => {});
     resetSyncedAudioPlaybackRate();
     flushCommunityListeningStats();
+    flushHighDifficultyListenInterval();
     reportCommunityListening(true).catch(() => {});
     state.audioAnalysis.live = false;
+    suspendAudioAnalysis();
+    syncRealtimePolling();
     applyBridgeVisual();
     updatePlayState();
+    notifyPlaybackIntelligence('pause', { song: playbackIntelligenceSongPayload() });
   });
   els.audio.addEventListener('ended', () => {
     state.audioPlaybackContinuity.playingIntent = false;
     resetAudioPlaybackContinuity(els.audio.currentTime);
     resetSyncedAudioPlaybackRate();
     flushCommunityListeningStats();
+    flushHighDifficultyListenInterval();
     reportCommunityListening(true).catch(() => {});
-    transport('/api/player/next');
+    suspendAudioAnalysis();
+    syncRealtimePolling();
+    unlockAppAchievement('track-finished');
+    const trackId = currentAchievementTrackId();
+    if (trackId) {
+      queueHighDifficultyAchievementEvidence('track-completed', {
+        trackId,
+        durationSec: Math.max(0, Math.round(Number(els.audio.duration) || Number(state.currentSong?.duration) || 0)),
+        completedAt: Date.now()
+      });
+    }
+    notifyPlaybackIntelligence('track-complete', { song: playbackIntelligenceSongPayload() });
+    playbackIntelligenceTrackSignature = '';
+    transport('/api/player/next', { completed: true });
   });
   els.audio.addEventListener('error', () => {
     resetSyncedAudioPlaybackRate();
+    suspendAudioAnalysis();
+    syncRealtimePolling();
     const extension = isLocalSong(state.currentSong) ? localAudioExtension(state.currentSong.fileName) : '';
     if (!extension && state.community.activeSession && !state.community.listenRecoveryActive) {
       window.setTimeout(() => skipUnavailableCommunitySong('当前音频源格式不受支持').catch(() => {}), 0);
@@ -28294,7 +37447,7 @@ function bindOrbEvents() {
     if (event.button !== 0) return;
     if (state.playbackPage && beginTextPresetGesture(event)) {
       captureStagePointer(event.pointerId);
-      if (!state.textPresetGesture.pending) event.preventDefault();
+      event.preventDefault();
       return;
     }
     if (state.playbackPage && beginChladniTextGesture(event)) {
@@ -28349,6 +37502,7 @@ function bindOrbEvents() {
     state.orb.mouseY = state.playbackVisual.mouseY;
     state.orb.mouseActive = true;
     state.orb.lastMouseAt = performance.now();
+    requestOrbFrame();
     if (moveTextPresetGesture(event)) {
       event.preventDefault();
       return;
@@ -28446,6 +37600,7 @@ function bindOrbEvents() {
   els.stage.addEventListener('pointerleave', () => {
     if (!state.orb.dragging) state.orb.mouseActive = false;
     if (!state.textPresetGesture.dragging) els.stage.classList.remove('is-text-preset-hover');
+    requestOrbFrame();
   }, { passive: true });
   els.stage.addEventListener('pointerup', (event) => {
     if (event.button !== 2 || !state.shelfHiddenByUser) return;
@@ -28596,7 +37751,7 @@ function coverParticleEngineOptions() {
   const palette = state.coverParticle.palette || fallbackLyricPalette(state.currentSong);
   return {
     fullScreen: { enable: false },
-    fpsLimit: 1000,
+    fpsLimit: Number.POSITIVE_INFINITY,
     detectRetina: true,
     background: { color: 'transparent' },
     particles: {
@@ -28653,7 +37808,14 @@ function ensureCoverParticleEngine() {
         cover.engineContainer = container;
         cover.enginePlaying = false;
       }
-      if (container && (!cover.engineVisible || !coverParticlePresetVisible())) pauseCoverParticleEngine(true);
+      if (container && (!cover.engineVisible || !coverParticlePresetVisible())) {
+        pauseCoverParticleEngine(true);
+        if (typeof container.destroy === 'function') {
+          try { container.destroy(); } catch (error) {}
+        }
+        if (cover.engineContainer === container) cover.engineContainer = null;
+        return null;
+      }
       return container;
     })
     .catch(() => null);
@@ -28687,10 +37849,15 @@ function coverParticleNoise(x, y, salt = 0) {
   return value - Math.floor(value);
 }
 
-function buildCoverParticleSamples(width, height, dpr) {
+function buildCoverParticleSamples(width, height, dpr, gpuAvailable = true) {
   const image = state.coverParticle.image;
-  const highDensityDesktop = !reducedMotion && !MOBILE_RENDER_TARGET;
-  const sampleSize = highDensityDesktop ? 512 : reducedMotion ? 192 : 224;
+  const safeFallback = !gpuAvailable && graphicsSafeFallbackActive();
+  const highDensityDesktop = gpuAvailable && !reducedMotion && !MOBILE_RENDER_TARGET;
+  const sampleSize = highDensityDesktop
+    ? 512
+    : !gpuAvailable
+      ? safeFallback ? 64 : 96
+      : reducedMotion ? 192 : 224;
   const stepX = 1;
   const stepY = highDensityDesktop ? 2 : 1;
   const signature = `${state.coverParticle.imageSignature}|${sampleSize}|${stepX}x${stepY}`;
@@ -28809,6 +37976,10 @@ function buildCoverParticleSamples(width, height, dpr) {
         cpuWaveCPhase: -sheetPhase * 0.89 + py * 6.6,
         cpuRadialPhase,
         cpuMicroPhase,
+        jitterDirectionX: driftX,
+        jitterDirectionY: driftY,
+        jitterRate: COVER_PARTICLE_BASS_JITTER_BASE_RATE
+          + (0.42 + coverParticleNoise(x, y, 9) * 0.54) * 36,
         bumpDriftX: driftX * driftMagnitude,
         bumpDriftY: driftY * driftMagnitude
       });
@@ -28862,6 +38033,7 @@ function coverParticleGpuMaterial(THREE) {
       uMotionScale: { value: 1 },
       uFloatSpeed: { value: 1 },
       uWholeJump: { value: 0 },
+      uBassJitter: { value: 0 },
       uMouseActive: { value: 0 },
       uMouseLimit: { value: 1 },
       uMousePullBase: { value: 0 },
@@ -28891,6 +38063,7 @@ function coverParticleGpuMaterial(THREE) {
       uniform float uMotionScale;
       uniform float uFloatSpeed;
       uniform float uWholeJump;
+      uniform float uBassJitter;
       uniform float uMouseActive;
       uniform float uMouseLimit;
       uniform float uMousePullBase;
@@ -28919,6 +38092,8 @@ function coverParticleGpuMaterial(THREE) {
         );
         float particleFloat = sin(particleFloatTime * aFloatRate + aFloatPhase);
         float naturalFloat = particleFloat * 0.64 + baseNaturalWave * 0.28 + microWave * 0.08;
+        float flowWave = sin(position.x * 4.2 + position.y * 2.3 - sheetTime * 0.85);
+        float flowStrength = uAudioActive * (0.006 + uEnergy * 0.006) * min(uMotionScale, 1.4);
         float waveDepth = uAudioActive * naturalFloat
           * (0.016 + relief * 0.008) * aWaveStrength * uMotionScale;
         float dynamicDepth = clamp(waveDepth, -0.050, 0.050);
@@ -28931,9 +38106,37 @@ function coverParticleGpuMaterial(THREE) {
         float motionAmount = abs(dynamicDepth) * 8.0;
         float lateralWave = uAudioActive * naturalFloat * 0.14 * uMotionScale;
         float wholeJumpOffset = uWholeJump * 0.052 * uMotionScale;
+        float jitterRate = ${COVER_PARTICLE_BASS_JITTER_BASE_RATE}.0 + abs(aFloatRate) * 36.0;
+        float jitterA = sin(
+          sheetTime * jitterRate + aFloatPhase * 1.83 + aWavePhase * 0.37
+        );
+        float jitterB = sin(
+          sheetTime * jitterRate * 1.37 + aFloatPhase * 0.71 - aWavePhase * 1.21
+        );
+        vec2 jitterDirection = aDrift / max(length(aDrift), 0.0001);
+        vec2 jitterPerpendicular = vec2(-jitterDirection.y, jitterDirection.x);
+        float jitterLevel = clamp(uBassJitter, 0.0, ${COVER_PARTICLE_BASS_JITTER_MAX}.0);
+        float jitterMotionScale = min(uMotionScale, 1.35);
+        float jitterAmplitude = jitterLevel
+          * ${COVER_PARTICLE_BASS_JITTER_AMPLITUDE} * jitterMotionScale;
+        vec2 bassJitterOffset = clamp(
+          jitterDirection * jitterA + jitterPerpendicular * jitterB * 0.62,
+          vec2(-1.25),
+          vec2(1.25)
+        ) * jitterAmplitude;
+        float bassJitterDepth = clamp(
+          (jitterA * 0.58 + jitterB * 0.42)
+            * jitterLevel * ${COVER_PARTICLE_BASS_JITTER_DEPTH} * jitterMotionScale,
+          -${COVER_PARTICLE_BASS_JITTER_DEPTH_LIMIT},
+          ${COVER_PARTICLE_BASS_JITTER_DEPTH_LIMIT}
+        );
         vec3 source = vec3(position.xy, position.z)
           + vec3(aDrift * lateralWave, depthLayerOffset + dynamicDepth);
+        source.y += flowWave * flowStrength * 0.28;
+        source.z += flowWave * flowStrength;
+        source.xy += bassJitterOffset;
         source.z += wholeJumpOffset;
+        source.z += bassJitterDepth;
 
         float rotatedX = source.x * uYawCos + source.z * uYawSin;
         float rotatedZ = -source.x * uYawSin + source.z * uYawCos;
@@ -29118,9 +38321,11 @@ function updateCoverParticleMotionEnvelope(audioActive, envelopeStepMs) {
     : 0;
   const energyRate = 1 - Math.exp(-envelopeStepMs / (audioEnergy > cover.energy ? 85 : 380));
   cover.energy += (audioEnergy - cover.energy) * energyRate;
+  if (!audioActive && cover.energy < 0.002) cover.energy = 0;
   const gateTarget = audioActive ? 1 : 0;
   const gateRate = 1 - Math.exp(-envelopeStepMs / (gateTarget > cover.motionGate ? 260 : 420));
   cover.motionGate += (gateTarget - cover.motionGate) * gateRate;
+  if (!audioActive && cover.motionGate < 0.002) cover.motionGate = 0;
   const wholeJumpTarget = audioActive
     ? smoothstep(0.035, 0.92, lowFrequencyTarget)
     : 0;
@@ -29129,6 +38334,21 @@ function updateCoverParticleMotionEnvelope(audioActive, envelopeStepMs) {
   );
   cover.wholeJump += (wholeJumpTarget - cover.wholeJump) * wholeJumpRate;
   if (wholeJumpTarget === 0 && cover.wholeJump < 0.024) cover.wholeJump = 0;
+  const bassJitterTarget = audioActive
+    ? Math.min(
+      COVER_PARTICLE_BASS_JITTER_MAX,
+      smoothstep(0.045, 0.84, lowFrequencyTarget) * (0.72 + lowFrequencyTarget * 0.28)
+    )
+    : 0;
+  const bassJitterRate = 1 - Math.exp(
+    -envelopeStepMs / (bassJitterTarget > cover.bassJitter ? 28 : 110)
+  );
+  cover.bassJitter = clamp(
+    cover.bassJitter + (bassJitterTarget - cover.bassJitter) * bassJitterRate,
+    0,
+    COVER_PARTICLE_BASS_JITTER_MAX
+  );
+  if (bassJitterTarget === 0 && cover.bassJitter < 0.006) cover.bassJitter = 0;
   if (audioActive) cover.waveTime += envelopeStepMs / 1000 * 0.72;
 }
 
@@ -29158,6 +38378,31 @@ function drawCoverParticleSceneGpu(
   const mouseActive = state.orb.mouseActive && now - state.orb.lastMouseAt < 1600;
   const coverYaw = state.playbackVisual.yaw - PLAYBACK_REST_YAW;
   const coverPitch = state.playbackVisual.pitch - PLAYBACK_REST_PITCH;
+  const animated = isPlaybackClockRunning()
+    || motionGate > 0
+    || cover.energy > 0
+    || cover.wholeJump > 0
+    || cover.bassJitter > 0
+    || mouseActive
+    || state.playbackVisual.dragging
+    || Math.abs(state.playbackVisual.velocityYaw) > 0.00002
+    || Math.abs(state.playbackVisual.velocityPitch) > 0.00002;
+  if (!animated) {
+    const staticSignature = [
+      width,
+      height,
+      cover.gpuSignature,
+      zoom.toFixed(4),
+      coverYaw.toFixed(5),
+      coverPitch.toFixed(5),
+      coverParticleMotionScale().toFixed(3),
+      coverParticleFloatSpeedScale().toFixed(3)
+    ].join('|');
+    if (cover.gpuRenderSignature === staticSignature) return true;
+    cover.gpuRenderSignature = staticSignature;
+  } else {
+    cover.gpuRenderSignature = '';
+  }
 
   uniforms.uResolution.value.set(width, height);
   uniforms.uCenter.value.set(width * 0.5, height * 0.48);
@@ -29174,6 +38419,7 @@ function drawCoverParticleSceneGpu(
   uniforms.uMotionScale.value = coverParticleMotionScale();
   uniforms.uFloatSpeed.value = coverParticleFloatSpeedScale();
   uniforms.uWholeJump.value = cover.wholeJump;
+  uniforms.uBassJitter.value = cover.bassJitter;
   uniforms.uMouseActive.value = mouseActive ? 1 : 0;
   uniforms.uMouseLimit.value = 132 * dpr;
   uniforms.uMousePullBase.value = (16 + cover.energy * 28) * dpr;
@@ -29188,22 +38434,30 @@ function drawCoverParticleScene(width, height, dpr) {
   if (!frame) return;
   width = frame.width;
   height = frame.height;
-  buildCoverParticleSamples(width, height, dpr);
+  const cover = state.coverParticle;
+  const gpuAvailable = ensureCoverParticleGpu(frame);
+  const safeFallback = graphicsSafeFallbackActive();
+  const now = performance.now();
+  if (!gpuAvailable) {
+    const fallbackMaxFps = safeFallback
+      ? COVER_PARTICLE_CPU_SAFE_FALLBACK_MAX_FPS
+      : COVER_PARTICLE_CPU_FALLBACK_MAX_FPS;
+    const fallbackFrameInterval = 1000 / fallbackMaxFps;
+    if (cover.fallbackLastFrameAt && now - cover.fallbackLastFrameAt < fallbackFrameInterval) return;
+    cover.fallbackLastFrameAt = now;
+  } else {
+    cover.fallbackLastFrameAt = 0;
+  }
+  buildCoverParticleSamples(width, height, dpr, gpuAvailable);
   updatePlaybackQuality(state.playbackVisual);
 
-  const cover = state.coverParticle;
   const particles = cover.particles;
-  const particleLimit = Math.min(
-    particles.length,
-    Math.max(reducedMotion ? 14000 : 76000, Math.floor(particles.length * (state.playbackVisual.quality || 1)))
-  );
-  const now = performance.now();
   const audioActive = isPlaybackClockRunning();
   const frameStep = state.playbackVisual.frameStep || 1;
   const envelopeStepMs = Math.max(1, frameStep * RENDER_PROFILE.targetFrameMs);
   updateCoverParticleMotionEnvelope(audioActive, envelopeStepMs);
 
-  if (drawCoverParticleSceneGpu(
+  if (gpuAvailable && drawCoverParticleSceneGpu(
     frame,
     width,
     height,
@@ -29212,7 +38466,18 @@ function drawCoverParticleScene(width, height, dpr) {
     cover.waveTime,
     cover.motionGate
   )) return;
+  if (gpuAvailable) cover.gpuFailed = true;
 
+  const fallbackParticleLimit = safeFallback
+    ? COVER_PARTICLE_CPU_SAFE_FALLBACK_MAX_PARTICLES
+    : reducedMotion
+      ? COVER_PARTICLE_CPU_FALLBACK_REDUCED_MAX_PARTICLES
+      : COVER_PARTICLE_CPU_FALLBACK_MAX_PARTICLES;
+  const particleLimit = Math.min(
+    particles.length,
+    fallbackParticleLimit,
+    Math.max(1, Math.floor(particles.length * (state.playbackVisual.quality || 1)))
+  );
   const context = frame.canvas.getContext('2d');
   if (!context) return;
   context.clearRect(0, 0, width, height);
@@ -29220,7 +38485,7 @@ function drawCoverParticleScene(width, height, dpr) {
   const cy = height * 0.48;
   const zoom = clamp(state.playbackVisual.zoom || 1, 0.58, 2.35);
   const coverSize = Math.min(width, height) * 0.76 * zoom;
-  const coverPixelSize = coverParticlePointSize(coverSize, particles.length);
+  const coverPixelSize = coverParticlePointSize(coverSize, particleLimit);
   const mouseX = state.playbackVisual.mouseX * width;
   const mouseY = state.playbackVisual.mouseY * height;
   const mouseActive = state.orb.mouseActive && now - state.orb.lastMouseAt < 1600;
@@ -29239,6 +38504,13 @@ function drawCoverParticleScene(width, height, dpr) {
   const sheetTime = cover.waveTime;
   const particleFloatTime = cover.waveTime * coverParticleFloatSpeedScale();
   const wholeJumpOffset = cover.wholeJump * 0.052 * motionScale;
+  const bassJitterLevel = cover.bassJitter;
+  const bassJitterMotionScale = Math.min(motionScale, 1.35);
+  const bassJitterAmplitude = bassJitterLevel
+    * COVER_PARTICLE_BASS_JITTER_AMPLITUDE * bassJitterMotionScale;
+  const bassJitterDepthAmplitude = bassJitterLevel
+    * COVER_PARTICLE_BASS_JITTER_DEPTH * bassJitterMotionScale;
+  const bassJitterActive = bassJitterLevel > 0.001;
   const drawAllParticles = particleLimit >= particles.length;
   const sampleScale = drawAllParticles ? 1 : particles.length / particleLimit;
 
@@ -29305,7 +38577,37 @@ function drawCoverParticleScene(width, height, dpr) {
     const relief = clamp((particle.z + 0.04) / 0.14, 0, 1);
     const particleFloat = Math.sin(particleFloatTime * particle.floatRate + particle.floatPhase);
     const naturalFloat = particleFloat * 0.64 + baseNaturalWave * 0.28 + microWave * 0.08;
+    let bassJitterX = 0;
+    let bassJitterY = 0;
+    let bassJitterDepth = 0;
+    if (bassJitterActive) {
+      const jitterA = Math.sin(
+        sheetTime * particle.jitterRate
+          + particle.floatPhase * 1.83 + particle.wavePhase * 0.37
+      );
+      const jitterB = Math.sin(
+        sheetTime * particle.jitterRate * 1.37
+          + particle.floatPhase * 0.71 - particle.wavePhase * 1.21
+      );
+      bassJitterX = clamp(
+        particle.jitterDirectionX * jitterA - particle.jitterDirectionY * jitterB * 0.62,
+        -1.25,
+        1.25
+      ) * bassJitterAmplitude;
+      bassJitterY = clamp(
+        particle.jitterDirectionY * jitterA + particle.jitterDirectionX * jitterB * 0.62,
+        -1.25,
+        1.25
+      ) * bassJitterAmplitude;
+      bassJitterDepth = clamp(
+        (jitterA * 0.58 + jitterB * 0.42) * bassJitterDepthAmplitude,
+        -COVER_PARTICLE_BASS_JITTER_DEPTH_LIMIT,
+        COVER_PARTICLE_BASS_JITTER_DEPTH_LIMIT
+      );
+    }
     const audioGate = motionGate;
+    const flowWave = Math.sin(particle.x * 4.2 + particle.y * 2.3 - sheetTime * 0.85);
+    const flowStrength = audioGate * (0.006 + energy * 0.006) * Math.min(motionScale, 1.4);
     const waveDepth = audioGate * naturalFloat
       * (0.016 + relief * 0.008) * particle.waveStrength * motionScale;
     const dynamicDepth = clamp(waveDepth, -0.05, 0.05);
@@ -29320,10 +38622,15 @@ function drawCoverParticleScene(width, height, dpr) {
     const sourceX = particle.x + particle.bumpDriftX * lateralWave;
     const sourceY = particle.y + particle.bumpDriftY * lateralWave;
     const sourceZ = particle.z + depthLayerOffset + dynamicDepth + wholeJumpOffset;
-    const rotatedX = sourceX * yawCos + sourceZ * yawSin;
-    const rotatedZ = -sourceX * yawSin + sourceZ * yawCos;
-    const rotatedY = sourceY * pitchCos - rotatedZ * pitchSin;
-    const pointZ = sourceY * pitchSin + rotatedZ * pitchCos;
+    const flowedSourceY = sourceY + flowWave * flowStrength * 0.28;
+    const flowedSourceZ = sourceZ + flowWave * flowStrength;
+    const jitteredSourceX = sourceX + bassJitterX;
+    const jitteredSourceY = flowedSourceY + bassJitterY;
+    const jitteredSourceZ = flowedSourceZ + bassJitterDepth;
+    const rotatedX = jitteredSourceX * yawCos + jitteredSourceZ * yawSin;
+    const rotatedZ = -jitteredSourceX * yawSin + jitteredSourceZ * yawCos;
+    const rotatedY = jitteredSourceY * pitchCos - rotatedZ * pitchSin;
+    const pointZ = jitteredSourceY * pitchSin + rotatedZ * pitchCos;
     const perspective = 1.24 / (1.24 - pointZ * 0.54);
     let x = cx + rotatedX * coverSize * perspective;
     let y = cy + rotatedY * coverSize * perspective;
@@ -29446,8 +38753,8 @@ function updateGlitchBeatMotion(playbackRunning, now = performance.now()) {
 
   const beat = clamp(Number(state.visual.beat) || 0, 0, 1.4);
   const sensitivity = clamp(Number(settings.glitchBeatSensitivity) || 56, 20, 95) / 100;
-  const threshold = 0.82 - sensitivity * 0.56;
-  const releaseThreshold = threshold * 0.62;
+  const threshold = 0.68 - sensitivity * 0.48;
+  const releaseThreshold = threshold * 0.58;
   if (beat <= releaseThreshold) runtime.glitchBeatArmed = true;
 
   const duration = clamp(Number(settings.glitchBeatDuration) || 180, 80, 420);
@@ -29461,7 +38768,7 @@ function updateGlitchBeatMotion(playbackRunning, now = performance.now()) {
   runtime.glitchBeatArmed = false;
   runtime.glitchBeatLastAt = now;
   runtime.glitchBeatVariant = runtime.glitchBeatVariant ? 0 : 1;
-  const strength = clamp(0.34 + (beat - threshold) / Math.max(0.12, 1 - threshold), 0.34, 1.25);
+  const strength = clamp(0.52 + (beat - threshold) / Math.max(0.12, 1 - threshold), 0.52, 1.25);
   const nextClass = runtime.glitchBeatVariant
     ? 'is-text-glitch-beat-a'
     : 'is-text-glitch-beat-b';
@@ -29477,7 +38784,7 @@ function updatePlaybackSceneMotion() {
   const visual = state.playbackVisual;
   const now = performance.now();
   const playbackRunning = isPlaybackClockRunning();
-  const simulationStep = playbackPresetsUseNativeRefresh() && visual.lastMotionAt
+  const simulationStep = visual.lastMotionAt
     ? clamp((now - visual.lastMotionAt) / RENDER_PROFILE.targetFrameMs, 0.05, 2)
     : 1;
   visual.lastMotionAt = now;
@@ -29490,11 +38797,16 @@ function updatePlaybackSceneMotion() {
   if ((centralLyricsNeedFrame || multiRowLyricsNeedFrame || cardLyricsNeedFrame) && state.lyricLines.length) {
     syncPlaybackLyricAnimationFrame();
   }
-  if (!visual.dragging && !state.orb.reducedMotion) {
-    visual.yaw += visual.velocityYaw * simulationStep;
-    visual.pitch += visual.velocityPitch * simulationStep;
-    visual.velocityYaw *= Math.pow(0.91, simulationStep);
-    visual.velocityPitch *= Math.pow(0.91, simulationStep);
+  if (!visual.dragging) {
+    if (state.orb.reducedMotion) {
+      visual.velocityYaw = 0;
+      visual.velocityPitch = 0;
+    } else {
+      visual.yaw += visual.velocityYaw * simulationStep;
+      visual.pitch += visual.velocityPitch * simulationStep;
+      visual.velocityYaw *= Math.pow(0.91, simulationStep);
+      visual.velocityPitch *= Math.pow(0.91, simulationStep);
+    }
   }
   visual.yaw = wrapRadians(visual.yaw);
   visual.pitch = wrapRadians(visual.pitch);
@@ -29530,11 +38842,25 @@ function updatePlaybackSceneMotion() {
       `${Math.round(4 + visual.lyricPulse * 4 + bassJump * 7)}px`
     );
   }
-  updateDynamicCubeMotion();
-  updateFreeCubeMotion();
-  updateVoidPrismMotion();
-  updateChladniMotion();
-  updateSonicTopographyMotion();
+  switch (state.diyPreset) {
+    case 'cube':
+      updateDynamicCubeMotion();
+      break;
+    case 'free-cubes':
+      updateFreeCubeMotion();
+      break;
+    case 'void-prism':
+      updateVoidPrismMotion();
+      break;
+    case 'chladni':
+      updateChladniMotion();
+      break;
+    case 'topography':
+      updateSonicTopographyMotion();
+      break;
+    default:
+      break;
+  }
 }
 
 function resetRainGlassDrop(drop, width, height, dpr, fromTop = true, moving = true) {
@@ -29804,9 +39130,33 @@ function drawRainGlassDrop(context, drop, width, height, dpr, t, dt, audio) {
 
 function clearRainGlassOverlay() {
   const canvas = els.rainGlassCanvas;
-  if (!canvas) return;
-  const context = canvas.getContext('2d');
-  if (context) context.clearRect(0, 0, canvas.width || 0, canvas.height || 0);
+  if (canvas) {
+    const context = canvas.getContext('2d');
+    if (context) context.clearRect(0, 0, canvas.width || 0, canvas.height || 0);
+    canvas.width = 1;
+    canvas.height = 1;
+    canvas.style.width = '1px';
+    canvas.style.height = '1px';
+  }
+  const scene = state.rainGlassScene;
+  if (scene.staticCanvas) {
+    scene.staticCanvas.width = 1;
+    scene.staticCanvas.height = 1;
+  }
+  scene.staticCanvas = null;
+  scene.drops = [];
+  scene.staticDrops = [];
+  scene.specks = [];
+  if (scene.backgroundImage) {
+    scene.backgroundImage.onload = null;
+    scene.backgroundImage.removeAttribute?.('src');
+  }
+  scene.backgroundImage = null;
+  scene.backgroundReady = false;
+  scene.width = 0;
+  scene.height = 0;
+  scene.lastFrameAt = 0;
+  scene.staticLayerReady = false;
 }
 
 function drawRainGlassOverlay(scene, width, height, dpr, t, dt, audio) {
@@ -30026,8 +39376,71 @@ function drawAmbientOrbStreaks(context, width, height, dpr, now) {
 
 function requestOrbFrame() {
   const bootCoveringStage = !!(els.bootScreen && !els.bootScreen.hidden && !bootVisual.entering);
-  if (document.hidden || (MOBILE_RENDER_TARGET && bootCoveringStage) || state.sandbox.open || state.orb.animationFrame) return;
+  if (document.hidden || bootCoveringStage || state.sandbox.open || state.orb.animationFrame) return;
   state.orb.animationFrame = window.requestAnimationFrame(drawOrb);
+}
+
+function coverParticleNeedsContinuousFrame(now = performance.now()) {
+  if (!state.playbackPage || !isCoverParticlePreset()) return true;
+  const cover = state.coverParticle;
+  const visual = state.playbackVisual;
+  return isPlaybackClockRunning()
+    || cover.motionGate > 0
+    || cover.energy > 0
+    || cover.wholeJump > 0
+    || cover.bassJitter > 0
+    || visual.dragging
+    || Math.abs(visual.velocityYaw) > 0.00002
+    || Math.abs(visual.velocityPitch) > 0.00002
+    || (state.orb.mouseActive && now - state.orb.lastMouseAt < 1600);
+}
+
+function orbFrameBudgetMs() {
+  const displayBudget = Math.max(
+    1000 / 120,
+    Number(state.renderClarity.targetFrameMs) || Number(RENDER_PROFILE.targetFrameMs) || 1000 / 60
+  );
+  if (reducedMotion) return Math.max(displayBudget, 1000 / 30);
+  const activeMotion = state.orb.dragging
+    || state.playbackVisual.dragging
+    || isPlaybackClockRunning();
+  return activeMotion ? displayBudget : Math.max(displayBudget, 1000 / 60);
+}
+
+function resetOrbFrameBudget() {
+  state.orb.frameBudgetAt = 0;
+  state.orb.frameBudgetCarryMs = 0;
+}
+
+function playbackFrameRateUncapped() {
+  return state.playbackPage && isPlaybackClockRunning();
+}
+
+function consumeOrbFrameBudget(now) {
+  if (playbackFrameRateUncapped()) {
+    // Playback UI and scene presets render on every frame the compositor offers.
+    // requestAnimationFrame still follows the display/WebView presentation clock,
+    // but there is no additional 60/120 FPS software gate while music is playing.
+    state.orb.frameBudgetAt = now;
+    state.orb.frameBudgetCarryMs = 0;
+    return true;
+  }
+  const budgetMs = orbFrameBudgetMs();
+  const previousAt = Number(state.orb.frameBudgetAt) || 0;
+  if (!previousAt) {
+    state.orb.frameBudgetAt = now;
+    state.orb.frameBudgetCarryMs = 0;
+    return true;
+  }
+  const elapsedMs = clamp(now - previousAt, 0, budgetMs * 2);
+  state.orb.frameBudgetAt = now;
+  state.orb.frameBudgetCarryMs = Math.min(
+    budgetMs * 2,
+    Math.max(0, Number(state.orb.frameBudgetCarryMs) || 0) + elapsedMs
+  );
+  if (state.orb.frameBudgetCarryMs + 0.25 < budgetMs) return false;
+  state.orb.frameBudgetCarryMs = Math.max(0, state.orb.frameBudgetCarryMs - budgetMs);
+  return true;
 }
 
 function coveredPlaybackCanvasKey() {
@@ -30093,24 +39506,18 @@ function clearCoveredPlaybackCanvas(canvas, key) {
 
 function drawOrb(now = performance.now()) {
   state.orb.animationFrame = 0;
-  if (document.hidden || state.sandbox.open) return;
-  syncBookLyricFrame();
-  const frameInterval = playbackPresetsUseNativeRefresh()
-    ? 0
-    : state.orb.dragging ? 16 : RENDER_PROFILE.targetFrameMs;
-  if (state.orb.lastPaintAt && now - state.orb.lastPaintAt < frameInterval) {
+  const bootCoveringStage = !!(els.bootScreen && !els.bootScreen.hidden && !bootVisual.entering);
+  if (document.hidden || bootCoveringStage || state.sandbox.open) {
+    resetOrbFrameBudget();
+    return;
+  }
+  if (!consumeOrbFrameBudget(now)) {
     requestOrbFrame();
     return;
   }
-  state.orb.lastPaintAt = now;
+  syncBookLyricFrame();
   observeRenderClarityFrame(now);
-  const sampleSpectrum = !playbackPresetsUseNativeRefresh()
-    || !state.orb.lastSpectrumAt
-    || now - state.orb.lastSpectrumAt >= RENDER_PROFILE.targetFrameMs;
-  if (sampleSpectrum) {
-    state.orb.lastSpectrumAt = now;
-    updateAudioSpectrum();
-  }
+  updateAudioSpectrum();
   const canvas = els.canvas;
   const coveredCanvasKey = coveredPlaybackCanvasKey();
   if (coveredCanvasKey) {
@@ -30137,7 +39544,7 @@ function drawOrb(now = performance.now()) {
 
   if (state.playbackPage) {
     drawPlaybackParticles(context, rect, dpr, width, height);
-    requestOrbFrame();
+    if (coverParticleNeedsContinuousFrame(now)) requestOrbFrame();
     return;
   }
 
@@ -30358,8 +39765,46 @@ function initElasticRangeVisuals() {
 }
 
 const backgroundPollingTimers = [];
+const realtimePollingTimers = [];
+
+function clearRealtimePolling() {
+  while (realtimePollingTimers.length) {
+    window.clearInterval(realtimePollingTimers.pop());
+  }
+}
+
+function realtimePollingActive() {
+  return !document.hidden
+    && !!els.audio?.src
+    && !els.audio.paused
+    && !els.audio.ended;
+}
+
+function syncRealtimePolling() {
+  clearRealtimePolling();
+  if (!realtimePollingActive()) return;
+  const every = (callback, interval) => {
+    realtimePollingTimers.push(window.setInterval(callback, interval));
+  };
+  if (state.clientRuntime.nativeAudioActive && state.clientRuntime.settings.xAudio2) {
+    every(refreshNativeAudioSample, MOBILE_RENDER_TARGET ? 120 : 50);
+  }
+  const spatial = state.obrSpatialAudio;
+  if (
+    spatial.requested
+    && spatial.enabled
+    && spatial.graph?.nativeStream
+    && !spatial.graph.disposed
+  ) {
+    every(() => refreshNativeGoogleObrHealth().catch(() => {}), 250);
+  }
+  if (state.audioPlaybackContinuity.playingIntent) {
+    every(() => monitorAudioPlaybackContinuity().catch(() => {}), 100);
+  }
+}
 
 function clearBackgroundPolling() {
+  clearRealtimePolling();
   while (backgroundPollingTimers.length) {
     window.clearInterval(backgroundPollingTimers.pop());
   }
@@ -30367,30 +39812,2580 @@ function clearBackgroundPolling() {
 
 function startBackgroundPolling() {
   clearBackgroundPolling();
-  if (document.hidden) return;
+  if (document.hidden || !bootVisual.servicesStarted) return;
   const every = (callback, interval) => {
     backgroundPollingTimers.push(window.setInterval(callback, interval));
   };
-  every(refreshNativeAudioSample, MOBILE_RENDER_TARGET ? 120 : 50);
-  every(() => refreshNativeGoogleObrHealth().catch(() => {}), 250);
-  every(() => monitorAudioPlaybackContinuity().catch(() => {}), 100);
   every(refreshVisualBridge, 1000);
   every(() => refreshPlayerState().catch(() => {}), 5000);
   every(refreshUserPlaylists, 30000);
-  every(() => refreshCommunityState(state.activeProvider).catch(() => {}), 15000);
-  every(() => refreshCommunityListenState().catch(() => {}), 5000);
+  every(() => {
+    if (!state.community.eventConnected) scheduleCommunityRefresh(0);
+  }, 15000);
+  every(() => {
+    if (state.community.activeSession || !state.community.eventConnected) {
+      refreshCommunityListenState().catch(() => {});
+    }
+  }, 5000);
   every(() => reportCommunityListening(false).catch(() => {}), 5000);
+  every(() => checkGitHubClientUpdate().catch(() => {}), CLIENT_UPDATE_CHECK_INTERVAL_MS);
+  syncRealtimePolling();
 }
+
+window.FeMonsterCreativeBridge = Object.freeze({
+  request: apiJson,
+  query,
+  toast,
+  getContext() {
+    return {
+      provider: state.activeProvider,
+      profile: state.community.profile ? { ...state.community.profile } : null,
+      friends: Array.isArray(state.community.friends) ? state.community.friends.map((friend) => ({ ...friend })) : [],
+      friendRequests: normalizeCommunityFriendRequests(state.community.friendRequests),
+      profileOpen: !!state.community.profileOpen,
+      profilePage: state.community.profilePage
+    };
+  },
+  refreshCommunity() {
+    scheduleCommunityRefresh(0);
+  },
+  openProfilePage(page) {
+    setCommunityProfileOpen(true, page);
+  },
+  closeProfile() {
+    setCommunityProfileOpen(false);
+  },
+  openMessages(targetId = '', profile = null) {
+    const target = profile && typeof profile === 'object'
+      ? { ...profile, feId: safeText(profile.feId || targetId, '') }
+      : targetId;
+    openCommunityMessages(target);
+  },
+  addFriend: addCommunityFriendById,
+  openFriendIdentityCard: showCommunityFriendIdentityCard,
+  installCursor: installCreativeMarketCursor,
+  prepareCursor: prepareCreativeMarketCursor,
+  installWallpaper: installCreativeMarketWallpaper,
+  installMusic: addCreativeMarketMusic,
+  installTrail: installCreativeMarketTrail,
+  syncCustomTrailOption: syncCustomCursorTrailOption,
+  renderFriends() {
+    renderCommunityFriends(state.community.friends);
+  }
+});
+
+const PET_ASSISTANT_LEGACY_COMMANDS = Object.freeze({
+  play_song: 'music.search.play',
+  search_and_play: 'music.search.play',
+  play: 'playback.play',
+  pause: 'playback.pause',
+  next: 'playback.next',
+  previous: 'playback.previous',
+  set_volume: 'playback.volume.set',
+  switch_preset: 'scene.preset.set',
+  open_page: 'navigation.open'
+});
+const PET_BUILTIN_SCENE_PRESETS = Object.freeze([
+  Object.freeze({ id: 'lyric', name: '歌词场景', aliases: ['lyrics', '歌词'] }),
+  Object.freeze({ id: 'wallpaper', name: '壁纸场景', aliases: ['壁纸'] }),
+  Object.freeze({ id: 'cube', name: '动态魔方', aliases: ['立方体', '魔方'] }),
+  Object.freeze({ id: 'free-cubes', name: '自由方块', aliases: ['自由方块'] }),
+  Object.freeze({ id: 'void-prism', name: '虚空棱镜', aliases: ['虚空棱镜'] }),
+  Object.freeze({ id: 'topography', name: '声波地形', aliases: ['地形', '声波地形'] }),
+  Object.freeze({ id: 'chladni', name: '克拉尼', aliases: ['克拉尼'] }),
+  Object.freeze({ id: 'rain-glass', name: '雨玻璃', aliases: ['雨玻璃'] }),
+  Object.freeze({ id: 'cover-particles', name: '封面粒子', aliases: ['封面粒子'] }),
+  Object.freeze({ id: 'book', name: '书页歌词', aliases: ['书页', '书本'] })
+]);
+function petAssistantBoundedText(value, name, maximum = 180) {
+  const text = safeText(value, '').trim();
+  if (!text || text.length > maximum) throw new Error(`${name}参数无效`);
+  return text;
+}
+
+function petAssistantArguments(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value;
+}
+
+let playbackIntelligence = null;
+function playbackIntelligenceIdentity() {
+  const provider = providerInfo(state.activeProvider).id;
+  const status = state.loginStatusByProvider[provider] || {};
+  const account = status.account && typeof status.account === 'object' ? status.account : {};
+  const profile = status.profile && typeof status.profile === 'object' ? status.profile : {};
+  const accountId = safeText(
+    state.community.profile?.feId
+      || profile.platformUserId
+      || account.userId
+      || account.platformUserId
+      || account.uid
+      || account.uin
+      || account.id,
+    'guest'
+  );
+  return `${provider}:${accountId}`;
+}
+
+function livePlaybackIntelligenceSnapshot() {
+  const mediaPosition = Number(els.audio?.currentTime);
+  const mediaDuration = Number(els.audio?.duration);
+  const positionSeconds = Number.isFinite(mediaPosition)
+    ? Math.max(0, mediaPosition)
+    : Math.max(0, estimatedPlayerClockTime(Number(state.currentSong?.position) || 0));
+  const durationSeconds = Number.isFinite(mediaDuration) && mediaDuration > 0
+    ? mediaDuration
+    : Math.max(0, Number(state.currentSong?.duration) || Number(state.playerClock.duration) || 0);
+  return {
+    song: state.currentSong ? petAssistantSongSummary(state.currentSong) : null,
+    playing: !!els.audio?.src && !els.audio.paused && !els.audio.ended,
+    positionSeconds,
+    durationSeconds,
+    queueIndex: state.queueIndex,
+    queueLength: state.queueLength || state.queue.length
+  };
+}
+
+async function playbackIntelligenceQueuePage(cursor, limit) {
+  if (state.localQueueActive) {
+    return {
+      items: state.queue.slice(cursor, cursor + limit).map(petAssistantSongSummary),
+      total: state.queue.length,
+      queueIndex: state.queueIndex,
+      queueRevision: state.queueRevision
+    };
+  }
+  try {
+    const page = await apiJson(`/api/player/queue?${query({ cursor, limit })}`);
+    return {
+      ...page,
+      items: Array.isArray(page.items) ? page.items.map(petAssistantSongSummary) : []
+    };
+  } catch (error) {
+    return {
+      items: state.queue.slice(cursor, cursor + limit).map(petAssistantSongSummary),
+      total: state.queueLength || state.queue.length,
+      queueIndex: state.queueIndex,
+      queueRevision: state.queueRevision
+    };
+  }
+}
+
+function ensurePlaybackIntelligence() {
+  if (playbackIntelligence) return playbackIntelligence;
+  const factory = window.FeMonsterPlaybackIntelligence;
+  if (!factory?.create) throw new Error('Playback intelligence module is unavailable.');
+  playbackIntelligence = factory.create({
+    player: {
+      snapshot: livePlaybackIntelligenceSnapshot,
+      queuePage: playbackIntelligenceQueuePage
+    },
+    playlists: {
+      async list() {
+        if (!state.userPlaylists.length && providerConfigured(state.activeProvider)) {
+          await refreshUserPlaylists({ force: true }).catch(() => {});
+        }
+        return playbackPlaylists().map((playlist) => ({ ...playlist }));
+      },
+      tracks: playlistTracksForPlayback,
+      play: (playlist, tracks, index) => playPlaylistTracks(playlist, tracks, index, {
+        closeShelf: false,
+        updateShelf: false,
+        silent: true
+      })
+    },
+    storage: window.localStorage,
+    commandBus: window.FeMonsterAppCommands,
+    identity: playbackIntelligenceIdentity,
+    onPersist: scheduleClientPreferencesSync
+  });
+  return playbackIntelligence;
+}
+
+function notifyPlaybackIntelligence(event, payload = {}) {
+  try {
+    const result = ensurePlaybackIntelligence().notify(event, payload);
+    if (result && typeof result.catch === 'function') result.catch(() => {});
+  } catch (_) {}
+}
+
+let playbackIntelligenceTrackSignature = '';
+function playbackIntelligenceSongPayload() {
+  return state.currentSong ? {
+    id: safeText(state.currentSong.id, ''),
+    name: safeText(state.currentSong.title || state.currentSong.name, ''),
+    title: safeText(state.currentSong.title || state.currentSong.name, ''),
+    artist: safeText(state.currentSong.artist, ''),
+    provider: safeText(state.currentSong.provider, state.activeProvider)
+  } : null;
+}
+
+function notePlaybackIntelligenceTrackStart() {
+  const song = playbackIntelligenceSongPayload();
+  if (!song) return;
+  const signature = `${playbackIntelligenceIdentity()}|${song.provider}|${song.id || song.title}`;
+  if (signature === playbackIntelligenceTrackSignature) return;
+  playbackIntelligenceTrackSignature = signature;
+  notifyPlaybackIntelligence('track-start', {
+    song,
+    playlist: state.activePlaylist ? {
+      id: safeText(state.activePlaylist.id, ''),
+      name: safeText(state.activePlaylist.name, '')
+    } : null
+  });
+}
+
+function petAssistantExplicitPlaybackSection() {
+  const song = state.currentSong;
+  if (!song || typeof song !== 'object') return null;
+  const positionSeconds = Number(els.audio?.currentTime);
+  if (!Number.isFinite(positionSeconds)) return null;
+  const candidates = [
+    song.currentSection,
+    ...(Array.isArray(song.sections) ? song.sections : []),
+    ...(Array.isArray(song.structure?.sections) ? song.structure.sections : []),
+    ...(Array.isArray(song.analysis?.sections) ? song.analysis.sections : [])
+  ].filter((section) => section && typeof section === 'object');
+  for (const section of candidates) {
+    const type = safeText(section.type || section.kind || section.name || section.label, '').trim();
+    if (!/(?:^|\b)(?:chorus|hook)(?:\b|$)|副歌|高潮/iu.test(type)) continue;
+    const startSeconds = Number(section.startSeconds);
+    const endSeconds = Number(section.endSeconds);
+    if (!Number.isFinite(startSeconds) || !Number.isFinite(endSeconds) || endSeconds <= startSeconds) continue;
+    if (positionSeconds < startSeconds || positionSeconds >= endSeconds || endSeconds - startSeconds > 90) continue;
+    return {
+      type,
+      startSeconds,
+      endSeconds,
+      reliable: true,
+      source: 'track-metadata'
+    };
+  }
+  return petAssistantRepeatedLyricSection(positionSeconds);
+}
+
+function petAssistantRepeatedLyricSection(positionSeconds) {
+  const lines = Array.isArray(state.lyricLines) ? state.lyricLines : [];
+  const activeIndex = Number(state.lyricIndex);
+  if (!Number.isInteger(activeIndex) || activeIndex < 0 || activeIndex >= lines.length) return null;
+  const normalizedText = (line) => safeText(line?.text, '')
+    .toLocaleLowerCase()
+    .replace(/[\p{P}\p{S}\s]+/gu, '')
+    .slice(0, 180);
+  const activeText = normalizedText(lines[activeIndex]);
+  if (activeText.length < 4) return null;
+
+  for (let candidateIndex = 0; candidateIndex < lines.length; candidateIndex += 1) {
+    if (Math.abs(candidateIndex - activeIndex) < 3 || normalizedText(lines[candidateIndex]) !== activeText) continue;
+    let backward = 0;
+    while (
+      backward < 4
+      && activeIndex - backward - 1 >= 0
+      && candidateIndex - backward - 1 >= 0
+      && normalizedText(lines[activeIndex - backward - 1])
+      && normalizedText(lines[activeIndex - backward - 1]) === normalizedText(lines[candidateIndex - backward - 1])
+    ) backward += 1;
+    let forward = 0;
+    while (
+      forward < 6
+      && activeIndex + forward + 1 < lines.length
+      && candidateIndex + forward + 1 < lines.length
+      && normalizedText(lines[activeIndex + forward + 1])
+      && normalizedText(lines[activeIndex + forward + 1]) === normalizedText(lines[candidateIndex + forward + 1])
+    ) forward += 1;
+    if (backward + forward + 1 < 2) continue;
+
+    const startIndex = activeIndex - backward;
+    const endIndex = activeIndex + forward;
+    const startSeconds = Number(lines[startIndex]?.time);
+    const explicitEnd = Number(lines[endIndex]?.endTime);
+    const nextTime = Number(lines[endIndex + 1]?.time);
+    const endSeconds = Number.isFinite(explicitEnd) && explicitEnd > startSeconds
+      ? explicitEnd
+      : nextTime;
+    if (
+      !Number.isFinite(startSeconds)
+      || !Number.isFinite(endSeconds)
+      || endSeconds - startSeconds < 4
+      || endSeconds - startSeconds > 90
+      || positionSeconds < startSeconds
+      || positionSeconds >= endSeconds
+    ) continue;
+    return {
+      type: 'chorus',
+      startSeconds,
+      endSeconds,
+      reliable: true,
+      source: 'repeated-lyric-sequence',
+      repeatedLineCount: backward + forward + 1
+    };
+  }
+  return null;
+}
+
+function petAssistantPlaybackSnapshot() {
+  let live = null;
+  try { live = ensurePlaybackIntelligence().snapshot(); } catch (_) { live = null; }
+  return {
+    song: live?.song || (state.currentSong ? petAssistantSongSummary(state.currentSong) : null),
+    playing: live ? live.playing === true : !!els.audio?.src && !els.audio.paused && !els.audio.ended,
+    positionSeconds: Number(live?.positionSeconds) || 0,
+    durationSeconds: Number(live?.durationSeconds) || 0,
+    remainingSeconds: Number(live?.remainingSeconds) || 0,
+    progress: Number(live?.progress) || 0,
+    queueIndex: Number.isInteger(live?.queueIndex) ? live.queueIndex : state.queueIndex,
+    queueLength: Number.isInteger(live?.queueLength) ? live.queueLength : state.queueLength || state.queue.length,
+    volume: Math.round(clamp(Number(els.audio?.volume) || 0, 0, 1) * 100),
+    energy: clamp(Number(state.visual.energy) || 0, 0, 1),
+    bass: clamp(Math.max(Number(state.visual.bass) || 0, Number(state.visual.lowFrequencyAmplitude) || 0), 0, 1),
+    mid: clamp(Math.max(Number(state.visual.mid) || 0, Number(state.visual.lowMid) || 0), 0, 1),
+    treble: clamp(Math.max(Number(state.visual.treble) || 0, Number(state.visual.highMid) || 0), 0, 1),
+    beat: clamp(Number(state.visual.beat) || 0, 0, 1),
+    section: petAssistantExplicitPlaybackSection(),
+    preset: normalizeDiyPreset(state.diyPreset),
+    page: state.playbackPage ? 'playback' : 'home'
+  };
+}
+
+function petAssistantClientContextPage() {
+  if (state.sandbox.open) return { name: 'sandbox', section: safeText(state.sandbox.tab, 'library') };
+  if (state.runtimeSettingsOpen) return { name: 'settings' };
+  if (state.community.profileOpen) {
+    return { name: 'community', section: safeText(state.community.profilePage, 'self') };
+  }
+  if (state.playbackChrome.communityVisible) return { name: 'community', section: 'friends' };
+  if (state.playlistSongPageOpen) return { name: 'playlist' };
+  if (state.diyOpen) {
+    return {
+      name: 'customize',
+      section: safeText(state.diyPage, ''),
+      preset: normalizeDiyPreset(state.diyPreset)
+    };
+  }
+  return { name: state.playbackPage ? 'playback' : 'home' };
+}
+
+function createPetAssistantUiTools(hostDocument = document, hostWindow = window) {
+  const SAFE_CONTROL_SELECTOR = 'button[id],[role="button"][id]';
+  const SENSITIVE_FORM_SELECTOR = 'input[type="password"],input[type="file"]';
+  const UNSAFE_CONTROL = /(?:password|passwd|secret|token|cookie|credential|api.?key|delete|remove|uninstall|purchase|payment|upload|download|import|export|publish|send|account.*(?:logout|close)|(?:logout|close).*account|删除|移除|卸载|付款|购买|上传|下载|导入|导出|发布|发送|注销|退出登录)/i;
+  const NAVIGATION_KEYS = Object.freeze({
+    arrowup: 'ArrowUp',
+    arrowdown: 'ArrowDown',
+    arrowleft: 'ArrowLeft',
+    arrowright: 'ArrowRight',
+    home: 'Home',
+    end: 'End',
+    pageup: 'PageUp',
+    pagedown: 'PageDown',
+    tab: 'Tab',
+    enter: 'Enter',
+    escape: 'Escape',
+    esc: 'Escape',
+    space: 'Space',
+    spacebar: 'Space'
+  });
+  let revision = 0;
+  let queried = false;
+  let available = new Map();
+
+  const normalizeArguments = (value) => (value && typeof value === 'object' ? value : {});
+  const controlDescriptor = (control) => {
+    if (!control || control.ownerDocument !== hostDocument || control.isConnected === false) return null;
+    const tagName = String(control.tagName || '').toUpperCase();
+    const role = String(control.getAttribute?.('role') || '').toLowerCase();
+    if (tagName !== 'BUTTON' && role !== 'button') return null;
+    const id = String(control.id || '').trim();
+    if (!/^[A-Za-z][A-Za-z0-9_.:-]{0,95}$/.test(id)) return null;
+    if (control.hidden || control.disabled || control.getAttribute?.('aria-hidden') === 'true'
+      || control.getAttribute?.('aria-disabled') === 'true' || control.closest?.('[hidden],[aria-hidden="true"],[inert]')) return null;
+    const style = hostWindow.getComputedStyle?.(control);
+    if (style && (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) <= 0)) return null;
+    if (!control.getClientRects?.().length) return null;
+    const label = String(
+      control.getAttribute?.('aria-label')
+      || control.getAttribute?.('title')
+      || control.textContent
+      || id
+    ).replace(/\s+/g, ' ').trim().slice(0, 100);
+    const identity = `${id} ${label}`;
+    if (UNSAFE_CONTROL.test(identity)) return null;
+    const form = control.closest?.('form');
+    if (form?.querySelector?.(SENSITIVE_FORM_SELECTOR)) return null;
+    return Object.freeze({
+      controlId: `control:${id}`,
+      id,
+      label,
+      kind: 'button',
+      enabled: true,
+      visible: true
+    });
+  };
+
+  const dispatchDirty = (reason) => {
+    const EventConstructor = hostWindow.CustomEvent;
+    if (!EventConstructor || !hostWindow.dispatchEvent) return;
+    hostWindow.dispatchEvent(new EventConstructor('fe-monster-client-context-dirty', {
+      detail: { reason }
+    }));
+  };
+
+  return Object.freeze({
+    query(argumentsValue = {}) {
+      const args = normalizeArguments(argumentsValue);
+      const query = String(args.query || '').trim().toLowerCase().slice(0, 80);
+      const cursor = Math.max(0, Math.floor(Number(args.cursor) || 0));
+      const limit = Math.max(1, Math.min(50, Math.floor(Number(args.limit) || 30)));
+      const matches = [];
+      const nodes = Array.from(hostDocument.querySelectorAll?.(SAFE_CONTROL_SELECTOR) || []);
+      nodes.forEach((control) => {
+        const descriptor = controlDescriptor(control);
+        if (!descriptor) return;
+        if (query && !`${descriptor.id} ${descriptor.label}`.toLowerCase().includes(query)) return;
+        matches.push({ descriptor, control });
+      });
+      const page = matches.slice(cursor, cursor + limit);
+      available = new Map(page.map(({ descriptor, control }) => [descriptor.controlId, { descriptor, control }]));
+      queried = true;
+      revision += 1;
+      return {
+        revision,
+        total: matches.length,
+        nextCursor: cursor + page.length < matches.length ? cursor + page.length : null,
+        controls: page.map(({ descriptor }) => descriptor)
+      };
+    },
+    click(argumentsValue = {}) {
+      if (!queried) throw new Error('Query controls before clicking.');
+      const args = normalizeArguments(argumentsValue);
+      const controlId = String(args.controlId || '').trim();
+      const record = available.get(controlId);
+      if (!record) throw new Error('Control was not present in the preceding query snapshot.');
+      const current = controlDescriptor(record.control);
+      if (!current || current.controlId !== controlId) {
+        available.delete(controlId);
+        throw new Error('Control is no longer visible or available.');
+      }
+      record.control.click();
+      dispatchDirty('ui:control-click');
+      return { clicked: true, controlId, label: current.label };
+    },
+    pressKey(argumentsValue = {}) {
+      if (hostDocument.visibilityState === 'hidden' || hostDocument.hidden === true
+        || (typeof hostDocument.hasFocus === 'function' && !hostDocument.hasFocus())) {
+        throw new Error('A focused FE Monster window is required.');
+      }
+      const args = normalizeArguments(argumentsValue);
+      const requested = String(args.key || '').trim();
+      const key = NAVIGATION_KEYS[requested.toLowerCase()];
+      if (!key) throw new Error('Only a supported navigation key may be pressed.');
+      const target = hostDocument.activeElement || hostDocument.body || hostDocument.documentElement;
+      const tagName = String(target?.tagName || '').toUpperCase();
+      const role = String(target?.getAttribute?.('role') || '').toLowerCase();
+      if (!target?.dispatchEvent || target.ownerDocument !== hostDocument
+        || target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(tagName) || role === 'textbox') {
+        throw new Error('Navigation keys are unavailable while a text editor has focus.');
+      }
+      const EventConstructor = hostWindow.KeyboardEvent;
+      if (typeof EventConstructor !== 'function') throw new Error('Keyboard navigation is unavailable.');
+      const eventKey = key === 'Space' ? ' ' : key;
+      const code = key === 'Space' ? 'Space' : key;
+      target.dispatchEvent(new EventConstructor('keydown', {
+        key: eventKey, code, bubbles: true, cancelable: true, composed: true
+      }));
+      target.dispatchEvent(new EventConstructor('keyup', {
+        key: eventKey, code, bubbles: true, cancelable: true, composed: true
+      }));
+      dispatchDirty('ui:key-press');
+      return { key };
+    },
+    focusedControlId() {
+      const descriptor = controlDescriptor(hostDocument.activeElement);
+      return descriptor?.controlId || null;
+    },
+    summary() {
+      return { revision, queried, availableCount: available.size };
+    }
+  });
+}
+
+const petAssistantUiTools = createPetAssistantUiTools(document, window);
+
+function petAssistantClientContextProvider(providerId) {
+  const info = providerInfo(providerId);
+  const status = state.loginStatusByProvider[info.id] || {};
+  const account = status.account && typeof status.account === 'object' ? status.account : {};
+  return {
+    id: info.id,
+    label: safeText(info.label, info.id),
+    active: info.id === state.activeProvider,
+    configured: providerConfigured(info.id),
+    loggedIn: status.loggedIn === true,
+    displayName: safeText(account.nickname || account.name || account.username, '').slice(0, 80),
+    vip: accountVipStatus(status)
+  };
+}
+
+function petAssistantClientContextParameters() {
+  let entries = [];
+  try { entries = petAssistantParameterEntries(); } catch (_) { entries = []; }
+  const values = [];
+  entries.slice(0, 80).forEach((entry) => {
+    try {
+      values.push({
+        key: entry.key,
+        scope: entry.scope,
+        preset: entry.preset,
+        value: entry.get(),
+        available: entry.available !== false
+      });
+    } catch (_) {}
+  });
+  return { total: entries.length, values, truncated: entries.length > values.length };
+}
+
+function petAssistantClientContextId(value) {
+  const id = safeText(value, '').slice(0, 180);
+  return /^(?:[a-z][a-z0-9+.-]*:\/\/|file:|blob:|[a-z]:[\\/]|\\\\|\/)/i.test(id) ? 'local' : id;
+}
+
+function petAssistantClientContextSong(song) {
+  const summary = petAssistantSongSummary(song);
+  return { ...summary, id: petAssistantClientContextId(summary.id) };
+}
+
+function petAssistantClientContextUi() {
+  const dialogs = {
+    boot: !!els.bootScreen && els.bootScreen.hidden !== true,
+    update: !!els.updateDialog && els.updateDialog.hidden !== true,
+    community: state.community.profileOpen === true,
+    settings: state.runtimeSettingsOpen === true,
+    sandbox: state.sandbox.open === true,
+    customize: state.diyOpen === true,
+    playlist: state.playlistSongPageOpen === true || state.playbackPlaylistPickerOpen === true
+  };
+  const activeDialog = Object.entries(dialogs).find(([, open]) => open)?.[0] || null;
+  return {
+    dialogs,
+    activeDialog,
+    focusedControlId: petAssistantUiTools.focusedControlId(),
+    safeControls: petAssistantUiTools.summary()
+  };
+}
+
+function petAssistantClientContextAchievements() {
+  const api = window.feAchievements;
+  const catalog = Array.isArray(api?.catalog) ? api.catalog : [];
+  const unlockedItems = catalog.filter((achievement) => api?.isUnlocked?.(achievement.id));
+  const ornamentState = api?.getOrnamentState?.() || {};
+  return {
+    total: catalog.length,
+    unlocked: unlockedItems.length,
+    unlockedItems: unlockedItems.slice(-12).map((achievement) => ({
+      id: safeText(achievement.id, '').slice(0, 80),
+      name: safeText(achievement.name, '').slice(0, 80)
+    })),
+    equippedOrnamentId: safeText(ornamentState.equipped?.achievementId, '') || null,
+    pageOpen: state.community.profileOpen === true && state.community.profilePage === 'achievement'
+  };
+}
+
+function petAssistantClientContextCommands(commandCatalog) {
+  const categories = new Map();
+  commandCatalog.forEach((definition) => {
+    const id = safeText(definition?.category, 'app').slice(0, 48) || 'app';
+    const current = categories.get(id) || { id, count: 0, readOnlyCount: 0 };
+    current.count += 1;
+    if (definition?.readOnly === true) current.readOnlyCount += 1;
+    categories.set(id, current);
+  });
+  return {
+    total: commandCatalog.length,
+    defaultPolicy: 'allow-registered',
+    categories: Array.from(categories.values()).sort((left, right) => left.id.localeCompare(right.id))
+  };
+}
+
+function petAssistantClientContextSnapshot(options = {}) {
+  const playback = petAssistantPlaybackSnapshot();
+  if (playback.song) playback.song = petAssistantClientContextSong(playback.song);
+  const queue = Array.isArray(state.queue) ? state.queue : [];
+  const queueStart = Math.max(0, Math.min(queue.length, Math.max(0, state.queueIndex) - 4));
+  const presets = petAssistantPresetCatalog();
+  const activePreset = presets.find((preset) => preset.active) || null;
+  const profile = state.community.profile;
+  const lyricLine = state.lyricLines[state.lyricIndex] || null;
+  const commandCatalog = window.FeMonsterAppCommands?.catalog?.() || [];
+  const commandContext = petAssistantClientContextCommands(commandCatalog);
+  return {
+    schema: 'fe-monster.client-context/v1',
+    page: petAssistantClientContextPage(),
+    playback: {
+      ...playback,
+      playlist: state.activePlaylist ? {
+        id: petAssistantClientContextId(state.activePlaylist.id),
+        name: safeText(state.activePlaylist.name, '')
+      } : null,
+      queue: {
+        index: state.queueIndex,
+        length: state.queueLength || queue.length,
+        revision: state.queueRevision,
+        start: queueStart,
+        items: queue.slice(queueStart, queueStart + 50).map((song, offset) => ({
+          index: queueStart + offset,
+          ...petAssistantClientContextSong(song)
+        })),
+        truncated: queue.length > queueStart + 50
+      }
+    },
+    preset: {
+      active: activePreset ? {
+        id: activePreset.id,
+        name: activePreset.name,
+        source: activePreset.source,
+        type: activePreset.presetType
+      } : null,
+      diy: normalizeDiyPreset(state.diyPreset),
+      scene: normalizeDiyPreset(state.scenePreset),
+      text: safeText(state.textPreset, ''),
+      sandboxPresetId: safeText(state.sandbox.playbackPresetId || state.sandbox.selectedPresetId, ''),
+      availableCount: presets.length
+    },
+    ...(options.includeParameters === false ? {} : { parameters: petAssistantClientContextParameters() }),
+    lyrics: {
+      activeIndex: state.lyricIndex,
+      activeText: safeText(state.lyricDisplayText || lyricLine?.text, ''),
+      translation: safeText(state.lyricSubtitleText || lyricLine?.translation, ''),
+      progressPercent: Number(state.lyricProgressPercent) || 0,
+      mode: safeText(state.textPreset, ''),
+      bilingual: state.bilingualLyricsEnabled !== false,
+      multiRow: state.multiRowLyricsEnabled === true,
+      offsetSeconds: lyricClockOffsetSeconds()
+    },
+    community: {
+      loggedIn: !!profile?.feId,
+      profile: profile ? {
+        feId: safeText(profile.feId, '').slice(0, 8),
+        username: safeText(profile.username || profile.name, '').slice(0, 80)
+      } : null,
+      friendCount: state.community.friends.length,
+      onlineFriendCount: state.community.friends.filter((friend) => friend?.online === true).length,
+      incomingFriendRequests: state.community.friendRequests?.incoming?.length || 0,
+      unreadMailbox: state.community.mailbox.unreadCount || 0,
+      selectedFriendId: safeText(state.community.selectedFriendId, '').slice(0, 8),
+      togetherListening: state.community.activeSession ? {
+        active: true,
+        peerCount: Array.isArray(state.community.activeSession.members)
+          ? state.community.activeSession.members.length
+          : 0
+      } : { active: false }
+    },
+    accounts: {
+      activeProvider: state.activeProvider,
+      providers: Object.keys(state.providers).map(petAssistantClientContextProvider)
+    },
+    ui: petAssistantClientContextUi(),
+    achievements: petAssistantClientContextAchievements(),
+    commands: commandContext,
+    settings: {
+      playbackQuality: state.playbackQuality,
+      renderClarity: {
+        automatic: state.renderClarity.auto === true,
+        percent: effectiveRenderClarityPercent()
+      },
+      lyricBrightness: state.lyricBrightness,
+      lyricSpeed: state.lyricSpeed,
+      wallpaper: {
+        source: state.wallpaperSource,
+        activeId: petAssistantClientContextId(state.activeWallpaperId),
+        opacity: state.wallpaperOpacity,
+        brightness: state.wallpaperBrightness,
+        blur: state.wallpaperBlur,
+        scale: state.wallpaperScale,
+        fit: state.wallpaperFitMode
+      },
+      cursor: { ...state.cursorPreferences },
+      messageDoNotDisturb: state.community.messageBubbleMuted === true,
+      recording: { active: state.recording.active === true, paused: state.recording.paused === true }
+    },
+    runtime: {
+      online: navigator.onLine !== false,
+      visibility: document.visibilityState || (document.hidden ? 'hidden' : 'visible'),
+      client: document.documentElement.getAttribute('data-fe-client') || 'browser',
+      fullscreen: state.appWindowFullscreen === true,
+      mode: safeText(state.clientRuntime.mode, ''),
+      renderBackend: safeText(state.clientRuntime.renderBackend, ''),
+      audioBackend: safeText(state.clientRuntime.audioBackend, ''),
+      spatialAudioBackend: safeText(state.clientRuntime.audioSpatialBackend, ''),
+      audioDecoder: safeText(state.clientRuntime.audioDecoder, ''),
+      nativeAudioActive: state.clientRuntime.nativeAudioActive === true,
+      audioSampleRate: Number(state.clientRuntime.audioSampleRate) || 0,
+      communityConnected: state.community.eventConnected === true,
+      communityLastEventSecondsAgo: state.community.eventLastActivityAt
+        ? Math.max(0, Math.round((Date.now() - state.community.eventLastActivityAt) / 1_000))
+        : null,
+      commands: commandContext
+    }
+  };
+}
+
+const PET_MUSIC_ALIASES = Object.freeze({
+  '周董': '周杰伦',
+  '杰伦': '周杰伦',
+  '陈医生': '陈奕迅',
+  'Eason': '陈奕迅',
+  'JJ': '林俊杰',
+  'GEM': '邓紫棋',
+  'G.E.M.': '邓紫棋',
+  '霉霉': 'Taylor Swift',
+  '火星哥': 'Bruno Mars',
+  '断眉': 'Charlie Puth',
+  'A妹': 'Ariana Grande'
+});
+const PET_SCENE_ALIASES = Object.freeze({
+  lyric: 'lyric',
+  lyrics: 'lyric',
+  歌词: 'lyric',
+  cube: 'cube',
+  立方体: 'cube',
+  'free-cubes': 'free-cubes',
+  自由方块: 'free-cubes',
+  'void-prism': 'void-prism',
+  虚空棱镜: 'void-prism',
+  topography: 'topography',
+  地形: 'topography',
+  声波地形: 'topography',
+  chladni: 'chladni',
+  克拉尼: 'chladni',
+  'rain-glass': 'rain-glass',
+  雨玻璃: 'rain-glass',
+  'cover-particles': 'cover-particles',
+  封面粒子: 'cover-particles',
+  book: 'book',
+  书页: 'book'
+});
+
+function petAssistantNormalizeLookupText(value) {
+  return safeText(value, '')
+    .normalize('NFKC')
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+function petAssistantPresetCatalog(argumentsValue = {}) {
+  const args = petAssistantArguments(argumentsValue);
+  const queryText = petAssistantNormalizeLookupText(args.query || args.keyword || args.name || '');
+  const builtIn = PET_BUILTIN_SCENE_PRESETS.map((preset) => ({
+    ...preset,
+    source: 'builtin',
+    presetType: 'playback',
+    active: state.diyPreset === preset.id && !state.sandbox.playbackPresetId
+  }));
+  const dynamic = (Array.isArray(state.sandbox.presets) ? state.sandbox.presets : [])
+    .filter((preset) => preset && preset.id && (
+      (preset.presetType === 'scene' && Array.isArray(preset.sceneItems) && preset.sceneItems.length)
+      || (preset.presetType === 'playback' && preset.playbackPreset)
+    ))
+    .map((preset) => ({
+      id: safeText(preset.id, ''),
+      name: safeText(preset.name, preset.id),
+      aliases: Array.isArray(preset.aliases)
+        ? preset.aliases.map((alias) => safeText(alias, '')).filter(Boolean).slice(0, 12)
+        : [],
+      source: safeText(preset.source, 'local'),
+      presetType: safeText(preset.presetType, 'scene'),
+      playbackPreset: safeText(preset.playbackPreset, ''),
+      active: state.sandbox.playbackPresetId === preset.id
+    }));
+  const unique = new Map();
+  [...builtIn, ...dynamic].forEach((preset) => {
+    if (!unique.has(preset.id)) unique.set(preset.id, preset);
+  });
+  const presets = Array.from(unique.values());
+  if (!queryText) return presets;
+  return presets.filter((preset) => (
+    [preset.id, preset.name, ...(preset.aliases || [])]
+      .some((value) => petAssistantNormalizeLookupText(value).includes(queryText))
+  ));
+}
+
+async function petAssistantSwitchPreset(argumentsValue = {}) {
+  const args = petAssistantArguments(argumentsValue);
+  const requested = petAssistantBoundedText(
+    args.preset || args.id || args.name || args.query,
+    '场景',
+    120
+  );
+  const alias = PET_SCENE_ALIASES[requested] || PET_SCENE_ALIASES[requested.toLowerCase()] || requested;
+  const lookup = petAssistantNormalizeLookupText(alias);
+  const candidates = petAssistantPresetCatalog().filter((preset) => (
+    [preset.id, preset.name, ...(preset.aliases || [])]
+      .some((value) => petAssistantNormalizeLookupText(value) === lookup)
+  ));
+  if (!candidates.length) throw new Error(`未找到已注册预设 ${requested}`);
+  if (candidates.length > 1) throw new Error(`预设名称 ${requested} 不唯一，请使用预设 ID`);
+  const preset = candidates[0];
+  if (preset.source === 'builtin') enterPresetPlaybackPage(preset.id);
+  else await enterDiyScenePresetPlayback(preset.id);
+  return {
+    ...petAssistantPlaybackSnapshot(),
+    selectedPreset: { id: preset.id, name: preset.name, source: preset.source }
+  };
+}
+const PET_PAGE_ALIASES = Object.freeze({
+  首页: 'home',
+  主页: 'home',
+  播放: 'playback',
+  播放页: 'playback',
+  社区: 'community',
+  个人资料: 'profile',
+  广场: 'square',
+  社交广场: 'square',
+  消息: 'messages',
+  私信: 'messages',
+  邮箱: 'mailbox',
+  报告: 'report',
+  一起听报告: 'report',
+  市场: 'market',
+  创作市场: 'market',
+  成就: 'achievement',
+  挂饰: 'ornament',
+  设置: 'settings',
+  场景: 'scene',
+  预设: 'scene',
+  歌词设置: 'lyrics',
+  壁纸: 'wallpaper',
+  节奏游戏: 'rhythm-game'
+});
+
+function petAssistantOptionalText(value, maximum = 180) {
+  return safeText(value, '').trim().slice(0, maximum);
+}
+
+function petAssistantBoolean(value, fallback = false) {
+  if (typeof value === 'boolean') return value;
+  const normalized = safeText(value, '').trim().toLowerCase();
+  if (['1', 'true', 'on', 'yes', 'enable', 'enabled', '开启', '打开'].includes(normalized)) return true;
+  if (['0', 'false', 'off', 'no', 'disable', 'disabled', '关闭'].includes(normalized)) return false;
+  return fallback;
+}
+
+function petAssistantExpandMusicAliases(value) {
+  let text = petAssistantOptionalText(value, 240).normalize('NFKC');
+  Object.entries(PET_MUSIC_ALIASES).forEach(([alias, canonical]) => {
+    text = text.replace(new RegExp(alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig'), canonical);
+  });
+  return text;
+}
+
+function petAssistantNormalizeMusicText(value) {
+  return petAssistantExpandMusicAliases(value)
+    .toLocaleLowerCase()
+    .replace(/[（(][^）)]*(?:版|version|live|伴奏|翻唱)[^）)]*[）)]/ig, '')
+    .replace(/\b(?:feat|ft)\.?\s+[^·,/|-]+/ig, '')
+    .replace(/[^\p{L}\p{N}]+/gu, '')
+    .trim();
+}
+
+function petAssistantEditSimilarity(leftValue, rightValue) {
+  const left = petAssistantNormalizeMusicText(leftValue).slice(0, 96);
+  const right = petAssistantNormalizeMusicText(rightValue).slice(0, 96);
+  if (!left || !right) return 0;
+  if (left === right) return 1;
+  if (left.includes(right) || right.includes(left)) {
+    return .82 + Math.min(left.length, right.length) / Math.max(left.length, right.length) * .16;
+  }
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    let diagonal = previous[0];
+    previous[0] = leftIndex;
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      const above = previous[rightIndex];
+      const cost = left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1;
+      previous[rightIndex] = Math.min(previous[rightIndex] + 1, previous[rightIndex - 1] + 1, diagonal + cost);
+      diagonal = above;
+    }
+  }
+  return Math.max(0, 1 - previous[right.length] / Math.max(left.length, right.length));
+}
+
+function petAssistantKnownSongs() {
+  const unique = new Map();
+  [state.currentSong, ...state.queue, ...state.searchSuggestions.songs].filter(Boolean).forEach((song) => {
+    const key = safeText(song.id, '') || `${petAssistantNormalizeMusicText(song.title)}:${petAssistantNormalizeMusicText(song.artist)}`;
+    if (key && !unique.has(key)) unique.set(key, song);
+  });
+  return Array.from(unique.values());
+}
+
+function petAssistantSongRequest(argumentsValue = {}) {
+  const args = petAssistantArguments(argumentsValue);
+  let title = petAssistantOptionalText(args.title || args.song || args.songName, 120);
+  let artist = petAssistantOptionalText(args.artist || args.singer || args.artistName, 100);
+  let queryText = petAssistantOptionalText(args.query || args.keyword || args.text || [artist, title].filter(Boolean).join(' '), 180);
+  queryText = queryText
+    .replace(/^(?:请|麻烦)?(?:给我|帮我)?(?:播放|搜索|找|放|来一首)\s*/u, '')
+    .replace(/^(?:一首|一些)?(?:和|跟)?\s*(?:类似于?|像)\s*/u, '')
+    .replace(/\s*(?:类似的歌|相似的歌|similar songs?)\s*$/iu, '')
+    .trim();
+  if ((!title || !artist) && queryText) {
+    const possessive = queryText.match(/^(.{1,60}?)(?:的|[-—/·])(.{1,100})$/u);
+    if (possessive) {
+      artist ||= possessive[1].trim();
+      title ||= possessive[2].trim();
+    }
+  }
+  artist = petAssistantExpandMusicAliases(artist);
+  queryText = petAssistantExpandMusicAliases(queryText);
+  return {
+    id: petAssistantOptionalText(args.songId || args.id, 180),
+    query: queryText || [artist, title].filter(Boolean).join(' '),
+    title,
+    artist
+  };
+}
+
+function petAssistantSongAliases(song) {
+  const aliases = [song?.alias, song?.aliases, song?.alia]
+    .flatMap((value) => Array.isArray(value) ? value : value ? [value] : [])
+    .map((value) => petAssistantOptionalText(value, 120))
+    .filter(Boolean);
+  return aliases;
+}
+
+function petAssistantSongMatchScore(song, request, index = 0) {
+  const titleCandidates = [song?.title, song?.name, ...petAssistantSongAliases(song)];
+  const titleScore = request.title
+    ? Math.max(0, ...titleCandidates.map((value) => petAssistantEditSimilarity(value, request.title)))
+    : 0;
+  const artistScore = request.artist
+    ? petAssistantEditSimilarity(song?.artist || song?.singer, request.artist)
+    : 0;
+  const combined = [song?.artist || song?.singer, song?.title || song?.name].filter(Boolean).join(' ');
+  const queryScore = request.query ? petAssistantEditSimilarity(combined, request.query) : 0;
+  const relevance = Math.max(0, 1 - index * .035);
+  if (request.title && request.artist) return titleScore * .58 + artistScore * .32 + relevance * .1;
+  if (request.title) return titleScore * .78 + queryScore * .12 + relevance * .1;
+  return queryScore * .68 + artistScore * .2 + relevance * .12;
+}
+
+function petAssistantSortSongs(songs, request) {
+  return songs
+    .map((song, index) => ({ song, score: petAssistantSongMatchScore(song, request, index) }))
+    .sort((left, right) => right.score - left.score)
+    .map(({ song }) => song);
+}
+
+async function petAssistantSearchSongs(argumentsValue, limit = 12) {
+  const request = petAssistantSongRequest(argumentsValue);
+  const requestedId = request.id;
+  if (requestedId) {
+    const known = petAssistantKnownSongs().find((song) => safeText(song.id, '') === requestedId);
+    return { request, songs: known ? [known] : [] };
+  }
+  if (!request.query && !request.title && !request.artist) throw new Error('请告诉我要搜索的歌曲或歌手');
+  if (!providerConfigured(state.activeProvider)) {
+    throw new Error(`请先配置${providerInfo(state.activeProvider).label}音乐服务`);
+  }
+
+  const terms = Array.from(new Set([
+    [request.artist, request.title].filter(Boolean).join(' '),
+    request.query,
+    request.title,
+    request.artist
+  ].map((value) => petAssistantOptionalText(value, 180)).filter(Boolean))).slice(0, 4);
+  const unique = new Map();
+  let lastError = null;
+  for (const keyword of terms) {
+    try {
+      const data = await apiJson(`/api/search?${query({ q: keyword, limit, provider: state.activeProvider })}`, {
+        timeoutMs: 12_000
+      });
+      normalizeSearchResults(data.songs).forEach((song) => {
+        const key = safeText(song.id, '') || `${petAssistantNormalizeMusicText(song.title)}:${petAssistantNormalizeMusicText(song.artist)}`;
+        if (key && !unique.has(key)) unique.set(key, song);
+      });
+      if (unique.size >= Math.min(5, limit)) break;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (!unique.size) {
+    petAssistantKnownSongs().forEach((song) => {
+      if (petAssistantSongMatchScore(song, request) >= .56) {
+        const key = safeText(song.id, '') || `${song.title}:${song.artist}`;
+        unique.set(key, song);
+      }
+    });
+  }
+  if (!unique.size && lastError) throw lastError;
+  return { request, songs: petAssistantSortSongs(Array.from(unique.values()), request).slice(0, limit) };
+}
+
+function petAssistantSongSummary(song) {
+  return {
+    id: safeText(song?.id, ''),
+    title: safeText(song?.title || song?.name, ''),
+    artist: safeText(song?.artist || song?.singer, ''),
+    album: safeText(song?.album, '')
+  };
+}
+
+async function petAssistantSearchAndPlayFuzzy(argumentsValue) {
+  const args = petAssistantArguments(argumentsValue);
+  const raw = petAssistantOptionalText(args.query || args.keyword || args.text, 180);
+  if (petAssistantBoolean(args.similar, false) || /(?:类似|相似|similar)/iu.test(raw)) {
+    return petAssistantPlaySimilar(args);
+  }
+  const { request, songs } = await petAssistantSearchSongs(args, 14);
+  const song = songs[0];
+  if (!song) throw new Error(`没有找到“${request.query || request.title || request.artist}”`);
+  state.searchSuggestions.query = request.query;
+  state.searchSuggestions.songs = songs;
+  renderSearchSuggestions();
+  if (!await loadSong(song, { silent: true })) throw new Error('歌曲暂时无法播放');
+  return { ...petAssistantPlaybackSnapshot(), matched: petAssistantSongSummary(song) };
+}
+
+async function petAssistantPlaySimilar(argumentsValue = {}) {
+  const args = petAssistantArguments(argumentsValue);
+  let seed = null;
+  const request = petAssistantSongRequest(args);
+  if (request.id) seed = petAssistantKnownSongs().find((song) => safeText(song.id, '') === request.id) || null;
+  if (!seed && (request.query || request.title || request.artist)) {
+    const seedSearch = await petAssistantSearchSongs(request, 10);
+    seed = seedSearch.songs[0] || null;
+  }
+  seed ||= state.currentSong || null;
+  if (!seed) throw new Error('请先播放一首歌，或告诉我作为参考的歌曲');
+
+  const relatedRequest = {
+    query: petAssistantOptionalText(args.artist || seed.artist || seed.title, 180),
+    artist: petAssistantOptionalText(args.artist || seed.artist, 100)
+  };
+  const searched = await petAssistantSearchSongs(relatedRequest, 20);
+  const seedId = safeText(seed.id, '');
+  const seedTitle = petAssistantNormalizeMusicText(seed.title);
+  const candidates = searched.songs.filter((song) => {
+    if (seedId && safeText(song.id, '') === seedId) return false;
+    return petAssistantNormalizeMusicText(song.title) !== seedTitle;
+  });
+  const ranked = candidates.sort((left, right) => {
+    const leftArtist = petAssistantEditSimilarity(left.artist, seed.artist);
+    const rightArtist = petAssistantEditSimilarity(right.artist, seed.artist);
+    return rightArtist - leftArtist;
+  });
+  const song = ranked[0] || petAssistantKnownSongs().find((candidate) => safeText(candidate.id, '') !== seedId);
+  if (!song) throw new Error(`暂时没有找到与“${safeText(seed.title, '这首歌')}”类似的歌曲`);
+  if (!await loadSong(song, { silent: true })) throw new Error('相似歌曲暂时无法播放');
+  return {
+    ...petAssistantPlaybackSnapshot(),
+    seed: petAssistantSongSummary(seed),
+    matched: petAssistantSongSummary(song)
+  };
+}
+
+function petAssistantSetVolume(argumentsValue, relative = false) {
+  const args = petAssistantArguments(argumentsValue);
+  const raw = relative ? args.delta ?? args.amount ?? args.value : args.volume ?? args.value;
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric)) throw new Error('音量参数必须是数字');
+  const current = Math.round(clamp(Number(els.audio?.volume) || 0, 0, 1) * 100);
+  const volume = Math.round(clamp(relative ? current + numeric : numeric, 0, 100));
+  els.volumeRange.value = String(volume);
+  els.audio.volume = volume / 100;
+  els.volumeLabel.textContent = `${volume}%`;
+  syncElasticRangeVisual(els.volumeRange);
+  schedulePlayerVolumeCommit(volume / 100, { immediate: true });
+  notifyPlaybackIntelligence('volume-change', { volume });
+  return petAssistantPlaybackSnapshot();
+}
+
+async function petAssistantOpenPage(argumentsValue) {
+  const args = petAssistantArguments(argumentsValue);
+  const rawPage = petAssistantBoundedText(args.page || args.tab || args.name, '页面', 60).toLowerCase();
+  const requestedPage = PET_PAGE_ALIASES[rawPage] || rawPage;
+  const page = ({
+    'creative-market': 'market',
+    achievements: 'achievement',
+    'listen-report': 'report',
+    self: 'profile'
+  })[requestedPage] || requestedPage;
+  if (page === 'home') returnHomePage();
+  else if (page === 'playback') enterPlaybackPage();
+  else if (page === 'community') {
+    if (state.playbackPage) showCommunityPageFromPlayback();
+    else setCommunityProfileOpen(true, 'self');
+  }
+  else if (page === 'profile') setCommunityProfileOpen(true, 'self');
+  else if (['square', 'mailbox', 'report', 'market', 'achievement', 'ornament'].includes(page)) {
+    setCommunityProfileOpen(true, page);
+  }
+  else if (page === 'messages') {
+    if (!state.community.selectedFriendId) throw new Error('请先选择一位社区好友');
+    await openCommunityMessages(state.community.selectedFriendId);
+  }
+  else if (page === 'settings') setRuntimeSettingsOpen(true);
+  else if (page === 'scene') openPlaybackDiyPanel('preset');
+  else if (page === 'lyrics') openPlaybackDiyPanel('text');
+  else if (page === 'wallpaper') openPlaybackDiyPanel('wallpaper');
+  else if (page === 'rhythm-game') openPlaybackRhythmGame();
+  else throw new Error(`当前客户端没有“${requestedPage}”页面`);
+  return { ...petAssistantPlaybackSnapshot(), openedPage: page };
+}
+
+function petAssistantSetLyricMode(argumentsValue) {
+  const args = petAssistantArguments(argumentsValue);
+  const rawMode = petAssistantBoundedText(args.mode || args.preset || args.value, '歌词模式', 60).toLowerCase();
+  const mode = ({
+    关闭: 'none', 无: 'none', 单排: 'single', 单行: 'single', 多排: 'multi', 多行: 'multi',
+    双语: 'bilingual', 深度: 'depth', 流动: 'flow', 书页: 'book', 故障: 'glitch'
+  })[rawMode] || rawMode;
+  if (mode === 'single') setMultiRowLyricsEnabled(false);
+  else if (mode === 'multi') setMultiRowLyricsEnabled(true);
+  else if (mode === 'bilingual') setBilingualLyricsEnabled(true);
+  else if (mode === 'none' || TEXT_PALETTE_PRESET_IDS.includes(mode)) {
+    setTextPreset(mode, { applyTemplate: mode !== 'none' });
+  } else {
+    throw new Error(`不支持歌词模式 ${rawMode}`);
+  }
+  return {
+    mode: state.textPreset,
+    multiRow: state.multiRowLyricsEnabled === true,
+    bilingual: state.bilingualLyricsEnabled !== false,
+    offsetSeconds: lyricClockOffsetSeconds()
+  };
+}
+
+function petAssistantSetWallpaperAppearance(argumentsValue) {
+  const args = petAssistantArguments(argumentsValue);
+  let changed = false;
+  const applyPercent = (key, target, minimum, maximum) => {
+    if (args[key] === undefined) return;
+    const value = Number(args[key]);
+    if (!Number.isFinite(value)) throw new Error(`${key} 必须是数字`);
+    state[target] = clamp(value / 100, minimum, maximum);
+    changed = true;
+  };
+  applyPercent('opacity', 'wallpaperOpacity', .3, 1);
+  applyPercent('brightness', 'wallpaperBrightness', .35, 1.5);
+  applyPercent('scale', 'wallpaperScale', .7, 1);
+  if (args.blur !== undefined) {
+    const blur = Number(args.blur);
+    if (!Number.isFinite(blur)) throw new Error('blur 必须是数字');
+    state.wallpaperBlur = clamp(blur, 0, 24);
+    changed = true;
+  }
+  if (args.fit !== undefined || args.fitMode !== undefined) {
+    const requestedFit = petAssistantOptionalText(args.fit ?? args.fitMode, 20).toLowerCase();
+    const fit = ({ cover: 'fill', contain: 'fit' })[requestedFit] || requestedFit;
+    if (!WALLPAPER_FIT_MODES.has(fit)) throw new Error(`不支持壁纸适配模式 ${requestedFit}`);
+    state.wallpaperFitMode = fit;
+    changed = true;
+  }
+  if (!changed) throw new Error('请提供透明度、亮度、模糊、缩放或适配模式');
+  updateWallpaperDiyVars();
+  scheduleWallpaperAutoSize();
+  saveWallpaperPrefs({ immediate: true });
+  return {
+    opacity: Math.round(state.wallpaperOpacity * 100),
+    brightness: Math.round(state.wallpaperBrightness * 100),
+    blur: Math.round(state.wallpaperBlur),
+    scale: Math.round(state.wallpaperScale * 100),
+    fit: state.wallpaperFitMode
+  };
+}
+
+const PET_PARAMETER_CONTROL_EXCLUSIONS = /(?:password|secret|token|credential|login|account|community(?:search|message|square|profile|marketpublish)|mailbox|import|file|path|url|code|updateinstall|progress|seek)/i;
+const PET_PARAMETER_HIGH_IMPACT = /(?:gpuacceleration|directx11|xaudio2|x3daudio|renderbackend|hardwareacceleration)/i;
+const PET_PARAMETER_MEDIUM_IMPACT = /(?:renderclarity|presetfsr|recording|camera|microphone|spatial|wallpaperengine)/i;
+
+function petAssistantParameterScope(value) {
+  const text = safeText(value, '').toLowerCase();
+  if (/(?:lyric|text|translation|glitch|font)/.test(text)) return 'lyrics';
+  if (/(?:wallpaper|background)/.test(text)) return 'wallpaper';
+  if (/(?:audio|volume|sonic|sound|music)/.test(text)) return 'audio';
+  if (/(?:render|fsr|gpu|directx|clarity)/.test(text)) return 'render';
+  if (/(?:cursor|pointer|trail)/.test(text)) return 'cursor';
+  if (/(?:recording|record)/.test(text)) return 'recording';
+  if (/(?:community|message|friend)/.test(text)) return 'community';
+  if (/(?:petassistant|voice)/.test(text)) return 'pet';
+  if (/(?:achievement|ornament)/.test(text)) return 'achievement';
+  if (/(?:cube|chladni|storm|rain|fog|galaxy|fountain|scene|preset|topography)/.test(text)) return 'scene';
+  return 'appearance';
+}
+
+function petAssistantParameterPurpose(control) {
+  const aria = safeText(control.getAttribute?.('aria-label'), '');
+  if (aria) return aria.slice(0, 120);
+  const id = safeText(control.id, '');
+  const labels = Array.from(document.querySelectorAll('label'));
+  const label = labels.find((candidate) => candidate.getAttribute('for') === id)
+    || control.closest?.('label');
+  const concise = safeText(
+    label?.querySelector?.('strong, span')?.textContent || label?.textContent,
+    id
+  ).replace(/\s+/g, ' ');
+  return concise.slice(0, 120);
+}
+
+function petAssistantControlParameter(control) {
+  const id = safeText(control?.id, '');
+  if (!id || PET_PARAMETER_CONTROL_EXCLUSIONS.test(id)) return null;
+  const tag = safeText(control.tagName, '').toLowerCase();
+  const inputType = safeText(control.type, '').toLowerCase();
+  if (tag !== 'select' && !['range', 'number', 'checkbox', 'color'].includes(inputType)) return null;
+  const purpose = petAssistantParameterPurpose(control);
+  const scope = petAssistantParameterScope(`${id} ${purpose}`);
+  const feature = control.closest?.('[data-scene-feature-preset]');
+  const preset = safeText(feature?.dataset?.sceneFeaturePreset, '') || 'global';
+  const compactId = id.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+  const impact = PET_PARAMETER_HIGH_IMPACT.test(id)
+    ? 'high'
+    : PET_PARAMETER_MEDIUM_IMPACT.test(id) ? 'medium' : 'low';
+  let type = 'string';
+  let range = null;
+  let options = null;
+  if (inputType === 'checkbox') type = 'boolean';
+  else if (inputType === 'range' || inputType === 'number') {
+    type = 'number';
+    range = {
+      min: Number.isFinite(Number(control.min)) ? Number(control.min) : 0,
+      max: Number.isFinite(Number(control.max)) ? Number(control.max) : 100,
+      step: Number.isFinite(Number(control.step)) && Number(control.step) > 0 ? Number(control.step) : 1
+    };
+  } else if (inputType === 'color') {
+    type = 'color';
+  } else {
+    type = 'enum';
+    options = Array.from(control.options || []).map((option) => ({
+      value: safeText(option.value, ''),
+      label: safeText(option.textContent, option.value).slice(0, 80)
+    })).filter((option) => option.value).slice(0, 64);
+    if (!options.length) return null;
+  }
+  const get = () => type === 'boolean'
+    ? control.checked === true
+    : type === 'number' ? Number(control.value) : safeText(control.value, '');
+  const set = async (value) => {
+    if (control.disabled) {
+      const error = new Error(`${purpose} 当前不可用`);
+      error.code = 'parameter_unavailable';
+      throw error;
+    }
+    if (type === 'boolean') control.checked = value === true;
+    else control.value = String(value);
+    control.dispatchEvent(new Event('input', { bubbles: true }));
+    control.dispatchEvent(new Event('change', { bubbles: true }));
+    await Promise.resolve();
+    return get();
+  };
+  return {
+    key: `ui.${compactId}`,
+    name: purpose,
+    purpose,
+    scope,
+    category: scope,
+    preset,
+    type,
+    impact,
+    range,
+    options,
+    available: control.disabled !== true,
+    get,
+    set
+  };
+}
+
+function petAssistantSemanticParameters() {
+  return [
+    {
+      key: 'playback.volume', name: '播放音量', purpose: '调整播放器主音量', scope: 'audio', category: 'audio',
+      preset: 'global', type: 'number', impact: 'low', range: { min: 0, max: 100, step: 1 }, available: true,
+      get: () => Math.round(clamp(Number(els.audio?.volume) || 0, 0, 1) * 100),
+      set: async (value) => petAssistantSetVolume({ volume: value }).volume
+    },
+    {
+      key: 'lyrics.offset_seconds', name: '歌词时间偏移', purpose: '校准歌词相对歌曲的显示时间', scope: 'lyrics', category: 'lyrics',
+      preset: 'global', type: 'number', impact: 'low', range: { min: -3, max: 3, step: 0.05 }, available: true,
+      get: () => lyricClockOffsetSeconds(),
+      set: async (value) => { setLyricClockOffsetSeconds(value); return lyricClockOffsetSeconds(); }
+    },
+    {
+      key: 'lyrics.bilingual', name: '双语歌词', purpose: '显示或隐藏歌词翻译', scope: 'lyrics', category: 'lyrics',
+      preset: 'global', type: 'boolean', impact: 'low', range: null, available: true,
+      get: () => state.bilingualLyricsEnabled !== false,
+      set: async (value) => { setBilingualLyricsEnabled(value); return state.bilingualLyricsEnabled !== false; }
+    },
+    {
+      key: 'lyrics.multi_row', name: '多排歌词', purpose: '开启或关闭多排歌词布局', scope: 'lyrics', category: 'lyrics',
+      preset: 'global', type: 'boolean', impact: 'low', range: null, available: true,
+      get: () => state.multiRowLyricsEnabled === true,
+      set: async (value) => setMultiRowLyricsEnabled(value)
+    },
+    {
+      key: 'wallpaper.fit_mode', name: '壁纸适配', purpose: '选择壁纸填充、适应或拉伸模式', scope: 'wallpaper', category: 'wallpaper',
+      preset: 'wallpaper', type: 'enum', impact: 'low', range: null, available: true,
+      options: Array.from(WALLPAPER_FIT_MODES).map((value) => ({ value, label: value })),
+      get: () => state.wallpaperFitMode,
+      set: async (value) => petAssistantSetWallpaperAppearance({ fit: value }).fit
+    },
+    {
+      key: 'community.message_dnd', name: '社区消息免打扰', purpose: '控制社区私信气泡提醒', scope: 'community', category: 'community',
+      preset: 'global', type: 'boolean', impact: 'low', range: null, available: true,
+      get: () => state.community.messageBubbleMuted === true,
+      set: async (value) => {
+        saveCommunityMessageDnd(value);
+        renderCommunityDndButton();
+        return state.community.messageBubbleMuted === true;
+      }
+    }
+  ];
+}
+
+function petAssistantParameterEntries() {
+  const entries = new Map();
+  petAssistantSemanticParameters().forEach((entry) => entries.set(entry.key, entry));
+  document.querySelectorAll('input[id], select[id]').forEach((control) => {
+    const entry = petAssistantControlParameter(control);
+    if (entry && !entries.has(entry.key)) entries.set(entry.key, entry);
+  });
+  return Array.from(entries.values()).sort((left, right) => left.key.localeCompare(right.key, 'en'));
+}
+
+function petAssistantPublicParameter(entry, includeValue = true) {
+  const parameter = {
+    key: entry.key,
+    name: entry.name,
+    purpose: entry.purpose,
+    type: entry.type,
+    scope: entry.scope,
+    category: entry.category,
+    preset: entry.preset,
+    impact: entry.impact,
+    available: entry.available !== false
+  };
+  if (entry.range) parameter.range = { ...entry.range };
+  if (entry.options) parameter.options = entry.options.map((option) => ({ ...option }));
+  if (includeValue) parameter.currentValue = entry.get();
+  return parameter;
+}
+
+function petAssistantParameterFilters(argumentsValue = {}) {
+  const args = petAssistantArguments(argumentsValue);
+  const categories = String(args.category || args.scope || '').split(',').map((value) => value.trim()).filter(Boolean);
+  const queryText = petAssistantNormalizeLookupText(args.query || args.search || '');
+  const preset = safeText(args.preset, '');
+  const requestedKeys = Array.isArray(args.keys)
+    ? new Set(args.keys.map((key) => safeText(key, '')).filter(Boolean).slice(0, 64))
+    : null;
+  return petAssistantParameterEntries().filter((entry) => {
+    if (categories.length && !categories.includes(entry.category) && !categories.includes(entry.scope)) return false;
+    if (preset && entry.preset !== preset && entry.preset !== 'global') return false;
+    if (requestedKeys && !requestedKeys.has(entry.key)) return false;
+    if (queryText && !petAssistantNormalizeLookupText(`${entry.key} ${entry.name} ${entry.purpose}`).includes(queryText)) return false;
+    return true;
+  });
+}
+
+function petAssistantParameterPage(argumentsValue = {}, includeMetadata = true) {
+  const args = petAssistantArguments(argumentsValue);
+  const entries = petAssistantParameterFilters(args);
+  const cursor = clamp(Math.floor(Number(args.cursor) || 0), 0, entries.length);
+  const limit = clamp(Math.floor(Number(args.limit) || 16), 1, 20);
+  const page = entries.slice(cursor, cursor + limit);
+  return {
+    total: entries.length,
+    cursor,
+    limit,
+    nextCursor: cursor + page.length < entries.length ? String(cursor + page.length) : null,
+    parameters: page.map((entry) => includeMetadata
+      ? petAssistantPublicParameter(entry, true)
+      : { key: entry.key, value: entry.get(), available: entry.available !== false })
+  };
+}
+
+function petAssistantNormalizeParameterValue(entry, rawValue) {
+  if (entry.type === 'boolean') {
+    if (typeof rawValue === 'boolean') return rawValue;
+    const normalized = safeText(rawValue, '').toLowerCase();
+    if (['true', '1', 'on', 'yes', '开启', '打开'].includes(normalized)) return true;
+    if (['false', '0', 'off', 'no', '关闭'].includes(normalized)) return false;
+    throw new Error(`${entry.name} 必须是布尔值`);
+  }
+  if (entry.type === 'number') {
+    const value = Number(rawValue);
+    if (!Number.isFinite(value)) throw new Error(`${entry.name} 必须是数字`);
+    if (value < entry.range.min || value > entry.range.max) {
+      throw new Error(`${entry.name} 必须在 ${entry.range.min} 到 ${entry.range.max} 之间`);
+    }
+    const steps = Math.round((value - entry.range.min) / entry.range.step);
+    return Number((entry.range.min + steps * entry.range.step).toFixed(6));
+  }
+  const value = safeText(rawValue, '');
+  if (value.length > 160 || /(?:https?:\/\/|javascript:|<\/?script)/i.test(value)) {
+    throw new Error(`${entry.name} 的值包含不允许的网址或代码`);
+  }
+  if (entry.type === 'color' && !/^#[0-9a-f]{6}$/i.test(value)) throw new Error(`${entry.name} 必须是六位十六进制颜色`);
+  if (entry.type === 'enum' && !entry.options.some((option) => option.value === value)) {
+    throw new Error(`${entry.name} 不支持值 ${value}`);
+  }
+  return value;
+}
+
+function petAssistantParameterChanges(argumentsValue = {}) {
+  const args = petAssistantArguments(argumentsValue);
+  let rawChanges = args.changes;
+  if (!rawChanges && args.key) rawChanges = [{ key: args.key, value: args.value, delta: args.delta }];
+  if (!Array.isArray(rawChanges) && rawChanges && typeof rawChanges === 'object') {
+    rawChanges = Object.entries(rawChanges).map(([key, value]) => ({ key, value }));
+  }
+  if (!Array.isArray(rawChanges) || !rawChanges.length || rawChanges.length > 32) {
+    throw new Error('changes 必须是 1 到 32 项结构化参数变更');
+  }
+  const registry = new Map(petAssistantParameterEntries().map((entry) => [entry.key, entry]));
+  const seen = new Set();
+  return rawChanges.map((change) => {
+    if (!change || typeof change !== 'object' || Array.isArray(change)) throw new Error('参数变更格式无效');
+    const forbidden = Object.keys(change).find((key) => /(?:path|url|code|script|command)/i.test(key));
+    if (forbidden) throw new Error(`参数变更不接受 ${forbidden}`);
+    const unknown = Object.keys(change).find((key) => !['key', 'value', 'delta'].includes(key));
+    if (unknown) throw new Error(`参数变更字段 ${unknown} 不受支持`);
+    const key = safeText(change.key, '');
+    if (!/^[a-z0-9][a-z0-9._-]{1,119}$/i.test(key)) throw new Error('参数 key 无效');
+    if (seen.has(key)) throw new Error(`参数 ${key} 在同一批次中重复`);
+    seen.add(key);
+    const entry = registry.get(key);
+    if (!entry) throw new Error(`客户端未注册参数 ${key}`);
+    if (entry.available === false) throw new Error(`${entry.name} 当前不可用`);
+    const before = entry.get();
+    const rawValue = change.delta !== undefined
+      ? entry.type === 'number'
+        ? Number(before) + Number(change.delta)
+        : (() => { throw new Error(`${entry.name} 不是可增减的数字参数`); })()
+      : change.value;
+    return { key, entry, before, value: petAssistantNormalizeParameterValue(entry, rawValue) };
+  });
+}
+
+async function petAssistantApplyParameterBatch(argumentsValue = {}) {
+  const changes = petAssistantParameterChanges(argumentsValue);
+  const applied = [];
+  const attempted = [];
+  try {
+    for (const change of changes) {
+      attempted.push(change);
+      const after = await change.entry.set(change.value);
+      applied.push({
+        key: change.key,
+        name: change.entry.name,
+        impact: change.entry.impact,
+        before: change.before,
+        after
+      });
+    }
+  } catch (error) {
+    for (const change of [...attempted].reverse()) {
+      try { await change.entry.set(change.before); } catch (rollbackError) {}
+    }
+    throw error;
+  }
+  return { applied, count: applied.length };
+}
+
+function petAssistantRecommendParameters(argumentsValue = {}) {
+  const args = petAssistantArguments(argumentsValue);
+  const target = petAssistantBoundedText(args.target || args.goal || args.intent, '目标', 240);
+  const normalizedTarget = petAssistantNormalizeLookupText(target);
+  const conceptScopes = [];
+  if (/(?:歌词|文字|翻译|字幕|lyric|text)/i.test(target)) conceptScopes.push('lyrics');
+  if (/(?:壁纸|背景|wallpaper|background)/i.test(target)) conceptScopes.push('wallpaper');
+  if (/(?:声音|音量|音频|安静|audio|volume|sound)/i.test(target)) conceptScopes.push('audio');
+  if (/(?:性能|省电|流畅|画质|清晰|渲染|performance|quality|render)/i.test(target)) conceptScopes.push('render', 'scene');
+  if (/(?:场景|粒子|雨|雾|星空|scene|particle|rain|fog)/i.test(target)) conceptScopes.push('scene');
+  if (/(?:光标|鼠标|cursor)/i.test(target)) conceptScopes.push('cursor');
+  const requestedScope = safeText(args.scope || args.category, '');
+  if (requestedScope) conceptScopes.push(requestedScope);
+  const scopeSet = new Set(conceptScopes);
+  const lowering = /(?:降低|减少|关闭|省电|低功耗|安静|轻量|流畅|lower|reduce|off|quiet|performance)/i.test(target);
+  const raising = /(?:提高|增强|开启|清晰|画质|沉浸|更亮|higher|increase|on|quality|vivid)/i.test(target);
+  const includeHighImpact = args.includeHighImpact === true;
+  const candidates = petAssistantParameterEntries()
+    .filter((entry) => entry.available !== false && (includeHighImpact || entry.impact !== 'high'))
+    .map((entry) => {
+      let score = scopeSet.has(entry.scope) ? 8 : 0;
+      const haystack = petAssistantNormalizeLookupText(`${entry.key}${entry.name}${entry.purpose}`);
+      if (normalizedTarget && haystack.includes(normalizedTarget)) score += 12;
+      [...normalizedTarget].forEach((character) => { if (haystack.includes(character)) score += 0.2; });
+      return { entry, score };
+    })
+    .filter((candidate) => candidate.score > 0)
+    .sort((left, right) => right.score - left.score || left.entry.key.localeCompare(right.entry.key, 'en'));
+  const changes = [];
+  const maximum = clamp(Math.floor(Number(args.limit) || 6), 1, 8);
+  for (const { entry } of candidates) {
+    let value;
+    if (entry.type === 'number') {
+      const ratio = lowering ? 0.25 : raising ? 0.75 : 0.5;
+      value = petAssistantNormalizeParameterValue(entry, entry.range.min + (entry.range.max - entry.range.min) * ratio);
+    } else if (entry.type === 'boolean' && (lowering || raising)) {
+      value = raising;
+    } else if (entry.type === 'enum') {
+      const match = entry.options.find((option) => (
+        normalizedTarget.includes(petAssistantNormalizeLookupText(option.value))
+        || normalizedTarget.includes(petAssistantNormalizeLookupText(option.label))
+      ));
+      if (!match) continue;
+      value = match.value;
+    } else {
+      continue;
+    }
+    const before = entry.get();
+    if (Object.is(before, value)) continue;
+    changes.push({ key: entry.key, value, before, name: entry.name, impact: entry.impact });
+    if (changes.length >= maximum) break;
+  }
+  return {
+    target,
+    summary: changes.length
+      ? `根据当前参数目录，为“${target}”推荐 ${changes.length} 项可校验调整；应用前仍会按实时范围重新验证。`
+      : `当前参数目录中没有可安全自动推荐给“${target}”的调整，请补充希望提高、降低、开启或关闭的方向。`,
+    proposal: { changes: changes.map(({ key, value }) => ({ key, value })) },
+    preview: changes
+  };
+}
+
+function petAssistantRequireCommunityLogin() {
+  const profile = state.community.profile;
+  if (!profile?.feId) {
+    const error = new Error('请先登录社区');
+    error.code = 'login_required';
+    throw error;
+  }
+  return profile;
+}
+
+function petAssistantCommunityStateSnapshot() {
+  return {
+    loggedIn: !!state.community.profile?.feId,
+    provider: state.activeProvider,
+    profile: state.community.profile ? { ...state.community.profile } : null,
+    friendCount: state.community.friends.length,
+    incomingFriendRequests: state.community.friendRequests?.incoming?.length || 0,
+    outgoingFriendRequests: state.community.friendRequests?.outgoing?.length || 0,
+    unreadMailbox: state.community.mailbox.unreadCount || 0,
+    latestBroadcast: state.community.broadcastLatest ? { ...state.community.broadcastLatest } : null,
+    listenActive: !!state.community.activeSession
+  };
+}
+
+function petAssistantCommunityFriendSummary(friend = {}) {
+  return {
+    feId: safeText(friend.feId || friend.id, ''),
+    username: safeText(friend.username || friend.name, ''),
+    online: friend.online === true,
+    likes: Number(friend.likes) || 0,
+    likedByMe: friend.likedByMe === true,
+    currentSong: friend.currentSong ? {
+      id: safeText(friend.currentSong.id, ''),
+      title: safeText(friend.currentSong.title, ''),
+      artist: safeText(friend.currentSong.artist, '')
+    } : null
+  };
+}
+
+function petAssistantCommunityFriendRequestSummary(request = {}, direction = 'incoming') {
+  const peer = request.peer && typeof request.peer === 'object' ? request.peer : {};
+  return {
+    id: safeText(request.id, '').slice(0, 120),
+    direction,
+    from: safeText(request.from, '').slice(0, 8),
+    to: safeText(request.to, '').slice(0, 8),
+    createdAt: Number(request.createdAt) || 0,
+    status: safeText(request.status, 'pending').slice(0, 40),
+    peer: {
+      feId: safeText(peer.feId, direction === 'incoming' ? request.from : request.to).slice(0, 8),
+      username: safeText(peer.username || peer.name, '').slice(0, 80)
+    }
+  };
+}
+
+function petAssistantPaginate(items, argumentsValue = {}, maximum = 20) {
+  const args = petAssistantArguments(argumentsValue);
+  const list = Array.isArray(items) ? items : [];
+  const cursor = clamp(Math.floor(Number(args.cursor) || 0), 0, list.length);
+  const limit = clamp(Math.floor(Number(args.limit) || 12), 1, maximum);
+  const page = list.slice(cursor, cursor + limit);
+  return {
+    items: page,
+    total: list.length,
+    cursor,
+    limit,
+    nextCursor: cursor + page.length < list.length ? String(cursor + page.length) : null
+  };
+}
+
+async function petAssistantCommunityFriendsQuery(argumentsValue = {}) {
+  const args = petAssistantArguments(argumentsValue);
+  petAssistantRequireCommunityLogin();
+  if (args.refresh === true) await refreshCommunityState(state.activeProvider);
+  const queryText = petAssistantNormalizeLookupText(args.query || args.search || args.name || args.feId || '');
+  const friends = state.community.friends
+    .map(petAssistantCommunityFriendSummary)
+    .filter((friend) => !queryText || petAssistantNormalizeLookupText(`${friend.feId} ${friend.username}`).includes(queryText));
+  const page = petAssistantPaginate(friends, args, 8);
+  const requests = normalizeCommunityFriendRequests(state.community.friendRequests);
+  return {
+    friends: page.items,
+    total: page.total,
+    cursor: page.cursor,
+    limit: page.limit,
+    nextCursor: page.nextCursor,
+    requests: {
+      incoming: requests.incoming.slice(0, 6).map((request) => petAssistantCommunityFriendRequestSummary(request, 'incoming')),
+      outgoing: requests.outgoing.slice(0, 6).map((request) => petAssistantCommunityFriendRequestSummary(request, 'outgoing'))
+    }
+  };
+}
+
+async function petAssistantCommunityUserQuery(argumentsValue = {}) {
+  const args = petAssistantArguments(argumentsValue);
+  petAssistantRequireCommunityLogin();
+  const feId = petAssistantBoundedText(args.feId || args.targetId || args.id, 'FE ID', 8);
+  if (!/^\d{8}$/.test(feId)) throw new Error('用户 FE ID 必须是 8 位数字');
+  if (feId === safeText(state.community.profile?.feId, '')) return { user: { ...state.community.profile }, self: true };
+  const local = communityFriendById(feId);
+  if (local && args.refresh !== true) return { user: petAssistantCommunityFriendSummary(local), friend: true };
+  const payload = await apiJson(`/api/community/user?${query({ provider: state.activeProvider, id: feId })}`);
+  return { user: payload.user || payload.profile || null, friend: !!local };
+}
+
+async function petAssistantCommunityMessagesQuery(argumentsValue = {}) {
+  const args = petAssistantArguments(argumentsValue);
+  petAssistantRequireCommunityLogin();
+  const targetId = petAssistantBoundedText(args.targetId || args.feId || args.id, '私信对象', 8);
+  if (!/^\d{8}$/.test(targetId)) throw new Error('私信对象必须是 8 位 FE ID');
+  const peer = await resolveCommunityMessagePeer(targetId);
+  if (!peer) throw new Error('未找到私信对象');
+  const payload = await apiJson(`/api/community/messages?${query({ provider: state.activeProvider, targetId })}`);
+  const messages = dedupeCommunityMessages(payload.messages).map((message) => ({
+      id: safeText(message.id, ''),
+      from: safeText(message.from, ''),
+      to: safeText(message.to, ''),
+      text: safeText(message.text, '').slice(0, 500),
+      sentAt: Number(message.sentAt) || 0
+    }));
+  const page = petAssistantPaginate(messages, args, 6);
+  return { peer, messages: page.items, total: page.total, cursor: page.cursor, limit: page.limit, nextCursor: page.nextCursor };
+}
+
+async function petAssistantCommunityMailboxQuery(argumentsValue = {}) {
+  petAssistantRequireCommunityLogin();
+  await refreshCommunityMailbox();
+  if (state.community.mailbox.lastError) throw new Error(state.community.mailbox.lastError);
+  const mails = state.community.mailbox.mails.map((mail) => ({
+      id: safeText(mail.id, '').slice(0, 120),
+      title: safeText(mail.title, '').slice(0, 160),
+      text: safeText(mail.text || mail.content || mail.description, '').slice(0, 500),
+      read: mail.read === true,
+      expired: mail.expired === true,
+      createdAt: mail.createdAt,
+      attachments: mail.attachments.slice(0, 12).map((attachment) => ({
+        id: safeText(attachment.id, '').slice(0, 120),
+        type: safeText(attachment.type, '').slice(0, 40),
+        label: safeText(attachment.label, '').slice(0, 160),
+        claimed: attachment.claimed,
+        supported: attachment.supported
+      }))
+    }));
+  const page = petAssistantPaginate(mails, argumentsValue, 2);
+  return {
+    unreadCount: state.community.mailbox.unreadCount,
+    mails: page.items,
+    total: page.total,
+    cursor: page.cursor,
+    limit: page.limit,
+    nextCursor: page.nextCursor
+  };
+}
+
+async function petAssistantCommunityMailboxClaim(argumentsValue = {}) {
+  const args = petAssistantArguments(argumentsValue);
+  petAssistantRequireCommunityLogin();
+  if (!state.community.mailbox.mails.length) await refreshCommunityMailbox();
+  const mailId = petAssistantBoundedText(args.mailId || args.id, '邮件', 120);
+  const mail = state.community.mailbox.mails.find((item) => item.id === mailId);
+  if (!mail) throw new Error('未找到这封社区邮件');
+  const requestedAttachment = safeText(args.attachmentId, '');
+  const attachment = requestedAttachment
+    ? mail.attachments.find((item) => item.id === requestedAttachment)
+    : mail.attachments.find((item) => !item.claimed && item.supported);
+  if (!attachment) throw new Error('邮件中没有可领取的受支持附件');
+  state.community.mailbox.lastError = '';
+  await claimCommunityMailboxAttachment(mail.id, attachment.id);
+  if (state.community.mailbox.lastError) throw new Error(state.community.mailbox.lastError);
+  return { mailId: mail.id, attachmentId: attachment.id, claimed: attachment.claimed === true };
+}
+
+async function petAssistantCommunityListenReportQuery() {
+  petAssistantRequireCommunityLogin();
+  await refreshCommunityListenReport();
+  return {
+    report: state.community.togetherReport,
+    partners: communityTogetherPartners()
+  };
+}
+
+async function petAssistantServerUpdateCheck() {
+  const [installed, release] = await Promise.all([
+    apiJson('/api/app/version'),
+    apiJson('/api/update/latest')
+  ]);
+  const available = !!release?.version && compareClientVersions(release.version, installed.version) > 0;
+  if (available) setAvailableClientUpdate({ ...release, source: 'server' });
+  return { installedVersion: safeText(installed.version, ''), available, release: available ? release : null };
+}
+
+async function petAssistantServerUpdateOpen() {
+  const status = await petAssistantServerUpdateCheck();
+  if (!status.available || !state.update.release) return status;
+  showUpdateDialog(state.update.release);
+  return { ...status, opened: true };
+}
+
+function registerPetAssistantAppCommands() {
+  const commands = window.FeMonsterAppCommands;
+  if (!commands) throw new Error('通用程序命令模块没有加载');
+  commands.registerMany([
+    {
+      command: 'app.capabilities.query', category: 'read', readOnly: true,
+      title: '读取可用程序命令', description: '分页读取客户端当前注册的安全命令目录，可按关键词或类别筛选。',
+      parameters: { query: 'string?', category: 'string?', cursor: 'number?', limit: 'number 1..20?' },
+      handler: (args) => commands.capabilities(args)
+    },
+    {
+      command: 'app.context.query', aliases: ['app.state.query', 'client.context.query'],
+      category: 'read', readOnly: true, title: '读取客户端实时上下文',
+      description: '读取当前页面、播放队列、歌词、预设参数、登录平台、设置与连接状态的脱敏快照。',
+      handler: () => window.FeMonsterPetClientContext?.snapshot?.() || petAssistantClientContextSnapshot()
+    },
+    {
+      command: 'ui.controls.query', aliases: ['ui.controls.list'], category: 'read', readOnly: true,
+      title: 'Read visible controls',
+      description: 'Returns only visible, enabled, non-sensitive FE Monster controls with stable control IDs.',
+      parameters: { query: 'string?', cursor: 'number?', limit: 'number 1..50?' },
+      handler: (args) => petAssistantUiTools.query(args)
+    },
+    {
+      command: 'ui.control.click', category: 'navigation',
+      title: 'Click a verified control',
+      description: 'Clicks only a safe control from the immediately preceding controls query while it remains visible.',
+      parameters: { controlId: 'string' }, requiredParameterGroups: [['controlId']],
+      handler: (args) => petAssistantUiTools.click(args)
+    },
+    {
+      command: 'ui.key.press', category: 'navigation',
+      title: 'Press a navigation key',
+      description: 'Sends one finite navigation key to the focused FE Monster app window.',
+      parameters: { key: 'ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Home|End|PageUp|PageDown|Tab|Enter|Escape|Space' },
+      requiredParameterGroups: [['key']], handler: (args) => petAssistantUiTools.pressKey(args)
+    },
+    {
+      command: 'app.parameters.catalog.query', aliases: ['app.parameters.list'], category: 'read', readOnly: true,
+      title: '读取客户端参数目录',
+      description: '分页读取真实注册参数的名称、用途、类型、范围、影响等级与当前值；支持 category/query/preset/cursor/limit。',
+      parameters: { category: 'string?', query: 'string?', preset: 'string?', cursor: 'number?', limit: 'number 1..20?' },
+      handler: (args) => petAssistantParameterPage(args, true)
+    },
+    {
+      command: 'app.parameters.current.query', aliases: ['app.parameters.get'], category: 'read', readOnly: true,
+      title: '读取客户端参数当前值',
+      description: '按 scope/category、keys、preset 或分页游标读取参数实时值。',
+      parameters: { scope: 'string?', keys: 'string[]?', preset: 'string?', cursor: 'number?', limit: 'number 1..20?' },
+      handler: (args) => petAssistantParameterPage(args, false)
+    },
+    {
+      command: 'app.parameters.recommend.query', aliases: ['app.parameters.recommend', 'app.parameters.plan.recommend'],
+      category: 'read', readOnly: true, title: '按目标推荐参数方案',
+      description: '只从实时参数目录和真实范围生成小型可读方案，不会自动应用。',
+      parameters: { target: 'string', scope: 'string?', limit: 'number 1..8?', includeHighImpact: 'boolean?' },
+      handler: petAssistantRecommendParameters
+    },
+    {
+      command: 'app.parameters.batch.apply', aliases: ['app.parameters.apply'], category: 'settings',
+      title: '批量应用客户端参数',
+      description: '批量设置或增减已注册参数；拒绝 path/url/code，复用现有设置事件与持久化并返回 before/after。',
+      parameters: { changes: '[{key,value|delta}]' },
+      handler: petAssistantApplyParameterBatch
+    },
+    {
+      command: 'pet.mascot.visibility.query', aliases: ['pet.visibility.query'], category: 'read', readOnly: true,
+      title: '读取桌宠显示状态', description: '读取当前页面中小 Fe 形象是否显示，以及是否处于原生桌宠窗口。',
+      handler: () => {
+        const assistant = window.FeMonsterPetAssistant;
+        return assistant?.visibility?.() || {
+          visible: document.getElementById('petAssistant')?.hidden !== true,
+          desktopMode: document.documentElement.getAttribute('data-fe-client') === 'desktop-pet'
+        };
+      }
+    },
+    {
+      command: 'pet.mascot.visibility.set', aliases: ['pet.visibility.set'], category: 'appearance',
+      title: '显示或隐藏桌宠形象', description: '隐藏后保留页面恢复按钮；原生桌宠窗口隐藏后可从系统托盘恢复。',
+      parameters: { visible: 'boolean' },
+      requiredParameterGroups: [['visible', 'enabled', 'value']], handler: async (args) => {
+        const visible = petAssistantBoolean(args.visible ?? args.enabled ?? args.value, true);
+        const assistant = window.FeMonsterPetAssistant;
+        if (!assistant?.setVisible) throw new Error('桌宠显示控制尚未就绪');
+        await assistant.setVisible(visible);
+        return assistant.visibility();
+      }
+    },
+    {
+      command: 'pet.desktop.mode.query', aliases: ['pet.desktop.query'], category: 'read', readOnly: true,
+      title: '读取原生桌宠模式', description: '读取当前 Windows 原生桌宠窗口的真实启用与显示状态；浏览器会明确返回不支持。',
+      handler: petAssistantDesktopStateQuery
+    },
+    {
+      command: 'pet.desktop.mode.set', category: 'appearance',
+      title: '切换原生桌宠模式', description: '在主窗口与透明置顶桌宠窗口之间重挂载同一个 WebView2；浏览器不支持。',
+      parameters: { enabled: 'boolean' },
+      requiredParameterGroups: [['enabled', 'value']], handler: petAssistantSetDesktopMode
+    },
+    {
+      command: 'pet.desktop.visibility.set', category: 'appearance',
+      title: '显示或隐藏原生桌宠窗口', description: '控制原生桌宠小窗；隐藏后始终可从 Windows 系统托盘恢复。',
+      parameters: { visible: 'boolean' },
+      requiredParameterGroups: [['visible', 'enabled', 'value']], handler: petAssistantSetDesktopVisibility
+    },
+    {
+      command: 'pet.desktop.position.query', category: 'read', readOnly: true,
+      title: 'Read desktop pet position',
+      description: 'Returns native pixel bounds, work area and normalized desktop position.',
+      handler: petAssistantDesktopPositionQuery
+    },
+    {
+      command: 'pet.desktop.position.set', category: 'appearance',
+      title: 'Move desktop pet smoothly',
+      description: 'Glides the native desktop pet to a named anchor or clamped work-area percentages.',
+      parameters: { anchor: 'string?', xPercent: 'number 0..1?', yPercent: 'number 0..1?', durationMs: 'number 250..1200?' },
+      requiredParameterGroups: [['anchor', 'xPercent']], handler: petAssistantDesktopPositionSet
+    },
+    {
+      command: 'pet.desktop.position.smart', category: 'appearance',
+      title: 'Place desktop pet intelligently',
+      description: 'Moves the pet to the opposite lower corner so it stays visible without covering its current side.',
+      parameters: { durationMs: 'number 250..1200?' }, handler: petAssistantDesktopPositionSmart
+    },
+    {
+      command: 'pet.desktop.show', category: 'appearance', title: '显示原生桌宠窗口',
+      description: '显示 Windows 原生桌宠小窗；若模式尚未启用则进入桌宠模式。',
+      handler: () => requestNativeDesktopPet('show')
+    },
+    {
+      command: 'pet.desktop.hide', category: 'appearance', title: '隐藏原生桌宠窗口',
+      description: '隐藏 Windows 原生桌宠小窗，并保留系统托盘恢复入口。',
+      handler: () => requestNativeDesktopPet('hide')
+    },
+    {
+      command: 'player.state.query', aliases: ['playback.progress.query'], category: 'read', readOnly: true,
+      title: '读取播放状态', description: '读取当前歌曲、真实媒体进度、时长、剩余时间、队列位置、音量、场景与页面。',
+      handler: petAssistantPlaybackSnapshot
+    },
+    {
+      command: 'playback.progress.watch.start', category: 'read', readOnly: true,
+      title: '开始监看播放进度', description: '注册一个本机临时进度监看并立即返回，不会创建持久自动化。',
+      parameters: { songId: 'current song id?' },
+      handler: (args) => ensurePlaybackIntelligence().execute('playback.progress.watch.start', args)
+    },
+    {
+      command: 'playback.progress.watch.stop', category: 'read', readOnly: true,
+      title: '停止监看播放进度', description: '停止指定的本机临时进度监看，并返回最后一次进度快照。',
+      parameters: { watchId: 'progress watch id' },
+      handler: (args) => ensurePlaybackIntelligence().execute('playback.progress.watch.stop', args)
+    },
+    {
+      command: 'player.queue.query', category: 'read', readOnly: true,
+      title: '分页读取播放队列', description: '分页读取真实播放队列，避免把大型歌单一次性传给桌宠。',
+      parameters: { cursor: 'number?', limit: 'number 1..50?' },
+      handler: (args) => ensurePlaybackIntelligence().execute('queue.query', args)
+    },
+    {
+      command: 'playlist.query', aliases: ['playlist.catalog.query', 'music.playlist.query', 'music.playlist.catalog.query'], category: 'read', readOnly: true,
+      title: '查询歌单', description: '按名称、平台或歌单 ID 分页查询当前账号可用歌单。',
+      parameters: { query: 'string?', cursor: 'number?', limit: 'number 1..50?' },
+      handler: (args) => ensurePlaybackIntelligence().execute('playlist.query', args)
+    },
+    {
+      command: 'playlist.play', aliases: ['music.playlist.play'], category: 'music',
+      title: '播放歌单歌曲', description: '按歌单精确名称或 ID 播放指定序号歌曲；重名时必须使用 ID，不会猜测。',
+      parameters: { playlist: 'exact playlist name or id', index: 'zero-based number?' },
+      handler: (args) => ensurePlaybackIntelligence().execute('playlist.play', args)
+    },
+    {
+      command: 'playback.automation.rule.query', aliases: [
+        'playback.automation.rules.query',
+        'automation.query',
+        'automation.rule.query',
+        'automation.rules.query'
+      ], category: 'read', readOnly: true,
+      title: '查询播放自动化', description: '分页读取本机当前账号的播放自动化规则。',
+      parameters: { cursor: 'number?', limit: 'number 1..50?', includeArchived: 'boolean?' },
+      handler: (args) => ensurePlaybackIntelligence().execute('automation.rule.query', args)
+    },
+    {
+      command: 'playback.automation.rule.create', aliases: ['automation.create', 'automation.rule.create'], category: 'playback',
+      title: '创建播放自动化', description: '创建由真实音乐进度事件触发的本地持久规则，动作仍通过安全程序命令执行。',
+      parameters: { title: 'string?', trigger: '{type:"progress",atSeconds|atPercent,songId?} or {type:"event",event}', action: '{command,parameters}', once: 'boolean?' },
+      handler: (args, context) => ensurePlaybackIntelligence().execute('automation.rule.create', args, context)
+    },
+    ...['enable', 'disable', 'archive'].map((operation) => ({
+      command: `playback.automation.rule.${operation}`,
+      aliases: [`automation.${operation}`, `automation.rule.${operation}`],
+      category: 'playback',
+      title: operation === 'enable' ? '启用播放自动化' : operation === 'disable' ? '暂停播放自动化' : '归档播放自动化',
+      description: operation === 'archive' ? '软归档规则并停止执行，保留审计信息。' : '更改本地持久播放自动化的启用状态。',
+      parameters: { id: 'automation rule id' },
+      handler: (args, context) => ensurePlaybackIntelligence().execute(`automation.rule.${operation}`, args, context)
+    })),
+    {
+      command: 'pet.habits.query', aliases: ['pet.listening.habits.query'], category: 'read', readOnly: true,
+      title: '读取听歌习惯摘要', description: '读取按当前账号隔离的有界聚合习惯；至少三次证据才形成偏好，不保存原始历史。',
+      handler: () => ensurePlaybackIntelligence().execute('habit.summary')
+    },
+    {
+      command: 'pet.weekly.summary.query', aliases: ['pet.weekly.query'], category: 'read', readOnly: true,
+      title: '读取本周听歌总结', description: '读取本机按账号和自然周汇总的听歌首数与最晚深夜时间。',
+      handler: () => window.FeMonsterPetCompanionP2?.weeklySummary?.() || {
+        songCount: 0,
+        text: '这周还没听歌，等你来开场。'
+      }
+    },
+    {
+      command: 'pet.weekly.summary.show', category: 'pet',
+      title: '显示本周听歌总结', description: '让桌宠显示本周一句听歌总结。',
+      handler: () => window.FeMonsterPetCompanionP2?.showWeeklySummary?.() || {
+        songCount: 0,
+        text: '这周还没听歌，等你来开场。'
+      }
+    },
+    {
+      command: 'playback.play', aliases: ['play'], category: 'playback',
+      title: '播放', description: '继续播放当前歌曲。',
+      handler: async () => {
+        if (!els.audio?.src && !state.currentSong && !state.queue.length) throw new Error('播放栏暂无歌曲');
+        if (els.audio.paused || els.audio.ended) await togglePlay();
+        return petAssistantPlaybackSnapshot();
+      }
+    },
+    {
+      command: 'playback.pause', aliases: ['pause'], category: 'playback',
+      title: '暂停', description: '暂停当前歌曲。',
+      handler: async () => {
+        if (els.audio?.src && !els.audio.paused) await togglePlay();
+        return petAssistantPlaybackSnapshot();
+      }
+    },
+    {
+      command: 'playback.toggle', category: 'playback', title: '切换播放状态',
+      description: '在播放和暂停之间切换。', handler: async () => {
+        await togglePlay();
+        return petAssistantPlaybackSnapshot();
+      }
+    },
+    {
+      command: 'playback.next', aliases: ['next'], category: 'playback', title: '下一曲',
+      description: '切换到下一首歌曲。', handler: async (_args, context) => {
+        const executeNext = async () => {
+          if (await transport('/api/player/next') === false) throw new Error('无法切换到下一首');
+          return petAssistantPlaybackSnapshot();
+        };
+        const companion = window.FeMonsterPetCompanionP2;
+        if (!companion?.runNext) return executeNext();
+        return companion.runNext({
+          source: safeText(context?.source, 'app'),
+          snapshot: petAssistantPlaybackSnapshot(),
+          execute: executeNext
+        });
+      }
+    },
+    {
+      command: 'playback.previous', aliases: ['previous'], category: 'playback', title: '上一曲',
+      description: '切换到上一首歌曲。', handler: async () => {
+        if (await transport('/api/player/previous') === false) throw new Error('无法切换到上一首');
+        return petAssistantPlaybackSnapshot();
+      }
+    },
+    {
+      command: 'playback.volume.set', aliases: ['set_volume'], category: 'playback',
+      title: '设置音量', description: '把音量设置为 0 到 100。',
+      parameters: { volume: 'number 0..100' }, handler: (args) => petAssistantSetVolume(args)
+    },
+    {
+      command: 'playback.volume.adjust', category: 'playback', title: '增减音量',
+      description: '按百分点提高或降低音量。', parameters: { delta: 'number -100..100' },
+      handler: (args) => petAssistantSetVolume(args, true)
+    },
+    {
+      command: 'playback.seek', category: 'playback', title: '调整播放进度',
+      description: '跳转到歌曲中的秒数。', parameters: { seconds: 'number' }, handler: async (args) => {
+        const seconds = Number(args.seconds ?? args.position);
+        if (!Number.isFinite(seconds) || seconds < 0) throw new Error('播放进度必须是非负秒数');
+        const duration = Number(els.audio?.duration);
+        const target = Number.isFinite(duration) && duration > 0 ? clamp(seconds, 0, duration) : seconds;
+        els.audio.currentTime = target;
+        await apiJson(`/api/player/seek?${query({ position: Math.round(target) })}`).catch(() => {});
+        return { ...petAssistantPlaybackSnapshot(), positionSeconds: target };
+      }
+    },
+    {
+      command: 'music.search', category: 'music', readOnly: true, title: '搜索歌曲',
+      description: '按歌名、歌手、别名或近似文本搜索歌曲。',
+      handler: async (args) => {
+        const { request, songs } = await petAssistantSearchSongs(args, 12);
+        state.searchSuggestions.query = request.query;
+        state.searchSuggestions.songs = songs;
+        renderSearchSuggestions();
+        return { query: request.query, songs: songs.map(petAssistantSongSummary) };
+      }
+    },
+    {
+      command: 'music.search.play', aliases: ['music.search_and_play', 'music.play', 'search_and_play', 'play_song'], category: 'music',
+      title: '搜索并播放歌曲', description: '容错搜索歌手和歌名，并播放最佳匹配。',
+      handler: petAssistantSearchAndPlayFuzzy
+    },
+    {
+      command: 'music.play.similar', aliases: ['play_similar'], category: 'music',
+      title: '播放类似歌曲', description: '以指定歌曲或当前歌曲为参考播放相似歌曲。',
+      handler: petAssistantPlaySimilar
+    },
+    {
+      command: 'navigation.open', aliases: ['open_page'], category: 'navigation',
+      title: '打开页面', description: '打开客户端或社区中的只读页面。', handler: petAssistantOpenPage
+    },
+    {
+      command: 'community.page.open', aliases: ['open_community_page', 'open_community_tab'], category: 'navigation',
+      title: '打开社区页面', description: '打开个人资料、广场、邮箱、报告、市场、成就或挂饰页面。',
+      handler: (args) => petAssistantOpenPage({ page: args.page || args.tab || 'community' })
+    },
+    {
+      command: 'community.state.query', aliases: ['community.query'], category: 'read', readOnly: true,
+      title: '读取社区状态', description: '读取当前登录、好友、邮箱、广播与一起听摘要。',
+      handler: async (args) => {
+        if (args.refresh === true) await refreshCommunityState(state.activeProvider);
+        return petAssistantCommunityStateSnapshot();
+      }
+    },
+    {
+      command: 'community.friends.query', aliases: ['community.friends.search', 'community.friend.list'], category: 'read', readOnly: true,
+      title: '列出或搜索社区好友', description: '按 FE ID 或昵称读取已确认好友及待确认申请。',
+      parameters: { query: 'string?', refresh: 'boolean?' }, handler: petAssistantCommunityFriendsQuery
+    },
+    {
+      command: 'community.user.query', category: 'read', readOnly: true,
+      title: '读取社区用户', description: '按 8 位 FE ID 读取社区用户资料。',
+      parameters: { feId: '8 digit string' }, handler: petAssistantCommunityUserQuery
+    },
+    {
+      command: 'community.friend.request.send', aliases: ['community.friend.request', 'community.friend.add'], category: 'social',
+      title: '发送好友申请', description: '通过现有好友申请流程发送请求，不会跳过对方确认。',
+      parameters: { targetId: '8 digit FE ID' }, handler: async (args) => {
+        const targetId = petAssistantBoundedText(args.targetId || args.feId || args.id, '好友 FE ID', 8);
+        const payload = await addCommunityFriendById(targetId);
+        return { status: payload.status || 'requested', targetId };
+      }
+    },
+    {
+      command: 'community.friend.request.respond', category: 'social',
+      title: '处理好友申请', description: '仅能接受或忽略当前待确认列表中的真实好友申请。',
+      parameters: { requestId: 'string', accepted: 'boolean' },
+      requiredParameterGroups: [['requestId', 'id'], ['accepted']], handler: async (args) => {
+        const requestId = petAssistantBoundedText(args.requestId || args.id, '好友申请', 120);
+        const accepted = petAssistantBoolean(args.accepted, false);
+        await respondCommunityFriendRequest(requestId, accepted, { throwOnError: true });
+        return { requestId, accepted };
+      }
+    },
+    {
+      command: 'community.friend.request.accept', aliases: ['community.friend.accept'], category: 'social',
+      title: '接受好友申请', description: '接受当前待确认列表中的真实好友申请。',
+      handler: async (args) => {
+        const requestId = petAssistantBoundedText(args.requestId || args.id, '好友申请', 120);
+        await respondCommunityFriendRequest(requestId, true, { throwOnError: true });
+        return { requestId, accepted: true };
+      }
+    },
+    {
+      command: 'community.friend.request.reject', aliases: ['community.friend.reject'], category: 'social',
+      title: '忽略好友申请', description: '忽略当前待确认列表中的真实好友申请。',
+      handler: async (args) => {
+        const requestId = petAssistantBoundedText(args.requestId || args.id, '好友申请', 120);
+        await respondCommunityFriendRequest(requestId, false, { throwOnError: true });
+        return { requestId, accepted: false };
+      }
+    },
+    {
+      command: 'community.friend.like', category: 'social',
+      title: '点赞社区好友', description: '只通过现有好友点赞接口点赞已确认的社区好友。',
+      handler: async (args) => {
+        const targetId = petAssistantBoundedText(args.targetId || args.feId, '好友', 8);
+        const payload = await likeCommunityFriend(targetId, { throwOnError: true });
+        return { targetId, liked: true, friend: payload.friends?.find((friend) => String(friend.feId) === targetId) || null };
+      }
+    },
+    {
+      command: 'community.messages.query', aliases: ['community.messages.list'], category: 'read', readOnly: true,
+      title: '读取社区私信', description: '按 FE ID 读取与指定用户的私信列表。',
+      parameters: { targetId: '8 digit FE ID' }, handler: petAssistantCommunityMessagesQuery
+    },
+    {
+      command: 'community.message.send', aliases: ['community.messages.send'], category: 'social',
+      title: '发送社区私信', description: '通过现有私信业务接口向指定 FE ID 发送最多 500 字消息。',
+      parameters: { targetId: '8 digit FE ID', text: 'string 1..500' }, handler: async (args) => {
+        const targetId = petAssistantBoundedText(args.targetId || args.feId, '私信对象', 8);
+        const text = petAssistantBoundedText(args.text || args.message, '私信内容', 500);
+        const payload = await sendCommunityMessageTo(targetId, text);
+        return { targetId, message: payload.message || null, sent: true };
+      }
+    },
+    {
+      command: 'community.square.query', aliases: ['community.square.list'], category: 'read', readOnly: true,
+      title: '读取社交广场', description: '分页读取社交广场当前公开发言。', handler: async (args) => {
+        if (!window.FeCreativeCommunity?.refreshSquare) throw new Error('社交广场模块尚未就绪');
+        const messages = (await window.FeCreativeCommunity.refreshSquare()).map((message) => {
+          const author = message.author || message.user || {};
+          return {
+            id: safeText(message.id, '').slice(0, 120),
+            text: safeText(message.text || message.content, '').slice(0, 500),
+            createdAt: Number(message.createdAt || message.sentAt) || 0,
+            author: {
+              feId: safeText(author.feId || message.feId || message.from, '').slice(0, 8),
+              username: safeText(author.username || author.name || message.username, '').slice(0, 80)
+            }
+          };
+        });
+        const page = petAssistantPaginate(messages, args, 6);
+        return { messages: page.items, total: page.total, cursor: page.cursor, limit: page.limit, nextCursor: page.nextCursor };
+      }
+    },
+    {
+      command: 'community.square.post', aliases: ['community.square.send'], category: 'social',
+      title: '在社交广场发言', description: '通过现有广场接口发布最多 500 字的公开发言。',
+      parameters: { text: 'string 1..500' }, handler: async (args) => {
+        if (!window.FeCreativeCommunity?.postSquareMessage) throw new Error('社交广场模块尚未就绪');
+        return window.FeCreativeCommunity.postSquareMessage({ text: petAssistantBoundedText(args.text || args.message, '广场发言', 500) });
+      }
+    },
+    {
+      command: 'community.market.query', aliases: ['community.market.list', 'community.market.search'], category: 'read', readOnly: true,
+      title: '列出或搜索创作市场', description: '按关键词与作品类型读取创作市场真实作品。',
+      parameters: { query: 'string?', type: 'string?' }, handler: async (args) => {
+        if (!window.FeCreativeCommunity?.searchMarket) throw new Error('创作市场模块尚未就绪');
+        const items = await window.FeCreativeCommunity.searchMarket(args);
+        const page = petAssistantPaginate(items, args, 8);
+        return { items: page.items, total: page.total, cursor: page.cursor, limit: page.limit, nextCursor: page.nextCursor };
+      }
+    },
+    {
+      command: 'community.market.open', category: 'navigation',
+      title: '打开创作市场', description: '打开创作市场页面，可携带搜索词。', handler: async (args) => {
+        setCommunityProfileOpen(true, 'market');
+        if (args.query && window.FeCreativeCommunity?.searchMarket) await window.FeCreativeCommunity.searchMarket(args);
+        return { opened: true, page: 'market' };
+      }
+    },
+    {
+      command: 'community.market.work.publish', aliases: ['community.market.publish'], category: 'social',
+      title: '发布创作市场作品',
+      description: '使用发布页当前选择的本地文件走既有格式、大小、预览和分段上传校验；缺少文件时保留草稿并返回 file_required。',
+      parameters: { type: 'wallpaper|character|cursor|cursor-trail|music', title: 'string', description: 'string?', tags: 'string[]?' },
+      handler: async (args) => {
+        if (!window.FeCreativeCommunity?.publishWork) throw new Error('创作市场模块尚未就绪');
+        return window.FeCreativeCommunity.publishWork(args);
+      }
+    },
+    {
+      command: 'community.market.work.like', aliases: ['community.market.like'], category: 'social',
+      title: '点赞创作市场作品', description: '通过现有作品点赞接口切换点赞状态。',
+      handler: async (args) => {
+        if (!window.FeCreativeCommunity?.likeWork) throw new Error('创作市场模块尚未就绪');
+        return window.FeCreativeCommunity.likeWork(petAssistantBoundedText(args.workId || args.id, '作品', 120));
+      }
+    },
+    {
+      command: 'community.market.work.comment', aliases: ['community.market.comment'], category: 'social',
+      title: '评论创作市场作品', description: '通过现有评论接口发布最多 500 字评论。',
+      handler: async (args) => {
+        if (!window.FeCreativeCommunity?.commentWork) throw new Error('创作市场模块尚未就绪');
+        return window.FeCreativeCommunity.commentWork(
+          petAssistantBoundedText(args.workId || args.id, '作品', 120),
+          petAssistantBoundedText(args.text || args.comment, '评论', 500)
+        );
+      }
+    },
+    {
+      command: 'community.market.work.share', aliases: ['community.market.share'], category: 'social',
+      title: '分享创作市场作品', description: '只能把作品分享给已经确认的社区好友。',
+      handler: async (args) => {
+        if (!window.FeCreativeCommunity?.shareWork) throw new Error('创作市场模块尚未就绪');
+        return window.FeCreativeCommunity.shareWork(
+          petAssistantBoundedText(args.workId || args.id, '作品', 120),
+          petAssistantBoundedText(args.targetId || args.feId, '好友', 8)
+        );
+      }
+    },
+    {
+      command: 'community.market.work.use', category: 'social',
+      title: '应用创作市场作品', description: '通过现有下载、格式验证与安装函数应用市场作品。',
+      handler: async (args) => {
+        if (!window.FeCreativeCommunity?.installWorkById) throw new Error('创作市场模块尚未就绪');
+        return window.FeCreativeCommunity.installWorkById(petAssistantBoundedText(args.workId || args.id, '作品', 120));
+      }
+    },
+    {
+      command: 'community.profile.query', aliases: ['community.profile.get'], category: 'read', readOnly: true,
+      title: '读取社区个人资料', description: '读取自己的资料，或按 FE ID 读取其他用户资料。',
+      handler: (args) => args.feId || args.targetId ? petAssistantCommunityUserQuery(args) : ({ profile: { ...petAssistantRequireCommunityLogin() } })
+    },
+    {
+      command: 'community.profile.update', category: 'social',
+      title: '更新社区个人资料', description: '更新个人描述，或佩戴已领取的客户端成就挂饰。',
+      parameters: { bio: 'string 0..180?', avatarOrnament: 'registered achievement id?' }, handler: updateCommunityProfileData
+    },
+    {
+      command: 'community.profile.open', category: 'navigation',
+      title: '打开社区个人主页', description: '打开自己的资料页或指定 FE ID 的公开主页。', handler: async (args) => {
+        const feId = safeText(args.feId || args.targetId, '');
+        if (feId) {
+          if (!window.FeCreativeCommunity?.openUserProfile) throw new Error('社区主页模块尚未就绪');
+          await window.FeCreativeCommunity.openUserProfile(feId);
+        } else {
+          setCommunityProfileOpen(true, 'self');
+        }
+        return { opened: true, feId: feId || safeText(state.community.profile?.feId, '') };
+      }
+    },
+    {
+      command: 'community.mailbox.query', aliases: ['community.mailbox.list'], category: 'read', readOnly: true,
+      title: '读取社区邮箱', description: '列出社区邮件及受支持附件状态。', handler: petAssistantCommunityMailboxQuery
+    },
+    {
+      command: 'community.mailbox.read', category: 'social',
+      title: '标记社区邮件已读', description: '通过现有邮箱业务接口标记指定邮件已读。', handler: async (args) => {
+        const mailId = petAssistantBoundedText(args.mailId || args.id, '邮件', 120);
+        state.community.mailbox.lastError = '';
+        await markCommunityMailboxRead(mailId);
+        if (state.community.mailbox.lastError) throw new Error(state.community.mailbox.lastError);
+        return { mailId, read: true };
+      }
+    },
+    {
+      command: 'community.mailbox.claim', category: 'social',
+      title: '领取社区邮件附件', description: '仅领取邮箱中已注册且客户端支持的真实奖励附件，并复用既有应用校验。',
+      parameters: { mailId: 'string', attachmentId: 'string?' }, handler: petAssistantCommunityMailboxClaim
+    },
+    {
+      command: 'community.listen.report.query', category: 'read', readOnly: true,
+      title: '读取一起听报告', description: '读取真实的一起听伙伴与时长报告。', handler: petAssistantCommunityListenReportQuery
+    },
+    {
+      command: 'community.listen.state.query', category: 'read', readOnly: true,
+      title: '读取一起听状态', description: '读取当前待处理邀请、活动会话与连麦状态。', handler: async () => {
+        await refreshCommunityListenState();
+        return {
+          pendingInvite: state.community.pendingInvite,
+          activeSession: state.community.activeSession,
+          call: {
+            active: state.community.call.active === true,
+            targetId: safeText(state.community.call.targetId, ''),
+            sessionId: safeText(state.community.call.sessionId, '')
+          }
+        };
+      }
+    },
+    {
+      command: 'community.listen.invite', category: 'social',
+      title: '邀请好友一起听', description: '只向已确认且在线的好友发送当前歌曲的一起听邀请。', handler: async (args) => {
+        const targetId = petAssistantBoundedText(args.targetId || args.feId, '好友', 8);
+        const payload = await inviteCommunityListen(targetId, { throwOnError: true });
+        return { targetId, invite: payload.invite || null };
+      }
+    },
+    {
+      command: 'community.listen.respond', category: 'social',
+      title: '处理一起听邀请', description: '接受或拒绝当前客户端真实待处理的一起听邀请。',
+      parameters: { accepted: 'boolean' }, requiredParameterGroups: [['accepted']], handler: async (args) => {
+        const accepted = petAssistantBoolean(args.accepted, false);
+        const payload = await respondCommunityListen(accepted, { throwOnError: true });
+        return { accepted, session: payload.session || null };
+      }
+    },
+    {
+      command: 'community.listen.accept', category: 'social',
+      title: '接受一起听邀请', description: '接受当前客户端真实待处理的一起听邀请。', handler: async () => {
+        const payload = await respondCommunityListen(true, { throwOnError: true });
+        return { accepted: true, session: payload.session || null };
+      }
+    },
+    {
+      command: 'community.listen.reject', category: 'social',
+      title: '拒绝一起听邀请', description: '拒绝当前客户端真实待处理的一起听邀请。', handler: async () => {
+        await respondCommunityListen(false, { throwOnError: true });
+        return { accepted: false };
+      }
+    },
+    {
+      command: 'community.listen.leave', category: 'social',
+      title: '退出一起听', description: '通过现有会话退出流程离开当前一起听。', handler: async () => {
+        await leaveCommunityListen({ throwOnError: true });
+        return { left: true };
+      }
+    },
+    {
+      command: 'community.call.start', category: 'social',
+      title: '发起社区语音连麦', description: '在当前一起听会话中请求麦克风权限并发起已有的 WebRTC 语音连麦；不支持视频。',
+      handler: async (args) => {
+        if (args.video === true || safeText(args.mode, 'audio') === 'video') throw new Error('当前客户端只注册了语音连麦，不支持视频通话');
+        return startCommunityCall({ throwOnError: true });
+      }
+    },
+    {
+      command: 'community.call.accept', category: 'social',
+      title: '接受社区语音连麦', description: '处理当前一起听会话中已到达的真实连麦信令。',
+      handler: async () => {
+        if (!state.community.activeSession) throw new Error('当前没有一起听会话');
+        await pollCommunityCallSignals();
+        return { active: state.community.call.active === true, targetId: state.community.call.targetId };
+      }
+    },
+    {
+      command: 'community.call.hangup', aliases: ['community.call.end'], category: 'social',
+      title: '挂断社区语音连麦', description: '复用现有挂断函数关闭当前语音连麦并释放媒体轨道。', handler: () => {
+        const wasActive = state.community.call.active === true;
+        stopCommunityCall(true);
+        return { ended: wasActive };
+      }
+    },
+    {
+      command: 'community.ornaments.query', category: 'read', readOnly: true,
+      title: '读取社区成就挂饰', description: '读取客户端已注册成就挂饰及领取、佩戴状态。', handler: () => {
+        if (!window.feAchievements) throw new Error('成就挂饰模块尚未就绪');
+        const ornamentState = window.feAchievements.getOrnamentState?.() || {};
+        return {
+          ornaments: (window.feAchievements.ornaments || []).slice(0, 40),
+          state: ornamentState
+        };
+      }
+    },
+    {
+      command: 'community.ornament.claim', category: 'social',
+      title: '领取成就挂饰', description: '只领取客户端已注册且对应成就已完成的挂饰。', handler: (args) => {
+        const achievementId = petAssistantBoundedText(args.achievementId || args.id, '成就', 80);
+        if (!window.feAchievements?.claimOrnament?.(achievementId)) throw new Error('该成就挂饰不存在、尚未解锁或已经领取');
+        return { achievementId, claimed: true };
+      }
+    },
+    {
+      command: 'community.ornament.equip', category: 'social',
+      title: '佩戴成就挂饰', description: '只佩戴客户端已注册且已经领取的成就挂饰。', handler: (args) => {
+        const achievementId = petAssistantBoundedText(args.achievementId || args.id, '成就', 80);
+        const current = window.feAchievements?.getOrnamentState?.();
+        if (current?.equipped?.achievementId !== achievementId && !window.feAchievements?.equipOrnament?.(achievementId)) {
+          throw new Error('该成就挂饰尚未领取或不能佩戴');
+        }
+        return { achievementId, equipped: true };
+      }
+    },
+    {
+      command: 'community.ornament.unequip', category: 'social',
+      title: '取消成就挂饰', description: '使用现有挂饰函数取消当前佩戴。', handler: () => ({
+        unequipped: window.feAchievements?.unequipOrnament?.() === true
+      })
+    },
+    {
+      command: 'server.broadcast.latest.query', category: 'read', readOnly: true,
+      title: '读取最新社区广播', description: '只读取客户端已接收的最新服务器广播，不提供广播发送能力。',
+      handler: () => ({ broadcast: state.community.broadcastLatest ? { ...state.community.broadcastLatest } : null })
+    },
+    {
+      command: 'server.broadcast.open', category: 'navigation',
+      title: '打开最新社区广播', description: '打开客户端已接收的最新广播卡片。', handler: () => {
+        openCommunityBroadcast();
+        return { opened: !!state.community.broadcastLatest, broadcast: state.community.broadcastLatest };
+      }
+    },
+    {
+      command: 'server.update.check', category: 'read', readOnly: true,
+      title: '检查客户端更新', description: '只读取本机服务端既有的更新发布信息，不接受 URL 或路径。',
+      handler: petAssistantServerUpdateCheck
+    },
+    {
+      command: 'server.update.get', aliases: ['server.update.open'], category: 'navigation',
+      title: '打开客户端更新', description: '检查并展示本机服务端提供的最新发布信息，不直接安装。',
+      handler: petAssistantServerUpdateOpen
+    },
+    {
+      command: 'scene.preset.catalog.query', aliases: ['preset.list', 'scene.preset.list'], category: 'read', readOnly: true,
+      title: '列出已注册场景预设',
+      description: '列出全部内置及 state.sandbox.presets 动态注册的本地或市场场景预设。',
+      parameters: { query: 'string?', cursor: 'number?', limit: 'number 1..20?' },
+      handler: (args) => {
+        const page = petAssistantPaginate(petAssistantPresetCatalog(args), args);
+        return { presets: page.items, total: page.total, cursor: page.cursor, limit: page.limit, nextCursor: page.nextCursor };
+      }
+    },
+    {
+      command: 'scene.preset.search', aliases: ['preset.search'], category: 'read', readOnly: true,
+      title: '搜索已注册场景预设',
+      description: '按名称、ID 或别名搜索当前客户端真实存在的任意预设。',
+      parameters: { query: 'string', cursor: 'number?', limit: 'number 1..20?' },
+      handler: (args) => {
+        const page = petAssistantPaginate(petAssistantPresetCatalog(args), args);
+        return { presets: page.items, total: page.total, cursor: page.cursor, limit: page.limit, nextCursor: page.nextCursor };
+      }
+    },
+    {
+      command: 'scene.preset.set', aliases: ['preset.switch', 'switch_preset'], category: 'appearance',
+      title: '切换场景预设',
+      description: '按名称或 ID 切换任意已注册内置、本地或市场场景预设；动态预设复用 enterDiyScenePresetPlayback。',
+      handler: petAssistantSwitchPreset
+    },
+    {
+      command: 'lyrics.mode.set', aliases: ['set_lyric_mode'], category: 'lyrics',
+      title: '设置歌词模式', description: '设置单排、多排、双语或视觉歌词模式。', handler: petAssistantSetLyricMode
+    },
+    {
+      command: 'lyrics.offset.set', aliases: ['set_lyric_offset'], category: 'lyrics',
+      title: '设置歌词偏移', description: '设置 -3 到 3 秒的歌词时间偏移。', handler: (args) => {
+        const seconds = Number(args.seconds ?? args.offset ?? args.value);
+        if (!Number.isFinite(seconds)) throw new Error('歌词偏移必须是数字');
+        setLyricClockOffsetSeconds(seconds);
+        return { offsetSeconds: lyricClockOffsetSeconds() };
+      }
+    },
+    {
+      command: 'lyrics.offset.adjust', aliases: ['adjust_lyric_offset'], category: 'lyrics',
+      title: '微调歌词偏移', description: '按秒数增减当前歌词偏移。', handler: (args) => {
+        const delta = Number(args.deltaSeconds ?? args.delta ?? args.value);
+        if (!Number.isFinite(delta)) throw new Error('歌词偏移增量必须是数字');
+        adjustLyricClockOffsetSeconds(delta);
+        return { offsetSeconds: lyricClockOffsetSeconds() };
+      }
+    },
+    {
+      command: 'lyrics.bilingual.set', category: 'lyrics', title: '切换双语歌词',
+      description: '开启或关闭双语歌词。', parameters: { enabled: 'boolean' },
+      requiredParameterGroups: [['enabled', 'value']], handler: (args) => {
+        setBilingualLyricsEnabled(petAssistantBoolean(args.enabled ?? args.value, true));
+        return { bilingual: state.bilingualLyricsEnabled !== false };
+      }
+    },
+    {
+      command: 'lyrics.multi.row.set', category: 'lyrics', title: '切换多排歌词',
+      description: '开启或关闭多排歌词。', parameters: { enabled: 'boolean' },
+      requiredParameterGroups: [['enabled', 'value']], handler: (args) => ({
+        multiRow: setMultiRowLyricsEnabled(petAssistantBoolean(args.enabled ?? args.value, true))
+      })
+    },
+    {
+      command: 'wallpaper.setting.set', aliases: ['set_wallpaper_appearance'], category: 'wallpaper',
+      title: '调整壁纸外观', description: '调整现有壁纸的透明度、亮度、模糊、缩放和适配方式；不导入或删除文件。',
+      handler: petAssistantSetWallpaperAppearance
+    }
+  ]);
+}
+
+registerPetAssistantAppCommands();
+
+function resolvePetAssistantRoutableCommand(name) {
+  const legacyCommand = PET_ASSISTANT_LEGACY_COMMANDS[name];
+  if (legacyCommand) return legacyCommand;
+  try {
+    return window.FeMonsterAppCommands.resolve(name).command;
+  } catch (_) {
+    return '';
+  }
+}
+
+function inspectPetAssistantAction(command = {}, context = {}) {
+  const name = safeText(command.name, '').trim().toLowerCase();
+  const args = petAssistantArguments(command.arguments);
+  if (name === 'query_app_capabilities' || name === 'discover_app_commands') {
+    return {
+      command: 'app.capabilities.query',
+      title: '读取程序能力',
+      description: '读取客户端命令目录。',
+      readOnly: true,
+      requiresConfirmation: false
+    };
+  }
+  if (name === 'control_app' || name === 'execute_app_command') {
+    const requestedCommand = petAssistantBoundedText(args.command, '程序命令', 96);
+    const parameters = petAssistantArguments(args.arguments || args.parameters);
+    return window.FeMonsterAppCommands.inspect(requestedCommand, parameters, {
+      source: 'pet-assistant',
+      taintedByExternalContent: context.taintedByExternalContent === true,
+      sourceTrust: context.sourceTrust
+    });
+  }
+  const routedCommand = resolvePetAssistantRoutableCommand(name);
+  if (!routedCommand) throw new Error('当前客户端不支持这个程序命令');
+  return window.FeMonsterAppCommands.inspect(routedCommand, args, {
+    source: PET_ASSISTANT_LEGACY_COMMANDS[name] ? 'pet-assistant-legacy' : 'pet-assistant-direct',
+    taintedByExternalContent: context.taintedByExternalContent === true,
+    sourceTrust: context.sourceTrust
+  });
+}
+
+async function executePetAssistantAction(command = {}, context = {}) {
+  const name = safeText(command.name, '').trim().toLowerCase();
+  const args = petAssistantArguments(command.arguments);
+  if (name === 'query_app_capabilities' || name === 'discover_app_commands') {
+    return window.FeMonsterAppCommands.capabilities(args);
+  }
+  if (name === 'control_app' || name === 'execute_app_command') {
+    const requestedCommand = petAssistantBoundedText(args.command, '程序命令', 96);
+    const parameters = petAssistantArguments(args.arguments || args.parameters);
+    return window.FeMonsterAppCommands.execute(requestedCommand, parameters, {
+      source: 'pet-assistant',
+      confirmed: context.confirmed === true,
+      taintedByExternalContent: context.taintedByExternalContent === true,
+      sourceTrust: context.sourceTrust
+    });
+  }
+  const routedCommand = resolvePetAssistantRoutableCommand(name);
+  if (!routedCommand) throw new Error('当前客户端不支持这个程序命令');
+  return window.FeMonsterAppCommands.execute(routedCommand, args, {
+    source: PET_ASSISTANT_LEGACY_COMMANDS[name] ? 'pet-assistant-legacy' : 'pet-assistant-direct',
+    confirmed: context.confirmed === true,
+    taintedByExternalContent: context.taintedByExternalContent === true,
+    sourceTrust: context.sourceTrust
+  });
+}
+
+window.FeMonsterPetActionBridge = Object.freeze({
+  envelopes: Object.freeze(['control_app', 'execute_app_command', 'query_app_capabilities', 'discover_app_commands']),
+  execute: executePetAssistantAction,
+  inspect: inspectPetAssistantAction,
+  catalog: () => window.FeMonsterAppCommands.catalog(),
+  presetCatalog: (args = {}) => petAssistantPresetCatalog(args),
+  snapshot: petAssistantPlaybackSnapshot,
+  clientContextSnapshot: petAssistantClientContextSnapshot
+});
 
 async function init() {
   initCursorPreferences();
   initCursorMotionRuntime();
   initDesktopSceneBridge();
   initBootScreen();
+  const identityBootstrap = refreshMusicApiProviders({ silent: true }).then(() => {
+    void refreshLoginStatus(state.activeProvider).finally(() => scheduleCommunityRefresh(0));
+  });
   initGlassSurfaces();
   initWallpaperAutoSizeObserver();
   initRenderCapabilityBridge();
   applyRuntimeDataset();
+  probeRequestedDirectX11Renderer();
   loadWallpaperPrefs();
   loadSceneWallpaperPrefs();
   applySonicTopographySettings({ persist: false, sync: true, renderConfig: false });
@@ -30406,7 +42401,7 @@ async function init() {
   initOrbCanvasMetrics();
   initPlaybackParticles();
   initRenderClarity();
-  enterWallpaperHome();
+  restoreSavedVisualWorkspace();
   updateLyricDiyVars();
   initializeTextFontOptions();
   applyTextFontPreference();
@@ -30429,15 +42424,29 @@ async function init() {
   renderCommunityBroadcastButton();
   renderCommunityListeningStats();
   els.audio.volume = Number(els.volumeRange.value) / 100;
-  await Promise.allSettled([refreshClientRuntime(), refreshMusicApiProviders({ silent: true }), refreshPlayerState(), refreshVisualBridge(), refreshNativeAudioSample(), refreshLoginStatus(), refreshUserPlaylists(), refreshSandboxPresets({ silent: true })]);
+  await Promise.allSettled([
+    refreshClientRuntime(),
+    identityBootstrap,
+    refreshPlayerState(),
+    refreshVisualBridge(),
+    refreshNativeAudioSample(),
+    refreshSandboxPresets({ silent: true })
+  ]);
+  scheduleClientPreferencesSync();
   finishDesktopSceneInitialization();
-  startBackgroundPolling();
+  document.documentElement.dataset.interactiveServices = DESKTOP_SCENE_CLIENT ? 'started' : 'deferred';
   requestOrbFrame();
 }
 
 function scheduleButtonGlowEnhancement() {
-  if (MOBILE_RENDER_TARGET || reducedMotion || RENDER_PROFILE.tier === 'economy') return;
-  const load = () => import('./border-glow-buttons.js?v=20260712-ui-performance-audit').catch(() => {});
+  if (
+    bootVisual.enhancementsScheduled
+    || MOBILE_RENDER_TARGET
+    || reducedMotion
+    || RENDER_PROFILE.tier === 'economy'
+  ) return;
+  bootVisual.enhancementsScheduled = true;
+  const load = () => import('./border-glow-buttons.js?v=20260811-cache-audit-1').catch(() => {});
   if ('requestIdleCallback' in window) {
     window.requestIdleCallback(load, { timeout: 2400 });
   } else {
@@ -30445,6 +42454,4 @@ function scheduleButtonGlowEnhancement() {
   }
 }
 
-init()
-  .then(scheduleButtonGlowEnhancement)
-  .catch((error) => toast(error.message));
+init().catch((error) => toast(error.message));

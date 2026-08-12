@@ -7,20 +7,31 @@
     <title>FE Monster Java</title>
     <link rel="icon" type="image/png" sizes="64x64" href="/assets/fe-monster-favicon.png" />
     <link rel="apple-touch-icon" sizes="512x512" href="/assets/fe-monster-app-icon.png" />
+    <link rel="preload" href="fonts/awei-pixel/AaWeiWeiDianZhenTi.woff2?v=20260729-webfont-2" as="font" type="font/woff2" crossorigin />
     <script>
       const clientMode = new URLSearchParams(window.location.search).get('client');
-      if (clientMode === 'embedded' || clientMode === 'desktop-scene') {
+      if (clientMode === 'embedded' || clientMode === 'desktop-scene' || clientMode === 'desktop-pet') {
         document.documentElement.dataset.fePlatform = 'desktop';
       }
       if (clientMode) document.documentElement.setAttribute('data-fe-client', clientMode);
+      if (clientMode !== 'desktop-scene') {
+        document.documentElement.dataset.interactiveServices = 'deferred';
+      }
     </script>
-    <link rel="stylesheet" href="/components/GlassSurface.css?v=20260706-black-glass-scroll" />
-    <link rel="stylesheet" href="/components/BorderGlow.css?v=20260705-button-border-glow-fix" />
-    <link rel="stylesheet" href="border-glow-buttons.css?v=20260705-button-border-glow-fix" />
-  <link rel="stylesheet" href="text-fonts.css?v=20260721-licensed-fonts-1" />
-    <link rel="stylesheet" href="styles.css?v=20260728-liquid-switch-cursor-matte-1" />
-  <link rel="stylesheet" href="rhythm-game.css?v=20260716-rhythm-game-2" />
-    <link rel="stylesheet" href="black-gold-buttons.css?v=20260714-black-react-bits-glass-16" />
+    <link rel="stylesheet" href="/components/GlassSurface.css?v=20260811-cache-audit-1" />
+    <link rel="stylesheet" href="/components/BorderGlow.css?v=20260811-cache-audit-1" />
+    <link rel="stylesheet" href="border-glow-buttons.css?v=20260811-cache-audit-1" />
+  <link rel="stylesheet" href="text-fonts.css?v=20260811-cache-audit-1" />
+    <link rel="stylesheet" href="styles.css?v=20260812-friend-card-1" />
+    <link rel="stylesheet" href="rhythm-game.css?v=20260811-cache-audit-1" />
+    <link rel="stylesheet" href="black-gold-buttons.css?v=20260811-cache-audit-1" />
+    <link rel="stylesheet" href="pixel-adventure.css?v=20260813-achievement-rewards-1" />
+    <link rel="stylesheet" href="pet-assistant.css?v=20260811-conversation-emotion-2" />
+    <link rel="stylesheet" href="pet-companion-p2.css?v=20260811-cache-audit-1" />
+    <link rel="stylesheet" href="pet-product-tour.css?v=20260811-moving-guide-1" />
+    <link rel="stylesheet" href="community-reward-runtime.css?v=20260812-reward-stages-2" />
+  <link rel="stylesheet" href="fe-identity-card.css?v=20260813-material-texture-2" />
+    <link rel="stylesheet" href="lyric-render-quality.css?v=20260811-cache-audit-1" />
   </head>
   <body>
     <section class="boot-screen" id="bootScreen" aria-label="FE moster launch screen">
@@ -42,6 +53,9 @@
           <span aria-hidden="true"></span>
         </button>
         <button class="window-control-button window-control-button--close" id="windowQuitButton" type="button" title="退出程序" aria-label="退出程序">
+          <span aria-hidden="true"></span>
+        </button>
+        <button class="window-control-button update-notice-button" id="updateNoticeButton" type="button" title="发现新版本" aria-label="发现新版本" aria-haspopup="dialog" aria-controls="updateDialog" hidden>
           <span aria-hidden="true"></span>
         </button>
       </div>
@@ -106,16 +120,43 @@
           <input class="ui-switch" id="x3DAudioToggle" type="checkbox" role="switch" />
           <span>X3DAudio</span>
         </label>
-        <label class="runtime-toggle runtime-toggle--gesture">
-          <span>
-            <strong>手势操作</strong>
-            <small id="gestureControlStatus">摄像头关闭</small>
-          </span>
-          <input class="ui-switch" id="gestureControlToggle" type="checkbox" role="switch" />
+        <label class="runtime-toggle runtime-toggle--achievement-sound">
+          <input class="ui-switch" id="achievementSoundToggle" type="checkbox" role="switch" checked />
+          <span>成就音效</span>
         </label>
-        <div class="runtime-camera-source" role="group" aria-label="手势输入来源">
-          <button class="runtime-camera-source-button is-active" id="gestureWebcamButton" type="button" data-gesture-camera-source="webcam" aria-pressed="true">摄像头</button>
-          <button class="runtime-camera-source-button" id="gestureCameraButton" type="button" data-gesture-camera-source="camera" aria-pressed="false">相机</button>
+        <details class="runtime-settings-group runtime-pet-voice-settings" id="petAssistantVoiceDisclosure">
+          <summary id="petAssistantVoiceDisclosureSummary" aria-controls="petAssistantVoiceDisclosureOptions" aria-expanded="false">
+            <span>桌宠语音</span>
+            <small>音色、语音播放与实时对话快捷键</small>
+          </summary>
+          <div class="runtime-settings-group-content" id="petAssistantVoiceDisclosureOptions">
+            <label class="pet-assistant__voice-picker" for="petAssistantVoiceSelect">
+              <span>回复音色</span>
+              <select id="petAssistantVoiceSelect" aria-describedby="petAssistantVoiceHint" disabled>
+                <option value="">正在同步音色…</option>
+              </select>
+              <span class="pet-assistant__voice-hint" id="petAssistantVoiceHint">音色由你的 FE Monster 服务器提供</span>
+            </label>
+            <div class="pet-assistant__voice-settings" aria-label="桌宠语音设置">
+              <label class="pet-assistant__voice-playback" for="petAssistantVoicePlaybackToggle">
+                <input id="petAssistantVoicePlaybackToggle" class="ui-switch" type="checkbox" role="switch" checked />
+                <span>播放桌宠语音回复</span>
+              </label>
+              <span class="pet-assistant__shortcut-editor">
+                <button id="petAssistantShortcutCapture" type="button" aria-pressed="false" aria-describedby="petAssistantShortcutHint">设置实时对话快捷键</button>
+                <output id="petAssistantShortcutValue" for="petAssistantShortcutCapture">未设置</output>
+                <button id="petAssistantShortcutClear" type="button" title="清除语音快捷键" hidden>清除</button>
+              </span>
+              <small id="petAssistantShortcutHint">按一次开始连续实时对话，再按一次结束；输入框中不会误输入快捷键。</small>
+            </div>
+          </div>
+        </details>
+        <div class="runtime-product-tour" aria-label="桌宠程序演示">
+          <span>
+            <strong>小 Fe 程序演示</strong>
+            <small>安全重看社区、场景、歌词与壁纸入口</small>
+          </span>
+          <button id="petProductTourReplay" type="button">重新演示</button>
         </div>
         <details class="runtime-settings-group runtime-cursor-settings" id="runtimeCursorSettingsGroup">
           <summary>
@@ -653,15 +694,30 @@
         >
           <div class="glass-surface__content">
           <div class="community-card__head">
-            <span class="community-avatar" id="communityAvatar" role="button" tabindex="0" aria-label="打开社区个人资料">
-              <img id="communityAvatarImage" alt="" />
-              <span>FE</span>
+            <span class="community-avatar-stack">
+              <span class="community-avatar" id="communityAvatar" role="button" tabindex="0" aria-label="打开社区个人资料">
+                <img id="communityAvatarImage" alt="" />
+                <span>FE</span>
+              </span>
+              <button class="community-mailbox-shortcut" id="communityMailboxShortcut" type="button" aria-label="打开社区邮箱" aria-controls="communityProfileMailboxPage">
+                邮箱<span class="community-mailbox-unread-dot" id="communityMailboxUnreadDot" aria-label="没有未读邮件" hidden></span>
+              </button>
             </span>
             <span class="community-profile">
               <span class="community-kicker">COMMUNITY</span>
               <strong id="communityName">登录后启用社区</strong>
               <small id="communityMeta">同步音乐平台账号</small>
             </span>
+            <button class="community-identity-card-trigger" id="communityIdentityCardButton" type="button" aria-label="打开身份卡列表" title="身份卡" aria-haspopup="listbox" aria-controls="communityIdentityCardMenu" aria-expanded="false">
+              <span aria-hidden="true">FE</span>
+            </button>
+            <section class="community-identity-card-menu" id="communityIdentityCardMenu" aria-label="已领取身份卡" hidden>
+              <header>
+                <strong>身份卡</strong>
+                <button id="feIdentityCardPreview" type="button" aria-label="展示当前身份卡" title="展示当前身份卡"><span aria-hidden="true">◇</span></button>
+              </header>
+              <div class="fe-identity-card__collection-list" id="feIdentityCardCollection" role="listbox" aria-label="已领取身份卡"></div>
+            </section>
             <button class="community-broadcast-button" id="communityBroadcastButton" type="button" aria-label="社区公告广播" title="社区公告广播">
               <span class="community-broadcast-icon" aria-hidden="true"></span>
               <span class="community-broadcast-dot" aria-hidden="true"></span>
@@ -671,30 +727,43 @@
             </button>
           </div>
 
-          <div class="community-id-row">
-            <span>FE ID</span>
-            <strong id="communityFeId">--------</strong>
-          </div>
-          <div class="community-listening-stats" aria-label="&#25105;&#30340;&#21548;&#27468;&#32479;&#35745;">
-            <span>
-              <small>&#32047;&#35745;&#21548;&#27468;</small>
-              <strong id="communityListeningDuration">0 &#20998;&#38047;</strong>
-            </span>
-            <span>
-              <small>&#21435;&#37325;&#27468;&#26354;</small>
-              <strong id="communityListeningSongs">0 &#39318;</strong>
-            </span>
+          <div class="community-summary-row" aria-label="社区账号与听歌统计">
+            <div class="community-id-row">
+              <span>FE ID</span>
+              <strong id="communityFeId">--------</strong>
+            </div>
+            <div class="community-listening-stats" aria-label="&#25105;&#30340;&#21548;&#27468;&#32479;&#35745;">
+              <span>
+                <small>&#32047;&#35745;&#21548;&#27468;</small>
+                <strong id="communityListeningDuration">0 &#20998;&#38047;</strong>
+              </span>
+              <span>
+                <small>&#21435;&#37325;&#27468;&#26354;</small>
+                <strong id="communityListeningSongs">0 &#39318;</strong>
+              </span>
+            </div>
           </div>
 
           <form class="community-add-form" id="communityAddForm">
             <input id="communitySearchInput" type="search" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="搜索 8 位好友 ID" />
-            <button id="communityAddButton" type="submit">添加</button>
+            <button id="communityAddButton" type="submit">申请</button>
           </form>
+
+          <section class="community-friend-requests" id="communityFriendRequests" aria-labelledby="communityFriendRequestsTitle" hidden>
+            <header>
+              <span id="communityFriendRequestsTitle">好友申请</span>
+              <strong id="communityFriendRequestsCount">0</strong>
+            </header>
+            <div class="community-friend-request-list" id="communityFriendRequestList" aria-live="polite"></div>
+          </section>
 
           <div class="community-friends-head">
             <span id="communityFriendsLabel">在线好友</span>
             <span class="community-friends-tools">
+              <button class="community-header-action community-report-entry" id="communityReportButton" type="button" aria-haspopup="dialog" aria-controls="communityProfileDialog" aria-expanded="false">报告</button>
               <button class="community-header-action community-market-entry" id="communityMarketButton" type="button" aria-haspopup="dialog" aria-controls="communityProfileDialog" aria-expanded="false">市场</button>
+              <button class="community-header-action community-achievement-entry" id="communityAchievementButton" type="button" aria-haspopup="dialog" aria-controls="communityProfileDialog" aria-expanded="false">成就</button>
+              <button class="community-header-action community-ornament-entry" id="communityOrnamentButton" type="button" aria-haspopup="dialog" aria-controls="communityProfileDialog" aria-expanded="false">挂饰</button>
               <button class="community-header-action" id="communityMessageButton" type="button">消息</button>
               <button class="community-header-action" id="communityDndButton" type="button" aria-pressed="false">免扰</button>
               <strong id="communityOnlineCount">0</strong>
@@ -714,10 +783,39 @@
                 <strong id="communityMessageTitle">选择好友</strong>
                 <small id="communityMessageMeta">互发消息</small>
               </div>
-              <button id="communityMessageClose" type="button" aria-label="关闭消息">×</button>
+              <span class="community-message-head-actions">
+                <button class="community-message-background-button" id="communityMessageBackgroundButton" type="button" aria-haspopup="dialog" aria-controls="communityMessageBackgroundMenu" aria-expanded="false">聊天背景</button>
+                <button id="communityMessageClose" type="button" aria-label="关闭消息">×</button>
+              </span>
             </header>
-            <div class="community-message-list" id="communityMessageList">
-              <span class="community-empty">选择在线好友后开始聊天</span>
+            <section class="community-message-background-menu" id="communityMessageBackgroundMenu" aria-label="聊天背景" hidden>
+              <header>
+                <span>
+                  <strong>聊天背景</strong>
+                  <small id="communityMessageBackgroundStatus">仅读取 Wallpaper Engine 壁纸</small>
+                </span>
+                <button id="communityMessageBackgroundRefresh" type="button">刷新壁纸</button>
+              </header>
+              <div class="community-message-background-choices" id="communityMessageBackgroundChoices" role="listbox" aria-label="Wallpaper Engine 聊天背景"></div>
+            </section>
+            <div class="community-message-stage" id="communityMessageStage">
+              <div class="community-message-wallpaper" id="communityMessageWallpaperSurface" aria-hidden="true" hidden>
+                <img id="communityMessageWallpaperImage" alt="" />
+                <video id="communityMessageWallpaperVideo" muted playsinline preload="auto"></video>
+                <iframe
+                  id="communityMessageWallpaperWebFrame"
+                  title="Wallpaper Engine 聊天背景"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock"
+                  referrerpolicy="no-referrer"
+                  allow="autoplay"
+                  tabindex="-1"
+                  hidden
+                ></iframe>
+              </div>
+              <div class="community-message-wallpaper-scrim" aria-hidden="true"></div>
+              <div class="community-message-list" id="communityMessageList">
+                <span class="community-empty">选择在线好友后开始聊天</span>
+              </div>
             </div>
             <form class="community-message-form" id="communityMessageForm">
               <input id="communityMessageInput" type="text" autocomplete="off" maxlength="500" placeholder="输入消息" />
@@ -730,8 +828,8 @@
         <div class="community-broadcast-toast" id="communityBroadcastToast" aria-live="polite" hidden></div>
         <div class="community-listen-bubbles" id="communityListenBubbles" aria-live="polite"></div>
         <div class="community-danmaku-layer" id="communityDanmakuLayer" aria-live="polite" aria-label="一起听弹幕"></div>
-        <section class="community-profile-dialog" id="communityProfileDialog" aria-label="社区个人资料" hidden>
-          <div class="community-profile-panel" id="communityProfilePanel">
+        <section class="community-profile-dialog" id="communityProfileDialog" role="dialog" aria-labelledby="communityProfileTitle" hidden>
+          <div class="community-profile-panel" id="communityProfilePanel" data-achievement-page-theme="classic">
             <header class="community-profile-head" id="communityProfileHead">
               <div>
                 <span>COMMUNITY PROFILE</span>
@@ -739,12 +837,19 @@
                 <small id="communityProfileMeta">描述自己</small>
               </div>
               <span class="community-profile-head-actions">
-                <button class="community-profile-tab is-active" id="communityProfileSelfTab" type="button" role="tab" aria-selected="true" aria-controls="communityProfileSelfPage" data-community-profile-page="self">个人资料</button>
-                <button class="community-profile-tab" id="communityProfileGroupTab" type="button" role="tab" aria-selected="false" aria-controls="communityProfileNearbyPage" data-community-profile-page="nearby">社区集体</button>
-                <button class="community-profile-tab" id="communityProfileMarketTab" type="button" role="tab" aria-selected="false" aria-controls="communityProfileMarketPage" data-community-profile-page="market">创作市场</button>
                 <button id="communityProfileClose" type="button" aria-label="关闭个人资料">×</button>
               </span>
             </header>
+            <span class="community-profile-tabs" role="tablist" aria-label="社区资料页面">
+              <button class="community-profile-tab is-active" id="communityProfileSelfTab" type="button" role="tab" aria-selected="true" aria-controls="communityProfileSelfPage" data-community-profile-page="self">个人资料</button>
+              <button class="community-profile-tab" id="communityProfileGroupTab" type="button" role="tab" aria-selected="false" aria-controls="communityProfileNearbyPage" data-community-profile-page="nearby">社区集体</button>
+              <button class="community-profile-tab" id="communityProfileSquareTab" type="button" role="tab" aria-selected="false" aria-controls="communityProfileSquarePage" data-community-profile-page="square">社交广场</button>
+              <button class="community-profile-tab community-mailbox-tab" id="communityProfileMailboxTab" type="button" role="tab" aria-selected="false" aria-controls="communityProfileMailboxPage" data-community-profile-page="mailbox">邮箱</button>
+              <button class="community-profile-tab" id="communityProfileReportTab" type="button" role="tab" aria-selected="false" aria-controls="communityProfileReportPage" data-community-profile-page="report">一起听报告</button>
+              <button class="community-profile-tab" id="communityProfileMarketTab" type="button" role="tab" aria-selected="false" aria-controls="communityProfileMarketPage" data-community-profile-page="market">创作市场</button>
+              <button class="community-profile-tab" id="communityProfileAchievementTab" type="button" role="tab" aria-selected="false" aria-controls="communityProfileAchievementPage" data-community-profile-page="achievement">成就</button>
+              <button class="community-profile-tab" id="communityProfileOrnamentTab" type="button" role="tab" aria-selected="false" aria-controls="communityProfileOrnamentPage" data-community-profile-page="ornament">挂饰</button>
+            </span>
             <div class="community-profile-pages">
               <div class="community-profile-page is-active" id="communityProfileSelfPage" role="tabpanel" aria-labelledby="communityProfileSelfTab">
                 <div class="community-profile-card">
@@ -763,6 +868,42 @@
                   <span id="communityProfileStatus">点击头像打开个人资料</span>
                 </div>
               </div>
+              <div class="community-profile-page community-profile-viewer-page" id="communityProfileViewerPage" role="region" aria-labelledby="communityViewerName" hidden>
+                <div class="community-profile-viewer-toolbar">
+                  <span>
+                    <strong>用户个人主页</strong>
+                    <small id="communityViewerMeta" role="status" aria-live="polite">正在读取用户资料</small>
+                  </span>
+                  <button id="communityViewerBack" type="button" aria-label="关闭用户个人主页并返回">返回</button>
+                </div>
+                <section class="community-profile-viewer-identity" aria-label="用户资料">
+                  <span class="community-profile-viewer-avatar" id="communityViewerAvatar" role="img" aria-label="用户头像">FE</span>
+                  <span class="community-profile-viewer-copy">
+                    <strong id="communityViewerName">社区用户</strong>
+                    <small id="communityViewerId">FE ID --------</small>
+                    <p id="communityViewerBio">这位用户还没有填写个人描述。</p>
+                  </span>
+                </section>
+                <dl class="community-profile-viewer-stats" id="communityViewerStats" aria-label="用户社区统计">
+                  <div><dt>发布作品</dt><dd id="communityProfileViewerWorksCount">0</dd></div>
+                  <div><dt>社区好友</dt><dd id="communityProfileViewerFriendsCount">0</dd></div>
+                  <div><dt>获赞</dt><dd id="communityProfileViewerLikesCount">0</dd></div>
+                </dl>
+                <div class="community-profile-viewer-actions">
+                  <button class="is-primary" id="communityViewerAddFriend" type="button">添加好友</button>
+                  <button id="communityViewerMessage" type="button">发送私信</button>
+                  <button id="communityViewerIdentityCard" type="button">展示身份卡</button>
+                </div>
+                <section class="community-profile-viewer-works" aria-labelledby="communityProfileViewerWorksTitle">
+                  <header>
+                    <strong id="communityProfileViewerWorksTitle">TA 的作品</strong>
+                    <small id="communityProfileViewerWorksMeta">0 个公开作品</small>
+                  </header>
+                  <div id="communityProfileViewerWorks" role="list">
+                    <span class="community-empty">这位用户还没有发布作品</span>
+                  </div>
+                </section>
+              </div>
               <div class="community-profile-page" id="communityProfileNearbyPage" role="tabpanel" aria-labelledby="communityProfileGroupTab" hidden>
                 <div class="community-nearby-head">
                   <strong>社区集体</strong>
@@ -772,20 +913,222 @@
                   <span class="community-empty">正在读取附近社区账号</span>
                 </div>
               </div>
+              <div class="community-profile-page community-square-page" id="communityProfileSquarePage" role="tabpanel" aria-labelledby="communityProfileSquareTab" hidden>
+                <div class="community-square-head">
+                  <span>
+                    <strong>社交广场</strong>
+                    <small id="communitySquareMeta">所有社区用户都可以在这里交流</small>
+                  </span>
+                  <button id="communitySquareRefresh" type="button">刷新</button>
+                </div>
+                <div class="community-square-feed" id="communitySquareList" role="log" aria-live="polite" aria-relevant="additions text" aria-busy="false">
+                  <span class="community-empty">正在连接社交广场</span>
+                </div>
+                <form class="community-square-composer" id="communitySquareForm">
+                  <label for="communitySquareInput">
+                    <span class="sr-only">输入广场消息</span>
+                    <textarea id="communitySquareInput" rows="2" placeholder="和广场里的大家聊聊" autocomplete="off"></textarea>
+                  </label>
+                  <div>
+                    <small id="communitySquareStatus" role="status" aria-live="polite">登录社区后即可发送</small>
+                    <button id="communitySquareSend" type="submit">发送</button>
+                  </div>
+                </form>
+              </div>
+              <div class="community-profile-page community-mailbox-page" id="communityProfileMailboxPage" role="tabpanel" aria-labelledby="communityProfileMailboxTab" hidden>
+                <header class="community-mailbox-head">
+                  <span>
+                    <strong>社区邮箱</strong>
+                    <small id="communityMailboxMeta">系统通知与安全奖励附件</small>
+                  </span>
+                  <button id="communityMailboxRefresh" type="button">刷新</button>
+                </header>
+                <div class="community-mailbox-list" id="communityMailboxList" aria-live="polite" aria-busy="false">
+                  <span class="community-empty">打开邮箱后读取系统邮件</span>
+                </div>
+                <p class="community-mailbox-status" id="communityMailboxStatus" role="status" aria-live="polite"></p>
+              </div>
+              <div class="community-profile-page community-listen-report-page" id="communityProfileReportPage" role="tabpanel" aria-labelledby="communityProfileReportTab" hidden>
+                <div class="community-listen-report-head">
+                  <span>
+                    <strong>一起听报告</strong>
+                    <small id="communityListenReportMeta">记录每一次共同听歌的陪伴</small>
+                  </span>
+                  <button id="communityListenReportRefresh" type="button">刷新</button>
+                </div>
+                <section class="community-listen-report-highlight" id="communityListenReportHighlight" aria-label="一起听时间最长的好友">
+                  <span class="community-listen-report-avatar" id="communityListenReportAvatar">FE</span>
+                  <span>
+                    <small>一起听最久</small>
+                    <strong id="communityListenReportLongestName">还没有一起听记录</strong>
+                    <em id="communityListenReportLongestTime">邀请好友一起听后，这里会开始累计</em>
+                  </span>
+                </section>
+                <dl class="community-listen-report-totals" aria-label="一起听汇总">
+                  <div><dt>共同时间</dt><dd id="communityListenReportTotalTime">0 分钟</dd></div>
+                  <div><dt>一起听次数</dt><dd id="communityListenReportSessions">0 次</dd></div>
+                  <div><dt>陪伴过的好友</dt><dd id="communityListenReportPartners">0 位</dd></div>
+                </dl>
+                <div class="community-listen-report-list" id="communityListenReportList" aria-live="polite">
+                  <span class="community-empty">还没有一起听记录</span>
+                </div>
+              </div>
               <div class="community-profile-page" id="communityProfileMarketPage" role="tabpanel" aria-labelledby="communityProfileMarketTab" hidden>
                 <div class="community-market-head">
                   <div>
                     <strong>创作市场</strong>
-                    <small id="communityMarketMeta">预览并下载社区组件与场景预设</small>
+                    <small id="communityMarketMeta">浏览社区作品并直接添加使用</small>
                   </div>
-                  <button id="communityMarketRefresh" type="button">刷新</button>
+                  <span class="community-market-head-actions">
+                    <button id="communityMarketRefresh" type="button">刷新</button>
+                    <button class="is-primary" id="communityMarketPublishOpen" type="button" aria-controls="communityMarketPublishView" aria-expanded="false">发布作品</button>
+                  </span>
                 </div>
-                <label class="community-market-search" for="communityMarketSearch">
-                  <span class="sr-only">搜索市场资产</span>
-                  <input id="communityMarketSearch" type="search" autocomplete="off" placeholder="搜索组件、预设、标签或创作者" />
-                </label>
-                <div class="community-market-list" id="communityMarketList">
-                  <span class="community-empty">正在读取创作市场</span>
+                <div class="community-market-category-tabs" id="communityMarketCategoryTabs" role="tablist" aria-label="创作市场作品类型">
+                  <button class="is-active" id="communityMarketCategoryAll" type="button" role="tab" aria-selected="true" aria-controls="communityMarketBrowseView" data-market-kind="all">全部</button>
+                  <button id="communityMarketCategoryWallpaper" type="button" role="tab" aria-selected="false" aria-controls="communityMarketBrowseView" data-market-kind="wallpaper" tabindex="-1">壁纸</button>
+                  <button id="communityMarketCategoryCharacter" type="button" role="tab" aria-selected="false" aria-controls="communityMarketBrowseView" data-market-kind="character" tabindex="-1">角色</button>
+                  <button id="communityMarketCategoryCursor" type="button" role="tab" aria-selected="false" aria-controls="communityMarketBrowseView" data-market-kind="cursor" tabindex="-1">光标</button>
+                  <button id="communityMarketCategoryTrail" type="button" role="tab" aria-selected="false" aria-controls="communityMarketBrowseView" data-market-kind="trail" tabindex="-1">尾迹</button>
+                  <button id="communityMarketCategoryMusic" type="button" role="tab" aria-selected="false" aria-controls="communityMarketBrowseView" data-market-kind="music" tabindex="-1">音乐</button>
+                </div>
+                <section class="community-market-browse-view" id="communityMarketBrowseView" aria-label="创作市场作品列表">
+                  <label class="community-market-search" for="communityMarketSearch">
+                    <span class="sr-only">搜索市场作品</span>
+                    <input id="communityMarketSearch" type="search" autocomplete="off" placeholder="搜索作品、标签或创作者" />
+                  </label>
+                  <div class="community-market-list" id="communityMarketList" role="feed" aria-live="polite" aria-busy="false">
+                    <span class="community-empty">正在读取创作市场</span>
+                  </div>
+                </section>
+                <section class="community-market-publish-view" id="communityMarketPublishView" aria-labelledby="communityMarketPublishHeading" hidden>
+                  <header class="community-market-publish-head">
+                    <span>
+                      <strong id="communityMarketPublishHeading">发布作品</strong>
+                      <small>填写作品资料，预览确认后发布到创作市场</small>
+                    </span>
+                    <button id="communityMarketPublishClose" type="button" aria-label="关闭发布作品页面">返回市场</button>
+                  </header>
+                  <form class="community-market-publish-form" id="communityMarketPublishForm" enctype="multipart/form-data">
+                    <div class="community-market-publish-fields">
+                      <label for="communityMarketPublishType">
+                        <span>作品类型</span>
+                        <select id="communityMarketPublishType" name="type" required>
+                          <option value="wallpaper">壁纸</option>
+                          <option value="character">登录场景角色</option>
+                          <option value="cursor">鼠标光标</option>
+                          <option value="trail">鼠标尾迹</option>
+                          <option value="music">音乐</option>
+                        </select>
+                      </label>
+                      <label for="communityMarketPublishTitle">
+                        <span>作品标题</span>
+                        <input id="communityMarketPublishTitle" name="title" type="text" maxlength="80" autocomplete="off" placeholder="给作品起一个清楚的名字" required />
+                      </label>
+                      <label class="is-wide" for="communityMarketPublishDescription">
+                        <span>作品说明</span>
+                        <textarea id="communityMarketPublishDescription" name="description" rows="3" maxlength="500" placeholder="介绍作品效果、使用方式和适用场景"></textarea>
+                      </label>
+                      <label class="is-wide" for="communityMarketPublishTags">
+                        <span>标签</span>
+                        <input id="communityMarketPublishTags" name="tags" type="text" maxlength="120" autocomplete="off" placeholder="用逗号分隔，例如：像素, 夜景, 低频" />
+                      </label>
+                      <label class="community-market-file-field" for="communityMarketPublishAsset">
+                        <span>作品主文件</span>
+                        <input id="communityMarketPublishAsset" name="asset" type="file" accept="image/*,audio/*,video/*,.json,.femouse,.fetrail" required />
+                        <small id="communityMarketPublishAssetName">尚未选择文件</small>
+                      </label>
+                      <label class="community-market-file-field" for="communityMarketPublishPreview">
+                        <span>作品预览图</span>
+                        <input id="communityMarketPublishPreview" name="preview" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+                        <small id="communityMarketPublishPreviewName">支持 PNG、JPG、WebP、GIF</small>
+                      </label>
+                    </div>
+                    <figure class="community-market-publish-preview" id="communityMarketPublishPreviewFrame">
+                      <img id="communityMarketPublishPreviewImage" alt="作品发布预览" hidden />
+                      <figcaption id="communityMarketPublishPreviewPlaceholder">选择预览图后可在发布前检查作品展示效果</figcaption>
+                    </figure>
+                    <div class="community-market-publish-progress">
+                      <progress id="communityMarketPublishProgress" max="100" value="0" hidden>0%</progress>
+                      <output id="communityMarketPublishStatus" role="status" aria-live="polite">等待选择作品文件</output>
+                    </div>
+                    <div class="community-market-publish-actions">
+                      <button id="communityMarketPublishCancel" type="button">取消</button>
+                      <button class="is-primary" id="communityMarketPublishSubmit" type="submit">确认发布</button>
+                    </div>
+                  </form>
+                </section>
+                <section class="community-market-comment-drawer" id="communityMarketCommentDrawer" role="region" aria-labelledby="communityMarketCommentTitle" hidden>
+                  <header>
+                    <span>
+                      <strong id="communityMarketCommentTitle">作品评论</strong>
+                      <small id="communityMarketCommentWorkTitle">选择作品后查看评论</small>
+                    </span>
+                    <button id="communityMarketCommentClose" type="button" aria-label="关闭作品评论">关闭</button>
+                  </header>
+                  <div class="community-market-comment-list" id="communityMarketCommentList" role="feed" aria-live="polite">
+                    <span class="community-empty">还没有评论</span>
+                  </div>
+                  <form class="community-market-comment-form" id="communityMarketCommentForm">
+                    <label for="communityMarketCommentInput">
+                      <span class="sr-only">输入作品评论</span>
+                      <textarea id="communityMarketCommentInput" rows="2" maxlength="500" placeholder="说说你对这个作品的看法"></textarea>
+                    </label>
+                    <span>
+                      <small id="communityMarketCommentStatus" role="status" aria-live="polite"></small>
+                      <button id="communityMarketCommentSend" type="submit">发表评论</button>
+                    </span>
+                  </form>
+                </section>
+              </div>
+              <div class="community-profile-page community-achievement-page" id="communityProfileAchievementPage" role="tabpanel" aria-labelledby="communityProfileAchievementTab" hidden>
+                <div class="community-achievement-head">
+                  <span>
+                    <strong>冒险成就</strong>
+                    <small id="communityAchievementMeta">已解锁 0 / 19</small>
+                  </span>
+                  <button class="community-achievement-ornament-button" id="communityAchievementOrnamentsButton" type="button">查看挂饰</button>
+                  <div class="achievement-theme-controls" role="group" aria-label="成就外观设置">
+                    <label>
+                      <span>成就页</span>
+                      <select id="achievementPageThemeSelect" aria-label="成就页皮肤">
+                        <option value="classic">矿井经典</option>
+                        <option value="forge">熔岩锻炉</option>
+                        <option value="void">星渊遗迹</option>
+                        <option value="frost">极光冻土</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>成就弹窗</span>
+                      <select id="achievementToastThemeSelect" aria-label="成就弹窗皮肤">
+                        <option value="classic">矿井经典</option>
+                        <option value="forge">熔岩锻炉</option>
+                        <option value="void">星渊遗迹</option>
+                        <option value="frost">极光冻土</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+                <div class="community-achievement-grid" id="communityAchievementGrid" role="group" aria-label="成就路径" aria-live="polite"></div>
+              </div>
+              <div class="community-profile-page community-ornament-page" id="communityProfileOrnamentPage" role="tabpanel" aria-labelledby="communityProfileOrnamentTab" hidden>
+                <div class="community-ornament-head">
+                  <span>
+                    <strong>头像挂饰</strong>
+                    <small id="communityOrnamentMeta">完成成就后点击成就即可领取专属挂饰</small>
+                  </span>
+                  <button id="communityOrnamentUnequip" type="button" hidden>取消佩戴</button>
+                </div>
+                <section class="community-ornament-preview" aria-label="当前佩戴预览">
+                  <span class="community-ornament-preview-avatar" id="communityOrnamentPreviewAvatar">FE</span>
+                  <span>
+                    <small>社区头像展示</small>
+                    <strong id="communityOrnamentEquippedName">尚未佩戴挂饰</strong>
+                    <em id="communityOrnamentEquippedMeta">佩戴后所有好友都能在社区头像上看到</em>
+                  </span>
+                </section>
+                <div class="community-ornament-list" id="communityOrnamentList" aria-live="polite">
+                  <span class="community-empty">正在读取成就挂饰</span>
                 </div>
               </div>
             </div>
@@ -817,7 +1160,7 @@
         </section>
         <section class="wallpaper-scene" id="wallpaperScene" aria-label="壁纸模式" hidden>
           <img class="wallpaper-media wallpaper-media--image" id="wallpaperImage" alt="" />
-          <video class="wallpaper-media wallpaper-media--video" id="wallpaperVideo" muted loop playsinline></video>
+          <video class="wallpaper-media wallpaper-media--video" id="wallpaperVideo" muted playsinline preload="auto"></video>
           <iframe
             class="wallpaper-media wallpaper-media--web"
             id="wallpaperWebFrame"
@@ -832,7 +1175,7 @@
         <section class="rhythm-game" id="rhythmGameScene" aria-label="音游模式" hidden>
           <div class="rhythm-game-background" aria-hidden="true">
             <img id="rhythmGameBackgroundImage" alt="" />
-            <video id="rhythmGameBackgroundVideo" muted loop playsinline></video>
+            <video id="rhythmGameBackgroundVideo" muted playsinline preload="auto"></video>
           </div>
           <div class="rhythm-game-scrim" aria-hidden="true"></div>
 
@@ -960,6 +1303,8 @@
               <span class="playback-lyric-layer lyric-depth-1" id="playbackLyricDepth1"></span>
               <span class="playback-lyric-layer lyric-depth-0" id="playbackLyricText"></span>
               <span class="playback-lyric-layer lyric-back" id="playbackLyricBack"></span>
+              <span class="word-glow-lyric-previous" id="wordGlowLyricPrevious" aria-hidden="true" hidden></span>
+              <span class="word-glow-lyric-keyword word-glow-echo" id="wordGlowLyricKeyword" aria-hidden="true"></span>
               <div class="playback-lyric-subtitle" id="playbackLyricSubtitle"></div>
             </div>
           </div>
@@ -1434,16 +1779,43 @@
                   <label for="sonicOuterColorInput"><span>外围音柱</span><input id="sonicOuterColorInput" type="color" value="#83e4ff" aria-label="外围音柱颜色" /></label>
                 </div>
                 <div class="sonic-range-control"><label for="sonicBrightnessRange">亮度 <output id="sonicBrightnessValue" for="sonicBrightnessRange">100%</output></label><input id="sonicBrightnessRange" type="range" min="40" max="200" step="1" value="100" aria-valuetext="100%" /></div>
+                <div class="sonic-range-control"><label for="sonicFluorescenceRange">荧光质感 <output id="sonicFluorescenceValue" for="sonicFluorescenceRange">72%</output></label><input id="sonicFluorescenceRange" type="range" min="0" max="150" step="1" value="72" aria-valuetext="72%" /></div>
+                <div class="sonic-range-control"><label for="sonicFluorescenceScatterRange">荧光散射 <output id="sonicFluorescenceScatterValue" for="sonicFluorescenceScatterRange">55%</output></label><input id="sonicFluorescenceScatterRange" type="range" min="0" max="150" step="1" value="55" aria-valuetext="55%" /></div>
                 <div class="sonic-range-control"><label for="sonicExposureRange">曝光 <output id="sonicExposureValue" for="sonicExposureRange">0.00 EV</output></label><input id="sonicExposureRange" type="range" min="-150" max="150" step="5" value="0" aria-valuetext="0.00 EV" /></div>
                 <div class="sonic-range-control"><label for="sonicColumnHeightRange">音柱高度 <output id="sonicColumnHeightValue" for="sonicColumnHeightRange">100%</output></label><input id="sonicColumnHeightRange" type="range" min="50" max="250" step="1" value="100" aria-valuetext="100%" /></div>
                 <div class="sonic-range-control"><label for="sonicFovRange">广角视野 <output id="sonicFovValue" for="sonicFovRange">44°</output></label><input id="sonicFovRange" type="range" min="42" max="68" step="1" value="44" aria-valuetext="44°" /></div>
                 <div class="sonic-range-control"><label for="sonicSmoothingRange">升降丝滑度 <output id="sonicSmoothingValue" for="sonicSmoothingRange">100%</output></label><input id="sonicSmoothingRange" type="range" min="50" max="200" step="1" value="100" aria-valuetext="100%" /></div>
               </div>
             </details>
-            <details class="scene-feature-group" id="sonicGroundFeatureGroup" data-scene-feature-preset="topography">
-              <summary><strong>全部地面浮动</strong><small>错落节奏隆起</small></summary>
+            <details class="scene-feature-group" id="sonicGroundFeatureGroup" data-scene-feature-preset="topography" open>
+              <summary><strong>地形波峰</strong><small>调色、发光与固定全地形隆起</small></summary>
               <div class="scene-feature-group__content sonic-effect-controls">
-                <label class="sonic-effect-toggle" for="sonicAllGroundFloatToggle"><span>全部地面浮动</span><input class="ui-switch" id="sonicAllGroundFloatToggle" type="checkbox" role="switch" aria-label="全部地面浮动" /></label>
+                <label class="sonic-effect-toggle" for="sonicGroundMoundsToggle"><span>全地形波峰</span><input class="ui-switch" id="sonicGroundMoundsToggle" type="checkbox" role="switch" aria-label="全地形波峰" checked /></label>
+                <header class="sonic-preset-controls__head sonic-effect-controls__wide">
+                  <span><strong>地面调色盘</strong><small id="sonicGroundPaletteMode">随封面实时取色</small></span>
+                  <button id="sonicGroundFollowCoverButton" type="button" aria-pressed="true">封面取色</button>
+                </header>
+                <label class="sonic-effect-color sonic-effect-controls__wide" for="sonicGroundColorInput"><span>地面颜色</span><input id="sonicGroundColorInput" type="color" value="#83e4ff" aria-label="地面颜色" /></label>
+                <div class="sonic-range-control sonic-effect-controls__wide"><label for="sonicGroundEmissionRange">地面自发光 <output id="sonicGroundEmissionValue" for="sonicGroundEmissionRange">40%</output></label><input id="sonicGroundEmissionRange" type="range" min="0" max="150" step="1" value="40" aria-valuetext="40%" /></div>
+                <p class="sonic-ground-mound-note sonic-effect-controls__wide">固定数量的大波峰彼此相接并覆盖整片地形，只负责隆起，不生成音柱</p>
+                <div class="sonic-range-control"><label for="sonicGroundMoundHeightRange">隆起高度 <output id="sonicGroundMoundHeightValue" for="sonicGroundMoundHeightRange">145%</output></label><input id="sonicGroundMoundHeightRange" type="range" min="0" max="400" step="5" value="145" aria-valuetext="145%" /></div>
+                <div class="sonic-range-control sonic-effect-controls__wide"><label for="sonicGroundMoundRadiusRange">隆起宽度 <output id="sonicGroundMoundRadiusValue" for="sonicGroundMoundRadiusRange">18 格</output></label><input id="sonicGroundMoundRadiusRange" type="range" min="16" max="30" step="1" value="18" aria-valuetext="18 格" /></div>
+              </div>
+            </details>
+            <details class="scene-feature-group" id="sonicRainFeatureGroup" data-scene-feature-preset="topography">
+              <summary><strong>雨天湿地</strong><small>雨幕、落点水波与地面反光</small></summary>
+              <div class="scene-feature-group__content sonic-effect-controls">
+                <label class="sonic-effect-toggle sonic-effect-controls__wide" for="sonicRainToggle"><span>全场雨天效果</span><input class="ui-switch" id="sonicRainToggle" type="checkbox" role="switch" aria-label="全场雨天效果" checked /></label>
+                <div class="sonic-range-control"><label for="sonicRainIntensityRange">雨幕强度 <output id="sonicRainIntensityValue" for="sonicRainIntensityRange">72%</output></label><input id="sonicRainIntensityRange" type="range" min="0" max="150" step="1" value="72" aria-valuetext="72%" /></div>
+                <div class="sonic-range-control"><label for="sonicRainSpeedRange">下落速度 <output id="sonicRainSpeedValue" for="sonicRainSpeedRange">100%</output></label><input id="sonicRainSpeedRange" type="range" min="40" max="200" step="1" value="100" aria-valuetext="100%" /></div>
+                <div class="sonic-range-control"><label for="sonicRainWindRange">风向倾斜 <output id="sonicRainWindValue" for="sonicRainWindRange">+8%</output></label><input id="sonicRainWindRange" type="range" min="-100" max="100" step="1" value="8" aria-valuetext="+8%" /></div>
+                <div class="sonic-range-control"><label for="sonicRainLengthRange">雨丝长度 <output id="sonicRainLengthValue" for="sonicRainLengthRange">100%</output></label><input id="sonicRainLengthRange" type="range" min="40" max="200" step="1" value="100" aria-valuetext="100%" /></div>
+                <div class="sonic-range-control"><label for="sonicRainWidthRange">雨丝粗细 <output id="sonicRainWidthValue" for="sonicRainWidthRange">72%</output></label><input id="sonicRainWidthRange" type="range" min="35" max="180" step="1" value="72" aria-valuetext="72%" /></div>
+                <div class="sonic-range-control"><label for="sonicRainRippleIntensityRange">涟漪强度 <output id="sonicRainRippleIntensityValue" for="sonicRainRippleIntensityRange">72%</output></label><input id="sonicRainRippleIntensityRange" type="range" min="0" max="150" step="1" value="72" aria-valuetext="72%" /></div>
+                <div class="sonic-range-control"><label for="sonicRainRippleSizeRange">涟漪大小 <output id="sonicRainRippleSizeValue" for="sonicRainRippleSizeRange">100%</output></label><input id="sonicRainRippleSizeRange" type="range" min="40" max="200" step="1" value="100" aria-valuetext="100%" /></div>
+                <div class="sonic-range-control"><label for="sonicRainRippleLifeRange">涟漪寿命 <output id="sonicRainRippleLifeValue" for="sonicRainRippleLifeRange">100%</output></label><input id="sonicRainRippleLifeRange" type="range" min="40" max="200" step="1" value="100" aria-valuetext="100%" /></div>
+                <div class="sonic-range-control"><label for="sonicRainWetReflectanceRange">湿地反光 <output id="sonicRainWetReflectanceValue" for="sonicRainWetReflectanceRange">62%</output></label><input id="sonicRainWetReflectanceRange" type="range" min="0" max="150" step="1" value="62" aria-valuetext="62%" /></div>
+                <div class="sonic-range-control"><label for="sonicRainWetGlowRange">地面光晕 <output id="sonicRainWetGlowValue" for="sonicRainWetGlowRange">42%</output></label><input id="sonicRainWetGlowRange" type="range" min="0" max="150" step="1" value="42" aria-valuetext="42%" /></div>
               </div>
             </details>
             <details class="scene-feature-group" id="sonicFountainFeatureGroup" data-scene-feature-preset="topography">
@@ -1803,6 +2175,14 @@
                   <output id="textLyricsValue" for="textLyricsToggle">ON</output>
                 </div>
                 <div class="diy-text-composer-grid">
+                  <div class="diy-text-composer-field diy-text-composer-field--wide">
+                    <label for="textLyricHighlightMode">高亮动画</label>
+                    <output id="textLyricHighlightModeValue" for="textLyricHighlightMode">滚动高亮</output>
+                    <select id="textLyricHighlightMode" data-text-composer-setting="lyricHighlightMode">
+                      <option value="rolling" selected>滚动高亮</option>
+                      <option value="shine">擦亮扫光</option>
+                    </select>
+                  </div>
                   <div class="diy-text-composer-field">
                     <label for="textFlowIntensity">流动强度</label>
                     <output id="textFlowIntensityValue" for="textFlowIntensity">24%</output>
@@ -1823,6 +2203,19 @@
                     <output id="lyricSpeedValue" for="lyricSpeedRange">100%</output>
                     <input id="lyricSpeedRange" type="range" min="60" max="180" value="100" />
                   </div>
+                </div>
+                <div class="diy-control diy-control--handwritten-mood">
+                  <label class="diy-toggle" for="textHandwrittenMoodToggle">
+                    <span>手写心情</span>
+                    <input
+                      class="ui-switch"
+                      id="textHandwrittenMoodToggle"
+                      data-text-composer-setting="handwrittenMoodEnabled"
+                      type="checkbox"
+                      role="switch"
+                    />
+                  </label>
+                  <output id="textHandwrittenMoodValue" for="textHandwrittenMoodToggle">OFF</output>
                 </div>
                 <section class="diy-text-glitch-control" id="textGlitchControl" aria-labelledby="textGlitchTitle">
                   <header class="diy-text-glitch-head">
@@ -1993,7 +2386,7 @@
       <section
         class="netease-login-panel glass-surface glass-surface--fallback"
         data-glass-surface
-        data-glass-radius="20"
+        data-glass-radius="4"
         data-glass-brightness="58"
         data-glass-opacity="0.92"
         data-glass-blur="14"
@@ -2013,6 +2406,108 @@
             </div>
             <button class="login-close-button" id="neteaseLoginClose" type="button" aria-label="关闭登录弹窗"></button>
           </header>
+
+          <section class="pixel-login-scene" id="pixelLoginScene" aria-label="像素冒险登录场景">
+            <header class="pixel-login-hud">
+              <span>
+                <b id="pixelLoginLevelLabel">LEVEL · MUSIC GATE</b>
+                <small id="pixelLoginSeedLabel">地图生成中</small>
+              </span>
+              <strong id="pixelLoginStatus" role="status" aria-live="polite">A / D 移动 · 空格跳跃</strong>
+            </header>
+            <div class="pixel-login-viewport">
+              <canvas
+                id="pixelLoginCanvas"
+                width="600"
+                height="320"
+                tabindex="0"
+                role="application"
+                aria-label="音乐平台像素冒险。按 A 向左，D 向右，空格跳跃，顶中平台方块登录。"
+                aria-describedby="pixelLoginHelp pixelLoginStatus"
+              ></canvas>
+              <span class="pixel-login-scanlines" aria-hidden="true"></span>
+              <span class="pixel-login-hell-fx" aria-hidden="true"></span>
+            </div>
+            <footer class="pixel-login-help">
+              <p id="pixelLoginHelp">走到平台方块下方，跳起来顶一下。发光方块表示该平台已登录，再顶一次即可切换账号。</p>
+              <nav class="pixel-login-a11y-shortcuts" aria-label="无障碍平台直达">
+                <span>平台直达</span>
+                <button type="button" data-pixel-provider-shortcut="netease">网易云</button>
+                <button type="button" data-pixel-provider-shortcut="qq">QQ</button>
+                <button type="button" data-pixel-provider-shortcut="kugou">酷狗</button>
+                <button type="button" data-pixel-provider-shortcut="qishui">汽水</button>
+              </nav>
+              <div class="pixel-login-controls" aria-label="冒险场景触控操作">
+                <button type="button" data-pixel-control="left" aria-label="向左移动">A</button>
+                <button type="button" data-pixel-control="right" aria-label="向右移动">D</button>
+                <button type="button" data-pixel-control="jump" aria-label="跳跃">SPACE</button>
+                <button class="pixel-character-editor-trigger" id="pixelCharacterEditorOpen" type="button">绘制角色</button>
+              </div>
+            </footer>
+
+            <section class="pixel-character-editor" id="pixelCharacterEditor" aria-labelledby="pixelCharacterEditorTitle" aria-hidden="true" hidden>
+              <div class="pixel-character-editor__panel">
+                <header class="pixel-character-editor__head">
+                  <span>
+                    <small>PLAYER SPRITE LAB · 19 × 28</small>
+                    <strong id="pixelCharacterEditorTitle">绘制你的登录冒险角色</strong>
+                  </span>
+                  <button id="pixelCharacterEditorClose" type="button" aria-label="关闭角色绘制">×</button>
+                </header>
+                <div class="pixel-character-editor__body">
+                  <div class="pixel-character-editor__stage">
+                    <canvas
+                      id="pixelCharacterEditorCanvas"
+                      width="19"
+                      height="28"
+                      tabindex="0"
+                      aria-label="19 乘 28 像素角色画布。拖动鼠标或手指绘制。"
+                    ></canvas>
+                    <span>拖动绘制 · 透明像素不改变角色碰撞范围</span>
+                  </div>
+                  <aside class="pixel-character-editor__tools" aria-label="角色绘制工具">
+                    <div class="pixel-character-preview-wrap">
+                      <canvas id="pixelCharacterPreviewCanvas" width="19" height="28" aria-hidden="true"></canvas>
+                      <span>游戏内预览</span>
+                    </div>
+                    <div class="pixel-character-palette" id="pixelCharacterPalette" aria-label="角色颜色"></div>
+                    <label class="pixel-character-color-picker">
+                      <span>编辑当前颜色</span>
+                      <input id="pixelCharacterColorInput" type="color" value="#69d6c2" />
+                    </label>
+                    <div class="pixel-character-tool-row" aria-label="画笔工具">
+                      <button class="is-active" type="button" data-character-tool="pencil" aria-pressed="true">画笔</button>
+                      <button type="button" data-character-tool="eraser" aria-pressed="false">橡皮</button>
+                      <button type="button" data-character-tool="fill" aria-pressed="false">填充</button>
+                    </div>
+                    <div class="pixel-character-tool-row">
+                      <button id="pixelCharacterUndo" type="button">撤销</button>
+                      <button id="pixelCharacterClear" type="button">清空</button>
+                      <button id="pixelCharacterReset" type="button">恢复默认</button>
+                    </div>
+                  </aside>
+                </div>
+                <footer class="pixel-character-editor__footer">
+                  <p id="pixelCharacterEditorStatus" role="status" aria-live="polite">选择颜色后在画布上绘制。</p>
+                  <span>
+                    <button id="pixelCharacterCancel" type="button">取消</button>
+                    <button class="is-primary" id="pixelCharacterSave" type="button">保存并使用</button>
+                  </span>
+                </footer>
+              </div>
+            </section>
+          </section>
+
+          <section class="pixel-login-auth-drawer" id="pixelLoginAuthDrawer" aria-label="平台登录面板" aria-hidden="true">
+            <header class="pixel-login-auth-head">
+              <button id="pixelLoginAuthBack" type="button">← 返回场景</button>
+              <span class="pixel-login-auth-mark" id="pixelLoginAuthProviderMark" aria-hidden="true">FE</span>
+              <span>
+                <small>PLATFORM GATE</small>
+                <strong id="pixelLoginAuthProviderName">音乐平台登录</strong>
+              </span>
+            </header>
+            <p class="pixel-login-auth-notice" id="pixelLoginAuthNotice" role="status" aria-live="polite" hidden></p>
 
           <div class="login-provider-tabs" id="loginProviderTabs" role="tablist" aria-label="已识别的音乐平台" aria-live="polite"></div>
 
@@ -2125,9 +2620,189 @@
               <strong id="loginCommunityId">FE ID --------</strong>
             </div>
           </div>
+          </section>
         </div>
       </section>
     </div>
+
+    <section class="pet-assistant" id="petAssistant" data-state="idle" aria-label="FE Monster 智能桌宠" hidden>
+      <section
+        class="pet-assistant__panel pet-assistant__text-bubble"
+        id="petAssistantPanel"
+        data-pet-text-bubble
+        aria-label="小 Fe 文字聊天"
+        hidden
+      >
+        <div class="pet-assistant__messages pet-assistant__current-reply" id="petAssistantMessages" role="log" aria-label="当前文字回复" aria-live="polite" aria-relevant="additions text"></div>
+        <p class="pet-assistant__interim" id="petAssistantInterim" aria-live="polite" hidden></p>
+        <section class="pet-assistant__confirmation" id="petAssistantConfirmation" role="alertdialog" aria-labelledby="petAssistantConfirmationTitle" aria-describedby="petAssistantConfirmationText" hidden>
+          <span>
+            <small>需要本机确认</small>
+            <strong id="petAssistantConfirmationTitle">确认执行高影响操作</strong>
+          </span>
+          <p id="petAssistantConfirmationText"></p>
+          <div class="pet-assistant__confirmation-actions">
+            <button id="petAssistantConfirmationCancel" type="button">取消</button>
+            <button id="petAssistantConfirmationConfirm" type="button">确认执行</button>
+          </div>
+        </section>
+        <form class="pet-assistant__composer" id="petAssistantForm">
+          <textarea id="petAssistantInput" rows="1" maxlength="2000" autocomplete="off" placeholder="和小 Fe 说话，或输入“帮我播放……”" aria-label="发送给桌宠的消息"></textarea>
+          <button class="pet-assistant__send" id="petAssistantSend" type="submit">发送</button>
+        </form>
+      </section>
+
+      <div class="pet-assistant__dock" id="petAssistantDock">
+        <span class="pet-assistant__speech" id="petAssistantSpeech" aria-live="polite">单击实时对话 · 双击打字</span>
+        <button class="pet-assistant__character" id="petAssistantCharacter" type="button" aria-label="单击开始实时对话，双击打开文字输入" aria-pressed="false" aria-expanded="false" aria-controls="petAssistantPanel">
+          <canvas id="petAssistantParticleOrb" class="pet-assistant__particle-orb" role="img" aria-label="小 Fe，随声音呼吸变形的白色粒子桌宠"></canvas>
+          <span class="pet-assistant__aura" aria-hidden="true"></span>
+          <svg class="pet-assistant__vector pet-assistant__rig" viewBox="0 0 1254 1254" role="img" aria-label="小 Fe，FE Monster 黑色音频龙动态桌宠">
+            <defs>
+              <linearGradient id="petSpectrumGradient" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stop-color="#22edff" />
+                <stop offset="0.52" stop-color="#526cff" />
+                <stop offset="1" stop-color="#c12cff" />
+              </linearGradient>
+              <clipPath id="petRigTail"><path d="M620 500H1180V1130H600Z" /></clipPath>
+              <clipPath id="petRigFins"><path d="M540 480H860V780H540Z" /></clipPath>
+              <clipPath id="petRigTorso"><path d="M300 535H755V970H300Z" /></clipPath>
+              <clipPath id="petRigLeftArm"><path d="M245 610H490V990H245Z" /></clipPath>
+              <clipPath id="petRigRightArm"><path d="M570 580H790V965H570Z" /></clipPath>
+              <clipPath id="petRigLeftLeg"><path d="M245 800H530V1215H245Z" /></clipPath>
+              <clipPath id="petRigRightLeg"><path d="M455 790H755V1215H455Z" /></clipPath>
+              <clipPath id="petRigFace"><path d="M275 195H830V665H275Z" /></clipPath>
+              <clipPath id="petRigEars"><path d="M190 170H390V475H190ZM675 125H875V470H675Z" /></clipPath>
+              <clipPath id="petRigHorns"><path d="M315 25H735V420H315Z" /></clipPath>
+              <clipPath id="petRigHeadphones"><path d="M255 205H400V620H255ZM690 190H860V620H690Z" /></clipPath>
+              <clipPath id="petRigHeadband"><path d="M275 175H825V370H275Z" /></clipPath>
+              <clipPath id="petRigTailSpectrum"><path d="M665 705H1100V1075H665Z" /></clipPath>
+            </defs>
+            <g class="pet-assistant__body pet-assistant__rig-body">
+              <g class="pet-assistant__tail pet-assistant__rig-tail">
+                <image class="pet-assistant__rig-texture" href="assets/fe-monster-pet-mascot.png" width="1254" height="1254" clip-path="url(#petRigTail)" />
+                <image class="pet-assistant__rig-texture pet-assistant__tail-spectrum" href="assets/fe-monster-pet-mascot.png" width="1254" height="1254" clip-path="url(#petRigTailSpectrum)" />
+              </g>
+              <g class="pet-assistant__back-fins pet-assistant__rig-fins">
+                <image class="pet-assistant__rig-texture" href="assets/fe-monster-pet-mascot.png" width="1254" height="1254" clip-path="url(#petRigFins)" />
+              </g>
+              <g class="pet-assistant__rig-torso">
+                <image class="pet-assistant__rig-texture" href="assets/fe-monster-pet-mascot.png" width="1254" height="1254" clip-path="url(#petRigTorso)" />
+              </g>
+              <g class="pet-assistant__rig-limb pet-assistant__rig-arm-left">
+                <image class="pet-assistant__rig-texture" href="assets/fe-monster-pet-mascot.png" width="1254" height="1254" clip-path="url(#petRigLeftArm)" />
+              </g>
+              <g class="pet-assistant__rig-limb pet-assistant__rig-arm-right">
+                <image class="pet-assistant__rig-texture" href="assets/fe-monster-pet-mascot.png" width="1254" height="1254" clip-path="url(#petRigRightArm)" />
+              </g>
+              <g class="pet-assistant__rig-limb pet-assistant__rig-leg-left">
+                <image class="pet-assistant__rig-texture" href="assets/fe-monster-pet-mascot.png" width="1254" height="1254" clip-path="url(#petRigLeftLeg)" />
+              </g>
+              <g class="pet-assistant__rig-limb pet-assistant__rig-leg-right">
+                <image class="pet-assistant__rig-texture" href="assets/fe-monster-pet-mascot.png" width="1254" height="1254" clip-path="url(#petRigRightLeg)" />
+              </g>
+              <g class="pet-assistant__rig-head">
+                <image class="pet-assistant__rig-texture" href="assets/fe-monster-pet-mascot.png" width="1254" height="1254" clip-path="url(#petRigHeadband)" />
+                <image class="pet-assistant__rig-texture" href="assets/fe-monster-pet-mascot.png" width="1254" height="1254" clip-path="url(#petRigFace)" />
+                <g class="pet-assistant__ears">
+                  <image class="pet-assistant__rig-texture" href="assets/fe-monster-pet-mascot.png" width="1254" height="1254" clip-path="url(#petRigEars)" />
+                </g>
+                <g class="pet-assistant__horns">
+                  <image class="pet-assistant__rig-texture" href="assets/fe-monster-pet-mascot.png" width="1254" height="1254" clip-path="url(#petRigHorns)" />
+                </g>
+                <g class="pet-assistant__headphones">
+                  <image class="pet-assistant__rig-texture" href="assets/fe-monster-pet-mascot.png" width="1254" height="1254" clip-path="url(#petRigHeadphones)" />
+                </g>
+                <g class="pet-assistant__face" aria-hidden="true">
+                  <g class="pet-assistant__eyes">
+                    <path class="pet-assistant__eyelid" d="M397 504Q436 468 482 504C482 562 462 570 397 540Z" />
+                    <path class="pet-assistant__eyelid" d="M567 468Q618 421 671 466C670 526 645 545 570 510Z" />
+                  </g>
+                  <path class="pet-assistant__mouth" d="M489 555Q531 587 579 550Q542 607 492 574Z" />
+                </g>
+              </g>
+            </g>
+            <g class="pet-assistant__spectrum-marks" aria-hidden="true">
+              <path d="M441 705h18v50h-18zm28-30h18v80h-18zm28 14h18v66h-18zm28-45h18v111h-18zm28 28h18v83h-18zm28-12h18v95h-18z" fill="url(#petSpectrumGradient)" />
+            </g>
+            <g class="pet-assistant__thinking-dots" fill="#d8fcff" aria-hidden="true">
+              <circle cx="866" cy="330" r="25" /><circle cx="934" cy="256" r="17" /><circle cx="979" cy="182" r="11" />
+            </g>
+            <g class="pet-assistant__sparkles" fill="#fff" aria-hidden="true">
+              <path d="m235 475 18 42 42 18-42 18-18 42-18-42-42-18 42-18z" />
+              <path d="m875 685 12 30 30 12-30 12-12 30-12-30-30-12 30-12z" />
+            </g>
+            <rect class="pet-assistant__scanner" x="285" y="340" width="560" height="16" rx="8" fill="#fff" opacity="0" aria-hidden="true" />
+          </svg>
+          <span class="pet-assistant__eye-glow" aria-hidden="true"></span>
+          <span class="pet-assistant__voice-ring" aria-hidden="true"></span>
+          <span class="pet-assistant__equalizer" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="pet-assistant__state-badge" id="petAssistantStateBadge" aria-hidden="true">●</span>
+        </button>
+      </div>
+      <audio id="petAssistantAudio" preload="none"></audio>
+    </section>
+    <button class="pet-assistant-restore" id="petAssistantRestore" type="button" aria-label="重新显示小 Fe" hidden>显示小 Fe</button>
+
+    <section class="fe-identity-card-dialog" id="feIdentityCardDialog" role="dialog" aria-modal="true" aria-labelledby="feIdentityCardTitle" hidden>
+      <button class="fe-identity-card__backdrop" type="button" data-fe-identity-close tabindex="-1" aria-label="关闭身份卡"></button>
+      <div class="fe-identity-card__viewer" role="document">
+        <header class="fe-identity-card__header">
+          <span>
+            <small>FE COMMUNITY IDENTITY</small>
+            <strong id="feIdentityCardTitle">我的身份卡</strong>
+          </span>
+          <span class="fe-identity-card__header-actions">
+            <button id="feIdentityCardSound" class="fe-identity-card__icon-button" type="button" aria-pressed="false" aria-label="关闭身份卡音效" title="身份卡音效">
+              <span aria-hidden="true">♪</span>
+            </button>
+            <button id="feIdentityCardClose" class="fe-identity-card__icon-button" type="button" aria-label="关闭身份卡">
+              <span aria-hidden="true">×</span>
+            </button>
+          </span>
+        </header>
+
+        <div class="fe-identity-card__stage" id="feIdentityCardStage" data-entrance="corner-fall-float">
+          <span class="fe-identity-card__halo" aria-hidden="true"></span>
+          <span class="fe-identity-card__shadow" aria-hidden="true"></span>
+          <span class="fe-identity-card__shell" id="feIdentityCardShell">
+            <button class="fe-identity-card__card" id="feIdentityCard" type="button" aria-label="翻转身份卡，查看背面" aria-pressed="false">
+              <span class="fe-identity-card__front" id="feIdentityCardFront">
+                <span class="fe-identity-card__microcopy">FE MOSTER · VERIFIED MEMBER</span>
+                <span class="fe-identity-card__feid-block">
+                  <small>FE ID</small>
+                  <strong id="feIdentityCardFeId">--------</strong>
+                </span>
+                <span class="fe-identity-card__nickname" id="feIdentityCardNickname" role="button" tabindex="0" aria-label="编辑身份卡昵称" title="点击编辑昵称">FE 用户</span>
+                <span class="fe-identity-card__seal" aria-hidden="true"><b>FE</b><i>IDENTITY</i></span>
+                <span class="fe-identity-card__serial">FE COMMUNITY · 2.0</span>
+              </span>
+              <span class="fe-identity-card__back" id="feIdentityCardBack">
+                <span class="fe-identity-card__back-mark">FE MOSTER</span>
+                <span class="fe-identity-card__back-rule" aria-hidden="true"></span>
+                <span class="fe-identity-card__back-copy">MEMBER IDENTITY · AUTHENTICATED</span>
+              </span>
+            </button>
+          </span>
+        </div>
+
+        <div class="fe-identity-card__controls" aria-label="身份卡操作">
+          <button id="feIdentityCardFlip" type="button" aria-label="翻转身份卡" title="翻转身份卡"><span aria-hidden="true">↻</span><span class="fe-identity-card__control-label">翻转身份卡</span></button>
+          <button id="feIdentityCardEdit" type="button" aria-label="编辑昵称" title="编辑昵称"><span aria-hidden="true">✎</span><span class="fe-identity-card__control-label">编辑昵称</span></button>
+          <button id="feIdentityCardReplay" type="button" aria-label="重播出场动画" title="重播出场动画"><span aria-hidden="true">▶</span><span class="fe-identity-card__control-label">重播出场动画</span></button>
+        </div>
+
+        <form class="fe-identity-card__nickname-form" id="feIdentityCardNicknameForm" hidden>
+          <label for="feIdentityCardNicknameInput">卡面昵称</label>
+          <span>
+            <input id="feIdentityCardNicknameInput" type="text" maxlength="32" autocomplete="nickname" placeholder="输入卡面昵称" />
+            <button type="submit">刻到卡面</button>
+          </span>
+        </form>
+
+        <p class="fe-identity-card__status" id="feIdentityCardStatus" role="status" aria-live="polite">登录社区后显示专属身份卡</p>
+      </div>
+    </section>
 
     <section class="update-dialog" id="updateDialog" role="dialog" aria-modal="true" aria-labelledby="updateDialogTitle" hidden>
       <div class="update-dialog-panel">
@@ -2149,18 +2824,51 @@
       </div>
     </section>
 
+    <section class="world-peace-cinematic" id="worldPeaceCinematic" aria-hidden="true" hidden>
+      <div class="world-peace-cinematic__vignette" aria-hidden="true"></div>
+      <div class="world-peace-cinematic__copy">
+        <p class="world-peace-cinematic__line world-peace-cinematic__line--primary" id="worldPeaceLinePrimary"><span>世界和平</span></p>
+        <p class="world-peace-cinematic__line world-peace-cinematic__line--secondary" id="worldPeaceLineSecondary"><span>愿天下没有战争</span></p>
+      </div>
+    </section>
+
+    <aside class="achievement-toast" id="achievementToast" role="status" aria-live="polite" aria-atomic="true" data-achievement-toast-theme="classic" hidden>
+      <span class="achievement-toast__icon" aria-hidden="true">
+        <canvas id="achievementToastIcon" width="32" height="32"></canvas>
+      </span>
+      <span class="achievement-toast__copy">
+        <small class="achievement-toast-kicker">获得成就</small>
+        <strong id="achievementToastName">这都被你发现了？</strong>
+      </span>
+    </aside>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <audio id="audio" preload="auto"></audio>
-    <script src="vendor/three.r128.min.js?v=20260701-main-blue-orb"></script>
-    <script src="liquid-ether-switches.js?v=20260728-interactive-liquid-switches-1"></script>
-    <script type="module" src="client-runtime-loader.js?v=20260713-platform-split-3"></script>
-    <script src="render-quality.js?v=20260718-preset-fsr-versions-1"></script>
-    <script src="storm-ocean-runtime.js?v=20260718-fine-waves-120"></script>
-    <script src="free-cube-runtime.js?v=20260718-material-clarity-2"></script>
-    <script src="void-prism-runtime.js?v=20260721-text-fonts-1"></script>
-    <script src="chladni-runtime.js?v=20260723-chladni-low-bass-jump-2"></script>
-    <script src="app.js?v=20260728-cursor-skins-trails-1"></script>
-    <script src="cursor-trails.js?v=20260728-cursor-skins-trails-1"></script>
-    <script src="rhythm-game.js?v=20260718-rhythm-game-orbit-lock-1"></script>
+    <script src="/api/app/preferences/bootstrap.js"></script>
+    <script src="vendor/three.r128.min.js?v=20260811-cache-audit-1"></script>
+    <script src="liquid-ether-switches.js?v=20260811-cache-audit-1"></script>
+    <script type="module" src="client-runtime-loader.js?v=20260811-cache-audit-1"></script>
+    <script src="render-quality.js?v=20260811-cache-audit-1"></script>
+    <script src="wallpaper-video-continuity.js?v=20260811-cache-audit-1"></script>
+    <script src="app-command.js?v=20260811-cache-audit-1"></script>
+    <script src="playback-intelligence.js?v=20260811-cache-audit-1"></script>
+    <script src="music-api-package-client.js?v=20260811-cache-audit-1"></script>
+    <script src="community-reward-runtime.js?v=20260812-reward-stages-2"></script>
+    <script src="app.js?v=20260813-achievement-rewards-1"></script>
+  <script src="fe-identity-card.js?v=20260812-friend-card-2"></script>
+    <script src="pet-emotion-runtime.js?v=20260811-conversation-emotion-1"></script>
+    <script src="pet-client-context.js?v=20260811-cache-audit-1"></script>
+    <script src="pet-live-turn-controller.js?v=20260811-cache-audit-1"></script>
+    <script src="pet-live-telemetry.js?v=20260811-cache-audit-1"></script>
+    <script src="pet-live-playout.js?v=20260811-cache-audit-1"></script>
+    <script src="pet-live-stt-client.js?v=20260811-cache-audit-1"></script>
+    <script src="pet-assistant.js?v=20260811-server-tour-tts-2"></script>
+    <script src="pet-product-tour.js?v=20260811-moving-guide-2"></script>
+  <script src="pet-particle-orb.js?v=20260812-audio-reactive-sphere-2"></script>
+    <script src="pet-companion-p2.js?v=20260811-cache-audit-1"></script>
+    <script src="pixel-achievements.js?v=20260813-achievement-rewards-1"></script>
+    <script src="pixel-login-adventure.js?v=20260811-cache-audit-1"></script>
+    <script src="cursor-trails.js?v=20260811-cache-audit-1"></script>
+    <script src="creative-community.js?v=20260812-friend-card-1"></script>
+    <script src="rhythm-game.js?v=20260811-cache-audit-1"></script>
   </body>
 </html>

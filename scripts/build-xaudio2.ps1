@@ -214,8 +214,19 @@ try {
   Copy-Item -LiteralPath $stagedRustUpmixDll -Destination $installedRustUpmixDll -Force -ErrorAction Stop
   $verifiedDlls = @($installedDll, $installedRustUpmixDll)
 } catch {
-  $verifiedDlls = @($stagedDll, $stagedRustUpmixDll)
-  Write-Warning "The running app is using a native audio DLL. Verified replacements remain staged under $stagingOutputDir."
+  # Windows locks an in-use image file. Keep a complete side-by-side runtime
+  # so the next client launch can pick up the verified build without stopping
+  # the user's currently playing session or requiring another compilation.
+  $nextRuntimeDir = Join-Path $nativeSourceDir 'build-next'
+  if (!(Test-Path -LiteralPath $nextRuntimeDir -PathType Container)) {
+    New-Item -ItemType Directory -Path $nextRuntimeDir -Force | Out-Null
+  }
+  $nextDll = Join-Path $nextRuntimeDir 'fe-monster-xaudio2.dll'
+  $nextRustUpmixDll = Join-Path $nextRuntimeDir 'fe_monster_upmix.dll'
+  Copy-Item -LiteralPath $stagedDll -Destination $nextDll -Force
+  Copy-Item -LiteralPath $stagedRustUpmixDll -Destination $nextRustUpmixDll -Force
+  $verifiedDlls = @($nextDll, $nextRustUpmixDll)
+  Write-Warning "The running app is using the installed native audio DLL. The verified replacement is ready for the next launch under $nextRuntimeDir."
 }
 
 Write-Host "Built $($verifiedDlls -join ', ')"

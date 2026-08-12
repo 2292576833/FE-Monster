@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$pluginVersion = "3.1.0"
+$pluginVersion = "3.1.1"
 $pluginRoot = [IO.Path]::GetFullPath($PSScriptRoot)
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $pluginRoot "..\.."))
 $buildRoot = [IO.Path]::GetFullPath((Join-Path $pluginRoot ".build"))

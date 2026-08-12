@@ -1,0 +1,271 @@
+{
+  "schemaVersion": 1,
+  "entry": "web/index.html",
+  "assets": [
+    {
+      "path": "components/BorderGlow.css",
+      "version": "20260811-cache-audit-1",
+      "sha256": "b535627b58584d14dc22be192e1f5352d8bea5ab3b0e11fcb9d9848f8b5ad447"
+    },
+    {
+      "path": "components/GlassSurface.css",
+      "version": "20260811-cache-audit-1",
+      "sha256": "07b0d4ea8b3f99e68af873e194dac6eb9297adcbce5eedc38afb7b9111c05c97"
+    },
+    {
+      "path": "web/app-command.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "0912db53b84dd741b7b21bdf010dd4e0d38f1646cf1336cc9fecb5a9a0203080"
+    },
+    {
+      "path": "web/app.js",
+      "version": "20260813-achievement-rewards-1",
+      "sha256": "7f59837062d8dbb508dd8e69334f80b5901d40894965d6e88370def466f59a79"
+    },
+    {
+      "path": "web/black-gold-buttons.css",
+      "version": "20260811-cache-audit-1",
+      "sha256": "a903dcccc9deaa6eaf3a175dd155e60f3556d403c025076f3db4c511ff4165b0"
+    },
+    {
+      "path": "web/blur-text-lyrics-apk.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "bf3152a85e1db19fb697b31829f534daed0d303dc3f63f76e9d38585241f668d"
+    },
+    {
+      "path": "web/blur-text-lyrics.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "093393436b6aa516bf5b1ed9fc0c8c2edfb9e33a8dfe89dc0c677cd8c955738f"
+    },
+    {
+      "path": "web/boot-lightfall-apk.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "540961bbeca618fe5499b3f4d8bbd1169ab03d7d772cc4c139eb3c2cae511fca"
+    },
+    {
+      "path": "web/boot-lightfall-react.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "02ce2f82db7b7dfee94ad7fcf2a78f2a9e61f85991ce339a48bbd74a2bbcbe0f"
+    },
+    {
+      "path": "web/border-glow-buttons.css",
+      "version": "20260811-cache-audit-1",
+      "sha256": "5dce735126612d77fc0f18b950bc4f0c3c59de1790bc7648714ff40a73d9b5e8"
+    },
+    {
+      "path": "web/border-glow-buttons.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "bb698cfc327655baf50e232427d9bf4afad57467ce128db3ea54b414091f383e"
+    },
+    {
+      "path": "web/chladni-runtime.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "710232e72459bf60a428cbf358c635041f30f7839667262e2a6efe69eb4e2fe7"
+    },
+    {
+      "path": "web/client-runtime-loader.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "82420ba9a829228c493abc99461354cfb6a4e6fe8abe3fcd8c82f79ca9ebf6da"
+    },
+    {
+      "path": "web/community-reward-runtime.css",
+      "version": "20260812-reward-stages-2",
+      "sha256": "e8a75a68b64e7425df5c673716aa60d86a8319d9ce9e5fe7b8fc6d2ba4e5acea"
+    },
+    {
+      "path": "web/community-reward-runtime.js",
+      "version": "20260812-reward-stages-2",
+      "sha256": "ce60de2c8625b0165268c1d1ce28cb392a798ae87faab6ae7ef4ea16e4b9adc9"
+    },
+    {
+      "path": "web/creative-community.js",
+      "version": "20260812-friend-card-1",
+      "sha256": "abee422eb2f8bfc6deb12418e17233228b96f1ffb8019174cfd05beac7c8f9ca"
+    },
+    {
+      "path": "web/cursor-trails.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "971e9fb5c379e4be6be928363d8e9537c76d0ea1716e6acdc9d37412d1c4ed91"
+    },
+    {
+      "path": "web/fe-identity-card.css",
+      "version": "20260813-material-texture-2",
+      "sha256": "d150b12b2d49b0439c8b024e68aa762459c55297bcf89eceac3524c4ec917464"
+    },
+    {
+      "path": "web/fe-identity-card.js",
+      "version": "20260812-friend-card-2",
+      "sha256": "5180dde5b61b411f5922ff38b042e54e520f553edecca281ef9b2f87a476b1b4"
+    },
+    {
+      "path": "web/free-cube-runtime.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "f504e96e39e253509ed2d2b82bed96c7d966d6335f240375e6eb9dc5d1bffcdf"
+    },
+    {
+      "path": "web/liquid-ether-switches.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "84bd8df54389a3c85af1acabbe73a007f02b1ac8783c37d2321963b5dd1e4cd3"
+    },
+    {
+      "path": "web/lyric-render-quality.css",
+      "version": "20260811-cache-audit-1",
+      "sha256": "aeec30704a605a9a6868a154a77b909973c89696fa9b21096ba25fd6c90a2975"
+    },
+    {
+      "path": "web/music-api-package-client.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "34e000b4e32a1d3e83180076b1f37aba12c1345af20fa1b32d5f90026a41ab2d"
+    },
+    {
+      "path": "web/pet-assistant.css",
+      "version": "20260811-conversation-emotion-2",
+      "sha256": "518c38afb166826858f145931858c359a41cf119d656cc2580037d4a4278018e"
+    },
+    {
+      "path": "web/pet-assistant.js",
+      "version": "20260811-server-tour-tts-2",
+      "sha256": "a61cd83c448e7d43e0d92c5daf34f8dc2037a02ea3f2fc0808d1134829389b1e"
+    },
+    {
+      "path": "web/pet-client-context.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "60fb4235701aa651ea1d61c799b108a762bd9ae4c571ec60cc2ca3513093a38e"
+    },
+    {
+      "path": "web/pet-companion-p2.css",
+      "version": "20260811-cache-audit-1",
+      "sha256": "3c9b8a4003ce4d983879ac0c11eb556649aa371c4df4e598452e59686fba5d1a"
+    },
+    {
+      "path": "web/pet-companion-p2.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "d4ac7a22ffcf27a2bd60a451213d8d9c5b1f20567ac5320bc8660fac5b3f91a3"
+    },
+    {
+      "path": "web/pet-emotion-runtime.js",
+      "version": "20260811-conversation-emotion-1",
+      "sha256": "17dfddab82f66edd25998a54e582e498ba1d660e878dee9acff5b91c585192ca"
+    },
+    {
+      "path": "web/pet-live-audio-worklet.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "131d5a8ca44df748620efd50b83521864348ea2b75afd3c5a8ce4a20dd256f52"
+    },
+    {
+      "path": "web/pet-live-playout.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "ec39f10a5ab6656aba33343f9aad72589d37338cb605920995eb9fed650f4ade"
+    },
+    {
+      "path": "web/pet-live-stt-client.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "500347311d4b6252ee2861cc29e09fdfa05bcff28bd64a41dcecd8c6a64f9b23"
+    },
+    {
+      "path": "web/pet-live-telemetry.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "b7a748a14127edc475254d6852ab90b94f061ea9f686fc9abc688348b2cc12c2"
+    },
+    {
+      "path": "web/pet-live-turn-controller.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "4325a21003cd1a67b9d735ca9edeb9fcf9635a7e623fdb3701cc374203cd784d"
+    },
+    {
+      "path": "web/pet-particle-orb.js",
+      "version": "20260812-audio-reactive-sphere-2",
+      "sha256": "e1cfbdf859e55c37b412cdc48781390fc15284b453c5dc0f97a756203e6332dc"
+    },
+    {
+      "path": "web/pet-product-tour.css",
+      "version": "20260811-moving-guide-1",
+      "sha256": "b46383a8b2c67ac69a0b2eaa2177692b7d075f575bf6238c9c5c1b9ae869a80b"
+    },
+    {
+      "path": "web/pet-product-tour.js",
+      "version": "20260811-moving-guide-2",
+      "sha256": "0474540d78c166134be74f126c09fbfb237ffdd85042d16f4e2ec87f997bf969"
+    },
+    {
+      "path": "web/pixel-achievements.js",
+      "version": "20260813-achievement-rewards-1",
+      "sha256": "979fe17730e9026d96cc9351ff629df8010c0ef540bdb1777bf76edd8653b311"
+    },
+    {
+      "path": "web/pixel-adventure.css",
+      "version": "20260813-achievement-rewards-1",
+      "sha256": "41eddc4656739e258bf2449b34463cf2a521e865c4ae31a4a589689a0cf348d0"
+    },
+    {
+      "path": "web/pixel-login-adventure.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "464cd1479478f4beb910d208e4446d5b2e174ba544c0c7fbb2c5d7210f74dc69"
+    },
+    {
+      "path": "web/playback-intelligence.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "6184e4a0e89246dc04e50705092e39a2c6bc17a5c4ccccf7f8fa3ab1532eba93"
+    },
+    {
+      "path": "web/render-quality.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "317d857abf722e24f459f367f48eda5e0799d8970a57e9fdb182683ede209fb0"
+    },
+    {
+      "path": "web/rhythm-game.css",
+      "version": "20260811-cache-audit-1",
+      "sha256": "91d34996c294456438b21292fafd79c603ad05e6f575262086f8f35a15a3f15b"
+    },
+    {
+      "path": "web/rhythm-game.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "3a07bbd9a6fe3d07ec45a5741f9f07b397b4d75b0b2160895e215ef2a8a0446d"
+    },
+    {
+      "path": "web/storm-ocean-runtime.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "30b34a337d06e2ae81428b06b9e21f9c6d2d483f34bc190a8b73a28526937603"
+    },
+    {
+      "path": "web/styles.css",
+      "version": "20260812-friend-card-1",
+      "sha256": "7803b56020a932b2ffdf7bfb046fef84a29b49d9ea08e028ec4abb622ad0ebe9"
+    },
+    {
+      "path": "web/text-fonts.css",
+      "version": "20260811-cache-audit-1",
+      "sha256": "f3729f0d098bb6decb58627f8b59ff067d7e3f04a08a2f92c349ba8d37796fbe"
+    },
+    {
+      "path": "web/vendor/GLTFLoader.r128.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "430707158b6a8a61e7b185f07166eef12607f2016a7d2b99463e17fafe5dc561"
+    },
+    {
+      "path": "web/vendor/google-obr/obr-worklet.js",
+      "version": "478dc7c752d5-surround2",
+      "sha256": "039733a1bf0812ed96f1b6cc88a4d86fff399b6289349f9e15ce227445fc5d6d"
+    },
+    {
+      "path": "web/vendor/native-spatial/native-pcm-worklet.js",
+      "version": "20260728-direct-4096-1",
+      "sha256": "7e4991f058c6deecec755aa09da0388ded1702af9094f45ebc7aed9107bc1725"
+    },
+    {
+      "path": "web/vendor/three.r128.min.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "9274bbcec8d96168626c732b5d31c775aa8cfb7eaa0599bec0c175908a2c1ce2"
+    },
+    {
+      "path": "web/void-prism-runtime.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "4e4a93eaa071a09fde78472afd52c9f08d0834a886e2307e369bb6e95c6ecfd4"
+    },
+    {
+      "path": "web/wallpaper-video-continuity.js",
+      "version": "20260811-cache-audit-1",
+      "sha256": "e0935ccb07729bb28456f3ee4e5734afe97ae1d16d3999aba24df4cab32a7fe5"
+    }
+  ]
+}

@@ -26,7 +26,6 @@ import java.util.StringJoiner;
 
 public final class NeteaseClient implements MusicProviderClient {
     private final String baseUrl;
-    private final HttpClient client;
     private final Path authFile;
     private volatile String cookie = "";
 
@@ -37,7 +36,6 @@ public final class NeteaseClient implements MusicProviderClient {
     public NeteaseClient(String baseUrl, Path authFile) {
         this.baseUrl = normalizeBase(baseUrl);
         this.authFile = authFile == null ? null : authFile.toAbsolutePath().normalize();
-        this.client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
         restoreAuth();
     }
 
@@ -70,7 +68,10 @@ public final class NeteaseClient implements MusicProviderClient {
                 .timeout(Duration.ofSeconds(12))
                 .GET()
                 .build();
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            HttpResponse<String> response = HttpClientHolder.INSTANCE.send(
+                request,
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
+            );
             return response.body();
         } catch (IOException | InterruptedException | IllegalArgumentException e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
@@ -95,6 +96,12 @@ public final class NeteaseClient implements MusicProviderClient {
         }
         String nextCookie = joined.toString();
         if (!nextCookie.isBlank()) rememberCookie(nextCookie);
+    }
+
+    private static final class HttpClientHolder {
+        private static final HttpClient INSTANCE = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(3))
+            .build();
     }
 
     @Override
@@ -229,20 +236,35 @@ public final class NeteaseClient implements MusicProviderClient {
         if (uid.isBlank()) {
             body.put("ok", false);
             body.put("loggedIn", false);
+            body.put("userLibrary", false);
             body.put("playlists", List.of());
             body.put("error", "netease login required");
             body.put("provider", "netease");
             body.put("label", label());
             return body;
         }
+
+        Object root = jsonGet("/user/playlist", Map.of("uid", uid));
+        Map<String, Object> rootMap = SimpleJson.asMap(root);
+        boolean userLibrary = !rootMap.containsKey("error")
+            && (!rootMap.containsKey("ok") || SimpleJson.asBoolean(rootMap.get("ok"), true))
+            && (!rootMap.containsKey("code") || SimpleJson.asInt(rootMap.get("code"), 0) == 200)
+            && rootMap.containsKey("playlist")
+            && rootMap.get("playlist") instanceof List<?>;
         List<Map<String, Object>> playlists = new ArrayList<>();
-        for (Playlist playlist : userPlaylists(uid)) playlists.add(playlist.toMap());
-        body.put("ok", true);
-        body.put("loggedIn", true);
+        if (userLibrary) {
+            for (Playlist playlist : userPlaylistsFrom(root)) playlists.add(playlist.toMap());
+        }
+        body.put("ok", userLibrary);
+        body.put("loggedIn", userLibrary);
+        body.put("userLibrary", userLibrary);
         body.put("uid", uid);
         body.put("provider", "netease");
         body.put("label", label());
         body.put("playlists", playlists);
+        if (!userLibrary) {
+            body.put("error", SimpleJson.asString(rootMap.get("error"), "netease user library unavailable"));
+        }
         return body;
     }
 
@@ -303,7 +325,10 @@ public final class NeteaseClient implements MusicProviderClient {
     }
 
     public List<Playlist> userPlaylists(String uid) {
-        Object root = jsonGet("/user/playlist", Map.of("uid", uid));
+        return userPlaylistsFrom(jsonGet("/user/playlist", Map.of("uid", uid)));
+    }
+
+    private List<Playlist> userPlaylistsFrom(Object root) {
         List<Playlist> playlists = new ArrayList<>();
         for (Object item : SimpleJson.asList(SimpleJson.asMap(root).get("playlist"))) {
             Map<String, Object> map = SimpleJson.asMap(item);

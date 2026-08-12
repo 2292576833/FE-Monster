@@ -204,7 +204,6 @@
     var dpr = 1;
     var lastText = '';
     var progressText = '';
-    var displayedProgress = 0;
     var baseFontSize = 58;
     var renderedFontSize = 58;
     var fitScaleX = 1;
@@ -222,9 +221,10 @@
     var particles = [];
     var live = { solar:0, beat:0, bass:0, scale:1, glow:0, spark:0, lift:0 };
     var state = {
-      enabled:false,text:'Mineradio',progress:0,progressSpan:4.8,progressReceivedAt:0,playing:false,
+      enabled:false,text:'Mineradio',progress:0,progressSpan:4.8,playing:false,
+      effectiveLyricTime:NaN,lyricLineStartTime:NaN,lyricLineEndTime:NaN,
       playbackTime:0,playbackDuration:0,playbackRate:1,playbackReceivedAt:0,beatMapKey:'',
-      size:1,opacity:.92,clickThrough:true,lyricGlowParticles:false,cinema:true,highlightFollow:false,frameRate:60,
+      size:1,opacity:.92,clickThrough:true,lyricGlowParticles:false,cinema:true,highlightFollow:false,
       lyricGlow:true,lyricGlowBeat:true,lyricGlowStrength:.35,highBloom:0,beatGlow:0,beatPulse:0,bass:0,feather:.055,
       fontFamily:'Inter,"Noto Sans SC","PingFang SC","Microsoft YaHei",Arial,sans-serif',
       fontWeight:900,letterSpacing:0,lineHeight:1,lyricScale:1,
@@ -251,6 +251,16 @@
       var n = Number(value);
       if (!isFinite(n)) n = fallback;
       return Math.max(min, Math.min(max, n));
+    }
+    function lyricProgressFromSnapshot(snapshot) {
+      snapshot = snapshot || {};
+      var effectiveTime = Number(snapshot.effectiveLyricTime);
+      var lineStart = Number(snapshot.lyricLineStartTime);
+      var lineEnd = Number(snapshot.lyricLineEndTime);
+      if (isFinite(effectiveTime) && isFinite(lineStart) && isFinite(lineEnd) && lineEnd > lineStart) {
+        return clamp((effectiveTime - lineStart) / (lineEnd - lineStart), 0, 1, 0);
+      }
+      return clamp(snapshot.progress, 0, 1, 0);
     }
     function rand(seed){ return Math.abs(Math.sin(seed * 9283.173) * 43758.5453) % 1; }
     function isLocked(){ return state.clickThrough !== false; }
@@ -727,13 +737,11 @@
       if (motion.bass != null) state.bass = motion.bass;
       var text = String(state.text || 'Mineradio').replace(/\s+/g, ' ').trim() || 'Mineradio';
       baseFontSize = Math.round(58 * clamp(state.size, .72, 1.55, 1));
-      state.progress = clamp(state.progress, 0, 1, 0);
+      state.progress = lyricProgressFromSnapshot(state);
       state.progressSpan = clamp(state.progressSpan, .75, 18, 4.8);
-      state.progressReceivedAt = performance.now();
       state.fontWeight = Math.round(clamp(state.fontWeight, 500, 900, 900) / 50) * 50;
       state.letterSpacing = clamp(state.letterSpacing, -.04, .18, 0);
       state.lineHeight = clamp(state.lineHeight, .86, 1.35, 1);
-      state.frameRate = normalizeFrameRate(state.frameRate);
       state.lyricGlowStrength = clamp(state.lyricGlowStrength, 0, .85, .35);
       state.highBloom = clamp(state.highBloom, 0, 1.45, 0);
       state.beatGlow = clamp(state.beatGlow, 0, 1.7, 0);
@@ -772,7 +780,6 @@
       if (text !== lastText) {
         lastText = text;
         progressText = text;
-        displayedProgress = state.progress;
         scrollState.offset = 0;
         scrollState.dir = -1;
         scrollState.holdUntil = performance.now() + lyricScrollInitialHoldMs();
@@ -785,30 +792,11 @@
       fitLyricText(false);
     }
     function currentDisplayProgress() {
-      var target = clamp(state.progress, 0, 1, 0);
-      if (state.playing && state.progressSpan > 0) {
-        target += Math.max(0, performance.now() - (state.progressReceivedAt || performance.now())) / (state.progressSpan * 1000);
-      }
-      target = clamp(target, 0, 1, target);
-      if (progressText !== lastText) {
-        progressText = lastText;
-        displayedProgress = target;
-      }
-      var delta = target - displayedProgress;
-      if (delta < -0.018 && target > 0.035 && displayedProgress < 0.985) {
-        displayedProgress = clamp(displayedProgress + Math.max(delta * .018, -0.0028), 0, 1, displayedProgress);
-        return displayedProgress;
-      }
-      var ease = delta >= 0 ? Math.min(.30, .074 + Math.abs(delta) * .50) : Math.min(.030, .008 + Math.abs(delta) * .045);
-      displayedProgress = clamp(displayedProgress + delta * ease, 0, 1, displayedProgress);
-      return displayedProgress;
+      progressText = lastText;
+      return lyricProgressFromSnapshot(state);
     }
     function currentRawProgress() {
-      var target = clamp(state.progress, 0, 1, 0);
-      if (state.playing && state.progressSpan > 0) {
-        target += Math.max(0, performance.now() - (state.progressReceivedAt || performance.now())) / (state.progressSpan * 1000);
-      }
-      return clamp(target, 0, 1, target);
+      return lyricProgressFromSnapshot(state);
     }
     function drawCanvasText(text, x, y, fontSize, spacing, stroke) {
       var chars = Array.from(text || '');
@@ -990,13 +978,6 @@
       ctx.restore();
     }
     function draw(nowMs){
-      if (state.enabled) {
-        var interval = frameIntervalMs();
-        if (interval > 0 && lastDrawAt && nowMs - lastDrawAt < Math.max(4, interval - 1.25)) {
-          scheduleNextDraw();
-          return;
-        }
-      }
       var dt = lastDrawAt ? Math.min(.12, Math.max(.001, (nowMs - lastDrawAt) / 1000)) : 1 / 60;
       lastDrawAt = nowMs;
       var now = nowMs * .001;
@@ -1016,17 +997,6 @@
         return;
       }
       requestAnimationFrame(draw);
-    }
-    function normalizeFrameRate(value) {
-      var n = Number(value);
-      if (!isFinite(n) || n <= 0) return 0;
-      if (n <= 26) return 24;
-      if (n <= 45) return 30;
-      if (n <= 90) return 60;
-      return 120;
-    }
-    function frameIntervalMs() {
-      return 0;
     }
     function pointInRect(evt, rect, padX, padY) {
       return evt.clientX >= rect.left - padX && evt.clientX <= rect.right + padX && evt.clientY >= rect.top - padY && evt.clientY <= rect.bottom + padY;

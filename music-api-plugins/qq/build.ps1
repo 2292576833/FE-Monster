@@ -6,7 +6,7 @@ $buildRoot = [IO.Path]::GetFullPath((Join-Path $qqRoot ".build"))
 $runtimeRoot = Join-Path $buildRoot "runtime"
 $packageRoot = Join-Path $buildRoot "package"
 $outputDirectory = [IO.Path]::GetFullPath((Join-Path $repositoryRoot "dist\plugins"))
-$outputPath = [IO.Path]::GetFullPath((Join-Path $outputDirectory "FE-Monster-QQ-API-Plugin-2.4.0.zip"))
+$outputPath = [IO.Path]::GetFullPath((Join-Path $outputDirectory "FE-Monster-QQ-API-Plugin-2.4.1.zip"))
 
 if (-not $buildRoot.StartsWith("$qqRoot\", [StringComparison]::OrdinalIgnoreCase)) {
   throw "Refusing to use a build directory outside the QQ plugin source."
@@ -27,6 +27,11 @@ if ($LASTEXITCODE -ne 0) {
 $installedMetadata = Get-Content -LiteralPath (Join-Path $runtimeRoot "node_modules\@sansenjian\qq-music-api\package.json") -Raw | ConvertFrom-Json
 if ($installedMetadata.version -ne "2.4.0") {
   throw "Expected @sansenjian/qq-music-api 2.4.0, got $($installedMetadata.version)."
+}
+
+& node (Join-Path $qqRoot "patch-runtime.cjs") $runtimeRoot
+if ($LASTEXITCODE -ne 0) {
+  throw "Failed to patch the QQ Music API private playlist extractor."
 }
 
 $upstreamRoot = Join-Path $runtimeRoot "node_modules\@sansenjian\qq-music-api"
@@ -66,6 +71,9 @@ if ($zipBytes -gt 25MB) {
 }
 
 $zipChecksum = (Get-FileHash -LiteralPath $outputPath -Algorithm SHA256).Hash
+$checksumPath = "$outputPath.sha256"
+$checksumLine = "$($zipChecksum.ToLowerInvariant())  $([IO.Path]::GetFileName($outputPath))`n"
+[IO.File]::WriteAllText($checksumPath, $checksumLine, [Text.Encoding]::ASCII)
 $result = [pscustomobject]@{
   Output = $outputPath
   ZipBytes = $zipBytes

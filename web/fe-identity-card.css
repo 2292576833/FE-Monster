@@ -1,0 +1,1479 @@
+:root {
+  --fe-card-gold: #d8a83f;
+  --fe-card-gold-light: #ffe6a2;
+  --fe-card-gold-deep: #6f4308;
+  --fe-card-ink: #3e2505;
+}
+
+html.is-identity-card-open {
+  overflow: hidden;
+}
+
+.community-card__head {
+  position: relative;
+  grid-template-columns: clamp(48px, 4.6vw, 62px) minmax(0, 1fr) 28px 28px 28px;
+  gap: 9px;
+}
+
+.community-avatar-stack {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: auto 18px;
+  gap: 4px;
+  align-self: start;
+  justify-items: center;
+}
+
+.community-mailbox-shortcut {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: 0;
+  grid-auto-flow: column;
+  place-content: center;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 4px;
+  padding: 1px 3px 2px;
+  color: rgba(255, 235, 184, 0.82);
+  background: transparent;
+  box-shadow: none;
+  font: 760 9px/1.2 "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  cursor: pointer;
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+.community-mailbox-shortcut:is(:hover, :focus-visible) {
+  color: #ffe5a1;
+  background: transparent;
+  transform: translateY(-1px);
+}
+
+.community-mailbox-shortcut:focus-visible {
+  outline: 2px solid rgba(255, 225, 145, 0.7);
+  outline-offset: 1px;
+}
+
+.community-identity-card-trigger {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  place-items: center;
+  border: 0 !important;
+  border-radius: 6px;
+  padding: 0;
+  color: rgba(255, 242, 204, 0.96);
+  background: transparent !important;
+  box-shadow: none !important;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 180ms ease, filter 180ms ease;
+}
+
+.community-identity-card-trigger > span:first-child {
+  display: grid;
+  width: 20px;
+  height: 14px;
+  place-items: center;
+  border: 1px solid var(--community-card-accent, rgba(255, 230, 154, 0.66));
+  border-radius: 3px;
+  color: #ffe4a0;
+  background: linear-gradient(135deg,
+    var(--community-card-secondary, #4f3008),
+    var(--community-card-primary, #c99431) 49%,
+    var(--community-card-secondary, #6f4308));
+  box-shadow: inset 0 1px rgba(255, 251, 230, 0.4), 0 0 8px rgba(229, 176, 65, 0.22);
+  font-size: 7px;
+  letter-spacing: -0.04em;
+}
+
+.community-identity-card-trigger:is(:hover, :focus-visible) {
+  background: transparent !important;
+  filter: brightness(1.14);
+  transform: translateY(-1px) scale(1.06);
+}
+
+.community-identity-card-trigger:focus-visible {
+  outline: 2px solid rgba(255, 225, 145, 0.72);
+  outline-offset: 2px;
+}
+
+.community-identity-card-trigger[aria-disabled="true"] {
+  opacity: 0.62;
+}
+
+/* The global black-gold role-button selector deliberately carries ID-level
+ * specificity. Keep this icon-only identity entry above that skin. */
+#communityIdentityCardButton.community-identity-card-trigger {
+  border: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.community-identity-card-menu {
+  position: absolute;
+  z-index: 32;
+  top: calc(100% + 9px);
+  right: 56px;
+  display: grid;
+  width: min(220px, calc(100vw - 28px));
+  gap: 9px;
+  border: 1px solid rgba(255, 225, 151, 0.26);
+  border-radius: 12px;
+  padding: 9px;
+  color: rgba(255, 246, 220, 0.94);
+  background: rgba(14, 11, 7, 0.78);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34), inset 0 1px rgba(255, 244, 210, 0.08);
+  backdrop-filter: blur(16px) saturate(1.12);
+}
+
+.community-identity-card-menu[hidden] {
+  display: none;
+}
+
+.community-identity-card-menu > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 28px;
+  padding-inline: 2px;
+}
+
+.community-identity-card-menu > header strong {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+.community-identity-card-menu > header button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgba(255, 225, 151, 0.28);
+  border-radius: 50%;
+  padding: 0;
+  color: #ffe4a0;
+  background: rgba(81, 50, 8, 0.46);
+  cursor: pointer;
+}
+
+.community-identity-card-menu .fe-identity-card__collection-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(50px, 1fr));
+  max-height: 180px;
+  overflow: auto;
+}
+
+.community-card.is-collapsed .community-card__head {
+  grid-template-columns: 42px minmax(0, 1fr) 26px 26px;
+}
+
+.community-card.is-collapsed .community-identity-card-trigger {
+  display: none;
+}
+
+.community-card.is-collapsed .community-avatar-stack {
+  grid-template-rows: auto;
+}
+
+.community-card.is-collapsed .community-mailbox-shortcut {
+  display: none;
+}
+
+.fe-identity-card-dialog {
+  --fe-identity-card-width: min(550px, 78vw);
+  --fe-identity-card-nickname-left: min(236.5px, 33.54vw);
+  --fe-identity-card-nickname-width: min(357.5px, 50.7vw);
+  --fe-identity-card-nickname-top: min(3.5px, 0.5vw);
+  position: fixed;
+  z-index: 2480;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 0;
+  color: #fff8e7;
+  isolation: isolate;
+}
+
+.fe-identity-card-dialog[hidden] {
+  display: none;
+}
+
+.fe-identity-card__backdrop {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border: 0;
+  background: transparent;
+  backdrop-filter: none;
+  cursor: default;
+  opacity: 1;
+  animation: none;
+}
+
+#feIdentityCardDialog .fe-identity-card__backdrop {
+  border: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.fe-identity-card__viewer {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 100vw;
+  height: 100dvh;
+  max-height: none;
+  grid-template-rows: 1fr;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  opacity: 1;
+  transform: none;
+  animation: none;
+  pointer-events: none;
+}
+
+.fe-identity-card__viewer::before {
+  content: none;
+}
+
+.fe-identity-card__header,
+.fe-identity-card__header-actions,
+.fe-identity-card__controls,
+.fe-identity-card__collection header {
+  display: flex;
+  align-items: center;
+}
+
+.fe-identity-card__header {
+  position: absolute;
+  z-index: 8;
+  top: max(16px, env(safe-area-inset-top));
+  right: max(18px, env(safe-area-inset-right));
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.fe-identity-card__header > span:first-child {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.fe-identity-card__header small {
+  color: rgba(245, 205, 112, 0.68);
+  font-size: 9px;
+  font-weight: 760;
+  letter-spacing: 0.2em;
+}
+
+.fe-identity-card__header strong {
+  color: #fff7e4;
+  font-size: 17px;
+  letter-spacing: 0.02em;
+}
+
+.fe-identity-card__header-actions {
+  gap: 8px;
+}
+
+.fe-identity-card__icon-button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(255, 226, 157, 0.24);
+  border-radius: 50%;
+  color: rgba(255, 244, 216, 0.94);
+  background: rgba(13, 10, 6, 0.72);
+  font: inherit;
+  font-size: 18px;
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.fe-identity-card__icon-button:is(:hover, :focus-visible) {
+  border-color: rgba(255, 226, 157, 0.68);
+  background: rgba(74, 47, 8, 0.72);
+  transform: scale(1.04);
+}
+
+.fe-identity-card__icon-button[aria-pressed="true"] {
+  color: rgba(255, 244, 216, 0.46);
+}
+
+.fe-identity-card__stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  min-height: 0;
+  place-items: center;
+  perspective: 1500px;
+  perspective-origin: 50% 45%;
+  contain: layout paint;
+  pointer-events: none;
+}
+
+.fe-identity-card__halo {
+  position: absolute;
+  width: min(610px, 82vw);
+  aspect-ratio: 1.7;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(234, 177, 64, 0.26), rgba(151, 91, 7, 0.07) 44%, transparent 72%);
+  filter: blur(24px);
+  opacity: 0.66;
+  transform: translateY(12%);
+  animation: fe-identity-card-halo-breathe 5.6s ease-in-out infinite;
+}
+
+.fe-identity-card__shadow {
+  position: absolute;
+  top: 71%;
+  width: min(480px, 66vw);
+  height: 36px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.78) 0 38%, rgba(0, 0, 0, 0.42) 62%, transparent 82%);
+  filter: blur(var(--fe-card-shadow-softness, 7px));
+  opacity: 0.8;
+  transform: translate3d(0, 0, 0) scale(1.02, 1);
+  transform-origin: 50% 50%;
+  pointer-events: none;
+  will-change: transform, opacity, filter;
+}
+
+.fe-identity-card__shell {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: var(--fe-identity-card-width);
+  transform-style: preserve-3d;
+  will-change: transform;
+  pointer-events: auto;
+}
+
+.fe-identity-card__card {
+  --card-material-optic-a: linear-gradient(116deg, transparent 0 18%, rgba(255, 250, 224, 0.38) 27%, transparent 39% 71%, rgba(104, 61, 2, 0.2) 100%);
+  --card-material-optic-b: radial-gradient(ellipse at 74% 76%, rgba(255, 194, 61, 0.24), transparent 48%);
+  --card-material-blend-a: screen;
+  --card-material-blend-b: soft-light;
+  --card-finish-texture-a: linear-gradient(transparent, transparent);
+  --card-finish-texture-b: linear-gradient(transparent, transparent);
+  --card-finish-size-a: 100% 100%;
+  --card-finish-size-b: 100% 100%;
+  --card-finish-repeat-a: no-repeat;
+  --card-finish-repeat-b: no-repeat;
+  --card-finish-blend-a: normal;
+  --card-finish-blend-b: normal;
+  --card-face-filter: none;
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.586 / 1;
+  border: 0;
+  border-radius: var(--card-radius, clamp(18px, 2.2vw, 26px));
+  padding: 0;
+  color: var(--fe-card-ink);
+  background: transparent;
+  cursor: pointer;
+  transform-style: preserve-3d;
+  transition: transform 760ms cubic-bezier(0.2, 0.74, 0.22, 1);
+  will-change: transform;
+}
+
+#feIdentityCard.fe-identity-card__card {
+  border: 0 !important;
+  border-radius: var(--card-radius, clamp(18px, 2.2vw, 26px)) !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.fe-identity-card__card[aria-pressed="true"] {
+  transform: rotateY(180deg);
+}
+
+.fe-identity-card__stage.is-editing .fe-identity-card__shell {
+  animation: none !important;
+  transform: translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg) !important;
+}
+
+.fe-identity-card__stage.is-editing .fe-identity-card__nickname {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fe-identity-card__nickname {
+  appearance: none;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  color: rgba(56, 31, 0, 0.92) !important;
+  cursor: text;
+  opacity: 1 !important;
+  outline: none;
+  transform: none !important;
+  transition: filter 160ms ease, text-shadow 160ms ease;
+}
+
+.fe-identity-card__nickname:is(:hover, :focus-visible) {
+  filter: brightness(1.08);
+  text-shadow: 0 1px rgba(255, 255, 255, 0.34), 0 -1px rgba(75, 42, 0, 0.58), 0 0 9px rgba(255, 233, 167, 0.22);
+}
+
+.fe-identity-card__nickname[aria-disabled="true"] {
+  cursor: default;
+  filter: none;
+  opacity: 1 !important;
+}
+
+.fe-identity-card__nickname[aria-disabled="true"]:hover {
+  filter: none;
+}
+
+/* A nickname is engraved content with button semantics, not a black button.
+ * Match the global skin's ID-level specificity so the metal remains visible. */
+#feIdentityCardNickname.fe-identity-card__nickname {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  color: var(--card-text-strong, rgba(56, 31, 0, 0.92)) !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+.fe-identity-card__front,
+.fe-identity-card__back {
+  position: absolute;
+  display: block;
+  overflow: hidden;
+  inset: 0;
+  border: 1px solid var(--card-border, rgba(255, 238, 185, 0.78));
+  border-radius: inherit;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+  background-position: center, center, center, center, center, center, center, center;
+  background-repeat:
+    var(--card-finish-repeat-a),
+    var(--card-finish-repeat-b),
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    no-repeat,
+    repeat,
+    no-repeat;
+  background-size:
+    var(--card-finish-size-a),
+    var(--card-finish-size-b),
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    auto,
+    100% 100%;
+  background-blend-mode:
+    var(--card-finish-blend-a),
+    var(--card-finish-blend-b),
+    var(--card-material-blend-a),
+    var(--card-material-blend-b),
+    screen,
+    screen,
+    soft-light,
+    normal;
+  filter: var(--card-face-filter);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    inset 0 -2px 0 rgba(76, 42, 1, 0.52),
+    inset 12px 10px 28px rgba(255, 243, 188, 0.2),
+    inset -18px -15px 34px rgba(73, 39, 1, 0.35),
+    0 28px 60px rgba(0, 0, 0, 0.42),
+    0 0 26px rgba(213, 156, 45, 0.18);
+}
+
+.fe-identity-card__front {
+  --card-base: #cf9b31;
+  --card-highlight: #ffe7a3;
+  --card-deep: #704307;
+  --card-ink: #432801;
+  color: var(--card-ink);
+  background-image:
+    var(--card-finish-texture-a),
+    var(--card-finish-texture-b),
+    var(--card-material-optic-a),
+    var(--card-material-optic-b),
+    radial-gradient(circle at 19% 13%, rgb(255 255 238 / var(--card-metal-alpha, 0.7)), transparent 15%),
+    linear-gradient(116deg, transparent 0 18%, rgb(255 248 213 / var(--card-metal-alpha, 0.64)) 26%, transparent 34% 61%, rgba(255, 233, 157, 0.24) 69%, transparent 77%),
+    repeating-linear-gradient(101deg, rgb(255 255 255 / var(--card-roughness-alpha, 0.06)) 0 1px, transparent 1px 4px),
+    linear-gradient(142deg, var(--card-highlight), var(--card-front, var(--card-base)) 31%, var(--card-base) 57%, var(--card-deep));
+}
+
+.fe-identity-card__front::before,
+.fe-identity-card__back::before {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  inset: 5px;
+  border: 1px solid rgba(77, 41, 0, 0.38);
+  border-radius: calc(var(--card-radius, clamp(18px, 2.2vw, 26px)) - 5px);
+  box-shadow: inset 0 0 0 1px rgba(255, 247, 213, 0.22);
+}
+
+.fe-identity-card__card[data-material="obsidian"] :is(.fe-identity-card__front, .fe-identity-card__back)::before {
+  border-color: rgba(207, 224, 255, 0.34);
+  box-shadow: inset 0 0 0 1px rgba(4, 7, 14, 0.72), inset 0 0 18px rgba(0, 0, 0, 0.38);
+}
+
+.fe-identity-card__card[data-material="ceramic"] :is(.fe-identity-card__front, .fe-identity-card__back)::before {
+  border-color: rgba(85, 68, 44, 0.24);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 250, 0.48), inset 0 0 14px rgba(255, 255, 255, 0.18);
+}
+
+.fe-identity-card__front::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  top: -40%;
+  left: -58%;
+  width: 34%;
+  height: 180%;
+  background: linear-gradient(90deg, transparent, rgb(255 255 241 / var(--card-sweep-alpha, 0.82)), rgba(255, 222, 135, 0.26), transparent);
+  filter: blur(5px);
+  opacity: 0;
+  transform: rotate(16deg) translateX(0);
+  animation: fe-identity-card-sweep 1450ms 290ms cubic-bezier(0.18, 0.72, 0.22, 1) paused both;
+}
+
+.fe-identity-card__stage.is-entering .fe-identity-card__front::after {
+  animation-play-state: running;
+}
+
+.fe-identity-card__microcopy,
+.fe-identity-card__serial,
+.fe-identity-card__feid-block,
+.fe-identity-card__nickname,
+.fe-identity-card__seal,
+.fe-identity-card__back-mark,
+.fe-identity-card__back-copy,
+.fe-identity-card__back-rule {
+  position: absolute;
+  display: block;
+  z-index: 2;
+}
+
+.fe-identity-card__microcopy {
+  top: 8%;
+  left: 7%;
+  color: rgba(66, 37, 0, 0.72);
+  font-size: clamp(7px, 1vw, 10px);
+  font-weight: 850;
+  letter-spacing: 0.19em;
+}
+
+.fe-identity-card__feid-block {
+  top: 17%;
+  left: 7%;
+  display: grid;
+  gap: 1px;
+  text-align: left;
+}
+
+.fe-identity-card__feid-block small {
+  color: rgba(77, 43, 0, 0.62);
+  font-size: clamp(7px, 1vw, 10px);
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+.fe-identity-card__feid-block strong {
+  color: rgba(62, 35, 1, 0.9);
+  font-size: clamp(15px, 2.6vw, 28px);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+}
+
+.fe-identity-card__nickname,
+.fe-identity-card__feid-block strong,
+.fe-identity-card__back-mark {
+  text-shadow:
+    0 var(--card-engraving-offset, 1px) 0 rgba(255, 255, 255, 0.48),
+    0 calc(-1 * var(--card-engraving-offset, 1px)) 1px rgba(75, 42, 0, 0.78),
+    var(--card-engraving-offset, 1px) var(--card-engraving-offset, 1px) 1px rgba(255, 236, 171, 0.2);
+}
+
+.fe-identity-card__nickname {
+  top: 49%;
+  left: 7%;
+  width: 65%;
+  overflow: hidden;
+  color: rgba(56, 31, 0, 0.92);
+  font-family: "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  font-size: clamp(22px, 5vw, 46px);
+  font-weight: 890;
+  line-height: 1.08;
+  letter-spacing: 0.02em;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fe-identity-card__seal {
+  right: 7%;
+  bottom: 17%;
+  display: grid;
+  width: clamp(54px, 10vw, 82px);
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(75, 40, 0, 0.6);
+  border-radius: 50%;
+  color: rgba(68, 38, 0, 0.82);
+  box-shadow: inset 0 0 0 4px rgba(255, 232, 156, 0.22), inset 0 0 0 6px rgba(75, 40, 0, 0.36);
+  transform: rotate(-8deg);
+}
+
+.fe-identity-card__seal b {
+  font-size: clamp(18px, 3.4vw, 30px);
+  line-height: 0.8;
+  text-shadow: 0 1px rgba(255, 250, 222, 0.5), 0 -1px rgba(67, 36, 0, 0.7);
+}
+
+.fe-identity-card__seal i {
+  font-size: clamp(5px, 0.8vw, 8px);
+  font-style: normal;
+  font-weight: 850;
+  letter-spacing: 0.15em;
+}
+
+.fe-identity-card__serial {
+  bottom: 7%;
+  left: 7%;
+  color: rgba(71, 40, 0, 0.66);
+  font-size: clamp(6px, 0.9vw, 9px);
+  font-weight: 760;
+  letter-spacing: 0.16em;
+}
+
+.fe-identity-card__back {
+  --card-back-base: #b77c1c;
+  --card-back-highlight: #f8d579;
+  --card-back-deep: #7e4d08;
+  color: rgba(61, 34, 0, 0.9);
+  background-image:
+    var(--card-finish-texture-a),
+    var(--card-finish-texture-b),
+    var(--card-material-optic-a),
+    var(--card-material-optic-b),
+    radial-gradient(circle at 50% 50%, rgba(255, 242, 188, 0.38), transparent 33%),
+    linear-gradient(126deg, transparent 16%, rgba(255, 250, 222, 0.24) 28%, transparent 43% 72%, rgba(64, 36, 2, 0.16)),
+    repeating-linear-gradient(79deg, rgb(255 255 255 / var(--card-roughness-alpha, 0.055)) 0 1px, transparent 1px 5px),
+    linear-gradient(132deg, var(--card-back-highlight), var(--card-back-base) 42%, var(--card-back-deep) 72%, var(--card-back-highlight));
+  transform: rotateY(180deg);
+}
+
+.fe-identity-card__back-mark {
+  top: 44%;
+  left: 10%;
+  width: 80%;
+  font-size: clamp(25px, 6vw, 54px);
+  font-weight: 930;
+  letter-spacing: 0.13em;
+  text-align: center;
+}
+
+.fe-identity-card__back-rule {
+  top: 65%;
+  left: 25%;
+  width: 50%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(66, 36, 0, 0.62), transparent);
+  box-shadow: 0 1px rgba(255, 243, 196, 0.44);
+}
+
+.fe-identity-card__back-copy {
+  right: 0;
+  bottom: 16%;
+  left: 0;
+  color: rgba(68, 38, 0, 0.64);
+  font-size: clamp(6px, 1vw, 10px);
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-align: center;
+}
+
+.fe-identity-card__card[data-material="rose-gold"] .fe-identity-card__front {
+  --card-base: #c88774;
+  --card-highlight: #ffd8c6;
+  --card-deep: #704036;
+  --card-ink: #43201b;
+}
+
+.fe-identity-card__card[data-material="polished-gold"] .fe-identity-card__front,
+.fe-identity-card__card[data-material="brushed-gold"] .fe-identity-card__front {
+  --card-base: #cf9b31;
+  --card-highlight: #ffe7a3;
+  --card-deep: #704307;
+  --card-ink: #432801;
+}
+
+.fe-identity-card__card[data-material="rose-gold"] .fe-identity-card__back {
+  --card-back-base: #b87262;
+  --card-back-highlight: #ffd4c1;
+  --card-back-deep: #6e3c33;
+}
+
+.fe-identity-card__card[data-material="black-gold"] .fe-identity-card__front {
+  --card-base: #211b13;
+  --card-highlight: #8c7446;
+  --card-deep: #070604;
+  --card-ink: #f4d78e;
+  color: #f4d78e;
+}
+
+.fe-identity-card__card[data-material="black-gold"] .fe-identity-card__back {
+  --card-back-base: #201a11;
+  --card-back-highlight: #75613a;
+  --card-back-deep: #050403;
+  color: #ead18b;
+}
+
+.fe-identity-card__card[data-material="silver"] .fe-identity-card__front {
+  --card-base: #aeb4b9;
+  --card-highlight: #f4f6f7;
+  --card-deep: #4f575e;
+  --card-ink: #25292d;
+}
+
+.fe-identity-card__card[data-material="silver"] .fe-identity-card__back,
+.fe-identity-card__card[data-material="titanium"] .fe-identity-card__back {
+  --card-back-base: #90979d;
+  --card-back-highlight: #eff1f3;
+  --card-back-deep: #4b5157;
+  color: #25292d;
+}
+
+.fe-identity-card__card[data-material="titanium"] .fe-identity-card__front {
+  --card-base: #73767b;
+  --card-highlight: #c8cbd0;
+  --card-deep: #292c31;
+  --card-ink: #17191c;
+}
+
+.fe-identity-card__card[data-material="obsidian"] .fe-identity-card__front {
+  --card-base: #171719;
+  --card-highlight: #73727a;
+  --card-deep: #020203;
+  --card-ink: #f1d88f;
+}
+
+.fe-identity-card__card[data-material="ceramic"] .fe-identity-card__front {
+  --card-base: #ddd4bd;
+  --card-highlight: #fffdf5;
+  --card-deep: #85775c;
+  --card-ink: #3c3325;
+}
+
+.fe-identity-card__card[data-material="obsidian"] .fe-identity-card__back {
+  --card-back-base: #171719;
+  --card-back-highlight: #73727a;
+  --card-back-deep: #020203;
+  color: #ecd38f;
+}
+
+.fe-identity-card__card[data-material="ceramic"] .fe-identity-card__back {
+  --card-back-base: #ddd4bd;
+  --card-back-highlight: #fffdf5;
+  --card-back-deep: #85775c;
+  color: #3c3325;
+}
+
+/* Server colors are the pigment. Material remains an independent optical
+ * layer, so choosing a different substrate is visible even with one palette. */
+.fe-identity-card__card:is([data-material="gold"], [data-material="polished-gold"]) {
+  --card-material-optic-a: linear-gradient(116deg, transparent 0 18%, rgba(255, 252, 226, 0.42) 27%, transparent 39% 69%, rgba(104, 61, 2, 0.24) 100%);
+  --card-material-optic-b: radial-gradient(ellipse at 75% 78%, rgba(255, 187, 44, 0.3), transparent 49%);
+  --card-material-blend-a: screen;
+  --card-material-blend-b: soft-light;
+}
+
+.fe-identity-card__card[data-material="brushed-gold"] {
+  --card-material-optic-a: linear-gradient(116deg, rgba(90, 51, 3, 0.18), transparent 20%, rgba(255, 248, 210, 0.34) 31%, transparent 47% 72%, rgba(93, 53, 2, 0.22));
+  --card-material-optic-b: linear-gradient(116deg, transparent 12%, rgba(255, 242, 187, 0.34) 29%, transparent 45% 73%, rgba(92, 51, 2, 0.2));
+  --card-material-blend-a: overlay;
+  --card-material-blend-b: screen;
+}
+
+.fe-identity-card__card[data-material="rose-gold"] {
+  --card-material-optic-a: linear-gradient(118deg, rgba(73, 19, 17, 0.18), transparent 22%, rgba(255, 238, 229, 0.42) 32%, transparent 48% 72%, rgba(104, 31, 33, 0.26));
+  --card-material-optic-b: radial-gradient(ellipse at 72% 78%, rgba(255, 147, 137, 0.27), transparent 52%);
+  --card-material-blend-a: screen;
+  --card-material-blend-b: soft-light;
+}
+
+.fe-identity-card__card[data-material="black-gold"] {
+  --card-material-optic-a: linear-gradient(118deg, rgba(0, 0, 0, 0.5), transparent 24%, rgba(255, 226, 147, 0.28) 32%, transparent 42% 67%, rgba(0, 0, 0, 0.64));
+  --card-material-optic-b: radial-gradient(ellipse at 68% 70%, rgba(203, 147, 42, 0.2), rgba(0, 0, 0, 0.38) 58%, transparent 76%);
+  --card-material-blend-a: multiply;
+  --card-material-blend-b: soft-light;
+}
+
+.fe-identity-card__card[data-material="silver"] {
+  --card-material-optic-a: linear-gradient(113deg, rgba(38, 52, 64, 0.22), transparent 18%, rgba(255, 255, 255, 0.58) 28%, transparent 39% 67%, rgba(75, 91, 105, 0.3));
+  --card-material-optic-b: radial-gradient(ellipse at 76% 76%, rgba(200, 224, 239, 0.34), transparent 52%);
+  --card-material-blend-a: screen;
+  --card-material-blend-b: color-dodge;
+}
+
+.fe-identity-card__card[data-material="titanium"] {
+  --card-material-optic-a: linear-gradient(112deg, rgba(22, 28, 34, 0.34), transparent 20%, rgba(218, 226, 234, 0.36) 31%, transparent 44% 66%, rgba(38, 49, 60, 0.38));
+  --card-material-optic-b: linear-gradient(101deg, rgba(174, 190, 205, 0.16), transparent 18%, rgba(32, 39, 47, 0.18) 34%, transparent 54%, rgba(207, 216, 226, 0.13));
+  --card-material-blend-a: luminosity;
+  --card-material-blend-b: overlay;
+}
+
+.fe-identity-card__card[data-material="obsidian"] {
+  --card-material-optic-a: linear-gradient(116deg, rgba(0, 0, 0, 0.7) 0 17%, rgba(202, 226, 255, 0.48) 28%, rgba(25, 35, 57, 0.12) 33%, rgba(0, 0, 0, 0.58) 49% 100%);
+  --card-material-optic-b: radial-gradient(ellipse at 70% 68%, rgba(41, 48, 77, 0.16), rgba(0, 0, 0, 0.68) 63%, transparent 82%);
+  --card-material-blend-a: multiply;
+  --card-material-blend-b: multiply;
+}
+
+.fe-identity-card__card[data-material="ceramic"] {
+  --card-material-optic-a: radial-gradient(ellipse at 48% 42%, rgba(255, 255, 250, 0.68), rgba(244, 238, 224, 0.42) 48%, rgba(128, 112, 86, 0.16) 100%);
+  --card-material-optic-b: repeating-radial-gradient(circle at 23% 31%, rgba(255, 255, 255, 0.3) 0 0.8px, rgba(89, 73, 53, 0.13) 1px 1.35px, transparent 1.6px 9px);
+  --card-material-blend-a: screen;
+  --card-material-blend-b: soft-light;
+}
+
+.fe-identity-card__card:is([data-material="black-gold"], [data-material="obsidian"]) :is(
+  .fe-identity-card__microcopy,
+  .fe-identity-card__feid-block small,
+  .fe-identity-card__feid-block strong,
+  .fe-identity-card__nickname,
+  .fe-identity-card__seal,
+  .fe-identity-card__serial,
+  .fe-identity-card__back-mark,
+  .fe-identity-card__back-copy
+) {
+  color: rgba(255, 226, 157, 0.92);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.82), 0 0 7px rgba(230, 178, 71, 0.18);
+}
+
+.fe-identity-card__card:is([data-material="black-gold"], [data-material="obsidian"]) {
+  --card-text-strong: rgba(255, 226, 157, 0.92);
+}
+
+.fe-identity-card__card:is([data-material="silver"], [data-material="titanium"]) :is(
+  .fe-identity-card__microcopy,
+  .fe-identity-card__feid-block small,
+  .fe-identity-card__feid-block strong,
+  .fe-identity-card__nickname,
+  .fe-identity-card__seal,
+  .fe-identity-card__serial,
+  .fe-identity-card__back-mark,
+  .fe-identity-card__back-copy
+) {
+  color: rgba(20, 26, 32, 0.9);
+  text-shadow: 0 1px rgba(255, 255, 255, 0.58), 0 -1px rgba(23, 29, 35, 0.48);
+}
+
+.fe-identity-card__card:is([data-material="silver"], [data-material="titanium"]) {
+  --card-text-strong: rgba(20, 26, 32, 0.9);
+}
+
+.fe-identity-card__card[data-finish="brushed"] :is(.fe-identity-card__front, .fe-identity-card__back) {
+  --card-finish-texture-a: linear-gradient(90deg, rgba(255, 255, 255, 0.24) 0 16%, rgba(20, 12, 3, 0.2) 16% 33%, transparent 33% 100%);
+  --card-finish-texture-b: linear-gradient(90deg, transparent 0 57%, rgba(255, 246, 207, 0.16) 57% 63%, transparent 63% 100%);
+  --card-finish-size-a: 6px 100%;
+  --card-finish-size-b: 19px 100%;
+  --card-finish-repeat-a: repeat;
+  --card-finish-repeat-b: repeat;
+  --card-finish-blend-a: overlay;
+  --card-finish-blend-b: screen;
+}
+
+.fe-identity-card__card[data-finish="satin"] :is(.fe-identity-card__front, .fe-identity-card__back) {
+  --card-finish-texture-a: radial-gradient(ellipse at 50% 42%, rgba(255, 255, 255, 0.18), rgba(128, 117, 96, 0.08) 58%, rgba(0, 0, 0, 0.06));
+  --card-finish-texture-b: repeating-radial-gradient(circle at 32% 37%, rgba(255, 255, 255, 0.055) 0 0.7px, transparent 1px 4px);
+  --card-finish-size-a: 100% 100%;
+  --card-finish-size-b: 7px 7px;
+  --card-finish-repeat-a: no-repeat;
+  --card-finish-repeat-b: repeat;
+  --card-finish-blend-a: soft-light;
+  --card-finish-blend-b: soft-light;
+  --card-face-filter: saturate(0.82) contrast(0.76) brightness(1.045);
+}
+
+.fe-identity-card__card[data-finish="mirror"] :is(.fe-identity-card__front, .fe-identity-card__back) {
+  --card-finish-texture-a: linear-gradient(108deg, rgba(255, 255, 255, 0.03) 0 27%, rgba(255, 255, 255, 0.78) 31%, rgba(255, 255, 255, 0.12) 34%, transparent 39% 65%, rgba(7, 8, 10, 0.25) 73%, transparent 79%);
+  --card-finish-texture-b: linear-gradient(108deg, transparent 18%, rgba(255, 255, 255, 0.24) 19.5%, transparent 21% 83%, rgba(255, 255, 255, 0.18) 84%, transparent 85.5%);
+  --card-finish-size-a: 100% 100%;
+  --card-finish-size-b: 100% 100%;
+  --card-finish-repeat-a: no-repeat;
+  --card-finish-repeat-b: no-repeat;
+  --card-finish-blend-a: screen;
+  --card-finish-blend-b: screen;
+  --card-face-filter: saturate(1.08) contrast(1.1);
+}
+
+.fe-identity-card__card[data-finish="hammered"] :is(.fe-identity-card__front, .fe-identity-card__back) {
+  --card-finish-texture-a: repeating-radial-gradient(circle at 6px 6px, rgba(255, 255, 255, 0.52) 0 0.9px, rgba(22, 13, 4, 0.44) 1.3px 2.4px, rgba(255, 255, 255, 0.18) 3px, transparent 4.3px 13px);
+  --card-finish-texture-b: repeating-radial-gradient(circle at 12px 9px, rgba(15, 8, 2, 0.42) 0 1.1px, rgba(255, 255, 255, 0.32) 1.7px 3.2px, transparent 4.5px 17px);
+  --card-finish-size-a: 19px 17px;
+  --card-finish-size-b: 27px 23px;
+  --card-finish-repeat-a: repeat;
+  --card-finish-repeat-b: repeat;
+  --card-finish-blend-a: overlay;
+  --card-finish-blend-b: soft-light;
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.74),
+    inset 0 -2px rgba(65, 36, 2, 0.52),
+    inset 12px 10px 36px rgba(255, 243, 188, 0.18),
+    inset -18px -15px 38px rgba(73, 39, 1, 0.4),
+    0 28px 60px rgba(0, 0, 0, 0.42),
+    0 0 26px rgba(213, 156, 45, 0.18);
+}
+
+.fe-identity-card__stage.is-entering[data-entrance="corner-fall-float"] .fe-identity-card__shell {
+  animation: none;
+  transform-origin: 0 100%;
+}
+
+.fe-identity-card__stage.is-entering[data-entrance="corner-fall-float"] .fe-identity-card__shadow {
+  will-change: transform, opacity, filter;
+}
+
+.fe-identity-card__stage.is-entering[data-entrance="rise-flip"] .fe-identity-card__shell {
+  animation: fe-identity-card-rise-flip var(--fe-card-entrance-duration, 1080ms) cubic-bezier(0.2, 0.76, 0.18, 1) both;
+}
+
+.fe-identity-card__stage.is-entering[data-entrance="rise-flip"] .fe-identity-card__shadow {
+  animation: fe-identity-card-shadow-rise-flip var(--fe-card-entrance-duration, 1080ms) cubic-bezier(0.2, 0.76, 0.18, 1) both;
+}
+
+.fe-identity-card__stage.is-entering[data-entrance="soft-reveal"] .fe-identity-card__shell {
+  animation: fe-identity-card-soft-reveal var(--fe-card-entrance-duration, 620ms) cubic-bezier(0.2, 0.74, 0.24, 1) both;
+}
+
+.fe-identity-card__stage.is-entering[data-entrance="soft-reveal"] .fe-identity-card__shadow {
+  animation: fe-identity-card-shadow-soft-reveal var(--fe-card-entrance-duration, 620ms) cubic-bezier(0.2, 0.74, 0.24, 1) both;
+}
+
+.fe-identity-card__stage.is-landed .fe-identity-card__shell {
+  animation: none;
+  transform: translate3d(0, 8vh, 0) rotateX(78deg) rotateY(0deg) rotateZ(0deg) scale(0.98);
+  transform-origin: 0 100%;
+}
+
+.fe-identity-card__stage.is-landed .fe-identity-card__card {
+  cursor: pointer;
+}
+
+.fe-identity-card__stage.is-landed .fe-identity-card__shadow {
+  filter: blur(7px);
+  opacity: 0.8;
+  transform: translate3d(0, 0, 0) scale(1.02, 1);
+}
+
+.fe-identity-card__stage.is-lifting .fe-identity-card__shell {
+  animation: fe-identity-card-lift-from-ground var(--fe-card-lift-duration, 920ms) cubic-bezier(0.18, 0.78, 0.2, 1) both;
+  transform-origin: 0 100%;
+}
+
+.fe-identity-card__stage.is-lifting .fe-identity-card__shadow {
+  animation: fe-identity-card-shadow-lift var(--fe-card-lift-duration, 920ms) cubic-bezier(0.18, 0.78, 0.2, 1) both;
+}
+
+.fe-identity-card__stage.is-showcasing .fe-identity-card__shell {
+  animation: fe-identity-card-showcase 14s linear infinite;
+}
+
+.fe-identity-card__stage.is-showcasing .fe-identity-card__shadow {
+  animation: fe-identity-card-shadow-showcase 7s ease-in-out infinite;
+}
+
+.fe-identity-card__controls {
+  position: absolute;
+  z-index: 8;
+  top: 50%;
+  right: max(20px, env(safe-area-inset-right));
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  transform: translateY(-50%);
+  pointer-events: auto;
+}
+
+.fe-identity-card__controls button,
+.fe-identity-card__nickname-form button,
+.fe-identity-card__collection-list button {
+  border: 1px solid rgba(255, 222, 142, 0.24);
+  border-radius: 8px;
+  color: rgba(255, 244, 217, 0.94);
+  background: rgba(16, 12, 7, 0.7);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.fe-identity-card__controls button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  min-height: 0;
+  place-items: center;
+  border-radius: 50%;
+  padding: 0;
+  font-size: 17px;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.fe-identity-card__control-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.fe-identity-card__controls button:is(:hover, :focus-visible),
+.fe-identity-card__nickname-form button:is(:hover, :focus-visible),
+.fe-identity-card__collection-list button:is(:hover, :focus-visible) {
+  border-color: rgba(255, 224, 146, 0.68);
+  background: rgba(84, 53, 9, 0.66);
+  transform: translateY(-1px);
+}
+
+.fe-identity-card__nickname-form {
+  position: absolute;
+  z-index: 9;
+  top: calc(50% - var(--fe-identity-card-nickname-top));
+  left: calc(50% - var(--fe-identity-card-nickname-left));
+  display: grid;
+  width: var(--fe-identity-card-nickname-width);
+  gap: 6px;
+  margin: 0;
+  transform: none;
+  pointer-events: auto;
+}
+
+.fe-identity-card__nickname-form[hidden] {
+  display: none;
+}
+
+.fe-identity-card__nickname-form > label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+}
+
+.fe-identity-card__nickname-form > span {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.fe-identity-card__nickname-form input {
+  min-width: 0;
+  min-height: 38px;
+  border: 0;
+  border-bottom: 1px solid rgba(55, 30, 0, 0.64);
+  border-radius: 0;
+  padding: 8px 3px 6px;
+  color: #382000;
+  background: transparent;
+  box-shadow: none;
+  font: 820 clamp(18px, 3vw, 28px)/1.08 "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  outline: 0;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.42), 0 -1px 1px rgba(75, 42, 0, 0.72);
+}
+
+.fe-identity-card__nickname-form input:focus {
+  border-bottom-width: 2px;
+  border-color: rgba(55, 30, 0, 0.92);
+  box-shadow: none;
+}
+
+.fe-identity-card__nickname-form input::placeholder {
+  color: rgba(66, 37, 0, 0.72);
+  opacity: 1;
+}
+
+.fe-identity-card__nickname-form button {
+  border-color: rgba(72, 42, 4, 0.48);
+  padding: 7px 13px;
+  color: rgba(55, 31, 0, 0.96);
+  background: rgba(255, 239, 184, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 240, 0.48);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.fe-identity-card__nickname-form button:is(:hover, :focus-visible) {
+  border-color: rgba(61, 34, 0, 0.76);
+  color: #321c00;
+  background: rgba(255, 244, 202, 0.46);
+}
+
+.fe-identity-card__collection {
+  position: absolute;
+  z-index: 8;
+  top: 50%;
+  left: max(18px, env(safe-area-inset-left));
+  display: grid;
+  width: 54px;
+  max-height: min(62vh, 430px);
+  gap: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  transform: translateY(-50%);
+  pointer-events: auto;
+}
+
+.fe-identity-card__collection header {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+}
+
+.fe-identity-card__collection header > span {
+  display: grid;
+  gap: 1px;
+}
+
+.fe-identity-card__collection header strong {
+  color: rgba(255, 245, 222, 0.9);
+  font-size: 12px;
+}
+
+.fe-identity-card__collection header small {
+  color: rgba(232, 210, 160, 0.56);
+  font-size: 9px;
+}
+
+.fe-identity-card__collection-list {
+  display: grid;
+  gap: 9px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 2px;
+  scrollbar-width: thin;
+}
+
+.fe-identity-card__collection-list button {
+  display: grid;
+  width: 50px;
+  min-width: 0;
+  height: 36px;
+  min-height: 0;
+  place-items: center;
+  padding: 0;
+}
+
+.fe-identity-card__collection-list button::before {
+  content: "FE";
+  display: grid;
+  width: 31px;
+  aspect-ratio: 1.586;
+  place-items: center;
+  border: 1px solid rgba(255, 242, 201, 0.58);
+  border-radius: 4px;
+  color: #4a2b03;
+  background: linear-gradient(135deg, #ffe3a0, #b97713 58%, #704207);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.48);
+  font-size: 7px;
+  font-weight: 900;
+}
+
+.fe-identity-card__collection-list button[data-material="rose-gold"]::before {
+  background: linear-gradient(135deg, #ffd6c4, #bd7666 58%, #6c3d34);
+}
+
+.fe-identity-card__collection-list button[data-material="polished-gold"]::before,
+.fe-identity-card__collection-list button[data-material="brushed-gold"]::before {
+  background: linear-gradient(135deg, #ffe3a0, #b97713 58%, #704207);
+}
+
+.fe-identity-card__collection-list button[data-material="black-gold"]::before {
+  color: #f2d486;
+  background: linear-gradient(135deg, #4e422d, #16120c 58%, #030302);
+}
+
+.fe-identity-card__collection-list button[data-material="silver"]::before,
+.fe-identity-card__collection-list button[data-material="titanium"]::before {
+  color: #26292d;
+  background: linear-gradient(135deg, #f0f2f3, #92999f 58%, #4b5157);
+}
+
+.fe-identity-card__collection-list button[data-material="obsidian"]::before {
+  color: #ead28e;
+  background: linear-gradient(135deg, #6b6970, #171719 58%, #020203);
+}
+
+.fe-identity-card__collection-list button[data-material="ceramic"]::before {
+  color: #3c3325;
+  background: linear-gradient(135deg, #fffdf5, #ddd4bd 58%, #85775c);
+}
+
+.fe-identity-card__collection-list button > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+}
+
+.fe-identity-card__collection-list button strong,
+.fe-identity-card__collection-list button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fe-identity-card__collection-list button strong {
+  font-size: 11px;
+}
+
+.fe-identity-card__collection-list button small {
+  color: rgba(236, 215, 166, 0.58);
+  font-size: 9px;
+}
+
+.fe-identity-card__collection-list button.is-equipped {
+  border-color: rgba(255, 222, 136, 0.82);
+  background: rgba(104, 68, 13, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(255, 239, 188, 0.12), 0 0 16px rgba(215, 159, 46, 0.14);
+}
+
+.fe-identity-card__collection-list button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+  transform: none;
+}
+
+.fe-identity-card__status {
+  position: absolute;
+  z-index: 7;
+  left: 50%;
+  bottom: max(8px, env(safe-area-inset-bottom));
+  width: min(520px, calc(100vw - 120px));
+  min-height: 16px;
+  margin: 0;
+  transform: translateX(-50%);
+  color: rgba(233, 211, 163, 0.62);
+  font-size: 10px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.fe-identity-card__status.is-error {
+  color: #ffd0b0;
+}
+
+@keyframes fe-identity-card-rise-flip {
+  0% { opacity: 0; transform: translate3d(0, 24vh, -260px) rotateX(64deg) rotateY(-170deg) scale(0.56); }
+  62% { opacity: 1; transform: translate3d(0, 3vh, 20px) rotateX(54deg) rotateY(14deg) scale(1.03); }
+  100% { opacity: 1; transform: translate3d(0, 8vh, 0) rotateX(78deg) rotateY(0deg) scale(0.98); }
+}
+
+@keyframes fe-identity-card-shadow-rise-flip {
+  0% { filter: blur(25px); opacity: 0.2; transform: translate3d(-5%, 6px, 0) scale(0.56, 0.48); }
+  62% { filter: blur(14px); opacity: 0.55; transform: translate3d(1%, 2px, 0) scale(0.88, 0.8); }
+  100% { filter: blur(7px); opacity: 0.8; transform: translate3d(0, 0, 0) scale(1.02, 1); }
+}
+
+@keyframes fe-identity-card-soft-reveal {
+  0% { opacity: 0; transform: translate3d(0, -16vh, -80px) rotateX(78deg) scale(0.92); }
+  100% { opacity: 1; transform: translate3d(0, 8vh, 0) rotateX(78deg) scale(0.98); }
+}
+
+@keyframes fe-identity-card-shadow-soft-reveal {
+  0% { filter: blur(22px); opacity: 0.24; transform: translate3d(0, 5px, 0) scale(0.64, 0.54); }
+  50% { filter: blur(14px); opacity: 0.5; transform: translate3d(0, 2px, 0) scale(0.84, 0.76); }
+  100% { filter: blur(7px); opacity: 0.8; transform: translate3d(0, 0, 0) scale(1.02, 1); }
+}
+
+@keyframes fe-identity-card-lift-from-ground {
+  0% { transform: translate3d(0, 8vh, 0) rotateX(78deg) rotateY(0deg) rotateZ(0deg) scale(0.98); }
+  48% { transform: translate3d(0, -4.8vh, 44px) rotateX(20deg) rotateY(-8deg) rotateZ(-1deg) scale(1.025); }
+  76% { transform: translate3d(0, -1.4vh, 18px) rotateX(-4deg) rotateY(3deg) rotateZ(0.4deg) scale(1.01); }
+  100% { transform: translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg) rotateZ(0deg) scale(1); }
+}
+
+@keyframes fe-identity-card-shadow-lift {
+  0% { filter: blur(7px); opacity: 0.8; transform: translate3d(0, 0, 0) scale(1.02, 1); }
+  48% { filter: blur(22px); opacity: 0.38; transform: translate3d(-1%, 3px, 0) scale(0.78, 0.72); }
+  76% { filter: blur(18px); opacity: 0.44; transform: translate3d(0, 2px, 0) scale(0.83, 0.76); }
+  100% { filter: blur(16px); opacity: 0.48; transform: translate3d(0, 1px, 0) scale(0.86, 0.8); }
+}
+
+@keyframes fe-identity-card-showcase {
+  0% { transform: translate3d(0, 0, 0) rotateX(1.4deg) rotateY(0deg); }
+  25% { transform: translate3d(0, -5px, 10px) rotateX(-1deg) rotateY(-90deg); }
+  50% { transform: translate3d(0, -9px, 14px) rotateX(-1.8deg) rotateY(-180deg); }
+  75% { transform: translate3d(0, -4px, 8px) rotateX(0.8deg) rotateY(-270deg); }
+  100% { transform: translate3d(0, 0, 0) rotateX(1.4deg) rotateY(-360deg); }
+}
+
+@keyframes fe-identity-card-shadow-showcase {
+  0%, 100% { filter: blur(16px); opacity: 0.48; transform: translate3d(0, 1px, 0) scale(0.86, 0.8); }
+  50% { filter: blur(20px); opacity: 0.39; transform: translate3d(0, 4px, 0) scale(0.76, 0.68); }
+}
+
+@keyframes fe-identity-card-sweep {
+  0% { opacity: 0; transform: rotate(16deg) translateX(0); }
+  14% { opacity: 0.92; }
+  72% { opacity: 0.48; }
+  100% { opacity: 0; transform: rotate(16deg) translateX(520%); }
+}
+
+@keyframes fe-identity-card-halo-breathe {
+  0%, 100% { opacity: 0.48; transform: translateY(12%) scale(0.96); }
+  50% { opacity: 0.72; transform: translateY(12%) scale(1.04); }
+}
+
+@keyframes fe-identity-card-backdrop-in {
+  to { opacity: 1; }
+}
+
+@keyframes fe-identity-card-viewer-in {
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 640px) {
+  .community-card__head {
+    grid-template-columns: clamp(44px, 12vw, 52px) minmax(0, 1fr) 26px 26px 26px;
+    gap: 6px;
+  }
+
+  .community-identity-card-trigger {
+    width: 26px;
+    height: 26px;
+  }
+
+  .community-identity-card-trigger > span:first-child {
+    width: 16px;
+    height: 12px;
+    font-size: 6px;
+  }
+
+  .community-identity-card-menu {
+    right: 50px;
+    width: min(204px, calc(100vw - 20px));
+  }
+
+  .fe-identity-card-dialog {
+    padding: 0;
+  }
+
+  .fe-identity-card__viewer {
+    width: 100vw;
+    height: 100dvh;
+    max-height: none;
+    padding: 0;
+  }
+
+  .fe-identity-card__stage {
+    min-height: 280px;
+  }
+
+  .fe-identity-card__shell {
+    width: min(92vw, 520px);
+  }
+
+  .fe-identity-card__controls {
+    top: 50%;
+    right: 10px;
+    margin: 0;
+  }
+
+  .fe-identity-card__controls button {
+    width: 34px;
+    height: 34px;
+    min-height: 0;
+    padding: 0;
+    font-size: 15px;
+  }
+
+  .fe-identity-card__collection {
+    top: auto;
+    left: 12px;
+    bottom: 12px;
+    width: calc(100vw - 64px);
+    max-height: 40px;
+    transform: none;
+  }
+
+  .fe-identity-card__collection-list {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .fe-identity-card__status {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fe-identity-card__backdrop,
+  .fe-identity-card__viewer,
+  .fe-identity-card__stage.is-entering .fe-identity-card__shell,
+  .fe-identity-card__stage.is-lifting .fe-identity-card__shell,
+  .fe-identity-card__stage.is-showcasing .fe-identity-card__shell,
+  .fe-identity-card__stage.is-entering[data-entrance="rise-flip"] .fe-identity-card__shadow,
+  .fe-identity-card__stage.is-entering[data-entrance="soft-reveal"] .fe-identity-card__shadow,
+  .fe-identity-card__stage.is-lifting .fe-identity-card__shadow,
+  .fe-identity-card__stage.is-showcasing .fe-identity-card__shadow,
+  .fe-identity-card__front::after,
+  .fe-identity-card__halo {
+    animation: none !important;
+  }
+
+  .fe-identity-card__backdrop,
+  .fe-identity-card__viewer {
+    opacity: 1;
+    transform: none;
+  }
+
+  .fe-identity-card__stage.is-landed .fe-identity-card__shadow,
+  .fe-identity-card__stage.is-lifting .fe-identity-card__shadow,
+  .fe-identity-card__stage.is-showcasing .fe-identity-card__shadow {
+    filter: blur(10px);
+    opacity: 0.58;
+    transform: translate3d(0, 1px, 0) scale(0.9, 0.84);
+  }
+
+  .fe-identity-card__card,
+  .fe-identity-card__controls button,
+  .fe-identity-card__nickname-form button,
+  .fe-identity-card__collection-list button {
+    transition-duration: 1ms !important;
+  }
+}

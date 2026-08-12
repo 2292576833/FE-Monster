@@ -21,6 +21,11 @@ check('manual offset is rounded, bounded, saved, and restored', /function normal
   && /function loadLyricClockOffsetPreference[\s\S]*?localStorage\.getItem\(LYRIC_CLOCK_OFFSET_PREFERENCE_KEY\)/.test(app)
   && /function saveLyricClockOffsetPreference[\s\S]*?localStorage\.setItem\(LYRIC_CLOCK_OFFSET_PREFERENCE_KEY/.test(app));
 check('audio element remains the authoritative lyric clock', /function currentPlaybackLyricTime[\s\S]*?els\.audio\.currentTime/.test(app));
+check('multi-row lyrics cancel the legacy timestamp delay and follow the audible media clock',
+  /MULTI_ROW_LYRIC_VISUAL_LEAD_SECONDS\s*=\s*LYRIC_TIMESTAMP_COMPENSATION_SECONDS/.test(app)
+  && /function playbackLyricVisualLeadSeconds[\s\S]*?state\.multiRowLyricsEnabled[\s\S]*?MULTI_ROW_LYRIC_VISUAL_LEAD_SECONDS/.test(app));
+check('lyric frame identity includes the multi-row clock mode',
+  /const signature = `\$\{state\.lyricSignature\}\|\$\{state\.textPreset\}\|\$\{state\.multiRowLyricsEnabled \? 1 : 0\}`/.test(app));
 check('browser output latency only applies to the audible Web Audio media path', /function lyricAudioOutputLatencySeconds[\s\S]*?sourceMode !== 'media'[\s\S]*?outputConnected !== true/.test(app));
 check('native OBR lyrics use measured native output latency only on the native graph',
   /function lyricAudioOutputLatencySeconds[\s\S]*?nativeGraph\?\.nativeStream === true[\s\S]*?nativeOutputLatencySeconds/.test(app));

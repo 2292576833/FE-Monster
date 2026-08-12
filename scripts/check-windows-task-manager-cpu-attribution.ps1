@@ -3,6 +3,8 @@ param(
   [int]$MainProcessId = 0,
   [ValidateRange(500, 10000)]
   [int]$SampleMilliseconds = 1500,
+  [ValidateRange(0, 60000)]
+  [int]$WarmupMilliseconds = 0,
   [switch]$LaunchIfMissing
 )
 
@@ -140,6 +142,10 @@ try {
   }
 
   $family = Wait-ForProcessFamily -RootProcessId $MainProcessId
+  if ($WarmupMilliseconds -gt 0) {
+    Start-Sleep -Milliseconds $WarmupMilliseconds
+    $family = Wait-ForProcessFamily -RootProcessId $MainProcessId
+  }
   $snapshot = $family.Snapshot
   $familyIds = @($family.Ids)
   $byId = @{}
@@ -160,6 +166,8 @@ try {
 
   $mainCpuMilliseconds = 0.0
   $familyCpuMilliseconds = 0.0
+  $familyWorkingSetBytes = 0L
+  $familyPrivateBytes = 0L
   $members = @()
   foreach ($processId in $familyIds) {
     if (!$beforeCpu.ContainsKey($processId)) {
@@ -177,12 +185,18 @@ try {
     if ($processId -eq $MainProcessId) {
       $mainCpuMilliseconds = $delta
     }
+    $workingSetBytes = [long]$runtimeProcess.WorkingSet64
+    $privateBytes = [long]$runtimeProcess.PrivateMemorySize64
+    $familyWorkingSetBytes += $workingSetBytes
+    $familyPrivateBytes += $privateBytes
     $metadata = $byId[$processId]
     $members += [pscustomobject]@{
       name = [string]$metadata.Name
       processId = $processId
       parentProcessId = [int]$metadata.ParentProcessId
       sampledCpuMilliseconds = [Math]::Round($delta, 1)
+      workingSetMegabytes = [Math]::Round($workingSetBytes / 1MB, 1)
+      privateMemoryMegabytes = [Math]::Round($privateBytes / 1MB, 1)
     }
     $runtimeProcess.Dispose()
   }
@@ -224,6 +238,8 @@ try {
       logicalProcessors = $logicalProcessors
       mainProcessCpuPercent = $mainCpuPercent
       completeProcessFamilyCpuPercent = $familyCpuPercent
+      completeProcessFamilyWorkingSetMegabytes = [Math]::Round($familyWorkingSetBytes / 1MB, 1)
+      completeProcessFamilyPrivateMemoryMegabytes = [Math]::Round($familyPrivateBytes / 1MB, 1)
       members = @($members | Sort-Object sampledCpuMilliseconds -Descending)
     }
     taskManager = [ordered]@{

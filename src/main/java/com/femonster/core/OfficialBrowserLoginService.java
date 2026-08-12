@@ -25,7 +25,14 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Opens an isolated official Chromium window and reads only the selected
@@ -34,6 +41,10 @@ import java.util.concurrent.TimeUnit;
  */
 public final class OfficialBrowserLoginService implements AutoCloseable {
     private static final Duration SESSION_TTL = Duration.ofMinutes(10);
+    private static final Duration DEFAULT_SYNC_ATTEMPT_TIMEOUT = Duration.ofSeconds(18);
+    private static final Duration DEFAULT_SYNC_TOTAL_BUDGET = Duration.ofSeconds(45);
+    private static final Duration DEFAULT_TERMINAL_RETENTION = Duration.ofMinutes(2);
+    private static final long MONITOR_INTERVAL_MILLIS = 150L;
     private static final Map<String, ProviderSpec> PROVIDERS = Map.of(
         "netease", new ProviderSpec(
             "网易云音乐",
@@ -54,14 +65,54 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
 
     private final Path profileRoot;
     private final MusicProviderRegistry music;
-    private final HttpClient http;
+    private final Duration syncAttemptTimeout;
+    private final Duration syncTotalBudget;
+    private final Duration terminalRetention;
     private final Map<String, LoginSession> sessions = new ConcurrentHashMap<>();
     private final Map<String, String> activeByProvider = new ConcurrentHashMap<>();
+    private final ScheduledExecutorService monitorExecutor = Executors.newScheduledThreadPool(3, runnable -> {
+        Thread thread = new Thread(runnable, "fe-monster-browser-session");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private final ExecutorService syncExecutor = Executors.newFixedThreadPool(3, runnable -> {
+        Thread thread = new Thread(runnable, "fe-monster-browser-sync");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     public OfficialBrowserLoginService(Path dataDir, MusicProviderRegistry music) {
+        this(dataDir, music, DEFAULT_SYNC_ATTEMPT_TIMEOUT, DEFAULT_SYNC_TOTAL_BUDGET, DEFAULT_TERMINAL_RETENTION);
+    }
+
+    OfficialBrowserLoginService(
+        Path dataDir,
+        MusicProviderRegistry music,
+        Duration syncAttemptTimeout,
+        Duration syncTotalBudget
+    ) {
+        this(dataDir, music, syncAttemptTimeout, syncTotalBudget, DEFAULT_TERMINAL_RETENTION);
+    }
+
+    OfficialBrowserLoginService(
+        Path dataDir,
+        MusicProviderRegistry music,
+        Duration syncAttemptTimeout,
+        Duration syncTotalBudget,
+        Duration terminalRetention
+    ) {
         this.profileRoot = dataDir.toAbsolutePath().normalize().resolve("official-browser-login");
         this.music = music;
-        this.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+        this.syncAttemptTimeout = requirePositive(syncAttemptTimeout, "sync attempt timeout");
+        this.syncTotalBudget = requirePositive(syncTotalBudget, "sync total budget");
+        this.terminalRetention = requirePositive(terminalRetention, "terminal retention");
+    }
+
+    private static Duration requirePositive(Duration value, String label) {
+        if (value == null || value.isZero() || value.isNegative()) {
+            throw new IllegalArgumentException(label + " must be positive");
+        }
+        return value;
     }
 
     public synchronized Map<String, Object> start(String provider) {
@@ -78,8 +129,18 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
         }
 
         try {
+            Map<String, Object> providerLogin = Map.of();
+            String loginUrl = spec.loginUrl();
+            if ("kugou".equals(id)) {
+                music.clearBrowserSession(id);
+                providerLogin = music.beginProviderLogin(id);
+                loginUrl = validatedKugouLoginUrl(providerLogin);
+            }
             Path profile = profileRoot.resolve(id).normalize();
             if (!profile.startsWith(profileRoot)) throw new IllegalArgumentException("invalid browser profile path");
+            // Do not let expired cookies from an earlier isolated login be
+            // mistaken for the QR scan the user is performing now.
+            clearProviderProfile(id);
             Files.createDirectories(profile);
             int port = freeLoopbackPort();
             List<String> command = new ArrayList<>();
@@ -92,7 +153,7 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
             command.add("--no-default-browser-check");
             command.add("--disable-sync");
             command.add("--window-size=520,720");
-            command.add("--app=" + spec.loginUrl());
+            command.add("--app=" + loginUrl);
 
             ProcessBuilder builder = new ProcessBuilder(command);
             builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
@@ -100,8 +161,15 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
             Process process = builder.start();
             String sessionId = UUID.randomUUID().toString();
             LoginSession session = new LoginSession(sessionId, id, spec, browser.getFileName().toString(), port, process);
+            if ("kugou".equals(id)) {
+                session.providerManagedLogin = true;
+                session.providerLoginKey = SimpleJson.asString(providerLogin.get("key"), "").trim();
+                session.importPrepared = true;
+            }
             sessions.put(sessionId, session);
             activeByProvider.put(id, sessionId);
+            process.onExit().thenRun(() -> browserExited(session));
+            startMonitor(session);
             return payload(session);
         } catch (IOException error) {
             throw new IllegalArgumentException("启动官方浏览器失败：" + detail(error));
@@ -109,52 +177,356 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
     }
 
     public Map<String, Object> status(String provider, String sessionId) {
+        return status(provider, sessionId, -1L, 0);
+    }
+
+    public Map<String, Object> status(String provider, String sessionId, long afterRevision, int waitMillis) {
         String id = MusicProviderRegistry.normalize(provider);
         LoginSession session = requireSession(id, sessionId);
         synchronized (session) {
+            int boundedWait = Math.max(0, Math.min(15_000, waitMillis));
+            if (boundedWait > 0 && afterRevision >= 0L && session.revision <= afterRevision && !session.done()) {
+                try {
+                    session.wait(boundedWait);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+            }
             if (session.done()) return payload(session);
             if (System.nanoTime() - session.startedNanos > SESSION_TTL.toNanos()) {
-                session.phase = "expired";
-                session.message = "官方浏览器登录已超时，请重新打开";
+                finishSession(session, "expired", "官方浏览器登录已超时，请重新打开");
+                stopMonitor(session);
+                cancelSync(session);
                 closeProcess(session.process);
                 activeByProvider.remove(id, session.id);
                 return payload(session);
             }
-
-            try {
-                Map<String, Object> account = music.accountPayload(id);
-                if (SimpleJson.asBoolean(account.get("loggedIn"), false)) {
-                    session.phase = "success";
-                    session.message = session.spec.label() + "登录成功，正在同步账号与歌单";
-                    activeByProvider.remove(id, session.id);
-                    closeProcess(session.process);
-                    return payload(session);
-                }
-
-                Map<String, String> cookies = readProviderCookies(session);
-                if (hasAuthenticatedSession(id, cookies)) {
-                    music.rememberBrowserSession(id, cookies);
-                    session.phase = "success";
-                    session.message = session.spec.label() + "登录成功，已安全保存本机会话";
-                    activeByProvider.remove(id, session.id);
-                    closeProcess(session.process);
-                    return payload(session);
-                }
-                session.phase = "waiting";
-                session.message = "请在打开的" + session.spec.label() + "官方窗口中扫码并确认登录";
-            } catch (IOException | InterruptedException | RuntimeException error) {
-                if (error instanceof InterruptedException) Thread.currentThread().interrupt();
-                if (!session.process.isAlive()) {
-                    session.phase = "failed";
-                    session.message = "官方浏览器窗口已关闭，尚未检测到登录会话";
-                    activeByProvider.remove(id, session.id);
-                } else {
-                    session.phase = "opening";
-                    session.message = "正在等待官方登录页面准备完成";
-                }
-            }
             return payload(session);
         }
+    }
+
+    private void startMonitor(LoginSession session) {
+        synchronized (session) {
+            if (session.done() || session.monitorTask != null) return;
+            session.monitorTask = monitorExecutor.scheduleWithFixedDelay(
+                () -> monitorSession(session),
+                100L,
+                MONITOR_INTERVAL_MILLIS,
+                TimeUnit.MILLISECONDS
+            );
+        }
+    }
+
+    private void monitorSession(LoginSession session) {
+        if (session.providerManagedLogin) {
+            monitorManagedProviderLogin(session);
+            return;
+        }
+        Map<String, String> cookies;
+        synchronized (session) {
+            if (session.done()) {
+                stopMonitor(session);
+                return;
+            }
+            if (System.nanoTime() - session.startedNanos > SESSION_TTL.toNanos()) {
+                finishSession(session, "expired", "官方浏览器登录已超时，请重新打开");
+                activeByProvider.remove(session.provider, session.id);
+                stopMonitor(session);
+                cancelSync(session);
+                closeProcess(session.process);
+                return;
+            }
+            cookies = session.authenticatedCookies;
+            if (!cookies.isEmpty()) beginProviderSync(session);
+        }
+
+        if (cookies.isEmpty()) {
+            try {
+                Map<String, String> detected = readProviderCookies(session);
+                if (!hasAuthenticatedSession(session.provider, detected)) {
+                    synchronized (session) {
+                        if (!session.done()) {
+                            transition(session, "waiting", "请在打开的" + session.spec.label() + "官方窗口中扫码并确认登录");
+                        }
+                    }
+                    return;
+                }
+                cookies = Map.copyOf(detected);
+                synchronized (session) {
+                    if (session.done()) return;
+                    session.authenticatedCookies = cookies;
+                    beginProviderSync(session);
+                }
+            } catch (IOException | InterruptedException | RuntimeException error) {
+                if (error instanceof InterruptedException) Thread.currentThread().interrupt();
+                handleBrowserProbeFailure(session);
+                return;
+            }
+        }
+
+        synchronizeAuthenticatedSession(session, cookies);
+    }
+
+    private void monitorManagedProviderLogin(LoginSession session) {
+        long now = System.nanoTime();
+        synchronized (session) {
+            if (session.done()) {
+                stopMonitor(session);
+                return;
+            }
+            if (now - session.startedNanos > SESSION_TTL.toNanos()) {
+                finishSession(session, "expired", "酷狗扫码登录已超时，请重新打开");
+                activeByProvider.remove(session.provider, session.id);
+                stopMonitor(session);
+                closeProcess(session.process);
+                return;
+            }
+            if (now - session.lastProviderPollNanos < TimeUnit.MILLISECONDS.toNanos(350L)) return;
+            session.lastProviderPollNanos = now;
+        }
+
+        try {
+            Map<String, Object> state = music.pollProviderLogin(session.provider, session.providerLoginKey);
+            int status = SimpleJson.asInt(state.get("status"), 0);
+            boolean authenticated = SimpleJson.asBoolean(state.get("authenticated"), status == 4);
+            if (!authenticated) {
+                synchronized (session) {
+                    if (session.done()) return;
+                    if (status == 0) {
+                        finishSession(session, "expired", "酷狗二维码已失效，请重新扫码");
+                        activeByProvider.remove(session.provider, session.id);
+                        stopMonitor(session);
+                        closeProcess(session.process);
+                    } else if (status == 2) {
+                        transition(session, "waiting", "已扫码，请在酷狗音乐中确认登录");
+                    } else {
+                        transition(session, "waiting", "请使用酷狗音乐 App 扫码并确认登录");
+                    }
+                }
+                return;
+            }
+            synchronized (session) {
+                if (session.done()) return;
+                session.authenticatedCookies = Map.of("provider-session", "ready");
+                beginProviderSync(session);
+            }
+            synchronizeAuthenticatedSession(session, Map.of());
+        } catch (RuntimeException error) {
+            synchronized (session) {
+                if (!session.done()) {
+                    transition(session, "opening", "正在连接酷狗登录服务，请稍候");
+                }
+            }
+        }
+    }
+
+    private static void beginProviderSync(LoginSession session) {
+        if (session.syncStartedNanos == 0L) session.syncStartedNanos = System.nanoTime();
+        transition(session, "syncing", session.spec.label() + "登录已确认，正在同步账号与歌单");
+    }
+
+    private void synchronizeAuthenticatedSession(LoginSession session, Map<String, String> cookies) {
+        long remainingNanos;
+        synchronized (session) {
+            if (session.done()) return;
+            beginProviderSync(session);
+            remainingNanos = remainingSyncNanos(session);
+            if (remainingNanos <= 0L) {
+                failProviderSync(session);
+                closeProcess(session.process);
+                return;
+            }
+            session.syncAttempts += 1;
+        }
+
+        if (!prepareImportedSession(session)) return;
+
+        Future<Map<String, Object>> task = syncExecutor.submit(
+            () -> session.providerManagedLogin
+                ? music.synchronizeCurrentSession(session.provider)
+                : music.synchronizeBrowserSession(session.provider, cookies)
+        );
+        synchronized (session) {
+            if (session.done()) {
+                task.cancel(true);
+                return;
+            }
+            session.syncTask = task;
+        }
+
+        try {
+            long waitNanos = Math.max(1L, Math.min(syncAttemptTimeout.toNanos(), remainingNanos));
+            Map<String, Object> sync = task.get(waitNanos, TimeUnit.NANOSECONDS);
+            boolean completed;
+            synchronized (session) {
+                if (session.done()) return;
+                session.accountReady = SimpleJson.asBoolean(sync.get("loggedIn"), false);
+                session.playlistsReady = SimpleJson.asBoolean(sync.get("playlistsReady"), false);
+                if (!SimpleJson.asBoolean(sync.get("ready"), false)) {
+                    completed = false;
+                } else {
+                    completed = session.accountReady && session.playlistsReady;
+                }
+                if (completed) {
+                    finishSession(session, "success", session.spec.label() + "登录成功，账号与歌单已同步");
+                    activeByProvider.remove(session.provider, session.id);
+                    stopMonitor(session);
+                } else {
+                    boolean terminal = retryOrFailProviderSync(session);
+                    if (!terminal) session.authenticatedCookies = Map.of();
+                }
+            }
+            if (completed || session.done()) closeProcess(session.process);
+        } catch (TimeoutException | ExecutionException | RuntimeException error) {
+            task.cancel(true);
+            boolean terminal;
+            synchronized (session) {
+                if (session.done()) return;
+                terminal = retryOrFailProviderSync(session);
+                if (!terminal) session.authenticatedCookies = Map.of();
+            }
+            if (terminal) closeProcess(session.process);
+        } catch (InterruptedException interrupted) {
+            task.cancel(true);
+            Thread.currentThread().interrupt();
+        } finally {
+            synchronized (session) {
+                if (session.syncTask == task) session.syncTask = null;
+            }
+        }
+    }
+
+    private boolean prepareImportedSession(LoginSession session) {
+        synchronized (session) {
+            if (session.importPrepared) return true;
+            session.importPrepared = true;
+        }
+        try {
+            // An explicit QR login replaces the provider session. Clear the
+            // previous account once so cookies from two users cannot be merged
+            // while the new official-browser session is being verified.
+            music.clearBrowserSession(session.provider);
+            return true;
+        } catch (RuntimeException error) {
+            boolean terminal;
+            synchronized (session) {
+                session.importPrepared = false;
+                if (session.done()) return false;
+                terminal = retryOrFailProviderSync(session);
+                if (!terminal) session.authenticatedCookies = Map.of();
+            }
+            if (terminal) closeProcess(session.process);
+            return false;
+        }
+    }
+
+    private void handleBrowserProbeFailure(LoginSession session) {
+        synchronized (session) {
+            if (session.done()) return;
+            if (session.process == null || !session.process.isAlive()) {
+                finishSession(session, "failed", "官方浏览器窗口已关闭，尚未检测到登录会话");
+                activeByProvider.remove(session.provider, session.id);
+                stopMonitor(session);
+            } else {
+                transition(session, "opening", "正在等待官方登录页面准备完成");
+            }
+        }
+    }
+
+    private long remainingSyncNanos(LoginSession session) {
+        return syncTotalBudget.toNanos() - (System.nanoTime() - session.syncStartedNanos);
+    }
+
+    private boolean retryOrFailProviderSync(LoginSession session) {
+        if (remainingSyncNanos(session) <= 0L) {
+            failProviderSync(session);
+            return true;
+        }
+        transition(session, "sync-retrying", session.spec.label() + "账号或歌单暂未准备好，正在自动重试");
+        return false;
+    }
+
+    private void failProviderSync(LoginSession session) {
+        finishSession(session, "sync-failed", session.spec.label() + "账号与歌单同步超时，请重试登录");
+        activeByProvider.remove(session.provider, session.id);
+        stopMonitor(session);
+        cancelSync(session);
+    }
+
+    private void browserExited(LoginSession session) {
+        synchronized (session) {
+            if (session.providerManagedLogin && !session.done()) return;
+            if (session.done() || !session.authenticatedCookies.isEmpty()) return;
+            finishSession(session, "failed", "官方浏览器窗口已关闭，尚未检测到登录会话");
+            activeByProvider.remove(session.provider, session.id);
+            stopMonitor(session);
+        }
+    }
+
+    private void finishSession(LoginSession session, String phase, String message) {
+        if (!"success".equals(phase)) discardImportedSession(session);
+        transition(session, phase, message);
+        session.authenticatedCookies = Map.of();
+        scheduleTerminalCleanup(session);
+    }
+
+    private void discardImportedSession(LoginSession session) {
+        synchronized (session) {
+            if (!session.importPrepared) return;
+            session.importPrepared = false;
+        }
+        try {
+            music.clearBrowserSession(session.provider);
+        } catch (RuntimeException ignored) {
+            // The login remains failed even if an already-corrupt provider
+            // workspace cannot be removed. A later explicit login retries the
+            // one-time cleanup before importing new browser cookies.
+        }
+    }
+
+    private void scheduleTerminalCleanup(LoginSession session) {
+        synchronized (session) {
+            if (!session.done() || session.cleanupTask != null) return;
+            try {
+                session.cleanupTask = monitorExecutor.schedule(() -> {
+                    synchronized (session) {
+                        session.authenticatedCookies = Map.of();
+                        sessions.remove(session.id, session);
+                        activeByProvider.remove(session.provider, session.id);
+                        session.cleanupTask = null;
+                    }
+                }, terminalRetention.toNanos(), TimeUnit.NANOSECONDS);
+            } catch (RuntimeException rejected) {
+                sessions.remove(session.id, session);
+                activeByProvider.remove(session.provider, session.id);
+            }
+        }
+    }
+
+    private static void transition(LoginSession session, String phase, String message) {
+        if (phase.equals(session.phase) && message.equals(session.message)) return;
+        session.phase = phase;
+        session.message = message;
+        session.revision += 1L;
+        session.notifyAll();
+    }
+
+    private static void stopMonitor(LoginSession session) {
+        ScheduledFuture<?> task;
+        synchronized (session) {
+            task = session.monitorTask;
+            session.monitorTask = null;
+        }
+        if (task != null) task.cancel(false);
+    }
+
+    private static void cancelSync(LoginSession session) {
+        Future<?> task;
+        synchronized (session) {
+            task = session.syncTask;
+            session.syncTask = null;
+        }
+        if (task != null) task.cancel(true);
     }
 
     public Map<String, Object> cancel(String provider, String sessionId) {
@@ -162,10 +534,11 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
         LoginSession session = requireSession(id, sessionId);
         synchronized (session) {
             if (!session.done()) {
-                session.phase = "cancelled";
-                session.message = "已关闭官方浏览器登录";
+                finishSession(session, "cancelled", "已关闭官方浏览器登录");
             }
             activeByProvider.remove(id, session.id);
+            stopMonitor(session);
+            cancelSync(session);
             closeProcess(session.process);
             return payload(session);
         }
@@ -197,6 +570,7 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
     }
 
     private Map<String, String> readProviderCookies(LoginSession session) throws IOException, InterruptedException {
+        HttpClient http = HttpClientHolder.INSTANCE;
         HttpRequest versionRequest = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + session.port + "/json/version"))
             .timeout(Duration.ofSeconds(3))
             .GET()
@@ -251,7 +625,7 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
         return switch (provider) {
             case "netease" -> hasCookie(cookies, "MUSIC_U", "MUSIC_A");
             case "qq" -> hasCookie(cookies, "uin", "p_uin", "wxuin")
-                && hasCookie(cookies, "qm_keyst", "qqmusic_key", "p_skey", "skey");
+                && hasCookie(cookies, "qm_keyst", "qqmusic_key");
             case "kugou" -> hasKugouAuthenticatedSession(cookies);
             default -> false;
         };
@@ -311,6 +685,52 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
         return "";
     }
 
+    private static String validatedKugouLoginUrl(Map<String, Object> providerLogin) {
+        String key = SimpleJson.asString(providerLogin.get("key"), "").trim();
+        String raw = SimpleJson.asString(providerLogin.get("loginUrl"), "").trim();
+        if (key.isBlank() || key.length() > 512 || raw.isBlank()) {
+            throw new IllegalArgumentException("酷狗二维码登录初始化失败");
+        }
+        try {
+            URI uri = URI.create(raw);
+            String queryKey = onlyQueryParameter(uri, "key");
+            if (!"http".equalsIgnoreCase(uri.getScheme())
+                || !"127.0.0.1".equalsIgnoreCase(uri.getHost())
+                || uri.getPort() < 1024
+                || uri.getUserInfo() != null
+                || uri.getFragment() != null
+                || !"/login/qr/view".equals(uri.getPath())
+                || !key.equals(queryKey)) {
+                throw new IllegalArgumentException("invalid Kugou QR login URL");
+            }
+            return uri.toASCIIString();
+        } catch (RuntimeException error) {
+            throw new IllegalArgumentException("酷狗二维码登录地址无效", error);
+        }
+    }
+
+    private static String onlyQueryParameter(URI uri, String expectedName) {
+        String rawQuery = uri.getRawQuery();
+        if (rawQuery == null || rawQuery.isBlank()) return "";
+        String value = null;
+        for (String pair : rawQuery.split("&")) {
+            int separator = pair.indexOf('=');
+            String rawName = separator < 0 ? pair : pair.substring(0, separator);
+            String rawValue = separator < 0 ? "" : pair.substring(separator + 1);
+            String name;
+            String decoded;
+            try {
+                name = URLDecoder.decode(rawName, StandardCharsets.UTF_8);
+                decoded = URLDecoder.decode(rawValue, StandardCharsets.UTF_8);
+            } catch (IllegalArgumentException error) {
+                return "";
+            }
+            if (!expectedName.equals(name) || value != null) return "";
+            value = decoded;
+        }
+        return value == null ? "" : value;
+    }
+
     private static boolean hasCookie(Map<String, String> cookies, String... names) {
         for (Map.Entry<String, String> entry : cookies.entrySet()) {
             for (String name : names) {
@@ -322,11 +742,17 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
 
     private static Map<String, Object> payload(LoginSession session) {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("ok", !"failed".equals(session.phase));
+        body.put("ok", !"failed".equals(session.phase) && !"sync-failed".equals(session.phase));
         body.put("provider", session.provider);
         body.put("session", session.id);
         body.put("phase", session.phase);
         body.put("loggedIn", "success".equals(session.phase));
+        body.put("syncing", "syncing".equals(session.phase) || "sync-retrying".equals(session.phase));
+        body.put("retryable", "sync-retrying".equals(session.phase) || "sync-failed".equals(session.phase));
+        body.put("syncAttempts", session.syncAttempts);
+        body.put("accountReady", session.accountReady);
+        body.put("playlistsReady", session.playlistsReady);
+        body.put("revision", session.revision);
         body.put("terminal", session.done());
         body.put("message", session.message);
         body.put("browser", session.browserName);
@@ -411,9 +837,10 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
         if (session == null) return;
         synchronized (session) {
             if (!session.done()) {
-                session.phase = phase;
-                session.message = "官方浏览器登录已结束";
+                finishSession(session, phase, "官方浏览器登录已结束");
             }
+            stopMonitor(session);
+            cancelSync(session);
             closeProcess(session.process);
         }
     }
@@ -450,7 +877,10 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
     @Override
     public void close() {
         sessions.values().forEach(session -> closeSession(session, "cancelled"));
+        sessions.clear();
         activeByProvider.clear();
+        monitorExecutor.shutdownNow();
+        syncExecutor.shutdownNow();
     }
 
     private record ProviderSpec(String label, String loginUrl, List<String> domains) {
@@ -464,6 +894,12 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
         }
     }
 
+    private static final class HttpClientHolder {
+        private static final HttpClient INSTANCE = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(2))
+            .build();
+    }
+
     private static final class LoginSession {
         private final String id;
         private final String provider;
@@ -472,6 +908,19 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
         private final int port;
         private final Process process;
         private final long startedNanos = System.nanoTime();
+        private long syncStartedNanos;
+        private long lastProviderPollNanos;
+        private Map<String, String> authenticatedCookies = Map.of();
+        private ScheduledFuture<?> monitorTask;
+        private ScheduledFuture<?> cleanupTask;
+        private Future<?> syncTask;
+        private boolean importPrepared;
+        private boolean providerManagedLogin;
+        private String providerLoginKey = "";
+        private boolean accountReady;
+        private boolean playlistsReady;
+        private int syncAttempts;
+        private long revision;
         private String phase = "opening";
         private String message = "正在打开官方登录页面";
 
@@ -485,7 +934,7 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
         }
 
         private boolean done() {
-            return "success".equals(phase) || "failed".equals(phase) || "expired".equals(phase)
+            return "success".equals(phase) || "failed".equals(phase) || "sync-failed".equals(phase) || "expired".equals(phase)
                 || "cancelled".equals(phase) || "replaced".equals(phase);
         }
     }

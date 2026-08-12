@@ -27,9 +27,11 @@ const clarityObserver = functionBody('observeRenderClarityFrame');
 const drawOrb = functionBody('drawOrb');
 const init = functionBody('init');
 const polling = functionBody('startBackgroundPolling');
+const interactiveRuntime = functionBody('startInteractiveRuntime');
 const dynamicVisibility = functionBody('updateDynamicCubeVisibility');
 const sonicVisibility = functionBody('updateSonicTopographyVisibility');
-const nativeRefresh = functionBody('playbackPresetsUseNativeRefresh');
+const frameBudget = functionBody('consumeOrbFrameBudget');
+const uncappedPlayback = functionBody('playbackFrameRateUncapped');
 
 const checks = {
   playbackParticleDensityIsFixed:
@@ -47,13 +49,21 @@ const checks = {
     drawOrb.length > 0
     && !/state\.particles\.slice\s*\([^)]*\)\.map\s*\(/.test(drawOrb)
     && /orb\.drawable/.test(drawOrb),
-  visibleFrameRateRemainsNative:
-    /return\s+!document\.hidden/.test(nativeRefresh)
-    && /playbackPresetsUseNativeRefresh\(\)\s*\?\s*0/.test(drawOrb),
+  nonPlaybackFrameWorkUsesAdaptive120FpsBudget:
+    frameBudget.length > 0
+    && /orbFrameBudgetMs\s*\(/.test(frameBudget)
+    && /frameBudgetCarryMs/.test(frameBudget)
+    && /consumeOrbFrameBudget\s*\(now\)/.test(drawOrb),
+  activePlaybackUsesEveryPresentedFrame:
+    /state\.playbackPage/.test(uncappedPlayback)
+    && /isPlaybackClockRunning\s*\(\)/.test(uncappedPlayback)
+    && /if\s*\(playbackFrameRateUncapped\s*\(\)\)/.test(frameBudget)
+    && /return true/.test(frameBudget),
   permanentInitIntervalsRemoved:
     init.length > 0
     && !/setInterval\s*\(/.test(init)
-    && /startBackgroundPolling\s*\(/.test(init),
+    && !/startBackgroundPolling\s*\(/.test(init)
+    && /startBackgroundPolling\s*\(/.test(interactiveRuntime),
   pollingStopsWhenDocumentIsHidden:
     polling.length > 0
     && /document\.hidden/.test(polling)
@@ -74,7 +84,7 @@ const failures = Object.entries(checks)
 console.log(JSON.stringify({
   pass: failures.length === 0,
   policy: {
-    adaptiveFrameRate: false,
+    adaptiveFrameRate: true,
     adaptiveParticleDensity: false,
     adaptiveClarityDuringRendering: false
   },

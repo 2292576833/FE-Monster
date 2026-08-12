@@ -9,7 +9,7 @@ public final class KugouWorkspaceMigration {
     public static void main(String[] args) throws Exception {
         try (MusicApiConfigService service = new MusicApiConfigService(ProjectPaths.detect())) {
             MusicApiConfigService.ProviderConfig kugou = service.provider("kugou");
-            boolean pass = "2.0.1".equals(kugou.manifestVersion())
+            boolean pass = "2.0.7".equals(kugou.manifestVersion())
                 && "imported-zip".equals(kugou.source())
                 && !kugou.packageDirectory().isBlank();
             System.out.println("{"

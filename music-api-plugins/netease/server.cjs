@@ -1,5 +1,7 @@
 'use strict';
 
+require('./safe-log.cjs').installSafeLogging();
+
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -86,10 +88,17 @@ async function main() {
 
   if (!fs.existsSync(anonymousToken)) fs.writeFileSync(anonymousToken, '', 'utf8');
   global.cnIp = generateRandomChineseIP();
-  await serveNcmApi({
+  const app = await serveNcmApi({
     port: Number(process.env.PORT || '3010'),
     host: process.env.HOST || '127.0.0.1',
     checkVersion: false
+  });
+  app.get('/health', (_request, response) => {
+    response.status(200).json({
+      ok: true,
+      provider: 'netease',
+      version: '4.32.0'
+    });
   });
   void generateConfig();
 }

@@ -11,8 +11,30 @@ import java.util.Map;
 
 public final class QishuiPackageImportProbe {
     public static void main(String[] args) throws Exception {
-        if (args.length != 1) throw new IllegalArgumentException("expected Qishui package ZIP path");
+        if (args.length < 1 || args.length > 2) {
+            throw new IllegalArgumentException("expected Qishui package ZIP path and optional previous version");
+        }
         Path packageZip = Path.of(args[0]).toAbsolutePath().normalize();
+        if (args.length == 2) {
+            if (!"3.1.0".equals(args[1])) {
+                throw new IllegalArgumentException("expected Qishui 3.1.0 migration fixture");
+            }
+            try (MusicApiConfigService service = new MusicApiConfigService(ProjectPaths.detect())) {
+                MusicApiConfigService.ProviderConfig config = service.provider("qishui");
+                if (!"3.1.1".equals(config.manifestVersion())) {
+                    throw new IllegalStateException("Qishui bundled package was not migrated");
+                }
+                Map<String, Object> result = new LinkedHashMap<>();
+                result.put("ok", true);
+                result.put("provider", config.id());
+                result.put("previousVersion", args[1]);
+                result.put("version", config.manifestVersion());
+                result.put("source", config.source());
+                result.put("configured", config.configured());
+                System.out.println(SimpleJson.stringify(result));
+                return;
+            }
+        }
         Map<String, Object> status = Map.of();
 
         try (MusicApiConfigService service = new MusicApiConfigService(ProjectPaths.detect());
@@ -27,7 +49,7 @@ public final class QishuiPackageImportProbe {
             }
 
             MusicApiConfigService.ProviderConfig config = service.provider("qishui");
-            if (!"3.1.0".equals(config.manifestVersion())) {
+            if (!"3.1.1".equals(config.manifestVersion())) {
                 throw new IllegalStateException("Qishui package version was not imported");
             }
             if (!"ready".equals(SimpleJson.asString(status.get("status"), ""))) {

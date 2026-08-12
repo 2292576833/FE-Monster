@@ -29,6 +29,8 @@ import java.util.concurrent.TimeoutException;
 public final class PlayerService {
     private static final long SAVE_DEBOUNCE_MILLIS = 180;
     private static final long SAVE_FLUSH_TIMEOUT_MILLIS = 2000;
+    private static final int MAX_QUEUE_SIZE = 2_000;
+    private static final int MAX_QUEUE_PAGE_SIZE = 200;
 
     private final Path stateFile;
     private final MusicProviderRegistry music;
@@ -40,6 +42,7 @@ public final class PlayerService {
     });
     private ScheduledFuture<?> pendingSave;
     private long stateRevision = 0;
+    private long queueRevision = 0;
     private long loadRevision = 0;
     private boolean closed = false;
     private Song currentSong = Song.empty();
@@ -71,8 +74,9 @@ public final class PlayerService {
         body.put("position", position);
         body.put("duration", duration);
         body.put("song", currentSong.toMap());
-        body.put("queue", queueMaps());
+        body.put("queueLength", queue.size());
         body.put("queueIndex", queueIndex);
+        body.put("queueRevision", queueRevision);
         body.put("url", url);
         body.put("quality", quality);
         body.put("volume", volume);
@@ -204,18 +208,27 @@ public final class PlayerService {
     }
 
     public synchronized Map<String, Object> setQueue(List<Song> songs, int currentIndex) {
-        queue.clear();
-        for (Song song : songs) {
-            if (song.hasIdentity()) queue.add(song);
-            if (queue.size() >= 100) break;
+        List<Song> nextQueue = new ArrayList<>();
+        if (songs != null) {
+            for (Song song : songs) {
+                if (song != null && song.hasIdentity()) nextQueue.add(song);
+                if (nextQueue.size() >= MAX_QUEUE_SIZE) break;
+            }
         }
-        queueIndex = currentIndex >= -1 && currentIndex < queue.size() ? currentIndex : -1;
-        syncQueueIndexToCurrentSong();
+        boolean membershipChanged = !sameQueue(queue, nextQueue);
+        queue.clear();
+        queue.addAll(nextQueue);
+        if (membershipChanged) queueRevision += 1;
+        boolean explicitSelection = currentIndex >= 0 && currentIndex < queue.size();
+        queueIndex = explicitSelection ? currentIndex : -1;
+        if (!explicitSelection) syncQueueIndexToCurrentSong();
         save();
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("ok", true);
         body.put("length", queue.size());
+        body.put("queueLength", queue.size());
         body.put("queueIndex", queueIndex);
+        body.put("queueRevision", queueRevision);
         return body;
     }
 
@@ -228,7 +241,8 @@ public final class PlayerService {
         if ("next".equalsIgnoreCase(mode)) {
             List<Song> toInsert = new ArrayList<>();
             for (Song song : incoming) {
-                if (song.hasIdentity() && queuedIds.add(song.id)) {
+                if (queue.size() + toInsert.size() >= MAX_QUEUE_SIZE) break;
+                if (song != null && song.hasIdentity() && queuedIds.add(song.id)) {
                     toInsert.add(song);
                 }
             }
@@ -237,20 +251,43 @@ public final class PlayerService {
             added = toInsert.size();
         } else {
             for (Song song : incoming) {
-                if (song.hasIdentity() && queuedIds.add(song.id)) {
+                if (queue.size() >= MAX_QUEUE_SIZE) break;
+                if (song != null && song.hasIdentity() && queuedIds.add(song.id)) {
                     queue.add(song);
                     added++;
                 }
             }
         }
+        if (added > 0) queueRevision += 1;
         if (queueIndex >= queue.size()) queueIndex = -1;
         save();
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("ok", true);
         body.put("mode", mode == null || mode.isBlank() ? "append" : mode);
         body.put("length", queue.size());
+        body.put("queueLength", queue.size());
         body.put("queueIndex", queueIndex);
+        body.put("queueRevision", queueRevision);
         body.put("added", added);
+        return body;
+    }
+
+    public synchronized Map<String, Object> queuePage(int requestedCursor, int requestedLimit) {
+        int cursor = Math.max(0, Math.min(requestedCursor, queue.size()));
+        int limit = Math.max(1, Math.min(requestedLimit, MAX_QUEUE_PAGE_SIZE));
+        int end = Math.min(queue.size(), cursor + limit);
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (int index = cursor; index < end; index++) {
+            items.add(queue.get(index).toQueueMap(index, index == queueIndex));
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("items", items);
+        body.put("total", queue.size());
+        body.put("cursor", cursor);
+        body.put("limit", limit);
+        body.put("nextCursor", end < queue.size() ? end : null);
+        body.put("queueIndex", queueIndex);
+        body.put("queueRevision", queueRevision);
         return body;
     }
 
@@ -328,6 +365,8 @@ public final class PlayerService {
         body.put("ok", ok);
         body.put("playing", playing);
         body.put("queueIndex", queueIndex);
+        body.put("queueLength", queue.size());
+        body.put("queueRevision", queueRevision);
         body.put("song", currentSong.toMap());
         body.put("url", url);
         body.put("quality", quality);
@@ -349,6 +388,17 @@ public final class PlayerService {
             items.add(queue.get(i).toQueueMap(i, i == queueIndex));
         }
         return items;
+    }
+
+    private static boolean sameQueue(List<Song> left, List<Song> right) {
+        if (left.size() != right.size()) return false;
+        for (int index = 0; index < left.size(); index++) {
+            Song leftSong = left.get(index);
+            Song rightSong = right.get(index);
+            if (leftSong == rightSong) continue;
+            if (leftSong == null || rightSong == null || !leftSong.toMap().equals(rightSong.toMap())) return false;
+        }
+        return true;
     }
 
     private void syncQueueIndexToCurrentSong() {
@@ -381,6 +431,7 @@ public final class PlayerService {
             volume = SimpleJson.asDouble(root.get("volume"), 0.8);
             quality = normalizeQuality(SimpleJson.asString(root.get("quality"), "standard"));
             queueIndex = SimpleJson.asInt(root.get("queueIndex"), -1);
+            queueRevision = Math.max(0L, SimpleJson.asLong(root.get("queueRevision"), 0L));
             url = SimpleJson.asString(root.get("url"), "");
             audioLoaded = !url.isBlank();
             playing = false;
@@ -388,7 +439,9 @@ public final class PlayerService {
             for (Object item : SimpleJson.asList(root.get("queue"))) {
                 Song song = Song.fromMap(SimpleJson.asMap(item));
                 if (song.hasIdentity()) queue.add(song);
+                if (queue.size() >= MAX_QUEUE_SIZE) break;
             }
+            if (!queue.isEmpty() && queueRevision == 0) queueRevision = 1;
         } catch (IOException ignored) {
         }
     }
@@ -443,6 +496,7 @@ public final class PlayerService {
 
     private String persistentStateJson() {
         Map<String, Object> root = new LinkedHashMap<>(state());
+        root.put("queue", queueMaps());
         root.put("playing", false);
         return SimpleJson.stringify(root);
     }

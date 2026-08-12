@@ -15,8 +15,6 @@ public final class RuntimeSettingsService {
     private boolean directX11 = true;
     private boolean xAudio2 = true;
     private boolean x3DAudio = true;
-    private boolean gestureControl = false;
-    private String gestureCameraSource = "webcam";
 
     public RuntimeSettingsService(Path file) {
         this.file = file.toAbsolutePath().normalize();
@@ -30,8 +28,6 @@ public final class RuntimeSettingsService {
         body.put("directX11", directX11);
         body.put("xAudio2", xAudio2);
         body.put("x3DAudio", x3DAudio);
-        body.put("gestureControl", gestureControl);
-        body.put("gestureCameraSource", gestureCameraSource);
         return body;
     }
 
@@ -40,18 +36,8 @@ public final class RuntimeSettingsService {
         directX11 = SimpleJson.asBoolean(next.get("directX11"), directX11);
         xAudio2 = SimpleJson.asBoolean(next.get("xAudio2"), xAudio2);
         x3DAudio = SimpleJson.asBoolean(next.get("x3DAudio"), x3DAudio);
-        gestureControl = SimpleJson.asBoolean(next.get("gestureControl"), gestureControl);
-        gestureCameraSource = normalizeGestureCameraSource(SimpleJson.asString(next.get("gestureCameraSource"), gestureCameraSource));
         save();
         return snapshot();
-    }
-
-    public synchronized boolean gestureControlEnabled() {
-        return gestureControl;
-    }
-
-    public synchronized String gestureCameraSource() {
-        return gestureCameraSource;
     }
 
     private void restore() {
@@ -62,16 +48,8 @@ public final class RuntimeSettingsService {
             directX11 = SimpleJson.asBoolean(root.get("directX11"), directX11);
             xAudio2 = SimpleJson.asBoolean(root.get("xAudio2"), xAudio2);
             x3DAudio = SimpleJson.asBoolean(root.get("x3DAudio"), x3DAudio);
-            gestureControl = SimpleJson.asBoolean(root.get("gestureControl"), gestureControl);
-            gestureCameraSource = normalizeGestureCameraSource(SimpleJson.asString(root.get("gestureCameraSource"), gestureCameraSource));
         } catch (IOException | RuntimeException ignored) {
         }
-    }
-
-    private static String normalizeGestureCameraSource(String source) {
-        if (source == null) return "webcam";
-        String normalized = source.trim().toLowerCase();
-        return "camera".equals(normalized) || "canon".equals(normalized) || "eos".equals(normalized) ? "camera" : "webcam";
     }
 
     private void save() {

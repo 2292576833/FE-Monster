@@ -67,4 +67,4 @@
 powershell -ExecutionPolicy Bypass -File music-api-plugins/qishui/build.ps1
 ```
 
-产物为 `dist/plugins/FE-Monster-Qishui-OpenAPI-Plugin-3.1.0.zip`。
+产物为 `dist/plugins/FE-Monster-Qishui-OpenAPI-Plugin-3.1.1.zip`。

@@ -89,6 +89,11 @@ assert.match(
   'the render loop must use the drag preview clock instead of overwriting it with audio.currentTime'
 );
 assert.match(clock, /progressDragging/, 'the preview clock must only override media time while dragging');
+assert.ok(
+  clock.indexOf('if (els.audio?.src && Number.isFinite(audioTime))')
+    < clock.indexOf('if (Number.isFinite(handoffTarget))'),
+  'after drag release, a usable media.currentTime must outrank the synthetic handoff target'
+);
 assert.match(
   progress,
   /currentPlaybackLyricTime\(audioCurrent\)[\s\S]*?syncPlaybackLyricAtTime\(current\)/,
@@ -105,17 +110,12 @@ assert.match(
   'normal lyric line motion must stay media-clock driven'
 );
 
-const toleranceMatch = app.match(
-  /const QISHUI_SEEK_HANDOFF_TOLERANCE_SECONDS\s*=\s*([0-9.]+)/
-);
 const maximumAgeMatch = app.match(/const QISHUI_SEEK_HANDOFF_MAX_MS\s*=\s*([0-9.]+)/);
-assert.ok(toleranceMatch && maximumAgeMatch, 'seek handoff bounds must be explicit');
-const handoffTolerance = Number(toleranceMatch[1]);
+assert.ok(maximumAgeMatch, 'the unavailable-media handoff fallback must have an explicit maximum age');
 const handoffMaximumAge = Number(maximumAgeMatch[1]);
-assert.ok(handoffTolerance > 0 && handoffTolerance <= 0.1, 'seek handoff error must be at most 100ms');
 
 function resolveHandoffClock({ audioTime, target, age, hasSource = true }) {
-  if (Math.abs(audioTime - target) <= handoffTolerance) return audioTime;
+  if (hasSource && Number.isFinite(audioTime)) return audioTime;
   if (hasSource && age <= handoffMaximumAge) return target;
   return audioTime;
 }
@@ -126,17 +126,20 @@ const staleFirstFrame = resolveHandoffClock({
   target,
   age: 16
 });
-assert.equal(staleFirstFrame, target, 'first frame after release must not jump back to stale media time');
-const settledAudioTime = target + handoffTolerance * 0.75;
+assert.equal(staleFirstFrame, 17.2, 'after release, lyric state must remain at the real media time until seek settles');
+const unavailableClockFallback = resolveHandoffClock({
+  audioTime: Number.NaN,
+  target,
+  age: 16
+});
+assert.equal(unavailableClockFallback, target, 'the target may be a bounded fallback only when media time is unavailable');
+const settledAudioTime = target + 0.06;
 const settledFrame = resolveHandoffClock({
   audioTime: settledAudioTime,
   target,
   age: 32
 });
-assert.ok(
-  Math.abs(settledFrame - target) <= handoffTolerance,
-  'handoff to audio.currentTime must stay inside the explicit error bound'
-);
+assert.equal(settledFrame, settledAudioTime, 'settled lyrics must use the exact media.currentTime sample');
 
 console.log(JSON.stringify({
   ok: true,
@@ -148,7 +151,8 @@ console.log(JSON.stringify({
   sourceRebuilds: occurrences(`${preview}\n${commit}`, /(?:audio|els\.audio)\.src\s*=/g),
   pauses: occurrences(`${preview}\n${commit}`, /\.pause\(/g),
   loads: occurrences(`${preview}\n${commit}`, /\.load\(/g),
-  firstFrameErrorSeconds: Math.abs(staleFirstFrame - target),
-  settledFrameErrorSeconds: Math.abs(settledFrame - target),
-  handoffToleranceSeconds: handoffTolerance
+  releasedLogicalAdvanceErrorSeconds: Math.abs(staleFirstFrame - 17.2),
+  unavailableClockFallbackSeconds: unavailableClockFallback,
+  settledMediaClockErrorSeconds: Math.abs(settledFrame - settledAudioTime),
+  unavailableClockFallbackMaximumAgeMs: handoffMaximumAge
 }, null, 2));

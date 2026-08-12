@@ -23,7 +23,11 @@ function loadUpstream(relativePath, bundledLoader) {
 }
 
 const loginToken = loadUpstream("module/login_token.js", () => require("../../../node_modules/kugoumusicapi/module/login_token.js"));
+const loginQrKey = loadUpstream("module/login_qr_key.js", () => require("../../../node_modules/kugoumusicapi/module/login_qr_key.js"));
+const loginQrCreate = loadUpstream("module/login_qr_create.js", () => require("../../../node_modules/kugoumusicapi/module/login_qr_create.js"));
+const loginQrCheck = loadUpstream("module/login_qr_check.js", () => require("../../../node_modules/kugoumusicapi/module/login_qr_check.js"));
 const userDetail = loadUpstream("module/user_detail.js", () => require("../../../node_modules/kugoumusicapi/module/user_detail.js"));
+const userVipDetail = loadUpstream("module/user_vip_detail.js", () => require("../../../node_modules/kugoumusicapi/module/user_vip_detail.js"));
 const userPlaylist = loadUpstream("module/user_playlist.js", () => require("../../../node_modules/kugoumusicapi/module/user_playlist.js"));
 const topPlaylist = loadUpstream("module/top_playlist.js", () => require("../../../node_modules/kugoumusicapi/module/top_playlist.js"));
 const playlistDetail = loadUpstream("module/playlist_detail.js", () => require("../../../node_modules/kugoumusicapi/module/playlist_detail.js"));
@@ -38,13 +42,14 @@ const commentMusic = loadUpstream("module/comment_music.js", () => require("../.
 const playlistTracksAdd = loadUpstream("module/playlist_tracks_add.js", () => require("../../../node_modules/kugoumusicapi/module/playlist_tracks_add.js"));
 const { createRequest } = loadUpstream("util/request.js", () => require("../../../node_modules/kugoumusicapi/util/request.js"));
 
-const VERSION = "2.0.1";
+const VERSION = "2.0.7";
 const UPSTREAM_VERSION = "1.5.1";
 const SOURCE_COMMIT = "283f1e97b110726b208a64b486a657c0fc0a6126";
 const MAX_BODY_BYTES = 1024 * 1024;
 const SESSION_SCHEMA = "fe-monster.kugou-session/v1";
 const MAX_NETWORK_ATTEMPTS = 3;
 const NETWORK_RETRY_BASE_MS = 1000;
+const QR_VIEW_TTL_MS = 10 * 60 * 1000;
 const RETRYABLE_NETWORK_CODES = new Set([
   "ECONNABORTED",
   "ECONNREFUSED",
@@ -68,7 +73,7 @@ const CAPABILITIES = Object.freeze([
   "playlist-tracks",
   "playlist-write",
   "user-playlists",
-  "official-browser-session"
+  "provider-qr-login"
 ]);
 
 function cliValue(name, fallback) {
@@ -243,31 +248,52 @@ const providerDataDirectory = dataDirectory();
 const sessionPath = path.join(providerDataDirectory, "session.json");
 fs.mkdirSync(providerDataDirectory, { recursive: true });
 
-function restoredCookies() {
+function restoredState() {
   try {
     const stored = JSON.parse(fs.readFileSync(sessionPath, "utf8"));
-    if (stored?.schema !== SESSION_SCHEMA || stored?.provider !== "kugou") return {};
-    return safeCookieMap(stored.cookies);
+    if (stored?.schema !== SESSION_SCHEMA || stored?.provider !== "kugou") {
+      return { cookies: {}, verification: null };
+    }
+    const cookies = safeCookieMap(stored.cookies);
+    const userid = String(stored?.verification?.userid || "").trim();
+    const currentUserId = canonicalAuthCookies({}, cookies).userid || "";
+    const verification = stored?.verification?.verified === true
+      && stored?.verification?.source === "kugou-app-qr"
+      && userid
+      && userid === currentUserId
+      ? {
+          verified: true,
+          source: "kugou-app-qr",
+          userid,
+          verifiedAt: Number(stored.verification.verifiedAt) || 0
+        }
+      : null;
+    return { cookies, verification };
   } catch (error) {
     if (error?.code !== "ENOENT") {
       process.stderr.write(`FE Monster Kugou API plugin ignored invalid session data: ${error.message}\n`);
     }
-    return {};
+    return { cookies: {}, verification: null };
   }
 }
 
+const restored = restoredState();
 const runtimeCookies = {
   ...newDeviceCookies(),
-  ...restoredCookies()
+  ...restored.cookies
 };
+let runtimeVerification = restored.verification;
 let deviceRegistrationPromise = null;
 let sessionWriteChain = Promise.resolve();
+const qrViews = new Map();
+const qrFinalizations = new Map();
 
 function sessionPayload() {
   return `${JSON.stringify({
     schema: SESSION_SCHEMA,
     provider: "kugou",
-    cookies: runtimeCookies
+    cookies: runtimeCookies,
+    ...(runtimeVerification ? { verification: runtimeVerification } : {})
   }, null, 2)}\n`;
 }
 
@@ -298,14 +324,64 @@ function persistSession() {
   return write;
 }
 
-async function rememberCookieMap(cookies) {
+const ACCOUNT_COOKIE_NAMES = new Set([
+  "token",
+  "t",
+  "userid",
+  "vip_token",
+  "vip_type",
+  "kugoo",
+  "kugooid",
+  "kugootoken",
+  "kugoopwd",
+  "username",
+  "nickname",
+  "pic",
+  "a_id",
+  "ct",
+  "t1"
+]);
+
+async function rememberCookieMap(cookies, { resetAccount = false } = {}) {
   let changed = false;
+  if (resetAccount) {
+    for (const key of Object.keys(runtimeCookies)) {
+      if (!ACCOUNT_COOKIE_NAMES.has(key.toLowerCase())) continue;
+      delete runtimeCookies[key];
+      changed = true;
+    }
+    if (runtimeVerification) {
+      runtimeVerification = null;
+      changed = true;
+    }
+  }
   for (const [key, content] of Object.entries(safeCookieMap(cookies))) {
     if (runtimeCookies[key] === content) continue;
     runtimeCookies[key] = content;
     changed = true;
   }
   if (changed) await persistSession();
+}
+
+async function clearAccountSession() {
+  qrViews.clear();
+  qrFinalizations.clear();
+  await rememberCookieMap({}, { resetAccount: true });
+  return { code: 200, status: 1, data: { cleared: true } };
+}
+
+async function markQrSessionVerified(userid) {
+  const normalized = String(userid || "").trim();
+  if (!normalized || normalized === "0") {
+    throw Object.assign(new Error("Kugou QR login did not return a valid account"), { status: 502 });
+  }
+  runtimeVerification = {
+    verified: true,
+    source: "kugou-app-qr",
+    userid: normalized,
+    verifiedAt: Date.now()
+  };
+  await persistSession();
 }
 
 function deviceIdentity() {
@@ -375,9 +451,22 @@ function canonicalAuthCookies(params, suppliedCookies) {
       || nestedCookieValue(kugoo, "KugooID", "userid")
       || ""
   ).trim();
+  const vipToken = String(
+    params.vip_token
+      || cookieMapValue(suppliedCookies, "vip_token", "vipToken")
+      || ""
+  ).trim();
+  const vipType = String(
+    params.vip_type
+      || params.vipType
+      || cookieMapValue(suppliedCookies, "vip_type", "vipType")
+      || ""
+  ).trim();
   return {
     ...(token ? { token } : {}),
-    ...(userid && userid !== "0" ? { userid } : {})
+    ...(userid && userid !== "0" ? { userid } : {}),
+    ...(vipToken ? { vip_token: vipToken } : {}),
+    ...(vipType ? { vip_type: vipType } : {})
   };
 }
 
@@ -413,7 +502,21 @@ async function requestParams(request, url, body) {
     ...parseCookie(request.headers.authorization)
   };
   const authCookies = canonicalAuthCookies(params, suppliedCookies);
-  await rememberCookieMap({ ...suppliedCookies, ...authCookies });
+  const previousAuth = canonicalAuthCookies({}, runtimeCookies);
+  const verifiedAuthMatches = Boolean(
+    runtimeVerification?.verified === true
+      && authCookies.userid
+      && authCookies.token
+      && authCookies.userid === previousAuth.userid
+      && authCookies.token === previousAuth.token
+  );
+  const nonAccountCookies = Object.fromEntries(
+    Object.entries(suppliedCookies).filter(([key]) => !ACCOUNT_COOKIE_NAMES.has(key.toLowerCase()))
+  );
+  await rememberCookieMap({
+    ...nonAccountCookies,
+    ...(verifiedAuthMatches ? authCookies : {})
+  });
   if (authCookies.token) params.token = authCookies.token;
   if (authCookies.userid) params.userid = authCookies.userid;
   params.cookie = {
@@ -482,6 +585,19 @@ function sendJson(request, response, status, payload, cookies = []) {
   if (cookies.length) headers["Set-Cookie"] = cookies.map((cookie) => `${cookie}; Path=/; SameSite=Lax`);
   response.writeHead(status, headers);
   response.end(body);
+}
+
+function sendHtml(request, response, status, body) {
+  const contents = String(body || "");
+  response.writeHead(status, {
+    ...corsHeaders(request),
+    "Content-Type": "text/html; charset=utf-8",
+    "Content-Length": Buffer.byteLength(contents),
+    "Content-Security-Policy": "default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff"
+  });
+  response.end(contents);
 }
 
 async function upstreamJson(url) {
@@ -607,6 +723,77 @@ function firstPlaybackUrl(payload) {
   return "";
 }
 
+function playbackPayloadMatchesIdentity(payload, identity) {
+  const hashes = new Set();
+  const albumAudioIds = new Set();
+  const hashKeys = new Set(["hash", "filehash", "audiohash", "songhash", "trackhash"]);
+  const albumAudioIdKeys = new Set(["albumaudioid", "audioid", "mixsongid", "mixid", "mxid"]);
+  const queue = [payload];
+  const seen = new Set();
+  while (queue.length) {
+    const value = queue.shift();
+    if (!value || typeof value !== "object" || seen.has(value)) continue;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      queue.push(...value);
+      continue;
+    }
+    for (const [key, nested] of Object.entries(value)) {
+      const normalizedKey = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
+      const candidates = Array.isArray(nested) ? nested : [nested];
+      if (hashKeys.has(normalizedKey)) {
+        for (const candidate of candidates) {
+          const hash = String(candidate || "").trim().toLowerCase();
+          if (/^[a-f0-9]{32}$/.test(hash)) hashes.add(hash);
+        }
+      } else if (albumAudioIdKeys.has(normalizedKey)) {
+        for (const candidate of candidates) {
+          const albumAudioId = String(candidate || "").trim();
+          if (/^\d+$/.test(albumAudioId) && albumAudioId !== "0") albumAudioIds.add(albumAudioId);
+        }
+      }
+      if (nested && typeof nested === "object") queue.push(nested);
+    }
+  }
+
+  const requestedHash = String(identity?.hash || "").trim().toLowerCase();
+  const requestedAlbumAudioId = String(identity?.albumAudioId || "").trim();
+  if (requestedHash && hashes.has(requestedHash)) return true;
+  if (requestedAlbumAudioId && albumAudioIds.has(requestedAlbumAudioId)) return true;
+  return false;
+}
+
+function playbackUrlMatchesIdentity(value, identity, payload) {
+  const text = String(value || "").trim();
+  if (!text || !identity) return false;
+  let decoded = text;
+  try {
+    decoded = decodeURIComponent(new URL(text).pathname);
+  } catch {
+    // The URL was already accepted by firstPlaybackUrl. Keep its raw text for
+    // identity inspection if an upstream returned unusual escaping.
+  }
+  const requestedHash = String(identity.hash || "").toLowerCase();
+  const requestedAlbumAudioId = String(identity.albumAudioId || "");
+  const pathHashes = [...decoded.matchAll(/(?:^|\/)([a-f0-9]{32})(?=\/|$)/ig)]
+    .map((match) => match[1].toLowerCase());
+  const trackHashes = [...decoded.matchAll(/\/v\d+\/([a-f0-9]{32})(?=\/|$)/ig)]
+    .map((match) => match[1].toLowerCase());
+  const albumAudioIds = [...decoded.matchAll(/(?:^|[_/-])mx(\d+)(?=[_./-]|$)/ig)]
+    .map((match) => match[1]);
+
+  // A regular Kugou CDN URL contains a 32-character CDN signature before
+  // `/v3/{track-hash}/`. That signature is not song identity. Accept when
+  // either stable identity marker matches; reject only when an actual track
+  // hash or mx marker is present and every available marker disagrees.
+  if (requestedHash && pathHashes.includes(requestedHash)) return true;
+  if (requestedAlbumAudioId && albumAudioIds.includes(requestedAlbumAudioId)) return true;
+  const hasTrackHashEvidence = Boolean(requestedHash && trackHashes.length);
+  const hasAlbumAudioEvidence = Boolean(requestedAlbumAudioId && albumAudioIds.length);
+  if (hasTrackHashEvidence || hasAlbumAudioEvidence) return false;
+  return playbackPayloadMatchesIdentity(payload, identity);
+}
+
 async function ensureRegisteredDevice() {
   if (runtimeCookies.dfid) return runtimeCookies.dfid;
   if (!deviceRegistrationPromise) {
@@ -693,15 +880,45 @@ async function lyricPayload(params) {
     throw Object.assign(new Error("A valid Kugou song hash or album audio id is required"), { status: 400 });
   }
   const cookie = { ...runtimeCookies, ...(params.cookie || {}) };
-  const searchResult = await callModule(searchLyric, {
-    ...params,
-    hash: identity.hash,
-    album_audio_id: identity.albumAudioId || 0,
-    keywords: params.keywords || params.keyword || "",
-    cookie
-  }, { idempotent: true });
-  await rememberCookies(searchResult.cookie);
-  const candidate = lyricCandidates(searchResult.body).find((item) => item?.id && item?.accesskey);
+  const keywords = String(params.keywords || params.keyword || "").trim();
+  const searchCandidate = async ({ albumAudioId, searchKeywords, duration }) => {
+    const searchResult = await callModule(searchLyric, {
+      ...params,
+      hash: identity.hash,
+      album_audio_id: albumAudioId || 0,
+      keywords: searchKeywords,
+      duration,
+      cookie
+    }, { idempotent: true });
+    await rememberCookies(searchResult.cookie);
+    return lyricCandidates(searchResult.body).find((item) => item?.id && item?.accesskey) || null;
+  };
+
+  let candidate = await searchCandidate({
+    albumAudioId: identity.albumAudioId,
+    searchKeywords: keywords,
+    duration: params.duration || 0
+  });
+  // Releases before the mixsongid correction may have persisted audio_id in
+  // the compound id. Kugou returns no candidate for that stale pair even when
+  // the hash is valid, so retry without the conflicting numeric identity.
+  if (!candidate && identity.hash && identity.albumAudioId) {
+    candidate = await searchCandidate({
+      albumAudioId: "",
+      searchKeywords: keywords,
+      duration: params.duration || 0
+    });
+  }
+  // Metadata occasionally differs between a provider library and the lyric
+  // catalogue. A final hash-only lookup is deterministic and avoids a false
+  // permanent no-lyric result while keeping the normal path to one request.
+  if (!candidate && identity.hash && (keywords || Number(params.duration || 0) > 0)) {
+    candidate = await searchCandidate({
+      albumAudioId: "",
+      searchKeywords: "",
+      duration: 0
+    });
+  }
   if (!candidate) {
     return noLyricPayload("not-found");
   }
@@ -790,6 +1007,7 @@ async function songUrlPayload(params) {
   if (!hash && !/^\d+$/.test(albumAudioId)) {
     throw Object.assign(new Error("A valid Kugou song hash or album audio id is required"), { status: 400 });
   }
+  const identity = { hash, albumAudioId, albumId };
   await ensureRegisteredDevice();
   const cookie = { ...runtimeCookies, ...(params.cookie || {}) };
   const request = {
@@ -804,6 +1022,7 @@ async function songUrlPayload(params) {
   let result = null;
   let playbackUrl = "";
   let networkError = null;
+  let identityMismatch = false;
   for (const resolver of [songUrl, songUrlNew]) {
     try {
       const candidate = await callModule(
@@ -814,6 +1033,10 @@ async function songUrlPayload(params) {
       await rememberCookies(candidate.cookie);
       const candidateUrl = firstPlaybackUrl(candidate.body);
       if (!candidateUrl) continue;
+      if (!playbackUrlMatchesIdentity(candidateUrl, identity, candidate.body)) {
+        identityMismatch = true;
+        continue;
+      }
       result = candidate;
       playbackUrl = candidateUrl;
       break;
@@ -827,6 +1050,21 @@ async function songUrlPayload(params) {
     }
   }
   if (!playbackUrl) {
+    if (identityMismatch) {
+      throw Object.assign(new Error("Kugou returned audio for a different track identity"), {
+        status: 403,
+        body: {
+          ok: false,
+          provider: "kugou",
+          type: "api",
+          errorType: "api",
+          code: 403,
+          playable: false,
+          reason: "provider-identity-mismatch",
+          error: "Kugou returned audio for a different track identity"
+        }
+      });
+    }
     if (networkError) throw networkError;
     throw Object.assign(new Error("Kugou audio source is unavailable for this account"), {
       status: 403,
@@ -849,17 +1087,205 @@ async function songUrlPayload(params) {
   };
 }
 
+function verifiedAccountAuth() {
+  const auth = canonicalAuthCookies({}, runtimeCookies);
+  const verified = Boolean(
+    runtimeVerification?.verified === true
+      && runtimeVerification.source === "kugou-app-qr"
+      && runtimeVerification.userid
+      && runtimeVerification.userid === auth.userid
+      && auth.token
+  );
+  return verified ? auth : {};
+}
+
+async function qrKeyPayload(params) {
+  const result = await callModule(loginQrKey, { ...params, type: "app" }, { idempotent: false });
+  const key = String(
+    result.body?.data?.qrcode
+      || result.body?.data?.key
+      || result.body?.qrcode
+      || ""
+  ).trim();
+  if (!key || key.length > 512) {
+    throw Object.assign(new Error("Kugou did not return a valid QR login key"), { status: 502 });
+  }
+  const rendered = await callModule(loginQrCreate, { key, qrimg: true }, { idempotent: false });
+  const dataUrl = String(rendered.body?.data?.base64 || "").trim();
+  if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(dataUrl)) {
+    throw Object.assign(new Error("Kugou did not return a valid QR login image"), { status: 502 });
+  }
+  const now = Date.now();
+  for (const [storedKey, view] of qrViews.entries()) {
+    if (now - view.createdAt > QR_VIEW_TTL_MS) {
+      qrViews.delete(storedKey);
+      qrFinalizations.delete(storedKey);
+    }
+  }
+  qrViews.set(key, { dataUrl, createdAt: now });
+  return {
+    code: 200,
+    status: 1,
+    data: {
+      key,
+      loginUrl: `http://127.0.0.1:${port}/login/qr/view?key=${encodeURIComponent(key)}`
+    }
+  };
+}
+
+function cookieMapFromSetCookies(cookies) {
+  const map = {};
+  for (const cookie of Array.isArray(cookies) ? cookies : []) {
+    const pair = cookiePair(cookie);
+    if (pair) map[pair[0]] = pair[1];
+  }
+  return map;
+}
+
+function deviceOnlyCookies(cookies) {
+  return Object.fromEntries(
+    Object.entries(safeCookieMap(cookies))
+      .filter(([name]) => !ACCOUNT_COOKIE_NAMES.has(name.toLowerCase()))
+  );
+}
+
+async function finalizeQrAuthorization(data, returnedCookies) {
+  const initialAuth = canonicalAuthCookies(data, returnedCookies);
+  if (!initialAuth.token || !initialAuth.userid) {
+    throw Object.assign(new Error("Kugou QR login completed without account credentials"), { status: 502 });
+  }
+
+  // The QR endpoint issues a short-lived App authorization token. Kugou's
+  // standard account APIs require it to be exchanged once through the same
+  // App-platform login_by_token endpoint before profile/VIP/library calls.
+  // Website tokens must never enter this path.
+  await ensureRegisteredDevice();
+  const seedCookies = {
+    ...deviceOnlyCookies(runtimeCookies),
+    ...returnedCookies,
+    ...initialAuth
+  };
+  const refreshed = await callModule(loginToken, {
+    ...initialAuth,
+    cookie: seedCookies
+  }, { idempotent: false });
+  const refreshedCookies = cookieMapFromSetCookies(refreshed.cookie);
+  const refreshedData = refreshed.body?.data && typeof refreshed.body.data === "object"
+    ? refreshed.body.data
+    : {};
+  const auth = canonicalAuthCookies(
+    { ...initialAuth, ...refreshedData },
+    { ...seedCookies, ...refreshedCookies }
+  );
+  if (!auth.token || !auth.userid || auth.userid !== initialAuth.userid) {
+    throw Object.assign(new Error("Kugou did not return a valid account token after QR authorization"), { status: 502 });
+  }
+
+  const candidateCookies = {
+    ...deviceOnlyCookies(runtimeCookies),
+    ...returnedCookies,
+    ...refreshedCookies,
+    ...auth
+  };
+  await callModule(userDetail, {
+    ...auth,
+    cookie: candidateCookies
+  }, { idempotent: true });
+
+  await rememberCookieMap(candidateCookies, { resetAccount: true });
+  await markQrSessionVerified(auth.userid);
+}
+
+function qrViewPage(key) {
+  const view = qrViews.get(key);
+  if (!view || Date.now() - view.createdAt > QR_VIEW_TTL_MS) {
+    qrViews.delete(key);
+    return null;
+  }
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>酷狗音乐扫码登录</title>
+  <style>
+    :root{color-scheme:dark;font-family:"Microsoft YaHei UI","Segoe UI",sans-serif}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at 50% 5%,#18324a 0,#0d1625 42%,#080d16 100%);color:#f7fbff}
+    main{width:min(440px,calc(100vw - 32px));padding:34px 28px 30px;text-align:center;border:1px solid rgba(91,207,255,.32);border-radius:28px;background:rgba(10,18,31,.88);box-shadow:0 24px 70px rgba(0,0,0,.46),inset 0 1px rgba(255,255,255,.08)}
+    .brand{font-size:15px;font-weight:700;letter-spacing:.18em;color:#65d7ff}
+    h1{margin:12px 0 8px;font-size:25px}
+    p{margin:0 0 24px;color:#aebdca;font-size:14px;line-height:1.7}
+    .qr{display:inline-grid;place-items:center;padding:16px;border-radius:22px;background:#fff;box-shadow:0 0 38px rgba(55,194,255,.34)}
+    .qr img{display:block;width:min(280px,65vw);height:auto;image-rendering:auto}
+    .hint{margin-top:22px;font-size:13px;color:#7f92a4}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand">FE MONSTER × KUGOU</div>
+    <h1>使用酷狗音乐 App 扫码</h1>
+    <p>打开酷狗音乐，扫描二维码并在手机上确认登录。<br>确认后歌单、头像和 VIP 状态会立即同步。</p>
+    <div class="qr"><img src="${view.dataUrl}" alt="酷狗音乐登录二维码"></div>
+    <div class="hint">此窗口会在同步完成后自动关闭</div>
+  </main>
+</body>
+</html>`;
+}
+
+async function qrCheckPayload(params) {
+  const key = String(params.key || params.qrcode || "").trim();
+  if (!key || key.length > 512) {
+    throw Object.assign(new Error("A valid Kugou QR login key is required"), { status: 400 });
+  }
+  const result = await callModule(loginQrCheck, { key }, { idempotent: true });
+  const data = result.body?.data && typeof result.body.data === "object"
+    ? result.body.data
+    : {};
+  const status = Number(data.status ?? result.body?.status ?? 0);
+  if (status === 4) {
+    const returnedCookies = cookieMapFromSetCookies(result.cookie);
+    let finalization = qrFinalizations.get(key);
+    if (!finalization) {
+      finalization = finalizeQrAuthorization(data, returnedCookies);
+      qrFinalizations.set(key, finalization);
+    }
+    await finalization;
+  }
+  if (status === 0 || status === 4) qrViews.delete(key);
+  if (status === 0) qrFinalizations.delete(key);
+  return {
+    code: 200,
+    status: 1,
+    data: {
+      status: Number.isFinite(status) ? status : 0,
+      authenticated: status === 4
+    }
+  };
+}
+
 function loginStatusPayload(params) {
   const token = String(params.token || params.cookie.token || "");
   const userid = String(params.userid || params.cookie.userid || "");
-  const loggedIn = Boolean(token && userid && userid !== "0");
+  const verified = verifiedAccountAuth();
+  const loggedIn = Boolean(
+    verified.token
+      && verified.userid
+      && verified.userid === userid
+      && verified.token === token
+  );
+  const vipType = String(params.vip_type || params.vipType || params.cookie.vip_type || "").trim();
+  const normalizedVipType = vipType.toLowerCase();
+  const vipKnown = loggedIn && Boolean(vipType);
+  const isVip = Boolean(vipType)
+    && !["0", "5", "false", "free", "normal", "none", "expired"].includes(normalizedVipType);
   return {
     code: 200,
     status: loggedIn ? 1 : 0,
     data: {
       status: loggedIn ? 1 : 0,
-      userid: loggedIn ? userid : "",
-      token: loggedIn ? token : ""
+      ...(loggedIn && vipType ? { vipType } : {}),
+      ...(vipKnown ? { vipStatus: isVip ? "active" : "inactive", isVip } : { vipStatus: "unknown" })
     }
   };
 }
@@ -867,6 +1293,7 @@ function loginStatusPayload(params) {
 const moduleRoutes = new Map([
   ["/login/token", { handler: loginToken, idempotent: false }],
   ["/user/detail", { handler: userDetail, idempotent: true }],
+  ["/user/vip/detail", { handler: userVipDetail, idempotent: true }],
   ["/user/playlist", { handler: userPlaylist, idempotent: true }],
   ["/user/playlists", { handler: userPlaylist, idempotent: true }],
   ["/top/playlist", { handler: topPlaylist, idempotent: true }],
@@ -907,6 +1334,19 @@ async function handle(request, response) {
 
   const url = new URL(request.url || "/", "http://127.0.0.1");
   const pathname = cleanPath(url.pathname);
+  if (pathname === "/login/qr/view") {
+    if (request.method !== "GET") {
+      sendHtml(request, response, 405, "<!doctype html><meta charset=\"utf-8\"><title>不支持的请求</title>");
+      return;
+    }
+    const page = qrViewPage(String(url.searchParams.get("key") || ""));
+    if (!page) {
+      sendHtml(request, response, 404, "<!doctype html><meta charset=\"utf-8\"><title>二维码已失效</title><body style=\"background:#080d16;color:#fff;font-family:sans-serif;display:grid;place-items:center;min-height:100vh\"><h2>二维码已失效，请返回 FE Monster 重新登录</h2></body>");
+      return;
+    }
+    sendHtml(request, response, 200, page);
+    return;
+  }
   if (pathname === "/health") {
     sendJson(request, response, 200, {
       ok: true,
@@ -916,8 +1356,9 @@ async function handle(request, response) {
       upstreamVersion: UPSTREAM_VERSION,
       sourceCommit: SOURCE_COMMIT,
       loginQr: false,
-      authMode: "official-browser-cookie",
-      loggedIn: Boolean(runtimeCookies.token && runtimeCookies.userid && String(runtimeCookies.userid) !== "0"),
+      providerQr: true,
+      authMode: "provider-qr",
+      loggedIn: Boolean(verifiedAccountAuth().userid),
       contract: "fe-monster.music-api/v1",
       persistence: true,
       deviceIdentity: deviceIdentity(),
@@ -946,6 +1387,12 @@ async function handle(request, response) {
     || pathname === "/favorite/add"
   ) {
     payload = await playlistAddPayload(params);
+  } else if (pathname === "/login/qr/key") {
+    payload = await qrKeyPayload(params);
+  } else if (pathname === "/login/qr/check") {
+    payload = await qrCheckPayload(params);
+  } else if (pathname === "/login/clear") {
+    payload = await clearAccountSession();
   } else if (pathname === "/login/status") {
     payload = loginStatusPayload(params);
   } else {

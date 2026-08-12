@@ -25,6 +25,9 @@ public static class FeOfficialWindowRoundingProbe
     [DllImport("user32.dll")]
     public static extern int GetWindowRgn(IntPtr hwnd, IntPtr region);
 
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
+    public static extern IntPtr GetWindowLongPtr(IntPtr hwnd, int index);
+
     [DllImport("user32.dll")]
     public static extern bool IsWindowVisible(IntPtr hwnd);
 
@@ -82,7 +85,9 @@ $dwmResult = if ($windowHandle -ne [IntPtr]::Zero) {
 }
 
 $regionType = -1
+$windowStyle = 0L
 if ($windowHandle -ne [IntPtr]::Zero) {
+  $windowStyle = [FeOfficialWindowRoundingProbe]::GetWindowLongPtr($windowHandle, -16).ToInt64()
   $probeRegion = [FeOfficialWindowRoundingProbe]::CreateRectRgn(0, 0, 1, 1)
   try {
     $regionType = [FeOfficialWindowRoundingProbe]::GetWindowRgn($windowHandle, $probeRegion)
@@ -125,7 +130,8 @@ $checks = [ordered]@{
     [FeOfficialWindowRoundingProbe]::IsWindowVisible($windowHandle)
   winFormsWindowClass = $className.ToString() -like 'WindowsForms10.Window.*'
   dwmNativeRoundingEnabled = $dwmResult -eq 0 -and $cornerPreference -eq 2
-  largeManualWindowRegion = $regionType -gt 0
+  noManualWindowRegion = $regionType -eq 0
+  nativeResizeFramePreserved = ($windowStyle -band 0x00040000L) -ne 0
   noVisibleLegacyClient = $visibleLegacyClients.Count -eq 0
 }
 
@@ -145,6 +151,7 @@ $result = [ordered]@{
   dwmResult = $dwmResult
   cornerPreference = $cornerPreference
   regionType = $regionType
+  windowStyle = ('0x{0:X}' -f $windowStyle)
   checks = $checks
   failures = $failures
 }

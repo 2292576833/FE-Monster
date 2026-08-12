@@ -54,7 +54,7 @@ assert.equal(existsSync(manifestPath), true, 'Qishui OpenAPI package manifest is
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
 assert.equal(manifest.schema, 'fe-monster.music-api-package/v1');
 assert.equal(manifest.id, 'qishui');
-assert.equal(manifest.version, '3.1.0');
+assert.equal(manifest.version, '3.1.1');
 assert.equal(manifest.baseUrl, 'http://127.0.0.1:3013');
 assert.equal(manifest.healthPath, '/health');
 assert.equal(manifest.loginQr, false);

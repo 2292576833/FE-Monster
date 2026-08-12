@@ -10,11 +10,16 @@ runtime/
 data/
 !web/data/
 !web/data/storm-ocean-preset.json
-.venv-gesture/
 node_modules/
 download-site/
 __pycache__/
 *.pyc
+
+# Local agent, scratch, and imported design workspaces
+tmp/
+.tmp-test/
+.agents/
+design-resources/
 
 # IDE
 .idea/
@@ -42,6 +47,7 @@ web/reactbits/vite-dev*.log
 *.exp
 *.lib
 native/windows/build/
+native/windows/build-next/
 native/windows/.cmake-build-*/
 native/windows/packages/
 native/windows/setup/bin/
@@ -58,6 +64,7 @@ android/local.properties
 
 # Local QA, render and release evidence (never ship as source)
 artifacts/
+obs/
 video-analysis/
 videos/
 .tmp/

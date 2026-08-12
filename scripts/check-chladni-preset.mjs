@@ -12,7 +12,10 @@ const runtime = fs.existsSync(runtimePath) ? fs.readFileSync(runtimePath, 'utf8'
 
 const checks = {
   runtimeFile: fs.existsSync(runtimePath),
-  runtimeLoadedBeforeApp: /chladni-runtime\.js[\s\S]*app\.js/.test(html),
+  runtimeLoadedOnDemand:
+    !/<script[^>]+src=["'][^"']*chladni-runtime\.js/.test(html)
+    && /chladni:\s*Object\.freeze\([\s\S]{0,180}chladni-runtime\.js/.test(app)
+    && /ensurePresetRuntime\(runtimeKey\)/.test(app),
   sceneSurface: /id="chladniScene"/.test(html) && /id="chladniCore"/.test(html),
   presetCard: /id="diyChladniPreset"[\s\S]*data-preset="chladni"/.test(html),
   normalizedPreset: /preset === 'chladni'/.test(app),

@@ -3,6 +3,7 @@ package com.femonster.core;
 import com.femonster.json.SimpleJson;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,9 +27,13 @@ public final class UpdateService {
         }
         String downloadUrl = SimpleJson.asString(release.get("downloadUrl"), "");
         String version = SimpleJson.asString(release.get("version"), "");
-        if (downloadUrl.isBlank() || !downloadUrl.matches("(?i)^https?://.+")) {
-            return error("update download url is missing");
+        String sha256 = SimpleJson.asString(release.get("sha256"), "").trim().toLowerCase();
+        if (sha256.startsWith("sha256:")) sha256 = sha256.substring("sha256:".length());
+        if (!isOfficialGitHubReleaseAsset(downloadUrl)) {
+            return error("update download url is not an official FE Monster GitHub release asset");
         }
+        if (sha256.isBlank()) return error("update sha256 is required");
+        if (!sha256.matches("[0-9a-f]{64}")) return error("update sha256 is invalid");
         if (version.isBlank()) version = "unknown";
 
         String id = UUID.randomUUID().toString().replace("-", "");
@@ -58,6 +63,8 @@ public final class UpdateService {
             downloadUrl,
             "-Version",
             version,
+            "-Sha256",
+            sha256,
             "-ProgressFile",
             progressFile.toString()
         );
@@ -102,6 +109,19 @@ public final class UpdateService {
         body.put("message", message == null ? "" : message);
         body.put("updatedAt", System.currentTimeMillis());
         Files.writeString(file, SimpleJson.stringify(body), StandardCharsets.UTF_8);
+    }
+
+    private static boolean isOfficialGitHubReleaseAsset(String downloadUrl) {
+        if (downloadUrl == null || downloadUrl.isBlank()) return false;
+        try {
+            URI uri = URI.create(downloadUrl);
+            String path = uri.getPath() == null ? "" : uri.getPath();
+            return "https".equalsIgnoreCase(uri.getScheme())
+                && "github.com".equalsIgnoreCase(uri.getHost())
+                && path.matches("(?i)^/2292576833/FE-Monster/releases/download/[^/]+/FE[-_. ]?Monster[^/]*\\.exe$");
+        } catch (IllegalArgumentException error) {
+            return false;
+        }
     }
 
     private static void writeProgressQuietly(Path file, String status, int percent, String message) {

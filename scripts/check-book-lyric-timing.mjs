@@ -38,7 +38,7 @@ const bookLead = constant('BOOK_LYRIC_VISUAL_LEAD_SECONDS');
 const glyphLead = constant('BOOK_LYRIC_GLYPH_VISUAL_LEAD_SECONDS');
 const compensation = constant('LYRIC_TIMESTAMP_COMPENSATION_SECONDS');
 
-if (!/function findLyricIndexAtTime[\s\S]*?let found = -1;/.test(source)) {
+if (!/function findLyricIndexAtDisplayTime[\s\S]*?let found = -1;/.test(source)) {
   throw new Error('Lyric lookup still activates the first line before its timestamp');
 }
 if (!/function updateBookLyricLines[\s\S]*?clamp\(state\.lyricIndex, -1,/.test(source)) {
@@ -61,14 +61,13 @@ const drawOrbStart = source.indexOf('function drawOrb(');
 const drawOrbEnd = source.indexOf('\nfunction ', drawOrbStart + 1);
 const drawOrbSource = source.slice(drawOrbStart, drawOrbEnd > drawOrbStart ? drawOrbEnd : undefined);
 const lyricSyncPosition = drawOrbSource.indexOf('syncBookLyricFrame();');
-const renderThrottlePosition = drawOrbSource.indexOf('state.orb.lastPaintAt && now - state.orb.lastPaintAt < frameInterval');
 
-if (drawOrbStart < 0 || lyricSyncPosition < 0 || renderThrottlePosition < 0) {
+if (drawOrbStart < 0 || lyricSyncPosition < 0) {
   throw new Error('Unable to inspect the book lyric animation-frame scheduling path');
 }
 
-if (lyricSyncPosition > renderThrottlePosition) {
-  throw new Error('Book lyric sync is still behind the scene render throttle and can drop to 20-30 FPS');
+if (/\b(?:frameInterval|lastPaintAt)\b/.test(drawOrbSource)) {
+  throw new Error('Book lyric sync still shares a frame-skipping scene render path');
 }
 
 const effectiveLead = bookLead - compensation;
@@ -111,6 +110,6 @@ console.log(JSON.stringify({
   glyphLead,
   displayAdaptiveFrameClock: true,
   scrollMinStep,
-  lyricSyncRunsBeforeSceneThrottle: true,
+  lyricSyncRunsEveryAnimationFrame: true,
   switchedAtSecondsBeforeTimestamp: Number(effectiveLead.toFixed(3))
 }, null, 2));

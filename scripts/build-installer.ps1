@@ -9,6 +9,8 @@ param(
   [ValidateSet('Online', 'Offline')]
   [string]$WebView2Mode = 'Online',
   [string]$BundledSceneServerRoot = $Env:FE_MONSTER_BUNDLED_SCENE_SERVER_ROOT,
+  [string]$CommunityServerUrl = $Env:FE_MONSTER_RELEASE_COMMUNITY_URL,
+  [string]$CommunityServerTlsPins = $Env:FE_MONSTER_RELEASE_COMMUNITY_TLS_PINS,
   [string]$SignCertificateThumbprint = $Env:FE_MONSTER_SIGN_CERTIFICATE_THUMBPRINT,
   [string]$TimestampUrl = $(if ([string]::IsNullOrWhiteSpace($Env:FE_MONSTER_SIGN_TIMESTAMP_URL)) { 'http://timestamp.digicert.com' } else { $Env:FE_MONSTER_SIGN_TIMESTAMP_URL }),
   [switch]$RequireSignature
@@ -46,6 +48,13 @@ if (!$PSBoundParameters.ContainsKey('EmbedPayload')) {
 }
 if ($NoNodeBundle) {
   throw '-NoNodeBundle is not supported: FE Monster requires bundled Node.js for imported music API plugins.'
+}
+if (
+  $ReusePayloadZip -and
+  (![string]::IsNullOrWhiteSpace($CommunityServerUrl) -or
+    ![string]::IsNullOrWhiteSpace($CommunityServerTlsPins))
+) {
+  throw 'Explicit community release settings cannot be combined with -ReusePayloadZip because the reused payload cannot be revalidated.'
 }
 if ($EmbedPayload -and !$AllowEmbeddedPayload) {
   Write-Warning 'Building a single-file installer with embedded payload as requested.'
@@ -263,6 +272,16 @@ function Build-App {
     & powershell.exe -NoProfile -File (Join-Path $rootPath 'scripts\stop-stale-fe-monster.ps1') -Root $rootPath
   }
 
+  Invoke-Step 'Building bundled Netease API plugin' {
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $rootPath 'music-api-plugins\netease\build.ps1')
+    if ($LASTEXITCODE -ne 0) { throw "Netease API plugin build failed with exit code $LASTEXITCODE" }
+  }
+
+  Invoke-Step 'Building bundled QQ API plugin' {
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $rootPath 'music-api-plugins\qq\build.ps1')
+    if ($LASTEXITCODE -ne 0) { throw "QQ API plugin build failed with exit code $LASTEXITCODE" }
+  }
+
   Invoke-Step 'Building bundled Kugou API plugin' {
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $rootPath 'music-api-plugins\kugou\build.ps1')
     if ($LASTEXITCODE -ne 0) { throw "Kugou API plugin build failed with exit code $LASTEXITCODE" }
@@ -368,6 +387,7 @@ function Stage-JavaRuntime {
   & $jlink `
     --add-modules $moduleList `
     --strip-debug `
+    --compress=2 `
     --no-header-files `
     --no-man-pages `
     --output $runtimeDestination
@@ -385,6 +405,10 @@ function Stage-JavaRuntime {
   & $stagedJava -version
   if ($LASTEXITCODE -ne 0) {
     throw "Bundled Java runtime failed its version probe with exit code $LASTEXITCODE"
+  }
+  & $stagedJavaw -version
+  if ($LASTEXITCODE -ne 0) {
+    throw "Bundled Java windowless runtime failed its version probe with exit code $LASTEXITCODE"
   }
   & $namedBackend -version
   if ($LASTEXITCODE -ne 0) {
@@ -463,16 +487,53 @@ function New-PayloadIntegrityManifest {
   foreach ($relative in @(
     'out\fe-monster-java.jar',
     'web\index.html',
+    'web\cache-fingerprints.json',
+    'web\app.js',
+    'web\styles.css',
+    'web\lyric-render-quality.css',
+    'web\app-command.js',
+    'web\playback-intelligence.js',
+    'web\wallpaper-video-continuity.js',
+    'web\pet-emotion-runtime.js',
+    'web\pet-client-context.js',
+    'web\pet-live-turn-controller.js',
+    'web\pet-live-audio-worklet.js',
+    'web\pet-live-telemetry.js',
+    'web\pet-live-playout.js',
+    'web\pet-live-stt-client.js',
+    'web\pet-assistant.js',
+    'web\fe-identity-card.js',
+    'web\fe-identity-card.css',
+    'web\pet-product-tour.js',
+    'web\pet-product-tour.css',
+    'web\community-reward-runtime.js',
+    'web\community-reward-runtime.css',
+    'web\pet-particle-orb.js',
+    'web\pet-assistant.css',
+    'web\pet-companion-p2.js',
+    'web\pet-companion-p2.css',
+    'web\creative-community.js',
+    'web\assets\fe-monster-pet-mascot.png',
+    'web\assets\fe-monster-pet-mascot-chroma.png',
+    'scripts\install-fe-monster.ps1',
+    'scripts\ensure-runtime-dependencies.ps1',
+    'scripts\java-runtime.ps1',
+    'data\community-server-url.txt',
+    'data\community-server-tls-pin.txt',
     'runtime\java\bin\java.exe',
     'runtime\java\bin\javaw.exe',
     'runtime\java\bin\FE Monster Backend.exe',
-    'runtime\python\python.exe',
     'native\windows\build\winforms\FE Monster.exe',
+    'native\windows\build\winforms\FE Monster.dll',
+    'native\windows\build\winforms\FE Monster.deps.json',
+    'native\windows\build\winforms\FE Monster.runtimeconfig.json',
     'native\windows\build\winforms\WebView2Loader.dll',
     'native\windows\build\fe-monster-xaudio2.dll',
     'native\windows\build\fe_monster_upmix.dll',
-    'plugins\music-api\FE-Monster-Kugou-API-Plugin-2.0.1.zip',
-    'plugins\music-api\FE-Monster-Qishui-OpenAPI-Plugin-3.1.0.zip'
+    'plugins\music-api\FE-Monster-Netease-API-Plugin-4.32.0.zip',
+    'plugins\music-api\FE-Monster-QQ-API-Plugin-2.4.1.zip',
+    'plugins\music-api\FE-Monster-Kugou-API-Plugin-2.0.7.zip',
+    'plugins\music-api\FE-Monster-Qishui-OpenAPI-Plugin-3.1.1.zip'
   )) {
     $relativeFiles.Add($relative) | Out-Null
   }
@@ -523,13 +584,445 @@ function New-PayloadIntegrityManifest {
     Set-Content -LiteralPath (Join-Path $payloadRoot $payloadIntegrityManifestName) -Encoding UTF8
 }
 
+function ConvertTo-NormalizedCommunityTlsPins {
+  param([string]$Value)
+
+  if ([string]::IsNullOrWhiteSpace($Value)) { return @() }
+  $entries = @($Value -split '[,;\r\n]+' | Where-Object { ![string]::IsNullOrWhiteSpace($_) })
+  if ($entries.Count -lt 1 -or $entries.Count -gt 2) {
+    throw 'Community server TLS pins must contain one or two SHA-256 leaf certificate fingerprints.'
+  }
+
+  $normalized = New-Object System.Collections.Generic.List[string]
+  foreach ($entry in $entries) {
+    $candidate = $entry.Trim()
+    if ($candidate.StartsWith('sha256:', [StringComparison]::OrdinalIgnoreCase)) {
+      $candidate = $candidate.Substring('sha256:'.Length)
+    }
+    $candidate = $candidate.Replace(':', '')
+    if ($candidate -notmatch '^[A-Fa-f0-9]{64}$') {
+      throw 'Community server TLS pins must be SHA-256 leaf certificate fingerprints.'
+    }
+    $candidate = $candidate.ToUpperInvariant()
+    if (!$normalized.Contains($candidate)) { $normalized.Add($candidate) }
+  }
+  return @($normalized)
+}
+
+function Initialize-CommunityHealthProbeType {
+  if ($null -ne ('FeMonsterInstaller.CommunityHealthProbe' -as [type])) { return }
+
+  Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Net;
+using System.Net.Security;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+
+namespace FeMonsterInstaller {
+    public static class CommunityHealthProbe {
+        public static bool ValidateCertificate(
+            X509Certificate certificate,
+            string[] pins,
+            SslPolicyErrors errors,
+            DateTime utcNow
+        ) {
+            HashSet<string> allowedPins = new HashSet<string>(
+                pins ?? new string[0],
+                StringComparer.OrdinalIgnoreCase
+            );
+            if (certificate == null) return false;
+            if ((errors & SslPolicyErrors.RemoteCertificateNameMismatch) != 0) return false;
+            if ((errors & SslPolicyErrors.RemoteCertificateNotAvailable) != 0) return false;
+            using (X509Certificate2 leaf = new X509Certificate2(certificate)) {
+                if (utcNow < leaf.NotBefore.ToUniversalTime() || utcNow > leaf.NotAfter.ToUniversalTime()) {
+                    return false;
+                }
+                using (SHA256 sha256 = SHA256.Create()) {
+                    byte[] digest = sha256.ComputeHash(leaf.RawData);
+                    StringBuilder fingerprint = new StringBuilder(digest.Length * 2);
+                    foreach (byte value in digest) fingerprint.Append(value.ToString("X2"));
+                    return allowedPins.Contains(fingerprint.ToString());
+                }
+            }
+        }
+
+        public static string Get(string url, string[] pins, int timeoutMilliseconds) {
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+            request.Method = "GET";
+            request.AllowAutoRedirect = false;
+            request.Timeout = timeoutMilliseconds;
+            request.ReadWriteTimeout = timeoutMilliseconds;
+            request.ServerCertificateValidationCallback = delegate(
+                object sender,
+                X509Certificate certificate,
+                X509Chain chain,
+                SslPolicyErrors errors
+            ) {
+                return ValidateCertificate(certificate, pins, errors, DateTime.UtcNow);
+            };
+
+            using (HttpWebResponse response = (HttpWebResponse)request.GetResponse()) {
+                int statusCode = (int)response.StatusCode;
+                if (statusCode < 200 || statusCode >= 300) {
+                    throw new WebException("Community health endpoint returned a non-success status.");
+                }
+                using (Stream stream = response.GetResponseStream())
+                using (StreamReader reader = new StreamReader(stream, Encoding.UTF8, true)) {
+                    return reader.ReadToEnd();
+                }
+            }
+        }
+    }
+}
+'@ | Out-Null
+}
+
+function Invoke-PinnedCommunityHealthRequest {
+  param(
+    [string]$HealthUrl,
+    [string[]]$TlsPins
+  )
+
+  Initialize-CommunityHealthProbeType
+  return [FeMonsterInstaller.CommunityHealthProbe]::Get($HealthUrl, $TlsPins, 8000)
+}
+
+function Test-IsPublicCommunityAddress {
+  param([Net.IPAddress]$Address)
+
+  if ($null -eq $Address) { return $false }
+  if ($Address.IsIPv4MappedToIPv6) {
+    return Test-IsPublicCommunityAddress $Address.MapToIPv4()
+  }
+  if (
+    [Net.IPAddress]::IsLoopback($Address) -or
+    $Address.Equals([Net.IPAddress]::Any) -or
+    $Address.Equals([Net.IPAddress]::IPv6Any)
+  ) {
+    return $false
+  }
+
+  if ($Address.AddressFamily -eq [Net.Sockets.AddressFamily]::InterNetwork) {
+    $bytes = $Address.GetAddressBytes()
+    if ($bytes[0] -in @(0, 10, 127)) { return $false }
+    if ($bytes[0] -eq 100 -and $bytes[1] -ge 64 -and $bytes[1] -le 127) { return $false }
+    if ($bytes[0] -eq 169 -and $bytes[1] -eq 254) { return $false }
+    if ($bytes[0] -eq 172 -and $bytes[1] -ge 16 -and $bytes[1] -le 31) { return $false }
+    if ($bytes[0] -eq 192 -and $bytes[1] -eq 168) { return $false }
+    if ($bytes[0] -eq 192 -and $bytes[1] -eq 0 -and $bytes[2] -in @(0, 2)) { return $false }
+    if ($bytes[0] -eq 198 -and $bytes[1] -in @(18, 19)) { return $false }
+    if ($bytes[0] -eq 198 -and $bytes[1] -eq 51 -and $bytes[2] -eq 100) { return $false }
+    if ($bytes[0] -eq 203 -and $bytes[1] -eq 0 -and $bytes[2] -eq 113) { return $false }
+    if ($bytes[0] -ge 224) { return $false }
+    return $true
+  }
+
+  if ($Address.AddressFamily -eq [Net.Sockets.AddressFamily]::InterNetworkV6) {
+    if ($Address.IsIPv6LinkLocal -or $Address.IsIPv6SiteLocal -or $Address.IsIPv6Multicast) {
+      return $false
+    }
+    $bytes = $Address.GetAddressBytes()
+    if (($bytes[0] -band 0xFE) -eq 0xFC) { return $false }
+    if ($bytes[0] -eq 0x20 -and $bytes[1] -eq 0x01 -and $bytes[2] -eq 0x0D -and $bytes[3] -eq 0xB8) {
+      return $false
+    }
+    return $true
+  }
+
+  return $false
+}
+
+function Resolve-CommunityServerAddresses {
+  param([Uri]$Uri)
+
+  $hostName = $Uri.DnsSafeHost.TrimEnd('.')
+  [Net.IPAddress]$literalAddress = $null
+  if ([Net.IPAddress]::TryParse($hostName, [ref]$literalAddress)) {
+    return ,$literalAddress
+  }
+
+  try {
+    $addresses = @([Net.Dns]::GetHostAddresses($hostName))
+  } catch {
+    throw "Release community server host '$hostName' could not be resolved."
+  }
+  if ($addresses.Count -eq 0) {
+    throw "Release community server host '$hostName' did not resolve to an address."
+  }
+  return $addresses
+}
+
+function Assert-PublicCommunityServerUrl {
+  param([string]$Value)
+
+  $configuredUrl = $Value.Trim().TrimStart([char]0xFEFF).Trim()
+  if ([string]::IsNullOrWhiteSpace($configuredUrl)) {
+    throw 'Release community server URL is empty.'
+  }
+
+  [Uri]$communityUri = $null
+  if (
+    ![Uri]::TryCreate($configuredUrl, [UriKind]::Absolute, [ref]$communityUri) -or
+    $communityUri.Scheme -ne [Uri]::UriSchemeHttps -or
+    [string]::IsNullOrWhiteSpace($communityUri.Host)
+  ) {
+    throw 'Release community server URL must be an absolute HTTPS URL.'
+  }
+  if (
+    ![string]::IsNullOrWhiteSpace($communityUri.UserInfo) -or
+    ![string]::IsNullOrWhiteSpace($communityUri.Query) -or
+    ![string]::IsNullOrWhiteSpace($communityUri.Fragment)
+  ) {
+    throw 'Release community server URL cannot contain credentials, a query, or a fragment.'
+  }
+
+  $hostName = $communityUri.DnsSafeHost.TrimEnd('.')
+  if ($communityUri.IsLoopback -or $hostName.Equals('localhost', [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'Release community server URL cannot use a loopback host.'
+  }
+
+  $addresses = @(Resolve-CommunityServerAddresses $communityUri)
+  foreach ($address in $addresses) {
+    if (!(Test-IsPublicCommunityAddress $address)) {
+      throw "Release community server host '$hostName' resolved to a non-public address."
+    }
+  }
+
+  return $communityUri.GetLeftPart([UriPartial]::Path).TrimEnd('/')
+}
+
+function Assert-CommunityServerHealth {
+  param(
+    [string]$CommunityBaseUrl,
+    [string[]]$TlsPins = @()
+  )
+
+  [Uri]$communityUri = $CommunityBaseUrl
+  $healthUrl = $CommunityBaseUrl.TrimEnd('/') + '/health'
+  $maximumAttempts = 5
+  $lastFailure = ''
+  for ($attempt = 1; $attempt -le $maximumAttempts; $attempt++) {
+    try {
+      if (@($TlsPins).Count -gt 0) {
+        $healthJson = Invoke-PinnedCommunityHealthRequest -HealthUrl $healthUrl -TlsPins $TlsPins
+        $health = $healthJson | ConvertFrom-Json
+      } else {
+        $health = Invoke-RestMethod `
+          -Method Get `
+          -Uri $healthUrl `
+          -TimeoutSec 8 `
+          -MaximumRedirection 0
+      }
+
+      $serviceProperty = if ($null -eq $health) { $null } else { $health.PSObject.Properties['service'] }
+      if ($null -eq $serviceProperty -or [string]$serviceProperty.Value -cne 'fe-monster-community') {
+        throw 'Unexpected community health service identity.'
+      }
+      return
+    } catch {
+      $lastFailure = $_.Exception.Message
+      Write-Warning "Community health check attempt $attempt/$maximumAttempts failed: $lastFailure"
+      if ($attempt -lt $maximumAttempts) {
+        Start-Sleep -Milliseconds ([Math]::Min(8000, 500 * [Math]::Pow(2, $attempt - 1)))
+      }
+    }
+  }
+  throw "Release community health check failed for host '$($communityUri.DnsSafeHost)' after $maximumAttempts attempts. Last error: $lastFailure"
+}
+
+function Assert-PayloadZipCommunityConfiguration {
+  param(
+    [string]$ArchivePath,
+    [switch]$SkipHealthCheck
+  )
+
+  if (!(Test-Path -LiteralPath $ArchivePath -PathType Leaf)) {
+    throw "Payload zip was not found: $ArchivePath"
+  }
+
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+  $archive = [IO.Compression.ZipFile]::OpenRead($ArchivePath)
+  try {
+    $urlEntries = @($archive.Entries | Where-Object {
+      $_.FullName.Replace('\', '/').TrimStart('/').Equals(
+        'FE Monster/data/community-server-url.txt',
+        [StringComparison]::OrdinalIgnoreCase
+      )
+    })
+    if ($urlEntries.Count -ne 1) {
+      throw 'Payload zip must contain exactly one community server URL configuration.'
+    }
+    if ($urlEntries[0].Length -gt 4096) {
+      throw 'Payload community server URL configuration is unexpectedly large.'
+    }
+    $urlStream = $urlEntries[0].Open()
+    $urlReader = [IO.StreamReader]::new($urlStream, [Text.Encoding]::UTF8, $true)
+    try {
+      $configuredUrl = $urlReader.ReadToEnd()
+    } finally {
+      $urlReader.Dispose()
+      $urlStream.Dispose()
+    }
+
+    $pinEntries = @($archive.Entries | Where-Object {
+      $_.FullName.Replace('\', '/').TrimStart('/').Equals(
+        'FE Monster/data/community-server-tls-pin.txt',
+        [StringComparison]::OrdinalIgnoreCase
+      )
+    })
+    if ($pinEntries.Count -gt 1) {
+      throw 'Payload zip contains duplicate community TLS pin configurations.'
+    }
+    $rawTlsPins = ''
+    if ($pinEntries.Count -eq 1) {
+      if ($pinEntries[0].Length -gt 4096) {
+        throw 'Payload community TLS pin configuration is unexpectedly large.'
+      }
+      $pinStream = $pinEntries[0].Open()
+      $pinReader = [IO.StreamReader]::new($pinStream, [Text.Encoding]::UTF8, $true)
+      try {
+        $rawTlsPins = $pinReader.ReadToEnd()
+      } finally {
+        $pinReader.Dispose()
+        $pinStream.Dispose()
+      }
+    }
+  } finally {
+    $archive.Dispose()
+  }
+
+  $validatedCommunityUrl = Assert-PublicCommunityServerUrl $configuredUrl
+  $normalizedTlsPins = @()
+  if ($pinEntries.Count -eq 1) {
+    if ([string]::IsNullOrWhiteSpace($rawTlsPins)) {
+      throw 'Payload community TLS pin configuration is empty.'
+    }
+    $normalizedTlsPins = @(ConvertTo-NormalizedCommunityTlsPins $rawTlsPins)
+    $expectedPinText = @($normalizedTlsPins | ForEach-Object { "sha256:$_" }) -join "`n"
+    $actualPinText = $rawTlsPins.Trim().Replace("`r`n", "`n").Replace("`r", "`n")
+    if ($actualPinText -cne $expectedPinText) {
+      throw 'Payload community TLS pins are not in canonical normalized form.'
+    }
+  }
+
+  if (!$SkipHealthCheck) {
+    Assert-CommunityServerHealth -CommunityBaseUrl $validatedCommunityUrl -TlsPins $normalizedTlsPins
+  }
+  return $validatedCommunityUrl
+}
+
+function Stage-CommunityServerConfiguration {
+  if (![string]::IsNullOrWhiteSpace($CommunityServerUrl)) {
+    $validatedCommunityUrl = Assert-PublicCommunityServerUrl $CommunityServerUrl
+    $normalizedTlsPins = @(ConvertTo-NormalizedCommunityTlsPins $CommunityServerTlsPins)
+    Assert-CommunityServerHealth -CommunityBaseUrl $validatedCommunityUrl -TlsPins $normalizedTlsPins
+    $destination = Join-Path $payloadRoot 'data\community-server-url.txt'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+    [IO.File]::WriteAllText(
+      $destination,
+      $validatedCommunityUrl,
+      [Text.UTF8Encoding]::new($false)
+    )
+    if ($normalizedTlsPins.Count -gt 0) {
+      $pinDestination = Join-Path $payloadRoot 'data\community-server-tls-pin.txt'
+      $pinLines = @($normalizedTlsPins | ForEach-Object { "sha256:$_" })
+      [IO.File]::WriteAllText(
+        $pinDestination,
+        ($pinLines -join [Environment]::NewLine),
+        [Text.UTF8Encoding]::new($false)
+      )
+    }
+    Write-Host 'Staged validated public community server URL.'
+    return
+  }
+
+  if (![string]::IsNullOrWhiteSpace($CommunityServerTlsPins)) {
+    throw '-CommunityServerTlsPins can only be used with an explicit HTTPS -CommunityServerUrl.'
+  }
+
+  $communityUrlFile = Join-Path $rootPath 'data\community-server-url.txt'
+  if (!(Test-Path -LiteralPath $communityUrlFile -PathType Leaf)) { return }
+
+  $rawCommunityUrl = Get-Content -LiteralPath $communityUrlFile -Raw
+  $configuredCommunityUrl = $rawCommunityUrl.Trim().TrimStart([char]0xFEFF).Trim()
+  if ([string]::IsNullOrWhiteSpace($configuredCommunityUrl)) { return }
+
+  [Uri]$communityUri = $null
+  $isAbsoluteUri = [Uri]::TryCreate(
+    $configuredCommunityUrl,
+    [UriKind]::Absolute,
+    [ref]$communityUri
+  )
+  if (
+    !$isAbsoluteUri -or
+    ($communityUri.Scheme -ne [Uri]::UriSchemeHttp -and
+      $communityUri.Scheme -ne [Uri]::UriSchemeHttps) -or
+    [string]::IsNullOrWhiteSpace($communityUri.Host)
+  ) {
+    throw "Community server URL must be an absolute HTTP(S) URL: $configuredCommunityUrl"
+  }
+
+  $communityHost = $communityUri.DnsSafeHost.TrimEnd('.')
+  $isLoopback =
+    $communityUri.IsLoopback -or
+    $communityHost.Equals('localhost', [StringComparison]::OrdinalIgnoreCase)
+
+  [Net.IPAddress]$communityAddress = $null
+  if ([Net.IPAddress]::TryParse($communityHost, [ref]$communityAddress)) {
+    if ($communityAddress.IsIPv4MappedToIPv6) {
+      $communityAddress = $communityAddress.MapToIPv4()
+    }
+    $isLoopback = $isLoopback -or [Net.IPAddress]::IsLoopback($communityAddress)
+  }
+
+  if ($isLoopback) {
+    Write-Host "Skipping local-only community server URL in distributable payload: $configuredCommunityUrl"
+    return
+  }
+
+  $communityPinFile = Join-Path $rootPath 'data\community-server-tls-pin.txt'
+  if ($communityUri.Scheme -ne [Uri]::UriSchemeHttps) {
+    throw 'Developer community server URL must use HTTPS before it can be staged in a distributable payload.'
+  }
+
+  $validatedCommunityUrl = Assert-PublicCommunityServerUrl $configuredCommunityUrl
+  $normalizedTlsPins = @()
+  if (Test-Path -LiteralPath $communityPinFile -PathType Leaf) {
+    $normalizedTlsPins = @(
+      ConvertTo-NormalizedCommunityTlsPins (Get-Content -LiteralPath $communityPinFile -Raw)
+    )
+  }
+  Assert-CommunityServerHealth -CommunityBaseUrl $validatedCommunityUrl -TlsPins $normalizedTlsPins
+
+  $destination = Join-Path $payloadRoot 'data\community-server-url.txt'
+  New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+  [IO.File]::WriteAllText(
+    $destination,
+    $validatedCommunityUrl,
+    [Text.UTF8Encoding]::new($false)
+  )
+  if ($normalizedTlsPins.Count -gt 0) {
+    $pinDestination = Join-Path $payloadRoot 'data\community-server-tls-pin.txt'
+    $pinLines = @($normalizedTlsPins | ForEach-Object { "sha256:$_" })
+    [IO.File]::WriteAllText(
+      $pinDestination,
+      ($pinLines -join [Environment]::NewLine),
+      [Text.UTF8Encoding]::new($false)
+    )
+  }
+  Write-Host 'Staged validated developer community HTTPS configuration.'
+}
+
 function Stage-Payload {
   Reset-Directory $workRoot
   New-Item -ItemType Directory -Path $payloadRoot -Force | Out-Null
   New-Item -ItemType Directory -Path $setupRoot -Force | Out-Null
 
   foreach ($file in @(
-    'run.cmd',
     'FE Monster.vbs',
     'build.cmd',
     'clean.cmd',
@@ -550,6 +1043,40 @@ function Stage-Payload {
 
   foreach ($dir in @('web', 'scripts', 'src')) {
     Copy-Dir (Join-Path $rootPath $dir) (Join-Path $payloadRoot $dir)
+  }
+
+  $stagedScripts = Join-Path $payloadRoot 'scripts'
+  $scriptsBeforeBytes = (
+    Get-ChildItem -LiteralPath $stagedScripts -Recurse -File -Force |
+      Measure-Object -Property Length -Sum
+  ).Sum
+  Get-ChildItem -LiteralPath $stagedScripts -File -Filter 'check-*' -Force |
+    Remove-Item -Force
+  foreach ($relativePath in @('fixtures', 'java')) {
+    $developmentDirectory = Join-Path $stagedScripts $relativePath
+    if (Test-Path -LiteralPath $developmentDirectory -PathType Container) {
+      Remove-Item -LiteralPath $developmentDirectory -Recurse -Force
+    }
+  }
+  Get-ChildItem -LiteralPath $stagedScripts -Recurse -Directory -Force |
+    Where-Object { $_.Name -eq '__pycache__' } |
+    Sort-Object -Property FullName -Descending |
+    Remove-Item -Recurse -Force
+  Get-ChildItem -LiteralPath $stagedScripts -Recurse -File -Force |
+    Where-Object { $_.Extension -in @('.pyc', '.pyo') } |
+    Remove-Item -Force
+  $scriptsAfterBytes = (
+    Get-ChildItem -LiteralPath $stagedScripts -Recurse -File -Force |
+      Measure-Object -Property Length -Sum
+  ).Sum
+  $savedScriptMiB = [math]::Round(($scriptsBeforeBytes - $scriptsAfterBytes) / 1MB, 2)
+  Write-Host "== Removed $savedScriptMiB MiB of build-time checks and fixtures from staged scripts"
+
+  # This full source font is used only by repository checks. Runtime CSS loads
+  # the subsetted WOFF2 and web TTF files that remain in the payload.
+  $buildOnlyFont = Join-Path $payloadRoot 'web\fonts\awei-pixel\AaWeiWeiDianZhenTi.ttf'
+  if (Test-Path -LiteralPath $buildOnlyFont -PathType Leaf) {
+    Remove-Item -LiteralPath $buildOnlyFont -Force
   }
 
   $stormAssetRoot = Join-Path $payloadRoot 'web\bundled-assets\1dec0986-a81d-4847-af22-93d1976b5f2d\blender-output'
@@ -576,12 +1103,8 @@ function Stage-Payload {
 
   Stage-BundledSceneLibrary
 
-  $communityUrlFile = Join-Path $rootPath 'data\community-server-url.txt'
-  if (Test-Path $communityUrlFile) {
-    Copy-File $communityUrlFile (Join-Path $payloadRoot 'data\community-server-url.txt')
-  }
+  Stage-CommunityServerConfiguration
 
-  Stage-GesturePythonRuntime
   Copy-File (Join-Path $rootPath 'out\fe-monster-java.jar') (Join-Path $payloadRoot 'out\fe-monster-java.jar')
   $nativeBuildSource = Join-Path $rootPath 'native\windows\build'
   $nativeBuildDestination = Join-Path $payloadRoot 'native\windows\build'
@@ -618,11 +1141,17 @@ function Stage-Payload {
     }
   }
   Copy-File `
-    (Join-Path $rootPath 'dist\plugins\FE-Monster-Kugou-API-Plugin-2.0.1.zip') `
-    (Join-Path $payloadRoot 'plugins\music-api\FE-Monster-Kugou-API-Plugin-2.0.1.zip')
+    (Join-Path $rootPath 'dist\plugins\FE-Monster-Netease-API-Plugin-4.32.0.zip') `
+    (Join-Path $payloadRoot 'plugins\music-api\FE-Monster-Netease-API-Plugin-4.32.0.zip')
   Copy-File `
-    (Join-Path $rootPath 'dist\plugins\FE-Monster-Qishui-OpenAPI-Plugin-3.1.0.zip') `
-    (Join-Path $payloadRoot 'plugins\music-api\FE-Monster-Qishui-OpenAPI-Plugin-3.1.0.zip')
+    (Join-Path $rootPath 'dist\plugins\FE-Monster-QQ-API-Plugin-2.4.1.zip') `
+    (Join-Path $payloadRoot 'plugins\music-api\FE-Monster-QQ-API-Plugin-2.4.1.zip')
+  Copy-File `
+    (Join-Path $rootPath 'dist\plugins\FE-Monster-Kugou-API-Plugin-2.0.7.zip') `
+    (Join-Path $payloadRoot 'plugins\music-api\FE-Monster-Kugou-API-Plugin-2.0.7.zip')
+  Copy-File `
+    (Join-Path $rootPath 'dist\plugins\FE-Monster-Qishui-OpenAPI-Plugin-3.1.1.zip') `
+    (Join-Path $payloadRoot 'plugins\music-api\FE-Monster-Qishui-OpenAPI-Plugin-3.1.1.zip')
 
   Stage-JavaRuntime
   if ($includeOfflineWebView2) {
@@ -651,20 +1180,51 @@ function Stage-Payload {
   $requiredPayloadItems = @(
     'out\fe-monster-java.jar',
     'web\index.html',
+    'web\cache-fingerprints.json',
+    'web\app-command.js',
+    'web\playback-intelligence.js',
+    'web\wallpaper-video-continuity.js',
+    'web\pet-emotion-runtime.js',
+    'web\pet-client-context.js',
+    'web\pet-live-turn-controller.js',
+    'web\pet-live-audio-worklet.js',
+    'web\pet-live-telemetry.js',
+    'web\pet-live-playout.js',
+    'web\pet-live-stt-client.js',
+    'web\pet-assistant.js',
+    'web\fe-identity-card.js',
+    'web\fe-identity-card.css',
+    'web\pet-product-tour.js',
+    'web\pet-product-tour.css',
+    'web\community-reward-runtime.js',
+    'web\community-reward-runtime.css',
+    'web\lyric-render-quality.css',
+    'web\pet-particle-orb.js',
+    'web\pet-assistant.css',
+    'web\pet-companion-p2.js',
+    'web\pet-companion-p2.css',
+    'web\creative-community.js',
+    'web\assets\fe-monster-pet-mascot.png',
+    'web\assets\fe-monster-pet-mascot-chroma.png',
+    'scripts\install-fe-monster.ps1',
+    'scripts\ensure-runtime-dependencies.ps1',
+    'scripts\java-runtime.ps1',
+    'data\community-server-url.txt',
+    'data\community-server-tls-pin.txt',
     'runtime\java\bin\java.exe',
     'runtime\java\bin\javaw.exe',
     'runtime\java\bin\FE Monster Backend.exe',
-    'runtime\python\python.exe',
-    'runtime\python-site-packages\cv2',
-    'runtime\python-site-packages\mediapipe',
-    'runtime\python-site-packages\pyautogui',
-    'runtime\python-site-packages\pygrabber',
     'native\windows\build\winforms\FE Monster.exe',
+    'native\windows\build\winforms\FE Monster.dll',
+    'native\windows\build\winforms\FE Monster.deps.json',
+    'native\windows\build\winforms\FE Monster.runtimeconfig.json',
     'native\windows\build\winforms\WebView2Loader.dll',
     'native\windows\build\fe-monster-xaudio2.dll',
     'native\windows\build\fe_monster_upmix.dll',
-    'plugins\music-api\FE-Monster-Kugou-API-Plugin-2.0.1.zip',
-    'plugins\music-api\FE-Monster-Qishui-OpenAPI-Plugin-3.1.0.zip'
+    'plugins\music-api\FE-Monster-Netease-API-Plugin-4.32.0.zip',
+    'plugins\music-api\FE-Monster-QQ-API-Plugin-2.4.1.zip',
+    'plugins\music-api\FE-Monster-Kugou-API-Plugin-2.0.7.zip',
+    'plugins\music-api\FE-Monster-Qishui-OpenAPI-Plugin-3.1.1.zip'
   )
   if ($includeOfflineWebView2) {
     $requiredPayloadItems += 'runtime\installers\MicrosoftEdgeWebView2RuntimeInstallerX64.exe'
@@ -679,7 +1239,6 @@ function Stage-Payload {
     'runtime\java\bin\java.exe',
     'runtime\java\bin\javaw.exe',
     'runtime\java\bin\FE Monster Backend.exe',
-    'runtime\python\python.exe',
     'native\windows\build\winforms\FE Monster.exe',
     'native\windows\build\winforms\WebView2Loader.dll',
     'native\windows\build\fe-monster-xaudio2.dll',
@@ -690,123 +1249,6 @@ function Stage-Payload {
   Assert-NoDynamicVcRuntime (Join-Path $payloadRoot 'native\windows\build\fe-monster-xaudio2.dll')
   Assert-NoDynamicVcRuntime (Join-Path $payloadRoot 'native\windows\build\fe_monster_upmix.dll')
   New-PayloadIntegrityManifest
-}
-
-function Test-GesturePythonImports {
-  param([string]$PythonExe)
-  if (!(Test-Path $PythonExe)) { return $false }
-  & $PythonExe -B -c "import cv2, mediapipe, pyautogui, pygrabber; print('gesture-python-ok')"
-  return $LASTEXITCODE -eq 0
-}
-
-function Remove-StagedGestureDevelopmentFiles {
-  param(
-    [string]$PythonDestination,
-    [string]$SitePackagesDestination
-  )
-
-  $beforeBytes = @($PythonDestination, $SitePackagesDestination) |
-    ForEach-Object { Get-ChildItem -LiteralPath $_ -Recurse -File -Force } |
-    Measure-Object -Property Length -Sum
-
-  foreach ($relativePath in @(
-    'Lib\ensurepip',
-    'Lib\idlelib',
-    'Lib\lib2to3',
-    'Lib\pydoc_data',
-    'Lib\turtledemo',
-    'include',
-    'libs',
-    'Scripts'
-  )) {
-    $target = Join-Path $PythonDestination $relativePath
-    if (Test-Path -LiteralPath $target) {
-      Remove-Item -LiteralPath $target -Recurse -Force
-    }
-  }
-
-  foreach ($target in @(
-    (Join-Path $SitePackagesDestination 'pip'),
-    (Join-Path $SitePackagesDestination 'cv2\samples')
-  )) {
-    if (Test-Path -LiteralPath $target) {
-      Remove-Item -LiteralPath $target -Recurse -Force
-    }
-  }
-  Get-ChildItem -LiteralPath $SitePackagesDestination -Directory -Filter 'pip-*.dist-info' -Force |
-    Remove-Item -Recurse -Force
-
-  foreach ($scanRoot in @($PythonDestination, $SitePackagesDestination)) {
-    Get-ChildItem -LiteralPath $scanRoot -Recurse -Directory -Force |
-      Where-Object { $_.Name -eq '__pycache__' } |
-      Sort-Object -Property FullName -Descending |
-      Remove-Item -Recurse -Force
-    Get-ChildItem -LiteralPath $scanRoot -Recurse -File -Force |
-      Where-Object { $_.Extension -in @('.pyc', '.pyo') } |
-      Remove-Item -Force
-  }
-  Get-ChildItem -LiteralPath $SitePackagesDestination -Recurse -Directory -Force |
-    Where-Object { $_.Name -in @('test', 'tests') } |
-    Sort-Object -Property FullName -Descending |
-    Remove-Item -Recurse -Force
-  Get-ChildItem -LiteralPath $SitePackagesDestination -Recurse -File -Force |
-    Where-Object { $_.Extension -in @('.c', '.h', '.hpp', '.lib', '.pxd', '.pyi', '.pyx') } |
-    Remove-Item -Force
-
-  $afterBytes = @($PythonDestination, $SitePackagesDestination) |
-    ForEach-Object { Get-ChildItem -LiteralPath $_ -Recurse -File -Force } |
-    Measure-Object -Property Length -Sum
-  $savedMiB = [math]::Round(($beforeBytes.Sum - $afterBytes.Sum) / 1MB, 2)
-  Write-Host "== Removed $savedMiB MiB of Python caches, tests, package-manager and development files"
-}
-
-function Stage-GesturePythonRuntime {
-  $venvRoot = Join-Path $rootPath '.venv-gesture'
-  $venvPython = Join-Path $venvRoot 'Scripts\python.exe'
-  $requirements = Join-Path $rootPath 'scripts\gesture-requirements.txt'
-  if (!(Test-Path $venvPython)) {
-    throw "Gesture Python venv was not found: $venvPython"
-  }
-  if (!(Test-Path $requirements)) {
-    throw "Gesture requirements file was not found: $requirements"
-  }
-
-  Write-Host '== Validating gesture Python dependencies'
-  if (!(Test-GesturePythonImports $venvPython)) {
-    throw 'Gesture Python dependencies are missing. Run: .venv-gesture\Scripts\python.exe -m pip install -r scripts\gesture-requirements.txt'
-  }
-
-  $pythonHome = (& $venvPython -c "import sys; print(sys.base_prefix)") | Select-Object -First 1
-  $pythonHome = [string]$pythonHome
-  if ([string]::IsNullOrWhiteSpace($pythonHome) -or !(Test-Path $pythonHome)) {
-    throw "Could not locate base Python runtime for gesture venv: $pythonHome"
-  }
-
-  $pythonDest = Join-Path $payloadRoot 'runtime\python'
-  $sitePackagesSource = Join-Path $venvRoot 'Lib\site-packages'
-  $sitePackagesDest = Join-Path $payloadRoot 'runtime\python-site-packages'
-  if (!(Test-Path $sitePackagesSource)) {
-    throw "Gesture site-packages were not found: $sitePackagesSource"
-  }
-
-  Write-Host '== Staging gesture Python runtime'
-  Copy-DirExcept $pythonHome $pythonDest @((Join-Path $pythonHome 'Lib\site-packages'))
-  Copy-Dir $sitePackagesSource $sitePackagesDest
-  Remove-StagedGestureDevelopmentFiles $pythonDest $sitePackagesDest
-
-  $stagedPython = Join-Path $pythonDest 'python.exe'
-  $previousPythonPath = $Env:PYTHONPATH
-  $previousNoUserSite = $Env:PYTHONNOUSERSITE
-  try {
-    $Env:PYTHONPATH = $sitePackagesDest
-    $Env:PYTHONNOUSERSITE = '1'
-    if (!(Test-GesturePythonImports $stagedPython)) {
-      throw 'Staged gesture Python runtime cannot import OpenCV, MediaPipe, PyAutoGUI, and PyGrabber.'
-    }
-  } finally {
-    if ($null -eq $previousPythonPath) { Remove-Item Env:\PYTHONPATH -ErrorAction SilentlyContinue } else { $Env:PYTHONPATH = $previousPythonPath }
-    if ($null -eq $previousNoUserSite) { Remove-Item Env:\PYTHONNOUSERSITE -ErrorAction SilentlyContinue } else { $Env:PYTHONNOUSERSITE = $previousNoUserSite }
-  }
 }
 
 function New-PayloadZip {
@@ -855,11 +1297,17 @@ function Assert-PluginOnlyPayloadZip {
     if (!$includeOfflineWebView2 -and $hasOfflineWebView2) {
       throw 'Online payload unexpectedly contains the 194 MiB WebView2 offline runtime.'
     }
-    if (!($entries -contains 'fe monster/plugins/music-api/fe-monster-kugou-api-plugin-2.0.1.zip')) {
-      throw 'Payload is missing the bundled Kugou 2.0.1 migration package.'
+    if (!($entries -contains 'fe monster/plugins/music-api/fe-monster-netease-api-plugin-4.32.0.zip')) {
+      throw 'Payload is missing the bundled Netease 4.32.0 bootstrap package.'
     }
-    if (!($entries -contains 'fe monster/plugins/music-api/fe-monster-qishui-openapi-plugin-3.1.0.zip')) {
-      throw 'Payload is missing the bundled Qishui OpenAPI 3.1.0 migration package.'
+    if (!($entries -contains 'fe monster/plugins/music-api/fe-monster-qq-api-plugin-2.4.1.zip')) {
+      throw 'Payload is missing the bundled QQ 2.4.1 bootstrap package.'
+    }
+    if (!($entries -contains 'fe monster/plugins/music-api/fe-monster-kugou-api-plugin-2.0.7.zip')) {
+      throw 'Payload is missing the bundled Kugou 2.0.7 migration package.'
+    }
+    if (!($entries -contains 'fe monster/plugins/music-api/fe-monster-qishui-openapi-plugin-3.1.1.zip')) {
+      throw 'Payload is missing the bundled Qishui OpenAPI 3.1.1 migration package.'
     }
   } finally {
     $archive.Dispose()
@@ -1029,14 +1477,36 @@ Invoke-Step 'Validating Windows installer contract' {
   }
 }
 
+Invoke-Step 'Validating cross-computer runtime dependency resilience' {
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $rootPath 'scripts\check-runtime-dependency-resilience.ps1') -Root $rootPath
+  if ($LASTEXITCODE -ne 0) {
+    throw "Runtime dependency resilience check failed with exit code $LASTEXITCODE"
+  }
+}
+
+Invoke-Step 'Validating camera hand-control removal' {
+  & node (Join-Path $rootPath 'scripts\check-camera-hand-control-removed.mjs')
+  if ($LASTEXITCODE -ne 0) {
+    throw "Camera hand-control removal check failed with exit code $LASTEXITCODE"
+  }
+}
+
 if (!$SkipBuild) {
   Build-App
 }
 if ($ReusePayloadZip) {
   if ($StageOnly) { throw '-StageOnly cannot be combined with -ReusePayloadZip.' }
   if (!(Test-Path $payloadZip)) { throw "Existing payload zip was not found: $payloadZip" }
+  $null = Assert-PayloadZipCommunityConfiguration $payloadZip -SkipHealthCheck
 } else {
   Stage-Payload
+  & node `
+    (Join-Path $rootPath 'scripts\check-camera-hand-control-removed.mjs') `
+    --payload-root `
+    $payloadRoot
+  if ($LASTEXITCODE -ne 0) {
+    throw "Staged camera hand-control removal check failed with exit code $LASTEXITCODE"
+  }
   if ($StageOnly) {
     & powershell.exe `
       -NoProfile `
@@ -1053,6 +1523,7 @@ if ($ReusePayloadZip) {
   }
   New-PayloadZip
 }
+$null = Assert-PayloadZipCommunityConfiguration $payloadZip -SkipHealthCheck:(!$ReusePayloadZip)
 Assert-PluginOnlyPayloadZip
 New-SetupExe
 Protect-AndDescribeInstaller

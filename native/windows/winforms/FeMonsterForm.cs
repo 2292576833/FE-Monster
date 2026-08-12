@@ -15,17 +15,25 @@ namespace FeMonster.Client;
 internal sealed class FeMonsterForm : Form
 {
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(1) };
+    private static readonly Color WindowSurfaceColor = Color.FromArgb(255, 2, 2, 2);
 
     private const int WM_NCLBUTTONDOWN = 0x00A1;
     private const int HTCAPTION = 0x0002;
-    private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
-    private const int DWMWCP_ROUND = 2;
-    private const int WINDOW_VISUAL_RADIUS_DIP = 34;
+    private const int WindowWorkAreaMargin = 24;
     private readonly ClientOptions options;
-    private readonly WebView2 webView = new() { Dock = DockStyle.Fill };
+    private readonly bool ownsBackendProcess;
+    private readonly WebView2 webView = new()
+    {
+        Dock = DockStyle.Fill,
+        Margin = Padding.Empty
+    };
     private readonly DesktopSceneHost desktopSceneHost;
+    private readonly DesktopPetHost desktopPetHost;
     private readonly NotifyIcon trayIcon;
     private readonly ContextMenuStrip trayMenu;
+    private readonly ToolStripMenuItem desktopPetShowMenuItem;
+    private readonly ToolStripMenuItem desktopPetHideMenuItem;
+    private readonly ToolStripMenuItem desktopPetDisableMenuItem;
     private readonly Icon trayDisplayIcon;
     private CoreWebView2Environment? webEnvironment;
     private RecordingToolbarForm? recordingToolbar;
@@ -33,24 +41,43 @@ internal sealed class FeMonsterForm : Form
     private bool fullscreen;
     private bool serverQuitRequested;
     private bool trayResourcesDisposed;
+    private bool nativeCornerPreferenceApplied;
+    private int appliedCornerPreference = -1;
+    private int cachedResizeFrameDpi;
+    private Size cachedResizeFrameSize;
 
-    public FeMonsterForm(ClientOptions options)
+    public FeMonsterForm(ClientOptions options, bool ownsBackendProcess = false)
     {
         this.options = options;
+        this.ownsBackendProcess = ownsBackendProcess;
         desktopSceneHost = new DesktopSceneHost(options);
         Text = "FE Monster";
         Icon = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         Width = options.Width;
         Height = options.Height;
         FormBorderStyle = FormBorderStyle.None;
-        StartPosition = FormStartPosition.CenterScreen;
+        Padding = Padding.Empty;
+        StartPosition = FormStartPosition.Manual;
         MinimumSize = new Size(860, 560);
-        BackColor = Color.Black;
+        Rectangle initialWorkingArea = Screen.FromPoint(Cursor.Position).WorkingArea;
+        Bounds = FitWindowBoundsToWorkingArea(Bounds, initialWorkingArea, center: true);
+        BackColor = WindowSurfaceColor;
+        webView.DefaultBackgroundColor = WindowSurfaceColor;
         Controls.Add(webView);
+        desktopPetHost = new DesktopPetHost(webView, ShowMainWindow, options.Url);
+        desktopPetHost.WebMessageReceived += HandleWebMessage;
+        desktopPetHost.StateChanged += HandleDesktopPetStateChanged;
 
         trayMenu = new ContextMenuStrip();
         trayMenu.Items.Add("显示窗口", null, (_, _) => ShowMainWindow());
         trayMenu.Items.Add("隐藏窗口", null, (_, _) => HideMainWindow());
+        trayMenu.Items.Add(new ToolStripSeparator());
+        desktopPetShowMenuItem = new ToolStripMenuItem("显示桌宠", null, (_, _) => ShowDesktopPet());
+        desktopPetHideMenuItem = new ToolStripMenuItem("隐藏桌宠", null, (_, _) => HideDesktopPet());
+        desktopPetDisableMenuItem = new ToolStripMenuItem("桌宠返回主窗口", null, (_, _) => ShowMainWindow());
+        trayMenu.Items.Add(desktopPetShowMenuItem);
+        trayMenu.Items.Add(desktopPetHideMenuItem);
+        trayMenu.Items.Add(desktopPetDisableMenuItem);
         trayMenu.Items.Add(new ToolStripSeparator());
         trayMenu.Items.Add("退出 FE Monster", null, (_, _) => Close());
         trayDisplayIcon = CreateHighContrastTrayIcon();
@@ -66,6 +93,18 @@ internal sealed class FeMonsterForm : Form
             if (eventArgs.Button == MouseButtons.Left) ShowMainWindow();
         };
         trayIcon.DoubleClick += (_, _) => ShowMainWindow();
+        SyncDesktopPetTrayMenu();
+    }
+
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            CreateParams parameters = base.CreateParams;
+            parameters.Style |= NativeWindowChrome.CustomFrameStyle;
+            parameters.ClassStyle |= NativeWindowChrome.DropShadowClassStyle;
+            return parameters;
+        }
     }
 
     [DllImport("user32.dll")]
@@ -77,13 +116,35 @@ internal sealed class FeMonsterForm : Form
     [DllImport("user32.dll")]
     private static extern bool DestroyIcon(IntPtr handle);
 
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int attributeValue, int attributeSize);
-
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
+        nativeCornerPreferenceApplied = false;
+        appliedCornerPreference = -1;
+        cachedResizeFrameDpi = 0;
+        ApplyWindowSurfacePolicy();
+        NativeWindowChrome.RefreshFrame(Handle);
         ApplyWindowCornerPolicy();
+    }
+
+    protected override void WndProc(ref Message message)
+    {
+        if (message.Msg == NativeWindowChrome.WmNcCalcSize)
+        {
+            // The WebView owns the complete HWND surface. Keeping even a 1px
+            // non-client strip lets Windows paint a theme-dependent white edge,
+            // and becomes 2px after DPI rounding on some displays.
+            message.Result = IntPtr.Zero;
+            return;
+        }
+
+        if (message.Msg == NativeWindowChrome.WmNcHitTest)
+        {
+            message.Result = new IntPtr(HitTestWindowFrame(message.LParam));
+            return;
+        }
+
+        base.WndProc(ref message);
     }
 
     protected override async void OnShown(EventArgs e)
@@ -114,12 +175,15 @@ internal sealed class FeMonsterForm : Form
     protected override void OnResize(EventArgs e)
     {
         base.OnResize(e);
+        ApplyWindowSurfacePolicy();
         ApplyWindowCornerPolicy();
     }
 
     protected override void OnDpiChanged(DpiChangedEventArgs e)
     {
         base.OnDpiChanged(e);
+        cachedResizeFrameDpi = 0;
+        ApplyWindowSurfacePolicy();
         ApplyWindowCornerPolicy();
     }
 
@@ -127,11 +191,36 @@ internal sealed class FeMonsterForm : Form
     {
         base.OnFormClosing(e);
         if (e.Cancel) return;
-        DisposeTrayResources();
-        desktopSceneHost.Dispose();
-        recordingToolbar?.Close();
-        recordingToolbar = null;
-        RequestServerQuitAsync().GetAwaiter().GetResult();
+        RunShutdownStep("desktop pet", desktopPetHost.Dispose);
+        RunShutdownStep("desktop scene", desktopSceneHost.Dispose);
+        RunShutdownStep("tray icon", DisposeTrayResources);
+        RunShutdownStep("recording toolbar", () =>
+        {
+            recordingToolbar?.Close();
+            recordingToolbar = null;
+        });
+        if (!ownsBackendProcess)
+        {
+            RunShutdownStep(
+                "external backend",
+                () => RequestServerQuitAsync().GetAwaiter().GetResult()
+            );
+        }
+    }
+
+    private static void RunShutdownStep(string name, Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception error)
+        {
+            StartupDiagnostics.Write(new InvalidOperationException(
+                $"FE Monster could not close its {name} cleanly.",
+                error
+            ));
+        }
     }
 
     protected override void Dispose(bool disposing)
@@ -182,6 +271,7 @@ internal sealed class FeMonsterForm : Form
 
     internal void ShowMainWindow()
     {
+        if (desktopPetHost.IsEnabled) desktopPetHost.Disable();
         ShowInTaskbar = true;
         if (!Visible) Show();
         if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
@@ -195,14 +285,73 @@ internal sealed class FeMonsterForm : Form
         ShowInTaskbar = false;
     }
 
-    private async Task InitializeWebViewAsync()
+    private void ShowDesktopPet()
     {
-        var userDataFolder = Path.Combine(
+        try
+        {
+            desktopPetHost.Show();
+            HideMainWindow();
+            PostDesktopPetResult("", "");
+        }
+        catch (Exception error)
+        {
+            PostDesktopPetResult("", error.Message);
+            MessageBox.Show(
+                this,
+                "Desktop pet mode could not be opened.\n\n" + error.Message,
+                "FE Monster",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning
+            );
+        }
+    }
+
+    private void HideDesktopPet()
+    {
+        desktopPetHost.Hide();
+        PostDesktopPetResult("", "");
+    }
+
+    private void HandleDesktopPetStateChanged()
+    {
+        SyncDesktopPetTrayMenu();
+        PostDesktopPetResult("", "");
+    }
+
+    private void SyncDesktopPetTrayMenu()
+    {
+        desktopPetShowMenuItem.Enabled = !desktopPetHost.IsVisible;
+        desktopPetHideMenuItem.Enabled = desktopPetHost.IsVisible;
+        desktopPetDisableMenuItem.Enabled = desktopPetHost.IsEnabled;
+    }
+
+    private static string ResolveWebView2DataRoot()
+    {
+        string configuredDataRoot = Environment.GetEnvironmentVariable("FE_MONSTER_DATA_DIR")?.Trim() ?? "";
+        if (configuredDataRoot.Length != 0)
+        {
+            string dataRoot = Path.GetFullPath(Environment.ExpandEnvironmentVariables(configuredDataRoot));
+            string appDataRoot = Directory.GetParent(dataRoot)?.FullName ?? dataRoot;
+            return Path.Combine(appDataRoot, "WebView2");
+        }
+
+        return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "FE Monster",
-            "WebView2",
-            "DesktopHostV2"
+            "WebView2"
         );
+    }
+
+    private async Task InitializeWebViewAsync()
+    {
+        string testStorageKey = Program.DesktopPetTestStorageKey();
+        string profileFolder = testStorageKey.Length == 0
+            ? "DesktopHostV2"
+            : "DesktopHostV2-Test-" + testStorageKey;
+        string profileRoot = testStorageKey.Length == 0
+            ? ResolveWebView2DataRoot()
+            : Path.Combine(Path.GetTempPath(), "FE Monster", "WebView2");
+        var userDataFolder = Path.Combine(profileRoot, profileFolder);
         Directory.CreateDirectory(userDataFolder);
 
         var environment = await CoreWebView2Environment.CreateAsync(
@@ -212,7 +361,8 @@ internal sealed class FeMonsterForm : Form
         );
         webEnvironment = environment;
 
-        webView.DefaultBackgroundColor = Color.FromArgb(255, 2, 2, 2);
+        webView.DefaultBackgroundColor = WindowSurfaceColor;
+        webView.AllowExternalDrop = true;
         await webView.EnsureCoreWebView2Async(environment);
         webView.CoreWebView2.WebMessageReceived += HandleWebMessage;
         webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
@@ -223,11 +373,10 @@ internal sealed class FeMonsterForm : Form
 
     private string BuildBrowserArguments()
     {
-        if (!options.GpuAcceleration) return "--disable-gpu";
-
-        var args = "--enable-gpu-rasterization --enable-accelerated-2d-canvas --force-high-performance-gpu --ignore-gpu-blocklist";
-        if (options.DirectX11) args += " --use-gl=angle --use-angle=d3d11";
-        return args;
+        return "--use-gl=angle --use-angle=d3d11 " +
+            "--enable-gpu-rasterization --enable-accelerated-2d-canvas " +
+            "--force_high_performance_gpu --ignore-gpu-blocklist " +
+            "--disable-software-rasterizer";
     }
 
     private void HandleWebMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
@@ -260,6 +409,12 @@ internal sealed class FeMonsterForm : Form
                 return;
             }
 
+            if (string.Equals(type.GetString(), "fe-pet-desktop", StringComparison.OrdinalIgnoreCase))
+            {
+                HandleDesktopPetMessage(document.RootElement);
+                return;
+            }
+
             if (!string.Equals(type.GetString(), "fe-window", StringComparison.OrdinalIgnoreCase)) return;
 
             var action = document.RootElement.TryGetProperty("action", out var actionElement)
@@ -276,6 +431,126 @@ internal sealed class FeMonsterForm : Form
         {
             ApplyWindowAction(e.TryGetWebMessageAsString());
         }
+    }
+
+    private async void HandleDesktopPetMessage(JsonElement root)
+    {
+        string action = ReadString(root, "action").Trim().ToLowerInvariant();
+        string requestId = ReadString(root, "requestId");
+        try
+        {
+            switch (action)
+            {
+                case "enable":
+                case "show":
+                    desktopPetHost.Show();
+                    HideMainWindow();
+                    break;
+                case "toggle":
+                    if (desktopPetHost.IsVisible)
+                    {
+                        desktopPetHost.Hide();
+                    }
+                    else
+                    {
+                        desktopPetHost.Show();
+                        HideMainWindow();
+                    }
+                    break;
+                case "hide":
+                    desktopPetHost.Hide();
+                    break;
+                case "disable":
+                case "show-main":
+                    ShowMainWindow();
+                    break;
+                case "move":
+                    desktopPetHost.MoveBy(ReadInt(root, "dx"), ReadInt(root, "dy"));
+                    return;
+                case "move-end":
+                    desktopPetHost.EndMove();
+                    return;
+                case "panel":
+                    JsonElement panelBounds = ReadObject(root, "bounds");
+                    JsonElement panelViewport = ReadObject(root, "viewport");
+                    float panelRadius = ReadFloat(panelBounds, "radius");
+                    if (panelRadius <= 0) panelRadius = ReadFloat(root, "radius");
+                    desktopPetHost.SetPanelOpen(
+                        ReadBool(root, "open"),
+                        new RectangleF(
+                            ReadFloat(panelBounds, "left"),
+                            ReadFloat(panelBounds, "top"),
+                            ReadFloat(panelBounds, "width"),
+                            ReadFloat(panelBounds, "height")
+                        ),
+                        new SizeF(
+                            ReadFloat(panelViewport, "width"),
+                            ReadFloat(panelViewport, "height")
+                        ),
+                        panelRadius
+                    );
+                    return;
+                case "bubble":
+                    JsonElement bubbleBounds = ReadObject(root, "bounds");
+                    JsonElement bubbleViewport = ReadObject(root, "viewport");
+                    desktopPetHost.SetBubbleVisible(
+                        ReadBool(root, "visible"),
+                        new RectangleF(
+                            ReadFloat(bubbleBounds, "left"),
+                            ReadFloat(bubbleBounds, "top"),
+                            ReadFloat(bubbleBounds, "width"),
+                            ReadFloat(bubbleBounds, "height")
+                        ),
+                        new SizeF(
+                            ReadFloat(bubbleViewport, "width"),
+                            ReadFloat(bubbleViewport, "height")
+                        ),
+                        ReadFloat(bubbleBounds, "radius")
+                    );
+                    return;
+                case "position-query":
+                    break;
+                case "position-set":
+                    string anchor = ReadString(root, "anchor");
+                    double? xPercent = ReadNullableDouble(root, "xPercent");
+                    double? yPercent = ReadNullableDouble(root, "yPercent");
+                    int requestedDuration = ReadInt(root, "durationMs");
+                    await desktopPetHost.GlideToAsync(
+                        anchor,
+                        xPercent,
+                        yPercent,
+                        requestedDuration > 0 ? requestedDuration : 500
+                    );
+                    break;
+                case "query":
+                case "ready":
+                    break;
+                default:
+                    throw new InvalidOperationException("Unsupported desktop pet action.");
+            }
+            PostDesktopPetResult(requestId, "");
+        }
+        catch (Exception error)
+        {
+            PostDesktopPetResult(requestId, error.Message);
+        }
+    }
+
+    private void PostDesktopPetResult(string requestId, string error)
+    {
+        string payload = JsonSerializer.Serialize(new
+        {
+            type = "fe-pet-desktop-result",
+            requestId,
+            supported = true,
+            enabled = desktopPetHost.IsEnabled,
+            visible = desktopPetHost.IsVisible,
+            hostMode = "wpf-composition-surface",
+            bounds = desktopPetHost.QueryBounds(),
+            error
+        });
+        webView.CoreWebView2?.PostWebMessageAsJson(payload);
+        desktopPetHost.PostWebMessageAsJson(payload);
     }
 
     private async void HandleDesktopSceneMessage(JsonElement root)
@@ -352,20 +627,20 @@ internal sealed class FeMonsterForm : Form
             requestId,
             host = new
             {
-                backend = options.DirectX11 ? "webview2-angle-d3d11" : "webview2-default",
-                gpuAcceleration = options.GpuAcceleration,
+                backend = "webview2-angle-d3d11",
+                gpuAcceleration = true,
                 ownsNativeRenderTargets = false
             },
             upscalers = new
             {
                 adaptiveSpatial = new
                 {
-                    available = options.GpuAcceleration,
+                    available = true,
                     backend = "webgl2-fragment-pass"
                 },
                 fsr1 = new
                 {
-                    available = options.GpuAcceleration,
+                    available = true,
                     backend = "webgl2-spatial-compatible",
                     officialVendorImplementation = false
                 },
@@ -504,18 +779,61 @@ internal sealed class FeMonsterForm : Form
         {
             restoreBounds = Bounds;
             WindowState = FormWindowState.Normal;
+            fullscreen = true;
+            ApplyWindowSurfacePolicy();
+            ApplyWindowCornerPolicy();
+            NativeWindowChrome.RefreshFrame(Handle);
             Bounds = Screen.FromControl(this).Bounds;
             TopMost = true;
-            fullscreen = true;
-            ApplyWindowCornerPolicy();
             return;
         }
 
         TopMost = false;
         WindowState = FormWindowState.Normal;
-        if (!restoreBounds.IsEmpty) Bounds = restoreBounds;
         fullscreen = false;
+        ApplyWindowSurfacePolicy();
         ApplyWindowCornerPolicy();
+        NativeWindowChrome.RefreshFrame(Handle);
+        if (!restoreBounds.IsEmpty)
+        {
+            Rectangle workingArea = Screen.FromRectangle(restoreBounds).WorkingArea;
+            Bounds = FitWindowBoundsToWorkingArea(restoreBounds, workingArea, center: false);
+        }
+    }
+
+    private static Rectangle FitWindowBoundsToWorkingArea(
+        Rectangle requestedBounds,
+        Rectangle workingArea,
+        bool center
+    )
+    {
+        int horizontalMargin = Math.Min(WindowWorkAreaMargin, Math.Max(0, (workingArea.Width - 1) / 2));
+        int verticalMargin = Math.Min(WindowWorkAreaMargin, Math.Max(0, (workingArea.Height - 1) / 2));
+        Rectangle safeArea = new(
+            workingArea.Left + horizontalMargin,
+            workingArea.Top + verticalMargin,
+            Math.Max(1, workingArea.Width - horizontalMargin * 2),
+            Math.Max(1, workingArea.Height - verticalMargin * 2)
+        );
+
+        int requestedWidth = Math.Max(1, requestedBounds.Width);
+        int requestedHeight = Math.Max(1, requestedBounds.Height);
+        double scale = Math.Min(
+            1d,
+            Math.Min(
+                safeArea.Width / (double)requestedWidth,
+                safeArea.Height / (double)requestedHeight
+            )
+        );
+        int width = Math.Max(1, Math.Min(safeArea.Width, (int)Math.Floor(requestedWidth * scale)));
+        int height = Math.Max(1, Math.Min(safeArea.Height, (int)Math.Floor(requestedHeight * scale)));
+        int left = center
+            ? safeArea.Left + (safeArea.Width - width) / 2
+            : Math.Clamp(requestedBounds.Left, safeArea.Left, safeArea.Right - width);
+        int top = center
+            ? safeArea.Top + (safeArea.Height - height) / 2
+            : Math.Clamp(requestedBounds.Top, safeArea.Top, safeArea.Bottom - height);
+        return new Rectangle(left, top, width, height);
     }
 
     private void BeginWindowDrag()
@@ -529,6 +847,37 @@ internal sealed class FeMonsterForm : Form
     {
         if (fullscreen || WindowState == FormWindowState.Minimized || (dx == 0 && dy == 0)) return;
         Location = new Point(Location.X + dx, Location.Y + dy);
+    }
+
+    private int HitTestWindowFrame(IntPtr packedScreenPoint)
+    {
+        if (fullscreen || WindowState != FormWindowState.Normal)
+        {
+            return NativeWindowChrome.HtClient;
+        }
+
+        Point clientPoint = PointToClient(NativeWindowChrome.PointFromLParam(packedScreenPoint));
+        int dpi = Math.Max(96, DeviceDpi);
+        if (cachedResizeFrameDpi != dpi)
+        {
+            cachedResizeFrameDpi = dpi;
+            cachedResizeFrameSize = NativeWindowChrome.GetResizeFrameSize(Handle, dpi);
+        }
+        Size frame = cachedResizeFrameSize;
+        bool left = clientPoint.X < frame.Width;
+        bool right = clientPoint.X >= ClientSize.Width - frame.Width;
+        bool top = clientPoint.Y < frame.Height;
+        bool bottom = clientPoint.Y >= ClientSize.Height - frame.Height;
+
+        if (top && left) return NativeWindowChrome.HtTopLeft;
+        if (top && right) return NativeWindowChrome.HtTopRight;
+        if (bottom && left) return NativeWindowChrome.HtBottomLeft;
+        if (bottom && right) return NativeWindowChrome.HtBottomRight;
+        if (left) return NativeWindowChrome.HtLeft;
+        if (right) return NativeWindowChrome.HtRight;
+        if (top) return NativeWindowChrome.HtTop;
+        if (bottom) return NativeWindowChrome.HtBottom;
+        return NativeWindowChrome.HtClient;
     }
 
     private static int ReadInt(JsonElement element, string propertyName)
@@ -551,52 +900,69 @@ internal sealed class FeMonsterForm : Form
         return element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.True;
     }
 
+    private void ApplyWindowSurfacePolicy()
+    {
+        if (!IsHandleCreated || WindowState == FormWindowState.Minimized) return;
+        NativeWindowChrome.TryEnableNonClientRendering(Handle);
+        NativeWindowChrome.TryForceOpaqueRedirectionBitmap(Handle);
+        NativeWindowChrome.TrySuppressVisibleBorder(Handle);
+    }
+
+    private static double? ReadNullableDouble(JsonElement element, string propertyName)
+    {
+        return element.TryGetProperty(propertyName, out var value)
+            && value.ValueKind == JsonValueKind.Number
+            && value.TryGetDouble(out double number)
+            && double.IsFinite(number)
+                ? number
+                : null;
+    }
+
+    private static JsonElement ReadObject(JsonElement element, string propertyName)
+    {
+        return element.ValueKind == JsonValueKind.Object
+            && element.TryGetProperty(propertyName, out var value)
+            && value.ValueKind == JsonValueKind.Object
+                ? value
+                : default;
+    }
+
+    private static float ReadFloat(JsonElement element, string propertyName)
+    {
+        return element.ValueKind == JsonValueKind.Object
+            && element.TryGetProperty(propertyName, out var value)
+            && value.ValueKind == JsonValueKind.Number
+            && value.TryGetSingle(out float number)
+                ? number
+                : 0;
+    }
+
     private void ApplyWindowCornerPolicy()
     {
         if (!IsHandleCreated || WindowState == FormWindowState.Minimized || ClientSize.Width < 2 || ClientSize.Height < 2) return;
 
-        try
+        bool shouldRound = !fullscreen && WindowState == FormWindowState.Normal;
+        if (NativeWindowChrome.SupportsSystemRoundedCorners)
         {
-            var preference = DWMWCP_ROUND;
-            DwmSetWindowAttribute(Handle, DWMWA_WINDOW_CORNER_PREFERENCE, ref preference, sizeof(int));
+            int preference = shouldRound
+                ? NativeWindowChrome.DwmWcpRound
+                : NativeWindowChrome.DwmWcpDoNotRound;
+            bool preferenceApplied = nativeCornerPreferenceApplied
+                && appliedCornerPreference == preference;
+            if (!preferenceApplied)
+            {
+                preferenceApplied = NativeWindowChrome.TrySetCornerPreference(Handle, preference);
+                nativeCornerPreferenceApplied = preferenceApplied;
+                appliedCornerPreference = preferenceApplied ? preference : -1;
+            }
         }
-        catch (DllNotFoundException)
-        {
-        }
-        catch (EntryPointNotFoundException)
-        {
-        }
-
-        var previousRegion = Region;
-        Region? nextRegion = fullscreen
-            ? null
-            : CreateRoundedWindowRegion(ClientSize.Width, ClientSize.Height);
-        Region = nextRegion;
-        previousRegion?.Dispose();
-    }
-
-    private Region CreateRoundedWindowRegion(int width, int height)
-    {
-        float scale = Math.Max(1f, DeviceDpi / 96f);
-        float radius = Math.Min(
-            WINDOW_VISUAL_RADIUS_DIP * scale,
-            Math.Max(1f, Math.Min(width, height) / 2f)
-        );
-        float diameter = radius * 2f;
-        using var path = new GraphicsPath();
-        path.StartFigure();
-        path.AddArc(0, 0, diameter, diameter, 180, 90);
-        path.AddArc(width - diameter, 0, diameter, diameter, 270, 90);
-        path.AddArc(width - diameter, height - diameter, diameter, diameter, 0, 90);
-        path.AddArc(0, height - diameter, diameter, diameter, 90, 90);
-        path.CloseFigure();
-        return new Region(path);
     }
 }
 
 internal sealed class RecordingToolbarForm : Form
 {
     private static readonly Color ToolbarBack = Color.FromArgb(13, 20, 25);
+    private const int TOOLBAR_CORNER_RADIUS_DIP = 18;
     private readonly Action<string> invokeAction;
     private readonly ToolbarIconButton startButton;
     private readonly ToolbarIconButton stopButton;
@@ -686,6 +1052,17 @@ internal sealed class RecordingToolbarForm : Form
         UpdateState("idle", "", false);
     }
 
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            CreateParams parameters = base.CreateParams;
+            parameters.Style |= NativeWindowChrome.CustomFrameStyle;
+            parameters.ClassStyle |= NativeWindowChrome.DropShadowClassStyle;
+            return parameters;
+        }
+    }
+
     public void UpdateState(string mode, string status, bool canSaveAs)
     {
         bool recording = string.Equals(mode, "recording", StringComparison.OrdinalIgnoreCase);
@@ -703,10 +1080,40 @@ internal sealed class RecordingToolbarForm : Form
         statusLabel.Text = string.IsNullOrWhiteSpace(status) ? "只录制程序画面" : status;
     }
 
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        NativeWindowChrome.TryEnableNonClientRendering(Handle);
+        ApplyWindowCornerPolicy();
+    }
+
+    protected override void WndProc(ref Message message)
+    {
+        if (message.Msg == NativeWindowChrome.WmNcCalcSize)
+        {
+            NativeWindowChrome.RetainThinNonClientBorder(
+                ref message,
+                Handle,
+                DeviceDpi
+            );
+            return;
+        }
+
+        if (message.Msg == NativeWindowChrome.WmNcHitTest)
+        {
+            // The toolbar is fixed-size; keep its whole surface in the client area
+            // so native resize cursors never leak through its retained frame style.
+            message.Result = new IntPtr(NativeWindowChrome.HtClient);
+            return;
+        }
+
+        base.WndProc(ref message);
+    }
+
     protected override void OnPaint(PaintEventArgs e)
     {
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        using var path = RoundedRectPath(ClientRectangle, 18);
+        using var path = RoundedRectPath(ClientRectangle, CornerRadiusPixels);
         using var fill = new SolidBrush(ToolbarBack);
         using var border = new Pen(Color.FromArgb(54, 248, 253, 255), 1f);
         using var glow = new SolidBrush(Color.FromArgb(32, 131, 228, 255));
@@ -718,8 +1125,13 @@ internal sealed class RecordingToolbarForm : Form
     protected override void OnResize(EventArgs e)
     {
         base.OnResize(e);
-        using var path = RoundedRectPath(new Rectangle(Point.Empty, Size), 18);
-        Region = new Region(path);
+        ApplyWindowCornerPolicy();
+    }
+
+    protected override void OnDpiChanged(DpiChangedEventArgs e)
+    {
+        base.OnDpiChanged(e);
+        ApplyWindowCornerPolicy();
     }
 
     private ToolbarIconButton CreateButton(string kind, string label, Color accent, string action)
@@ -764,9 +1176,28 @@ internal sealed class RecordingToolbarForm : Form
         dragging = false;
     }
 
+    private int CornerRadiusPixels => Math.Max(
+        1,
+        (int)Math.Round(TOOLBAR_CORNER_RADIUS_DIP * Math.Max(96, DeviceDpi) / 96d)
+    );
+
+    private void ApplyWindowCornerPolicy()
+    {
+        if (!IsHandleCreated || WindowState == FormWindowState.Minimized || ClientSize.Width < 2 || ClientSize.Height < 2) return;
+
+        if (NativeWindowChrome.SupportsSystemRoundedCorners)
+        {
+            NativeWindowChrome.TrySetCornerPreference(
+                Handle,
+                NativeWindowChrome.DwmWcpRound
+            );
+        }
+    }
+
     private static GraphicsPath RoundedRectPath(Rectangle rect, int radius)
     {
-        int diameter = radius * 2;
+        int safeRadius = Math.Max(1, Math.Min(radius, Math.Min(rect.Width, rect.Height) / 2));
+        int diameter = safeRadius * 2;
         var path = new GraphicsPath();
         path.AddArc(rect.Left, rect.Top, diameter, diameter, 180, 90);
         path.AddArc(rect.Right - diameter - 1, rect.Top, diameter, diameter, 270, 90);
@@ -871,5 +1302,296 @@ internal sealed class ToolbarIconButton : Button
                 graphics.DrawLine(pen, cx + 5f, cy - 5f, cx - 5f, cy + 5f);
                 break;
         }
+    }
+}
+
+internal static class NativeWindowChrome
+{
+    internal const int WmNcCalcSize = 0x0083;
+    internal const int WmNcHitTest = 0x0084;
+
+    internal const int HtClient = 1;
+    internal const int HtLeft = 10;
+    internal const int HtRight = 11;
+    internal const int HtTop = 12;
+    internal const int HtTopLeft = 13;
+    internal const int HtTopRight = 14;
+    internal const int HtBottom = 15;
+    internal const int HtBottomLeft = 16;
+    internal const int HtBottomRight = 17;
+
+    internal const int DwmWcpDoNotRound = 1;
+    internal const int DwmWcpRound = 2;
+
+    internal const int CustomFrameStyle =
+        WsCaption | WsSysMenu | WsThickFrame | WsMinimizeBox | WsMaximizeBox;
+    internal const int DropShadowClassStyle = 0x00020000;
+
+    private const int WsCaption = 0x00C00000;
+    private const int WsSysMenu = 0x00080000;
+    private const int WsThickFrame = 0x00040000;
+    private const int WsMinimizeBox = 0x00020000;
+    private const int WsMaximizeBox = 0x00010000;
+    private const int DwmWaNcRenderingPolicy = 2;
+    private const int DwmNcRenderingEnabled = 2;
+    private const int DwmWaWindowCornerPreference = 33;
+    private const int DwmWaBorderColor = 34;
+    private const int DwmWaRedirectionBitmapAlpha = 39;
+    private const int DwmColorNone = unchecked((int)0xFFFFFFFE);
+    private const int SmCxSizeFrame = 32;
+    private const int SmCySizeFrame = 33;
+    private const int SmCxPaddedBorder = 92;
+    private const uint SwpNoSize = 0x0001;
+    private const uint SwpNoMove = 0x0002;
+    private const uint SwpNoZOrder = 0x0004;
+    private const uint SwpNoActivate = 0x0010;
+    private const uint SwpFrameChanged = 0x0020;
+
+    internal static bool SupportsSystemRoundedCorners =>
+        OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000);
+
+    internal static bool SupportsOpaqueRedirectionBitmap =>
+        OperatingSystem.IsWindowsVersionAtLeast(10, 0, 26100);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(
+        IntPtr window,
+        int attribute,
+        ref int attributeValue,
+        int attributeSize
+    );
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(
+        IntPtr window,
+        IntPtr insertAfter,
+        int x,
+        int y,
+        int width,
+        int height,
+        uint flags
+    );
+
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr window);
+
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetricsForDpi(int index, uint dpi);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        internal int Left;
+        internal int Top;
+        internal int Right;
+        internal int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NcCalcSizeParameters
+    {
+        internal NativeRect ProposedClient;
+        internal NativeRect OldWindow;
+        internal NativeRect OldClient;
+        internal IntPtr WindowPosition;
+    }
+
+    internal static void TryEnableNonClientRendering(IntPtr window)
+    {
+        int policy = DwmNcRenderingEnabled;
+        try
+        {
+            DwmSetWindowAttribute(
+                window,
+                DwmWaNcRenderingPolicy,
+                ref policy,
+                sizeof(int)
+            );
+        }
+        catch (DllNotFoundException)
+        {
+        }
+        catch (EntryPointNotFoundException)
+        {
+        }
+    }
+
+    internal static bool TrySetCornerPreference(IntPtr window, int preference)
+    {
+        try
+        {
+            return DwmSetWindowAttribute(
+                window,
+                DwmWaWindowCornerPreference,
+                ref preference,
+                sizeof(int)
+            ) == 0;
+        }
+        catch (DllNotFoundException)
+        {
+            return false;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    internal static bool TryForceOpaqueRedirectionBitmap(IntPtr window)
+    {
+        if (!SupportsOpaqueRedirectionBitmap) return false;
+        int enabled = 0;
+        try
+        {
+            return DwmSetWindowAttribute(
+                window,
+                DwmWaRedirectionBitmapAlpha,
+                ref enabled,
+                sizeof(int)
+            ) == 0;
+        }
+        catch (DllNotFoundException)
+        {
+            return false;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    internal static bool TrySuppressVisibleBorder(IntPtr window)
+    {
+        if (!SupportsSystemRoundedCorners) return false;
+        int color = DwmColorNone;
+        try
+        {
+            return DwmSetWindowAttribute(
+                window,
+                DwmWaBorderColor,
+                ref color,
+                sizeof(int)
+            ) == 0;
+        }
+        catch (DllNotFoundException)
+        {
+            return false;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    internal static void RefreshFrame(IntPtr window)
+    {
+        if (window == IntPtr.Zero) return;
+        _ = SetWindowPos(
+            window,
+            IntPtr.Zero,
+            0,
+            0,
+            0,
+            0,
+            SwpNoMove | SwpNoSize | SwpNoZOrder | SwpNoActivate | SwpFrameChanged
+        );
+    }
+
+    internal static void RetainThinNonClientBorder(
+        ref Message message,
+        IntPtr window,
+        int fallbackDpi
+    )
+    {
+        if (message.LParam == IntPtr.Zero)
+        {
+            message.Result = IntPtr.Zero;
+            return;
+        }
+
+        uint dpi = ResolveWindowDpi(window, fallbackDpi);
+        int border = Math.Max(1, (int)Math.Round(dpi / 96d));
+        if (message.WParam != IntPtr.Zero)
+        {
+            NcCalcSizeParameters parameters =
+                Marshal.PtrToStructure<NcCalcSizeParameters>(message.LParam);
+            InsetRect(ref parameters.ProposedClient, border);
+            Marshal.StructureToPtr(parameters, message.LParam, false);
+        }
+        else
+        {
+            NativeRect client = Marshal.PtrToStructure<NativeRect>(message.LParam);
+            InsetRect(ref client, border);
+            Marshal.StructureToPtr(client, message.LParam, false);
+        }
+        message.Result = IntPtr.Zero;
+    }
+
+    internal static Size GetResizeFrameSize(IntPtr window, int fallbackDpi)
+    {
+        uint dpi = ResolveWindowDpi(window, fallbackDpi);
+
+        int fallback = Math.Max(6, (int)Math.Ceiling(8d * dpi / 96d));
+        try
+        {
+            int horizontal = GetSystemMetricsForDpi(SmCxSizeFrame, dpi)
+                + GetSystemMetricsForDpi(SmCxPaddedBorder, dpi);
+            int vertical = GetSystemMetricsForDpi(SmCySizeFrame, dpi)
+                + GetSystemMetricsForDpi(SmCxPaddedBorder, dpi);
+            return new Size(
+                Math.Max(fallback, horizontal),
+                Math.Max(fallback, vertical)
+            );
+        }
+        catch (DllNotFoundException)
+        {
+            return new Size(fallback, fallback);
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return new Size(fallback, fallback);
+        }
+    }
+
+    private static uint ResolveWindowDpi(IntPtr window, int fallbackDpi)
+    {
+        uint dpi = (uint)Math.Max(96, fallbackDpi);
+        try
+        {
+            uint reportedDpi = GetDpiForWindow(window);
+            if (reportedDpi > 0) dpi = reportedDpi;
+        }
+        catch (DllNotFoundException)
+        {
+        }
+        catch (EntryPointNotFoundException)
+        {
+        }
+        return dpi;
+    }
+
+    private static void InsetRect(ref NativeRect rect, int requestedBorder)
+    {
+        int horizontal = Math.Min(
+            requestedBorder,
+            Math.Max(0, (rect.Right - rect.Left - 1) / 2)
+        );
+        int vertical = Math.Min(
+            requestedBorder,
+            Math.Max(0, (rect.Bottom - rect.Top - 1) / 2)
+        );
+        rect.Left += horizontal;
+        rect.Right -= horizontal;
+        rect.Top += vertical;
+        rect.Bottom -= vertical;
+    }
+
+    internal static Point PointFromLParam(IntPtr packedPoint)
+    {
+        long value = packedPoint.ToInt64();
+        return new Point(
+            unchecked((short)(value & 0xffff)),
+            unchecked((short)((value >> 16) & 0xffff))
+        );
     }
 }

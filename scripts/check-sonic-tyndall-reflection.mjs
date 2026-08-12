@@ -65,9 +65,9 @@ const checks = {
   // than leaving the same fog and sky lift behind. This is the visual
   // contract that makes the switch unmistakable without overexposing "on".
   explicitAtmosphereOnOffContrast: /sonicAtmosphereContrast/.test(app)
-    && /scene\.fog\.near\s*=\s*190\s*-\s*sonicAtmosphereContrast/.test(app)
-    && /scene\.fog\.far\s*=\s*410\s*-\s*sonicAtmosphereContrast/.test(app)
-    && /uSkyContribution\.value\s*=\s*settings\.atmosphereEnabled\s*\?/.test(app),
+    && /scene\.fog\.near\s*=\s*190\s*-\s*sonicAtmosphereContrast\s*\*\s*[0-9.]+/.test(app)
+    && /scene\.fog\.far\s*=\s*410\s*-\s*sonicAtmosphereContrast\s*\*\s*[0-9.]+/.test(app)
+    && /uSkyContribution\.value\s*=\s*clamp\([\s\S]{0,180}?settings\.atmosphereEnabled[\s\S]{0,120}?:\s*0\)/.test(app),
 
   // Shafts should breathe independently and carry a slow secondary drift so
   // the volume feels alive instead of nine identical static strips.

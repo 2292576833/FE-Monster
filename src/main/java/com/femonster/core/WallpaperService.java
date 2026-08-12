@@ -9,20 +9,24 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 public final class WallpaperService {
+    public static final long MAX_IMPORT_BYTES = 512L * 1024L * 1024L;
     private static final Set<String> IMAGE_EXTENSIONS = Set.of(
         ".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif", ".svg", ".ico"
     );
@@ -38,14 +42,29 @@ public final class WallpaperService {
         "[A-Za-z]:\\\\[^\"<>|]+?\\.exe",
         Pattern.CASE_INSENSITIVE
     );
+    private static final long WALLPAPER_ROOT_DISCOVERY_TTL_MS = 30_000L;
+    private static final int MAX_SCENE_PROJECT_FILES = 4_096;
+    private static final int MAX_SCENE_WALK_NODES = 16_384;
+    private static final int MAX_CACHED_SCENE_INVENTORIES = 8;
+    private static final long SCENE_INVENTORY_CACHE_TTL_MS = 15_000L;
 
     private final Path importedDir;
     private final Object cacheLock = new Object();
+    private final Object sceneInventoryCacheLock = new Object();
+    private final LinkedHashMap<String, CachedSceneInventory> sceneInventoryCache =
+        new LinkedHashMap<>(MAX_CACHED_SCENE_INVENTORIES, 0.75f, true);
+    private final Map<String, SceneInventoryFlight> sceneInventoryFlights = new HashMap<>();
     private volatile List<Path> cachedWallpaperEngineRoots = List.of();
     private volatile Map<String, WallpaperProject> cachedWallpaperEngineProjects = Map.of();
     private volatile List<Map<String, Object>> cachedWallpaperEngineCatalog = List.of();
+    private volatile String cachedWallpaperEngineFingerprint = "";
+    private volatile long catalogRevision;
+    private long lastRootDiscoveryAt;
     private long rootScanCount;
     private long catalogScanCount;
+    private long catalogParseCount;
+    private long sceneInventoryParseCount;
+    private long sceneInventoryCacheHitCount;
 
     public WallpaperService(Path dataDir) {
         this.importedDir = dataDir.resolve("wallpapers").toAbsolutePath().normalize();
@@ -65,6 +84,14 @@ public final class WallpaperService {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("ok", true);
         body.put("wallpapers", wallpapers);
+        body.put("catalogRevision", catalogRevision == 0L ? "" : Long.toUnsignedString(catalogRevision));
+        List<String> activeWallpaperIds = cachedWallpaperEngineCatalog.stream()
+            .filter(item -> Boolean.TRUE.equals(item.get("active")))
+            .map(item -> SimpleJson.asString(item.get("id"), ""))
+            .filter(id -> !id.isBlank())
+            .toList();
+        body.put("activeWallpaperIds", activeWallpaperIds);
+        body.put("activeWallpaperId", activeWallpaperIds.isEmpty() ? "" : activeWallpaperIds.get(0));
         return body;
     }
 
@@ -122,14 +149,25 @@ public final class WallpaperService {
         return file;
     }
 
+    public Map<String, Object> sceneInventory(String rawId) throws IOException {
+        WallpaperProject project = requireSceneProject(rawId);
+        return sceneInventoryPayload(project, loadSceneInventory(project, false), true);
+    }
+
+    public Map<String, Object> sceneInventory(
+        String rawId,
+        boolean refresh,
+        int offset,
+        int limit
+    ) throws IOException {
+        WallpaperProject project = requireSceneProject(rawId);
+        SceneInventory inventory = loadSceneInventory(project, refresh);
+        return sceneInventoryPayload(project, inventory, true, offset, limit);
+    }
+
     public Map<String, Object> activate(String rawId) throws IOException {
         String id = rawId == null ? "" : rawId.trim();
-        String prefix = "wallpaper-engine:";
-        if (!id.startsWith(prefix)) throw new IOException("wallpaper project not found");
-        WallpaperProject project = cachedWallpaperEngineProjects.get(id.substring(prefix.length()));
-        if (project == null || !"scene".equals(project.type())) {
-            throw new IOException("Wallpaper Engine scene project not found");
-        }
+        WallpaperProject project = requireSceneProject(id);
 
         Path executable = findWallpaperEngineExecutable();
         if (executable == null) {
@@ -141,7 +179,7 @@ public final class WallpaperService {
             "-control",
             "openWallpaper",
             "-file",
-            project.projectJson().toString()
+            project.launchFile().toString()
         );
         builder.directory(executable.getParent().toFile());
         builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
@@ -152,8 +190,33 @@ public final class WallpaperService {
         body.put("ok", true);
         body.put("id", id);
         body.put("kind", project.type());
-        body.put("message", "场景壁纸已通过 Wallpaper Engine 应用到桌面");
+        Map<String, Object> inventory = sceneInventoryPayload(
+            project,
+            loadSceneInventory(project, false),
+            false
+        );
+        body.put("inventory", inventory);
+        long projectFileCount = SimpleJson.asLong(inventory.get("projectFileCount"), 0L);
+        long packageEntryCount = SimpleJson.asLong(inventory.get("packageEntryCount"), 0L);
+        boolean completeIndex = Boolean.TRUE.equals(inventory.get("allRuntimeFileNamesIndexed"));
+        body.put("status", "accepted");
+        body.put("appliedConfirmed", false);
+        body.put("message", completeIndex
+            ? "已索引 " + projectFileCount + " 个项目文件和 " + packageEntryCount
+                + " 个包内运行资源，已提交给 Wallpaper Engine 原生运行时读取并应用"
+            : "场景已提交给 Wallpaper Engine 原生运行时读取并应用（该包仅使用原生兼容路径）");
         return body;
+    }
+
+    private WallpaperProject requireSceneProject(String rawId) throws IOException {
+        String id = rawId == null ? "" : rawId.trim();
+        String prefix = "wallpaper-engine:";
+        if (!id.startsWith(prefix)) throw new IOException("wallpaper project not found");
+        WallpaperProject project = cachedWallpaperEngineProjects.get(id.substring(prefix.length()));
+        if (project == null || !"scene".equals(project.type())) {
+            throw new IOException("Wallpaper Engine scene project not found");
+        }
+        return project;
     }
 
     public Map<String, Object> cacheDiagnostics() {
@@ -163,6 +226,14 @@ public final class WallpaperService {
             diagnostics.put("catalogScanCount", catalogScanCount);
             diagnostics.put("rootCount", cachedWallpaperEngineRoots.size());
             diagnostics.put("projectCount", cachedWallpaperEngineProjects.size());
+            diagnostics.put("catalogParseCount", catalogParseCount);
+            diagnostics.put("catalogRevision", catalogRevision);
+            diagnostics.put("catalogFingerprint", cachedWallpaperEngineFingerprint);
+            synchronized (sceneInventoryCacheLock) {
+                diagnostics.put("sceneInventoryParseCount", sceneInventoryParseCount);
+                diagnostics.put("sceneInventoryCacheHitCount", sceneInventoryCacheHitCount);
+                diagnostics.put("sceneInventoryCacheSize", sceneInventoryCache.size());
+            }
             return diagnostics;
         }
     }
@@ -260,16 +331,28 @@ public final class WallpaperService {
 
     private void refreshWallpaperEngineCache() {
         rootScanCount++;
-        List<Path> roots = discoverWallpaperEngineRoots();
+        long now = System.currentTimeMillis();
+        List<Path> roots = cachedWallpaperEngineRoots;
+        if (roots.isEmpty() || now - lastRootDiscoveryAt >= WALLPAPER_ROOT_DISCOVERY_TTL_MS) {
+            roots = discoverWallpaperEngineRoots();
+            lastRootDiscoveryAt = now;
+        }
         catalogScanCount++;
+        String fingerprint = catalogFingerprint(roots);
+        if (fingerprint.equals(cachedWallpaperEngineFingerprint)) return;
+        catalogParseCount++;
 
         Map<String, WallpaperProject> projects = new LinkedHashMap<>();
         List<Map<String, Object>> catalog = new ArrayList<>();
+        Map<String, WorkshopMetadata> workshopMetadata = wallpaperEngineWorkshopMetadata(roots);
         for (Path root : roots) {
             if (!Files.isDirectory(root)) continue;
             try (Stream<Path> directories = Files.list(root)) {
                 for (Path directory : directories.filter(Files::isDirectory).sorted().toList()) {
-                    WallpaperProject project = readWallpaperEngineProject(directory);
+                    WallpaperProject project = readWallpaperEngineProject(
+                        directory,
+                        workshopMetadata.get(pathKey(directory))
+                    );
                     if (project == null || projects.containsKey(project.key())) continue;
                     projects.put(project.key(), project);
                     catalog.add(projectItem(project));
@@ -280,46 +363,433 @@ public final class WallpaperService {
             if (catalog.size() >= 260) break;
         }
 
+        Map<String, List<String>> activeProjects = activeWallpaperEngineProjects(roots, projects);
+        for (Map<String, Object> item : catalog) {
+            String projectKey = SimpleJson.asString(item.get("projectKey"), "");
+            List<String> monitors = activeProjects.get(projectKey);
+            if (monitors == null || monitors.isEmpty()) continue;
+            item.put("active", true);
+            item.put("activeMonitors", monitors);
+        }
+
         cachedWallpaperEngineRoots = List.copyOf(roots);
         cachedWallpaperEngineProjects = Map.copyOf(projects);
         cachedWallpaperEngineCatalog = List.copyOf(catalog);
+        cachedWallpaperEngineFingerprint = fingerprint;
+        catalogRevision = Math.max(catalogRevision + 1L, now);
     }
 
-    private WallpaperProject readWallpaperEngineProject(Path directory) {
+    private String catalogFingerprint(List<Path> roots) {
+        long hash = 0xcbf29ce484222325L;
+        for (Path root : roots) {
+            hash = fingerprintValue(hash, root.toString());
+            if (!Files.isDirectory(root)) continue;
+            try (Stream<Path> directories = Files.list(root)) {
+                for (Path directory : directories.filter(Files::isDirectory).sorted().limit(320).toList()) {
+                    Path projectJson = directory.resolve("project.json");
+                    Path scenePackage = directory.resolve("scene.pkg");
+                    if (!Files.isRegularFile(projectJson) && !Files.isRegularFile(scenePackage)) continue;
+                    hash = fingerprintValue(hash, directory.getFileName().toString());
+                    for (Path descriptor : List.of(projectJson, scenePackage)) {
+                        if (!Files.isRegularFile(descriptor)) continue;
+                        hash = fingerprintValue(hash, descriptor.getFileName().toString());
+                        hash = fingerprintValue(hash, String.valueOf(Files.size(descriptor)));
+                        hash = fingerprintValue(
+                            hash,
+                            String.valueOf(Files.getLastModifiedTime(descriptor).toMillis())
+                        );
+                    }
+                    hash = fingerprintValue(hash, String.valueOf(Files.getLastModifiedTime(directory).toMillis()));
+                }
+            } catch (IOException ignored) {
+                hash = fingerprintValue(hash, "unreadable");
+            }
+        }
+        for (Path config : wallpaperEngineConfigFiles(roots)) {
+            hash = fingerprintValue(hash, config.toString());
+            try {
+                hash = fingerprintValue(hash, String.valueOf(Files.size(config)));
+                hash = fingerprintValue(hash, String.valueOf(Files.getLastModifiedTime(config).toMillis()));
+            } catch (IOException ignored) {
+                hash = fingerprintValue(hash, "unreadable-config");
+            }
+        }
+        for (Path cache : wallpaperEngineWorkshopCacheFiles(roots)) {
+            hash = fingerprintValue(hash, cache.toString());
+            try {
+                hash = fingerprintValue(hash, String.valueOf(Files.size(cache)));
+                hash = fingerprintValue(hash, String.valueOf(Files.getLastModifiedTime(cache).toMillis()));
+            } catch (IOException ignored) {
+                hash = fingerprintValue(hash, "unreadable-workshop-cache");
+            }
+        }
+        return Long.toUnsignedString(hash, 16);
+    }
+
+    private static long fingerprintValue(long hash, String value) {
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        long next = hash;
+        for (byte item : bytes) {
+            next ^= item & 0xffL;
+            next *= 0x100000001b3L;
+        }
+        return next;
+    }
+
+    private Map<String, List<String>> activeWallpaperEngineProjects(
+        List<Path> roots,
+        Map<String, WallpaperProject> projects
+    ) {
+        Map<String, List<String>> active = new LinkedHashMap<>();
+        for (Path config : wallpaperEngineConfigFiles(roots)) {
+            try {
+                Map<String, Object> root = SimpleJson.parseObjectStrict(
+                    Files.readString(config, StandardCharsets.UTF_8)
+                );
+                for (Object accountValue : root.values()) {
+                    if (!(accountValue instanceof Map<?, ?>)) continue;
+                    Map<String, Object> account = SimpleJson.asMap(accountValue);
+                    Map<String, Object> general = SimpleJson.asMap(account.get("general"));
+                    Map<String, Object> wallpaperConfig = SimpleJson.asMap(general.get("wallpaperconfig"));
+                    Map<String, Object> selected = SimpleJson.asMap(wallpaperConfig.get("selectedwallpapers"));
+                    for (Map.Entry<String, Object> monitor : selected.entrySet()) {
+                        Map<String, Object> selection = SimpleJson.asMap(monitor.getValue());
+                        Path selectedFile = normalizedPath(
+                            SimpleJson.asString(selection.get("file"), "")
+                        );
+                        if (selectedFile == null) continue;
+                        for (WallpaperProject project : projects.values()) {
+                            if (!selectedFile.startsWith(project.root())) continue;
+                            active.computeIfAbsent(project.key(), ignored -> new ArrayList<>())
+                                .add(monitor.getKey());
+                            break;
+                        }
+                    }
+                }
+            } catch (IOException | IllegalArgumentException ignored) {
+            }
+        }
+        return active;
+    }
+
+    private List<Path> wallpaperEngineConfigFiles(List<Path> roots) {
+        List<Path> configs = new ArrayList<>();
+        Path configured = normalizedPath(System.getenv("FE_WALLPAPER_ENGINE_CONFIG"));
+        if (configured != null && Files.isRegularFile(configured)) configs.add(configured);
+        for (Path root : roots) {
+            Path steamApps = root;
+            while (steamApps != null && (
+                steamApps.getFileName() == null
+                    || !"steamapps".equalsIgnoreCase(steamApps.getFileName().toString())
+            )) {
+                steamApps = steamApps.getParent();
+            }
+            if (steamApps == null) continue;
+            Path config = steamApps.resolve("common").resolve("wallpaper_engine").resolve("config.json");
+            if (Files.isRegularFile(config)) configs.add(config.toAbsolutePath().normalize());
+        }
+        return configs.stream().distinct().toList();
+    }
+
+    private Map<String, WorkshopMetadata> wallpaperEngineWorkshopMetadata(List<Path> roots) {
+        Map<String, WorkshopMetadata> metadata = new LinkedHashMap<>();
+        for (Path cache : wallpaperEngineWorkshopCacheFiles(roots)) {
+            try {
+                if (Files.size(cache) > 32L * 1024L * 1024L) continue;
+                Map<String, Object> root = SimpleJson.parseObjectStrict(
+                    Files.readString(cache, StandardCharsets.UTF_8)
+                );
+                for (Object rawItem : SimpleJson.asList(root.get("wallpapers"))) {
+                    Map<String, Object> item = SimpleJson.asMap(rawItem);
+                    Path projectFile = normalizedPath(SimpleJson.asString(item.get("project"), ""));
+                    Path entryFile = normalizedPath(SimpleJson.asString(item.get("file"), ""));
+                    Path directory = projectFile == null ? null : projectFile.getParent();
+                    if (directory == null && entryFile != null) directory = entryFile.getParent();
+                    Path realDirectory = realDirectory(directory);
+                    if (realDirectory == null || roots.stream().noneMatch(realDirectory::startsWith)) continue;
+
+                    String title = SimpleJson.asString(item.get("title"), "").trim();
+                    String type = SimpleJson.asString(item.get("type"), "").trim().toLowerCase(Locale.ROOT);
+                    String workshopId = SimpleJson.asString(item.get("workshopid"), "").trim();
+                    metadata.putIfAbsent(
+                        pathKey(realDirectory),
+                        new WorkshopMetadata(title, type, workshopId)
+                    );
+                }
+            } catch (IOException | IllegalArgumentException ignored) {
+            }
+        }
+        return metadata;
+    }
+
+    private List<Path> wallpaperEngineWorkshopCacheFiles(List<Path> roots) {
+        List<Path> caches = new ArrayList<>();
+        for (Path root : roots) {
+            Path steamApps = root;
+            while (steamApps != null && (
+                steamApps.getFileName() == null
+                    || !"steamapps".equalsIgnoreCase(steamApps.getFileName().toString())
+            )) {
+                steamApps = steamApps.getParent();
+            }
+            if (steamApps == null) continue;
+            Path cache = steamApps.resolve("common")
+                .resolve("wallpaper_engine")
+                .resolve("bin")
+                .resolve("workshopcache.json");
+            if (Files.isRegularFile(cache)) caches.add(cache.toAbsolutePath().normalize());
+        }
+        return caches.stream().distinct().toList();
+    }
+
+    private static Path normalizedPath(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            return Path.of(raw.replace('/', java.io.File.separatorChar)).toAbsolutePath().normalize();
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static String pathKey(Path path) {
+        if (path == null) return "";
+        try {
+            return path.toAbsolutePath().normalize().toString().toLowerCase(Locale.ROOT);
+        } catch (RuntimeException ignored) {
+            return "";
+        }
+    }
+
+    private WallpaperProject readWallpaperEngineProject(Path directory, WorkshopMetadata workshopMetadata) {
         try {
             Path root = directory.toRealPath();
-            Path projectJson = root.resolve("project.json");
-            if (!Files.isRegularFile(projectJson)) return null;
-            projectJson = projectJson.toRealPath();
-            if (!projectJson.startsWith(root)) return null;
-
-            Map<String, Object> manifest = SimpleJson.parseObjectStrict(
-                Files.readString(projectJson, StandardCharsets.UTF_8)
+            boolean projectManifestPresent = Files.exists(
+                root.resolve("project.json"),
+                LinkOption.NOFOLLOW_LINKS
             );
-            String type = SimpleJson.asString(manifest.get("type"), "").trim().toLowerCase(Locale.ROOT);
-            if (!Set.of("video", "web", "scene").contains(type)) return null;
-            String rawEntry = SimpleJson.asString(manifest.get("file"), "").trim();
-            Path declaredEntry = resolveProjectPath(root, rawEntry);
-            if (declaredEntry == null || !validManifestEntryType(type, declaredEntry)) return null;
-            Path entry = resolveProjectFile(root, rawEntry);
-            if ("scene".equals(type)) {
-                Path packageFile = resolveProjectFile(root, "scene.pkg");
-                if (packageFile != null) entry = packageFile;
+            Path projectJson = resolveProjectFile(root, "project.json");
+            Path packageFile = resolveProjectFile(root, "scene.pkg");
+            Map<String, Object> manifest = null;
+            if (projectManifestPresent) {
+                if (projectJson == null || Files.size(projectJson) > 4L * 1024L * 1024L) return null;
+                try {
+                    manifest = SimpleJson.parseObjectStrict(
+                        Files.readString(projectJson, StandardCharsets.UTF_8)
+                    );
+                } catch (IOException | IllegalArgumentException ignored) {
+                    return null;
+                }
             }
+
+            String type = manifest == null
+                ? ""
+                : SimpleJson.asString(manifest.get("type"), "").trim().toLowerCase(Locale.ROOT);
+            String rawEntry = manifest == null
+                ? ""
+                : SimpleJson.asString(manifest.get("file"), "").trim();
+            Path entry = null;
+
+            if (manifest != null) {
+                if (!Set.of("video", "web", "scene").contains(type)) return null;
+                Path declaredEntry = resolveProjectPath(root, rawEntry);
+                if (declaredEntry == null || !validManifestEntryType(type, declaredEntry)) return null;
+                entry = resolveProjectFile(root, rawEntry);
+                if ("scene".equals(type) && packageFile != null) entry = packageFile;
+            } else if (packageFile != null) {
+                type = "scene";
+                rawEntry = "scene.pkg";
+                entry = packageFile;
+            }
+
             if (entry == null || !validResolvedEntryType(type, entry)) return null;
 
-            String rawPreview = SimpleJson.asString(manifest.get("preview"), "").trim();
+            String rawPreview = manifest == null
+                ? ""
+                : SimpleJson.asString(manifest.get("preview"), "").trim();
             Path preview = rawPreview.isBlank() ? null : resolveProjectFile(root, rawPreview);
             if (preview != null && !isSupportedImage(preview)) preview = null;
             if (preview == null) preview = defaultPreview(root);
 
-            String title = SimpleJson.asString(manifest.get("title"), "").trim();
+            String title = manifest == null
+                ? ""
+                : SimpleJson.asString(manifest.get("title"), "").trim();
+            if (title.isBlank() && workshopMetadata != null) title = workshopMetadata.title();
             if (title.isBlank()) title = directory.getFileName().toString();
             String key = projectKey(root);
-            return new WallpaperProject(key, root, projectJson, entry, preview, type, title, rawEntry);
+            String workshopId = workshopMetadata == null
+                ? directory.getFileName().toString()
+                : workshopMetadata.workshopId();
+            return new WallpaperProject(
+                key,
+                root,
+                projectJson,
+                entry,
+                preview,
+                type,
+                title,
+                rawEntry,
+                workshopId
+            );
         } catch (IOException | IllegalArgumentException ignored) {
             return null;
         }
+    }
+
+    private SceneInventory loadSceneInventory(WallpaperProject project, boolean refresh) {
+        long requestStartedAtNanos = System.nanoTime();
+        while (true) {
+            String generation = sceneInventoryGeneration(project);
+            long now = System.currentTimeMillis();
+            SceneInventoryFlight flight;
+            boolean ownsFlight = false;
+            synchronized (sceneInventoryCacheLock) {
+                CachedSceneInventory cached = sceneInventoryCache.get(project.key());
+                if (
+                    !refresh
+                        && cached != null
+                        && generation.equals(cached.generation())
+                        && now - cached.loadedAtMillis() <= SCENE_INVENTORY_CACHE_TTL_MS
+                ) {
+                    sceneInventoryCacheHitCount++;
+                    return cached.inventory();
+                }
+                if (
+                    refresh
+                        && cached != null
+                        && generation.equals(cached.generation())
+                        && cached.completedAtNanos() >= requestStartedAtNanos
+                ) {
+                    sceneInventoryCacheHitCount++;
+                    return cached.inventory();
+                }
+
+                flight = sceneInventoryFlights.get(project.key());
+                if (flight == null) {
+                    flight = new SceneInventoryFlight(generation, new CompletableFuture<>());
+                    sceneInventoryFlights.put(project.key(), flight);
+                    ownsFlight = true;
+                } else {
+                    sceneInventoryCacheHitCount++;
+                }
+            }
+
+            if (!ownsFlight) {
+                SceneInventory shared = flight.future().join();
+                if (generation.equals(flight.generation())) return shared;
+                continue;
+            }
+
+            try {
+                SceneInventory loaded = readSceneInventory(project.root(), project.entry());
+                synchronized (sceneInventoryCacheLock) {
+                    sceneInventoryParseCount++;
+                    sceneInventoryCache.put(
+                        project.key(),
+                        new CachedSceneInventory(
+                            generation,
+                            System.currentTimeMillis(),
+                            System.nanoTime(),
+                            loaded
+                        )
+                    );
+                    while (sceneInventoryCache.size() > MAX_CACHED_SCENE_INVENTORIES) {
+                        String eldest = sceneInventoryCache.keySet().iterator().next();
+                        sceneInventoryCache.remove(eldest);
+                    }
+                    sceneInventoryFlights.remove(project.key(), flight);
+                    flight.future().complete(loaded);
+                }
+                return loaded;
+            } catch (RuntimeException | Error error) {
+                synchronized (sceneInventoryCacheLock) {
+                    sceneInventoryFlights.remove(project.key(), flight);
+                    flight.future().completeExceptionally(error);
+                }
+                throw error;
+            }
+        }
+    }
+
+    private String sceneInventoryGeneration(WallpaperProject project) {
+        long hash = 0xcbf29ce484222325L;
+        hash = fingerprintValue(hash, project.root().toString());
+        for (Path file : List.of(project.entry())) {
+            try {
+                hash = fingerprintValue(hash, String.valueOf(Files.size(file)));
+                hash = fingerprintValue(hash, String.valueOf(Files.getLastModifiedTime(file).toMillis()));
+            } catch (IOException ignored) {
+                hash = fingerprintValue(hash, "unreadable-entry");
+            }
+        }
+        if (project.projectJson() != null) {
+            try {
+                hash = fingerprintValue(hash, String.valueOf(Files.size(project.projectJson())));
+                hash = fingerprintValue(
+                    hash,
+                    String.valueOf(Files.getLastModifiedTime(project.projectJson()).toMillis())
+                );
+            } catch (IOException ignored) {
+                hash = fingerprintValue(hash, "unreadable-project-json");
+            }
+        }
+        try {
+            hash = fingerprintValue(hash, String.valueOf(Files.getLastModifiedTime(project.root()).toMillis()));
+        } catch (IOException ignored) {
+            hash = fingerprintValue(hash, "unreadable-project-root");
+        }
+        return Long.toUnsignedString(hash, 16);
+    }
+
+    private SceneInventory readSceneInventory(Path root, Path entry) {
+        List<SceneFile> projectFiles = new ArrayList<>();
+        boolean projectFilesTruncated = false;
+        try (Stream<Path> stream = Files.walk(root)) {
+            var iterator = stream.iterator();
+            int visitedNodes = 0;
+            while (iterator.hasNext()) {
+                Path candidate = iterator.next();
+                visitedNodes++;
+                if (visitedNodes > MAX_SCENE_WALK_NODES
+                    || projectFiles.size() >= MAX_SCENE_PROJECT_FILES) {
+                    projectFilesTruncated = true;
+                    break;
+                }
+                if (Files.isSymbolicLink(candidate) || !Files.isRegularFile(candidate)) continue;
+                Path file;
+                try {
+                    file = candidate.toRealPath();
+                } catch (IOException ignored) {
+                    projectFilesTruncated = true;
+                    continue;
+                }
+                if (!file.startsWith(root)) continue;
+                String relative = root.relativize(file).toString().replace('\\', '/');
+                try {
+                    projectFiles.add(new SceneFile(
+                        relative,
+                        Files.size(file),
+                        WallpaperScenePackageReader.resourceCategory(relative),
+                        WallpaperScenePackageReader.isSourceCode(relative)
+                    ));
+                } catch (IOException ignored) {
+                    projectFilesTruncated = true;
+                }
+            }
+        } catch (IOException ignored) {
+            projectFilesTruncated = true;
+        }
+        projectFiles.sort(Comparator.comparing(SceneFile::path));
+
+        WallpaperScenePackageReader.PackageIndex packageIndex = null;
+        String packageError = "";
+        if (entry != null && ".pkg".equals(extension(entry))) {
+            try {
+                packageIndex = WallpaperScenePackageReader.inspect(entry);
+            } catch (IOException error) {
+                packageError = error.getMessage() == null ? "package index unavailable" : error.getMessage();
+            }
+        }
+        return new SceneInventory(projectFiles, projectFilesTruncated, packageIndex, packageError);
     }
 
     private static Path resolveProjectFile(Path root, String rawPath) throws IOException {
@@ -381,13 +851,15 @@ public final class WallpaperService {
     private Map<String, Object> projectItem(WallpaperProject project) {
         Map<String, Object> map = new LinkedHashMap<>();
         String previewUrl = project.preview() == null ? "" : fileUrl(project.preview());
-        map.put("id", "wallpaper-engine:" + project.key());
+        String id = "wallpaper-engine:" + project.key();
+        map.put("id", id);
         map.put("name", project.title());
         map.put("source", "wallpaper-engine");
         map.put("kind", project.type());
         map.put("projectType", project.type());
         map.put("projectKey", project.key());
         map.put("manifestFile", project.manifestFile());
+        if (!project.workshopId().isBlank()) map.put("workshopId", project.workshopId());
         if (!previewUrl.isBlank()) map.put("previewUrl", previewUrl);
 
         switch (project.type()) {
@@ -404,16 +876,21 @@ public final class WallpaperService {
             }
             case "scene" -> {
                 map.put("url", previewUrl);
-                map.put("projectJson", project.projectJson().toString());
+                if (project.projectJson() != null) map.put("projectJson", project.projectJson().toString());
                 map.put("entryPath", project.entry().toString());
                 map.put("requiresNativeEngine", true);
+                map.put("sceneInventoryUrl", "/api/wallpapers/scene?id=" + URLEncoder.encode(id, StandardCharsets.UTF_8));
+                map.put("sceneInventoryMode", "on-demand");
                 Map<String, Object> engine = new LinkedHashMap<>();
                 engine.put("provider", "wallpaper-engine");
                 engine.put("projectType", "scene");
                 engine.put("projectDirectory", project.root().toString());
-                engine.put("projectJson", project.projectJson().toString());
+                if (project.projectJson() != null) engine.put("projectJson", project.projectJson().toString());
                 engine.put("manifestFile", project.manifestFile());
                 engine.put("entryFile", project.entry().toString());
+                engine.put("launchFile", project.launchFile().toString());
+                engine.put("resourceInventory", "on-demand");
+                engine.put("nativePackageExecution", true);
                 engine.put("webViewRenderable", false);
                 map.put("engineLaunch", engine);
             }
@@ -421,6 +898,127 @@ public final class WallpaperService {
             }
         }
         return map;
+    }
+
+    private Map<String, Object> sceneInventoryPayload(
+        WallpaperProject project,
+        SceneInventory inventory,
+        boolean includeEntries
+    ) {
+        return sceneInventoryPayload(project, inventory, includeEntries, 0, Integer.MAX_VALUE);
+    }
+
+    private Map<String, Object> sceneInventoryPayload(
+        WallpaperProject project,
+        SceneInventory inventory,
+        boolean includeEntries,
+        int offset,
+        int limit
+    ) {
+        List<SceneFile> projectFiles = inventory.projectFiles();
+        WallpaperScenePackageReader.PackageIndex packageIndex = inventory.packageIndex();
+        boolean packagePresent = ".pkg".equals(extension(project.entry()));
+        boolean packageSupported = packageIndex != null && packageIndex.formatSupported();
+        long packageEntryCount = packageSupported ? packageIndex.entries().size() : 0L;
+        long declaredPackageEntryCount = packageIndex == null ? 0L : packageIndex.declaredEntryCount();
+        long sourceCodeEntryCount = packageSupported ? packageIndex.sourceCodeEntryCount() : 0L;
+        long projectSourceCodeCount = projectFiles.stream().filter(SceneFile::sourceCode).count();
+        long shaderSourceCount = packageSupported ? packageIndex.categoryCount("shader-source") : 0L;
+        long compiledShaderCount = packageSupported ? packageIndex.categoryCount("compiled-shader") : 0L;
+        long sceneDataCount = packageSupported ? packageIndex.categoryCount("scene-data") : 0L;
+        shaderSourceCount += projectFiles.stream()
+            .filter(file -> "shader-source".equals(file.category()))
+            .count();
+        compiledShaderCount += projectFiles.stream()
+            .filter(file -> "compiled-shader".equals(file.category()))
+            .count();
+        sceneDataCount += projectFiles.stream()
+            .filter(file -> "scene-data".equals(file.category()))
+            .count();
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("ok", true);
+        body.put("id", "wallpaper-engine:" + project.key());
+        body.put("name", project.title());
+        body.put("kind", "scene");
+        body.put("projectFileCount", projectFiles.size());
+        body.put("projectFilesTruncated", inventory.projectFilesTruncated());
+        body.put("projectFileNamesIndexed", !inventory.projectFilesTruncated());
+        body.put("packagePresent", packagePresent);
+        body.put("packageIndexReadable", packageIndex != null);
+        body.put("packageFormatSupported", packageSupported);
+        body.put("packageIndexComplete", !packagePresent || packageSupported);
+        body.put("packageVersion", packageIndex == null ? "" : packageIndex.version());
+        body.put("packageEntryCount", packageEntryCount);
+        body.put("declaredPackageEntryCount", declaredPackageEntryCount);
+        body.put("packageBytes", packageIndex == null ? 0L : packageIndex.packageSize());
+        body.put("packagePayloadBytes", packageSupported ? packageIndex.payloadBytes() : 0L);
+        body.put("sceneDataEntryCount", sceneDataCount);
+        body.put("shaderSourceEntryCount", shaderSourceCount);
+        body.put("compiledShaderEntryCount", compiledShaderCount);
+        body.put("sourceCodeEntryCount", sourceCodeEntryCount + projectSourceCodeCount);
+        body.put("embeddedSceneScript", packageSupported && packageIndex.embeddedSceneScript());
+        body.put("embeddedSceneScriptHeuristic", packageSupported);
+        body.put("embeddedSceneScriptScanComplete", packageSupported && packageIndex.scriptScanComplete());
+        body.put("allRuntimeFileNamesIndexed", !inventory.projectFilesTruncated()
+            && (!packagePresent || packageSupported));
+        body.put("nativeRuntime", "wallpaper-engine");
+        body.put("nativeRuntimeOwnsExecution", true);
+        body.put("runtimeFileContentsOwnedByNativeEngine", true);
+        body.put("scriptsExecutedInApplicationOrigin", false);
+        body.put("launchFile", project.root().relativize(project.launchFile()).toString().replace('\\', '/'));
+        if (!inventory.packageError().isBlank()) {
+            body.put("packageIndexError", inventory.packageError());
+        }
+
+        if (includeEntries) {
+            int safeOffset = Math.max(0, offset);
+            int safeLimit = Math.max(0, limit);
+            int projectFrom = Math.min(safeOffset, projectFiles.size());
+            int projectTo = (int) Math.min(projectFiles.size(), (long) projectFrom + safeLimit);
+            List<Map<String, Object>> projectFileItems = new ArrayList<>(projectTo - projectFrom);
+            for (SceneFile file : projectFiles.subList(projectFrom, projectTo)) {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("path", file.path());
+                item.put("size", file.size());
+                item.put("category", file.category());
+                item.put("sourceCode", file.sourceCode());
+                projectFileItems.add(item);
+            }
+            body.put("projectFiles", projectFileItems);
+
+            List<Map<String, Object>> packageEntries = new ArrayList<>();
+            if (packageSupported) {
+                int returnedProjectFiles = projectTo - projectFrom;
+                int remainingLimit = Math.max(0, safeLimit - returnedProjectFiles);
+                int packageFrom = (int) Math.min(
+                    Math.max(0L, (long) safeOffset - projectFiles.size()),
+                    packageIndex.entries().size()
+                );
+                int packageTo = (int) Math.min(
+                    packageIndex.entries().size(),
+                    (long) packageFrom + remainingLimit
+                );
+                for (WallpaperScenePackageReader.Entry entry
+                    : packageIndex.entries().subList(packageFrom, packageTo)) {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("path", entry.name());
+                    item.put("size", entry.size());
+                    item.put("category", entry.category());
+                    item.put("sourceCode", entry.sourceCode());
+                    packageEntries.add(item);
+                }
+            }
+            body.put("packageEntries", packageEntries);
+            long totalEntries = projectFiles.size() + packageEntryCount;
+            long pageEnd = Math.min(totalEntries, (long) safeOffset + safeLimit);
+            boolean hasMore = safeLimit > 0 && pageEnd < totalEntries;
+            body.put("entryOffset", safeOffset);
+            body.put("entryLimit", safeLimit);
+            body.put("entriesHaveMore", hasMore);
+            body.put("nextEntryOffset", hasMore ? pageEnd : -1L);
+        }
+        return body;
     }
 
     private Map<String, Object> importedItem(Path path, String title) {
@@ -558,10 +1156,16 @@ public final class WallpaperService {
 
     private static void copyWallpaper(InputStream input, Path target) throws IOException {
         byte[] buffer = new byte[1024 * 1024];
+        long total = 0L;
         try (OutputStream output = Files.newOutputStream(target)) {
             int read;
             while ((read = input.read(buffer)) >= 0) {
+                if (read == 0) continue;
+                if (read > MAX_IMPORT_BYTES - total) {
+                    throw new IOException("wallpaper exceeds 512 MiB import limit");
+                }
                 output.write(buffer, 0, read);
+                total += read;
             }
         }
     }
@@ -649,7 +1253,48 @@ public final class WallpaperService {
         Path preview,
         String type,
         String title,
-        String manifestFile
+        String manifestFile,
+        String workshopId
     ) {
+        private Path launchFile() {
+            return projectJson == null ? entry : projectJson;
+        }
+    }
+
+    private record SceneInventory(
+        List<SceneFile> projectFiles,
+        boolean projectFilesTruncated,
+        WallpaperScenePackageReader.PackageIndex packageIndex,
+        String packageError
+    ) {
+        private SceneInventory {
+            projectFiles = List.copyOf(projectFiles);
+            packageError = packageError == null ? "" : packageError;
+        }
+    }
+
+    private record SceneFile(String path, long size, String category, boolean sourceCode) {
+    }
+
+    private record CachedSceneInventory(
+        String generation,
+        long loadedAtMillis,
+        long completedAtNanos,
+        SceneInventory inventory
+    ) {
+    }
+
+    private record SceneInventoryFlight(
+        String generation,
+        CompletableFuture<SceneInventory> future
+    ) {
+    }
+
+    private record WorkshopMetadata(String title, String type, String workshopId) {
+        private WorkshopMetadata {
+            title = title == null ? "" : title;
+            type = type == null ? "" : type;
+            workshopId = workshopId == null ? "" : workshopId;
+        }
     }
 }

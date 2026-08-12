@@ -2,6 +2,7 @@
 
 const assert = require("node:assert/strict");
 const { spawn } = require("node:child_process");
+const { createHash } = require("node:crypto");
 const { mkdir, mkdtemp, rm, writeFile } = require("node:fs/promises");
 const { createServer } = require("node:http");
 const { createServer: createNetServer } = require("node:net");
@@ -257,6 +258,7 @@ test("official OpenAPI token login is validated, persisted, and never echoed", a
   assert.equal(loginResponse.status, 200);
   assert.equal(loginPayload.ok, true);
   assert.equal(loginPayload.loggedIn, true);
+  assert.match(loginPayload.account.userId, /^qishui-oauth-[a-f0-9]{40}$/);
   assert.equal(JSON.stringify(loginPayload).includes(accessToken), false);
   assert.deepEqual(requests, [{ method: "POST", accessToken }]);
   await stopChild(first.child);
@@ -264,7 +266,9 @@ test("official OpenAPI token login is validated, persisted, and never echoed", a
   const restarted = await startPlugin(dataDir, fixture.url);
   children.push(restarted.child);
   const restoredHealth = await (await fetch(`${restarted.baseUrl}/health`)).json();
+  const restoredLogin = await (await fetch(`${restarted.baseUrl}/login/status`)).json();
   assert.equal(restoredHealth.loggedIn, true);
+  assert.equal(restoredLogin.account.userId, loginPayload.account.userId);
   assert.equal(JSON.stringify(restoredHealth).includes(accessToken), false);
 });
 
@@ -680,6 +684,7 @@ test("SodaMusic Config exposes only an allowlisted public login profile and fail
   assert.equal(login.localLoginDetected, true);
   assert.equal(login.playbackAuthorized, false);
   assert.deepEqual(login.account, {
+    userId: `qishui-local-${createHash("sha256").update("private-local-user-id-must-not-leak").digest("hex")}`,
     nickname: "公开昵称",
     avatar: "https://media.example.test/avatar.jpg",
     isVip: true

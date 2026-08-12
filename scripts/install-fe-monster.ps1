@@ -1,6 +1,7 @@
 param(
   [string]$InstallDir = (Join-Path $Env:LOCALAPPDATA 'FE Monster'),
   [string]$PayloadRoot = '',
+  [switch]$ConsumePayloadRoot,
   [string]$LogPath = '',
   [switch]$NoLaunch,
   [switch]$NoShortcuts,
@@ -16,8 +17,20 @@ $installPath = [System.IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVar
 $outDir = Join-Path $installPath 'out'
 $installedLog = Join-Path $outDir 'install.log'
 $installerStateRoot = Join-Path $Env:LOCALAPPDATA 'FE Monster Setup'
-$sessionLogDirectory = Join-Path $installerStateRoot 'logs'
-$defaultSessionLog = Join-Path $sessionLogDirectory (
+$targetStateRoot = Join-Path (Split-Path -Parent $installPath) '.fe-monster-setup-state'
+$preferredSessionLogDirectory = if (
+  [string]::Equals(
+    [System.IO.Path]::GetPathRoot($installerStateRoot),
+    [System.IO.Path]::GetPathRoot($installPath),
+    [StringComparison]::OrdinalIgnoreCase
+  )
+) {
+  Join-Path $installerStateRoot 'logs'
+} else {
+  Join-Path $targetStateRoot 'logs'
+}
+$sessionLogDirectory = $preferredSessionLogDirectory
+$defaultSessionLog = Join-Path $preferredSessionLogDirectory (
   'install-{0}-{1}.log' -f (Get-Date -Format 'yyyyMMdd-HHmmss'), $PID
 )
 $installLog = if ([string]::IsNullOrWhiteSpace($LogPath)) {
@@ -32,7 +45,7 @@ if ($installLog.StartsWith($installPathPrefix, [StringComparison]::OrdinalIgnore
 $sessionLogDirectory = Split-Path -Parent $installLog
 $dependencyLog = Join-Path $sessionLogDirectory ('dependencies-{0}.log' -f $PID)
 $updateAgentLog = Join-Path $sessionLogDirectory ('update-agent-{0}.log' -f $PID)
-$appVersion = '1.8.8'
+$appVersion = '2.0.1'
 $mainExecutable = Join-Path $installPath 'native\windows\build\winforms\FE Monster.exe'
 $payloadIntegrityManifestName = 'payload-integrity.json'
 $peMachineAmd64 = 0x8664
@@ -41,17 +54,99 @@ $newInstallActivated = $false
 $sessionLogPublished = $false
 $installMutationLock = $null
 
+function Add-InstallerLogLine {
+  param(
+    [string]$Path,
+    [string]$Line
+  )
+
+  $lastError = $null
+  foreach ($attempt in 1..16) {
+    $stream = $null
+    $writer = $null
+    try {
+      $parent = Split-Path -Parent $Path
+      if (!(Test-Path -LiteralPath $parent -PathType Container)) {
+        New-Item -ItemType Directory -Path $parent -Force | Out-Null
+      }
+      $share = [System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete
+      $stream = [System.IO.File]::Open(
+        $Path,
+        [System.IO.FileMode]::Append,
+        [System.IO.FileAccess]::Write,
+        $share
+      )
+      $writer = [System.IO.StreamWriter]::new(
+        $stream,
+        [System.Text.UTF8Encoding]::new($false)
+      )
+      $writer.WriteLine($Line)
+      $writer.Flush()
+      return $true
+    } catch [System.IO.IOException] {
+      $lastError = $_.Exception
+    } catch [System.UnauthorizedAccessException] {
+      $lastError = $_.Exception
+    } finally {
+      # Closing a diagnostic stream can itself throw (for example when the
+      # system drive becomes full after Flush).  Logging must never roll back
+      # an otherwise valid installation transaction.
+      try {
+        if ($null -ne $writer) { $writer.Dispose() }
+        elseif ($null -ne $stream) { $stream.Dispose() }
+      } catch {
+      }
+    }
+    Start-Sleep -Milliseconds ([Math]::Min(200, 25 * $attempt))
+  }
+
+  Write-Warning "Installer log is temporarily unavailable; setup will continue without this line. $($lastError.Message)"
+  return $false
+}
+
+function Read-InstallerLogText {
+  param([string]$Path)
+
+  foreach ($attempt in 1..8) {
+    $stream = $null
+    $reader = $null
+    try {
+      if (!(Test-Path -LiteralPath $Path -PathType Leaf)) { return '' }
+      $share = [System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete
+      $stream = [System.IO.File]::Open(
+        $Path,
+        [System.IO.FileMode]::Open,
+        [System.IO.FileAccess]::Read,
+        $share
+      )
+      $reader = [System.IO.StreamReader]::new(
+        $stream,
+        [System.Text.Encoding]::UTF8,
+        $true
+      )
+      return $reader.ReadToEnd()
+    } catch [System.IO.IOException] {
+    } catch [System.UnauthorizedAccessException] {
+    } finally {
+      try {
+        if ($null -ne $reader) { $reader.Dispose() }
+        elseif ($null -ne $stream) { $stream.Dispose() }
+      } catch {
+      }
+    }
+    Start-Sleep -Milliseconds (25 * $attempt)
+  }
+  return ''
+}
+
 function Write-Log {
   param([string]$Message)
-  if (!(Test-Path $sessionLogDirectory)) {
-    New-Item -ItemType Directory -Path $sessionLogDirectory -Force | Out-Null
-  }
   $line = '[{0}] {1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $Message
   Write-Host $line
-  Add-Content -Encoding UTF8 -Path $installLog -Value $line
+  $null = Add-InstallerLogLine -Path $installLog -Line $line
   if ($script:newInstallActivated -and $script:sessionLogPublished) {
     if (!(Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir -Force | Out-Null }
-    Add-Content -Encoding UTF8 -Path $installedLog -Value $line
+    $null = Add-InstallerLogLine -Path $installedLog -Line $line
   }
 }
 
@@ -77,20 +172,37 @@ function Enter-InstallMutationLock {
   } finally {
     $sha.Dispose()
   }
-  $lockDirectory = Join-Path $Env:LOCALAPPDATA 'FE Monster Setup\Locks'
-  New-Item -ItemType Directory -Path $lockDirectory -Force | Out-Null
-  $lockPath = Join-Path $lockDirectory ($hash.Substring(0, 32) + '.lock')
-  try {
-    $stream = [System.IO.File]::Open(
-      $lockPath,
-      [System.IO.FileMode]::OpenOrCreate,
-      [System.IO.FileAccess]::ReadWrite,
-      [System.IO.FileShare]::None
-    )
-  } catch {
-    throw "Another FE Monster install, update, or uninstall is already changing $Path"
+  $lockName = $hash.Substring(0, 32) + '.lock'
+  $installParent = Split-Path -Parent (Resolve-FullPath $Path)
+  $lockDirectories = @(
+    (Join-Path $Env:LOCALAPPDATA 'FE Monster Setup\Locks'),
+    (Join-Path $installParent '.fe-monster-setup-locks')
+  ) | Select-Object -Unique
+  $lastError = $null
+  foreach ($lockDirectory in $lockDirectories) {
+    $stream = $null
+    $lockPath = Join-Path $lockDirectory $lockName
+    try {
+      New-Item -ItemType Directory -Path $lockDirectory -Force | Out-Null
+      $stream = [System.IO.File]::Open(
+        $lockPath,
+        [System.IO.FileMode]::OpenOrCreate,
+        [System.IO.FileAccess]::ReadWrite,
+        [System.IO.FileShare]::None
+      )
+      # Force a tiny real write. Opening an existing sparse/zero-length file
+      # can succeed even after a volume has reached zero free bytes.
+      $stream.SetLength(0)
+      $probe = [System.Text.Encoding]::ASCII.GetBytes("FE Monster setup lock`n")
+      $stream.Write($probe, 0, $probe.Length)
+      $stream.Flush($true)
+      return [pscustomobject]@{ Stream = $stream; Path = $lockPath }
+    } catch {
+      $lastError = $_.Exception
+      if ($null -ne $stream) { try { $stream.Dispose() } catch {} }
+    }
   }
-  return [pscustomobject]@{ Stream = $stream; Path = $lockPath }
+  throw "Another FE Monster install, update, or uninstall is already changing $Path, or no writable setup lock directory is available. $($lastError.Message)"
 }
 
 function Exit-InstallMutationLock {
@@ -98,6 +210,12 @@ function Exit-InstallMutationLock {
   if ($null -eq $Lock) { return }
   try { $Lock.Stream.Dispose() } catch {}
   try { Remove-Item -LiteralPath $Lock.Path -Force -ErrorAction SilentlyContinue } catch {}
+  try {
+    $parent = Split-Path -Parent $Lock.Path
+    if ((Split-Path -Leaf $parent) -eq '.fe-monster-setup-locks') {
+      Remove-Item -LiteralPath $parent -Force -ErrorAction SilentlyContinue
+    }
+  } catch {}
 }
 
 function Test-PathSameOrAncestor {
@@ -364,6 +482,7 @@ function Assert-InstallDriveSpace {
 
 function New-WritableTempDirectory {
   $bases = @(
+    (Split-Path -Parent $installPath),
     [System.IO.Path]::GetTempPath(),
     (Join-Path $Env:LOCALAPPDATA 'FE Monster Setup\Temp')
   ) | Select-Object -Unique
@@ -501,6 +620,73 @@ function Remove-KnownAppFiles {
   }
 }
 
+function Test-CanAtomicallyConsumePayload {
+  param(
+    [string]$Source,
+    [string]$Destination,
+    [string]$InstallTarget
+  )
+
+  if (!$ConsumePayloadRoot -or [string]::IsNullOrWhiteSpace($PayloadRoot)) { return $false }
+  if (!(Test-Path -LiteralPath $Source -PathType Container) -or
+      (Test-Path -LiteralPath $Destination)) {
+    return $false
+  }
+
+  $sourceFull = Resolve-FullPath $Source
+  $destinationFull = Resolve-FullPath $Destination
+  $installFull = Resolve-FullPath $InstallTarget
+  if ((Test-PathSameOrAncestor $sourceFull $destinationFull) -or
+      (Test-PathSameOrAncestor $destinationFull $sourceFull) -or
+      (Test-PathSameOrAncestor $sourceFull $installFull) -or
+      (Test-PathSameOrAncestor $installFull $sourceFull)) {
+    return $false
+  }
+
+  $sourceInfo = Get-Item -LiteralPath $sourceFull -Force
+  if (($sourceInfo.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+    return $false
+  }
+
+  $sourceVolume = [System.IO.Path]::GetPathRoot($sourceFull)
+  $destinationVolume = [System.IO.Path]::GetPathRoot($destinationFull)
+  return [string]::Equals($sourceVolume, $destinationVolume, [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-ReleaseControlledCommunityConfigurationSnapshot {
+  param([string]$StagedRoot)
+
+  $snapshot = @()
+  foreach ($name in @('community-server-url.txt', 'community-server-tls-pin.txt')) {
+    $path = Join-Path $StagedRoot (Join-Path 'data' $name)
+    $present = Test-Path -LiteralPath $path -PathType Leaf
+    $snapshot += [pscustomobject]@{
+      Name = $name
+      Present = $present
+      Bytes = if ($present) { [IO.File]::ReadAllBytes($path) } else { [byte[]]@() }
+    }
+  }
+  return @($snapshot)
+}
+
+function Restore-ReleaseControlledCommunityConfiguration {
+  param(
+    [string]$StagedRoot,
+    [object[]]$Snapshot
+  )
+
+  $stagedDataRoot = Join-Path $StagedRoot 'data'
+  New-Item -ItemType Directory -Path $stagedDataRoot -Force | Out-Null
+  foreach ($entry in @($Snapshot)) {
+    $target = Join-Path $stagedDataRoot ([string]$entry.Name)
+    if ([bool]$entry.Present) {
+      [IO.File]::WriteAllBytes($target, [byte[]]$entry.Bytes)
+    } elseif (Test-Path -LiteralPath $target -PathType Leaf) {
+      Remove-Item -LiteralPath $target -Force
+    }
+  }
+}
+
 function Copy-Payload {
   $installSafe = Assert-SafeInstallBoundary $installPath
   $tempRoot = ''
@@ -528,11 +714,27 @@ function Copy-Payload {
     if (Test-Path -LiteralPath $stageRoot) {
       Remove-Item -LiteralPath $stageRoot -Recurse -Force
     }
-    New-Item -ItemType Directory -Path $stageRoot | Out-Null
     Write-Log "Staging files under $stageRoot..."
-    & robocopy.exe $sourceRoot $stageRoot /E /R:2 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
-    if ($LASTEXITCODE -gt 7) { throw "staging robocopy failed with exit code $LASTEXITCODE" }
-    Test-PayloadIntegrity $stageRoot 'Staged payload' | Out-Null
+    $movedToStage = $false
+    if (Test-CanAtomicallyConsumePayload $sourceRoot $stageRoot $installSafe) {
+      try {
+        [System.IO.Directory]::Move($sourceRoot, $stageRoot)
+        $sourceRoot = $stageRoot
+        $movedToStage = $true
+        Write-Log 'Promoted verified Setup-owned payload to the transaction stage without copying.'
+      } catch {
+        Write-Log "Atomic payload promotion was unavailable; falling back to robocopy: $($_.Exception.Message)"
+      }
+    }
+    if (!$movedToStage) {
+      New-Item -ItemType Directory -Path $stageRoot | Out-Null
+      & robocopy.exe $sourceRoot $stageRoot /E /R:2 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null
+      if ($LASTEXITCODE -gt 7) { throw "staging robocopy failed with exit code $LASTEXITCODE" }
+      Test-PayloadIntegrity $stageRoot 'Staged payload' | Out-Null
+    }
+    $releaseCommunityConfigurationSnapshot = @(
+      Get-ReleaseControlledCommunityConfigurationSnapshot -StagedRoot $stageRoot
+    )
 
     $stageOutDir = Join-Path $stageRoot 'out'
     New-Item -ItemType Directory -Path $stageOutDir -Force | Out-Null
@@ -568,15 +770,21 @@ function Copy-Payload {
         Copy-Item -LiteralPath $existingUserFile -Destination (Join-Path $stageRoot $userFile) -Force
       }
     }
+    Restore-ReleaseControlledCommunityConfiguration `
+      -StagedRoot $stageRoot `
+      -Snapshot $releaseCommunityConfigurationSnapshot
+    Write-Log 'Restored release-controlled community URL and TLS pin after preserving user data.'
 
     $stagedInstallLog = Join-Path $stageOutDir 'install.log'
     if (Test-Path -LiteralPath $installedLog -PathType Leaf) {
       Copy-Item -LiteralPath $installedLog -Destination $stagedInstallLog -Force
     }
     if (Test-Path -LiteralPath $installLog -PathType Leaf) {
-      $sessionText = Get-Content -LiteralPath $installLog -Raw
+      $sessionText = Read-InstallerLogText -Path $installLog
       if (![string]::IsNullOrWhiteSpace($sessionText)) {
-        Add-Content -LiteralPath $stagedInstallLog -Encoding UTF8 -Value $sessionText.TrimEnd("`r", "`n")
+        $null = Add-InstallerLogLine `
+          -Path $stagedInstallLog `
+          -Line $sessionText.TrimEnd("`r", "`n")
       }
     }
     $script:sessionLogPublished = $true
@@ -700,7 +908,7 @@ function Install-Shortcuts {
     New-Shortcut `
       -Path (Join-Path $startMenu 'Uninstall FE Monster.lnk') `
       -TargetPath 'powershell.exe' `
-      -Arguments ('-NoProfile -ExecutionPolicy Bypass -File "{0}" -Root "{1}"' -f $uninstallScript, $installPath) `
+      -Arguments ('-NoProfile -ExecutionPolicy Bypass -File "{0}" -Root "{1}" -KeepUserData' -f $uninstallScript, $installPath) `
       -WorkingDirectory $installPath `
       -IconLocation $icon
   }
@@ -715,7 +923,7 @@ function Register-Uninstaller {
 
   $keyPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\FE Monster'
   $icon = $mainExecutable
-  $uninstallArgs = '-NoProfile -ExecutionPolicy Bypass -File {0} -Root {1}' -f (Quote-Arg $uninstallScript), (Quote-Arg $installPath)
+  $uninstallArgs = '-NoProfile -ExecutionPolicy Bypass -File {0} -Root {1} -KeepUserData' -f (Quote-Arg $uninstallScript), (Quote-Arg $installPath)
   $quietArgs = $uninstallArgs + ' -Quiet'
 
   New-Item -Path $keyPath -Force | Out-Null
@@ -754,6 +962,24 @@ function Invoke-RuntimeCheck {
   Write-Log 'Checking and installing runtime dependencies...'
   & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script -Root $installPath -InstallMissing *> $dependencyLog
   if ($LASTEXITCODE -ne 0) {
+    $dependencyTail = if (Test-Path -LiteralPath $dependencyLog -PathType Leaf) {
+      @(Get-Content -LiteralPath $dependencyLog -ErrorAction SilentlyContinue |
+        Where-Object { ![string]::IsNullOrWhiteSpace([string]$_) } |
+        Select-Object -Last 12)
+    } else {
+      @()
+    }
+    foreach ($line in $dependencyTail) {
+      $safeLine = ([string]$line).Trim()
+      if ($safeLine.Length -gt 800) { $safeLine = $safeLine.Substring(0, 800) + '...' }
+      Write-Log "Dependency detail: $safeLine"
+    }
+    $summary = @($dependencyTail | Where-Object {
+      [string]$_ -match '(?i)missing|failed|not detectable|unavailable'
+    }) | Select-Object -Last 1
+    if ($null -ne $summary) {
+      throw "Runtime dependency check failed: $(([string]$summary).Trim()). See $dependencyLog"
+    }
     throw "Runtime dependency check failed. See $dependencyLog"
   }
 }
@@ -761,21 +987,51 @@ function Invoke-RuntimeCheck {
 function Assert-RequiredFiles {
   $required = @(
     'FE Monster.vbs',
-    'run.cmd',
     'out\fe-monster-java.jar',
     'web\index.html',
+    'web\cache-fingerprints.json',
+    'web\app.js',
+    'web\styles.css',
+    'web\lyric-render-quality.css',
+    'web\app-command.js',
+    'web\playback-intelligence.js',
+    'web\wallpaper-video-continuity.js',
+    'web\pet-emotion-runtime.js',
+    'web\pet-client-context.js',
+    'web\pet-live-turn-controller.js',
+    'web\pet-live-audio-worklet.js',
+    'web\pet-live-telemetry.js',
+    'web\pet-live-playout.js',
+    'web\pet-live-stt-client.js',
+    'web\pet-assistant.js',
+    'web\fe-identity-card.js',
+    'web\fe-identity-card.css',
+    'web\pet-product-tour.js',
+    'web\pet-product-tour.css',
+    'web\community-reward-runtime.js',
+    'web\community-reward-runtime.css',
+    'web\pet-particle-orb.js',
+    'web\pet-assistant.css',
+    'web\pet-companion-p2.js',
+    'web\pet-companion-p2.css',
+    'web\creative-community.js',
+    'web\assets\fe-monster-pet-mascot.png',
+    'web\assets\fe-monster-pet-mascot-chroma.png',
     'scripts\launch-fe-monster.ps1',
     'scripts\uninstall-fe-monster.ps1',
-    'runtime\python\python.exe',
+    'scripts\install-fe-monster.ps1',
+    'scripts\ensure-runtime-dependencies.ps1',
+    'scripts\java-runtime.ps1',
+    'data\community-server-url.txt',
+    'data\community-server-tls-pin.txt',
     'runtime\java\bin\java.exe',
     'runtime\java\bin\javaw.exe',
     'runtime\java\bin\FE Monster Backend.exe',
     'runtime\node\node.exe',
-    'runtime\python-site-packages\cv2',
-    'runtime\python-site-packages\mediapipe',
-    'runtime\python-site-packages\pyautogui',
-    'runtime\python-site-packages\pygrabber',
     'native\windows\build\winforms\FE Monster.exe',
+    'native\windows\build\winforms\FE Monster.dll',
+    'native\windows\build\winforms\FE Monster.deps.json',
+    'native\windows\build\winforms\FE Monster.runtimeconfig.json',
     'native\windows\build\winforms\WebView2Loader.dll',
     'native\windows\build\fe-monster-xaudio2.dll',
     'native\windows\build\fe_monster_upmix.dll',
@@ -870,9 +1126,28 @@ function Test-JavaServer {
   try {
     Write-Log "Validating Java backend on temporary port $port..."
     $javaArgs = @('-jar', (Quote-Arg $jar), '--server') -join ' '
-    $process = Start-Process -FilePath $java -ArgumentList $javaArgs -WorkingDirectory $installPath -WindowStyle Hidden -PassThru
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $java
+    $startInfo.Arguments = $javaArgs
+    $startInfo.WorkingDirectory = $installPath
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $process = [Diagnostics.Process]::Start($startInfo)
+    if ($null -eq $process) { throw 'Java backend validation process could not be created.' }
     $url = "http://127.0.0.1:$port/api/app/version"
-    if (!(Wait-HttpOk $url 20)) { throw "Java backend did not answer: $url" }
+    if (!(Wait-HttpOk $url 20)) {
+      if (!$process.HasExited) {
+        $process.Kill()
+        [void]$process.WaitForExit(2000)
+      }
+      $backendError = $process.StandardError.ReadToEnd().Trim()
+      if (![string]::IsNullOrWhiteSpace($backendError)) {
+        Write-Log "Java backend validation stderr: $backendError"
+      }
+      throw "Java backend did not answer: $url"
+    }
     try {
       $quit = [System.Net.HttpWebRequest]::Create("http://127.0.0.1:$port/api/app/quit")
       $quit.Timeout = 2000
@@ -886,6 +1161,7 @@ function Test-JavaServer {
     if ($null -ne $process -and !$process.HasExited) {
       Stop-Process -Id $process.Id -Force
     }
+    if ($null -ne $process) { $process.Dispose() }
     if (Test-Path -LiteralPath $probeRoot -PathType Container) {
       Remove-Item -LiteralPath $probeRoot -Recurse -Force -ErrorAction SilentlyContinue
     }

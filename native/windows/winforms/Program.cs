@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
@@ -82,7 +83,7 @@ internal static class Program
                 clientArgs = args.Concat(new[] { "--url", backend.ClientUrl }).ToArray();
             }
 
-            using FeMonsterForm mainForm = new(ClientOptions.Parse(clientArgs));
+            using FeMonsterForm mainForm = new(ClientOptions.Parse(clientArgs), backend is not null);
             _ = mainForm.Handle;
             using CancellationTokenSource activationStop = new();
             Task activationTask = ListenForActivation(
@@ -145,10 +146,32 @@ internal static class Program
 
     private static string UserInstanceSuffix()
     {
+        string testScope = DesktopPetTestInstanceScope();
         byte[] identity = Encoding.UTF8.GetBytes(
-            Environment.UserDomainName + "\\" + Environment.UserName
+            Environment.UserDomainName + "\\" + Environment.UserName + testScope
         );
         return Convert.ToHexString(SHA256.HashData(identity)).Substring(0, 16);
+    }
+
+    internal static string DesktopPetTestStorageKey()
+    {
+        string testScope = DesktopPetTestInstanceScope();
+        return testScope.Length == 0
+            ? ""
+            : Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(testScope))).Substring(0, 16);
+    }
+
+    private static string DesktopPetTestInstanceScope()
+    {
+        string raw = Environment.GetEnvironmentVariable(
+            "FE_MONSTER_DESKTOP_PET_TEST_REGISTRY_PATH"
+        ) ?? "";
+        return raw.Length <= 512 && raw.StartsWith(
+            @"Software\FE Monster\DesktopPetTest\",
+            StringComparison.OrdinalIgnoreCase
+        )
+            ? "\n" + raw
+            : "";
     }
 
     private static Task ListenForActivation(
@@ -274,6 +297,7 @@ internal sealed class BackendHost : IDisposable
     public static BackendHost Start()
     {
         string root = ResolveRoot();
+        string dataDirectory = ResolveStableDataDirectory(root);
         string javaExe = ResolveJava(root);
         string jar = Path.Combine(root, "out", "fe-monster-java.jar");
         int port = ReserveLocalPort();
@@ -292,9 +316,14 @@ internal sealed class BackendHost : IDisposable
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
+        startInfo.ArgumentList.Add("-Xms64m");
+        startInfo.ArgumentList.Add("-Xmx512m");
         startInfo.ArgumentList.Add("-jar");
         startInfo.ArgumentList.Add(jar);
         startInfo.ArgumentList.Add("--server");
+        startInfo.Environment["FE_MONSTER_ROOT"] = root;
+        startInfo.Environment["FE_MONSTER_WEB_ROOT"] = Path.Combine(root, "web");
+        startInfo.Environment["FE_MONSTER_DATA_DIR"] = dataDirectory;
         startInfo.Environment["FE_MONSTER_PORT"] = port.ToString();
         startInfo.Environment["FE_MONSTER_MAIN_PID"] = Environment.ProcessId.ToString();
 
@@ -372,16 +401,11 @@ internal sealed class BackendHost : IDisposable
     private static string ResolveRoot()
     {
         List<string> candidates = new();
+        AddExecutableRootCandidates(candidates);
+
         string? explicitRoot = Environment.GetEnvironmentVariable("FE_MONSTER_ROOT");
         if (!string.IsNullOrWhiteSpace(explicitRoot)) candidates.Add(explicitRoot);
         candidates.Add(Environment.CurrentDirectory);
-        candidates.Add(AppContext.BaseDirectory);
-
-        DirectoryInfo? current = new(AppContext.BaseDirectory);
-        for (int i = 0; current != null && i < 8; i += 1, current = current.Parent)
-        {
-            candidates.Add(current.FullName);
-        }
 
         foreach (string candidate in candidates)
         {
@@ -399,6 +423,83 @@ internal sealed class BackendHost : IDisposable
             }
         }
         throw new FileNotFoundException("FE Monster application root or Java jar was not found.");
+    }
+
+    private static string ResolveStableDataDirectory(string root)
+    {
+        string? explicitDataDirectory = Environment.GetEnvironmentVariable("FE_MONSTER_DATA_DIR");
+        if (!string.IsNullOrWhiteSpace(explicitDataDirectory))
+        {
+            string requested = Path.GetFullPath(
+                Environment.ExpandEnvironmentVariables(explicitDataDirectory)
+            );
+            Directory.CreateDirectory(requested);
+            return requested;
+        }
+
+        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (string.IsNullOrWhiteSpace(localAppData))
+        {
+            localAppData = Path.GetTempPath();
+        }
+        string stable = Path.GetFullPath(Path.Combine(localAppData, "FE Monster", "data"));
+        Directory.CreateDirectory(stable);
+
+        string legacy = Path.GetFullPath(Path.Combine(root, "data"));
+        if (!string.Equals(legacy, stable, StringComparison.OrdinalIgnoreCase))
+        {
+            MigrateLegacyDataDirectory(legacy, stable);
+        }
+        return stable;
+    }
+
+    private static void MigrateLegacyDataDirectory(string source, string destination)
+    {
+        if (!Directory.Exists(source)) return;
+        try
+        {
+            EnumerationOptions options = new()
+            {
+                RecurseSubdirectories = true,
+                IgnoreInaccessible = true,
+                ReturnSpecialDirectories = false,
+                AttributesToSkip = FileAttributes.ReparsePoint
+            };
+            foreach (string sourceFile in Directory.EnumerateFiles(source, "*", options))
+            {
+                string relative = Path.GetRelativePath(source, sourceFile);
+                if (relative.StartsWith("..", StringComparison.Ordinal)) continue;
+                string destinationFile = Path.GetFullPath(Path.Combine(destination, relative));
+                string destinationPrefix = destination.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                if (!destinationFile.StartsWith(destinationPrefix, StringComparison.OrdinalIgnoreCase)) continue;
+
+                string? parent = Path.GetDirectoryName(destinationFile);
+                if (!string.IsNullOrWhiteSpace(parent)) Directory.CreateDirectory(parent);
+                bool releaseControlled = relative.Equals("community-server-url.txt", StringComparison.OrdinalIgnoreCase)
+                    || relative.Equals("community-server-tls-pin.txt", StringComparison.OrdinalIgnoreCase);
+                if (releaseControlled || !File.Exists(destinationFile))
+                {
+                    File.Copy(sourceFile, destinationFile, overwrite: releaseControlled);
+                }
+            }
+        }
+        catch (IOException)
+        {
+            // Existing stable state remains authoritative if a legacy file is locked.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // The backend will report a writable-data error if the stable root itself is unavailable.
+        }
+    }
+
+    private static void AddExecutableRootCandidates(List<string> candidates)
+    {
+        DirectoryInfo? current = new(AppContext.BaseDirectory);
+        for (int i = 0; current != null && i < 8; i += 1, current = current.Parent)
+        {
+            candidates.Add(current.FullName);
+        }
     }
 
     private static string ResolveJava(string root)
@@ -436,7 +537,9 @@ internal sealed class BackendHost : IDisposable
         foreach (string candidate in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
         {
             if (!File.Exists(candidate)) continue;
-            int major = ReadJavaMajorVersion(candidate);
+            int major = TryReadJavaReleaseMajorVersion(candidate, out int releaseMajor)
+                ? releaseMajor
+                : ReadJavaMajorVersion(candidate);
             if (major >= MinimumJavaMajor) return candidate;
             rejected.Add($"{candidate} (Java {major})");
         }
@@ -448,6 +551,39 @@ internal sealed class BackendHost : IDisposable
             $"FE Monster requires Java {MinimumJavaMajor} or newer. {detail} " +
             "Install Java 17+ or set FE_JAVA_HOME to a compatible runtime."
         );
+    }
+
+    private static bool TryReadJavaReleaseMajorVersion(string javaExecutable, out int major)
+    {
+        major = 0;
+        try
+        {
+            string? binDirectory = Path.GetDirectoryName(javaExecutable);
+            string? javaHome = string.IsNullOrWhiteSpace(binDirectory)
+                ? null
+                : Directory.GetParent(binDirectory)?.FullName;
+            if (string.IsNullOrWhiteSpace(javaHome)) return false;
+            string releasePath = Path.Combine(javaHome, "release");
+            if (!File.Exists(releasePath)) return false;
+
+            string release = File.ReadAllText(releasePath, Encoding.UTF8);
+            System.Text.RegularExpressions.Match match =
+                System.Text.RegularExpressions.Regex.Match(
+                    release,
+                    @"(?m)^JAVA_VERSION\s*=\s*""(?<first>\d+)(?:\.(?<second>\d+))?"
+                );
+            if (!match.Success) return false;
+            int first = int.Parse(match.Groups["first"].Value);
+            major = first == 1 && match.Groups["second"].Success
+                ? int.Parse(match.Groups["second"].Value)
+                : first;
+            return major > 0;
+        }
+        catch
+        {
+            major = 0;
+            return false;
+        }
     }
 
     private static int ReadJavaMajorVersion(string javaExecutable)
@@ -548,7 +684,7 @@ internal sealed class BackendHost : IDisposable
             catch
             {
             }
-            Thread.Sleep(200);
+            Thread.Sleep(50);
         }
         throw new TimeoutException($"FE Monster backend did not become ready. See {logPath}");
     }

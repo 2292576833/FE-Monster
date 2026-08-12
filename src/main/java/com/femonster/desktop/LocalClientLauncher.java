@@ -23,8 +23,9 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public final class LocalClientLauncher {
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
-    private static final int DEFAULT_WINDOW_WIDTH = 1600;
-    private static final int DEFAULT_WINDOW_HEIGHT = 900;
+    private static final int DEFAULT_WINDOW_WIDTH = 1760;
+    private static final int DEFAULT_WINDOW_HEIGHT = 990;
+    private static final String GPU_DISABLED_FLAG = "--disable-gpu";
     private static volatile ClientSession currentSession;
 
     private LocalClientLauncher() {
@@ -52,6 +53,7 @@ public final class LocalClientLauncher {
     public static Map<String, Object> runtimePayload(Map<String, Object> nativeAudio, Map<String, Object> settings) {
         boolean nativeAudioActive = Boolean.TRUE.equals(nativeAudio.get("active"));
         boolean mac = System.getProperty("os.name", "").toLowerCase().contains("mac");
+        Map<String, Object> effectiveSettings = effectiveRenderSettings(settings);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("ok", true);
         body.put("clientMode", "embedded");
@@ -60,9 +62,9 @@ public final class LocalClientLauncher {
         body.put("audioBackend", nativeAudioActive ? "xaudio2" : "html-audio-fallback");
         body.put("audioSpatialBackend", mac ? "web-audio-panner" : "x3daudio");
         body.put("audioDecoder", mac ? "webkit-media" : "media-foundation");
-        body.put("settings", settings);
+        body.put("settings", effectiveSettings);
         body.put("nativeAudio", nativeAudio);
-        body.put("launchFlags", mac ? List.of() : launchFlags(settings));
+        body.put("launchFlags", mac ? List.of() : launchFlags(effectiveSettings));
         body.put("note", mac
             ? "WKWebView uses WebKit's Metal-backed compositor and Web Audio fallback."
             : (nativeAudioActive
@@ -133,8 +135,8 @@ public final class LocalClientLauncher {
                 "--url", url,
                 "--width", String.valueOf(DEFAULT_WINDOW_WIDTH),
                 "--height", String.valueOf(DEFAULT_WINDOW_HEIGHT),
-                "--gpu", String.valueOf(setting(settings, "gpuAcceleration", true)),
-                "--dx11", String.valueOf(setting(settings, "directX11", true)),
+                "--gpu", "true",
+                "--dx11", "true",
                 "--xaudio2", String.valueOf(setting(settings, "xAudio2", true)),
                 "--x3daudio", String.valueOf(setting(settings, "x3DAudio", true))
             );
@@ -167,24 +169,39 @@ public final class LocalClientLauncher {
 
     private static String embeddedClientUrl(String url, Map<String, Object> settings) {
         String separator = url.contains("?") ? "&" : "?";
-        String render = setting(settings, "directX11", true) ? "directx11" : "default";
+        String render = isWindows() || setting(settings, "directX11", true) ? "directx11" : "default";
         String audio = setting(settings, "xAudio2", true) ? "xaudio2" : "html-audio";
         return url + separator + "client=embedded&render=" + render + "&audio=" + audio;
     }
 
     private static List<String> launchFlags(Map<String, Object> settings) {
-        if (!setting(settings, "gpuAcceleration", true)) return List.of("--disable-gpu");
+        if (!isWindows() && !setting(settings, "gpuAcceleration", true)) return List.of(GPU_DISABLED_FLAG);
         List<String> flags = new ArrayList<>();
-        if (setting(settings, "directX11", true)) {
+        if (isWindows() || setting(settings, "directX11", true)) {
             flags.add("--use-gl=angle");
             flags.add("--use-angle=d3d11");
         }
         flags.add("--enable-gpu-rasterization");
         flags.add("--enable-accelerated-2d-canvas");
-        flags.add("--force-high-performance-gpu");
+        flags.add("--force_high_performance_gpu");
         flags.add("--ignore-gpu-blocklist");
+        flags.add("--disable-software-rasterizer");
         flags.add("--autoplay-policy=no-user-gesture-required");
         return flags;
+    }
+
+    private static Map<String, Object> effectiveRenderSettings(Map<String, Object> settings) {
+        Map<String, Object> effective = new LinkedHashMap<>();
+        if (settings != null) effective.putAll(settings);
+        if (isWindows()) {
+            effective.put("gpuAcceleration", true);
+            effective.put("directX11", true);
+        }
+        return effective;
+    }
+
+    private static boolean isWindows() {
+        return System.getProperty("os.name", "").toLowerCase().startsWith("windows");
     }
 
     private static boolean setting(Map<String, Object> settings, String key, boolean fallback) {

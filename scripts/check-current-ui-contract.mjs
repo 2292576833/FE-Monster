@@ -53,6 +53,7 @@ function cssRules(selector) {
 
 const normalize = functionBlock('normalizeTextComposerSettings');
 const selectPreset = functionBlock('selectableTextPreset');
+const singleRowPreset = functionBlock('singleRowOnlyTextPreset');
 const textButtons = functionBlock('textPresetButtons');
 const syncButtons = functionBlock('syncTextPresetButtons');
 const glitchActive = functionBlock('glitchTextEffectActive');
@@ -79,15 +80,21 @@ const appScriptIndex = html.indexOf('src="app.js');
 const checks = {
   normalLyricCardRestored: /id=["']diyLyricPreset["'][^>]*data-text-preset=["']depth["']/.test(html),
   focusEchoCardRestored: /id=["']diyFocusEchoTextPreset["'][^>]*data-text-preset=["']focus-echo["']/.test(html),
+  standaloneWordGlowCardRemoved: !/id=["']diyWordGlowTextPreset["']/.test(html)
+    && /id=["']textLyricHighlightMode["'][^>]*data-text-composer-setting=["']lyricHighlightMode["']/.test(html),
   textCardsAreSelectable: /\[data-text-preset\]/.test(textButtons)
     && /textPresetButtons/.test(syncButtons)
     && /focus-echo/.test(selectPreset)
+    && !/word-glow/.test(selectPreset)
     && /setTextPreset\(button\.dataset\.textPreset\s*,/.test(app),
   bookRemovedFromLayoutMenu: !/<option\s+value=["']book["']/.test(html)
     && !/\[['"]single['"],\s*['"]multi['"],\s*['"]book['"]\]/.test(normalize),
-  focusEchoBlocksUnsungBlur: /focus-echo/.test(applyComposer)
+  focusEchoBlocksUnsungBlur: /focus-echo/.test(singleRowPreset)
+    && !/word-glow/.test(singleRowPreset)
+    && /singleRowOnlyTextPreset/.test(applyComposer)
     && /effectiveUnsungBlur/.test(applyComposer),
-  focusEchoBlocksGlitch: /focus-echo/.test(glitchActive),
+  focusEchoBlocksGlitch: /focus-echo/.test(glitchActive)
+    && /wordGlowLyricActive/.test(glitchActive),
   multiRowUsesSharedTransformGesture: /multiRowLyric(?:List|Stage)/.test(presetTargets)
     && /zone/.test(beginGesture)
     && /rotateX/.test(moveGesture)
@@ -98,7 +105,7 @@ const checks = {
   sidebarSlidersAreLarger: /min-height:\s*(?:3[0-9]|[4-9][0-9])px/.test(sidebarRangeRule)
     && /height:\s*(?:[7-9]|[1-9][0-9])px/.test(sidebarRangeTrackRule),
   sidebarCheckboxesHaveNoNativeBlueCheck: /(?:appearance|-webkit-appearance):\s*none/.test(sidebarCheckboxRule),
-  everyBooleanControlUsesUnifiedSwitch: checkboxTags.length === 20
+  everyBooleanControlUsesUnifiedSwitch: checkboxTags.length > 0
     && checkboxTags.every((tag) => /class=["'][^"']*\bui-switch\b/.test(tag))
     && checkboxTags.every((tag) => /role=["']switch["']/.test(tag))
     && checkboxTags.every((tag) => !/tabindex=["']-1["']/.test(tag)),

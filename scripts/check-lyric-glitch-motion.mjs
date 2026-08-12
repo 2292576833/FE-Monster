@@ -125,6 +125,7 @@ const syncControls = functionBlock("syncTextComposerControls");
 const applySettings = functionBlock("applyTextComposerSettings");
 const glitchActive = functionBlock("glitchTextEffectActive");
 const syncGlitchElement = functionBlock("syncGlitchTextElement");
+const syncGlitchLayers = functionBlock("syncGlitchTextLayers");
 const beatMotion = functionBlock("updateGlitchBeatMotion");
 const playbackMotion = functionBlock("updatePlaybackSceneMotion");
 const subtitleLayout = functionBlock("syncPlaybackLyricSubtitleLayout");
@@ -133,6 +134,8 @@ const playbackCardLyrics = functionBlock("updateQishuiPlaybackLyrics");
 const startPlaybackCardLyricTransition = functionBlock("startQishuiLyricTransition");
 const syncPlaybackCardLyricTransition = functionBlock("syncQishuiLyricTransition");
 const flipMotion = functionBlock("animateLyricGeometryFlip");
+const idleCyanMotion = balancedBlock(styles, "@keyframes textGlitchIdleCyan");
+const idleMagentaMotion = balancedBlock(styles, "@keyframes textGlitchIdleMagenta");
 
 const sensitivityInput = elementOpeningTag("textGlitchBeatSensitivity");
 const durationInput = elementOpeningTag("textGlitchBeatDuration");
@@ -155,6 +158,7 @@ const staticChecks = {
   restoredTextPresetCardsAreLimited: textPresetCardTags.length === 2
     && textPresetCardValues.join("|") === "depth|focus-echo"
     && textPresetCardIds.join("|") === "diyFocusEchoTextPreset|diyLyricPreset"
+    && !/\bid=(["'])diyWordGlowTextPreset\1/i.test(html)
     && !/\bid=(["'])diyGlitchTextPreset\1/i.test(html),
   beatControlsExistInGlitchGroup: !!sensitivityInput
     && !!durationInput
@@ -211,12 +215,27 @@ const staticChecks = {
     ),
   beatUpdaterSkipsBookAndFocusEchoLyrics: /glitchTextEffectActive/.test(beatMotion)
     && /state\.textPreset\s*!==\s*['"]book['"]/.test(glitchActive)
-    && /state\.textPreset\s*!==\s*['"]focus-echo['"]/.test(glitchActive),
+    && /state\.textPreset\s*!==\s*['"]focus-echo['"]/.test(glitchActive)
+    && /!wordGlowLyricActive\(settings\)/.test(glitchActive),
   glitchLayerCreationIsIdempotent: /const\s+copies\s*=\s*Array\.from/.test(syncGlitchElement)
     && /copies\.find/.test(syncGlitchElement)
     && /if\s*\(\s*!copy\s*\)/.test(syncGlitchElement)
     && !/replaceChildren/.test(beatMotion)
     && !/appendChild/.test(beatMotion),
+  hiddenLyricLayoutDoesNotKeepAnimatingGlitchCopies:
+    /singleRowActive\s*=\s*active\s*&&\s*!state\.multiRowLyricsEnabled/.test(syncGlitchLayers)
+    && /multiRowActive\s*=\s*active\s*&&\s*state\.multiRowLyricsEnabled/.test(syncGlitchLayers),
+  glitchRemainsVisibleBetweenBeatTriggers: !!idleCyanMotion
+    && !!idleMagentaMotion
+    && /textGlitchIdleCyan/.test(styles)
+    && /textGlitchIdleMagenta/.test(styles)
+    && /animation-iteration-count\s*:\s*infinite/i.test(styles)
+    && /animation-fill-mode\s*:\s*both\s*,\s*none/i.test(styles),
+  idleGlitchUsesReadableSlicesAndChromaticSeparation:
+    /clip-path\s*:\s*inset\(/.test(idleCyanMotion + idleMagentaMotion)
+    && /--text-glitch-rgb-offset/.test(idleCyanMotion + idleMagentaMotion)
+    && /text-glitch-copy--cyan[\s\S]{0,280}text-shadow/.test(styles)
+    && /text-glitch-copy--magenta[\s\S]{0,280}text-shadow/.test(styles),
   sharedFlipHelperHasGeometryAnimation: /getBoundingClientRect/.test(flipMotion)
     && (
       /\.animate\s*\(/.test(flipMotion)
@@ -368,7 +387,8 @@ if (runEdgeDomProbe) try {
           const ids = cards.map((card) => card.id).sort().join("|");
           return cards.length === 2
             && values === "depth|focus-echo"
-            && ids === "diyFocusEchoTextPreset|diyLyricPreset";
+            && ids === "diyFocusEchoTextPreset|diyLyricPreset"
+            && !document.getElementById("diyWordGlowTextPreset");
         })(),
         beatControlsAreMounted: !!document.getElementById("textGlitchBeatSensitivity")
           && !!document.getElementById("textGlitchBeatDuration"),

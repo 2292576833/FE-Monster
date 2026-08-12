@@ -1,0 +1,142 @@
+/* Shared high-DPI lyric rendering layer.
+ * User zoom is applied as layout zoom in styles.css. This layer keeps every
+ * final glyph edge explicit and prevents the playback card from turning its
+ * text subtree into a permanently tilted compositor texture. */
+:root {
+  --fe-lyric-edge-width: max(0.42px, 0.011em);
+  --fe-lyric-edge-dark: rgba(3, 7, 12, 0.62);
+  --fe-lyric-edge-light: rgba(255, 255, 255, 0.15);
+}
+
+.fe-lyric-crisp-text,
+.playback-lyric-scene:not(.is-book-text) :is(
+  .playback-lyric-layer,
+  .playback-lyric-subtitle,
+  .multi-row-lyric-line,
+  .multi-row-lyric-main,
+  .multi-row-lyric-translation
+),
+#qishuiPlaybackLyricPage :is(
+  .qishui-playback-lyric-line,
+  .book-lyric-line-text,
+  .book-lyric-copy,
+  .book-lyric-translation
+) {
+  font-synthesis: none;
+  font-kerning: normal;
+  font-optical-sizing: auto;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: subpixel-antialiased;
+  paint-order: stroke fill;
+}
+
+/* Single-row and multi-row lyrics use an em-relative contour. It grows with
+ * layout zoom, rather than stretching a fixed one-pixel outline afterward. */
+.playback-lyric-scene:not(.is-book-text) {
+  --fe-lyric-edge-width: max(0.46px, 0.011em);
+}
+
+.playback-lyric-scene:not(.is-book-text) :is(
+  .playback-lyric-layer,
+  .playback-lyric-subtitle,
+  .multi-row-lyric-main,
+  .multi-row-lyric-translation
+) {
+  -webkit-text-stroke-width: var(--fe-lyric-edge-width);
+  -webkit-text-stroke-color: var(--fe-lyric-edge-dark);
+}
+
+.playback-lyric-scene:not(.is-book-text) :is(
+  .lyric-depth-0,
+  .playback-lyric-subtitle,
+  .multi-row-lyric-line.is-current .multi-row-lyric-main,
+  .multi-row-lyric-line.is-current .multi-row-lyric-translation
+) {
+  text-shadow:
+    0 1px 0 var(--fe-lyric-edge-light),
+    0 1px 1.5px rgba(var(--lyric-depth-rgb), 0.5);
+}
+
+/* The playback page stays front-facing. Its physical depth comes from the
+ * existing surface/shadow layers, while its lyric glyphs remain native text. */
+#qishuiPlaybackPhone,
+#qishuiPlaybackPhone:hover,
+#qishuiPlaybackPhone.is-panel-open,
+#qishuiPlaybackPhone.is-panel-open:hover {
+  transform: none !important;
+  transform-style: flat;
+  will-change: auto;
+}
+
+.qishui-playback-card {
+  transition:
+    opacity 200ms ease,
+    visibility 200ms ease,
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#qishuiPlaybackLyricPage .qishui-playback-lyric-line {
+  text-shadow:
+    0 1px 0 rgba(var(--playback-lyric-shadow-rgb), 0.98),
+    0 1px 2px rgba(var(--playback-lyric-shadow-rgb), 0.68);
+  transform: translate3d(calc(var(--book-line-distance) * 2px), 0, 0);
+  will-change: auto !important;
+}
+
+#qishuiPlaybackLyricPage :is(
+  .book-lyric-line-text,
+  .book-lyric-copy,
+  .book-lyric-copy--hot,
+  .book-lyric-translation,
+  .book-lyric-translation-copy--hot
+) {
+  -webkit-text-stroke-width: max(0.32px, 0.01em);
+  -webkit-text-stroke-color: rgba(var(--playback-lyric-shadow-rgb), 0.58);
+  backface-visibility: visible;
+  will-change: auto !important;
+}
+
+#qishuiPlaybackLyricPage
+  .qishui-playback-lyric-line.is-current.is-scroll-arrived {
+  text-shadow:
+    0 1px 0 rgba(var(--playback-lyric-shadow-rgb), 1),
+    0 1px 2px rgba(var(--playback-lyric-shadow-rgb), 0.78),
+    0 0 6px rgba(var(--playback-lyric-current-rgb), 0.16);
+}
+
+#qishuiPlaybackLyricPage :is(
+  .book-lyric-copy--hot,
+  .book-lyric-translation-copy--hot
+) {
+  text-shadow:
+    0 1px 0 rgba(var(--playback-lyric-shadow-rgb), 1),
+    0 1px 2px rgba(var(--playback-lyric-shadow-rgb), 0.74),
+    0 0 5px rgba(var(--playback-lyric-current-rgb), 0.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qishui-playback-card,
+  #qishuiPlaybackPhone,
+  #qishuiPlaybackPhone .qishui-playback-content {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .fe-lyric-crisp-text,
+  .playback-lyric-scene:not(.is-book-text) :is(
+    .playback-lyric-layer,
+    .playback-lyric-subtitle,
+    .multi-row-lyric-main,
+    .multi-row-lyric-translation
+  ),
+  #qishuiPlaybackLyricPage :is(
+    .book-lyric-line-text,
+    .book-lyric-copy,
+    .book-lyric-translation
+  ) {
+    -webkit-text-stroke-width: 0;
+    text-shadow: none;
+  }
+}

@@ -271,14 +271,15 @@ const checks = {
       /depthTest:\s*false/.test(source)
       && /depthWrite:\s*false/.test(source)
     )),
-  sonicWallpaperSuppressesOnlyColorGlow:
-    /function\s+setSonicWallpaperSurface[\s\S]*topo\.background\.visible\s*=\s*false/.test(app)
+  sonicWallpaperBlendsWithColorGlow:
+    /function\s+setSonicWallpaperSurface[\s\S]{0,5000}topo\.background\.visible\s*=\s*true/.test(app)
     && /function\s+disposeSonicWallpaperSurface[\s\S]*topo\.background\.visible\s*=\s*true/.test(app)
+    && /bottomFeather/.test(app)
     && /wallpaperSurface\.renderOrder\s*=\s*-\d+/.test(app),
-  cameraAnchoredFullscreenSurfaces:
+  cameraAnchoredWallpaperSurfaces:
     /camera\.add\(wallpaperSurface\)/.test(app)
     && /camera\.add\(wallpaperMesh\)/.test(chladni)
-    && /camera-curved-fullscreen/.test(app)
+    && /camera-deep-concave-contain-dome/.test(app)
     && /camera-concave-fullscreen/.test(chladni)
     && /function\s+fitSonicWallpaperSurface/.test(app)
     && /function\s+fitWallpaperSurface/.test(chladni),

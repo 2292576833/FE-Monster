@@ -31,13 +31,22 @@ assert.doesNotMatch(service, /"qishui",\s*new ProviderSpec/);
 assert.doesNotMatch(routes, /\/api\/qishui\/login\/browser\//);
 assert.match(service, /--remote-debugging-address=127\.0\.0\.1/);
 assert.match(service, /--window-size=520,720/);
-assert.match(service, /--app=" \+ spec\.loginUrl\(\)/);
+assert.match(service, /--app=" \+ loginUrl/);
+assert.match(service, /music\.beginProviderLogin\(id\)/,
+  'Kugou login does not obtain an App-compatible provider QR session');
+assert.match(service, /music\.pollProviderLogin\(session\.provider, session\.providerLoginKey\)/,
+  'Kugou login does not privately poll the provider QR session');
+assert.match(service, /"127\.0\.0\.1"\.equalsIgnoreCase\(uri\.getHost\(\)\)/,
+  'Kugou QR display is not restricted to the loopback-only plugin page');
+assert.match(service, /"\/login\/qr\/view"\.equals\(uri\.getPath\(\)\)/,
+  'Kugou QR display is not restricted to the dedicated local QR view');
+assert.match(service, /!key\.equals\(queryKey\)/,
+  'Kugou QR display does not bind the local page to the provider-issued key');
 assert.doesNotMatch(service, /official-login|--app=http:\/\/127\.0\.0\.1/);
 assert.match(service, /new ServerSocket\(0, 1, java\.net\.InetAddress\.getLoopbackAddress\(\)\)/);
 assert.match(service, /command\.put\("method", "Storage\.getCookies"\)/);
 assert.match(service, /if \(!spec\.matchesDomain\(domain\)\) continue/);
-assert.match(service, /music\.rememberBrowserSession\(id, cookies\)/);
-assert.match(service, /music\.accountPayload\(id\)/);
+assert.match(service, /music\.synchronizeBrowserSession\(session\.provider, cookies\)/);
 assert.match(service, /public synchronized Map<String, Object> switchAccount\(String provider\)/);
 assert.match(service, /music\.clearBrowserSession\(id\)/);
 assert.match(service, /clearProviderProfile\(id\)/);
@@ -59,8 +68,9 @@ assert.match(netease, /rememberBrowserSession\(Map<String, String> cookies\)/);
 assert.match(generic, /rememberBrowserSession\(Map<String, String> cookies\)/);
 assert.match(netease, /clearBrowserSession\(\)/);
 assert.match(generic, /clearBrowserSession\(\)/);
-assert.match(generic, /nestedCookieValue\(kugoo, "KugooID", "userid"\)/);
-assert.match(generic, /nestedCookieValue\(kugoo,\s*(?:"t",\s*)?"KugooPwd",\s*"token"\)/);
+assert.match(generic, /if \("kugou"\.equals\(id\)\) return;/,
+  'Kugou must reject incompatible website-cookie imports');
+assert.doesNotMatch(generic, /resetKugouAccountStateForBrowserImport|nestedCookieValue\(kugoo/);
 
 assert.match(html, /id="browserLoginStage"/);
 assert.match(html, /id="officialBrowserLoginButton"/);
@@ -80,4 +90,4 @@ assert.doesNotMatch(app, /\/login\/qr\/|loginQr|loadLoginQr|OFFICIAL_BROWSER_LOG
 assert.match(app, /officialBrowserLoginButton\.addEventListener\('click', toggleOfficialBrowserLogin\)/);
 assert.match(app, /officialBrowserSwitchAccountButton\.addEventListener\('click', switchOfficialBrowserAccount\)/);
 
-console.log('Official website login contract PASS (NetEase, QQ, Kugou; no embedded QR flow)');
+console.log('Official browser login contract PASS (NetEase/QQ cookies; Kugou provider QR; no web-embedded QR flow)');

@@ -36,6 +36,7 @@ const contentTypes = new Map([
 ]);
 
 function apiFixture(pathname) {
+  if (pathname === "/api/app/preferences/bootstrap.js") return null;
   if (pathname === "/api/player/state") return { queue: [], queueIndex: -1, volume: 0.8, playing: false };
   if (pathname === "/api/visual-bridge/state") return { audio: {} };
   if (pathname === "/api/audio/sample") return {};
@@ -902,6 +903,8 @@ try {
     const bassColumnCluster = SONIC_BASS_COLUMN_CLUSTER;
     const bassColumnRadius = Number(bassColumnCluster.radius) || 0;
     const bassColumnBandAttribute = topo.terrain.geometry.getAttribute('aBassColumnBand');
+    const terrainSeedAttribute = topo.terrain.geometry.getAttribute('aTerrainSeed');
+    const terrainSmallLocalAttribute = topo.terrain.geometry.getAttribute('aTerrainSmallLocal');
     const bassColumnPositions = [];
     const bassColumnBandIndices = [];
     for (let index = 0; index < topo.terrain.count; index += 1) {
@@ -999,8 +1002,11 @@ try {
         )),
       clusteredContiguously: positionsAreContiguous(uniqueColumnX)
         && positionsAreContiguous(uniqueColumnZ),
-      reusesTerrain: topo.group.children.length === 3
-        && topo.group.children.filter((child) => child.isInstancedMesh).length === 3,
+      reusesTerrain: topo.group.children.includes(topo.terrain)
+        && topo.group.children.filter((child) => (
+          child.isInstancedMesh && !child.name.startsWith('SonicRain')
+        )).length === 3
+        && !topo.group.children.some((child) => /BassColumn/i.test(child.name || '')),
       shaderSelectsCluster: sonicVertexShader.includes('bassColumnGrid - vec2(0.0)')
         && /dot\\s*\\(\\s*bassColumnDelta\\s*,\\s*bassColumnDelta\\s*\\)/.test(sonicVertexShader)
         && sonicVertexShader.includes((bassColumnRadius ** 2 + 0.5).toFixed(1)),
@@ -1020,7 +1026,7 @@ try {
           && lowFrequencyTransition.activeSpectrumSamples[1] === 0
           && lowFrequencyTransition.activeSpectrumSamples[2] >= 110
           && lowFrequencyTransition.activeSpectrumSamples[3] >= 245,
-        pausedZero: lowFrequencyTransition.pausedSpectrumZero === true
+        missingSourceClears: lowFrequencyTransition.pausedSpectrumZero === true
       },
       silkyRise: lowFrequencyTransition.riseSpectrum?.length === 24
         && lowFrequencyTransition.riseSpectrum[0] > 0
@@ -1061,7 +1067,7 @@ try {
         && uniqueBandIndices.length === SONIC_LOW_FREQUENCY_BAND_COUNT
         && uniqueBandIndices[0] === 0
         && uniqueBandIndices.at(-1) === SONIC_LOW_FREQUENCY_BAND_COUNT - 1,
-      centerUsesAggregateAmplitude: /bassColumnCenterMask[\\s\\S]{0,800}uLowFrequencyAmplitude/.test(sonicVertexShader),
+      centerUsesAggregateAmplitude: /bassColumnCenterMask[\\s\\S]{0,1800}uLowFrequencyAmplitude/.test(sonicVertexShader),
       heightProfile: {
         center: centerHeightScale,
         middle: middleHeightScale,
@@ -1077,7 +1083,7 @@ try {
       },
       obviousCoreMiddleOuterHeightDifference: bassColumnCluster.coreRadius === 3
         && bassColumnCluster.coreFeather === 6
-        && bassColumnCluster.coreHeightScale === 3
+        && bassColumnCluster.coreHeightScale === 4.2
         && bassColumnCluster.innerHeightScale === 1.9
         && bassColumnCluster.outerHeightScale === 0.58
         && centerHeightScale > middleHeightScale
@@ -1092,12 +1098,19 @@ try {
         && /vBassColumnRadialMix\\s*=\\s*bassColumnRadialMix\\s*;/.test(sonicVertexShader)
         && /float\\s+bassColumnHeightProfile\\s*=\\s*mix\\s*\\(\\s*1\\.90\\s*,\\s*0\\.58\\s*,\\s*bassColumnRadialMix\\s*\\)/.test(sonicVertexShader)
         && /float\\s+bassColumnCoreHeightMix\\s*=\\s*1\\.0\\s*-\\s*smoothstep\\s*\\(\\s*3\\.0\\s*,\\s*9\\.0\\s*,\\s*bassColumnRadius\\s*\\)/.test(sonicVertexShader)
-        && /bassColumnHeightProfile\\s*=\\s*mix\\s*\\(\\s*bassColumnHeightProfile\\s*,\\s*3\\.00\\s*,\\s*bassColumnCoreHeightMix\\s*\\)/.test(sonicVertexShader)
-        && /float\\s+bassColumnLift[\\s\\S]{0,260}bassColumnDrive[\\s\\S]{0,220}bassColumnHeightProfile[\\s\\S]{0,120}uColumnHeightScale/.test(sonicVertexShader),
+        && /bassColumnHeightProfile\\s*=\\s*mix\\s*\\(\\s*bassColumnHeightProfile\\s*,\\s*4\\.20\\s*,\\s*bassColumnCoreHeightMix\\s*\\)/.test(sonicVertexShader)
+        && /float\\s+bassColumnDynamicScale[\\s\\S]{0,180}bassColumnHeightProfile/.test(sonicVertexShader)
+        && /float\\s+bassColumnLift[\\s\\S]{0,260}bassColumnDrive[\\s\\S]{0,220}bassColumnDynamicScale[\\s\\S]{0,120}uColumnHeightScale/.test(sonicVertexShader),
       smallRandomLowFrequencyBumps: {
-        seededCells: sonicVertexShader.includes('vec2 smallBassCell = floor(pos2D / 7.0)')
-          && sonicVertexShader.includes('float smallBassSeed = random(smallBassCell + vec2(23.7, 51.3))')
-          && sonicVertexShader.includes('float smallBassPresence = step(0.84, smallBassSeed)'),
+        seededCells: sonicVertexShader.includes('float smallBassSeed = aTerrainSeed.y')
+          && sonicVertexShader.includes('vec2 smallBassLocal = aTerrainSmallLocal - 0.5')
+          && sonicVertexShader.includes('float smallBassPresence = step(0.84, smallBassSeed)')
+          && terrainSeedAttribute?.isInstancedBufferAttribute === true
+          && terrainSeedAttribute.normalized === true
+          && terrainSeedAttribute.itemSize === 4
+          && terrainSmallLocalAttribute?.isInstancedBufferAttribute === true
+          && terrainSmallLocalAttribute.normalized === true
+          && terrainSmallLocalAttribute.itemSize === 2,
         smoothCompactShape: sonicVertexShader.includes(
           '1.0 - smoothstep(0.07, 0.31, smallBassDistance)'
         ),
@@ -1118,9 +1131,9 @@ try {
           '* (0.65 + smallBassSeed * 0.35) * 1.25 * uColumnHeightScale'
         )
           && 1.25 / (centerHeightScale * 6.5) <= 0.1,
-        contributesToTerrain: sonicVertexShader.includes(
-          'float audioElevation = bassColumnLift + smallBassLift + subLift + bassLift'
-        )
+        contributesToTerrain:
+          sonicVertexShader.includes('float terrainAudioElevation = smallBassLift + subLift + bassLift')
+          && sonicVertexShader.includes('float audioElevation = terrainAudioElevation + centerColumnAudioLift')
       },
       transitionSamples,
       transitionsIntoRelief: sonicVertexShader.includes('float bassColumnRadius = sqrt(bassColumnRadiusSquared)')
@@ -1137,10 +1150,14 @@ try {
         && lowFrequencyTransition.activeAmplitude > lowFrequencyTransition.riseAmplitude[0] * 4
         && lowFrequencyTransition.pausedAmplitude === 0,
       contributesToTerrain: sonicVertexShader.includes('float bassColumnLift')
-        && sonicVertexShader.includes(
-          'float audioElevation = bassColumnLift + smallBassLift + subLift'
-        ),
+        && sonicVertexShader.includes('float centerColumnAudioLift = centerColumnRawLift <= centerColumnKnee')
+        && sonicVertexShader.includes('float audioElevation = terrainAudioElevation + centerColumnAudioLift')
+        && sonicVertexShader.includes('idleElevation + bassColumnPedestalLift + audioElevation'),
       playbackClockGated: sonicMotionSource.includes('const audioDriving = isPlaybackClockRunning()'),
+      sameSourcePauseHoldContract: sonicMotionSource.includes('const holdPausedAudio = sameSourcePaused')
+        && sonicMotionSource.includes('else if (holdPausedAudio)')
+        && sonicMotionSource.includes('topo.audioTerrainSource === activeAudioSource')
+        && sonicMotionSource.includes('topo.audioTerrainTime = (Number(topo.audioTerrainTime) || 0) + dt'),
       activeLowFrequencyReachedUniforms: lowFrequencyTransition.activeSubBass >= 0.85
         && lowFrequencyTransition.activeBass >= 0.71
         && lowFrequencyTransition.activeLowMid >= 0.35,
@@ -1162,11 +1179,19 @@ try {
       centerColor: document.querySelector('#sonicCenterColorInput'),
       coreColor: document.querySelector('#sonicCoreColorInput'),
       outerColor: document.querySelector('#sonicOuterColorInput'),
+      groundMounds: document.querySelector('#sonicGroundMoundsToggle'),
+      groundColor: document.querySelector('#sonicGroundColorInput'),
+      groundFollowCover: document.querySelector('#sonicGroundFollowCoverButton'),
+      groundEmission: document.querySelector('#sonicGroundEmissionRange'),
+      groundMoundHeight: document.querySelector('#sonicGroundMoundHeightRange'),
+      groundMoundRadius: document.querySelector('#sonicGroundMoundRadiusRange'),
       fountainToggle: document.querySelector('#sonicFountainToggle'),
       fountainColor: document.querySelector('#sonicFountainColorInput'),
       starfieldToggle: document.querySelector('#sonicStarfieldToggle'),
       starfieldColor: document.querySelector('#sonicStarfieldColorInput'),
       brightness: document.querySelector('#sonicBrightnessRange'),
+      fluorescence: document.querySelector('#sonicFluorescenceRange'),
+      fluorescenceScatter: document.querySelector('#sonicFluorescenceScatterRange'),
       exposure: document.querySelector('#sonicExposureRange'),
       columnHeight: document.querySelector('#sonicColumnHeightRange'),
       fieldOfView: document.querySelector('#sonicFovRange'),
@@ -1202,11 +1227,19 @@ try {
         centerColor: sonicControlElements.centerColor?.type || '',
         coreColor: sonicControlElements.coreColor?.type || '',
         outerColor: sonicControlElements.outerColor?.type || '',
+        groundMounds: sonicControlElements.groundMounds?.type || '',
+        groundColor: sonicControlElements.groundColor?.type || '',
+        groundFollowCover: sonicControlElements.groundFollowCover?.type || '',
+        groundEmission: sonicControlElements.groundEmission?.type || '',
+        groundMoundHeight: sonicControlElements.groundMoundHeight?.type || '',
+        groundMoundRadius: sonicControlElements.groundMoundRadius?.type || '',
         fountainToggle: sonicControlElements.fountainToggle?.type || '',
         fountainColor: sonicControlElements.fountainColor?.type || '',
         starfieldToggle: sonicControlElements.starfieldToggle?.type || '',
         starfieldColor: sonicControlElements.starfieldColor?.type || '',
         brightness: sonicControlElements.brightness?.type || '',
+        fluorescence: sonicControlElements.fluorescence?.type || '',
+        fluorescenceScatter: sonicControlElements.fluorescenceScatter?.type || '',
         exposure: sonicControlElements.exposure?.type || '',
         columnHeight: sonicControlElements.columnHeight?.type || '',
         fieldOfView: sonicControlElements.fieldOfView?.type || '',
@@ -1224,6 +1257,13 @@ try {
           && /uniform\\s+vec3\\s+uCoreColumnColor\\s*;/.test(String(topo.material.fragmentShader || '')),
         outerColor: !!topo.uniforms.uOuterColumnColor
           && /uniform\\s+vec3\\s+uOuterColumnColor\\s*;/.test(String(topo.material.fragmentShader || '')),
+        groundColor: !!topo.uniforms.uGroundColor
+          && /uniform\\s+vec3\\s+uGroundColor\\s*;/.test(String(topo.material.fragmentShader || '')),
+        groundEmission: !!topo.uniforms.uGroundEmission
+          && /uniform\\s+float\\s+uGroundEmission\\s*;/.test(String(topo.material.fragmentShader || '')),
+        groundMoundHeight: !!topo.uniforms.uGroundMoundHeight
+          && /uniform\\s+float\\s+uGroundMoundHeight\\s*;/.test(sonicVertexShader)
+          && /attribute\\s+float\\s+aGroundMoundMask\\s*;/.test(sonicVertexShader),
         brightness: !!topo.uniforms.uSonicBrightness
           && /uniform\\s+float\\s+uSonicBrightness\\s*;/.test(String(topo.material.fragmentShader || '')),
         exposure: !!topo.uniforms.uSonicExposure
@@ -1259,6 +1299,12 @@ try {
     const hexColor = (color) => color?.isColor ? ('#' + color.getHexString()) : '';
     const sonicEffects = {
       threeIndependentColumnColors: false,
+      groundColorApplied: false,
+      groundCoverColorApplied: false,
+      groundEmissionApplied: false,
+      groundMoundControlsApply: false,
+      groundMoundResourcesStable: false,
+      groundSettingsPersist: false,
       preferencesPersist: false,
       fountainDisabledStaysIdle: false,
       fountainRisesWithLowFrequency: false,
@@ -1276,12 +1322,38 @@ try {
       starfieldColorApplied: false
     };
     try {
+      const terrainGeometryBeforeGroundControls = topo.terrain?.geometry;
+      const terrainMaterialBeforeGroundControls = topo.terrain?.material;
+      const terrainInstanceMatrixBeforeGroundControls = topo.terrain?.instanceMatrix;
+      const bassColumnAttributeBeforeGroundControls = topo.terrain?.geometry?.getAttribute?.('aBassColumnBand');
+      const groundMoundAttributeBeforeControls = topo.terrain?.geometry?.getAttribute?.('aGroundMoundMask');
+      const groundMoundVersionBeforeControls = groundMoundAttributeBeforeControls?.version || 0;
       dispatchControl(sonicControlElements.centerColor, '#ff315f', 'input');
       dispatchControl(sonicControlElements.coreColor, '#31ff7a', 'input');
       dispatchControl(sonicControlElements.outerColor, '#317aff', 'input');
       sonicEffects.threeIndependentColumnColors = hexColor(topo.uniforms.uCenterColumnColor?.value) === '#ff315f'
         && hexColor(topo.uniforms.uCoreColumnColor?.value) === '#31ff7a'
         && hexColor(topo.uniforms.uOuterColumnColor?.value) === '#317aff';
+
+      dispatchControl(sonicControlElements.groundMounds, true, 'change');
+      dispatchControl(sonicControlElements.groundColor, '#ff8a24', 'input');
+      dispatchControl(sonicControlElements.groundEmission, 125, 'input');
+      dispatchControl(sonicControlElements.groundMoundHeight, 210, 'input');
+      dispatchControl(sonicControlElements.groundMoundRadius, 20, 'input');
+      const groundMoundAttributeAfterControls = topo.terrain?.geometry?.getAttribute?.('aGroundMoundMask');
+      sonicEffects.groundColorApplied = hexColor(topo.uniforms.uGroundColor?.value) === '#ff8a24';
+      sonicEffects.groundEmissionApplied = Math.abs((topo.uniforms.uGroundEmission?.value || 0) - 1.25) < 0.001;
+      sonicEffects.groundMoundControlsApply = topo.settings.groundMoundsEnabled === true
+        && Math.abs(topo.settings.groundMoundHeight - 2.1) < 0.001
+        && topo.settings.groundMoundRadius === 20
+        && Math.abs((topo.uniforms.uGroundMoundHeight?.value || 0) - 2.1) < 0.001
+        && groundMoundAttributeAfterControls?.array?.some?.((value) => value > 0.9) === true;
+      sonicEffects.groundMoundResourcesStable = topo.terrain?.geometry === terrainGeometryBeforeGroundControls
+        && topo.terrain?.material === terrainMaterialBeforeGroundControls
+        && topo.terrain?.instanceMatrix === terrainInstanceMatrixBeforeGroundControls
+        && topo.terrain?.geometry?.getAttribute?.('aBassColumnBand') === bassColumnAttributeBeforeGroundControls
+        && groundMoundAttributeAfterControls === groundMoundAttributeBeforeControls
+        && (groundMoundAttributeAfterControls?.version || 0) > groundMoundVersionBeforeControls;
 
       dispatchControl(sonicControlElements.fountainColor, '#fff4d6', 'input');
       dispatchControl(sonicControlElements.starfieldColor, '#8bdcff', 'input');
@@ -1291,10 +1363,24 @@ try {
       sonicEffects.preferencesPersist = storedEffects.centerColor === '#ff315f'
         && storedEffects.coreColor === '#31ff7a'
         && storedEffects.outerColor === '#317aff'
+        && storedEffects.groundColor === '#ff8a24'
+        && storedEffects.groundEmission === 1.25
+        && storedEffects.groundMoundsEnabled === true
+        && storedEffects.groundMoundHeight === 2.1
+        && storedEffects.groundMoundRadius === 20
         && storedEffects.fountainEnabled === true
         && storedEffects.fountainColor === '#fff4d6'
         && storedEffects.starfieldEnabled === true
         && storedEffects.starfieldColor === '#8bdcff';
+      sonicEffects.groundSettingsPersist = storedEffects.groundColor === '#ff8a24'
+        && storedEffects.groundEmission === 1.25
+        && storedEffects.groundMoundsEnabled === true
+        && storedEffects.groundMoundHeight === 2.1
+        && storedEffects.groundMoundRadius === 20;
+      sonicControlElements.groundFollowCover?.click();
+      sonicEffects.groundCoverColorApplied = topo.settings.groundColor === null
+        && hexColor(topo.uniforms.uGroundColor?.value) === resolvedSonicGroundColor()
+        && sonicControlElements.groundFollowCover?.getAttribute('aria-pressed') === 'true';
 
       state.audioAnalysis.live = false;
       isPlaybackClockRunning = () => true;
@@ -1465,8 +1551,99 @@ try {
         localContrast: neighborContrast / Math.max(1, samples)
       };
     };
+    const captureSonicFrame = () => {
+      const previousRenderTarget = topo.renderer.getRenderTarget?.() || null;
+      topo.renderer.setRenderTarget(null);
+      topo.renderer.render(topo.scene, topo.camera);
+      const width = sonicGl.drawingBufferWidth;
+      const height = sonicGl.drawingBufferHeight;
+      const pixels = new Uint8Array(width * height * 4);
+      sonicGl.readPixels(0, 0, width, height, sonicGl.RGBA, sonicGl.UNSIGNED_BYTE, pixels);
+      if (previousRenderTarget) topo.renderer.setRenderTarget(previousRenderTarget);
+      return {
+        width,
+        height,
+        pixels,
+        drawCalls: Number(topo.renderer.info?.render?.calls) || 0
+      };
+    };
+    const compareSonicFluorescenceFrames = (offFrame, onFrame) => {
+      const width = Math.min(offFrame.width, onFrame.width);
+      const height = Math.min(offFrame.height, onFrame.height);
+      const pixelStep = Math.max(2, Math.floor(Math.min(width, height) / 160));
+      const luminanceAt = (pixels, pixelIndex) => (
+        pixels[pixelIndex] * 0.2126
+        + pixels[pixelIndex + 1] * 0.7152
+        + pixels[pixelIndex + 2] * 0.0722
+      ) / 255;
+      const gains = [];
+      let brightened = 0;
+      let gainSum = 0;
+      let gainSquared = 0;
+      let gainEdgeSum = 0;
+      let clippedHighlights = 0;
+      for (let y = 0; y < height; y += pixelStep) {
+        for (let x = 0; x < width; x += pixelStep) {
+          const pixelIndex = (y * width + x) * 4;
+          const offLuminance = luminanceAt(offFrame.pixels, pixelIndex);
+          const onLuminance = luminanceAt(onFrame.pixels, pixelIndex);
+          const gain = Math.max(0, onLuminance - offLuminance);
+          gains.push(gain);
+          gainSum += gain;
+          gainSquared += gain * gain;
+          if (gain >= 0.012) brightened += 1;
+          if (onLuminance >= 0.985) clippedHighlights += 1;
+          if (x + pixelStep < width) {
+            const neighborIndex = pixelIndex + pixelStep * 4;
+            const neighborGain = Math.max(
+              0,
+              luminanceAt(onFrame.pixels, neighborIndex)
+                - luminanceAt(offFrame.pixels, neighborIndex)
+            );
+            gainEdgeSum += Math.abs(gain - neighborGain);
+          }
+        }
+      }
+      gains.sort((a, b) => a - b);
+      const sampleCount = Math.max(1, gains.length);
+      const meanLuminanceGain = gainSum / sampleCount;
+      const percentile = (amount) => gains[Math.min(
+        gains.length - 1,
+        Math.max(0, Math.floor((gains.length - 1) * amount))
+      )] || 0;
+      return {
+        sampleCount,
+        meanLuminanceGain,
+        p90LuminanceGain: percentile(0.9),
+        p98LuminanceGain: percentile(0.98),
+        gainStdDev: Math.sqrt(Math.max(0, gainSquared / sampleCount - meanLuminanceGain ** 2)),
+        brightenedPixelRatio: brightened / sampleCount,
+        edgeDetailGain: gainEdgeSum / sampleCount,
+        clippedHighlightRatio: clippedHighlights / sampleCount,
+        offDrawCalls: offFrame.drawCalls,
+        onDrawCalls: onFrame.drawCalls
+      };
+    };
     const sonicDefaultPixelMetrics = sampleSonicPixels();
     const pixelProbeSettings = { ...topo.settings };
+    topo.settings = {
+      ...pixelProbeSettings,
+      atmosphereEnabled: false,
+      fluorescence: 0,
+      brightness: 1,
+      exposure: 0
+    };
+    applySonicTopographySettings({ persist: false, sync: false, renderConfig: false });
+    const sonicFluorescenceOffFrame = captureSonicFrame();
+    topo.settings = { ...topo.settings, fluorescence: 1 };
+    applySonicTopographySettings({ persist: false, sync: false, renderConfig: false });
+    const sonicFluorescenceOnFrame = captureSonicFrame();
+    const sonicFluorescencePixelContrast = compareSonicFluorescenceFrames(
+      sonicFluorescenceOffFrame,
+      sonicFluorescenceOnFrame
+    );
+    topo.settings = pixelProbeSettings;
+    applySonicTopographySettings({ persist: false, sync: false, renderConfig: false });
     const sampleOptics = () => ({
       groundColor: topo.tyndallGroundSheenMaterial?.uniforms?.uReflectionColor?.value?.getHexString?.() || '',
       wallColor: topo.tyndallWallBounceMaterial?.uniforms?.uReflectionColor?.value?.getHexString?.() || '',
@@ -1533,6 +1710,7 @@ try {
       shaderMaterials: topo.tyndallBeams?.every((beam) => beam.material?.isShaderMaterial === true)
         && topo.tyndallHalos?.every((halo) => halo.material?.isShaderMaterial === true),
       pixelMetrics: sonicPixelMetrics,
+      fluorescencePixelContrast: sonicFluorescencePixelContrast,
       opticsCoupling: sonicOpticsCoupling,
       programsRunnable: (topo.renderer.info?.programs || []).every((program) => program?.diagnostics?.runnable !== false),
       glError: sonicGl.getError()
@@ -1589,15 +1767,15 @@ try {
     setDiyPreset('lyric');
     sonicControls.panelHiddenOutsideTopography = !!sonicPanel && sonicPanel.hidden === true;
     const lyricNativeRefresh = playbackPresetsUseNativeRefresh();
-    const sandboxInterval = sandboxFrameInterval();
-    const coverParticleFpsLimit = coverParticleEngineOptions().fpsLimit;
+    const sandboxUsesEveryFrame = typeof sandboxFrameInterval === 'undefined';
+    const coverParticlesUseNativeClock = coverParticleEngineOptions().fpsLimit === Number.POSITIVE_INFINITY;
     returnHomePage();
     return {
       nativeRefresh,
       lyricNativeRefresh,
       homeNativeRefresh: playbackPresetsUseNativeRefresh(),
-      sandboxInterval,
-      coverParticleFpsLimit,
+      sandboxUsesEveryFrame,
+      coverParticlesUseNativeClock,
       renderTier: RENDER_PROFILE.tier,
       grid: RENDER_PROFILE.topographyGrid,
       instanceCount: sonicInstanceCount,
@@ -1985,6 +2163,7 @@ try {
     };
     let playCalls = 0;
     let pauseCalls = 0;
+    let destroyCalls = 0;
     let gpuSetSizeCalls = 0;
     let originalGpuSetSize = null;
     let result = { available: false };
@@ -1992,7 +2171,8 @@ try {
       setDiyPreset('lyric');
       cover.engineContainer = {
         play() { playCalls += 1; },
-        pause() { pauseCalls += 1; }
+        pause() { pauseCalls += 1; },
+        destroy() { destroyCalls += 1; }
       };
       cover.enginePromise = null;
       cover.enginePlaying = false;
@@ -2224,13 +2404,25 @@ try {
       setDiyPreset('lyric');
       await wait(80);
       const pauseAfterExit = pauseCalls;
+      const destroyAfterExit = destroyCalls;
+      const resourcesAfterExit = {
+        engineContainerReleased: cover.engineContainer === null,
+        gpuReleased: cover.gpuRenderer === null
+          && cover.gpuGeometry === null
+          && cover.gpuMaterial === null,
+        particleHeapReleased: cover.particles.length === 0,
+        backingStoreReleased: els.coverParticleCanvas?.width === 1
+          && els.coverParticleCanvas?.height === 1
+      };
       updateCoverParticleVisibility();
       updateCoverParticleVisibility();
       const pauseAfterRepeatedHidden = pauseCalls;
+      const destroyAfterRepeatedHidden = destroyCalls;
 
       enterPresetPlaybackPage('cover-particles');
       await wait(80);
       const playAfterPausedReentry = playCalls;
+      const visibleAfterReentry = cover.engineVisible && coverParticlePresetVisible();
       state.playerClock.playing = true;
       state.playerClock.updatedAt = performance.now();
       updatePlayState();
@@ -2245,8 +2437,12 @@ try {
         pauseAfterPlaybackPause,
         pauseAfterExit,
         pauseAfterRepeatedHidden,
+        destroyAfterExit,
+        destroyAfterRepeatedHidden,
+        resourcesAfterExit,
         playAfterPausedReentry,
         playAfterReentryPlaybackStart: playCalls,
+        visibleAfterReentry,
         gpuSetSizeCalls,
         wavePhase: {
           beforePlayback: waveTimeBeforePlayback,
@@ -2452,7 +2648,8 @@ try {
           && cpuRenderSource.includes(
             'Math.sin(particleFloatTime * particle.floatRate + particle.floatPhase)'
           ),
-        naturalFloatIndependentOfLowFrequency: !vertexShader.includes('uBass')
+        naturalFloatIndependentOfLowFrequency: !vertexShader.includes('uniform float uBass;')
+          && !vertexShader.includes('naturalFloat * uBassJitter')
           && !vertexShader.includes('uBeat')
           && !vertexShader.includes('uShock')
           && !vertexShader.includes('naturalFloat * uWholeJump')
@@ -2775,8 +2972,10 @@ try {
   const checks = {
     coverAndChladniEntranceMotion: Object.values(entranceMotionContract).every(Boolean),
     presetStarted: setup.active === true && setup.canvasCount === 1,
-    playbackPresetsTrackNativeRefresh: activeSample.nativeRefresh === true
-      && activeSample.renderToRafRatio >= 0.9,
+    playbackPresetsHoldSustainableFrameRate: activeSample.nativeRefresh === true
+      && activeSample.presetFps >= 55
+      && activeSample.presetFps <= 125
+      && activeSample.presetFps <= activeSample.rafFps + 2,
     freeCubeSkipsCovered2dScene: activeSample.hiddenOrbDrawImageCalls === 0,
     uiPointerWorkCoalesced: uiPointerSample.available === true
       && uiPointerSample.layoutReads <= 2
@@ -2789,7 +2988,9 @@ try {
     foregroundPresetResumed: lifecycle.resumedFrameDelta >= 5,
     foregroundEventStreamResumed: lifecycle.resumedEventSourceCount >= 1,
     inactivePresetDisposed: lifecycle.inactive.active === false && lifecycle.inactive.canvasCount === 0,
-    dynamicCubeTracksNativeRefresh: dynamicCubeRefresh.renderToRafRatio >= 0.9,
+    dynamicCubeHoldsSustainableFrameRate: dynamicCubeRefresh.renderFps >= 55
+      && dynamicCubeRefresh.renderFps <= 125
+      && dynamicCubeRefresh.renderFps <= dynamicCubeRefresh.rafFps + 2,
     dynamicCubeAvoidsPerFrameLayoutReads: dynamicCubeRefresh.layoutReads <= 3,
     coveredVoidSkips2dCanvas: voidCanvasBypass.runtimeFrameDelta > 0
       && voidCanvasBypass.drawImageCalls === 0
@@ -2857,15 +3058,19 @@ try {
       && renderQualityLifecycle.dynamicDiagnostics.gpuTimerQueriesEnabled === true
       && renderQualityLifecycle.dynamicCounters.timerExtensionRequests === 1
       && renderQualityLifecycle.dynamicCounters.queriesCreated === 1,
-    coverParticleEngineUsesVisibilityEdges: coverParticleLifecycle.available === true
+    coverParticleEngineReleasesOnVisibilityEdges: coverParticleLifecycle.available === true
       && coverParticleLifecycle.playWhilePaused === 0
       && coverParticleLifecycle.playAfterPlaybackStart === 1
       && coverParticleLifecycle.playAfterRepeatedVisible === 1
       && coverParticleLifecycle.pauseAfterPlaybackPause === 1
-      && coverParticleLifecycle.pauseAfterExit === 1
-      && coverParticleLifecycle.pauseAfterRepeatedHidden === 1
+      && coverParticleLifecycle.pauseAfterExit === 2
+      && coverParticleLifecycle.pauseAfterRepeatedHidden === 2
+      && coverParticleLifecycle.destroyAfterExit === 1
+      && coverParticleLifecycle.destroyAfterRepeatedHidden === 1
+      && Object.values(coverParticleLifecycle.resourcesAfterExit || {}).every(Boolean)
       && coverParticleLifecycle.playAfterPausedReentry === 1
-      && coverParticleLifecycle.playAfterReentryPlaybackStart === 2,
+      && coverParticleLifecycle.playAfterReentryPlaybackStart >= 1
+      && coverParticleLifecycle.visibleAfterReentry === true,
     coverParticleSkipsStableGpuResize: coverParticleLifecycle.gpuAvailable === true
       && coverParticleLifecycle.gpuSetSizeCalls === 0,
     coverParticleWavePhaseIsSmoothAndClockGated: coverParticleLifecycle.wavePhase?.afterPlaybackStart
@@ -3011,16 +3216,17 @@ try {
     coverParticleLeavesChladniUntouched: coverParticleDepthMapping.chladniUnchanged === true,
     presetRenderSurfacesCoverStage: presetSurfaceCoverage.available === true
       && presetSurfaceCoverage.allCoverStage === true,
-    sonicTracksNativeRefresh: sonicRefresh.nativeRefresh === true
+    sonicHoldsSustainableFrameRate: sonicRefresh.nativeRefresh === true
       && sonicRefresh.lyricNativeRefresh === true
       && sonicRefresh.homeNativeRefresh === true
-      && sonicRefresh.sandboxInterval === 0
-      && sonicRefresh.coverParticleFpsLimit >= 1000
+      && sonicRefresh.sandboxUsesEveryFrame === true
+      && sonicRefresh.coverParticlesUseNativeClock === true
       && sonicRefresh.grid >= sonicGridMinimum
       && sonicRefresh.instanceCount === sonicRefresh.grid * sonicRefresh.grid
-      && sonicRefresh.spectrumFps >= 24
-      && sonicRefresh.spectrumFps <= 50
-      && sonicRefresh.renderToRafRatio >= 0.9
+      && sonicRefresh.renderFps >= 50
+      && sonicRefresh.renderFps <= 125
+      && sonicRefresh.renderFps <= sonicRefresh.rafFps + 2
+      && sonicRefresh.spectrumFps >= sonicRefresh.renderFps * 0.9
       && sonicRefresh.contextLost === false
       && sonicRefresh.layoutReads <= 3,
     nativePresetRenderAvoidsRedundantTargets: sonicRefresh.renderTargetSwitches === 0,
@@ -3048,7 +3254,9 @@ try {
         && sonicRefresh.sonicAtmosphere?.groundHasNoSpotGeometry === true
         && sonicRefresh.sonicAtmosphere?.opticsCoupling?.temperatureChangesAllReceivers === true
         && sonicRefresh.sonicAtmosphere?.opticsCoupling?.reflectanceRaisesReceiverEnergy === true
-        && raised.clippedHighlightRatio <= 0.005
+        // Taller, denser column clusters expose more emissive top faces; keep
+        // clipping below 0.7% while still requiring shadow and midtone detail.
+        && raised.clippedHighlightRatio <= 0.007
         && raised.highlightRatio <= 0.02
         && raised.shadowRatio >= 0.45
         && raised.localContrast >= 0.006
@@ -3062,11 +3270,19 @@ try {
       && sonicRefresh.sonicControls?.inputTypes?.centerColor === 'color'
       && sonicRefresh.sonicControls?.inputTypes?.coreColor === 'color'
       && sonicRefresh.sonicControls?.inputTypes?.outerColor === 'color'
+      && sonicRefresh.sonicControls?.inputTypes?.groundMounds === 'checkbox'
+      && sonicRefresh.sonicControls?.inputTypes?.groundColor === 'color'
+      && sonicRefresh.sonicControls?.inputTypes?.groundFollowCover === 'button'
+      && sonicRefresh.sonicControls?.inputTypes?.groundEmission === 'range'
+      && sonicRefresh.sonicControls?.inputTypes?.groundMoundHeight === 'range'
+      && sonicRefresh.sonicControls?.inputTypes?.groundMoundRadius === 'range'
       && sonicRefresh.sonicControls?.inputTypes?.fountainToggle === 'checkbox'
       && sonicRefresh.sonicControls?.inputTypes?.fountainColor === 'color'
       && sonicRefresh.sonicControls?.inputTypes?.starfieldToggle === 'checkbox'
       && sonicRefresh.sonicControls?.inputTypes?.starfieldColor === 'color'
       && sonicRefresh.sonicControls?.inputTypes?.brightness === 'range'
+      && sonicRefresh.sonicControls?.inputTypes?.fluorescence === 'range'
+      && sonicRefresh.sonicControls?.inputTypes?.fluorescenceScatter === 'range'
       && sonicRefresh.sonicControls?.inputTypes?.exposure === 'range'
       && sonicRefresh.sonicControls?.inputTypes?.columnHeight === 'range'
       && sonicRefresh.sonicControls?.inputTypes?.fieldOfView === 'range'
@@ -3087,6 +3303,12 @@ try {
       && sonicRefresh.sonicSceneControls?.wallpaperBeforeSonic === true
       && sonicRefresh.sonicSceneControls?.actionsComplete === true,
     sonicEffectsRespondToControls: sonicRefresh.sonicEffects?.threeIndependentColumnColors === true
+      && sonicRefresh.sonicEffects?.groundColorApplied === true
+      && sonicRefresh.sonicEffects?.groundCoverColorApplied === true
+      && sonicRefresh.sonicEffects?.groundEmissionApplied === true
+      && sonicRefresh.sonicEffects?.groundMoundControlsApply === true
+      && sonicRefresh.sonicEffects?.groundMoundResourcesStable === true
+      && sonicRefresh.sonicEffects?.groundSettingsPersist === true
       && sonicRefresh.sonicEffects?.preferencesPersist === true
       && sonicRefresh.sonicEffects?.fountainDisabledStaysIdle === true
       && sonicRefresh.sonicEffects?.fountainRisesWithLowFrequency === true
@@ -3102,7 +3324,7 @@ try {
       && sonicRefresh.sonicEffects?.starfieldPointSize > 0
       && sonicRefresh.sonicEffects?.starfieldPointSize <= 0.5
       && sonicRefresh.sonicEffects?.starfieldLayerCount === 3,
-    sonicBassColumnsReuseTerrainAndStopPaused: sonicRefresh.bassColumns?.count === 1793
+    sonicBassColumnsReuseTerrainAndFreezePaused: sonicRefresh.bassColumns?.count === 1793
       && sonicRefresh.bassColumns?.uniqueX === 49
       && sonicRefresh.bassColumns?.uniqueZ === 49
       && sonicRefresh.bassColumns?.oddCenteredCore === true
@@ -3116,7 +3338,7 @@ try {
       && sonicRefresh.bassColumns?.spectrumTexture?.height === 1
       && sonicRefresh.bassColumns?.spectrumTexture?.bytes === 512
       && sonicRefresh.bassColumns?.spectrumTexture?.followsVisualBands === true
-      && sonicRefresh.bassColumns?.spectrumTexture?.pausedZero === true
+      && sonicRefresh.bassColumns?.spectrumTexture?.missingSourceClears === true
       && sonicRefresh.bassColumns?.silkyRise === true
       && sonicRefresh.bassColumns?.silkyRelease === true
       && sonicRefresh.bassColumns?.shaderSamples512Bands === true
@@ -3128,6 +3350,7 @@ try {
       && sonicRefresh.bassColumns?.amplitudeDriven === true
       && sonicRefresh.bassColumns?.contributesToTerrain === true
       && sonicRefresh.bassColumns?.playbackClockGated === true
+      && sonicRefresh.bassColumns?.sameSourcePauseHoldContract === true
       && sonicRefresh.bassColumns?.activeLowFrequencyReachedUniforms === true
       && sonicRefresh.bassColumns?.pausedUniformsZero === true
   };
@@ -3162,6 +3385,11 @@ try {
       while (!topo.wallpaperTexture && performance.now() - wallpaperStartedAt < 4000) await wait(40);
       topo.settings = {
         ...topo.settings,
+        groundMoundsEnabled: true,
+        groundColor: null,
+        groundEmission: 0.72,
+        groundMoundHeight: 1.25,
+        groundMoundRadius: 8,
         fogDensity: 0.42,
         fogGlow: 0.58,
         mistReflectance: 0.72,

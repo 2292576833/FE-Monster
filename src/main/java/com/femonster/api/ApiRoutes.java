@@ -1,6 +1,7 @@
 package com.femonster.api;
 
 import com.femonster.core.AppContext;
+import com.femonster.core.WallpaperService;
 import com.femonster.desktop.LocalClientLauncher;
 import com.femonster.http.HttpUtil;
 import com.femonster.json.SimpleJson;
@@ -33,12 +34,16 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class ApiRoutes {
     private static final String WALLPAPER_WEB_ENTRY_PREFIX = "/api/wallpapers/web-entry/";
     private static final String WALLPAPER_WEB_FILE_PREFIX = "/api/wallpapers/web/";
     private static final String WALLPAPER_WEB_HOST = "wallpaper.localhost";
+    private static final String CREATIVE_MARKET_WORK_PREFIX = "/api/creative-market/works/";
+    private static final String CREATIVE_MARKET_ASSET_PREFIX = "/api/creative-market/assets/";
+    private static final String COMMUNITY_PET_AUDIO_PREFIX = "/api/community/pet/audio/";
+    private static final long MAX_CREATIVE_MARKET_UPLOAD_BYTES = 512L * 1024 * 1024;
     private static final String COVER_CACHE_CONTROL = "private, max-age=86400, stale-while-revalidate=604800";
     private static final int MAX_QISHUI_LIBRARY_METADATA_BYTES = 2 * 1024 * 1024;
     private static final String WALLPAPER_WEB_CSP = String.join(" ",
@@ -57,8 +62,14 @@ public final class ApiRoutes {
         "frame-ancestors http://127.0.0.1:* http://localhost:* http://[::1]:*;"
     );
     private final AppContext context;
-    private final HttpClient coverClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(4)).build();
     private final AudioStreamProxy audioStreamProxy = new AudioStreamProxy();
+    private final AtomicBoolean quitRequested = new AtomicBoolean(false);
+
+    private static final class CoverHttpClientHolder {
+        private static final HttpClient INSTANCE = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(4))
+            .build();
+    }
 
     private ApiRoutes(AppContext context) {
         this.context = context;
@@ -77,6 +88,9 @@ public final class ApiRoutes {
                 && (!"GET".equals(method) || !path.startsWith(WALLPAPER_WEB_FILE_PREFIX))) {
                 HttpUtil.sendJson(exchange, 403, HttpUtil.error("isolated wallpaper origin"));
                 return;
+            }
+            if (path.startsWith("/api/community/pet/") || "/api/community/events".equals(path)) {
+                requireLocalPetAssistant(exchange);
             }
             if (HttpUtil.handleOptions(exchange)) return;
             Map<String, String> query = HttpUtil.query(exchange);
@@ -97,6 +111,8 @@ public final class ApiRoutes {
             }
 
             HttpUtil.sendJson(exchange, 405, HttpUtil.error("method not allowed"));
+        } catch (SecurityException e) {
+            HttpUtil.sendJson(exchange, 403, HttpUtil.error(e.getMessage() == null ? "forbidden" : e.getMessage()));
         } catch (IllegalArgumentException e) {
             HttpUtil.sendJson(exchange, 400, HttpUtil.error(e.getMessage() == null ? "invalid request" : e.getMessage()));
         } catch (Exception e) {
@@ -106,6 +122,17 @@ public final class ApiRoutes {
     }
 
     private void handleGet(HttpExchange exchange, String path, Map<String, String> query) throws IOException {
+        if ("/api/app/preferences/bootstrap.js".equals(path)) {
+            requireSameOriginClientPreferences(exchange);
+            exchange.getResponseHeaders().set("Cache-Control", "no-store, max-age=0");
+            HttpUtil.sendBytes(
+                exchange,
+                200,
+                "text/javascript; charset=utf-8",
+                context.clientPreferences.bootstrapScript().getBytes(StandardCharsets.UTF_8)
+            );
+            return;
+        }
         if (path.startsWith(WALLPAPER_WEB_ENTRY_PREFIX)) {
             handleWallpaperWebEntry(exchange, path);
             return;
@@ -118,6 +145,20 @@ public final class ApiRoutes {
             handleWallpaperWebFile(exchange, path);
             return;
         }
+        if (path.startsWith(CREATIVE_MARKET_WORK_PREFIX)) {
+            String workId = requireCreativePathId(path, CREATIVE_MARKET_WORK_PREFIX, "work-");
+            HttpUtil.sendJson(exchange, context.community.creativeMarketWork(workId));
+            return;
+        }
+        if (path.startsWith(CREATIVE_MARKET_ASSET_PREFIX)) {
+            String assetId = requireCreativePathId(path, CREATIVE_MARKET_ASSET_PREFIX, "asset-");
+            handleCreativeMarketAsset(exchange, assetId);
+            return;
+        }
+        if (path.startsWith(COMMUNITY_PET_AUDIO_PREFIX)) {
+            handleCommunityPetAudio(exchange, query, path.substring(COMMUNITY_PET_AUDIO_PREFIX.length()));
+            return;
+        }
         switch (path) {
             case "/api/app/version" -> HttpUtil.sendJson(exchange, appVersion());
             case "/api/app/machine" -> HttpUtil.sendJson(exchange, context.machine.payload());
@@ -126,14 +167,27 @@ public final class ApiRoutes {
                 context.runtimeSettings.snapshot()
             ));
             case "/api/app/runtime/settings" -> HttpUtil.sendJson(exchange, context.runtimeSettings.snapshot());
+            case "/api/app/preferences" -> {
+                requireSameOriginClientPreferences(exchange);
+                HttpUtil.sendJson(exchange, context.clientPreferences.snapshot());
+            }
+            case "/api/app/achievements" -> {
+                requireSameOriginClientPreferences(exchange);
+                HttpUtil.sendJson(exchange, achievementSnapshot(path, query));
+            }
+            case "/api/community/achievements" -> {
+                requireSameOriginClientPreferences(exchange);
+                HttpUtil.sendJson(exchange, achievementSnapshot(path, query));
+            }
             case "/api/sandbox/assets" -> handleSandboxAsset(exchange, query);
             case "/api/sandbox/capabilities", "/api/sandbox/presets", "/api/sandbox/components",
-                "/api/preset-market", "/api/component-market", "/api/creative-market" ->
+                "/api/preset-market", "/api/component-market" ->
                 HttpUtil.sendJson(exchange, context.community.sandboxGet(sandboxPath(path, query)));
-            case "/api/app/gesture" -> HttpUtil.sendJson(exchange, context.gestureControl.status(
-                context.runtimeSettings.gestureControlEnabled(),
-                context.runtimeSettings.gestureCameraSource()
-            ));
+            case "/api/creative-market" -> handleCreativeMarket(exchange, query);
+            case "/api/creative-market/comments" -> HttpUtil.sendJson(
+                exchange,
+                context.community.creativeMarketComments(requireCreativeId(HttpUtil.param(query, "id", ""), "work-"))
+            );
             case "/api/audio/runtime" -> HttpUtil.sendJson(exchange, context.audioEngine.runtimePayload());
             case "/api/audio/sample" -> HttpUtil.sendJson(exchange, context.audioEngine.samplePayload());
             case "/api/audio/stream/status" -> HttpUtil.sendJson(exchange, audioStreamProxy.status());
@@ -145,8 +199,29 @@ public final class ApiRoutes {
             case "/api/app/quit", "/api/app/window/quit" -> handleQuit(exchange, true);
             case "/api/visual-bridge/health" -> HttpUtil.sendJson(exchange, context.visualBridge.health());
             case "/api/visual-bridge/state" -> HttpUtil.sendJson(exchange, context.visualBridge.state());
-            case "/api/wallpapers" -> HttpUtil.sendJson(exchange, context.wallpapers.payload(Boolean.parseBoolean(HttpUtil.param(query, "scan", "true"))));
-            case "/api/wallpapers/file" -> handleWallpaperFile(exchange, query);
+            case "/api/wallpapers" -> {
+                requireLocalWallpaperControl(exchange);
+                HttpUtil.sendJson(
+                    exchange,
+                    context.wallpapers.payload(Boolean.parseBoolean(HttpUtil.param(query, "scan", "true")))
+                );
+            }
+            case "/api/wallpapers/scene" -> {
+                requireLocalWallpaperControl(exchange);
+                HttpUtil.sendJson(
+                    exchange,
+                    context.wallpapers.sceneInventory(
+                        HttpUtil.param(query, "id", ""),
+                        Boolean.parseBoolean(HttpUtil.param(query, "refresh", "false")),
+                        HttpUtil.intParam(query, "offset", 0, 0, 16_384),
+                        HttpUtil.intParam(query, "limit", 512, 0, 1_024)
+                    )
+                );
+            }
+            case "/api/wallpapers/file" -> {
+                requireLocalWallpaperControl(exchange);
+                handleWallpaperFile(exchange, query);
+            }
             case "/api/user-cursors" -> HttpUtil.sendJson(exchange, context.userCursors.payload());
             case "/api/user-cursors/file" -> handleUserCursorFile(exchange, query);
             case "/api/providers" -> HttpUtil.sendJson(exchange, context.music.providersPayload());
@@ -157,7 +232,18 @@ public final class ApiRoutes {
             case "/api/community/state" -> handleCommunityState(exchange, query);
             case "/api/community/messages" -> handleCommunityMessages(exchange, query);
             case "/api/community/nearby" -> handleCommunityNearby(exchange, query);
+            case "/api/community/user" -> HttpUtil.sendJson(
+                exchange,
+                context.community.userProfile(requireFeId(HttpUtil.param(query, "id", "")))
+            );
+            case "/api/community/square/messages" -> handleCommunitySquareMessages(exchange, query);
             case "/api/community/listen/state" -> handleCommunityListenState(exchange, query);
+            case "/api/community/listen/report" -> handleCommunityListenReport(exchange, query);
+            case "/api/community/mailbox" -> handleCommunityMailbox(exchange, query);
+            case "/api/community/identity-cards" -> handleCommunityIdentityCards(exchange, query);
+            case "/api/community/friends/identity-card" -> handleCommunityFriendIdentityCard(exchange, query);
+            case "/api/community/pet/status" -> handleCommunityPetStatus(exchange, query);
+            case "/api/community/pet/history" -> handleCommunityPetHistory(exchange, query);
             case "/api/community/call/signals" -> handleCommunityCallSignals(exchange, query);
             case "/api/community/events" -> handleCommunityEvents(exchange, query);
             case "/api/search", "/api/netease/search", "/api/qq/search", "/api/kugou/search", "/api/qishui/search" -> HttpUtil.sendJson(exchange, context.music.search(
@@ -190,7 +276,12 @@ public final class ApiRoutes {
             case "/api/login/status" -> HttpUtil.sendJson(exchange, context.music.accountPayload(providerFrom(path, query)));
             case "/api/netease/login/browser/status", "/api/qq/login/browser/status", "/api/kugou/login/browser/status" -> HttpUtil.sendJson(
                 exchange,
-                context.browserLogin.status(providerFrom(path, query), HttpUtil.param(query, "session", ""))
+                context.browserLogin.status(
+                    providerFrom(path, query),
+                    HttpUtil.param(query, "session", ""),
+                    HttpUtil.longParam(query, "after", -1L, -1L, Long.MAX_VALUE),
+                    HttpUtil.intParam(query, "waitMs", 0, 0, 15000)
+                )
             );
             case "/api/netease/service/status", "/api/qq/service/status", "/api/kugou/service/status", "/api/qishui/service/status" -> HttpUtil.sendJson(exchange, context.music.serviceStatus(providerFrom(path, query)));
             case "/api/netease/login/status" -> HttpUtil.sendRawJson(exchange, 200, requireNetease().rawGet("/login/status"));
@@ -217,6 +308,10 @@ public final class ApiRoutes {
                 HttpUtil.intParam(query, "limit", 30, 1, 50)
             ));
             case "/api/player/state" -> HttpUtil.sendJson(exchange, context.player.state());
+            case "/api/player/queue" -> HttpUtil.sendJson(exchange, context.player.queuePage(
+                HttpUtil.intParam(query, "cursor", 0, 0, Integer.MAX_VALUE),
+                HttpUtil.intParam(query, "limit", 12, 1, 200)
+            ));
             case "/api/player/volume" -> HttpUtil.sendJson(exchange, context.player.setVolume(
                 HttpUtil.doubleParam(query, "value", 0.8, 0.0, 1.0)
             ));
@@ -238,60 +333,32 @@ public final class ApiRoutes {
     }
 
     private void handleQuit(HttpExchange exchange, boolean quitServer) throws IOException {
-        context.player.flush();
+        if (!quitServer) context.player.flush();
         HttpUtil.sendJson(exchange, LocalClientLauncher.controlPayload(quitServer ? "quit" : "close"));
-        if (quitServer) {
+        if (quitServer && quitRequested.compareAndSet(false, true)) {
             Thread shutdown = new Thread(() -> {
                 try {
                     Thread.sleep(180);
                 } catch (InterruptedException ignored) {
                     Thread.currentThread().interrupt();
                 }
-                cleanupBackgroundServices();
-                context.gestureControl.stop();
-                context.musicApis.close();
-                System.exit(0);
+                try {
+                    context.close();
+                } finally {
+                    System.exit(0);
+                }
             }, "fe-monster-shutdown");
             shutdown.setDaemon(false);
             shutdown.start();
         }
     }
 
-    private void cleanupBackgroundServices() {
-        String osName = System.getProperty("os.name", "").toLowerCase();
-        if (!osName.contains("win")) return;
-        Path script = context.paths.root.resolve("scripts").resolve("stop-stale-fe-monster.ps1");
-        if (!Files.isRegularFile(script)) return;
-
-        ProcessBuilder builder = new ProcessBuilder(
-            "powershell.exe",
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-WindowStyle",
-            "Hidden",
-            "-File",
-            script.toString(),
-            "-Root",
-            context.paths.root.toString(),
-            "-SkipJava"
-        );
-        builder.directory(context.paths.root.toFile());
-        builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
-        builder.redirectError(ProcessBuilder.Redirect.DISCARD);
-
-        try {
-            Process process = builder.start();
-            if (!process.waitFor(2, TimeUnit.SECONDS)) {
-                process.destroy();
-            }
-        } catch (IOException ignored) {
-        } catch (InterruptedException ignored) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
     private void handlePost(HttpExchange exchange, String path, Map<String, String> query) throws IOException {
+        if ("/api/creative-market/uploads/content".equals(path)) {
+            requireLocalCreativeMarketUpload(exchange);
+            handleCreativeMarketUpload(exchange, query);
+            return;
+        }
         if ("/api/audio/spatial/start".equals(path)) {
             requireLocalNativeAudio(exchange);
             HttpUtil.sendJson(exchange, context.audioEngine.startSpatialStream(
@@ -306,14 +373,24 @@ public final class ApiRoutes {
             requireLocalNativeAudio(exchange);
             HttpUtil.sendJson(exchange, context.audioEngine.setSpatialStreamMuted(
                 longParam(query, "session", 0),
+                longParam(query, "generation", 0),
                 false
+            ));
+            return;
+        }
+        if ("/api/audio/spatial/pause".equals(path)) {
+            requireLocalNativeAudio(exchange);
+            HttpUtil.sendJson(exchange, context.audioEngine.pauseSpatialStream(
+                longParam(query, "session", 0),
+                longParam(query, "generation", 0)
             ));
             return;
         }
         if ("/api/audio/spatial/stop".equals(path)) {
             requireLocalNativeAudio(exchange);
             HttpUtil.sendJson(exchange, context.audioEngine.stopSpatialStream(
-                longParam(query, "session", 0)
+                longParam(query, "session", 0),
+                longParam(query, "generation", 0)
             ));
             return;
         }
@@ -360,7 +437,15 @@ public final class ApiRoutes {
             return;
         }
         if ("/api/wallpapers/import".equals(path)) {
-            HttpUtil.sendJson(exchange, context.wallpapers.importFile(HttpUtil.param(query, "name", "wallpaper"), exchange.getRequestBody()));
+            requireLocalWallpaperControl(exchange);
+            long contentLength = parseContentLength(exchange);
+            if (contentLength > WallpaperService.MAX_IMPORT_BYTES) {
+                throw new IllegalArgumentException("wallpaper exceeds 512 MiB import limit");
+            }
+            HttpUtil.sendJson(exchange, context.wallpapers.importFile(
+                HttpUtil.param(query, "name", "wallpaper"),
+                exchange.getRequestBody()
+            ));
             return;
         }
         if ("/api/user-cursors/import".equals(path)) {
@@ -383,18 +468,34 @@ public final class ApiRoutes {
         String body = HttpUtil.readBody(exchange);
         Map<String, Object> root = SimpleJson.parseObject(body);
         switch (path) {
-            case "/api/app/runtime/settings" -> {
-                Map<String, Object> saved = context.runtimeSettings.update(root);
-                saved.put("gestureStatus", context.gestureControl.applyEnabled(
-                    context.runtimeSettings.gestureControlEnabled(),
-                    context.runtimeSettings.gestureCameraSource()
-                ));
-                HttpUtil.sendJson(exchange, saved);
+            case "/api/app/achievements" -> {
+                requireSameOriginClientPreferences(exchange);
+                HttpUtil.sendJson(exchange, achievementUpdate(path, query, root));
             }
-            case "/api/wallpapers/activate" -> HttpUtil.sendJson(
-                exchange,
-                context.wallpapers.activate(SimpleJson.asString(root.get("id"), ""))
-            );
+            case "/api/community/achievements/claim" -> {
+                requireSameOriginClientPreferences(exchange);
+                handleCommunityAchievementRewardClaim(exchange, query, root);
+            }
+            case "/api/community/achievements/evidence" -> {
+                requireSameOriginClientPreferences(exchange);
+                handleCommunityAchievementEvidence(exchange, query, root);
+            }
+            case "/api/app/preferences" -> {
+                requireSameOriginClientPreferences(exchange);
+                HttpUtil.sendJson(exchange, context.clientPreferences.update(root));
+            }
+            case "/api/app/runtime/settings" -> HttpUtil.sendJson(exchange, context.runtimeSettings.update(root));
+            case "/api/app/interactive/activate" -> {
+                String provider = SimpleJson.asString(root.get("provider"), "netease");
+                HttpUtil.sendJson(exchange, context.activateInteractiveServices(provider));
+            }
+            case "/api/wallpapers/activate" -> {
+                requireLocalWallpaperControl(exchange);
+                HttpUtil.sendJson(
+                    exchange,
+                    context.wallpapers.activate(SimpleJson.asString(root.get("id"), ""))
+                );
+            }
             case "/api/qishui/login/token" -> {
                 requireLocalBrowserLogin(exchange);
                 HttpUtil.sendJson(exchange, context.music.configureLogin("qishui", qishuiLoginCredentials(root)));
@@ -407,15 +508,40 @@ public final class ApiRoutes {
                 HttpUtil.sendJson(exchange, context.community.sandboxPost(path, root));
             case "/api/playlist/add", "/api/netease/playlist/add", "/api/qq/playlist/add", "/api/kugou/playlist/add" -> handlePlaylistAdd(exchange, path, query, root);
             case "/api/community/friends/add" -> handleCommunityAddFriend(exchange, query, root);
+            case "/api/community/friends/respond" -> handleCommunityFriendRequestResponse(exchange, query, root);
+            case "/api/community/mailbox/read" -> handleCommunityMailboxRead(exchange, query, root);
+            case "/api/community/mailbox/claim" -> handleCommunityMailboxClaim(exchange, query, root);
+            case "/api/community/identity-cards/equip" -> handleCommunityIdentityCardEquip(exchange, query, root);
             case "/api/community/profile" -> handleCommunityProfile(exchange, query, root);
             case "/api/community/listening" -> handleCommunityListening(exchange, query, root);
             case "/api/community/messages/send" -> handleCommunitySendMessage(exchange, query, root);
             case "/api/community/likes/add" -> handleCommunityLikeFriend(exchange, query, root);
+            case "/api/community/creative-market/uploads/init",
+                "/api/community/creative-market/works/publish",
+                "/api/community/creative-market/works/like",
+                "/api/community/creative-market/works/comment",
+                "/api/community/creative-market/works/share",
+                "/api/community/creative-market/works/use" ->
+                handleCommunityCreativeMarketMutation(exchange, path, query, root);
+            case "/api/community/square/messages" -> handleCommunitySquareMessage(exchange, query, root);
             case "/api/community/listen/invite" -> handleCommunityListenInvite(exchange, query, root);
             case "/api/community/listen/respond" -> handleCommunityListenRespond(exchange, query, root);
             case "/api/community/listen/leave" -> handleCommunityListenLeave(exchange, query, root);
             case "/api/community/call/signal" -> handleCommunityCallSignal(exchange, query, root);
             case "/api/community/relay" -> handleCommunityRelay(exchange, query, root);
+            case "/api/community/pet/sessions",
+                "/api/community/pet/voice",
+                "/api/community/pet/habits",
+                "/api/community/pet/chat",
+                "/api/community/pet/narrate",
+                "/api/community/pet/narrate/cancel",
+                "/api/community/pet/cancel",
+                "/api/community/pet/voice/transcript",
+                "/api/community/pet/voice/chunk",
+                "/api/community/pet/live-stt",
+                "/api/community/pet/action-claim",
+                "/api/community/pet/action-result" ->
+                handleCommunityPetMutation(exchange, path, query, root);
             case "/api/update/install" -> HttpUtil.sendJson(exchange, context.updates.startInstall(SimpleJson.asMap(root.get("release"))));
             case "/api/player/queue" -> HttpUtil.sendJson(exchange, context.player.setQueue(
                 songsFromPayload(root),
@@ -483,6 +609,183 @@ public final class ApiRoutes {
         } catch (IllegalArgumentException error) {
             throw new IllegalArgumentException("music API import requires a local application origin");
         }
+    }
+
+    private static void requireSameOriginClientPreferences(HttpExchange exchange) {
+        String fetchSite = exchange.getRequestHeaders().getFirst("Sec-Fetch-Site");
+        if (
+            fetchSite != null
+                && !fetchSite.isBlank()
+                && !"same-origin".equalsIgnoreCase(fetchSite)
+                && !"same-site".equalsIgnoreCase(fetchSite)
+                && !"none".equalsIgnoreCase(fetchSite)
+        ) {
+            throw new IllegalArgumentException("client preferences require the application origin");
+        }
+        String source = exchange.getRequestHeaders().getFirst("Origin");
+        if (source == null || source.isBlank()) {
+            source = exchange.getRequestHeaders().getFirst("Referer");
+        }
+        if (source == null || source.isBlank()) return;
+        try {
+            URI sourceUri = URI.create(source);
+            URI requestUri = URI.create("http://" + exchange.getRequestHeaders().getFirst("Host"));
+            int sourcePort = sourceUri.getPort() >= 0 ? sourceUri.getPort() : defaultPort(sourceUri.getScheme());
+            int requestPort = requestUri.getPort() >= 0 ? requestUri.getPort() : exchange.getLocalAddress().getPort();
+            if (
+                sourceUri.getHost() == null
+                    || requestUri.getHost() == null
+                    || !sourceUri.getHost().equalsIgnoreCase(requestUri.getHost())
+                    || sourcePort != requestPort
+            ) {
+                throw new IllegalArgumentException("client preferences require the application origin");
+            }
+        } catch (IllegalArgumentException error) {
+            throw new IllegalArgumentException("client preferences require the application origin");
+        }
+    }
+
+    private static void requireLocalPetAssistant(HttpExchange exchange) {
+        exchange.setAttribute("fe.cors.same-origin", Boolean.TRUE);
+        var remote = exchange.getRemoteAddress();
+        if (remote == null || remote.getAddress() == null || !remote.getAddress().isLoopbackAddress()) {
+            throw new SecurityException("pet assistant is only available from this device");
+        }
+
+        int servicePort = exchange.getLocalAddress().getPort();
+        URI requestUri;
+        try {
+            String requestHost = exchange.getRequestHeaders().getFirst("Host");
+            if (requestHost == null || requestHost.isBlank()) throw new IllegalArgumentException();
+            requestUri = URI.create("http://" + requestHost);
+            int requestPort = requestUri.getPort() >= 0 ? requestUri.getPort() : servicePort;
+            if (!isApplicationLoopbackHost(requestUri.getHost()) || requestPort != servicePort) {
+                throw new IllegalArgumentException();
+            }
+        } catch (IllegalArgumentException error) {
+            throw new SecurityException("pet assistant requires the local application host");
+        }
+
+        String fetchSite = exchange.getRequestHeaders().getFirst("Sec-Fetch-Site");
+        if (
+            fetchSite != null
+                && !fetchSite.isBlank()
+                && !"same-origin".equalsIgnoreCase(fetchSite)
+                && !"none".equalsIgnoreCase(fetchSite)
+        ) {
+            throw new SecurityException("pet assistant requires the application origin");
+        }
+
+        String source = exchange.getRequestHeaders().getFirst("Origin");
+        if (source == null || source.isBlank()) source = exchange.getRequestHeaders().getFirst("Referer");
+        if (source == null || source.isBlank()) {
+            if (
+                !"same-origin".equalsIgnoreCase(fetchSite)
+                    && !"none".equalsIgnoreCase(fetchSite)
+            ) {
+                throw new SecurityException("pet assistant requires an application origin header");
+            }
+            return;
+        }
+        if ("null".equalsIgnoreCase(source.trim())) {
+            throw new SecurityException("pet assistant rejects opaque origins");
+        }
+        try {
+            URI sourceUri = URI.create(source);
+            int sourcePort = sourceUri.getPort() >= 0 ? sourceUri.getPort() : defaultPort(sourceUri.getScheme());
+            if (
+                !"http".equalsIgnoreCase(sourceUri.getScheme())
+                    || !isApplicationLoopbackHost(sourceUri.getHost())
+                    || requestUri.getHost() == null
+                    || !sourceUri.getHost().equalsIgnoreCase(requestUri.getHost())
+                    || sourcePort != servicePort
+            ) {
+                throw new IllegalArgumentException();
+            }
+        } catch (IllegalArgumentException error) {
+            throw new SecurityException("pet assistant requires the application origin");
+        }
+    }
+
+    private static void requireLocalCreativeMarketUpload(HttpExchange exchange) {
+        var remote = exchange.getRemoteAddress();
+        if (remote == null || remote.getAddress() == null || !remote.getAddress().isLoopbackAddress()) {
+            throw new IllegalArgumentException("creative market uploads are only available from this device");
+        }
+        int servicePort = exchange.getLocalAddress().getPort();
+        String requestHost = exchange.getRequestHeaders().getFirst("Host");
+        try {
+            if (requestHost == null || requestHost.isBlank()) throw new IllegalArgumentException();
+            URI requestUri = URI.create("http://" + requestHost);
+            int requestPort = requestUri.getPort() >= 0 ? requestUri.getPort() : servicePort;
+            if (!isApplicationLoopbackHost(requestUri.getHost()) || requestPort != servicePort) {
+                throw new IllegalArgumentException();
+            }
+        } catch (IllegalArgumentException error) {
+            throw new IllegalArgumentException("creative market uploads require the local application host");
+        }
+        requireSameOriginClientPreferences(exchange);
+    }
+
+    private static void requireLocalWallpaperControl(HttpExchange exchange) {
+        var remote = exchange.getRemoteAddress();
+        if (remote == null || remote.getAddress() == null || !remote.getAddress().isLoopbackAddress()) {
+            throw new IllegalArgumentException("wallpaper control is only available from this device");
+        }
+        int servicePort = exchange.getLocalAddress().getPort();
+        String requestHost = exchange.getRequestHeaders().getFirst("Host");
+        URI requestUri;
+        try {
+            if (requestHost == null || requestHost.isBlank()) throw new IllegalArgumentException();
+            requestUri = URI.create("http://" + requestHost);
+            int requestPort = requestUri.getPort() >= 0 ? requestUri.getPort() : servicePort;
+            if (!isApplicationLoopbackHost(requestUri.getHost()) || requestPort != servicePort) {
+                throw new IllegalArgumentException();
+            }
+        } catch (IllegalArgumentException error) {
+            throw new IllegalArgumentException("wallpaper control requires the local application host");
+        }
+        String fetchSite = exchange.getRequestHeaders().getFirst("Sec-Fetch-Site");
+        if (
+            fetchSite != null
+                && !fetchSite.isBlank()
+                && !"same-origin".equalsIgnoreCase(fetchSite)
+                && !"same-site".equalsIgnoreCase(fetchSite)
+                && !"none".equalsIgnoreCase(fetchSite)
+        ) {
+            throw new IllegalArgumentException("wallpaper control requires the application origin");
+        }
+        String source = exchange.getRequestHeaders().getFirst("Origin");
+        if (source == null || source.isBlank()) {
+            source = exchange.getRequestHeaders().getFirst("Referer");
+        }
+        if (source == null || source.isBlank()) return;
+        try {
+            URI sourceUri = URI.create(source);
+            int sourcePort = sourceUri.getPort() >= 0 ? sourceUri.getPort() : defaultPort(sourceUri.getScheme());
+            if (
+                !"http".equalsIgnoreCase(sourceUri.getScheme())
+                    || !isApplicationLoopbackHost(sourceUri.getHost())
+                    || !sourceUri.getHost().equalsIgnoreCase(requestUri.getHost())
+                    || sourcePort != servicePort
+            ) {
+                throw new IllegalArgumentException("wallpaper control requires the application origin");
+            }
+        } catch (IllegalArgumentException error) {
+            throw new IllegalArgumentException("wallpaper control requires the application origin");
+        }
+    }
+
+    private static boolean isApplicationLoopbackHost(String host) {
+        if (host == null) return false;
+        String normalized = host.toLowerCase();
+        return "127.0.0.1".equals(normalized)
+            || "localhost".equals(normalized)
+            || "::1".equals(normalized);
+    }
+
+    private static int defaultPort(String scheme) {
+        return "https".equalsIgnoreCase(scheme) ? 443 : 80;
     }
 
     private static void requireLocalBrowserLogin(HttpExchange exchange) {
@@ -580,8 +883,10 @@ public final class ApiRoutes {
         Map<String, String> query
     ) throws IOException {
         long session = longParam(query, "session", 0);
+        long generation = longParam(query, "generation", 0);
         int inputChannels = HttpUtil.intParam(query, "inputChannels", 2, 1, 2);
         if (session <= 0) throw new IllegalArgumentException("native spatial session is required");
+        if (generation <= 0) throw new IllegalArgumentException("native spatial generation is required");
 
         int framesPerTransportBlock = 4096;
         int samplesPerBlock = framesPerTransportBlock * inputChannels;
@@ -600,6 +905,7 @@ public final class ApiRoutes {
                 encodedBlock.flip();
                 lastResult = context.audioEngine.submitSpatialPcm(
                     session,
+                    generation,
                     encodedBlock,
                     framesPerTransportBlock
                 );
@@ -610,7 +916,7 @@ public final class ApiRoutes {
                 blocks += 1;
             }
         } finally {
-            context.audioEngine.stopSpatialStream(session);
+            context.audioEngine.stopSpatialStream(session, generation);
         }
 
         Map<String, Object> body = HttpUtil.ok();
@@ -623,10 +929,39 @@ public final class ApiRoutes {
         String value = exchange.getRequestHeaders().getFirst("Content-Length");
         if (value == null || value.isBlank()) return -1;
         try {
-            return Long.parseLong(value);
+            long length = Long.parseLong(value);
+            if (length < 0) throw new NumberFormatException();
+            return length;
         } catch (NumberFormatException error) {
-            throw new IllegalArgumentException("invalid music API import length");
+            throw new IllegalArgumentException("invalid request content length");
         }
+    }
+
+    private static String requireCreativePathId(String path, String pathPrefix, String idPrefix) {
+        if (path == null || !path.startsWith(pathPrefix)) {
+            throw new IllegalArgumentException("invalid creative market path");
+        }
+        String id = path.substring(pathPrefix.length());
+        if (id.isBlank() || id.indexOf('/') >= 0) {
+            throw new IllegalArgumentException("invalid creative market id");
+        }
+        return requireCreativeId(id, idPrefix);
+    }
+
+    private static String requireCreativeId(String value, String prefix) {
+        String id = value == null ? "" : value.trim();
+        if (!id.startsWith(prefix)) throw new IllegalArgumentException("invalid creative market id");
+        String suffix = id.substring(prefix.length());
+        if (suffix.length() < 12 || suffix.length() > 120 || !suffix.matches("[A-Za-z0-9_-]+")) {
+            throw new IllegalArgumentException("invalid creative market id");
+        }
+        return id;
+    }
+
+    private static String requireFeId(String value) {
+        String feId = value == null ? "" : value.trim();
+        if (!feId.matches("\\d{8}")) throw new IllegalArgumentException("invalid FE ID");
+        return feId;
     }
 
     private static long longParam(Map<String, String> query, String name, long fallback) {
@@ -692,9 +1027,33 @@ public final class ApiRoutes {
         ));
     }
 
+    private void handleCreativeMarket(HttpExchange exchange, Map<String, String> query) throws IOException {
+        HttpUtil.sendJson(exchange, context.community.creativeMarket(
+            HttpUtil.param(query, "type", ""),
+            HttpUtil.param(query, "q", ""),
+            HttpUtil.param(query, "feId", "")
+        ));
+    }
+
+    private void handleCommunitySquareMessages(HttpExchange exchange, Map<String, String> query) throws IOException {
+        String provider = communityProvider(query);
+        HttpUtil.sendJson(exchange, context.community.squareMessages(
+            provider,
+            providerLabel(provider),
+            context.music.accountPayload(provider),
+            HttpUtil.param(query, "after", ""),
+            HttpUtil.intParam(query, "limit", 60, 1, 100)
+        ));
+    }
+
     private void handleCommunityListenState(HttpExchange exchange, Map<String, String> query) throws IOException {
         String provider = communityProvider(query);
         HttpUtil.sendJson(exchange, context.community.listenState(provider, providerLabel(provider), context.music.accountPayload(provider)));
+    }
+
+    private void handleCommunityListenReport(HttpExchange exchange, Map<String, String> query) throws IOException {
+        String provider = communityProvider(query);
+        HttpUtil.sendJson(exchange, context.community.listenReport(provider, providerLabel(provider), context.music.accountPayload(provider)));
     }
 
     private void handleCommunityCallSignals(HttpExchange exchange, Map<String, String> query) throws IOException {
@@ -788,7 +1147,11 @@ public final class ApiRoutes {
             provider,
             providerLabel(provider),
             context.music.accountPayload(provider),
-            SimpleJson.asString(root.get("bio"), "")
+            root.containsKey("username") ? SimpleJson.asString(root.get("username"), "") : null,
+            root.containsKey("bio") ? SimpleJson.asString(root.get("bio"), "") : null,
+            root.containsKey("avatarOrnament")
+                ? SimpleJson.asMap(root.get("avatarOrnament"))
+                : null
         ));
     }
 
@@ -821,6 +1184,193 @@ public final class ApiRoutes {
             providerLabel(provider),
             context.music.accountPayload(provider),
             SimpleJson.asString(root.get("targetId"), "")
+        ));
+    }
+
+    private void handleCommunityIdentityCards(HttpExchange exchange, Map<String, String> query) throws IOException {
+        String provider = communityProvider(query);
+        HttpUtil.sendJson(exchange, context.community.identityCards(
+            provider,
+            providerLabel(provider),
+            context.music.accountPayload(provider)
+        ));
+    }
+
+    private void handleCommunityFriendIdentityCard(HttpExchange exchange, Map<String, String> query) throws IOException {
+        String provider = communityProvider(query);
+        HttpUtil.sendJson(exchange, context.community.friendIdentityCard(
+            provider,
+            providerLabel(provider),
+            context.music.accountPayload(provider),
+            HttpUtil.param(query, "targetId", "")
+        ));
+    }
+
+    private void handleCommunityIdentityCardEquip(HttpExchange exchange, Map<String, String> query, Map<String, Object> root) throws IOException {
+        String provider = communityProvider(query);
+        HttpUtil.sendJson(exchange, context.community.equipIdentityCard(
+            provider,
+            providerLabel(provider),
+            context.music.accountPayload(provider),
+            SimpleJson.asString(root.get("cardId"), "")
+        ));
+    }
+
+    private void handleCommunityAchievementRewardClaim(
+        HttpExchange exchange,
+        Map<String, String> query,
+        Map<String, Object> root
+    ) throws IOException {
+        String provider = communityProvider(query);
+        HttpUtil.sendJson(exchange, context.community.claimAchievementReward(
+            provider,
+            providerLabel(provider),
+            context.music.accountPayload(provider),
+            SimpleJson.asString(root.get("achievementId"), "")
+        ));
+    }
+
+    private void handleCommunityAchievementEvidence(
+        HttpExchange exchange,
+        Map<String, String> query,
+        Map<String, Object> root
+    ) throws IOException {
+        String provider = communityProvider(query);
+        HttpUtil.sendJson(exchange, context.community.submitAchievementEvidence(
+            provider,
+            providerLabel(provider),
+            context.music.accountPayload(provider),
+            SimpleJson.asMap(root.get("event"))
+        ));
+    }
+
+    private void handleCommunityPetStatus(HttpExchange exchange, Map<String, String> query) throws IOException {
+        String provider = communityProvider(query);
+        HttpUtil.sendJson(exchange, context.community.petStatus(
+            provider,
+            providerLabel(provider),
+            context.music.accountPayload(provider)
+        ));
+    }
+
+    private void handleCommunityPetHistory(HttpExchange exchange, Map<String, String> query) throws IOException {
+        String provider = communityProvider(query);
+        HttpUtil.sendJson(exchange, context.community.petHistory(
+            provider,
+            providerLabel(provider),
+            context.music.accountPayload(provider),
+            HttpUtil.param(query, "sessionId", "")
+        ));
+    }
+
+    private void handleCommunityPetMutation(
+        HttpExchange exchange,
+        String path,
+        Map<String, String> query,
+        Map<String, Object> root
+    ) throws IOException {
+        String prefix = "/api/community/pet/";
+        String action = path.startsWith(prefix) ? path.substring(prefix.length()) : "";
+        String provider = communityProvider(query);
+        HttpUtil.sendJson(exchange, context.community.petMutation(
+            provider,
+            providerLabel(provider),
+            context.music.accountPayload(provider),
+            action,
+            root
+        ));
+    }
+
+    private void handleCommunityPetAudio(
+        HttpExchange exchange,
+        Map<String, String> query,
+        String audioId
+    ) throws IOException {
+        String provider = communityProvider(query);
+        try {
+            HttpResponse<InputStream> response = context.community.petAudio(
+                provider,
+                providerLabel(provider),
+                context.music.accountPayload(provider),
+                audioId
+            );
+            proxyCommunityStream(exchange, response, false);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            HttpUtil.sendJson(exchange, 502, HttpUtil.error("pet audio transfer interrupted"));
+        }
+    }
+
+    private void handleCommunityFriendRequestResponse(HttpExchange exchange, Map<String, String> query, Map<String, Object> root) throws IOException {
+        String provider = communityProvider(query);
+        HttpUtil.sendJson(exchange, context.community.respondFriendRequest(
+            provider,
+            providerLabel(provider),
+            context.music.accountPayload(provider),
+            SimpleJson.asString(root.get("requestId"), ""),
+            SimpleJson.asBoolean(root.get("accepted"), false)
+        ));
+    }
+
+    private void handleCommunityMailbox(HttpExchange exchange, Map<String, String> query) throws IOException {
+        String provider = communityProvider(query);
+        HttpUtil.sendJson(exchange, context.community.mailbox(
+            provider,
+            providerLabel(provider),
+            context.music.accountPayload(provider)
+        ));
+    }
+
+    private void handleCommunityMailboxRead(HttpExchange exchange, Map<String, String> query, Map<String, Object> root) throws IOException {
+        String provider = communityProvider(query);
+        HttpUtil.sendJson(exchange, context.community.markMailboxRead(
+            provider,
+            providerLabel(provider),
+            context.music.accountPayload(provider),
+            SimpleJson.asString(root.get("mailId"), "")
+        ));
+    }
+
+    private void handleCommunityMailboxClaim(HttpExchange exchange, Map<String, String> query, Map<String, Object> root) throws IOException {
+        String provider = communityProvider(query);
+        HttpUtil.sendJson(exchange, context.community.claimMailboxReward(
+            provider,
+            providerLabel(provider),
+            context.music.accountPayload(provider),
+            SimpleJson.asString(root.get("mailId"), ""),
+            SimpleJson.asString(root.get("attachmentId"), "")
+        ));
+    }
+
+    private void handleCommunityCreativeMarketMutation(
+        HttpExchange exchange,
+        String path,
+        Map<String, String> query,
+        Map<String, Object> root
+    ) throws IOException {
+        String prefix = "/api/community/creative-market/";
+        if (!path.startsWith(prefix)) throw new IllegalArgumentException("invalid creative market action");
+        String provider = communityProvider(query);
+        HttpUtil.sendJson(exchange, context.community.creativeMarketMutation(
+            provider,
+            providerLabel(provider),
+            context.music.accountPayload(provider),
+            path.substring(prefix.length()),
+            root
+        ));
+    }
+
+    private void handleCommunitySquareMessage(
+        HttpExchange exchange,
+        Map<String, String> query,
+        Map<String, Object> root
+    ) throws IOException {
+        String provider = communityProvider(query);
+        HttpUtil.sendJson(exchange, context.community.sendSquareMessage(
+            provider,
+            providerLabel(provider),
+            context.music.accountPayload(provider),
+            root
         ));
     }
 
@@ -928,6 +1478,88 @@ public final class ApiRoutes {
         try (OutputStream output = exchange.getResponseBody()) {
             output.write(png);
         }
+    }
+
+    private void handleCreativeMarketAsset(HttpExchange exchange, String assetId) throws IOException {
+        try {
+            HttpResponse<InputStream> response = context.community.creativeMarketAsset(
+                assetId,
+                exchange.getRequestHeaders().getFirst("Range"),
+                exchange.getRequestHeaders().getFirst("If-None-Match"),
+                exchange.getRequestHeaders().getFirst("If-Range")
+            );
+            proxyCommunityStream(exchange, response, true);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            HttpUtil.sendJson(exchange, 502, HttpUtil.error("creative market asset transfer interrupted"));
+        }
+    }
+
+    private void handleCreativeMarketUpload(HttpExchange exchange, Map<String, String> query) throws IOException {
+        String uploadId = requireCreativeId(HttpUtil.param(query, "id", ""), "upload-");
+        String token = HttpUtil.param(query, "token", "");
+        long contentLength = parseContentLength(exchange);
+        if (contentLength > MAX_CREATIVE_MARKET_UPLOAD_BYTES) {
+            throw new IllegalArgumentException("creative upload exceeds 512 MiB limit");
+        }
+        try {
+            HttpResponse<InputStream> response = context.community.uploadCreativeMarketContent(
+                uploadId,
+                token,
+                exchange.getRequestHeaders().getFirst("Content-Type"),
+                contentLength,
+                exchange.getRequestBody()
+            );
+            proxyCommunityStream(exchange, response, false);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            HttpUtil.sendJson(exchange, 502, HttpUtil.error("creative market upload interrupted"));
+        }
+    }
+
+    private static void proxyCommunityStream(
+        HttpExchange exchange,
+        HttpResponse<InputStream> response,
+        boolean exposeRangeHeaders
+    ) throws IOException {
+        HttpUtil.addCors(exchange);
+        copyResponseHeader(response, exchange, "Content-Type");
+        copyResponseHeader(response, exchange, "Cache-Control");
+        copyResponseHeader(response, exchange, "ETag");
+        copyResponseHeader(response, exchange, "Last-Modified");
+        copyResponseHeader(response, exchange, "Content-Disposition");
+        if (exposeRangeHeaders) {
+            copyResponseHeader(response, exchange, "Accept-Ranges");
+            copyResponseHeader(response, exchange, "Content-Range");
+            exchange.getResponseHeaders().set(
+                "Access-Control-Expose-Headers",
+                "Accept-Ranges, Content-Range, Content-Length, ETag, Last-Modified"
+            );
+        }
+
+        int status = response.statusCode();
+        if (status == 204 || status == 304) {
+            try (InputStream input = response.body()) {
+                exchange.sendResponseHeaders(status, -1);
+            } finally {
+                exchange.close();
+            }
+            return;
+        }
+
+        long contentLength = response.headers().firstValueAsLong("content-length").orElse(-1L);
+        exchange.sendResponseHeaders(status, contentLength >= 0 ? contentLength : 0);
+        try (InputStream input = response.body(); OutputStream output = exchange.getResponseBody()) {
+            input.transferTo(output);
+        }
+    }
+
+    private static void copyResponseHeader(
+        HttpResponse<?> response,
+        HttpExchange exchange,
+        String header
+    ) {
+        response.headers().firstValue(header).ifPresent(value -> exchange.getResponseHeaders().set(header, value));
     }
 
     private void handleWallpaperWebEntry(HttpExchange exchange, String path) throws IOException {
@@ -1095,7 +1727,10 @@ public final class ApiRoutes {
                 .GET();
             copyCoverConditionalHeader(exchange, request, "If-None-Match");
             copyCoverConditionalHeader(exchange, request, "If-Modified-Since");
-            HttpResponse<byte[]> response = coverClient.send(request.build(), HttpResponse.BodyHandlers.ofByteArray());
+            HttpResponse<byte[]> response = CoverHttpClientHolder.INSTANCE.send(
+                request.build(),
+                HttpResponse.BodyHandlers.ofByteArray()
+            );
             String type = response.headers().firstValue("content-type").orElse("image/jpeg");
             if (response.statusCode() == 304) {
                 applyCoverCacheHeaders(
@@ -1197,7 +1832,7 @@ public final class ApiRoutes {
     private static Map<String, Object> appVersion() {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("name", "FE Monster Java");
-        body.put("version", "1.8.8");
+        body.put("version", "2.0.1");
         body.put("runtime", System.getProperty("java.version"));
         body.put("ok", true);
         return body;
@@ -1230,6 +1865,115 @@ public final class ApiRoutes {
             }
         }
         return song;
+    }
+
+    private Map<String, Object> achievementSnapshot(
+        String path,
+        Map<String, String> query
+    ) throws IOException {
+        String provider = providerFrom(path, query);
+        Map<String, Object> accountPayload = context.music.accountPayload(provider);
+        AchievementAccount account = achievementAccount(provider, accountPayload);
+        Map<String, Object> state = context.achievements.snapshot(account.scope());
+        boolean serverSynced = !account.remoteRequired();
+        if (account.remoteRequired()) {
+            Map<String, Object> remote = context.community.achievementState(
+                provider,
+                providerLabel(provider),
+                accountPayload
+            );
+            if (SimpleJson.asBoolean(remote.get("ok"), false)) {
+                Map<String, Object> remoteState = SimpleJson.asMap(remote.get("state"));
+                if (!remoteState.isEmpty()) {
+                    state = context.achievements.mergeRemote(account.scope(), remoteState);
+                    serverSynced = true;
+                }
+                return achievementResponse(state, account, serverSynced, remote);
+            }
+        }
+        return achievementResponse(state, account, serverSynced);
+    }
+
+    private Map<String, Object> achievementUpdate(
+        String path,
+        Map<String, String> query,
+        Map<String, Object> incoming
+    ) throws IOException {
+        String provider = providerFrom(path, query);
+        Map<String, Object> accountPayload = context.music.accountPayload(provider);
+        AchievementAccount account = achievementAccount(provider, accountPayload);
+        Map<String, Object> state = context.achievements.update(account.scope(), incoming);
+        boolean serverSynced = !account.remoteRequired();
+        if (account.remoteRequired()) {
+            Map<String, Object> remote = context.community.updateAchievementState(
+                provider,
+                providerLabel(provider),
+                accountPayload,
+                state
+            );
+            if (SimpleJson.asBoolean(remote.get("ok"), false)) {
+                Map<String, Object> remoteState = SimpleJson.asMap(remote.get("state"));
+                if (!remoteState.isEmpty()) {
+                    state = context.achievements.mergeRemote(account.scope(), remoteState);
+                    serverSynced = true;
+                }
+            }
+        }
+        return achievementResponse(state, account, serverSynced);
+    }
+
+    private static AchievementAccount achievementAccount(
+        String provider,
+        Map<String, Object> accountPayload
+    ) {
+        Map<String, Object> account = SimpleJson.asMap(accountPayload.get("account"));
+        String accountId = SimpleJson.asString(account.get("userId"), "").trim();
+        boolean loggedIn = SimpleJson.asBoolean(accountPayload.get("loggedIn"), false)
+            && !accountId.isBlank();
+        String normalizedProvider = MusicProviderRegistry.normalize(provider);
+        return new AchievementAccount(
+            loggedIn ? normalizedProvider + ":" + accountId : "anonymous",
+            normalizedProvider,
+            loggedIn ? accountId : "",
+            loggedIn
+        );
+    }
+
+    private static Map<String, Object> achievementResponse(
+        Map<String, Object> state,
+        AchievementAccount account,
+        boolean serverSynced
+    ) {
+        Map<String, Object> response = new LinkedHashMap<>(state);
+        Map<String, Object> sync = new LinkedHashMap<>();
+        sync.put("scope", account.scope());
+        sync.put("provider", account.provider());
+        sync.put("accountId", account.accountId());
+        sync.put("remoteRequired", account.remoteRequired());
+        sync.put("serverSynced", serverSynced);
+        response.put("_sync", sync);
+        return response;
+    }
+
+    private static Map<String, Object> achievementResponse(
+        Map<String, Object> state,
+        AchievementAccount account,
+        boolean serverSynced,
+        Map<String, Object> remote
+    ) {
+        Map<String, Object> response = achievementResponse(state, account, serverSynced);
+        for (String field : java.util.List.of("challenges", "identityCardRewards")) {
+            if (remote.containsKey(field)) response.put(field, remote.get(field));
+        }
+        return response;
+    }
+
+    private record AchievementAccount(
+        String scope,
+        String provider,
+        String accountId,
+        boolean remoteRequired
+    ) {
     }
 
     private static String providerFrom(String path, Map<String, String> query) {
@@ -1303,7 +2047,7 @@ public final class ApiRoutes {
 
     private static Map<String, Object> updatePayload() {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("version", "1.8.8");
+        body.put("version", "2.0.1");
         body.put("downloadUrl", "");
         body.put("releaseNotes", "New translucent playback page, clearer lyrics, independent lyric colors, rhythm mode, and adaptive preset performance.");
         body.put("fileSize", 0);

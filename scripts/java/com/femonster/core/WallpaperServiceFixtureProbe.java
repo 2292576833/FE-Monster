@@ -4,22 +4,32 @@ import com.femonster.json.SimpleJson;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 public final class WallpaperServiceFixtureProbe {
     private WallpaperServiceFixtureProbe() {
     }
 
     public static void main(String[] args) throws Exception {
-        if (args.length != 2) throw new IllegalArgumentException("expected <fixture-root> <data-dir>");
+        if (args.length != 3) {
+            throw new IllegalArgumentException("expected <fixture-root> <data-dir> <package-security-root>");
+        }
         Path fixtureRoot = Path.of(args[0]).toAbsolutePath().normalize();
         Path dataDir = Path.of(args[1]).toAbsolutePath().normalize();
+        Path packageSecurityRoot = Path.of(args[2]).toAbsolutePath().normalize();
         WallpaperService service = new WallpaperService(dataDir);
 
         Map<String, Object> beforeScan = diagnostics(service);
@@ -32,7 +42,14 @@ public final class WallpaperServiceFixtureProbe {
         Map<String, Object> video = byName(wallpapers, "Fixture Manifest Video");
         Map<String, Object> web = byName(wallpapers, "Fixture Web Wallpaper");
         Map<String, Object> scene = byName(wallpapers, "Fixture Native Scene");
+        Map<String, Object> packageOnlyScene = byName(wallpapers, "zz-pkg-only-scene");
         Map<String, Object> unsafe = byName(wallpapers, "Fixture Unsafe Project");
+        Map<String, Object> invalidSceneManifest = byName(
+            wallpapers,
+            "Invalid Scene Manifest With Package"
+        );
+        Map<String, Object> sceneInventory = service.sceneInventory(text(scene.get("id")));
+        Map<String, Object> packageOnlyInventory = service.sceneInventory(text(packageOnlyScene.get("id")));
 
         Map<String, Object> checks = new LinkedHashMap<>();
         checks.put("importedOnlyDoesNotScanWallpaperEngine",
@@ -43,6 +60,17 @@ public final class WallpaperServiceFixtureProbe {
             "video".equals(text(video.get("kind")))
                 && "web".equals(text(web.get("kind")))
                 && "scene".equals(text(scene.get("kind"))));
+        checks.put("catalogDefersSceneInventoryWork",
+            count(afterFirstScan, "sceneInventoryParseCount") == 0L
+                && "on-demand".equals(text(scene.get("sceneInventoryMode"))));
+        checks.put("currentWallpaperEngineSelectionExposed",
+            Boolean.TRUE.equals(video.get("active"))
+                && SimpleJson.asList(video.get("activeMonitors")).contains("Monitor0")
+                && Boolean.TRUE.equals(packageOnlyScene.get("active"))
+                && SimpleJson.asList(packageOnlyScene.get("activeMonitors")).contains("Monitor1")
+                && text(payload.get("activeWallpaperId")).equals(text(video.get("id")))
+                && SimpleJson.asList(payload.get("activeWallpaperIds")).contains(text(video.get("id")))
+                && SimpleJson.asList(payload.get("activeWallpaperIds")).contains(text(packageOnlyScene.get("id"))));
         checks.put("videoUsesManifestFile",
             decodedFileUrl(text(video.get("entryUrl"))).endsWith("video-project\\media\\manifest-video.mp4")
                 || decodedFileUrl(text(video.get("entryUrl"))).endsWith("video-project/media/manifest-video.mp4"));
@@ -58,8 +86,67 @@ public final class WallpaperServiceFixtureProbe {
                 && "scene.json".equals(text(SimpleJson.asMap(scene.get("engineLaunch")).get("manifestFile")))
                 && text(SimpleJson.asMap(scene.get("engineLaunch")).get("entryFile")).endsWith(
                     "scene-project" + java.io.File.separator + "scene.pkg"
+                )
+                && text(SimpleJson.asMap(scene.get("engineLaunch")).get("launchFile")).endsWith(
+                    "scene-project" + java.io.File.separator + "project.json"
                 ));
-        checks.put("unsafeManifestPathRejected", unsafe.isEmpty());
+        checks.put("scenePackageInventoryReadsRuntimeFilesAndCode",
+            "PKGV0021".equals(text(sceneInventory.get("packageVersion")))
+                && Boolean.TRUE.equals(sceneInventory.get("packageIndexReadable"))
+                && Boolean.TRUE.equals(sceneInventory.get("packageFormatSupported"))
+                && Boolean.TRUE.equals(sceneInventory.get("allRuntimeFileNamesIndexed"))
+                && Boolean.TRUE.equals(sceneInventory.get("embeddedSceneScript"))
+                && count(sceneInventory, "packageEntryCount") >= 5L
+                && count(sceneInventory, "sourceCodeEntryCount") >= 3L
+                && SimpleJson.asList(sceneInventory.get("packageEntries")).size() >= 5
+                && SimpleJson.asList(sceneInventory.get("projectFiles")).size() >= 3
+                && Boolean.FALSE.equals(sceneInventory.get("scriptsExecutedInApplicationOrigin")));
+        checks.put("packageOnlySceneIsDiscoveredAndLaunchable",
+            "scene".equals(text(packageOnlyScene.get("kind")))
+                && text(packageOnlyScene.get("projectJson")).isBlank()
+                && text(packageOnlyScene.get("entryPath")).endsWith(
+                    "zz-pkg-only-scene" + java.io.File.separator + "scene.pkg"
+                )
+                && text(SimpleJson.asMap(packageOnlyScene.get("engineLaunch")).get("launchFile")).endsWith(
+                    "zz-pkg-only-scene" + java.io.File.separator + "scene.pkg"
+                )
+                && "PKGV0015".equals(text(packageOnlyInventory.get("packageVersion")))
+                && count(packageOnlyInventory, "compiledShaderEntryCount") >= 1L);
+        Map<String, Object> activation = service.activate(text(packageOnlyScene.get("id")));
+        checks.put("packageOnlySceneUsesValidatedNativeActivation",
+            Boolean.TRUE.equals(activation.get("ok"))
+                && text(activation.get("message")).contains("包内运行资源")
+                && Boolean.TRUE.equals(
+                    SimpleJson.asMap(activation.get("inventory")).get("allRuntimeFileNamesIndexed")
+                )
+                && "accepted".equals(text(activation.get("status")))
+                && Boolean.FALSE.equals(activation.get("appliedConfirmed")));
+        checks.put("unsafeManifestPathRejected", unsafe.isEmpty() && invalidSceneManifest.isEmpty());
+
+        boolean malformedPackagesRejected = true;
+        for (String name : List.of(
+            "traversal.pkg",
+            "duplicate.pkg",
+            "out-of-bounds.pkg",
+            "overlap.pkg",
+            "invalid-utf8.pkg",
+            "excessive-count.pkg",
+            "truncated.pkg"
+        )) {
+            try {
+                WallpaperScenePackageReader.inspect(packageSecurityRoot.resolve(name));
+                malformedPackagesRejected = false;
+            } catch (IOException expected) {
+            }
+        }
+        WallpaperScenePackageReader.PackageIndex unknownPackage =
+            WallpaperScenePackageReader.inspect(packageSecurityRoot.resolve("unknown-version.pkg"));
+        checks.put("scenePackageParserFailsClosed",
+            malformedPackagesRejected
+                && "PKGV9999".equals(unknownPackage.version())
+                && !unknownPackage.formatSupported()
+                && unknownPackage.entries().isEmpty()
+                && Files.size(packageSecurityRoot.resolve("unknown-version.pkg")) > 0L);
 
         Path manifestVideo = fixtureRoot.resolve("video-project/media/manifest-video.mp4").toRealPath();
         boolean repeatedResolveWorks = true;
@@ -71,7 +158,44 @@ public final class WallpaperServiceFixtureProbe {
             count(afterFirstScan, "rootScanCount") >= 0
                 && repeatedResolveWorks
                 && count(afterFileRequests, "rootScanCount") == count(afterFirstScan, "rootScanCount")
-                && count(afterFileRequests, "catalogScanCount") == count(afterFirstScan, "catalogScanCount"));
+                && count(afterFileRequests, "catalogScanCount") == count(afterFirstScan, "catalogScanCount")
+                && count(afterFileRequests, "sceneInventoryParseCount") == 2L
+                && count(afterFileRequests, "sceneInventoryCacheHitCount") >= 1L);
+
+        int concurrentRefreshWorkers = 12;
+        CountDownLatch refreshWorkersReady = new CountDownLatch(concurrentRefreshWorkers);
+        CountDownLatch startConcurrentRefresh = new CountDownLatch(1);
+        ExecutorService refreshExecutor = Executors.newFixedThreadPool(concurrentRefreshWorkers);
+        List<Future<Map<String, Object>>> refreshResults = new ArrayList<>();
+        try {
+            for (int index = 0; index < concurrentRefreshWorkers; index++) {
+                refreshResults.add(refreshExecutor.submit(() -> {
+                    refreshWorkersReady.countDown();
+                    if (!startConcurrentRefresh.await(5, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("concurrent refresh start timed out");
+                    }
+                    return service.sceneInventory(text(scene.get("id")), true, 0, 0);
+                }));
+            }
+            if (!refreshWorkersReady.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("concurrent refresh workers did not become ready");
+            }
+            startConcurrentRefresh.countDown();
+            for (Future<Map<String, Object>> refreshResult : refreshResults) {
+                if (!Boolean.TRUE.equals(refreshResult.get(10, TimeUnit.SECONDS).get("ok"))) {
+                    throw new IllegalStateException("concurrent refresh returned an invalid payload");
+                }
+            }
+        } finally {
+            refreshExecutor.shutdownNow();
+        }
+        Map<String, Object> afterConcurrentRefresh = diagnostics(service);
+        checks.put("concurrentSceneRefreshIsSingleFlight",
+            count(afterConcurrentRefresh, "sceneInventoryParseCount")
+                    == count(afterFileRequests, "sceneInventoryParseCount") + 1L
+                && count(afterConcurrentRefresh, "sceneInventoryCacheHitCount")
+                    >= count(afterFileRequests, "sceneInventoryCacheHitCount")
+                        + concurrentRefreshWorkers - 1L);
 
         boolean webResourceResolved = false;
         boolean traversalRejected = false;
@@ -111,6 +235,7 @@ public final class WallpaperServiceFixtureProbe {
         result.put("beforeScan", beforeScan);
         result.put("afterFirstScan", afterFirstScan);
         result.put("afterFileRequests", afterFileRequests);
+        result.put("afterConcurrentRefresh", afterConcurrentRefresh);
         result.put("afterManualRefresh", afterManualRefresh);
         System.out.println(SimpleJson.stringify(result));
         if (!pass) System.exit(1);

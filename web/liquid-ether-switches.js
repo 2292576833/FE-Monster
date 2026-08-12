@@ -223,7 +223,9 @@
   }
 
   function activateSwitch(input, event) {
-    if (!input || input.disabled || !webglAvailable) return;
+    if (!input || input.disabled) return;
+    if (!webglAvailable) initialiseRenderer();
+    if (!webglAvailable) return;
     if (activeSwitch !== input) {
       activeSwitch = input;
       checkedMix = input.checked ? 1 : 0;
@@ -341,12 +343,17 @@
 
   function initialiseRenderer() {
     const THREE = window.THREE;
-    if (!THREE?.WebGLRenderer || disposed) return;
+    if (renderer || !THREE?.WebGLRenderer || disposed) return;
+    const graphicsBackend = window.feMonsterGraphicsBackend?.snapshot?.();
+    if (graphicsBackend?.requested && graphicsBackend.hardwareD3D11 !== true) {
+      webglAvailable = false;
+      return;
+    }
     try {
       renderer = new THREE.WebGLRenderer({
         alpha: true,
         antialias: true,
-        powerPreference: "low-power",
+        powerPreference: "high-performance",
         premultipliedAlpha: true
       });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_DEVICE_PIXEL_RATIO));
@@ -416,9 +423,12 @@
     document.documentElement.classList.remove(WEBGL_CLASS);
   }
 
+  let initialised = false;
+
   function initialise() {
+    if (initialised || disposed) return;
+    initialised = true;
     refreshSwitches();
-    initialiseRenderer();
     const observer = new MutationObserver((records) => {
       for (const record of records) {
         for (const node of record.addedNodes) {
@@ -445,28 +455,43 @@
     });
     window.addEventListener("beforeunload", dispose, { once: true });
 
-    window.FeLiquidEtherSwitches = Object.freeze({
-      refresh: refreshSwitches,
-      getDiagnostics() {
-        refreshSwitches();
-        return {
-          registered: registeredSwitches.size,
-          rendererCount: renderer ? 1 : 0,
-          canvasCount: document.querySelectorAll("canvas.liquid-ether-switch-layer").length,
-          webglAvailable,
-          activeId: activeSwitch?.id || "",
-          animationActive: Boolean(animationFrame),
-          renderCount,
-          mouseInteractive: true,
-          palette: ["#5227FF", "#FF9FFC", "#B497CF"]
-        };
-      }
-    });
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initialise, { once: true });
+  window.FeLiquidEtherSwitches = Object.freeze({
+    refresh() {
+      initialise();
+      refreshSwitches();
+    },
+    getDiagnostics() {
+      if (initialised) refreshSwitches();
+      return {
+        initialised,
+        registered: registeredSwitches.size,
+        rendererCount: renderer ? 1 : 0,
+        canvasCount: document.querySelectorAll("canvas.liquid-ether-switch-layer").length,
+        webglAvailable,
+        activeId: activeSwitch?.id || "",
+        animationActive: Boolean(animationFrame),
+        renderCount,
+        mouseInteractive: true,
+        palette: ["#5227FF", "#FF9FFC", "#B497CF"]
+      };
+    }
+  });
+
+  const startWhenInteractive = () => {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initialise, { once: true });
+    } else {
+      initialise();
+    }
+  };
+  if (
+    document.documentElement.dataset.interactiveServices === "started"
+    || document.documentElement.dataset.feClient === "desktop-scene"
+  ) {
+    startWhenInteractive();
   } else {
-    initialise();
+    window.addEventListener("fe-main-entered", startWhenInteractive, { once: true });
   }
 })();

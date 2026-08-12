@@ -1,6 +1,7 @@
 {
   "schema": "fe-monster.music-api-package/v1",
   "id": "qq",
+  "version": "2.4.1",
   "label": "QQ音乐",
   "appName": "QQ音乐 App",
   "baseUrl": "http://127.0.0.1:3011",

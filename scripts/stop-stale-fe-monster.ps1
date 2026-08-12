@@ -6,7 +6,13 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$rootPath = (Resolve-Path $Root).Path.TrimEnd('\')
+$rootPath = [System.IO.Path]::GetFullPath(
+  [Environment]::ExpandEnvironmentVariables($Root)
+).TrimEnd('\', '/')
+if ([string]::IsNullOrWhiteSpace($rootPath) -or
+    [string]::Equals($rootPath, [System.IO.Path]::GetPathRoot($rootPath).TrimEnd('\', '/'), [StringComparison]::OrdinalIgnoreCase)) {
+  throw "Unsafe FE Monster root: $Root"
+}
 $rootNeedle = $rootPath.ToLowerInvariant()
 
 function Test-FeMonsterPath {
@@ -102,6 +108,18 @@ function Test-FeMonsterProcess {
     $name -eq 'msedgewebview2.exe' -and
     $command.Contains('--user-data-dir=') -and
     $command.Contains('\webview2\')
+  ) {
+    return $true
+  }
+
+  # Upgrade cleanup for releases that bundled a private Python runtime.
+  # Match only an interpreter located below this FE Monster installation so
+  # unrelated system/user Python processes can never be terminated here.
+  if (
+    !$SkipClient -and
+    $name -in @('python.exe', 'pythonw.exe') -and
+    $executable.StartsWith($rootNeedle) -and
+    $executable.Contains('\runtime\python\')
   ) {
     return $true
   }

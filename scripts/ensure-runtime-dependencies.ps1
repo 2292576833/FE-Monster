@@ -109,7 +109,56 @@ function Test-MicrosoftSignedExecutable {
   param([string]$Path)
 
   if (!(Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
-  $signature = Get-AuthenticodeSignature -LiteralPath $Path
+  $bundledInstaller = Join-Path $rootPath 'runtime\installers\MicrosoftEdgeWebView2RuntimeInstallerX64.exe'
+  $resolvedPath = [IO.Path]::GetFullPath($Path)
+  $resolvedBundledInstaller = [IO.Path]::GetFullPath($bundledInstaller)
+
+  # The complete offline setup verifies every staged file against
+  # payload-integrity.json before this script runs. On a newly installed or
+  # offline Windows computer, Authenticode chain building can still report
+  # NotTrusted/UnknownError because the local root-certificate store is stale.
+  # Revalidate the bundled installer's exact manifest hash here so that an
+  # unavailable certificate service cannot make an otherwise valid offline
+  # installation impossible. Downloaded executables still require a fully
+  # valid Microsoft Authenticode result below.
+  if ([string]::Equals(
+      $resolvedPath,
+      $resolvedBundledInstaller,
+      [StringComparison]::OrdinalIgnoreCase
+  )) {
+    $manifestPath = Join-Path $rootPath 'payload-integrity.json'
+    try {
+      $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
+      $relativePath = 'runtime/installers/MicrosoftEdgeWebView2RuntimeInstallerX64.exe'
+      $entry = @($manifest.files | Where-Object {
+        [string]::Equals([string]$_.path, $relativePath, [StringComparison]::OrdinalIgnoreCase)
+      }) | Select-Object -First 1
+      if ($null -ne $entry -and
+          [int64]$entry.length -eq (Get-Item -LiteralPath $Path).Length) {
+        $actualHash = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
+        if ([string]::Equals(
+            $actualHash,
+            [string]$entry.sha256,
+            [StringComparison]::OrdinalIgnoreCase
+        )) {
+          Write-Host 'Bundled WebView2 installer passed the activated payload integrity manifest.'
+          return $true
+        }
+      }
+      Write-Host 'Bundled WebView2 installer did not match payload-integrity.json.'
+      return $false
+    } catch {
+      Write-Host "Bundled WebView2 integrity validation failed: $($_.Exception.Message)"
+      return $false
+    }
+  }
+
+  try {
+    $signature = Get-AuthenticodeSignature -LiteralPath $Path
+  } catch {
+    Write-Host "Authenticode validation could not run for $(Split-Path -Leaf $Path): $($_.Exception.Message)"
+    return $false
+  }
   if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) {
     Write-Host "Authenticode validation failed for $(Split-Path -Leaf $Path): $($signature.Status)"
     return $false
@@ -141,17 +190,24 @@ function Invoke-WebView2RuntimeInstaller {
     Write-Host "WebView2 installer could not start: $($_.Exception.Message)"
     return $false
   }
-  if ($process.ExitCode -notin @(0, 3010)) {
-    Write-Host "WebView2 installer failed with exit code $($process.ExitCode)."
-    return $false
-  }
+  $acceptedExitCode = $process.ExitCode -in @(0, 3010)
   if ($process.ExitCode -eq 3010) {
     Write-Host 'WebView2 installer requested a restart; setup will continue only if the Runtime is already detectable.'
   }
 
-  for ($attempt = 1; $attempt -le 30; $attempt += 1) {
-    if (Test-WebView2Runtime) { return $true }
+  $detectionAttempts = if ($acceptedExitCode) { 30 } else { 5 }
+  for ($attempt = 1; $attempt -le $detectionAttempts; $attempt += 1) {
+    if (Test-WebView2Runtime) {
+      if (!$acceptedExitCode) {
+        Write-Host "WebView2 installer returned exit code $($process.ExitCode), but the Runtime is already detectable; accepting the installed state."
+      }
+      return $true
+    }
     Start-Sleep -Seconds 1
+  }
+  if (!$acceptedExitCode) {
+    Write-Host "WebView2 installer failed with exit code $($process.ExitCode), and the Runtime is not detectable."
+    return $false
   }
   Write-Host 'WebView2 installer completed, but the Runtime was not detected.'
   return $false
@@ -223,6 +279,11 @@ function Ensure-WebView2Runtime {
   }
 
   Write-Host "${label}: missing"
+  Write-Host (
+    'WebView2 could not be installed from the network. ' +
+    'Connect this computer to the Internet and retry, or download or request ' +
+    'FE-Monster-Setup-2.0.1-Offline.exe, which includes the signed WebView2 Runtime.'
+  )
   $missing.Add($label) | Out-Null
 }
 
@@ -281,106 +342,30 @@ function Ensure-JavaRuntime {
   $missing.Add($javaLabel) | Out-Null
 }
 
-function Test-GesturePythonRuntime {
-  $python = Join-Path $rootPath 'runtime\python\python.exe'
-  $sitePackages = Join-Path $rootPath 'runtime\python-site-packages'
-  if (!(Test-Path $python) -or !(Test-Path $sitePackages)) { return $false }
-
-  $previousPythonPath = $Env:PYTHONPATH
-  $previousNoUserSite = $Env:PYTHONNOUSERSITE
-  try {
-    $Env:PYTHONPATH = $sitePackages
-    $Env:PYTHONNOUSERSITE = '1'
-    & $python -c "import cv2, mediapipe, pyautogui, pygrabber" *> $null
-    return $LASTEXITCODE -eq 0
-  } finally {
-    if ($null -eq $previousPythonPath) { Remove-Item Env:\PYTHONPATH -ErrorAction SilentlyContinue } else { $Env:PYTHONPATH = $previousPythonPath }
-    if ($null -eq $previousNoUserSite) { Remove-Item Env:\PYTHONNOUSERSITE -ErrorAction SilentlyContinue } else { $Env:PYTHONNOUSERSITE = $previousNoUserSite }
-  }
-}
-
-function Test-GesturePythonImports {
+function Invoke-MandatoryDependencyStep {
   param(
-    [string]$PythonExe,
-    [string]$SitePackages = ''
+    [string]$Name,
+    [scriptblock]$Action
   )
-
-  if ([string]::IsNullOrWhiteSpace($PythonExe) -or !(Test-Path $PythonExe)) { return $false }
-  $previousPythonPath = $Env:PYTHONPATH
-  $previousNoUserSite = $Env:PYTHONNOUSERSITE
   try {
-    if (![string]::IsNullOrWhiteSpace($SitePackages)) { $Env:PYTHONPATH = $SitePackages }
-    $Env:PYTHONNOUSERSITE = '1'
-    & $PythonExe -c "import cv2, mediapipe, pyautogui, pygrabber" *> $null
-    return $LASTEXITCODE -eq 0
-  } finally {
-    if ($null -eq $previousPythonPath) { Remove-Item Env:\PYTHONPATH -ErrorAction SilentlyContinue } else { $Env:PYTHONPATH = $previousPythonPath }
-    if ($null -eq $previousNoUserSite) { Remove-Item Env:\PYTHONNOUSERSITE -ErrorAction SilentlyContinue } else { $Env:PYTHONNOUSERSITE = $previousNoUserSite }
+    & $Action
+  } catch {
+    Write-Host "${Name}: check failed ($($_.Exception.Message))"
+    if (!$missing.Contains($Name)) { $missing.Add($Name) | Out-Null }
   }
 }
 
-function Copy-DirectoryWithRobocopy {
-  param(
-    [string]$Source,
-    [string]$Destination,
-    [string[]]$ExcludeDirs = @()
-  )
-
-  if (!(Test-Path $Source)) { return $false }
-  New-Item -ItemType Directory -Path $Destination -Force | Out-Null
-  $args = @($Source, $Destination, '/E', '/R:2', '/W:1', '/NFL', '/NDL', '/NJH', '/NJS', '/NP')
-  if ($ExcludeDirs.Count -gt 0) {
-    $args += '/XD'
-    $args += $ExcludeDirs
-  }
-  & robocopy.exe @args | Out-Null
-  return $LASTEXITCODE -le 7
+Invoke-MandatoryDependencyStep "Java $preferredJavaMajor+" { Ensure-JavaRuntime }
+Invoke-MandatoryDependencyStep '.NET Desktop Runtime 8 (or bundled self-contained client)' {
+  Ensure-Dependency '.NET Desktop Runtime 8 (or bundled self-contained client)' { Test-DotNetDesktop8 } 'Microsoft.DotNet.DesktopRuntime.8'
 }
-
-function Sync-GesturePythonRuntimeFromVenv {
-  $venvRoot = Join-Path $rootPath '.venv-gesture'
-  $venvPython = Join-Path $venvRoot 'Scripts\python.exe'
-  $sitePackagesSource = Join-Path $venvRoot 'Lib\site-packages'
-  if (!(Test-GesturePythonImports $venvPython) -or !(Test-Path $sitePackagesSource)) { return $false }
-
-  $pythonHome = (& $venvPython -c "import sys; print(sys.base_prefix)") | Select-Object -First 1
-  $pythonHome = [string]$pythonHome
-  if ([string]::IsNullOrWhiteSpace($pythonHome) -or !(Test-Path $pythonHome)) { return $false }
-
-  $pythonDest = Join-Path $rootPath 'runtime\python'
-  $sitePackagesDest = Join-Path $rootPath 'runtime\python-site-packages'
-  $baseSitePackages = Join-Path $pythonHome 'Lib\site-packages'
-
-  if (!(Copy-DirectoryWithRobocopy $pythonHome $pythonDest @($baseSitePackages))) { return $false }
-  if (!(Copy-DirectoryWithRobocopy $sitePackagesSource $sitePackagesDest)) { return $false }
-
-  return Test-GesturePythonRuntime
+Invoke-MandatoryDependencyStep 'Microsoft Edge WebView2 Runtime' { Ensure-WebView2Runtime }
+Invoke-MandatoryDependencyStep 'Node.js LTS' {
+  Ensure-Dependency 'Node.js LTS' { Test-Node } 'OpenJS.NodeJS.LTS'
 }
-
-function Ensure-GesturePythonRuntime {
-  if (Test-GesturePythonRuntime) {
-    Write-Host 'Gesture Python runtime (OpenCV / MediaPipe / PyAutoGUI): OK'
-    return
-  }
-
-  if (Sync-GesturePythonRuntimeFromVenv) {
-    Write-Host 'Gesture Python runtime (OpenCV / MediaPipe / PyAutoGUI): repaired from .venv-gesture'
-    return
-  }
-
-  Write-Host 'Gesture Python runtime (OpenCV / MediaPipe / PyAutoGUI): missing'
-  $missing.Add('Gesture Python runtime (OpenCV / MediaPipe / PyAutoGUI)') | Out-Null
-}
-
-Ensure-JavaRuntime
-Ensure-Dependency '.NET Desktop Runtime 8 (or bundled self-contained client)' { Test-DotNetDesktop8 } 'Microsoft.DotNet.DesktopRuntime.8'
-Ensure-WebView2Runtime
-Ensure-Dependency 'Node.js LTS' { Test-Node } 'OpenJS.NodeJS.LTS'
-Ensure-GesturePythonRuntime
 
 if ($missing.Count -gt 0) {
   Write-Host ('Missing dependencies: ' + ($missing -join ', '))
   exit 1
 }
-
 Write-Host 'Runtime dependencies: OK'

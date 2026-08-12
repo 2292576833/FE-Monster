@@ -54,7 +54,55 @@ function Get-CommunityUrl {
 }
 
 function Get-InstalledVersion {
-  return '1.8.8'
+  return '2.0.1'
+}
+
+function ConvertTo-WindowsProcessArgument {
+  param([AllowEmptyString()][string]$Argument)
+  if ($Argument -notmatch '[\s"]') { return $Argument }
+
+  $builder = New-Object System.Text.StringBuilder
+  [void]$builder.Append('"')
+  $slashes = 0
+  foreach ($character in $Argument.ToCharArray()) {
+    if ($character -eq [char]92) {
+      $slashes++
+      continue
+    }
+    if ($character -eq [char]34) {
+      if ($slashes -gt 0) { [void]$builder.Append(('\' * ($slashes * 2))) }
+      [void]$builder.Append('\"')
+      $slashes = 0
+      continue
+    }
+    if ($slashes -gt 0) { [void]$builder.Append(('\' * $slashes)) }
+    [void]$builder.Append($character)
+    $slashes = 0
+  }
+  if ($slashes -gt 0) { [void]$builder.Append(('\' * ($slashes * 2))) }
+  [void]$builder.Append('"')
+  return $builder.ToString()
+}
+
+function Start-ArgumentSafeProcess {
+  param(
+    [string]$FilePath,
+    [string[]]$Arguments,
+    [string]$WorkingDirectory
+  )
+
+  $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+  $startInfo.FileName = $FilePath
+  $startInfo.WorkingDirectory = $WorkingDirectory
+  $startInfo.UseShellExecute = $false
+  $startInfo.CreateNoWindow = $true
+  $argumentListProperty = $startInfo.PSObject.Properties['ArgumentList']
+  if ($null -ne $argumentListProperty) {
+    foreach ($argument in $Arguments) { $startInfo.ArgumentList.Add($argument) }
+  } else {
+    $startInfo.Arguments = (@($Arguments | ForEach-Object { ConvertTo-WindowsProcessArgument ([string]$_) }) -join ' ')
+  }
+  return [System.Diagnostics.Process]::Start($startInfo)
 }
 
 function Invoke-AutoInstall {
@@ -66,12 +114,20 @@ function Invoke-AutoInstall {
     if ($last -eq $version) { return }
   }
   $url = [string]$Release.downloadUrl
-  if ($url -notmatch '^https?://') { return }
+  $sha256 = ([string]$Release.sha256).Trim().ToLowerInvariant()
+  if ($sha256.StartsWith('sha256:')) { $sha256 = $sha256.Substring('sha256:'.Length) }
+  try {
+    $uri = [Uri]$url
+    if (!$uri.IsAbsoluteUri -or $uri.Scheme -ne 'https') { return }
+  } catch {
+    return
+  }
+  if ($sha256 -notmatch '^[0-9a-f]{64}$') { return }
   if (!(Test-Path $progressDir)) { New-Item -ItemType Directory -Path $progressDir -Force | Out-Null }
   $progressFile = Join-Path $progressDir ('agent-' + ([guid]::NewGuid().ToString('N')) + '.json')
   $script = Join-Path $rootPath 'scripts\apply-client-update.ps1'
   if (!(Test-Path $script)) { return }
-  $process = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+  $process = Start-ArgumentSafeProcess -FilePath 'powershell.exe' -Arguments @(
     '-NoProfile',
     '-ExecutionPolicy',
     'Bypass',
@@ -85,9 +141,11 @@ function Invoke-AutoInstall {
     $url,
     '-Version',
     $version,
+    '-Sha256',
+    $sha256,
     '-ProgressFile',
     $progressFile
-  ) -WorkingDirectory $rootPath -WindowStyle Hidden -PassThru
+  ) -WorkingDirectory $rootPath
   $process.WaitForExit()
   if ($process.ExitCode -eq 0) {
     Set-Content -Encoding UTF8 -Path $lastAutoInstallFile -Value $version

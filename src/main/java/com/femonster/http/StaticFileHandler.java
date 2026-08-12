@@ -26,6 +26,10 @@ public final class StaticFileHandler implements HttpHandler {
         Map.entry(".jpeg", "image/jpeg"),
         Map.entry(".svg", "image/svg+xml"),
         Map.entry(".ico", "image/x-icon"),
+        Map.entry(".woff", "font/woff"),
+        Map.entry(".woff2", "font/woff2"),
+        Map.entry(".ttf", "font/ttf"),
+        Map.entry(".otf", "font/otf"),
         Map.entry(".bin", "application/octet-stream"),
         Map.entry(".mp3", "audio/mpeg"),
         Map.entry(".wav", "audio/wav")

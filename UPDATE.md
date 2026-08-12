@@ -1,6 +1,12 @@
-# FE Monster 1.8.8
+# FE Monster 2.0.1 Windows 正式版
 
-发布日期：2026-07-29
+发布日期：2026-08-13
+
+## 版本范围
+
+- `2.0.1` 用于 Windows 客户端、安装器、Java 对外版本和官方下载页。
+- Android、iOS 和 macOS 本轮不发版，原有版本保持不变。
+- Rust 音频库与各音乐 API 插件使用独立版本，不跟随 Windows 应用版本统一递增。
 
 ## 重点更新
 
@@ -17,13 +23,12 @@
 
 ## Windows 安装包
 
-- 推荐联网版：`FE-Monster-Setup-1.8.8.exe`（437.58 MiB）
-  - SHA-256：`f934b536d12edd3ed2232649fa15e0b524bb1cf5c6d737592a27d9923d1fa15a`
-- 离线完整包：`FE-Monster-Setup-1.8.8-Offline.exe`（631.91 MiB）
-  - SHA-256：`4b1e02ac8565e428fc40bc60331dc6fc650fe879e2d64d8c69f80322156975a2`
+- 推荐联网版：`FE-Monster-Setup-2.0.1.exe`
+  - 大小：361.81 MiB（379,384,967 bytes）。
+  - SHA-256：`88c64df2f5ce5cec135e37d2e8423065482932baa2e7de86b6a84717a2111361`。
 - 系统：Windows 10 / 11 x64
-- 两种安装器都包含应用所需的 Java、Node.js、Python 手势依赖和原生音频组件，软件功能与画质完全相同。
-- 推荐联网版不再重复携带约 194 MiB 的 WebView2 离线安装器；电脑缺少 WebView2 时会使用 winget 或微软官方签名引导程序补装。无网络的新电脑请使用 `Offline` 完整包。
+- 联网安装器包含应用所需的 Java、Node.js 和原生音频组件；不再携带未使用的 Python 视觉识别运行库。
+- 联网版不再重复携带约 194 MiB 的 WebView2 离线安装器；电脑缺少 WebView2 时会使用 winget 或微软官方签名引导程序补装。
 - 为缩小体积，只保留运行时实际使用的 ReactBits 组件资源，并剔除测试、调试、缓存和开发文件；场景画质、字体、粒子密度与帧率策略不降低。
 - `components` 目录不能整包删除：玻璃表面、按钮光边和歌词动画仍会直接加载其中的 4 个运行时文件；这些文件合计约 16 KiB，不是安装包体积来源。
 - 当前安装包未配置 Authenticode 代码签名，Windows SmartScreen 可能提示未知发布者。请只从本仓库 Release 或官方下载页获取。
@@ -33,9 +38,9 @@
 Release 同时提供以下可独立导入的 ZIP，以及包含全部平台插件的 `plugins.zip`：
 
 - 网易云音乐：`FE-Monster-Netease-API-Plugin-4.32.0.zip`
-- QQ 音乐：`FE-Monster-QQ-API-Plugin-2.4.0.zip`
-- 酷狗音乐：`FE-Monster-Kugou-API-Plugin-2.0.1.zip`
-- 汽水音乐：`FE-Monster-Qishui-OpenAPI-Plugin-3.1.0.zip`
+- QQ 音乐：`FE-Monster-QQ-API-Plugin-2.4.1.zip`
+- 酷狗音乐：`FE-Monster-Kugou-API-Plugin-2.0.7.zip`
+- 汽水音乐：`FE-Monster-Qishui-OpenAPI-Plugin-3.1.1.zip`
 
 `plugins.zip` 是汇总下载包，需先解压，再在 FE Monster 登录页导入对应平台的单独 ZIP。插件不会绕过会员、版权、地区或账号权限。
 

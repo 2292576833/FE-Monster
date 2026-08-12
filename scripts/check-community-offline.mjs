@@ -217,7 +217,9 @@ try {
         await wait(10);
         refreshCommunityState('netease');
         await firstRefresh;
-        await wait(180);
+        // The queued request must wait for the outage backoff instead of
+        // restarting in the old 40 ms loop, then run once when eligible.
+        await wait(1700);
       } finally {
         communityApiJson = originalCommunityApiJson;
       }
@@ -263,7 +265,7 @@ try {
     && result.networkActionsDisabled
     && result.transientRecovered
     && result.transientAttempts === 5
-    && result.queuedRefreshCalls >= 2;
+    && result.queuedRefreshCalls === 2;
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   process.exitCode = result.ok ? 0 : 1;
 } finally {

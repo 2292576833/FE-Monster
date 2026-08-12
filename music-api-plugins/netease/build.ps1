@@ -63,6 +63,11 @@ $packageFiles = @(
 foreach ($file in $packageFiles) {
     Copy-Item -LiteralPath (Join-Path $sourceDirectory $file) -Destination (Join-Path $packageDirectory $file)
 }
+$sharedSafeLog = Join-Path (Split-Path -Parent $sourceDirectory) 'shared\safe-log.cjs'
+if (!(Test-Path -LiteralPath $sharedSafeLog -PathType Leaf)) {
+    throw "Shared music API log sanitizer is missing: $sharedSafeLog"
+}
+Copy-Item -LiteralPath $sharedSafeLog -Destination (Join-Path $packageDirectory 'safe-log.cjs')
 Copy-Item -LiteralPath (Join-Path $runtimeDirectory 'node_modules\NeteaseCloudMusicApi\LICENSE') -Destination (Join-Path $packageDirectory 'NETEASE_API_LICENSE.txt')
 
 if (Test-Path -LiteralPath $outputPath) {
@@ -79,10 +84,15 @@ if ($largestEntry.Length -gt 16MB) {
     throw "runtime.tgz exceeds the 16 MB per-entry import limit: $($largestEntry.Length) bytes"
 }
 
+$outputHash = (Get-FileHash -LiteralPath $outputPath -Algorithm SHA256).Hash
+$checksumPath = "$outputPath.sha256"
+$checksumLine = "$($outputHash.ToLowerInvariant())  $([System.IO.Path]::GetFileName($outputPath))`n"
+[System.IO.File]::WriteAllText($checksumPath, $checksumLine, [System.Text.Encoding]::ASCII)
+
 $result = [ordered]@{
     path = $outputFile.FullName
     bytes = $outputFile.Length
-    sha256 = (Get-FileHash -LiteralPath $outputPath -Algorithm SHA256).Hash
+    sha256 = $outputHash
     runtimeBytes = $largestEntry.Length
     runtimeSha256 = $archiveHash
 } | ConvertTo-Json

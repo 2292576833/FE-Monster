@@ -20,7 +20,7 @@ const path = require("node:path");
 const { gunzipSync } = require("node:zlib");
 
 const PROVIDER = "qishui";
-const VERSION = "3.1.0";
+const VERSION = "3.1.1";
 const CONTRACT = "fe-monster.music-api/v1";
 const DEFAULT_PORT = 3013;
 const DEFAULT_FEED_URL = "https://open.douyin.com/api/luna/v1/platform/feed/song-tab/";
@@ -460,6 +460,18 @@ function readLevelDbTable(content, onRecord) {
 
 function localAccountCacheHash(value) {
   return createHash("sha256").update(text(value)).digest("hex");
+}
+
+function oauthAccountId(authorization = {}) {
+  const openId = text(authorization.openId);
+  if (openId) return openId;
+  const credential = text(authorization.refreshToken) || text(authorization.accessToken);
+  if (!credential) return "";
+  const digest = createHash("sha256")
+    .update(`${text(authorization.clientKey)}\u001f${credential}`)
+    .digest("hex")
+    .slice(0, 40);
+  return `qishui-oauth-${digest}`;
 }
 
 function assertLocalCacheJsonBounds(root) {
@@ -1218,7 +1230,8 @@ function loadSession(sessionPath) {
           accessToken,
           openId: text(parsed.openId),
           refreshToken: text(parsed.refreshToken),
-          clientKey: text(parsed.clientKey)
+          clientKey: text(parsed.clientKey),
+          accountId: text(parsed.accountId) || oauthAccountId(parsed)
         }
       : {};
   } catch {
@@ -1563,7 +1576,13 @@ function createApp(options = {}) {
 
   function acceptAuthorization(result) {
     const next = result.authorization;
-    if (next.accessToken !== session.accessToken || next.refreshToken !== session.refreshToken) {
+    if (
+      next.accessToken !== session.accessToken
+      || next.refreshToken !== session.refreshToken
+      || next.openId !== session.openId
+      || next.clientKey !== session.clientKey
+      || next.accountId !== session.accountId
+    ) {
       saveSession(sessionPath, next);
     }
     session = next;
@@ -1602,14 +1621,18 @@ function createApp(options = {}) {
         const localStatus = localSodaMusicStatus();
         const playbackAuthorized = Boolean(session.accessToken);
         const localLoginDetected = localStatus.loginDetected === true;
+        const localAccountId = localLoginDetected
+          ? text(localPublicProfileSnapshot().accountCacheHash)
+          : "";
         const account = localLoginDetected
           ? {
+              userId: `qishui-local-${localAccountId}`,
               nickname: localStatus.displayName || "汽水音乐用户",
               avatar: localStatus.avatar,
               isVip: localStatus.isVip === true
             }
-          : session.openId
-            ? { userId: session.openId, nickname: "汽水音乐 OpenAPI" }
+          : oauthAccountId(session)
+            ? { userId: oauthAccountId(session), nickname: "汽水音乐 OpenAPI" }
             : {};
         json(response, 200, {
           ok: true,
@@ -1697,14 +1720,15 @@ function createApp(options = {}) {
           refreshToken: text(body.refreshToken),
           clientKey: text(body.clientKey)
         };
+        nextSession.accountId = oauthAccountId(nextSession);
         const result = await requestAuthorizedFeed(feedUrl, refreshUrl, nextSession, 1);
         acceptAuthorization(result);
         json(response, 200, {
           ok: true,
           provider: PROVIDER,
           loggedIn: true,
-          account: nextSession.openId
-            ? { userId: nextSession.openId, nickname: "汽水音乐 OpenAPI" }
+          account: nextSession.accountId
+            ? { userId: nextSession.accountId, nickname: "汽水音乐 OpenAPI" }
             : {}
         });
         return;

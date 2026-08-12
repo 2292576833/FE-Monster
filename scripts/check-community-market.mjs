@@ -19,6 +19,7 @@ const browser = spawn(edge, [
 let socket;
 let nextId = 1;
 const pending = new Map();
+const runtimeExceptions = [];
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -55,6 +56,10 @@ try {
   });
   socket.addEventListener("message", (event) => {
     const message = JSON.parse(String(event.data));
+    if (message.method === 'Runtime.exceptionThrown') {
+      runtimeExceptions.push(message.params?.exceptionDetails || {});
+      return;
+    }
     if (!message.id || !pending.has(message.id)) return;
     const request = pending.get(message.id);
     pending.delete(message.id);
@@ -71,7 +76,15 @@ try {
     mobile: viewportWidth < 640,
   });
   await command("Page.navigate", { url: `${baseUrl}/` });
-  await delay(1400);
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (runtimeExceptions.length) break;
+    const readiness = await command("Runtime.evaluate", {
+      returnByValue: true,
+      expression: "Boolean(document.documentElement.dataset.bundledLibrary)",
+    });
+    if (readiness.result.value === true) break;
+    await delay(100);
+  }
 
   const evaluation = await command("Runtime.evaluate", {
     awaitPromise: true,
@@ -102,6 +115,12 @@ try {
       const pageRect = marketPage ? marketPage.getBoundingClientRect() : null;
       const pageVisible = Boolean(marketPage && !marketPage.hidden && pageStyle.display !== 'none' && pageStyle.visibility !== 'hidden' && pageRect.width > 0 && pageRect.height > 0);
       return {
+        documentReadyState: document.readyState,
+        interactiveServices: document.documentElement.dataset.interactiveServices || '',
+        bundledLibrary: document.documentElement.dataset.bundledLibrary || '',
+        bootHidden: Boolean(document.querySelector('#bootScreen')?.hidden),
+        toastText: document.querySelector('#toast')?.textContent?.trim() || '',
+        toggleFunctionAvailable: typeof window.toggleCommunityPageFromPlayback === 'function',
         railVisible,
         railExpanded: rail?.getAttribute('aria-expanded') || '',
         drawerVisible,
@@ -116,6 +135,13 @@ try {
   });
 
   const result = evaluation.result.value;
+  result.runtimeExceptions = runtimeExceptions.map((detail) => ({
+    text: detail.text || '',
+    description: detail.exception?.description || '',
+    lineNumber: detail.lineNumber,
+    columnNumber: detail.columnNumber,
+    url: detail.url || ''
+  }));
   const visibleMarket = result.railVisible
     && result.railExpanded === 'true'
     && result.drawerVisible

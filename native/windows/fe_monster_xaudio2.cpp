@@ -38,6 +38,8 @@ constexpr size_t kLowProbeCount = (kLowMaxHz - kLowMinHz) / kLowStepHz + 1;
 constexpr size_t kLowBandCount = 512;
 constexpr size_t kAnalysisWindow = 2048;
 constexpr size_t kAnalysisHop = 1024;
+constexpr ULONGLONG kCaptureIdleTimeoutMs = 900;
+constexpr DWORD kCaptureWaitTimeoutMs = 180;
 
 IXAudio2* g_engine = nullptr;
 IXAudio2MasteringVoice* g_master_voice = nullptr;
@@ -47,6 +49,11 @@ bool g_ready = false;
 
 std::atomic<bool> g_capture_started{ false };
 std::atomic<bool> g_capture_active{ false };
+std::atomic<bool> g_capture_shutdown{ false };
+std::atomic<ULONGLONG> g_capture_last_request_tick{ 0 };
+std::mutex g_capture_thread_mutex;
+std::thread g_capture_thread;
+HANDLE g_capture_stop_event = nullptr;
 std::atomic<float> g_low_frequency{ 0.0f };
 std::atomic<float> g_energy{ 0.0f };
 std::atomic<float> g_beat{ 0.0f };
@@ -275,7 +282,14 @@ void append_frames(
     }
 }
 
-bool run_capture_session() {
+bool capture_requested() {
+    const ULONGLONG last_request = g_capture_last_request_tick.load(std::memory_order_relaxed);
+    return last_request != 0
+        && GetTickCount64() - last_request <= kCaptureIdleTimeoutMs
+        && !g_capture_shutdown.load(std::memory_order_relaxed);
+}
+
+bool run_capture_session(HANDLE stop_event) {
     ComPtr<IMMDeviceEnumerator> enumerator;
     HRESULT hr = CoCreateInstance(
         __uuidof(MMDeviceEnumerator),
@@ -304,17 +318,30 @@ bool run_capture_session() {
         return false;
     }
 
+    HANDLE capture_event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    if (!capture_event) {
+        CoTaskMemFree(mix_format);
+        return false;
+    }
+
     g_sample_rate.store(static_cast<float>(mix_format->nSamplesPerSec), std::memory_order_relaxed);
-    constexpr REFERENCE_TIME buffer_duration = 10000000;
     hr = audio_client->Initialize(
         AUDCLNT_SHAREMODE_SHARED,
-        AUDCLNT_STREAMFLAGS_LOOPBACK,
-        buffer_duration,
+        AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+        0,
         0,
         mix_format,
         nullptr
     );
     if (FAILED(hr)) {
+        CloseHandle(capture_event);
+        CoTaskMemFree(mix_format);
+        return false;
+    }
+
+    hr = audio_client->SetEventHandle(capture_event);
+    if (FAILED(hr)) {
+        CloseHandle(capture_event);
         CoTaskMemFree(mix_format);
         return false;
     }
@@ -322,38 +349,52 @@ bool run_capture_session() {
     ComPtr<IAudioCaptureClient> capture_client;
     hr = audio_client->GetService(IID_PPV_ARGS(&capture_client));
     if (FAILED(hr) || !capture_client) {
+        CloseHandle(capture_event);
         CoTaskMemFree(mix_format);
         return false;
     }
 
     hr = audio_client->Start();
     if (FAILED(hr)) {
+        CloseHandle(capture_event);
         CoTaskMemFree(mix_format);
         return false;
     }
 
     std::vector<float> pending;
     pending.reserve(kAnalysisWindow * 2);
-    UINT32 empty_ticks = 0;
+    ULONGLONG last_packet_tick = GetTickCount64();
+    bool silence_published = false;
 
-    while (true) {
-        Sleep(10);
+    while (capture_requested()) {
+        const HANDLE wait_handles[] = { stop_event, capture_event };
+        const DWORD wait_result = WaitForMultipleObjects(
+            static_cast<DWORD>(std::size(wait_handles)),
+            wait_handles,
+            FALSE,
+            kCaptureWaitTimeoutMs
+        );
+        if (wait_result == WAIT_OBJECT_0) break;
+        if (wait_result == WAIT_TIMEOUT) {
+            if (!silence_published && GetTickCount64() - last_packet_tick >= kCaptureWaitTimeoutMs) {
+                decay_sample();
+                g_capture_active.store(false, std::memory_order_relaxed);
+                silence_published = true;
+            }
+            continue;
+        }
+        if (wait_result != WAIT_OBJECT_0 + 1) break;
 
         UINT32 packet_frames = 0;
         hr = capture_client->GetNextPacketSize(&packet_frames);
         if (FAILED(hr)) break;
 
         if (packet_frames == 0) {
-            empty_ticks += 1;
-            if (empty_ticks > 16) {
-                decay_sample();
-                g_capture_active.store(false, std::memory_order_relaxed);
-                empty_ticks = 0;
-            }
             continue;
         }
 
-        empty_ticks = 0;
+        last_packet_tick = GetTickCount64();
+        silence_published = false;
         while (packet_frames > 0) {
             BYTE* data = nullptr;
             UINT32 frames_available = 0;
@@ -377,27 +418,66 @@ bool run_capture_session() {
     }
 
     audio_client->Stop();
+    CloseHandle(capture_event);
     CoTaskMemFree(mix_format);
     g_capture_active.store(false, std::memory_order_relaxed);
-    return false;
+    return true;
 }
 
-void capture_thread_main() {
+void capture_thread_main(HANDLE stop_event) {
     HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     const bool com_ready = SUCCEEDED(hr) || hr == RPC_E_CHANGED_MODE;
-    if (!com_ready) return;
-
-    while (true) {
-        run_capture_session();
+    if (com_ready) {
+        while (capture_requested()
+            && WaitForSingleObject(stop_event, 0) != WAIT_OBJECT_0) {
+            run_capture_session(stop_event);
+            if (!capture_requested()
+                || WaitForSingleObject(stop_event, kCaptureWaitTimeoutMs) == WAIT_OBJECT_0) {
+                break;
+            }
+        }
         decay_sample();
-        Sleep(1000);
+        g_capture_active.store(false, std::memory_order_relaxed);
+        if (SUCCEEDED(hr)) CoUninitialize();
     }
+    g_capture_started.store(false, std::memory_order_release);
 }
 
 void start_capture_once() {
-    bool expected = false;
-    if (!g_capture_started.compare_exchange_strong(expected, true)) return;
-    std::thread(capture_thread_main).detach();
+    if (!capture_requested()) return;
+    std::scoped_lock lock(g_capture_thread_mutex);
+    if (g_capture_shutdown.load(std::memory_order_relaxed)
+        || g_capture_started.load(std::memory_order_acquire)) {
+        return;
+    }
+    if (g_capture_thread.joinable()) g_capture_thread.join();
+    if (!g_capture_stop_event) {
+        g_capture_stop_event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+        if (!g_capture_stop_event) return;
+    } else {
+        ResetEvent(g_capture_stop_event);
+    }
+    g_capture_started.store(true, std::memory_order_release);
+    try {
+        g_capture_thread = std::thread(capture_thread_main, g_capture_stop_event);
+    } catch (...) {
+        g_capture_started.store(false, std::memory_order_release);
+    }
+}
+
+void stop_capture() {
+    g_capture_shutdown.store(true, std::memory_order_release);
+    std::scoped_lock lock(g_capture_thread_mutex);
+    if (g_capture_stop_event) SetEvent(g_capture_stop_event);
+    if (g_capture_thread.joinable()) g_capture_thread.join();
+    if (g_capture_stop_event) {
+        CloseHandle(g_capture_stop_event);
+        g_capture_stop_event = nullptr;
+    }
+    g_capture_started.store(false, std::memory_order_release);
+    g_capture_active.store(false, std::memory_order_relaxed);
+    g_capture_last_request_tick.store(0, std::memory_order_relaxed);
+    decay_sample();
 }
 
 X3DAUDIO_VECTOR vector3(float x, float y, float z) {
@@ -414,15 +494,21 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_femonster_core_NativeAudioEngine_
     jclass
 ) {
     const bool ready = init_engine();
-    if (ready) start_capture_once();
+    if (ready) g_capture_shutdown.store(false, std::memory_order_release);
     return ready ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT jfloatArray JNICALL Java_com_femonster_core_NativeAudioEngine_nativeSampleState(
     JNIEnv* env,
-    jclass
+    jclass,
+    jboolean request_capture
 ) {
-    std::array<jfloat, 5 + kLowBandCount> values{};
+    if (request_capture == JNI_TRUE && g_ready
+        && !g_capture_shutdown.load(std::memory_order_relaxed)) {
+        g_capture_last_request_tick.store(GetTickCount64(), std::memory_order_relaxed);
+        start_capture_once();
+    }
+    std::array<jfloat, 6 + kLowBandCount> values{};
     values[0] = g_low_frequency.load(std::memory_order_relaxed);
     values[1] = g_energy.load(std::memory_order_relaxed);
     values[2] = g_beat.load(std::memory_order_relaxed);
@@ -431,10 +517,37 @@ extern "C" JNIEXPORT jfloatArray JNICALL Java_com_femonster_core_NativeAudioEngi
     for (size_t index = 0; index < kLowBandCount; index += 1) {
         values[5 + index] = g_low_frequency_bands[index].load(std::memory_order_relaxed);
     }
+    values[5 + kLowBandCount] = g_capture_started.load(std::memory_order_acquire) ? 1.0f : 0.0f;
     jfloatArray result = env->NewFloatArray(static_cast<jsize>(values.size()));
     if (!result) return nullptr;
     env->SetFloatArrayRegion(result, 0, static_cast<jsize>(values.size()), values.data());
     return result;
+}
+
+extern "C" JNIEXPORT void JNICALL Java_com_femonster_core_NativeAudioEngine_nativeShutdown(
+    JNIEnv*,
+    jclass
+) {
+    stop_capture();
+    {
+        std::scoped_lock lock(g_spatial_pipeline_mutex);
+        if (g_spatial_pipeline != nullptr) {
+            fe_audio_pipeline_destroy(g_spatial_pipeline);
+            g_spatial_pipeline = nullptr;
+        }
+        g_spatial_input_channels = 0;
+    }
+    if (g_master_voice != nullptr) {
+        g_master_voice->DestroyVoice();
+        g_master_voice = nullptr;
+    }
+    if (g_engine != nullptr) {
+        g_engine->Release();
+        g_engine = nullptr;
+    }
+    g_low_frequency_kernel.reset();
+    g_output_channels = 0;
+    g_ready = false;
 }
 
 extern "C" JNIEXPORT jfloatArray JNICALL Java_com_femonster_core_NativeAudioEngine_nativeSpatialMatrix(

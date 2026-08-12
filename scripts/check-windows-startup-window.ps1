@@ -2,6 +2,8 @@ param(
   [string]$Executable = '',
   [string]$WorkingDirectory = '',
   [int]$TimeoutSeconds = 35,
+  [ValidateRange(0, 60000)]
+  [int]$MaxMainWindowMilliseconds = 0,
   [switch]$Runtime
 )
 
@@ -61,6 +63,8 @@ public static class FeMonsterWindowProbe
     private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int maxCount);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr hWnd, StringBuilder className, int maxCount);
     [DllImport("user32.dll")]
     private static extern bool IsWindowVisible(IntPtr hWnd);
     [DllImport("user32.dll")]
@@ -73,6 +77,13 @@ public static class FeMonsterWindowProbe
     {
         var buffer = new StringBuilder(1024);
         GetWindowText(hWnd, buffer, buffer.Capacity);
+        return buffer.ToString();
+    }
+
+    private static string ReadClassName(IntPtr hWnd)
+    {
+        var buffer = new StringBuilder(256);
+        GetClassName(hWnd, buffer, buffer.Capacity);
         return buffer.ToString();
     }
 
@@ -97,6 +108,7 @@ public static class FeMonsterWindowProbe
             }, IntPtr.Zero);
             rows.Add(String.Join(" | ", new [] {
                 processId.ToString(),
+                ReadClassName(hWnd),
                 (rect.Right - rect.Left).ToString(),
                 (rect.Bottom - rect.Top).ToString(),
                 String.Join(" ", texts)
@@ -127,9 +139,12 @@ function Get-ProcessFamilyIds {
 
 $process = $null
 $observedStartupWindow = $false
+$observedConsoleWindow = $false
 $observedMainWindow = $false
+$mainWindowMilliseconds = -1
 $observedRows = [Collections.Generic.HashSet[string]]::new()
 try {
+  $startupClock = [Diagnostics.Stopwatch]::StartNew()
   $process = Start-Process -FilePath $executablePath -WorkingDirectory $workingDirectoryPath -PassThru
   $deadline = (Get-Date).AddSeconds([Math]::Max(5, $TimeoutSeconds))
   do {
@@ -137,16 +152,23 @@ try {
     $familyIds = @(Get-ProcessFamilyIds -RootProcessId $process.Id)
     foreach ($row in [FeMonsterWindowProbe]::Snapshot($familyIds)) {
       [void]$observedRows.Add($row)
-      $parts = $row -split '\|', 4
-      if ($parts.Count -lt 4) { continue }
-      $width = [int]$parts[1].Trim()
-      $height = [int]$parts[2].Trim()
-      $text = $parts[3]
+      $parts = $row -split '\|', 5
+      if ($parts.Count -lt 5) { continue }
+      $className = $parts[1].Trim()
+      $width = [int]$parts[2].Trim()
+      $height = [int]$parts[3].Trim()
+      $text = $parts[4]
+      if ($className -in @('ConsoleWindowClass', 'CASCADIA_HOSTING_WINDOW_CLASS')) {
+        $observedConsoleWindow = $true
+      }
       if ($text -match 'Starting FE Monster local services') {
         $observedStartupWindow = $true
       }
       if ($text -match '\bFE Monster\b' -and $width -ge 640 -and $height -ge 480) {
         $observedMainWindow = $true
+        if ($mainWindowMilliseconds -lt 0) {
+          $mainWindowMilliseconds = [int][Math]::Round($startupClock.Elapsed.TotalMilliseconds)
+        }
       }
     }
     if ($observedStartupWindow -or $observedMainWindow -or $process.HasExited) { break }
@@ -155,11 +177,17 @@ try {
   if ($observedStartupWindow) {
     throw "Temporary startup window was observed while launching $executablePath."
   }
+  if ($observedConsoleWindow) {
+    throw "A visible console window was observed in the FE Monster startup process family."
+  }
   if (!$observedMainWindow) {
     $exitNote = if ($process.HasExited) { " Process exited with code $($process.ExitCode)." } else { '' }
     throw "The FE Monster main window did not appear within $TimeoutSeconds seconds.$exitNote"
   }
-  Write-Host "Windows startup runtime contract: OK ($executablePath opened the main window without the temporary startup form)."
+  if ($MaxMainWindowMilliseconds -gt 0 -and $mainWindowMilliseconds -gt $MaxMainWindowMilliseconds) {
+    throw "The FE Monster main window took ${mainWindowMilliseconds}ms to appear; budget is ${MaxMainWindowMilliseconds}ms."
+  }
+  Write-Host "Windows startup runtime contract: OK (main window ${mainWindowMilliseconds}ms; no temporary form or visible console)."
 } finally {
   if ($null -ne $process) {
     $familyIds = @(Get-ProcessFamilyIds -RootProcessId $process.Id) | Sort-Object -Descending

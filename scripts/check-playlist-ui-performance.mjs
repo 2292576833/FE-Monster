@@ -20,6 +20,7 @@ const thresholds = Object.freeze({
   maxFocusAverageMs: 4,
   maxFocusP95Ms: 8,
   maxFocusSingleMs: 32,
+  maxCreatedButtonsDuringFocus: 0,
   maxVisibleSongButtons: 15,
   maxSongButtonDomCount: 15,
   maxSongStackDescendants: 15 * 10 + 8,
@@ -269,6 +270,7 @@ try {
     renderPlaylistShelf(playlist, songs);
     const stack = document.getElementById('playlistSongStack');
     const stage = document.getElementById('playlistShelfStage');
+    const initialSongButtons = new Set(stack.querySelectorAll('.shelf-song-button'));
     stack.getBoundingClientRect();
     const initialSynchronousMs = performance.now() - initialStartedAt;
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -280,11 +282,21 @@ try {
     }).then((response) => response.json());
 
     const originalSetSongFocus = setSongFocus;
+    const originalCreateShelfSongButton = createShelfSongButton;
     const focusDurations = [];
     const directDurations = [];
     const wheelDurations = [];
+    const steadyFocusDurations = [];
+    const recycledWindowDurations = [];
+    const accessibilityProbes = [];
     let probeMode = 'direct';
+    let createdButtonsDuringFocus = 0;
+    createShelfSongButton = (...args) => {
+      createdButtonsDuringFocus += 1;
+      return originalCreateShelfSongButton(...args);
+    };
     setSongFocus = (...args) => {
+      const previousFirstIndex = Number(state.songButtonCache[0]?.dataset.songIndex);
       const startedAt = performance.now();
       const value = originalSetSongFocus(...args);
       const focused = state.songButtonCache.find(
@@ -294,6 +306,9 @@ try {
       if (focused) getComputedStyle(focused).transform;
       const duration = performance.now() - startedAt;
       focusDurations.push(duration);
+      const nextFirstIndex = Number(state.songButtonCache[0]?.dataset.songIndex);
+      (nextFirstIndex === previousFirstIndex ? steadyFocusDurations : recycledWindowDurations)
+        .push(duration);
       (probeMode === 'wheel' ? wheelDurations : directDurations).push(duration);
       return value;
     };
@@ -312,8 +327,22 @@ try {
         }));
         await new Promise((resolve) => requestAnimationFrame(resolve));
       }
+      for (const targetIndex of [${songCount - 1}, 0, ${Math.floor(songCount / 2)}, 5]) {
+        originalSetSongFocus(targetIndex, { focus: false });
+        const pool = Array.from(stack.querySelectorAll('.shelf-song-button'));
+        const selected = pool.filter((button) => button.getAttribute('aria-selected') === 'true');
+        const tabbable = pool.filter((button) => button.tabIndex === 0);
+        accessibilityProbes.push({
+          targetIndex,
+          selected: selected.map((button) => Number(button.dataset.songIndex)),
+          tabbable: tabbable.map((button) => Number(button.dataset.songIndex)),
+          selectedHidden: selected.some((button) => button.classList.contains('is-song-virtual-hidden')),
+          tabbableHidden: tabbable.some((button) => button.classList.contains('is-song-virtual-hidden'))
+        });
+      }
     } finally {
       setSongFocus = originalSetSongFocus;
+      createShelfSongButton = originalCreateShelfSongButton;
     }
 
     const summarize = (values) => {
@@ -359,6 +388,8 @@ try {
     const focusStats = summarize(focusDurations);
     const directStats = summarize(directDurations);
     const wheelStats = summarize(wheelDurations);
+    const steadyFocusStats = summarize(steadyFocusDurations);
+    const recycledWindowStats = summarize(recycledWindowDurations);
     const checks = {
       unmountedSongsDoNotConsumeDom: buttons.length < songCount,
       songButtonDomBounded: buttons.length <= thresholds.maxSongButtonDomCount,
@@ -380,6 +411,17 @@ try {
       noCanvasOrVideoPerSong:
         stack.querySelectorAll('canvas, video, iframe').length === 0,
       oneAccessibleSelection: selectedButtons.length === 1,
+      jumpAndWrapKeepOneAccessibleSelection: accessibilityProbes.every((probe) => (
+        probe.selected.length === 1
+        && probe.selected[0] === probe.targetIndex
+        && probe.tabbable.length === 1
+        && probe.tabbable[0] === probe.targetIndex
+        && probe.selectedHidden === false
+        && probe.tabbableHidden === false
+      )),
+      reusesInitialSongButtonPool: buttons.every((button) => initialSongButtons.has(button)),
+      focusCreatesNoSongButtons:
+        createdButtonsDuringFocus <= thresholds.maxCreatedButtonsDuringFocus,
       allButtonsNamed: buttons.every((button) => (
         button.getAttribute('aria-label')?.trim()
         && button.getAttribute('role') === 'option'
@@ -407,8 +449,11 @@ try {
         settled: Number(initialSettledMs.toFixed(3))
       },
       focusUpdateMs: focusStats,
+      createdButtonsDuringFocus,
       directFocusUpdateMs: directStats,
       wheelFocusUpdateMs: wheelStats,
+      steadyFocusUpdateMs: steadyFocusStats,
+      recycledWindowUpdateMs: recycledWindowStats,
       dom: {
         songButtons: buttons.length,
         descendants: stack.querySelectorAll('*').length,
@@ -421,6 +466,7 @@ try {
       initialCoverRequests,
       hiddenPaintStyleSample: hiddenPaintStyles[0] || null,
       selectedSongIndex: state.songFocusIndex,
+      accessibilityProbes,
       thresholds,
       checks
     };

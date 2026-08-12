@@ -275,10 +275,13 @@ try {
     const accountNameElement = document.getElementById('qishuiPlaybackAccountName');
     const accountStatusElement = document.getElementById('qishuiPlaybackAccountStatus');
     const vipBadge = document.getElementById('qishuiPlaybackVipBadge');
+    const accountLoading = !Object.prototype.hasOwnProperty.call(state.loginStatusByProvider, provider.id);
     const expectedVipLabel = accountPayload.loggedIn ? accountVipLabel(accountPayload) : '';
     const expectedAccountName = accountPayload.loggedIn
       ? accountName(accountPayload) || provider.label + '用户'
-      : provider.label + '未登录';
+      : accountLoading
+        ? '读取账号中'
+        : provider.label + '未登录';
     const platformIdentityPass = accountElement?.dataset.provider === provider.id
       && accountNameElement?.textContent === expectedAccountName
       && !!accountStatusElement?.textContent
@@ -374,6 +377,20 @@ try {
       ambientBackgroundColor: ambientStyle?.backgroundColor || '',
       ambientCoverValues,
       platformIdentityPass,
+      platformIdentityDetails: {
+        provider: provider.id,
+        renderedProvider: accountElement?.dataset.provider || '',
+        loading: accountLoading,
+        loggedIn: !!accountPayload.loggedIn,
+        expectedAccountName,
+        renderedAccountName: accountNameElement?.textContent || '',
+        renderedStatus: accountStatusElement?.textContent || '',
+        expectedVipLabel,
+        vipHidden: !!vipBadge?.hidden,
+        renderedVipLabel: vipBadge?.textContent || '',
+        avatarExpected: accountAvatar(accountPayload),
+        avatarRendered: accountAvatarImage?.src || ''
+      },
       textClarityPass,
       largerLyricsPass,
       ordinaryLyricFontSize: ordinaryLyricFontSize ? String(ordinaryLyricFontSize) + 'px' : '',
@@ -544,7 +561,26 @@ try {
       currentFontSize,
       phoneOverflow: phone ? [phone.clientWidth, phone.scrollWidth] : null,
       contentOverflow: content ? [content.clientWidth, content.scrollWidth] : null,
-      pageOverflow: page ? [page.clientWidth, page.scrollWidth] : null
+      pageOverflow: page ? [page.clientWidth, page.scrollWidth] : null,
+      viewControlChildren: content ? Array.from(content.querySelectorAll('.qishui-playback-view-controls > button')).map((child) => ({
+        id: child.id || '',
+        clientWidth: child.clientWidth,
+        scrollWidth: child.scrollWidth,
+        left: Math.round(child.getBoundingClientRect().left),
+        right: Math.round(child.getBoundingClientRect().right),
+        display: getComputedStyle(child).display,
+        width: getComputedStyle(child).width,
+        minWidth: getComputedStyle(child).minWidth,
+        padding: getComputedStyle(child).padding
+      })) : [],
+      contentChildren: content ? Array.from(content.children).map((child) => ({
+        id: child.id || '',
+        className: String(child.className || ''),
+        clientWidth: child.clientWidth,
+        scrollWidth: child.scrollWidth,
+        left: Math.round(child.getBoundingClientRect().left),
+        right: Math.round(child.getBoundingClientRect().right)
+      })) : []
     };
   })()`);
   result.smallLandscape = smallLandscape;

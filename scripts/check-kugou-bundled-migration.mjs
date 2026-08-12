@@ -128,11 +128,11 @@ function makeReleasePackage(scenarioRoot, port) {
   const releaseDir = path.join(scenarioRoot, 'dist', 'plugins');
   mkdirSync(packageRoot, { recursive: true });
   mkdirSync(releaseDir, { recursive: true });
-  writeFileSync(path.join(packageRoot, 'server.cjs'), fixtureServerSource('2.0.1'));
+  writeFileSync(path.join(packageRoot, 'server.cjs'), fixtureServerSource('2.0.7'));
   writeFileSync(path.join(packageRoot, 'music-api-package.json'), JSON.stringify({
     schema: 'fe-monster.music-api-package/v1',
     id: 'kugou',
-    version: '2.0.1',
+    version: '2.0.7',
     label: 'Kugou migration fixture',
     appName: 'Kugou fixture',
     baseUrl: `http://127.0.0.1:${port}`,
@@ -146,7 +146,7 @@ function makeReleasePackage(scenarioRoot, port) {
       args: ['--port=${port}', '--data-dir=${data}/kugou-music-api']
     }
   }, null, 2));
-  const zip = path.join(releaseDir, 'FE-Monster-Kugou-API-Plugin-2.0.1.zip');
+  const zip = path.join(releaseDir, 'FE-Monster-Kugou-API-Plugin-2.0.7.zip');
   run(jar, ['cf', zip, '-C', packageRoot, '.']);
 }
 
@@ -288,20 +288,21 @@ try {
   const storedKugou = stored.providers.find((provider) => provider.id === 'kugou');
   const storedNetease = stored.providers.find((provider) => provider.id === 'netease');
   const storedQq = stored.providers.find((provider) => provider.id === 'qq');
-  const storedRemovedProvider = stored.providers.find((provider) => provider.id === 'qishui');
+  const storedQishuiSlot = stored.providers.find((provider) => provider.id === 'qishui');
 
   assert.equal(report.firstStatus.status, 'ready', 'first startup did not migrate and start bundled Kugou');
   assert.equal(report.restartedStatus.status, 'ready', 'restart did not retain the migrated Kugou package');
   assert.equal(report.health.provider, 'kugou');
-  assert.equal(report.health.version, '2.0.1', 'restart still served the legacy Kugou version');
-  assert.equal(storedKugou.version, '2.0.1', 'migrated Kugou version was not persisted');
+  assert.equal(report.health.version, '2.0.7', 'restart still served the legacy Kugou version');
+  assert.equal(storedKugou.version, '2.0.7', 'migrated Kugou version was not persisted');
   assert.notEqual(storedKugou.package, 'kugou-legacy', 'providers.json still references the legacy package');
   assert.equal(existsSync(legacyPackage), false, 'legacy Kugou package was not removed after migration');
   assert.equal(storedNetease.baseUrl, 'http://127.0.0.1:43110', 'Netease provider was overwritten');
   assert.equal(storedNetease.healthPath, '/sentinel', 'Netease provider fields changed');
   assert.equal(storedQq.baseUrl, 'http://127.0.0.1:43111', 'QQ provider was overwritten');
   assert.equal(storedQq.healthPath, '/sentinel', 'QQ provider fields changed');
-  assert.equal(storedRemovedProvider, undefined, 'removed provider entry was retained in the active config');
+  assert.equal(storedQishuiSlot?.configured, false, 'missing Qishui provider must remain an inert plugin slot');
+  assert.equal(storedQishuiSlot?.source, 'plugin-slot', 'missing Qishui provider was unexpectedly activated');
   console.log(JSON.stringify({
     passed: true,
     firstStatus: report.firstStatus.status,

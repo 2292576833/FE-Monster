@@ -9,6 +9,7 @@ const webRoot = path.join(root, 'web');
 const edge = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const debugPort = 18000 + (process.pid % 10000);
 const profile = path.join(tmpdir(), `fe-monster-scene-lyric-rotation-${process.pid}`);
+const rotationIsolationOnly = process.argv.includes('--rotation-isolation-only');
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 const contentTypes = new Map([
@@ -87,6 +88,7 @@ const browser = spawn(edge, [
   '--enable-webgl',
   '--ignore-gpu-blocklist',
   '--force-prefers-reduced-motion=no-preference',
+  ...(rotationIsolationOnly ? ['--window-size=1600,900'] : []),
   `--remote-debugging-port=${debugPort}`,
   `--user-data-dir=${profile}`,
   'about:blank'
@@ -156,7 +158,347 @@ try {
     await delay(100);
   }
 
-  const results = await evaluate(`(async () => {
+  let results;
+  if (rotationIsolationOnly) {
+    const before = await evaluate(`(async () => {
+      const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+      document.querySelector('#bootScreen')?.setAttribute('hidden', '');
+      await wait(700);
+      state.currentSong = { id: 'scene-lyric-rotation-qa', title: 'Scene Lyric Rotation QA', artist: 'FE Monster' };
+      setPlaybackLyricLine('Scene Lyric Rotation QA', '场景歌词同步', 0.42);
+      state.playbackPage = true;
+      updatePlaybackPageClass();
+      setTextPreset('depth');
+      setDiyPreset('cube');
+      state.textPresetTransforms[state.textPreset] = normalizeTextPresetTransform();
+      updateTextPresetTransform();
+      resetPlaybackView();
+      updateDynamicCubeMotion();
+      await wait(40);
+      const target = els.playbackLyricText;
+      const rect = target.getBoundingClientRect();
+      const stageRect = els.stage.getBoundingClientRect();
+      const scale = Math.max(0.1, Number(textPresetTransform().scale) || 1);
+      const stableWidth = Math.max(1, Math.min(rect.width, target.offsetWidth * scale || rect.width));
+      const stableHeight = Math.max(1, Math.min(rect.height, target.offsetHeight * scale || rect.height));
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const stableRect = {
+        left: centerX - stableWidth / 2,
+        right: centerX + stableWidth / 2,
+        top: centerY - stableHeight / 2,
+        bottom: centerY + stableHeight / 2
+      };
+      const blockedSelector = [
+        '#qishuiPlaybackCard',
+        '#playbackLyricScene',
+        '#bookLyricPage',
+        '#multiRowLyricStage',
+        '#communityCard',
+        '[id^="community"]',
+        'button',
+        'input',
+        'select',
+        'textarea',
+        'a',
+        '[role="button"]',
+        '[role="slider"]'
+      ].join(', ');
+      const describe = (element) => element ? {
+        tag: element.tagName,
+        id: element.id || '',
+        className: typeof element.className === 'string' ? element.className : '',
+        pointerEvents: getComputedStyle(element).pointerEvents
+      } : null;
+      const candidates = [];
+      for (const side of ['left', 'right']) {
+        for (const inset of [8, 12, 18]) {
+          for (const yRatio of [0.5, 0.25, 0.75]) {
+            const point = {
+              x: side === 'left' ? rect.left + inset : rect.right - inset,
+              y: rect.top + rect.height * yRatio
+            };
+            const insideTransformed = point.x >= rect.left
+              && point.x <= rect.right
+              && point.y >= rect.top
+              && point.y <= rect.bottom;
+            const insideStable = point.x >= stableRect.left
+              && point.x <= stableRect.right
+              && point.y >= stableRect.top
+              && point.y <= stableRect.bottom;
+            const insideStage = point.x >= stageRect.left + 24
+              && point.x <= stageRect.right - 24
+              && point.y >= stageRect.top + 24
+              && point.y <= stageRect.bottom - 24;
+            const hit = document.elementFromPoint(point.x, point.y);
+            const backgroundHit = !!hit
+              && (hit === els.stage || els.stage.contains(hit))
+              && !hit.closest(blockedSelector);
+            candidates.push({ point, hit: describe(hit), eligible: insideTransformed && !insideStable && insideStage && backgroundHit });
+          }
+        }
+      }
+      const selected = candidates.find((candidate) => candidate.eligible) || null;
+      const start = selected?.point || null;
+      return {
+        start,
+        stablePointInside: start ? textPresetPointInside({
+          target: els.stage,
+          clientX: start.x,
+          clientY: start.y
+        }) : null,
+        boxQuadsType: typeof target.getBoxQuads,
+        elementFromPoint: selected?.hit || null,
+        transformedRect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom },
+        stableRect,
+        candidates,
+        scene: {
+          yaw: state.playbackVisual.yaw,
+          pitch: state.playbackVisual.pitch,
+          presetYaw: state.dynamicCube.group?.rotation?.y,
+          presetPitch: state.dynamicCube.group?.rotation?.x
+        },
+        text: {
+          transform: getComputedStyle(els.playbackLyricRig).transform,
+          rotateX: textPresetTransform().rotateX,
+          rotateY: textPresetTransform().rotateY
+        }
+      };
+    })()`);
+    if (!before.start) {
+      results = {
+        pass: false,
+        reason: 'No eligible transformed-edge background point was found',
+        transformedRect: before.transformedRect,
+        stableRect: before.stableRect,
+        candidates: before.candidates
+      };
+    } else {
+      const direction = before.start.x < (before.transformedRect.left + before.transformedRect.right) / 2 ? 1 : -1;
+      const end = {
+        x: before.start.x + direction * 120,
+        y: before.start.y - 70
+      };
+    await command('Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      x: before.start.x,
+      y: before.start.y,
+      button: 'none',
+      buttons: 0
+    });
+    await command('Input.dispatchMouseEvent', {
+      type: 'mousePressed',
+      x: before.start.x,
+      y: before.start.y,
+      button: 'left',
+      buttons: 1,
+      clickCount: 1
+    });
+    await command('Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      x: end.x,
+      y: end.y,
+      button: 'none',
+      buttons: 1
+    });
+    await command('Input.dispatchMouseEvent', {
+      type: 'mouseReleased',
+      x: end.x,
+      y: end.y,
+      button: 'left',
+      buttons: 0,
+      clickCount: 1
+    });
+    await delay(30);
+    const after = await evaluate(`(() => {
+      updateDynamicCubeMotion();
+      return {
+        scene: {
+          yaw: state.playbackVisual.yaw,
+          pitch: state.playbackVisual.pitch,
+          presetYaw: state.dynamicCube.group?.rotation?.y,
+          presetPitch: state.dynamicCube.group?.rotation?.x
+        },
+        text: {
+          transform: getComputedStyle(els.playbackLyricRig).transform,
+          rotateX: textPresetTransform().rotateX,
+          rotateY: textPresetTransform().rotateY
+        }
+      };
+    })()`);
+      const near = (left, right, tolerance = 0.000001) => Math.abs(left - right) <= tolerance;
+      results = {
+        pass: after.text.transform !== before.text.transform
+          && Math.abs(after.text.rotateX - before.text.rotateX) > 8
+          && Math.abs(after.text.rotateY - before.text.rotateY) > 8
+          && before.stablePointInside === false
+          && near(after.scene.yaw, before.scene.yaw)
+          && near(after.scene.pitch, before.scene.pitch)
+          && near(after.scene.presetYaw, before.scene.presetYaw)
+          && near(after.scene.presetPitch, before.scene.presetPitch),
+        elementFromPoint: before.elementFromPoint,
+        boxQuadsType: before.boxQuadsType,
+        stablePointInside: before.stablePointInside,
+        start: before.start,
+        transformedRect: before.transformedRect,
+        stableRect: before.stableRect,
+        sceneBefore: before.scene,
+        sceneAfter: after.scene,
+        textBefore: before.text,
+        textAfter: after.text
+      };
+      const blankBefore = await evaluate(`(() => {
+        const stageRect = els.stage.getBoundingClientRect();
+        const lyricRects = textPresetTargets().map((target) => {
+          const rect = target.getBoundingClientRect();
+          return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+        });
+        const blockedSelector = [
+          '#qishuiPlaybackCard',
+          '#playbackLyricScene',
+          '#bookLyricPage',
+          '#multiRowLyricStage',
+          '#communityCard',
+          '[id^="community"]',
+          'button',
+          'input',
+          'select',
+          'textarea',
+          'a',
+          '[role="button"]',
+          '[role="slider"]'
+        ].join(', ');
+        const describe = (element) => element ? {
+          tag: element.tagName,
+          id: element.id || '',
+          className: typeof element.className === 'string' ? element.className : '',
+          pointerEvents: getComputedStyle(element).pointerEvents
+        } : null;
+        let selected = null;
+        for (const yRatio of [0.86, 0.12, 0.68, 0.5, 0.32]) {
+          for (const xRatio of [0.08, 0.3, 0.5, 0.7, 0.92]) {
+            const point = {
+              x: stageRect.left + stageRect.width * xRatio,
+              y: stageRect.top + stageRect.height * yRatio
+            };
+            const hit = document.elementFromPoint(point.x, point.y);
+            const outsideLyrics = lyricRects.every((rect) => point.x < rect.left - 30
+              || point.x > rect.right + 30
+              || point.y < rect.top - 30
+              || point.y > rect.bottom + 30);
+            const backgroundHit = !!hit
+              && (hit === els.stage || els.stage.contains(hit))
+              && !hit.closest(blockedSelector);
+            if (outsideLyrics && backgroundHit) {
+              selected = { point, hit: describe(hit) };
+              break;
+            }
+          }
+          if (selected) break;
+        }
+        return {
+          start: selected?.point || null,
+          elementFromPoint: selected?.hit || null,
+          stageRect: {
+            left: stageRect.left,
+            right: stageRect.right,
+            top: stageRect.top,
+            bottom: stageRect.bottom
+          },
+          lyricRects,
+          scene: {
+            yaw: state.playbackVisual.yaw,
+            pitch: state.playbackVisual.pitch,
+            presetYaw: state.dynamicCube.group?.rotation?.y,
+            presetPitch: state.dynamicCube.group?.rotation?.x
+          },
+          text: {
+            transform: getComputedStyle(els.playbackLyricRig).transform,
+            rotateX: textPresetTransform().rotateX,
+            rotateY: textPresetTransform().rotateY
+          }
+        };
+      })()`);
+      if (!blankBefore.start) {
+        results.pass = false;
+        results.blankStage = {
+          pass: false,
+          reason: 'No eligible blank stage point was found',
+          lyricRects: blankBefore.lyricRects
+        };
+      } else {
+        const blankDirection = blankBefore.start.x < (blankBefore.stageRect.left + blankBefore.stageRect.right) / 2 ? 1 : -1;
+        const blankEnd = {
+          x: blankBefore.start.x + blankDirection * 90,
+          y: blankBefore.start.y - 54
+        };
+        await command('Input.dispatchMouseEvent', {
+          type: 'mouseMoved',
+          x: blankBefore.start.x,
+          y: blankBefore.start.y,
+          button: 'none',
+          buttons: 0
+        });
+        await command('Input.dispatchMouseEvent', {
+          type: 'mousePressed',
+          x: blankBefore.start.x,
+          y: blankBefore.start.y,
+          button: 'left',
+          buttons: 1,
+          clickCount: 1
+        });
+        await command('Input.dispatchMouseEvent', {
+          type: 'mouseMoved',
+          x: blankEnd.x,
+          y: blankEnd.y,
+          button: 'none',
+          buttons: 1
+        });
+        await command('Input.dispatchMouseEvent', {
+          type: 'mouseReleased',
+          x: blankEnd.x,
+          y: blankEnd.y,
+          button: 'left',
+          buttons: 0,
+          clickCount: 1
+        });
+        await delay(30);
+        const blankAfter = await evaluate(`(() => {
+          updateDynamicCubeMotion();
+          return {
+            scene: {
+              yaw: state.playbackVisual.yaw,
+              pitch: state.playbackVisual.pitch,
+              presetYaw: state.dynamicCube.group?.rotation?.y,
+              presetPitch: state.dynamicCube.group?.rotation?.x
+            },
+            text: {
+              transform: getComputedStyle(els.playbackLyricRig).transform,
+              rotateX: textPresetTransform().rotateX,
+              rotateY: textPresetTransform().rotateY
+            }
+          };
+        })()`);
+        const blankPass = Math.abs(blankAfter.scene.yaw - blankBefore.scene.yaw) > 0.05
+          && Math.abs(blankAfter.scene.pitch - blankBefore.scene.pitch) > 0.03
+          && near(blankAfter.scene.presetYaw, blankAfter.scene.yaw)
+          && near(blankAfter.scene.presetPitch, blankAfter.scene.pitch)
+          && near(blankAfter.text.rotateX, blankBefore.text.rotateX)
+          && near(blankAfter.text.rotateY, blankBefore.text.rotateY);
+        results.pass = results.pass && blankPass;
+        results.blankStage = {
+          pass: blankPass,
+          elementFromPoint: blankBefore.elementFromPoint,
+          start: blankBefore.start,
+          sceneBefore: blankBefore.scene,
+          sceneAfter: blankAfter.scene,
+          textBefore: blankBefore.text,
+          textAfter: blankAfter.text
+        };
+      }
+    }
+  } else {
+    results = await evaluate(`(async () => {
     const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
     const near = (left, right, tolerance = 0.025) => Math.abs(left - right) <= tolerance;
     const angleDelta = (after, before) => {
@@ -170,10 +512,17 @@ try {
       const radius = Math.hypot(camera.position.x, camera.position.y, camera.position.z) || 1;
       return Math.asin(camera.position.y / radius);
     };
-    const dispatchDrag = ({ dx = 20, dy = -10, pointerId = 701, keepPressed = false } = {}) => {
+    const dispatchDrag = ({
+      dx = 20,
+      dy = -10,
+      pointerId = 701,
+      keepPressed = false,
+      startX: requestedStartX,
+      startY: requestedStartY
+    } = {}) => {
       const rect = els.stage.getBoundingClientRect();
-      const startX = rect.left + 54;
-      const startY = rect.top + 142;
+      const startX = Number.isFinite(requestedStartX) ? requestedStartX : rect.left + 54;
+      const startY = Number.isFinite(requestedStartY) ? requestedStartY : rect.top + 142;
       els.stage.dispatchEvent(new PointerEvent('pointerdown', {
         bubbles: true,
         cancelable: true,
@@ -389,10 +738,18 @@ try {
 
     setDiyPreset('topography');
     setTextPreset('depth');
+    state.textPresetTransforms[state.textPreset] = normalizeTextPresetTransform();
+    updateTextPresetTransform();
     resetPlaybackView();
     await wait(220);
     state.sonicTopography.autoYaw = 0;
-    const finishSonicDrag = dispatchDrag({ pointerId: 713, keepPressed: true });
+    const sonicStageRect = els.stage.getBoundingClientRect();
+    const finishSonicDrag = dispatchDrag({
+      pointerId: 713,
+      keepPressed: true,
+      startX: sonicStageRect.left + 54,
+      startY: sonicStageRect.bottom - 54
+    });
     state.playbackVisual.yaw -= 20 * 0.0095;
     state.playbackVisual.pitch -= 10 * 0.0095;
     state.playbackVisual.lastX -= 20;
@@ -498,7 +855,8 @@ try {
       sonic,
       sandbox
     };
-  })()`);
+    })()`);
+  }
 
   console.log(JSON.stringify(results, null, 2));
   if (!results?.pass) process.exitCode = 1;

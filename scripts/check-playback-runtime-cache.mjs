@@ -70,15 +70,23 @@ const result = {
   )) && Boolean(styles.match(
     /\.app-shell\.has-qishui-playback-card \.playlist-album-orbit \.orb-playlist-card\s*\{[^}]*width:\s*min\(400px, calc\(100% - 32px\)\);/s
   )),
-  stylesHaveWhiteGlowingPlaylistBars: styles.includes(
-    '--playlist-glow-border: rgba(255, 255, 255, 0.58);'
+  stylesHaveWarmGlowingPlaylistCards: styles.includes(
+    '--fe-primitive-rgb-warm-neutral: 255 246 232;'
+  ) && styles.includes(
+    '--fe-playlist-card-bg: var(--fe-surface-dark-playlist);'
   ) && Boolean(styles.match(
-    /\.app-shell\.has-qishui-playback-card \.playlist-album-orbit \.orb-playlist-card\s*\{[^}]*border-color:\s*var\(--playlist-glow-border\);[^}]*0 0 10px var\(--playlist-glow-soft\);/s
-  )),
-  stylesHaveWhiteGlowingSongBars: Boolean(styles.match(
-    /\.app-shell\.has-qishui-playback-card \.playlist-song-page \.shelf-song-button\s*\{[^}]*border-color:\s*var\(--playlist-glow-border\);[^}]*0 0 9px var\(--playlist-glow-soft\);/s
+    /\.orb-playlist-card,\s*\.app-shell\.has-qishui-playback-card \.playlist-album-orbit \.orb-playlist-card\s*\{[^}]*background:\s*var\(--fe-playlist-card-bg\) !important;[^}]*background-image:\s*none !important;[^}]*box-shadow:\s*var\(--fe-playlist-card-glow-rest\) !important;/s
   )) && Boolean(styles.match(
-    /\.app-shell\.has-qishui-playback-card \.playlist-song-page \.shelf-song-button\.is-current\s*\{[^}]*border-color:\s*var\(--playlist-glow-border-hot\);[^}]*0 0 16px var\(--playlist-glow-hot\);/s
+    /\.orb-playlist-card:is\(\.is-focused, \.is-active, \[aria-selected="true"\]\),[\s\S]*?background:\s*var\(--fe-playlist-card-bg\) !important;[^}]*box-shadow:\s*var\(--fe-playlist-card-glow-active\) !important;/
+  )),
+  stylesHaveWarmGlowingSongBars: styles.includes(
+    '--fe-primitive-rgb-warm-neutral: 255 246 232;'
+  ) && styles.includes(
+    '--fe-song-card-bg: var(--fe-surface-dark-subtle);'
+  ) && Boolean(styles.match(
+    /\.shelf-song-button,\s*\.app-shell\.has-qishui-playback-card \.playlist-song-page \.shelf-song-button\s*\{[^}]*background:\s*var\(--fe-song-card-bg\) !important;[^}]*background-image:\s*none !important;[^}]*backdrop-filter:\s*none !important;[^}]*box-shadow:\s*var\(--fe-song-card-glow-rest\) !important;/s
+  )) && Boolean(styles.match(
+    /\.shelf-song-button:is\(\.is-focused, \.is-current, \[aria-selected="true"\]\),[\s\S]*?background:\s*var\(--fe-song-card-bg\) !important;[^}]*box-shadow:\s*var\(--fe-song-card-glow-current\) !important;/
   )),
   coverParticleBackgroundUsesThreeCoverColors: /function applyCoverParticlePalette[\s\S]*?source\.coverColors\?\.\[index\][\s\S]*?--cover-particle-c/.test(app)
     && /\.cover-particle-scene::before\s*\{[\s\S]*?var\(--cover-particle-a\)[\s\S]*?var\(--cover-particle-b\)[\s\S]*?var\(--cover-particle-c\)/.test(styles),
@@ -185,8 +193,8 @@ result.ok = result.rootStatus === 200
   && result.rootHasPlaybackGlassSurface
   && result.stylesHaveTransparentPanels
   && result.stylesHaveWidePlaylistBars
-  && result.stylesHaveWhiteGlowingPlaylistBars
-  && result.stylesHaveWhiteGlowingSongBars
+  && result.stylesHaveWarmGlowingPlaylistCards
+  && result.stylesHaveWarmGlowingSongBars
   && result.coverParticleBackgroundUsesThreeCoverColors
   && result.chladniBackgroundUsesThreeCoverColors
   && result.stylesHaveCompactAndExpandedModes

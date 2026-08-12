@@ -7,7 +7,9 @@ const app = readFileSync('web/app.js', 'utf8');
 const html = readFileSync('web/index.html', 'utf8');
 
 assert.match(service, /--window-size=520,720/);
-assert.match(service, /--app=" \+ spec\.loginUrl\(\)/);
+assert.match(service, /--app=" \+ loginUrl/);
+assert.match(service, /music\.beginProviderLogin\(id\)/);
+assert.match(service, /\/login\/qr\/view/);
 assert.doesNotMatch(service, /\?official-login=|--app=http:\/\/127\.0\.0\.1/);
 assert.match(routes, /browserLogin\.start\(providerFrom\(path, query\)\)/);
 assert.doesNotMatch(routes, /\/login\/qr\//);

@@ -123,6 +123,14 @@ $previousCommunityHost = $Env:FE_MONSTER_COMMUNITY_HOST
 $Env:PORT = [string]$Port
 $Env:FE_MONSTER_COMMUNITY_HOST = $HostAddress
 
+# Some launchers inject both `Path` and `PATH` into the Windows environment
+# block. Windows PowerShell treats them as duplicate dictionary keys when
+# Start-Process clones the environment and refuses to launch the service.
+# Recreate the process value once with canonical casing before spawning Node.
+$processPath = [Environment]::GetEnvironmentVariable('Path', 'Process')
+[Environment]::SetEnvironmentVariable('PATH', $null, 'Process')
+[Environment]::SetEnvironmentVariable('Path', $processPath, 'Process')
+
 Start-Process `
   -FilePath $node `
   -ArgumentList @("`"$(Join-Path $serverPath 'server.js')`"") `

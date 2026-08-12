@@ -1,8 +1,8 @@
 param(
   [Parameter(Mandatory = $true)]
   [long]$TargetProcessId,
-  [int]$Width = 1600,
-  [int]$Height = 900,
+  [int]$Width = 1760,
+  [int]$Height = 990,
   [int]$X = 120,
   [int]$Y = 80,
   [switch]$ShapeOnly,
@@ -15,15 +15,22 @@ Add-Type @"
 using System;
 using System.Runtime.InteropServices;
 
-public static class FeMonsterWin32 {
-    [StructLayout(LayoutKind.Sequential)]
-    public struct RECT {
-        public int Left;
-        public int Top;
-        public int Right;
-        public int Bottom;
-    }
+public struct FeMonsterRect {
+    public int Left;
+    public int Top;
+    public int Right;
+    public int Bottom;
+}
 
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+public struct FeMonsterMonitorInfo {
+    public int Size;
+    public FeMonsterRect Monitor;
+    public FeMonsterRect Work;
+    public int Flags;
+}
+
+public static class FeMonsterWin32 {
     public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
     [DllImport("user32.dll")]
@@ -45,19 +52,19 @@ public static class FeMonsterWin32 {
     public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
     [DllImport("user32.dll")]
-    public static extern uint GetDpiForWindow(IntPtr hWnd);
+    public static extern bool GetWindowRect(IntPtr hWnd, out FeMonsterRect rect);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr MonitorFromWindow(IntPtr hWnd, uint flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    public static extern bool GetMonitorInfo(IntPtr monitor, ref FeMonsterMonitorInfo info);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    public static extern bool SystemParametersInfo(uint action, uint parameter, ref FeMonsterRect value, uint flags);
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, bool bRedraw);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    public static extern bool GetClientRect(IntPtr hWnd, out RECT rect);
-
-    [DllImport("gdi32.dll", SetLastError = true)]
-    public static extern IntPtr CreateRoundRectRgn(int left, int top, int right, int bottom, int widthEllipse, int heightEllipse);
-
-    [DllImport("gdi32.dll")]
-    public static extern bool DeleteObject(IntPtr hObject);
 
     [DllImport("dwmapi.dll")]
     public static extern int DwmSetWindowAttribute(IntPtr hWnd, int attribute, ref int value, int size);
@@ -65,25 +72,82 @@ public static class FeMonsterWin32 {
 "@
 
 $GWL_STYLE = -16
-$WS_CAPTION = 0x00C00000
+$WS_BORDER = 0x00800000
+$WS_DLGFRAME = 0x00400000
 $WS_THICKFRAME = 0x00040000
 $SWP_NOZORDER = 0x0004
 $SWP_NOOWNERZORDER = 0x0200
 $SWP_FRAMECHANGED = 0x0020
 $SWP_SHOWWINDOW = 0x0040
 $DWMWA_WINDOW_CORNER_PREFERENCE = 33
+$DWMWCP_DONOTROUND = 1
 $DWMWCP_ROUND = 2
-$WINDOW_VISUAL_RADIUS_DIP = 34
+$MONITOR_DEFAULTTONEAREST = 2
+$SPI_GETWORKAREA = 48
+$WINDOW_WORK_AREA_MARGIN = 24
+
+function Get-FittedWindowBounds {
+  param(
+    [IntPtr]$Window,
+    [int]$RequestedX,
+    [int]$RequestedY,
+    [int]$RequestedWidth,
+    [int]$RequestedHeight
+  )
+
+  $work = [FeMonsterRect]::new()
+  $monitor = [FeMonsterWin32]::MonitorFromWindow($Window, $MONITOR_DEFAULTTONEAREST)
+  $info = [FeMonsterMonitorInfo]::new()
+  $info.Size = [Runtime.InteropServices.Marshal]::SizeOf([type][FeMonsterMonitorInfo])
+  $hasWorkArea = $monitor -ne [IntPtr]::Zero -and [FeMonsterWin32]::GetMonitorInfo($monitor, [ref]$info)
+  if ($hasWorkArea) {
+    $work = $info.Work
+  } else {
+    $hasWorkArea = [FeMonsterWin32]::SystemParametersInfo($SPI_GETWORKAREA, 0, [ref]$work, 0)
+  }
+  if (!$hasWorkArea) {
+    return [pscustomobject]@{
+      X = $RequestedX
+      Y = $RequestedY
+      Width = [Math]::Max(1, $RequestedWidth)
+      Height = [Math]::Max(1, $RequestedHeight)
+    }
+  }
+
+  $workingWidth = [Math]::Max(1, $work.Right - $work.Left)
+  $workingHeight = [Math]::Max(1, $work.Bottom - $work.Top)
+  $horizontalMargin = [int][Math]::Min($WINDOW_WORK_AREA_MARGIN, [Math]::Max(0, [Math]::Floor(($workingWidth - 1) / 2)))
+  $verticalMargin = [int][Math]::Min($WINDOW_WORK_AREA_MARGIN, [Math]::Max(0, [Math]::Floor(($workingHeight - 1) / 2)))
+  $safeLeft = [int]($work.Left + $horizontalMargin)
+  $safeTop = [int]($work.Top + $verticalMargin)
+  $safeWidth = [int][Math]::Max(1, $workingWidth - 2 * $horizontalMargin)
+  $safeHeight = [int][Math]::Max(1, $workingHeight - 2 * $verticalMargin)
+  $requestedWidth = [Math]::Max(1, $RequestedWidth)
+  $requestedHeight = [Math]::Max(1, $RequestedHeight)
+  $scale = [Math]::Min(
+    1.0,
+    [Math]::Min($safeWidth / [double]$requestedWidth, $safeHeight / [double]$requestedHeight)
+  )
+  $fittedWidth = [Math]::Max(1, [Math]::Min($safeWidth, [Math]::Floor($requestedWidth * $scale)))
+  $fittedHeight = [Math]::Max(1, [Math]::Min($safeHeight, [Math]::Floor($requestedHeight * $scale)))
+  $maximumX = $safeLeft + $safeWidth - $fittedWidth
+  $maximumY = $safeTop + $safeHeight - $fittedHeight
+  return [pscustomobject]@{
+    X = [int][Math]::Max($safeLeft, [Math]::Min($RequestedX, $maximumX))
+    Y = [int][Math]::Max($safeTop, [Math]::Min($RequestedY, $maximumY))
+    Width = [int]$fittedWidth
+    Height = [int]$fittedHeight
+  }
+}
 
 function Set-NativeRoundedWindow {
   param(
     [IntPtr]$Window,
-    [int]$WindowWidth,
-    [int]$WindowHeight
+    [switch]$Fullscreen
   )
 
   try {
-    $preference = $DWMWCP_ROUND
+    $preference = if ($Fullscreen) { $DWMWCP_DONOTROUND } else { $DWMWCP_ROUND }
     [void][FeMonsterWin32]::DwmSetWindowAttribute(
       $Window,
       $DWMWA_WINDOW_CORNER_PREFERENCE,
@@ -93,20 +157,7 @@ function Set-NativeRoundedWindow {
   } catch {
   }
 
-  $dpi = 96
-  try {
-    $reportedDpi = [FeMonsterWin32]::GetDpiForWindow($Window)
-    if ($reportedDpi -gt 0) { $dpi = [int]$reportedDpi }
-  } catch {
-  }
-  $radius = [Math]::Max(1, [int][Math]::Round($WINDOW_VISUAL_RADIUS_DIP * $dpi / 96.0))
-  $diameter = $radius * 2
-  $region = [FeMonsterWin32]::CreateRoundRectRgn(0, 0, $WindowWidth + 1, $WindowHeight + 1, $diameter, $diameter)
-  if ($region -eq [IntPtr]::Zero) { return }
-
-  if ([FeMonsterWin32]::SetWindowRgn($Window, $region, $true) -eq 0) {
-    [void][FeMonsterWin32]::DeleteObject($region)
-  }
+  [void][FeMonsterWin32]::SetWindowRgn($Window, [IntPtr]::Zero, $true)
 }
 
 function Get-ProcessFamilyIds {
@@ -150,32 +201,48 @@ for ($attempt = 0; $attempt -lt 24; $attempt += 1) {
   $window = Find-MainWindow -ProcessIds $ids
   if ($window -ne [IntPtr]::Zero) {
     if ($ShapeOnly) {
-      if ($Fullscreen) {
-        [void][FeMonsterWin32]::SetWindowRgn($window, [IntPtr]::Zero, $true)
-      } else {
-        $clientRect = New-Object FeMonsterWin32+RECT
-        if ([FeMonsterWin32]::GetClientRect($window, [ref]$clientRect)) {
-          $clientWidth = [Math]::Max(1, $clientRect.Right - $clientRect.Left)
-          $clientHeight = [Math]::Max(1, $clientRect.Bottom - $clientRect.Top)
-          Set-NativeRoundedWindow -Window $window -WindowWidth $clientWidth -WindowHeight $clientHeight
+      if (!$Fullscreen) {
+        $currentBounds = [FeMonsterRect]::new()
+        if ([FeMonsterWin32]::GetWindowRect($window, [ref]$currentBounds)) {
+          $fitted = Get-FittedWindowBounds `
+            -Window $window `
+            -RequestedX $currentBounds.Left `
+            -RequestedY $currentBounds.Top `
+            -RequestedWidth ($currentBounds.Right - $currentBounds.Left) `
+            -RequestedHeight ($currentBounds.Bottom - $currentBounds.Top)
+          [void][FeMonsterWin32]::SetWindowPos(
+            $window,
+            [IntPtr]::Zero,
+            $fitted.X,
+            $fitted.Y,
+            $fitted.Width,
+            $fitted.Height,
+            $SWP_NOZORDER -bor $SWP_NOOWNERZORDER -bor $SWP_FRAMECHANGED -bor $SWP_SHOWWINDOW
+          )
         }
       }
+      Set-NativeRoundedWindow -Window $window -Fullscreen:$Fullscreen
       exit 0
     }
+    $fitted = Get-FittedWindowBounds `
+      -Window $window `
+      -RequestedX $X `
+      -RequestedY $Y `
+      -RequestedWidth $Width `
+      -RequestedHeight $Height
     $style = [FeMonsterWin32]::GetWindowLongPtr($window, $GWL_STYLE).ToInt64()
-    $borderMask = $WS_CAPTION -bor $WS_THICKFRAME
-    $nextStyle = $style -band (-bnot $borderMask)
+    $nextStyle = ($style -band (-bnot $WS_DLGFRAME)) -bor $WS_BORDER -bor $WS_THICKFRAME
     [void][FeMonsterWin32]::SetWindowLongPtr($window, $GWL_STYLE, [IntPtr]$nextStyle)
     [void][FeMonsterWin32]::SetWindowPos(
       $window,
       [IntPtr]::Zero,
-      $X,
-      $Y,
-      $Width,
-      $Height,
+      $fitted.X,
+      $fitted.Y,
+      $fitted.Width,
+      $fitted.Height,
       $SWP_NOZORDER -bor $SWP_NOOWNERZORDER -bor $SWP_FRAMECHANGED -bor $SWP_SHOWWINDOW
     )
-    Set-NativeRoundedWindow -Window $window -WindowWidth $Width -WindowHeight $Height
+    Set-NativeRoundedWindow -Window $window -Fullscreen:$Fullscreen
     exit 0
   }
   Start-Sleep -Milliseconds 180

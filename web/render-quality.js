@@ -228,7 +228,7 @@
       renderer,
       maxTextureSize,
       maxRenderbufferSize,
-      softwareRenderer: /swiftshader|llvmpipe|lavapipe|software|microsoft basic render/i.test(`${vendor} ${renderer}`)
+      softwareRenderer: /swiftshader|llvmpipe|lavapipe|software|microsoft basic render|warp|reference/i.test(`${vendor} ${renderer}`)
     };
   }
 

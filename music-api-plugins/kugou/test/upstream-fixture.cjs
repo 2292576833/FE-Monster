@@ -15,6 +15,7 @@ let searchLyricAttempts = 0;
 let lyricAttempts = 0;
 let commentAttempts = 0;
 let playlistAddAttempts = 0;
+let qrCheckAttempts = 0;
 
 function record(event, detail = {}) {
   if (!logPath) return;
@@ -59,6 +60,157 @@ function successfulDeviceRegistration() {
   });
 }
 
+function userVipDetailFixture(params) {
+  record("user-vip-detail", {
+    userid: params?.userid || params?.cookie?.userid || "",
+    hasToken: Boolean(params?.token || params?.cookie?.token)
+  });
+  return Promise.resolve({
+    status: 200,
+    cookie: [],
+    body: {
+      status: 1,
+      data: {
+        userid: String(params?.userid || params?.cookie?.userid || "42"),
+        vip_type: 5,
+        m_type: 1,
+        y_type: 0,
+        busi_vip: [{
+          busi_type: "concept",
+          product_type: "svip",
+          is_vip: 1,
+          vip_end_time: "2099-12-31"
+        }]
+      }
+    }
+  });
+}
+
+function loginQrKeyFixture() {
+  record("login-qr-key");
+  return Promise.resolve({
+    status: 200,
+    cookie: [],
+    body: {
+      status: 1,
+      data: {
+        qrcode: "fixture-qr-key",
+        qrcode_img: "https://fixture.invalid/qr"
+      }
+    }
+  });
+}
+
+function loginQrCreateFixture(params) {
+  record("login-qr-create", {
+    keyMatches: params?.key === "fixture-qr-key",
+    qrimg: params?.qrimg === true
+  });
+  return Promise.resolve({
+    status: 200,
+    cookie: [],
+    body: {
+      code: 200,
+      data: {
+        url: `https://h5.kugou.com/apps/loginQRCode/html/index.html?qrcode=${encodeURIComponent(params?.key || "")}`,
+        base64: "data:image/png;base64,iVBORw0KGgo="
+      }
+    }
+  });
+}
+
+function loginQrCheckFixture(params) {
+  qrCheckAttempts += 1;
+  record("login-qr-check", {
+    attempt: qrCheckAttempts,
+    keyMatches: params?.key === "fixture-qr-key"
+  });
+  const authenticated = scenario === "qr-login-success";
+  return Promise.resolve({
+    status: 200,
+    cookie: authenticated
+      ? ["token=fixture-mobile-token", "userid=42", "vip_type=1"]
+      : [],
+    body: {
+      status: 1,
+      data: authenticated
+        ? {
+            status: 4,
+            token: "fixture-mobile-token",
+            userid: "42",
+            vip_type: 1
+          }
+        : { status: 1 }
+    }
+  });
+}
+
+function loginTokenFixture(params) {
+  record("login-token", {
+    useridMatches: String(params?.userid || params?.cookie?.userid || "") === "42",
+    usesQrToken: (params?.token || params?.cookie?.token) === "fixture-mobile-token",
+    hasDeviceIdentity: Boolean(params?.cookie?.KUGOU_API_GUID && params?.cookie?.dfid)
+  });
+  return Promise.resolve({
+    status: 200,
+    cookie: [
+      "token=fixture-refreshed-token",
+      "userid=42",
+      "vip_type=1",
+      "vip_token=fixture-vip-token"
+    ],
+    body: {
+      status: 1,
+      data: {
+        token: "fixture-refreshed-token",
+        userid: "42",
+        vip_type: 1,
+        vip_token: "fixture-vip-token"
+      }
+    }
+  });
+}
+
+function userDetailFixture(params) {
+  record("user-detail", {
+    userid: params?.userid || params?.cookie?.userid || "",
+    hasToken: Boolean(params?.token || params?.cookie?.token),
+    usesRefreshedToken: (params?.token || params?.cookie?.token) === "fixture-refreshed-token"
+  });
+  return Promise.resolve({
+    status: 200,
+    cookie: [],
+    body: {
+      status: 1,
+      data: {
+        userid: "42",
+        nickname: "Fixture Listener",
+        pic: "https://fixture.invalid/avatar.jpg"
+      }
+    }
+  });
+}
+
+function userPlaylistFixture(params) {
+  record("user-playlist", {
+    userid: params?.userid || params?.cookie?.userid || "",
+    hasToken: Boolean(params?.token || params?.cookie?.token)
+  });
+  return Promise.resolve({
+    status: 200,
+    cookie: [],
+    body: {
+      status: 1,
+      data: {
+        info: [
+          { listid: 100, listname: "我喜欢", type: 2, count: 9 },
+          { listid: 101, listname: "通勤歌单", type: 0, count: 4 }
+        ]
+      }
+    }
+  });
+}
+
 function songUrlFixture(params) {
   songUrlAttempts += 1;
   record("song-url", {
@@ -85,6 +237,50 @@ function songUrlFixture(params) {
       }
     });
   }
+  if (scenario === "song-identity-mismatch") {
+    return Promise.resolve({
+      status: 200,
+      cookie: [],
+      body: {
+        status: 1,
+        url: "https://fixture.invalid/v3/ffffffffffffffffffffffffffffffff/yp/full/mx999999_qu128.mp3"
+      }
+    });
+  }
+  if (scenario === "song-cdn-prefix-same-identity") {
+    return Promise.resolve({
+      status: 200,
+      cookie: [],
+      body: {
+        status: 1,
+        url: `https://fixture.invalid/expiry/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/v3/${params.hash}/yp/full/mx${params.album_audio_id}_qu128.mp3`
+      }
+    });
+  }
+  if (scenario === "song-unmarked-no-metadata") {
+    return Promise.resolve({
+      status: 200,
+      cookie: [],
+      body: {
+        status: 1,
+        url: "https://fixture.invalid/opaque/no-metadata.mp3"
+      }
+    });
+  }
+  if (scenario === "song-unmarked-mismatched-metadata") {
+    return Promise.resolve({
+      status: 200,
+      cookie: [],
+      body: {
+        status: 1,
+        data: [{
+          hash: "ffffffffffffffffffffffffffffffff",
+          album_audio_id: 999999,
+          url: "https://fixture.invalid/opaque/wrong-track.mp3"
+        }]
+      }
+    });
+  }
   if (scenario === "song-permission") {
     if (params?.free_part === true) {
       return Promise.resolve({ status: 200, cookie: [], body: { status: 1, url: "https://fixture.invalid/preview.mp3" } });
@@ -105,7 +301,18 @@ function songUrlFixture(params) {
       }
     });
   }
-  return Promise.resolve({ status: 200, cookie: [], body: { status: 1, url: "https://fixture.invalid/free.mp3" } });
+  return Promise.resolve({
+    status: 200,
+    cookie: [],
+    body: {
+      status: 1,
+      data: [{
+        hash: params?.hash || "",
+        album_audio_id: params?.album_audio_id || 0,
+        url: "https://fixture.invalid/free.mp3"
+      }]
+    }
+  });
 }
 
 function songUrlNewFixture(params) {
@@ -129,11 +336,70 @@ function songUrlNewFixture(params) {
       cookie: [],
       body: {
         status: 1,
-        url: ["https://fixture.invalid/current-free.mp3"]
+        data: [{
+          hash: params?.hash || "",
+          album_audio_id: params?.album_audio_id || 0,
+          url: ["https://fixture.invalid/current-free.mp3"]
+        }]
       }
     });
   }
-  return Promise.resolve({ status: 200, cookie: [], body: { status: 1, url: "https://fixture.invalid/new-free.mp3" } });
+  if (scenario === "song-identity-mismatch") {
+    return Promise.resolve({
+      status: 200,
+      cookie: [],
+      body: {
+        status: 1,
+        url: "https://fixture.invalid/v3/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee/yp/full/mx888888_qu128.mp3"
+      }
+    });
+  }
+  if (scenario === "song-cdn-prefix-same-identity") {
+    return Promise.resolve({
+      status: 200,
+      cookie: [],
+      body: {
+        status: 1,
+        url: `https://fixture.invalid/expiry/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/v3/${params.hash}/yp/full/mx${params.album_audio_id}_qu128.mp3`
+      }
+    });
+  }
+  if (scenario === "song-unmarked-no-metadata") {
+    return Promise.resolve({
+      status: 200,
+      cookie: [],
+      body: {
+        status: 1,
+        url: "https://fixture.invalid/opaque/new-no-metadata.mp3"
+      }
+    });
+  }
+  if (scenario === "song-unmarked-mismatched-metadata") {
+    return Promise.resolve({
+      status: 200,
+      cookie: [],
+      body: {
+        status: 1,
+        data: [{
+          hash: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          album_audio_id: 888888,
+          url: "https://fixture.invalid/opaque/new-wrong-track.mp3"
+        }]
+      }
+    });
+  }
+  return Promise.resolve({
+    status: 200,
+    cookie: [],
+    body: {
+      status: 1,
+      data: [{
+        hash: params?.hash || "",
+        album_audio_id: params?.album_audio_id || 0,
+        url: "https://fixture.invalid/new-free.mp3"
+      }]
+    }
+  });
 }
 
 function playlistDetailFixture() {
@@ -165,15 +431,17 @@ function searchLyricFixture(params) {
     duration: Number(params?.duration || 0)
   });
   const metadataRequired = scenario === "lyrics-metadata-required";
+  const staleAudioId = scenario === "lyrics-stale-audio-id";
   const unavailable = scenario === "lyrics-unavailable";
   const metadataMatches = params?.keywords === "Red Shoe"
     && Number(params?.duration) === 206000;
+  const staleAudioIdRejected = staleAudioId && Number(params?.album_audio_id || 0) > 0;
   return Promise.resolve({
     status: 200,
     cookie: [],
     body: {
       status: 200,
-      candidates: unavailable || (metadataRequired && !metadataMatches)
+      candidates: unavailable || staleAudioIdRejected || (metadataRequired && !metadataMatches)
         ? []
         : [{
             id: "fixture-lyric-id",
@@ -249,6 +517,13 @@ Module._load = function loadWithKugouFixture(request, parent, isMain) {
     .replaceAll("\\", "/")
     .replace("/.ignored_kugoumusicapi/", "/kugoumusicapi/");
   if (normalized.endsWith("/kugoumusicapi/module/register_dev.js")) return successfulDeviceRegistration;
+  if (normalized.endsWith("/kugoumusicapi/module/login_token.js")) return loginTokenFixture;
+  if (normalized.endsWith("/kugoumusicapi/module/login_qr_key.js")) return loginQrKeyFixture;
+  if (normalized.endsWith("/kugoumusicapi/module/login_qr_create.js")) return loginQrCreateFixture;
+  if (normalized.endsWith("/kugoumusicapi/module/login_qr_check.js")) return loginQrCheckFixture;
+  if (normalized.endsWith("/kugoumusicapi/module/user_detail.js")) return userDetailFixture;
+  if (normalized.endsWith("/kugoumusicapi/module/user_playlist.js")) return userPlaylistFixture;
+  if (normalized.endsWith("/kugoumusicapi/module/user_vip_detail.js")) return userVipDetailFixture;
   if (normalized.endsWith("/kugoumusicapi/module/song_url.js")) return songUrlFixture;
   if (normalized.endsWith("/kugoumusicapi/module/song_url_new.js")) return songUrlNewFixture;
   if (normalized.endsWith("/kugoumusicapi/module/playlist_detail.js")) return playlistDetailFixture;

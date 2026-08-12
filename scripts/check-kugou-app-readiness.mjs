@@ -6,7 +6,7 @@ import path from 'node:path';
 
 const workspaceRoot = path.resolve('.');
 const jar = path.resolve(process.env.FE_TEST_JAR || 'out/fe-monster-java.jar');
-const pluginZip = path.resolve('dist/plugins/FE-Monster-Kugou-API-Plugin-2.0.1.zip');
+const pluginZip = path.resolve('dist/plugins/FE-Monster-Kugou-API-Plugin-2.0.7.zip');
 const javaCandidates = [
   process.env.FE_TEST_JAVA,
   process.env.FE_JAVA26_HOME ? path.join(process.env.FE_JAVA26_HOME, 'bin', 'java.exe') : '',
@@ -66,15 +66,24 @@ async function json(pathname, timeout = 30000) {
   return payload;
 }
 
+const playbackFailures = [];
+
 async function playableSource(song) {
   let source;
   try {
     source = await json(`/api/kugou/song/url?id=${encodeURIComponent(song.id)}&quality=standard`);
   } catch (error) {
-    if (/returned (?:403|404|422):/.test(String(error?.message || ''))) return null;
+    const message = String(error?.message || '');
+    if (/returned (?:403|404|422):/.test(message)) {
+      if (playbackFailures.length < 24) playbackFailures.push({ id: song.id, title: song.title, error: message });
+      return null;
+    }
     throw error;
   }
-  if (!source.url) return null;
+  if (!source.url) {
+    if (playbackFailures.length < 24) playbackFailures.push({ id: song.id, title: song.title, error: source });
+    return null;
+  }
   const media = await fetch(`${baseUrl}/api/audio/stream?url=${encodeURIComponent(source.url)}`, {
     headers: { Range: 'bytes=0-4095' },
     signal: AbortSignal.timeout(120000)
@@ -82,7 +91,12 @@ async function playableSource(song) {
   const contentType = String(media.headers.get('content-type') || '');
   await media.body?.cancel();
   if ((media.status !== 200 && media.status !== 206)
-      || !/^(audio\/|application\/octet-stream)/i.test(contentType)) return null;
+      || !/^(audio\/|application\/octet-stream)/i.test(contentType)) {
+    if (playbackFailures.length < 24) {
+      playbackFailures.push({ id: song.id, title: song.title, mediaStatus: media.status, contentType });
+    }
+    return null;
+  }
   return { title: song.title, status: media.status, contentType: contentType.split(';')[0] };
 }
 
@@ -186,7 +200,9 @@ try {
   if (loadedPlaylists.length < 4) {
     throw new Error(`Kugou playlist loading is unstable: ${JSON.stringify(playlistReports)}`);
   }
-  if (!playlistPlayback) throw new Error(`Kugou playlist songs had no playable audio: ${JSON.stringify(playlistReports)}`);
+  if (!playlistPlayback) {
+    throw new Error(`Kugou playlist songs had no playable audio: ${JSON.stringify({ playlistReports, playbackFailures })}`);
+  }
 
   const search = await json(`/api/kugou/search?q=${encodeURIComponent('纯音乐')}&limit=30`);
   const songs = Array.isArray(search.songs) ? search.songs : [];

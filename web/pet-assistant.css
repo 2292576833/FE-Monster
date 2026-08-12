@@ -1,0 +1,2306 @@
+.pet-assistant {
+  --pet-accent: 112, 238, 255;
+  --pet-violet: 170, 112, 255;
+  position: fixed;
+  left: max(24px, env(safe-area-inset-left));
+  top: calc(100vh - 238px - max(20px, env(safe-area-inset-bottom)));
+  z-index: 2147481200;
+  width: 176px;
+  height: 218px;
+  pointer-events: none;
+  contain: layout style;
+  isolation: isolate;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  transform: translate3d(var(--pet-drag-x, 0), var(--pet-drag-y, 0), 0);
+  will-change: transform;
+}
+
+.pet-assistant-restore {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 2147481201;
+  min-width: 46px;
+  height: 34px;
+  padding: 0 12px;
+  color: rgba(242, 252, 255, .96);
+  font: 700 12px/1 "Segoe UI", sans-serif;
+  border: 1px solid rgba(112, 238, 255, .48);
+  border-radius: 999px;
+  background: rgba(7, 15, 27, .88);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .38), 0 0 18px rgba(112, 238, 255, .16);
+  backdrop-filter: blur(16px) saturate(1.3);
+  cursor: pointer;
+}
+
+.pet-assistant-restore:hover,
+.pet-assistant-restore:focus-visible {
+  border-color: rgba(112, 238, 255, .88);
+  outline: none;
+}
+
+html[data-fe-client="desktop-pet"],
+html[data-fe-client="desktop-pet"] body {
+  width: 100%;
+  height: 100%;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  background: transparent !important;
+}
+
+html[data-fe-client="desktop-pet"] body::before,
+html[data-fe-client="desktop-pet"] body::after {
+  display: none !important;
+  background: transparent !important;
+}
+
+html[data-fe-client="desktop-pet"] body > :not(#petAssistant):not(#petAssistantRestore):not(script) {
+  display: none !important;
+}
+
+html[data-fe-client="desktop-pet"] #petAssistant {
+  left: auto !important;
+  right: 8px !important;
+  top: auto !important;
+  bottom: 8px !important;
+  width: 292px !important;
+  height: 324px !important;
+  transform: none !important;
+}
+
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__panel {
+  position: absolute;
+  top: auto;
+  bottom: 64px;
+  left: auto;
+  right: calc(100% + 12px);
+  width: min(320px, calc(100vw - 28px));
+  height: auto;
+  max-height: min(360px, calc(100dvh - 28px));
+  transform-origin: 100% 85%;
+}
+
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__character {
+  width: 276px !important;
+  height: 276px !important;
+}
+
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__vector {
+  inset: 0;
+}
+
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__speech {
+  display: none;
+}
+
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__quick-actions {
+  display: none !important;
+}
+
+.pet-assistant[hidden],
+.pet-assistant__panel[hidden],
+.pet-assistant__interim[hidden],
+.pet-assistant__confirmation[hidden] {
+  display: none !important;
+}
+
+.pet-assistant button,
+.pet-assistant textarea,
+.pet-assistant select {
+  font: inherit;
+}
+
+.pet-assistant__dock,
+.pet-assistant__panel {
+  pointer-events: auto;
+}
+
+.pet-assistant__dock {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: end center;
+  cursor: grab;
+}
+
+.pet-assistant.is-dragging .pet-assistant__dock {
+  cursor: grabbing;
+}
+
+.pet-assistant .pet-assistant__character,
+#petAssistant #petAssistantCharacter {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 190px;
+  height: 190px;
+  padding: 0;
+  border: 0 !important;
+  outline: 0;
+  color: inherit;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  cursor: pointer;
+  filter: drop-shadow(0 18px 18px rgba(0, 0, 0, .42)) !important;
+  transform-origin: 50% 88%;
+  will-change: transform;
+}
+
+/* The compact glass bubbles share the same restrained seven-emotion tint as
+   the particle body. Text contrast stays neutral; only the edge/presence shifts. */
+#petAssistant[data-pet-emotion] .pet-assistant__speech,
+#petAssistant[data-pet-emotion] #petAssistantPanel[data-pet-text-bubble] {
+  box-shadow:
+    0 4px 8px rgba(0, 0, 0, .20),
+    0 0 16px rgba(var(--pet-particle-emotion-rgb, 214, 250, 255), .14) !important;
+  transition: box-shadow 880ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.pet-assistant .pet-assistant__character:focus-visible,
+#petAssistant #petAssistantCharacter:focus-visible {
+  outline: 2px solid rgba(var(--pet-accent), .92);
+  outline-offset: 3px;
+  border-radius: 48%;
+}
+
+.pet-assistant__art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  transform: translateZ(0);
+}
+
+.pet-assistant__vector,
+.pet-assistant__vector * {
+  pointer-events: none;
+}
+
+.pet-assistant__vector {
+  position: absolute;
+  inset: -4px 0 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 10px 9px rgba(0, 0, 0, .58));
+  transform: translateZ(0);
+}
+
+.pet-assistant__rig-texture {
+  pointer-events: none;
+  user-select: none;
+}
+
+.pet-assistant__body,
+.pet-assistant__face,
+.pet-assistant__eyes,
+.pet-assistant__mouth,
+.pet-assistant__ears,
+.pet-assistant__horns,
+.pet-assistant__headphones,
+.pet-assistant__tail,
+.pet-assistant__tail-spectrum,
+.pet-assistant__back-fins,
+.pet-assistant__rig-head,
+.pet-assistant__rig-torso,
+.pet-assistant__rig-limb {
+  transform-box: fill-box;
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+.pet-assistant__rig-tail {
+  transform-origin: 18% 66%;
+}
+
+.pet-assistant__rig-head {
+  transform-origin: 49% 78%;
+}
+
+.pet-assistant__rig-arm-left { transform-origin: 76% 10%; }
+.pet-assistant__rig-arm-right { transform-origin: 24% 10%; }
+.pet-assistant__rig-leg-left { transform-origin: 68% 4%; }
+.pet-assistant__rig-leg-right { transform-origin: 32% 4%; }
+
+.pet-assistant__eyelid {
+  fill: #090a11;
+  stroke: rgba(116, 91, 151, .72);
+  stroke-width: 5;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: pet-blink 5.6s infinite;
+}
+
+.pet-assistant__mouth {
+  fill: #090a11;
+  stroke: rgba(156, 71, 255, .72);
+  stroke-width: 5;
+  opacity: 0;
+}
+
+.pet-assistant__thinking-dots,
+.pet-assistant__sparkles,
+.pet-assistant__scanner {
+  opacity: 0;
+}
+
+.pet-assistant__aura,
+.pet-assistant__eye-glow,
+.pet-assistant__voice-ring,
+.pet-assistant__equalizer,
+.pet-assistant__state-badge {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.pet-assistant__aura {
+  left: 22%;
+  right: 22%;
+  bottom: 3%;
+  height: 17%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(var(--pet-accent), .56), rgba(var(--pet-violet), .2) 46%, transparent 74%);
+  filter: blur(7px);
+}
+
+.pet-assistant__eye-glow {
+  left: 50%;
+  top: 31%;
+  width: 42%;
+  height: 13%;
+  transform: translateX(-50%);
+  background: radial-gradient(circle at 30% 50%, rgba(255,255,255,.96) 0 3%, rgba(var(--pet-accent), .74) 9%, transparent 25%),
+              radial-gradient(circle at 70% 50%, rgba(255,255,255,.96) 0 3%, rgba(var(--pet-accent), .74) 9%, transparent 25%);
+  filter: blur(.35px) drop-shadow(0 0 6px rgba(var(--pet-accent), .9));
+}
+
+.pet-assistant__voice-ring {
+  inset: 8% 1% 4%;
+  border: 2px solid rgba(var(--pet-accent), .68);
+  border-radius: 50%;
+  box-shadow: 0 0 18px rgba(var(--pet-accent), .44), inset 0 0 12px rgba(var(--pet-violet), .2);
+}
+
+.pet-assistant__equalizer {
+  right: 9px;
+  bottom: 22px;
+  display: flex;
+  align-items: end;
+  gap: 3px;
+  height: 34px;
+  padding: 5px 6px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 12px;
+  background: rgba(4, 11, 22, .64);
+  box-shadow: 0 0 16px rgba(var(--pet-accent), .28);
+  backdrop-filter: blur(10px) saturate(1.3);
+}
+
+.pet-assistant__equalizer i {
+  display: block;
+  width: 3px;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(to top, rgb(var(--pet-violet)), rgb(var(--pet-accent)));
+  transform-origin: 50% 100%;
+}
+
+.pet-assistant__state-badge {
+  right: 14px;
+  top: 26px;
+  min-width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: rgb(var(--pet-accent));
+  background: rgba(5, 10, 20, .82);
+  border: 1px solid rgba(var(--pet-accent), .52);
+  box-shadow: 0 0 15px rgba(var(--pet-accent), .32);
+}
+
+.pet-assistant__speech {
+  position: absolute;
+  left: 88px;
+  bottom: 174px;
+  max-width: 154px;
+  padding: 8px 12px;
+  color: rgba(244, 252, 255, .94);
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px solid rgba(255, 255, 255, .72);
+  border-radius: 15px 15px 15px 4px;
+  background: rgba(255, 255, 255, .30);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, .24);
+  -webkit-backdrop-filter: blur(14px) saturate(.82) brightness(.36);
+  backdrop-filter: blur(14px) saturate(.82) brightness(.36);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .7);
+  transform: translate3d(-50%, 4px, 0);
+  opacity: 1;
+}
+
+.pet-assistant__quick-actions {
+  position: absolute;
+  z-index: 4;
+  right: 0;
+  top: 36px;
+  display: grid;
+  gap: 5px;
+  opacity: 0;
+  transform: translate3d(-4px, 0, 0);
+  transition: opacity .18s ease, transform .18s ease;
+}
+
+.pet-assistant:hover .pet-assistant__quick-actions,
+.pet-assistant:focus-within .pet-assistant__quick-actions {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+.pet-assistant__quick-actions button,
+.pet-assistant__panel-actions button {
+  min-width: 31px;
+  height: 31px;
+  padding: 0 8px;
+  color: rgba(240, 249, 255, .9);
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 11px;
+  background: rgba(7, 12, 24, .78);
+  box-shadow: 0 8px 20px rgba(0,0,0,.25), inset 0 1px rgba(255,255,255,.1);
+  backdrop-filter: blur(14px);
+  cursor: pointer;
+}
+
+.pet-assistant__quick-actions button:hover,
+.pet-assistant__panel-actions button:hover {
+  border-color: rgba(var(--pet-accent), .55);
+  color: #fff;
+}
+
+.pet-assistant__panel {
+  position: absolute;
+  left: 184px;
+  bottom: 64px;
+  width: min(320px, calc(100vw - 220px));
+  height: auto;
+  max-height: min(360px, calc(100dvh - 28px));
+  display: grid;
+  grid-template-rows: auto auto auto auto minmax(120px, 1fr) auto auto auto auto;
+  overflow: hidden;
+  color: rgba(243, 250, 255, .94);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 18% 4%, rgba(var(--pet-accent), .12), transparent 34%),
+    radial-gradient(circle at 92% 86%, rgba(var(--pet-violet), .12), transparent 38%),
+    linear-gradient(145deg, rgba(15, 22, 36, .9), rgba(5, 9, 18, .82));
+  box-shadow: 0 30px 80px rgba(0,0,0,.54), inset 0 1px rgba(255,255,255,.13), 0 0 42px rgba(var(--pet-accent), .08);
+  backdrop-filter: blur(28px) saturate(1.45);
+  transform-origin: 0 85%;
+  animation: pet-panel-in .28s cubic-bezier(.2,.85,.2,1) both;
+}
+
+.pet-assistant.is-panel-left .pet-assistant__panel {
+  left: auto;
+  right: 184px;
+  transform-origin: 100% 85%;
+}
+
+.pet-assistant__panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 18px 11px;
+}
+
+.pet-assistant__identity {
+  display: grid;
+  gap: 2px;
+}
+
+.pet-assistant__identity small {
+  color: rgba(var(--pet-accent), .76);
+  font-size: 9px;
+  letter-spacing: .14em;
+}
+
+.pet-assistant__identity strong {
+  font-size: 19px;
+  letter-spacing: .03em;
+}
+
+.pet-assistant__panel-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.pet-assistant__panel-actions button:first-child {
+  font-size: 11px;
+}
+
+.pet-assistant__status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 17px 10px;
+  padding: 7px 10px;
+  color: rgba(218, 240, 247, .78);
+  font-size: 11px;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 12px;
+  background: rgba(255,255,255,.04);
+}
+
+.pet-assistant__status > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgb(var(--pet-accent));
+  box-shadow: 0 0 9px rgba(var(--pet-accent), .7);
+}
+
+.pet-assistant__voice-picker {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  margin: 0 17px 8px;
+  padding: 5px 7px 5px 9px;
+  color: rgba(218, 240, 247, .7);
+  font-size: 10px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 11px;
+  background: rgba(255,255,255,.035);
+}
+
+.pet-assistant__voice-picker select {
+  min-width: 0;
+  height: 27px;
+  padding: 0 25px 0 8px;
+  color: rgba(244, 251, 255, .92);
+  outline: 0;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 8px;
+  background: rgba(4, 9, 18, .74);
+  cursor: pointer;
+}
+
+.pet-assistant__voice-picker select:disabled {
+  color: rgba(210, 226, 234, .46);
+  cursor: default;
+}
+
+.pet-assistant__voice-picker select:focus-visible {
+  border-color: rgba(var(--pet-accent), .62);
+  box-shadow: 0 0 0 2px rgba(var(--pet-accent), .12);
+}
+
+.pet-assistant__voice-hint {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.pet-assistant__voice-settings {
+  display: grid;
+  gap: 7px;
+  margin: 0 17px 8px;
+  padding: 8px 9px;
+  color: rgba(218, 240, 247, .72);
+  font-size: 10px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 11px;
+  background: rgba(255,255,255,.035);
+}
+
+.pet-assistant__voice-playback,
+.pet-assistant__shortcut-editor {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.pet-assistant__voice-playback input {
+  accent-color: rgb(var(--pet-accent));
+}
+
+.pet-assistant__shortcut-editor button {
+  min-height: 26px;
+  padding: 0 8px;
+  color: rgba(239, 250, 255, .9);
+  border: 1px solid rgba(var(--pet-accent), .24);
+  border-radius: 8px;
+  background: rgba(4, 9, 18, .7);
+  cursor: pointer;
+}
+
+.pet-assistant__shortcut-editor button[aria-pressed="true"] {
+  color: #fff;
+  border-color: rgba(255, 194, 92, .62);
+  box-shadow: 0 0 0 2px rgba(255, 194, 92, .1);
+}
+
+.pet-assistant__shortcut-editor output {
+  min-width: 0;
+  color: rgba(var(--pet-accent), .9);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pet-assistant__voice-settings small {
+  color: rgba(200, 219, 228, .52);
+  line-height: 1.4;
+}
+
+.pet-assistant__messages {
+  min-height: 0;
+  padding: 4px 16px 14px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--pet-accent), .32) transparent;
+}
+
+.pet-assistant__message {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  margin: 0 0 13px;
+}
+
+.pet-assistant__message.is-user {
+  justify-items: end;
+}
+
+.pet-assistant__message > span {
+  padding: 0 4px;
+  color: rgba(210, 229, 237, .56);
+  font-size: 10px;
+}
+
+.pet-assistant__message p {
+  max-width: 88%;
+  margin: 0;
+  padding: 10px 12px;
+  color: rgba(245, 251, 255, .94);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  border: 1px solid rgba(255,255,255,.11);
+  border-radius: 6px 16px 16px 16px;
+  background: rgba(255,255,255,.065);
+  box-shadow: 0 9px 24px rgba(0,0,0,.18), inset 0 1px rgba(255,255,255,.06);
+}
+
+.pet-assistant__message.is-user p {
+  border-color: rgba(var(--pet-accent), .2);
+  border-radius: 16px 6px 16px 16px;
+  background: linear-gradient(135deg, rgba(var(--pet-accent), .18), rgba(var(--pet-violet), .12));
+}
+
+.pet-assistant__message.is-pending p::after {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 12px;
+  margin-left: 3px;
+  vertical-align: -2px;
+  background: rgba(var(--pet-accent), .8);
+  animation: pet-caret .72s steps(2, end) infinite;
+}
+
+.pet-assistant__interim {
+  margin: 0 16px 8px;
+  padding: 8px 10px;
+  color: rgba(216, 241, 248, .68);
+  font-size: 11px;
+  border-left: 2px solid rgba(var(--pet-accent), .52);
+  background: rgba(var(--pet-accent), .05);
+}
+
+.pet-assistant__confirmation {
+  display: grid;
+  gap: 9px;
+  margin: 0 13px 9px;
+  padding: 12px;
+  border: 1px solid rgba(255, 194, 102, .42);
+  border-radius: 15px;
+  background: linear-gradient(145deg, rgba(73, 43, 12, .72), rgba(26, 19, 18, .84));
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .28), inset 0 1px rgba(255, 255, 255, .08);
+}
+
+.pet-assistant__confirmation > span {
+  display: grid;
+  gap: 2px;
+}
+
+.pet-assistant__confirmation small {
+  color: rgba(255, 206, 132, .72);
+  font-size: 10px;
+  letter-spacing: .08em;
+}
+
+.pet-assistant__confirmation strong {
+  color: #fff6e8;
+  font-size: 13px;
+}
+
+.pet-assistant__confirmation p {
+  max-height: 180px;
+  margin: 0;
+  overflow: auto;
+  color: rgba(255, 242, 222, .78);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.pet-assistant__confirmation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.pet-assistant__confirmation-actions button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 10px;
+  color: rgba(255, 248, 236, .9);
+  background: rgba(255, 255, 255, .07);
+  cursor: pointer;
+}
+
+#petAssistantConfirmationConfirm {
+  border-color: rgba(255, 196, 101, .56);
+  color: #1b1106;
+  font-weight: 750;
+  background: linear-gradient(135deg, #ffd48d, #ffaf5d);
+}
+
+.pet-assistant__composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(102px, auto) auto;
+  align-items: end;
+  gap: 7px;
+  padding: 10px 13px 8px;
+  border-top: 1px solid rgba(255,255,255,.08);
+  background: rgba(3, 7, 14, .32);
+}
+
+.pet-assistant__composer textarea {
+  min-height: 38px;
+  max-height: 104px;
+  resize: none;
+  padding: 10px 11px;
+  color: #f4fbff;
+  outline: 0;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 13px;
+  background: rgba(255,255,255,.055);
+}
+
+.pet-assistant__composer textarea:focus {
+  border-color: rgba(var(--pet-accent), .48);
+  box-shadow: 0 0 0 3px rgba(var(--pet-accent), .07);
+}
+
+.pet-assistant__voice,
+.pet-assistant__send {
+  height: 38px;
+  border: 1px solid rgba(var(--pet-accent), .28);
+  border-radius: 13px;
+  color: #edfaff;
+  background: linear-gradient(145deg, rgba(var(--pet-accent), .2), rgba(var(--pet-violet), .18));
+  box-shadow: inset 0 1px rgba(255,255,255,.12), 0 8px 20px rgba(0,0,0,.2);
+  cursor: pointer;
+}
+
+.pet-assistant__voice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 11px;
+  touch-action: none;
+}
+
+.pet-assistant__voice b {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.pet-assistant__send {
+  padding: 0 13px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pet-assistant__voice span {
+  display: block;
+  flex: 0 0 auto;
+  width: 11px;
+  height: 17px;
+  margin: 0;
+  border: 2px solid currentColor;
+  border-radius: 8px;
+  position: relative;
+}
+
+.pet-assistant__voice span::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 13px;
+  height: 7px;
+  border: 2px solid currentColor;
+  border-top: 0;
+  border-radius: 0 0 9px 9px;
+  transform: translateX(-50%);
+}
+
+.pet-assistant__voice[aria-pressed="true"] {
+  color: #fff;
+  border-color: rgba(255, 95, 145, .56);
+  background: rgba(255, 68, 126, .2);
+  animation: pet-voice-button 1.1s ease-in-out infinite;
+}
+
+.pet-assistant[data-voice-activity="speech"] .pet-assistant__voice[aria-pressed="true"] {
+  border-color: rgba(var(--pet-accent), .76);
+  box-shadow: 0 0 0 calc(2px + var(--pet-voice-level, 0) * 5px) rgba(var(--pet-accent), .12);
+}
+
+.pet-assistant__privacy {
+  margin: 0;
+  padding: 0 15px 12px;
+  color: rgba(200, 219, 228, .42);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.pet-assistant.is-collapsed {
+  width: 64px;
+  height: 64px;
+}
+
+.pet-assistant.is-collapsed .pet-assistant__character {
+  width: 62px;
+  height: 66px;
+}
+
+.pet-assistant.is-collapsed .pet-assistant__speech,
+.pet-assistant.is-collapsed .pet-assistant__quick-actions,
+.pet-assistant.is-collapsed .pet-assistant__panel {
+  display: none !important;
+}
+
+.pet-assistant[data-state="idle"] .pet-assistant__character {
+  animation: pet-breathe 3.8s ease-in-out infinite;
+}
+
+.pet-assistant[data-state="idle"] .pet-assistant__aura,
+.pet-assistant[data-state="thinking"] .pet-assistant__aura,
+.pet-assistant[data-state="speaking"] .pet-assistant__aura,
+.pet-assistant[data-state="executing"] .pet-assistant__aura,
+.pet-assistant[data-state="success"] .pet-assistant__aura {
+  opacity: .72;
+  animation: pet-aura 2.3s ease-in-out infinite;
+}
+
+.pet-assistant[data-state="listening"] .pet-assistant__character {
+  animation: pet-listen 1.15s ease-in-out infinite;
+}
+
+.pet-assistant[data-state="listening"] .pet-assistant__voice-ring,
+.pet-assistant[data-state="transcribing"] .pet-assistant__voice-ring {
+  opacity: .9;
+  animation: pet-ring 1.15s ease-out infinite;
+}
+
+.pet-assistant[data-state="transcribing"] .pet-assistant__character {
+  animation: pet-transcribe 1s ease-in-out infinite;
+}
+
+.pet-assistant[data-state="thinking"] .pet-assistant__character {
+  animation: pet-think 1.8s ease-in-out infinite;
+}
+
+.pet-assistant[data-state="thinking"] .pet-assistant__state-badge {
+  opacity: 1;
+  animation: pet-orbit-badge 1.5s linear infinite;
+}
+
+.pet-assistant[data-state="speaking"] .pet-assistant__character {
+  animation: pet-speak .52s ease-in-out infinite alternate;
+}
+
+.pet-assistant[data-state="speaking"] .pet-assistant__equalizer {
+  opacity: 1;
+}
+
+.pet-assistant[data-state="speaking"] .pet-assistant__equalizer i {
+  animation: pet-eq .54s ease-in-out infinite alternate;
+}
+
+.pet-assistant[data-state="speaking"] .pet-assistant__equalizer i:nth-child(2) { animation-delay: -.34s; }
+.pet-assistant[data-state="speaking"] .pet-assistant__equalizer i:nth-child(3) { animation-delay: -.18s; }
+.pet-assistant[data-state="speaking"] .pet-assistant__equalizer i:nth-child(4) { animation-delay: -.44s; }
+.pet-assistant[data-state="speaking"] .pet-assistant__equalizer i:nth-child(5) { animation-delay: -.08s; }
+
+.pet-assistant[data-state="executing"] .pet-assistant__character {
+  animation: pet-execute .72s cubic-bezier(.3,.8,.2,1) infinite;
+}
+
+.pet-assistant[data-state="executing"] .pet-assistant__eye-glow,
+.pet-assistant[data-state="success"] .pet-assistant__eye-glow {
+  opacity: .86;
+}
+
+.pet-assistant[data-state="success"] .pet-assistant__character {
+  animation: pet-success .82s cubic-bezier(.2,.9,.3,1) 2;
+}
+
+.pet-assistant[data-state="error"] .pet-assistant__character {
+  animation: pet-error .48s ease-in-out 3;
+}
+
+.pet-assistant[data-state="error"] .pet-assistant__state-badge {
+  opacity: 1;
+  color: #ff6d88;
+  border-color: rgba(255, 83, 119, .58);
+}
+
+.pet-assistant[data-state="idle"] .pet-assistant__body {
+  animation: pet-vector-breathe 3.6s ease-in-out infinite;
+}
+
+.pet-assistant[data-state="idle"] .pet-assistant__tail {
+  animation: pet-tail-idle 2.8s ease-in-out infinite;
+  transform-origin: 5% 50%;
+}
+
+.pet-assistant[data-state="listening"] .pet-assistant__ears,
+.pet-assistant[data-state="listening"] .pet-assistant__headphones {
+  animation: pet-ear-listen .64s ease-in-out infinite alternate;
+}
+
+.pet-assistant[data-state="listening"] .pet-assistant__rig-head {
+  animation: pet-rig-listen-head .86s ease-in-out infinite alternate;
+}
+
+.pet-assistant[data-state="listening"] .pet-assistant__spectrum-marks,
+.pet-assistant[data-state="speaking"] .pet-assistant__spectrum-marks {
+  animation: pet-spectrum-pulse .52s ease-in-out infinite alternate;
+}
+
+.pet-assistant[data-state="thinking"] .pet-assistant__thinking-dots {
+  opacity: 1;
+  animation: pet-thought-orbit 1.4s ease-in-out infinite;
+}
+
+.pet-assistant[data-state="thinking"] .pet-assistant__horns {
+  animation: pet-thinking-horns 1.8s ease-in-out infinite alternate;
+}
+
+.pet-assistant[data-state="speaking"] .pet-assistant__mouth {
+  opacity: .94;
+  animation: pet-mouth .18s ease-in-out infinite alternate;
+}
+
+.pet-assistant[data-state="speaking"] .pet-assistant__rig-arm-right {
+  animation: pet-rig-speaking-hand .7s ease-in-out infinite alternate;
+}
+
+.pet-assistant[data-state="speaking"] .pet-assistant__tail-spectrum {
+  animation: pet-tail-spectrum .42s ease-in-out infinite alternate;
+}
+
+.pet-assistant[data-state="executing"] .pet-assistant__scanner {
+  opacity: .94;
+  animation: pet-scan .72s linear infinite;
+}
+
+.pet-assistant[data-state="executing"] .pet-assistant__back-fins {
+  animation: pet-fin-drive .38s ease-in-out infinite alternate;
+}
+
+.pet-assistant[data-state="executing"] .pet-assistant__rig-arm-left,
+.pet-assistant[data-state="executing"] .pet-assistant__rig-arm-right {
+  animation: pet-rig-executing-arms .36s ease-in-out infinite alternate;
+}
+
+.pet-assistant[data-state="success"] .pet-assistant__sparkles {
+  opacity: 1;
+  animation: pet-sparkle .68s ease-in-out infinite alternate;
+}
+
+.pet-assistant[data-state="success"] .pet-assistant__tail {
+  animation: pet-tail-success .52s ease-in-out infinite alternate;
+  transform-origin: 5% 50%;
+}
+
+.pet-assistant[data-state="success"] .pet-assistant__rig-head {
+  animation: pet-rig-success-head .64s cubic-bezier(.2,.85,.3,1) 2;
+}
+
+.pet-assistant[data-state="error"] .pet-assistant__eyes {
+  animation: pet-error-eyes .45s ease-in-out infinite alternate;
+}
+
+.pet-assistant[data-state="dragging"] .pet-assistant__character {
+  animation: pet-dragging .34s ease-in-out infinite alternate;
+}
+
+.pet-assistant[data-state="dragging"] .pet-assistant__tail {
+  transform: rotate(-10deg) translate(-2px, 3px);
+  transform-origin: 5% 50%;
+}
+
+.pet-assistant[data-state="edge-peek"] .pet-assistant__character {
+  animation: pet-edge-peek 1.2s ease-in-out infinite;
+}
+
+.pet-assistant[data-state="edge-peek"] .pet-assistant__eyes {
+  animation: pet-edge-eyes 1.2s ease-in-out infinite;
+}
+
+.pet-assistant[data-state="offline"] .pet-assistant__character,
+.pet-assistant[data-state="sleep"] .pet-assistant__character {
+  animation: pet-sleep 4.8s ease-in-out infinite;
+  filter: saturate(.55) brightness(.72) drop-shadow(0 14px 16px rgba(0,0,0,.42)) !important;
+}
+
+.pet-assistant[data-state="offline"] .pet-assistant__state-badge,
+.pet-assistant[data-state="sleep"] .pet-assistant__state-badge {
+  opacity: .82;
+  color: rgba(195, 211, 220, .7);
+  border-color: rgba(195, 211, 220, .28);
+}
+
+.pet-assistant.is-page-hidden *,
+.pet-assistant.is-collapsed *,
+.pet-assistant.is-page-hidden *::before,
+.pet-assistant.is-collapsed *::before,
+.pet-assistant.is-page-hidden *::after,
+.pet-assistant.is-collapsed *::after {
+  animation-play-state: paused !important;
+}
+
+@keyframes pet-panel-in {
+  from { opacity: 0; transform: translate3d(-10px, 12px, 0) scale(.94); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes pet-breathe {
+  0%,100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(0, -4px, 0) scale(1.018, .992); }
+}
+
+@keyframes pet-blink {
+  0%, 43%, 47%, 73%, 77%, 100% { transform: scaleY(0); opacity: 0; }
+  44.4%, 45.6%, 74.4%, 75.6% { transform: scaleY(1); opacity: 1; }
+}
+
+@keyframes pet-mouth {
+  from { transform: scaleY(.45) translateY(-1px); }
+  to { transform: scaleY(1.55) translateY(1px); }
+}
+
+@keyframes pet-rig-listen-head {
+  from { transform: rotate(-1.2deg) translateY(2px); }
+  to { transform: rotate(1.5deg) translateY(-3px); }
+}
+
+@keyframes pet-rig-speaking-hand {
+  from { transform: rotate(-2deg) translateY(1px); }
+  to { transform: rotate(5deg) translateY(-4px); }
+}
+
+@keyframes pet-rig-executing-arms {
+  from { transform: rotate(-3deg) translateY(1px); }
+  to { transform: rotate(4deg) translateY(-5px); }
+}
+
+@keyframes pet-rig-success-head {
+  0%,100% { transform: rotate(0) translateY(0); }
+  45% { transform: rotate(-4deg) translateY(-8px); }
+  72% { transform: rotate(4deg) translateY(-4px); }
+}
+
+@keyframes pet-vector-breathe {
+  0%, 100% { transform: translateY(1px) scale(1, .99); }
+  50% { transform: translateY(-3px) scale(1.012, 1.018); }
+}
+
+@keyframes pet-tail-idle {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(5deg) translateY(-2px); }
+}
+
+@keyframes pet-ear-listen {
+  from { transform: rotate(-2deg) scaleY(.98); }
+  to { transform: rotate(2deg) scaleY(1.04); }
+}
+
+@keyframes pet-spectrum-pulse {
+  from { opacity: .62; filter: drop-shadow(0 0 1px #2cecff); }
+  to { opacity: 1; filter: drop-shadow(0 0 5px #8a48ff); }
+}
+
+@keyframes pet-thought-orbit {
+  0%, 100% { transform: translate(0, 2px) scale(.9); opacity: .45; }
+  50% { transform: translate(3px, -3px) scale(1.08); opacity: 1; }
+}
+
+@keyframes pet-thinking-horns {
+  from { transform: rotate(-1deg); }
+  to { transform: rotate(1.5deg) translateY(-1px); }
+}
+
+@keyframes pet-tail-spectrum {
+  from { filter: drop-shadow(0 0 2px #2cecff); transform: scaleY(.92); }
+  to { filter: drop-shadow(0 0 7px #a63cff); transform: scaleY(1.06); }
+}
+
+@keyframes pet-scan {
+  from { transform: translateY(-8px); filter: drop-shadow(0 0 4px #2cecff); }
+  to { transform: translateY(58px); filter: drop-shadow(0 0 7px #a63cff); }
+}
+
+@keyframes pet-fin-drive {
+  from { transform: translateX(-1px) scaleX(.96); }
+  to { transform: translateX(3px) scaleX(1.06); }
+}
+
+@keyframes pet-sparkle {
+  from { transform: rotate(-8deg) scale(.72); opacity: .4; }
+  to { transform: rotate(10deg) scale(1.25); opacity: 1; }
+}
+
+@keyframes pet-tail-success {
+  from { transform: rotate(-5deg); }
+  to { transform: rotate(10deg) translateY(-3px); }
+}
+
+@keyframes pet-error-eyes {
+  from { filter: drop-shadow(0 0 1px #ff2937); transform: translateX(-1px); }
+  to { filter: drop-shadow(0 0 7px #ff1829); transform: translateX(1px); }
+}
+
+@keyframes pet-dragging {
+  from { transform: rotate(-2deg) scale(.985, 1.015); }
+  to { transform: rotate(2deg) scale(1.018, .985); }
+}
+
+@keyframes pet-edge-peek {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  50% { transform: translateX(-5px) rotate(-2deg); }
+}
+
+@keyframes pet-edge-eyes {
+  0%, 100% { transform: translateX(0) scaleY(1); }
+  45% { transform: translateX(-2px) scaleY(1); }
+  50% { transform: translateX(-2px) scaleY(.08); }
+}
+
+@keyframes pet-listen {
+  0%,100% { transform: translate3d(0, 0, 0) rotate(-1deg); }
+  50% { transform: translate3d(2px, -3px, 0) rotate(4deg); }
+}
+
+@keyframes pet-transcribe {
+  0%,100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(0, -2px, 0) scale(1.035); }
+}
+
+@keyframes pet-think {
+  0%,100% { transform: translate3d(-2px, 1px, 0) rotate(-1.5deg); }
+  50% { transform: translate3d(3px, -9px, 0) rotate(2deg); }
+}
+
+@keyframes pet-speak {
+  from { transform: translate3d(0, 0, 0) scale(1, .99); }
+  to { transform: translate3d(0, -7px, 0) scale(1.025, 1.01); }
+}
+
+@keyframes pet-execute {
+  0%,100% { transform: translate3d(-5px, 0, 0) skewX(-3deg); }
+  46% { transform: translate3d(8px, -5px, 0) skewX(6deg); }
+  58% { transform: translate3d(5px, -3px, 0) skewX(3deg); }
+}
+
+@keyframes pet-success {
+  0%,100% { transform: translate3d(0, 0, 0) rotate(0); }
+  35% { transform: translate3d(0, -15px, 0) rotate(-5deg) scale(1.04); }
+  65% { transform: translate3d(0, -7px, 0) rotate(6deg) scale(1.02); }
+}
+
+@keyframes pet-error {
+  0%,100% { transform: translate3d(0, 0, 0) rotate(0); }
+  25% { transform: translate3d(-7px, 0, 0) rotate(-5deg); }
+  75% { transform: translate3d(7px, 0, 0) rotate(5deg); }
+}
+
+@keyframes pet-sleep {
+  0%,100% { transform: translate3d(0, 3px, 0) rotate(-2deg) scale(.985); }
+  50% { transform: translate3d(0, 0, 0) rotate(-2deg) scale(1); }
+}
+
+@keyframes pet-ring {
+  0% { opacity: .78; transform: scale(.82); }
+  100% { opacity: 0; transform: scale(1.12); }
+}
+
+@keyframes pet-aura {
+  0%,100% { opacity: .46; transform: scale(.88); }
+  50% { opacity: .84; transform: scale(1.12); }
+}
+
+@keyframes pet-orbit-badge {
+  0% { transform: translate3d(-6px, 7px, 0) rotate(0); }
+  50% { transform: translate3d(5px, -7px, 0) rotate(180deg); }
+  100% { transform: translate3d(-6px, 7px, 0) rotate(360deg); }
+}
+
+@keyframes pet-eq {
+  from { transform: scaleY(.32); }
+  to { transform: scaleY(1.5); }
+}
+
+@keyframes pet-caret { 50% { opacity: 0; } }
+@keyframes pet-voice-button { 50% { box-shadow: 0 0 0 5px rgba(255,68,126,.1); } }
+
+/* White topology-orb mascot. The legacy illustrated rig stays in the document
+   only as a compatibility seam for older clients, but never paints. */
+.pet-assistant__particle-orb {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  background: transparent !important;
+  background-color: transparent !important;
+  contain: paint;
+  image-rendering: auto;
+  filter: none;
+  transform: translateZ(0);
+}
+
+.pet-assistant__vector {
+  display: none !important;
+}
+
+.pet-assistant__aura,
+.pet-assistant__eye-glow,
+.pet-assistant__voice-ring,
+.pet-assistant__equalizer,
+.pet-assistant__state-badge {
+  display: none !important;
+}
+
+.pet-assistant[data-state="idle"] .pet-assistant__character,
+.pet-assistant[data-state="sleep"] .pet-assistant__character,
+.pet-assistant[data-state="offline"] .pet-assistant__character {
+  animation: pet-particle-orb-float 6.8s cubic-bezier(.45, 0, .55, 1) infinite !important;
+}
+
+.pet-assistant[data-state="listening"] .pet-assistant__character,
+.pet-assistant[data-state="transcribing"] .pet-assistant__character,
+.pet-assistant[data-state="thinking"] .pet-assistant__character,
+.pet-assistant[data-state="speaking"] .pet-assistant__character,
+.pet-assistant[data-state="executing"] .pet-assistant__character,
+.pet-assistant[data-state="success"] .pet-assistant__character,
+.pet-assistant[data-state="error"] .pet-assistant__character {
+  animation: pet-particle-orb-float 6.8s cubic-bezier(.45, 0, .55, 1) infinite !important;
+}
+
+@keyframes pet-particle-orb-float {
+  0%, 100% { transform: translate3d(0, 1px, 0) rotate(-.18deg); }
+  50% { transform: translate3d(0, -3px, 0) rotate(.18deg); }
+}
+
+/* Proactive lines and companion asides stay beside the mascot instead of
+   opening the full conversation panel. */
+.pet-assistant[data-pet-proactive="true"] .pet-assistant__speech,
+.pet-assistant[data-pet-aside="true"] .pet-assistant__speech {
+  z-index: 5;
+  display: block;
+  max-width: 220px;
+  padding: 9px 12px;
+  overflow: visible;
+  color: rgba(255, 255, 255, .98);
+  white-space: normal;
+  text-wrap: pretty;
+  text-overflow: clip;
+  border: 1px solid rgba(255, 255, 255, .72);
+  border-radius: 14px 14px 14px 5px;
+  background: rgba(255, 255, 255, .30);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, .24);
+  -webkit-backdrop-filter: blur(14px) saturate(.82) brightness(.36);
+  backdrop-filter: blur(14px) saturate(.82) brightness(.36);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .7);
+  opacity: 1;
+  animation: pet-proactive-bubble-in .22s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.pet-assistant[data-pet-proactive="true"] .pet-assistant__speech::after,
+.pet-assistant[data-pet-aside="true"] .pet-assistant__speech::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  bottom: -5px;
+  width: 8px;
+  height: 8px;
+  border-right: 1px solid rgba(255, 255, 255, .72);
+  border-bottom: 1px solid rgba(255, 255, 255, .72);
+  background: rgba(255, 255, 255, .30);
+  transform: rotate(45deg);
+}
+
+html[data-fe-client="desktop-pet"] #petAssistant[data-pet-proactive="true"] .pet-assistant__speech,
+html[data-fe-client="desktop-pet"] #petAssistant[data-pet-aside="true"] .pet-assistant__speech {
+  left: 50%;
+  right: auto;
+  bottom: 258px;
+  display: block;
+  width: max-content;
+  max-width: min(224px, calc(100vw - 24px));
+  transform: translate3d(-50%, 0, 0);
+}
+
+@keyframes pet-proactive-bubble-in {
+  from { opacity: 0; transform: translate3d(-50%, 6px, 0) scale(.97); }
+  to { opacity: 1; transform: translate3d(-50%, 0, 0) scale(1); }
+}
+
+/* Desktop chat is a light translucent layer. No black fill or black gradient
+   is left behind the mascot when the conversation is open. */
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__panel {
+  color: rgba(255, 255, 255, .98);
+  border: 1px solid rgba(255, 255, 255, .74);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, .30);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, .2), inset 0 1px rgba(255, 255, 255, .28);
+  -webkit-backdrop-filter: blur(26px) saturate(.72) brightness(.34);
+  backdrop-filter: blur(26px) saturate(.72) brightness(.34);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .62);
+}
+
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__message p {
+  color: rgba(255, 255, 255, .98);
+  border: 1px solid rgba(255, 255, 255, .68);
+  background: rgba(255, 255, 255, .30);
+  box-shadow: 0 3px 7px rgba(0, 0, 0, .18);
+  -webkit-backdrop-filter: blur(14px) saturate(.72) brightness(.34);
+  backdrop-filter: blur(14px) saturate(.72) brightness(.34);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .68);
+}
+
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__message.is-user p {
+  border-color: rgba(255, 255, 255, .82);
+  background: rgba(255, 255, 255, .30);
+}
+
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__status,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__voice-picker,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__voice-settings,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__confirmation,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__composer,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__composer textarea,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__voice-picker select {
+  color: rgba(255, 255, 255, .97);
+  border-color: rgba(255, 255, 255, .56);
+  background: rgba(255, 255, 255, .20);
+  box-shadow: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .66);
+}
+
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__composer {
+  border-top-color: rgba(255, 255, 255, .46);
+  background: transparent;
+}
+
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__composer textarea {
+  background: rgba(255, 255, 255, .30);
+}
+
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__voice,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__send,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__panel-actions button,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__confirmation-actions button,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__shortcut-editor button {
+  color: rgba(255, 255, 255, .98);
+  border-color: rgba(255, 255, 255, .62);
+  background: rgba(255, 255, 255, .24);
+  box-shadow: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .68);
+}
+
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantClear,
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantClose,
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantShortcutCapture,
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantShortcutClear,
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantVoice,
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantSend,
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantConfirmationCancel,
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantConfirmationConfirm {
+  appearance: none;
+  color: rgba(255, 255, 255, .98) !important;
+  border: 1px solid rgba(255, 255, 255, .68) !important;
+  background: rgba(255, 255, 255, .26) !important;
+  box-shadow: none !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .7) !important;
+}
+
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__identity small,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__status,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__voice-picker,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__voice-settings,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__voice-settings small,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__message > span,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__privacy {
+  color: rgba(255, 255, 255, .88);
+}
+
+@media (max-width: 760px) {
+  .pet-assistant__panel,
+  .pet-assistant.is-panel-left .pet-assistant__panel {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    top: 12px;
+    bottom: 12px;
+    width: auto;
+    height: auto;
+    transform-origin: 50% 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-assistant *,
+  .pet-assistant *::before,
+  .pet-assistant *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+
+  .pet-assistant__character {
+    transition: opacity .15s ease !important;
+  }
+}
+
+/* PET WHITE PANEL SURFACE */
+/* The in-app and detached desktop conversations share one flat 10% white
+   backing surface. Glass remains reserved for message content; only compact
+   controls use the requested 20% black surface. */
+.pet-assistant {
+  --pet-glass-surface: rgba(255, 255, 255, .10);
+  --pet-glass-highlight: rgba(255, 255, 255, .30);
+  --pet-glass-edge: rgba(255, 255, 255, .54);
+  --pet-glass-hairline: rgba(255, 255, 255, .24);
+  --pet-button-surface: rgba(0, 0, 0, .20);
+  --pet-button-surface-hover: rgba(0, 0, 0, .28);
+  --pet-button-surface-active: rgba(0, 0, 0, .34);
+  --pet-focus-ring: rgba(214, 247, 255, .94);
+}
+
+.pet-assistant__panel,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__panel {
+  grid-template-rows: auto auto auto minmax(72px, 1fr) auto auto auto auto;
+  color: rgba(255, 255, 255, .98);
+  border: 1px solid var(--pet-glass-edge);
+  border-radius: 28px;
+  background: var(--pet-glass-surface);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .64);
+}
+
+/* The disclosure replaces two always-open setting cards with one compact,
+   familiar control. Native details/summary keeps keyboard behavior intact. */
+.pet-assistant__voice-disclosure {
+  margin: 0 17px 9px;
+  overflow: clip;
+  color: rgba(255, 255, 255, .94);
+  border: 1px solid var(--pet-glass-hairline);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .08);
+}
+
+.pet-assistant__voice-summary {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 11px;
+  color: rgba(255, 255, 255, .96);
+  font-size: 11px;
+  font-weight: 650;
+  list-style: none;
+  background: var(--pet-button-surface);
+  cursor: pointer;
+  transition: background-color .18s cubic-bezier(.22, 1, .36, 1), color .18s ease;
+}
+
+.pet-assistant__voice-summary::-webkit-details-marker {
+  display: none;
+}
+
+.pet-assistant__voice-summary::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform .18s cubic-bezier(.22, 1, .36, 1);
+}
+
+.pet-assistant__voice-disclosure[open] > .pet-assistant__voice-summary::after {
+  transform: translateY(2px) rotate(225deg);
+}
+
+.pet-assistant__voice-summary:hover {
+  background: var(--pet-button-surface-hover);
+}
+
+.pet-assistant__voice-summary:focus-visible {
+  outline: 2px solid var(--pet-focus-ring);
+  outline-offset: -3px;
+}
+
+.pet-assistant__voice-summary:active {
+  background: var(--pet-button-surface-active);
+}
+
+.pet-assistant__voice-options {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+  border-top: 1px solid rgba(255, 255, 255, .18);
+}
+
+.pet-assistant__voice-options .pet-assistant__voice-picker,
+.pet-assistant__voice-options .pet-assistant__voice-settings {
+  margin: 0;
+}
+
+.pet-assistant__status,
+.pet-assistant__voice-picker,
+.pet-assistant__voice-settings,
+.pet-assistant__confirmation,
+.pet-assistant__composer,
+.pet-assistant__composer textarea,
+.pet-assistant__voice-picker select,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__status,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__voice-picker,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__voice-settings,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__confirmation,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__composer,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__composer textarea,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__voice-picker select {
+  color: rgba(255, 255, 255, .96);
+  border-color: var(--pet-glass-hairline);
+  background: rgba(255, 255, 255, .09);
+  box-shadow: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .66);
+}
+
+.pet-assistant__voice-options .pet-assistant__voice-picker,
+.pet-assistant__voice-options .pet-assistant__voice-settings {
+  border-color: rgba(255, 255, 255, .16);
+  background: rgba(255, 255, 255, .055);
+}
+
+.pet-assistant__voice-picker select {
+  background: rgba(0, 0, 0, .20);
+}
+
+.pet-assistant__composer {
+  border-top-color: rgba(255, 255, 255, .22);
+}
+
+.pet-assistant__composer textarea {
+  background: rgba(255, 255, 255, .12);
+}
+
+.pet-assistant__composer textarea::placeholder {
+  color: rgba(255, 255, 255, .78);
+}
+
+.pet-assistant__composer textarea:focus {
+  border-color: rgba(255, 255, 255, .72);
+  box-shadow: 0 0 0 2px rgba(214, 247, 255, .22);
+}
+
+.pet-assistant__message p,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__message p {
+  color: rgba(255, 255, 255, .98);
+  border-color: rgba(255, 255, 255, .38);
+  background: rgba(255, 255, 255, .16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .24);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .68);
+}
+
+.pet-assistant__message.is-user p,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__message.is-user p {
+  border-color: rgba(255, 255, 255, .52);
+  background: rgba(255, 255, 255, .22);
+}
+
+.pet-assistant__identity small,
+.pet-assistant__status,
+.pet-assistant__voice-picker,
+.pet-assistant__voice-settings,
+.pet-assistant__voice-settings small,
+.pet-assistant__message > span,
+.pet-assistant__privacy,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__identity small,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__status,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__voice-picker,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__voice-settings,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__voice-settings small,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__message > span,
+html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__privacy {
+  color: rgba(255, 255, 255, .86);
+}
+
+/* Every compact action has one material vocabulary. The particle character
+   remains completely transparent and is deliberately excluded. */
+.pet-assistant button:not(.pet-assistant__character),
+.pet-assistant__quick-actions button,
+.pet-assistant__panel-actions button,
+.pet-assistant__confirmation-actions button,
+.pet-assistant__shortcut-editor button,
+html[data-fe-client="desktop-pet"] #petAssistant button:not(.pet-assistant__character) {
+  color: rgba(255, 255, 255, .98) !important;
+  border: 1px solid rgba(255, 255, 255, .34) !important;
+  background: var(--pet-button-surface) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .72) !important;
+  transition:
+    background-color .18s cubic-bezier(.22, 1, .36, 1),
+    border-color .18s ease,
+    transform .18s cubic-bezier(.22, 1, .36, 1);
+}
+
+/* The earlier compatibility layer targets these controls by ID. Repeat that
+   specificity here so it cannot replace the requested 20% black material. */
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantClear,
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantClose,
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantShortcutCapture,
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantShortcutClear,
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantVoice,
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantSend,
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantConfirmationCancel,
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantConfirmationConfirm {
+  background: var(--pet-button-surface) !important;
+  border-color: rgba(255, 255, 255, .34) !important;
+}
+
+html[data-fe-client="desktop-pet"] #petAssistant :is(
+  #petAssistantClear,
+  #petAssistantClose,
+  #petAssistantShortcutCapture,
+  #petAssistantShortcutClear,
+  #petAssistantVoice,
+  #petAssistantSend,
+  #petAssistantConfirmationCancel,
+  #petAssistantConfirmationConfirm
+):hover:not(:disabled) {
+  background: var(--pet-button-surface-hover) !important;
+  border-color: rgba(255, 255, 255, .58) !important;
+}
+
+html[data-fe-client="desktop-pet"] #petAssistant :is(
+  #petAssistantClear,
+  #petAssistantClose,
+  #petAssistantShortcutCapture,
+  #petAssistantShortcutClear,
+  #petAssistantVoice,
+  #petAssistantSend,
+  #petAssistantConfirmationCancel,
+  #petAssistantConfirmationConfirm
+):focus-visible {
+  outline: 2px solid var(--pet-focus-ring);
+  outline-offset: 2px;
+}
+
+html[data-fe-client="desktop-pet"] #petAssistant :is(
+  #petAssistantClear,
+  #petAssistantClose,
+  #petAssistantShortcutCapture,
+  #petAssistantShortcutClear,
+  #petAssistantVoice,
+  #petAssistantSend,
+  #petAssistantConfirmationCancel,
+  #petAssistantConfirmationConfirm
+):active:not(:disabled) {
+  background: var(--pet-button-surface-active) !important;
+  transform: translateY(1px);
+}
+
+.pet-assistant button:not(.pet-assistant__character):hover:not(:disabled),
+.pet-assistant__quick-actions button:hover:not(:disabled),
+.pet-assistant__panel-actions button:hover:not(:disabled),
+.pet-assistant__confirmation-actions button:hover:not(:disabled),
+.pet-assistant__shortcut-editor button:hover:not(:disabled) {
+  color: #fff !important;
+  border-color: rgba(255, 255, 255, .58) !important;
+  background: var(--pet-button-surface-hover) !important;
+}
+
+.pet-assistant button:not(.pet-assistant__character):focus-visible,
+.pet-assistant__quick-actions button:focus-visible,
+.pet-assistant__panel-actions button:focus-visible,
+.pet-assistant__confirmation-actions button:focus-visible,
+.pet-assistant__shortcut-editor button:focus-visible {
+  outline: 2px solid var(--pet-focus-ring);
+  outline-offset: 2px;
+}
+
+.pet-assistant button:not(.pet-assistant__character):active:not(:disabled),
+.pet-assistant__quick-actions button:active:not(:disabled),
+.pet-assistant__panel-actions button:active:not(:disabled),
+.pet-assistant__confirmation-actions button:active:not(:disabled),
+.pet-assistant__shortcut-editor button:active:not(:disabled) {
+  background: var(--pet-button-surface-active) !important;
+  transform: translateY(1px);
+}
+
+.pet-assistant button:not(.pet-assistant__character):disabled,
+.pet-assistant__quick-actions button:disabled,
+.pet-assistant__panel-actions button:disabled,
+.pet-assistant__confirmation-actions button:disabled,
+.pet-assistant__shortcut-editor button:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-assistant__voice-summary,
+  .pet-assistant__voice-summary::after,
+  .pet-assistant button:not(.pet-assistant__character) {
+    transition-duration: .001ms !important;
+  }
+
+  .pet-assistant button:not(.pet-assistant__character):active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* COMPACT PET TEXT BUBBLE
+   Text chat is one restrained glass surface beside the mascot. Live voice
+   remains visually quiet; its state is carried by the particle choreography. */
+.pet-assistant {
+  --pet-text-glass: rgba(255, 255, 255, .12);
+  --pet-text-glass-edge: rgba(255, 255, 255, .42);
+  --pet-text-glass-field: rgba(255, 255, 255, .10);
+  --pet-text-ink: rgba(255, 255, 255, .98);
+  --pet-text-muted: rgba(255, 255, 255, .78);
+  --pet-text-shadow: rgba(0, 0, 0, .72);
+}
+
+#petAssistant,
+#petAssistant .pet-assistant__dock,
+#petAssistant #petAssistantCharacter,
+#petAssistant #petAssistantParticleOrb {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+#petAssistant,
+#petAssistant .pet-assistant__dock {
+  box-shadow: none !important;
+}
+
+#petAssistantPanel[data-pet-text-bubble] {
+  position: absolute !important;
+  left: calc(100% + 12px) !important;
+  right: auto !important;
+  bottom: 64px !important;
+  width: min(320px, calc(100vw - 32px)) !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: min(360px, calc(100dvh - 32px)) !important;
+  grid-template-rows: minmax(0, auto) auto auto auto !important;
+  overflow: hidden;
+  color: var(--pet-text-ink) !important;
+  border: 1px solid var(--pet-text-glass-edge) !important;
+  border-radius: 16px !important;
+  background: var(--pet-text-glass) !important;
+  background-image: none !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .16),
+    0 4px 8px rgba(0, 0, 0, .20) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(1.08) brightness(.92) contrast(1.03) !important;
+  backdrop-filter: blur(22px) saturate(1.08) brightness(.92) contrast(1.03) !important;
+  text-shadow: 0 1px 2px var(--pet-text-shadow);
+  transform-origin: 0 100%;
+  animation: pet-text-bubble-in .20s cubic-bezier(.22, 1, .36, 1) both;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+#petAssistant.is-panel-left #petAssistantPanel[data-pet-text-bubble] {
+  left: auto !important;
+  right: calc(100% + 12px) !important;
+  transform-origin: 100% 100%;
+}
+
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantPanel[data-pet-text-bubble] {
+  left: auto !important;
+  right: calc(100% + 12px) !important;
+  bottom: 64px !important;
+  width: min(320px, calc(100vw - 28px)) !important;
+  height: auto !important;
+  max-height: min(360px, calc(100dvh - 28px)) !important;
+  border-radius: 16px !important;
+}
+
+#petAssistantPanel[data-pet-text-bubble] > :is(
+  .pet-assistant__panel-head,
+  .pet-assistant__status,
+  .pet-assistant__voice-picker,
+  .pet-assistant__voice-settings,
+  .pet-assistant__voice-disclosure,
+  .pet-assistant__privacy
+) {
+  display: none !important;
+}
+
+#petAssistantPanel[data-pet-text-bubble] .pet-assistant__messages {
+  min-height: 0 !important;
+  max-height: 188px !important;
+  padding: 11px 12px 5px !important;
+  overflow: auto;
+}
+
+#petAssistantPanel[data-pet-text-bubble] .pet-assistant__messages:empty {
+  display: none;
+}
+
+#petAssistantPanel[data-pet-text-bubble] .pet-assistant__message {
+  gap: 3px;
+  margin: 0;
+}
+
+#petAssistantPanel[data-pet-text-bubble] .pet-assistant__message > span {
+  padding: 0 2px;
+  color: var(--pet-text-muted) !important;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+#petAssistantPanel[data-pet-text-bubble] .pet-assistant__message p,
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantPanel[data-pet-text-bubble] .pet-assistant__message p,
+#petAssistantPanel[data-pet-text-bubble] .pet-assistant__message.is-user p {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 2px 2px 7px;
+  color: var(--pet-text-ink) !important;
+  font-size: 13.5px;
+  line-height: 1.5;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  text-shadow: 0 1px 2px var(--pet-text-shadow);
+  text-wrap: pretty;
+}
+
+#petAssistantPanel[data-pet-text-bubble] .pet-assistant__interim {
+  margin: 0 10px 7px;
+  padding: 7px 9px;
+  color: var(--pet-text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .07);
+}
+
+#petAssistantPanel[data-pet-text-bubble] .pet-assistant__confirmation {
+  gap: 8px;
+  margin: 0 9px 8px;
+  padding: 10px;
+  border: 1px solid rgba(255, 215, 150, .46);
+  border-radius: 12px;
+  background: rgba(39, 29, 14, .86) !important;
+  box-shadow: none !important;
+}
+
+#petAssistantPanel[data-pet-text-bubble] .pet-assistant__composer,
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantPanel[data-pet-text-bubble] .pet-assistant__composer {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: end;
+  gap: 7px;
+  padding: 8px 9px 9px;
+  border-top: 1px solid rgba(255, 255, 255, .18);
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+#petAssistantPanel[data-pet-text-bubble] .pet-assistant__composer textarea,
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantPanel[data-pet-text-bubble] .pet-assistant__composer textarea {
+  min-width: 0;
+  min-height: 40px;
+  max-height: 104px;
+  padding: 10px 11px;
+  color: var(--pet-text-ink) !important;
+  caret-color: #fff;
+  border: 1px solid rgba(255, 255, 255, .28) !important;
+  border-radius: 12px;
+  background: var(--pet-text-glass-field) !important;
+  box-shadow: none !important;
+  text-shadow: 0 1px 2px var(--pet-text-shadow);
+}
+
+#petAssistantPanel[data-pet-text-bubble] .pet-assistant__composer textarea::placeholder {
+  color: rgba(255, 255, 255, .76);
+  opacity: 1;
+}
+
+#petAssistantPanel[data-pet-text-bubble] .pet-assistant__composer textarea:focus-visible {
+  outline: 2px solid rgba(236, 249, 255, .92);
+  outline-offset: 1px;
+  border-color: rgba(255, 255, 255, .52) !important;
+}
+
+#petAssistantPanel[data-pet-text-bubble] .pet-assistant__send,
+html[data-fe-client="desktop-pet"] #petAssistant #petAssistantPanel[data-pet-text-bubble] .pet-assistant__send {
+  min-width: 62px;
+  height: 40px;
+  padding: 0 13px;
+  color: rgba(255, 255, 255, .98) !important;
+  border: 1px solid rgba(255, 255, 255, .30) !important;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, .20) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .10) !important;
+}
+
+#petAssistantPanel[data-pet-text-bubble] .pet-assistant__send:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, .52) !important;
+  background: rgba(0, 0, 0, .28) !important;
+}
+
+#petAssistantPanel[data-pet-text-bubble] .pet-assistant__send:focus-visible {
+  outline: 2px solid rgba(236, 249, 255, .94);
+  outline-offset: 2px;
+}
+
+/* The old vertical shortcut rail is retired in both embedded and detached
+   clients. Keep legacy IDs covered for older cached markup. */
+#petAssistant .pet-assistant__quick-actions,
+#petAssistant :is(
+  #petAssistantMute,
+  #petAssistantCollapse,
+  #petAssistantHide,
+  #petAssistantDesktopMain,
+  #petAssistantClear,
+  #petAssistantClose,
+  #petAssistantVoice
+) {
+  display: none !important;
+}
+
+/* Instructional copy is not a permanent card. Only a deliberate proactive
+   line or aside earns a compact glass speech bubble. */
+#petAssistant .pet-assistant__speech {
+  display: none;
+}
+
+#petAssistant[data-pet-proactive="true"] .pet-assistant__speech,
+#petAssistant[data-pet-aside="true"] .pet-assistant__speech {
+  display: block;
+  max-width: min(224px, calc(100vw - 24px));
+  padding: 8px 11px;
+  color: var(--pet-text-ink);
+  font-size: 12px;
+  line-height: 1.4;
+  border: 1px solid var(--pet-text-glass-edge);
+  border-radius: 14px 14px 14px 5px;
+  background: var(--pet-text-glass);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, .20);
+  -webkit-backdrop-filter: blur(22px) saturate(1.08) brightness(.92) !important;
+  backdrop-filter: blur(22px) saturate(1.08) brightness(.92) !important;
+  text-shadow: 0 1px 2px var(--pet-text-shadow);
+}
+
+#petAssistant[data-pet-proactive="true"] .pet-assistant__speech::after,
+#petAssistant[data-pet-aside="true"] .pet-assistant__speech::after {
+  border-right-color: var(--pet-text-glass-edge);
+  border-bottom-color: var(--pet-text-glass-edge);
+  background: var(--pet-text-glass);
+}
+
+/* No text or proactive card competes with the continuous live conversation. */
+#petAssistant[data-live-conversation="active"] :is(
+  #petAssistantPanel,
+  .pet-assistant__speech,
+  .pet-assistant__interim,
+  .pet-assistant__confirmation
+) {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Voice preferences now belong to the existing matte-black settings stack. */
+.runtime-settings-panel .runtime-pet-voice-settings .runtime-settings-group-content {
+  gap: 8px;
+  padding: 0 8px 8px;
+}
+
+.runtime-settings-panel .runtime-pet-voice-settings .pet-assistant__voice-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  color: rgba(232, 234, 238, .78);
+  font-size: 10px;
+  font-weight: 700;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.runtime-settings-panel .runtime-pet-voice-settings .pet-assistant__voice-picker select {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 28px 0 9px;
+  color: rgba(248, 248, 249, .94);
+  border: 1px solid rgba(255, 255, 255, .11) !important;
+  border-radius: 9px;
+  background: #090b0e !important;
+  box-shadow: none !important;
+}
+
+.runtime-settings-panel .runtime-pet-voice-settings .pet-assistant__voice-picker select:focus-visible {
+  outline: 2px solid rgba(222, 244, 255, .86);
+  outline-offset: 2px;
+}
+
+.runtime-settings-panel .runtime-pet-voice-settings .pet-assistant__voice-settings {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  color: rgba(232, 234, 238, .78);
+  font-size: 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent !important;
+}
+
+.runtime-settings-panel .runtime-pet-voice-settings .pet-assistant__voice-playback {
+  min-height: 36px;
+  justify-content: space-between;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 255, 255, .10);
+  border-radius: 9px;
+  background: #111316;
+}
+
+.runtime-settings-panel .runtime-pet-voice-settings .pet-assistant__shortcut-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+  min-width: 0;
+}
+
+.runtime-settings-panel .runtime-pet-voice-settings .pet-assistant__shortcut-editor button {
+  min-height: 32px;
+  padding: 0 9px;
+  color: rgba(248, 248, 249, .94);
+  border: 1px solid rgba(255, 255, 255, .11);
+  border-radius: 9px;
+  background: #090b0e;
+  box-shadow: none;
+}
+
+.runtime-settings-panel .runtime-pet-voice-settings .pet-assistant__shortcut-editor button:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, .24);
+  background: #181a1e;
+}
+
+.runtime-settings-panel .runtime-pet-voice-settings .pet-assistant__shortcut-editor button:focus-visible {
+  outline: 2px solid rgba(222, 244, 255, .86);
+  outline-offset: 2px;
+}
+
+.runtime-settings-panel .runtime-pet-voice-settings .pet-assistant__shortcut-editor output {
+  align-self: center;
+  min-width: 0;
+  color: rgba(232, 234, 238, .72);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-settings-panel .runtime-pet-voice-settings .pet-assistant__voice-settings small {
+  color: rgba(211, 215, 221, .60);
+  line-height: 1.45;
+}
+
+@keyframes pet-text-bubble-in {
+  from { opacity: 0; transform: translate3d(0, 5px, 0) scale(.98); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@media (max-width: 620px) {
+  /* A transformed ancestor makes fixed descendants viewport-relative only in
+     name. Suspend the zero-value drag transform while the bubble is open so
+     compact/DPI layouts use the actual viewport edges. */
+  #petAssistant:has(#petAssistantPanel[data-pet-text-bubble]:not([hidden])) {
+    contain: style;
+    transform: none;
+    will-change: auto;
+  }
+
+  #petAssistant #petAssistantPanel[data-pet-text-bubble],
+  #petAssistant.is-panel-left #petAssistantPanel[data-pet-text-bubble] {
+    position: fixed !important;
+    left: max(12px, calc(50vw - 160px), env(safe-area-inset-left)) !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: calc(218px + max(12px, env(safe-area-inset-bottom))) !important;
+    width: min(320px, calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right))) !important;
+    max-height: min(330px, calc(100dvh - 246px)) !important;
+    transform-origin: 50% 100%;
+  }
+}
+
+@media (max-height: 480px) {
+  #petAssistant:has(#petAssistantPanel[data-pet-text-bubble]:not([hidden])) {
+    contain: style;
+    transform: none;
+    will-change: auto;
+  }
+
+  #petAssistant #petAssistantPanel[data-pet-text-bubble],
+  #petAssistant.is-panel-left #petAssistantPanel[data-pet-text-bubble],
+  html[data-fe-client="desktop-pet"] #petAssistant #petAssistantPanel[data-pet-text-bubble] {
+    position: fixed !important;
+    left: max(10px, calc(50vw - 160px), env(safe-area-inset-left)) !important;
+    right: auto !important;
+    top: max(10px, env(safe-area-inset-top)) !important;
+    bottom: auto !important;
+    width: min(320px, calc(100vw - 20px - env(safe-area-inset-left) - env(safe-area-inset-right))) !important;
+    max-height: calc(100dvh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+    transform-origin: 50% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #petAssistantPanel[data-pet-text-bubble],
+  #petAssistant[data-pet-proactive="true"] .pet-assistant__speech,
+  #petAssistant[data-pet-aside="true"] .pet-assistant__speech {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  #petAssistantPanel[data-pet-text-bubble],
+  #petAssistant[data-pet-proactive="true"] .pet-assistant__speech,
+  #petAssistant[data-pet-aside="true"] .pet-assistant__speech {
+    border-color: rgba(255, 255, 255, .58) !important;
+    background: rgba(18, 20, 23, .96) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  #petAssistantPanel[data-pet-text-bubble],
+  #petAssistant[data-pet-proactive="true"] .pet-assistant__speech,
+  #petAssistant[data-pet-aside="true"] .pet-assistant__speech {
+    color: CanvasText !important;
+    border-color: CanvasText !important;
+    background: Canvas !important;
+    box-shadow: none !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    text-shadow: none !important;
+    forced-color-adjust: auto;
+  }
+
+  #petAssistantPanel[data-pet-text-bubble] :is(textarea, button),
+  .runtime-settings-panel .runtime-pet-voice-settings :is(select, button) {
+    color: ButtonText !important;
+    border-color: ButtonText !important;
+    background: ButtonFace !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}
+
+/* LIVE PARTICLE PRESENCE
+   Continuous voice mode brightens the actual particle silhouette. It never
+   paints a backing disc, so transparent desktop pets keep their clean edge. */
+#petAssistant #petAssistantCharacter {
+  color: var(--pet-particle-emotion-color, rgb(214 250 255));
+  transition:
+    color 880ms cubic-bezier(.16, 1, .3, 1),
+    filter 220ms cubic-bezier(.22, 1, .36, 1);
+}
+
+/* These are deterministic CSS fallbacks. The particle runtime writes the same
+   semantic color variable inline and therefore remains the source of truth. */
+#petAssistant[data-pet-mood="1"] {
+  --pet-particle-emotion-color: rgb(158 184 255);
+}
+
+#petAssistant[data-pet-mood="2"] {
+  --pet-particle-emotion-color: rgb(186 204 255);
+}
+
+#petAssistant[data-pet-mood="3"] {
+  --pet-particle-emotion-color: rgb(214 250 255);
+}
+
+#petAssistant[data-pet-mood="4"] {
+  --pet-particle-emotion-color: rgb(168 255 230);
+}
+
+#petAssistant[data-pet-mood="5"] {
+  --pet-particle-emotion-color: rgb(255 184 237);
+}
+
+#petAssistant #petAssistantParticleOrb {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: inherit;
+  opacity: .975;
+  filter: brightness(1.04);
+  transform: translateZ(0);
+  transform-origin: 50% 50%;
+  transition:
+    filter 680ms ease-out,
+    opacity 460ms ease-out,
+    transform 680ms ease-out;
+}
+
+#petAssistant[data-live-conversation="active"] #petAssistantParticleOrb {
+  opacity: .96;
+  filter: brightness(1.12);
+  transition:
+    filter 220ms cubic-bezier(.22, 1, .36, 1),
+    opacity 180ms cubic-bezier(.22, 1, .36, 1),
+    transform 220ms cubic-bezier(.22, 1, .36, 1);
+  animation: pet-live-particle-breathe 3.4s cubic-bezier(.45, 0, .55, 1) infinite;
+  will-change: transform, opacity, filter;
+}
+
+#petAssistant[data-live-conversation="active"][data-state="listening"] #petAssistantParticleOrb,
+#petAssistant[data-live-conversation="active"][data-state="transcribing"] #petAssistantParticleOrb {
+  filter: brightness(1.14);
+  animation-duration: 3.1s;
+}
+
+#petAssistant[data-live-conversation="active"][data-state="thinking"] #petAssistantParticleOrb {
+  filter: brightness(1.10);
+  animation-duration: 4.2s;
+}
+
+#petAssistant[data-live-conversation="active"][data-state="speaking"] #petAssistantParticleOrb {
+  filter: brightness(1.16);
+  animation-duration: 2.65s;
+}
+
+@keyframes pet-live-particle-breathe {
+  0%, 100% {
+    opacity: .94;
+    transform: translateZ(0) scale(.996);
+  }
+  50% {
+    opacity: 1;
+    transform: translateZ(0) scale(1.012);
+  }
+}
+
+/* The canvas already reserves generous transparent padding around the 68%
+   particle sphere. Keep the glow inside the existing character/window bounds
+   in compact and detached desktop modes rather than growing the hit target. */
+@media (max-width: 420px) {
+  #petAssistant[data-live-conversation="active"] #petAssistantParticleOrb {
+    filter: brightness(1.12);
+  }
+
+  #petAssistant[data-live-conversation="active"][data-state="speaking"] #petAssistantParticleOrb {
+    filter: brightness(1.15);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #petAssistant #petAssistantCharacter,
+  #petAssistant #petAssistantParticleOrb,
+  #petAssistant[data-live-conversation="active"] #petAssistantParticleOrb {
+    animation: none !important;
+    transition-duration: .001ms !important;
+  }
+
+  #petAssistant[data-live-conversation="active"] #petAssistantParticleOrb {
+    opacity: 1;
+    transform: translateZ(0);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  #petAssistant[data-live-conversation="active"] #petAssistantParticleOrb {
+    opacity: 1;
+    filter:
+      brightness(1.14)
+      contrast(1.10)
+      drop-shadow(0 0 1px currentColor) !important;
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  #petAssistant #petAssistantCharacter,
+  #petAssistant #petAssistantParticleOrb,
+  #petAssistant[data-live-conversation="active"] #petAssistantParticleOrb {
+    color: CanvasText;
+    opacity: 1;
+    filter: none !important;
+    animation: none !important;
+    transition: none !important;
+    forced-color-adjust: auto;
+  }
+}

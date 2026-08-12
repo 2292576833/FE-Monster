@@ -1,5 +1,13 @@
 @echo off
 setlocal
 set ROOT=%~dp0
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%ROOT%scripts\launch-fe-monster.ps1" -Root "%ROOT:~0,-1%" %*
+set MAIN=%ROOT%native\windows\build\winforms\FE Monster.exe
+set JAR=%ROOT%out\fe-monster-java.jar
+if not exist "%MAIN%" goto fallback
+if not exist "%JAR%" goto fallback
+start "" "%MAIN%" %*
+exit /b 0
+
+:fallback
+start "" /b wscript.exe //B "%ROOT%FE Monster.vbs" %*
 endlocal

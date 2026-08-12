@@ -3,6 +3,8 @@
 
   const VERSION = '2026.07.18-rhythm-game-orbit-lock-1';
   const TAU = Math.PI * 2;
+  const GAME_TARGET_FPS = 120;
+  const GAME_FRAME_BUDGET_MS = 1000 / GAME_TARGET_FPS;
   const $ = (selector) => document.querySelector(selector);
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   const lerp = (from, to, progress) => from + (to - from) * progress;
@@ -72,8 +74,13 @@
     lastInputAt: Number.NEGATIVE_INFINITY,
     stats: null,
     frame: 0,
+    frameClock: 0,
+    frameCarry: 0,
     feedbackTimer: 0,
     analysisToken: 0,
+    analysisRequestAbortController: null,
+    wallpaperRequestToken: 0,
+    wallpaperRequestAbortController: null,
     pulses: [],
     mainAudioSnapshot: null,
     mainPausedByGame: false,
@@ -339,8 +346,11 @@
     return game.audioContext;
   }
 
-  async function decodeAndBuild(arrayBuffer, trackName, sourceUrl) {
-    const token = ++game.analysisToken;
+  async function decodeAndBuild(arrayBuffer, trackName, sourceUrl, requestToken = null) {
+    const token = requestToken !== null && Number.isFinite(Number(requestToken))
+      ? Number(requestToken)
+      : ++game.analysisToken;
+    if (!game.active || token !== game.analysisToken) return false;
     setMode('analyzing');
     setAnalysis('正在解析音频波形…');
     els.trackName.textContent = trackName;
@@ -348,10 +358,10 @@
     try {
       const audioContext = await audioContextReady();
       const decoded = await audioContext.decodeAudioData(arrayBuffer.slice(0));
-      if (token !== game.analysisToken) return;
+      if (!game.active || token !== game.analysisToken) return false;
       setAnalysis('正在定位强拍并生成方块轨道…');
       const chart = await analyzeAudioBuffer(decoded, game.difficulty);
-      if (token !== game.analysisToken) return;
+      if (!game.active || token !== game.analysisToken) return false;
       if (!chart.beats.length) throw new Error('没有检测到可用节拍');
       game.audioBuffer = decoded;
       game.chart = chart;
@@ -364,13 +374,15 @@
       setAnalysis('关卡已生成，可以开始', 'ready');
       resetStats();
       setMode('ready');
+      return true;
     } catch (error) {
-      if (token !== game.analysisToken) return;
+      if (!game.active || token !== game.analysisToken) return false;
       game.chart = null;
       game.audioBuffer = null;
       setMode('setup');
       setAnalysis(error?.message || '音乐分析失败，请更换音频文件', 'error');
       els.trackMeta.textContent = '无法读取该音频，请尝试本地 MP3、FLAC 或 WAV';
+      return false;
     }
   }
 
@@ -380,17 +392,71 @@
     game.objectUrl = '';
   }
 
+  function releaseRhythmGameTrackResources() {
+    game.analysisToken += 1;
+    const pendingRequest = game.analysisRequestAbortController;
+    game.analysisRequestAbortController = null;
+    try {
+      pendingRequest?.abort?.();
+    } catch {
+      // A request may already have completed while the close action was queued.
+    }
+    els.audio.pause();
+    try {
+      els.audio.currentTime = 0;
+    } catch {
+      // Some media backends reject seeks while their source is detaching.
+    }
+    els.audio.removeAttribute('src');
+    els.audio.load();
+    releaseObjectUrl();
+    game.audioBuffer = null;
+    game.chart = null;
+    game.sourceUrl = '';
+    game.trackName = '';
+    game.judgements.length = 0;
+    game.pathGrades.length = 0;
+    game.pathStep = 0;
+    game.stats = null;
+    game.resultStatus = '';
+    game.lastInputAt = Number.NEGATIVE_INFINITY;
+    game.pulses.length = 0;
+    const audioContext = game.audioContext;
+    game.audioContext = null;
+    if (audioContext && audioContext.state !== 'closed') {
+      try {
+        const closing = audioContext.close?.();
+        closing?.catch?.(() => {});
+      } catch {
+        // The context may already be closing during application teardown.
+      }
+    }
+  }
+
   async function chooseLocalFile(file) {
     if (!file) return;
     if (!String(file.type || '').startsWith('audio/') && !/\.(mp3|flac|wav|wave|m4a|aac|ogg|oga|opus|webm|mp4|wma|ape|alac|aif|aiff)$/i.test(file.name || '')) {
       setAnalysis('请选择可播放的音频文件', 'error');
       return;
     }
+    const token = ++game.analysisToken;
+    try {
+      game.analysisRequestAbortController?.abort?.();
+    } catch {
+      // The previous provider request may already have settled.
+    }
+    game.analysisRequestAbortController = null;
     els.audio.pause();
     releaseObjectUrl();
-    game.objectUrl = URL.createObjectURL(file);
+    const sourceUrl = URL.createObjectURL(file);
+    game.objectUrl = sourceUrl;
     const name = String(file.name || '本地音乐').replace(/\.[^.]+$/, '');
-    await decodeAndBuild(await file.arrayBuffer(), name, game.objectUrl);
+    const arrayBuffer = await file.arrayBuffer();
+    if (!game.active || token !== game.analysisToken || game.objectUrl !== sourceUrl) {
+      if (game.objectUrl === sourceUrl) releaseObjectUrl();
+      return;
+    }
+    await decodeAndBuild(arrayBuffer, name, sourceUrl, token);
   }
 
   async function useCurrentSong() {
@@ -399,6 +465,17 @@
       setAnalysis('当前没有可用歌曲，请选择本地音乐', 'error');
       return;
     }
+    const token = ++game.analysisToken;
+    try {
+      game.analysisRequestAbortController?.abort?.();
+    } catch {
+      // The previous provider request may already have settled.
+    }
+    const AbortControllerCtor = global.AbortController;
+    const requestController = typeof AbortControllerCtor === 'function'
+      ? new AbortControllerCtor()
+      : null;
+    game.analysisRequestAbortController = requestController;
     els.audio.pause();
     releaseObjectUrl();
     const title = els.dockTitle?.textContent?.trim();
@@ -406,12 +483,22 @@
     try {
       setMode('analyzing');
       setAnalysis('正在读取当前歌曲…');
-      const response = await fetch(source, { credentials: 'include' });
+      const response = await fetch(source, {
+        credentials: 'include',
+        ...(requestController ? { signal: requestController.signal } : {})
+      });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      await decodeAndBuild(await response.arrayBuffer(), name, source);
+      const arrayBuffer = await response.arrayBuffer();
+      if (!game.active || token !== game.analysisToken) return;
+      await decodeAndBuild(arrayBuffer, name, source, token);
     } catch (error) {
+      if (!game.active || token !== game.analysisToken || error?.name === 'AbortError') return;
       setMode('setup');
       setAnalysis('当前歌曲受音源权限限制，请选择本地音乐文件', 'error');
+    } finally {
+      if (game.analysisRequestAbortController === requestController) {
+        game.analysisRequestAbortController = null;
+      }
     }
   }
 
@@ -590,7 +677,7 @@
 
   function resizeCanvas() {
     const rect = els.canvas.getBoundingClientRect();
-    const dpr = Math.min(2, Math.max(1, Number(global.devicePixelRatio) || 1));
+    const dpr = Math.min(1.5, Math.max(1, Number(global.devicePixelRatio) || 1));
     const width = Math.max(1, Math.round(rect.width * dpr));
     const height = Math.max(1, Math.round(rect.height * dpr));
     if (els.canvas.width !== width || els.canvas.height !== height) {
@@ -740,6 +827,14 @@
 
   function renderFrame(frameTime) {
     if (!game.active) return;
+    game.frame = global.requestAnimationFrame(renderFrame);
+    const frameElapsed = game.frameClock
+      ? Math.min(100, Math.max(0, frameTime - game.frameClock))
+      : GAME_FRAME_BUDGET_MS;
+    game.frameClock = frameTime;
+    game.frameCarry = Math.min(GAME_FRAME_BUDGET_MS * 2, game.frameCarry + frameElapsed);
+    if (game.frameCarry + 0.1 < GAME_FRAME_BUDGET_MS) return;
+    game.frameCarry %= GAME_FRAME_BUDGET_MS;
     const time = Number(els.audio.currentTime) || 0;
     if (game.mode === 'playing') {
       markMisses(time);
@@ -758,17 +853,27 @@
       }
     }
     drawGame(time, frameTime);
-    game.frame = global.requestAnimationFrame(renderFrame);
   }
 
   function setBackgroundMedia(wallpaper) {
+    const videoUrl = wallpaper?.kind === 'video' ? String(wallpaper.url || '') : '';
+    if (videoUrl && els.backgroundVideo.dataset.activeSrc === videoUrl) {
+      window.FeWallpaperVideoContinuity?.prepare(els.backgroundVideo);
+      els.backgroundVideo.classList.add('is-active');
+      els.backgroundVideo.play().catch(() => {});
+      return;
+    }
     els.backgroundImage.classList.remove('is-active');
     els.backgroundVideo.classList.remove('is-active');
+    window.FeWallpaperVideoContinuity?.release?.(els.backgroundVideo);
     els.backgroundVideo.pause();
     els.backgroundVideo.removeAttribute('src');
+    delete els.backgroundVideo.dataset.activeSrc;
     els.backgroundImage.removeAttribute('src');
     if (!wallpaper?.url) return;
     if (wallpaper.kind === 'video') {
+      window.FeWallpaperVideoContinuity?.prepare(els.backgroundVideo);
+      els.backgroundVideo.dataset.activeSrc = wallpaper.url;
       els.backgroundVideo.src = wallpaper.url;
       els.backgroundVideo.classList.add('is-active');
       els.backgroundVideo.load();
@@ -779,7 +884,44 @@
     }
   }
 
+  function releaseBackgroundMedia() {
+    game.wallpaperRequestToken += 1;
+    const pendingRequest = game.wallpaperRequestAbortController;
+    game.wallpaperRequestAbortController = null;
+    try {
+      pendingRequest?.abort?.();
+    } catch {
+      // A wallpaper catalog request may already have settled.
+    }
+    els.backgroundVideo.classList.remove('is-active');
+    window.FeWallpaperVideoContinuity?.release?.(els.backgroundVideo);
+    els.backgroundVideo.pause();
+    els.backgroundVideo.removeAttribute('src');
+    delete els.backgroundVideo.dataset.activeSrc;
+    els.backgroundVideo.load();
+    els.backgroundImage.classList.remove('is-active');
+    els.backgroundImage.removeAttribute('src');
+  }
+
+  function releaseCanvasBackingStore() {
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.clearRect(0, 0, els.canvas.width, els.canvas.height);
+    els.canvas.width = 1;
+    els.canvas.height = 1;
+    game.canvasWidth = 1;
+    game.canvasHeight = 1;
+    game.dpr = 1;
+  }
+
   async function syncWallpaperBackground() {
+    const requestToken = ++game.wallpaperRequestToken;
+    try {
+      game.wallpaperRequestAbortController?.abort?.();
+    } catch {
+      // A previous wallpaper catalog request may already have settled.
+    }
+    game.wallpaperRequestAbortController = null;
+    const requestIsActive = () => game.active && requestToken === game.wallpaperRequestToken;
     let prefs = {};
     try { prefs = JSON.parse(global.localStorage.getItem('fe-monster-wallpaper-prefs') || '{}'); } catch (error) {}
     const brightness = clamp((Number(prefs.brightness) || 1) * 0.72, 0.42, 0.92);
@@ -787,17 +929,27 @@
     const currentVideo = els.wallpaperVideo?.getAttribute('src');
     const currentImage = els.wallpaperImage?.getAttribute('src');
     if (currentVideo) {
+      if (!requestIsActive()) return;
       setBackgroundMedia({ kind: 'video', url: currentVideo });
       return;
     }
     if (currentImage) {
+      if (!requestIsActive()) return;
       setBackgroundMedia({ kind: 'image', url: currentImage });
       return;
     }
+    const AbortControllerCtor = global.AbortController;
+    const requestController = typeof AbortControllerCtor === 'function'
+      ? new AbortControllerCtor()
+      : null;
+    game.wallpaperRequestAbortController = requestController;
     try {
-      const response = await fetch('/api/wallpapers?scan=false');
+      const response = await fetch('/api/wallpapers?scan=false', requestController
+        ? { signal: requestController.signal }
+        : undefined);
       if (!response.ok) return;
       const payload = await response.json();
+      if (!requestIsActive()) return;
       const wallpapers = Array.isArray(payload.wallpapers) ? payload.wallpapers : [];
       const source = prefs.source === 'live' ? 'wallpaper-engine' : 'imported';
       const activeIds = prefs.activeWallpaperIds && typeof prefs.activeWallpaperIds === 'object' ? prefs.activeWallpaperIds : {};
@@ -805,7 +957,12 @@
       const candidates = wallpapers.filter((wallpaper) => wallpaper?.source === source);
       setBackgroundMedia(candidates.find((wallpaper) => String(wallpaper.id) === String(activeId)) || candidates[0]);
     } catch (error) {
+      if (!requestIsActive() || error?.name === 'AbortError') return;
       // The game remains usable with its neutral fallback background.
+    } finally {
+      if (game.wallpaperRequestAbortController === requestController) {
+        game.wallpaperRequestAbortController = null;
+      }
     }
   }
 
@@ -823,26 +980,31 @@
     setMode(game.chart ? 'ready' : 'setup');
     syncWallpaperBackground();
     global.cancelAnimationFrame(game.frame);
+    game.frameClock = 0;
+    game.frameCarry = 0;
     game.frame = global.requestAnimationFrame(renderFrame);
     global.setTimeout(() => (game.chart ? els.start : els.choose).focus(), 0);
   }
 
   function closeGame() {
     if (!game.active) return;
-    game.analysisToken += 1;
-    els.audio.pause();
-    els.backgroundVideo.pause();
     global.cancelAnimationFrame(game.frame);
+    game.frame = 0;
+    game.frameClock = 0;
+    game.frameCarry = 0;
     global.clearTimeout(game.feedbackTimer);
     game.active = false;
     game.frame = 0;
-    setMode(game.chart ? 'ready' : 'setup');
+    releaseRhythmGameTrackResources();
+    setMode('setup');
     els.scene.hidden = true;
     els.shell?.classList.remove('has-rhythm-game');
     els.entry.classList.remove('is-active');
     els.entry.setAttribute('aria-pressed', 'false');
     els.countdown.hidden = true;
     els.feedback.classList.remove('is-visible');
+    releaseBackgroundMedia();
+    releaseCanvasBackingStore();
     if (game.wallpaperVideoWasPlaying) els.wallpaperVideo?.play().catch(() => {});
     game.wallpaperVideoWasPlaying = false;
     resumeMainAudioAfterGame();
@@ -912,7 +1074,7 @@
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && game.mode === 'playing') togglePause();
   });
-  global.addEventListener('beforeunload', releaseObjectUrl);
+  global.addEventListener('beforeunload', releaseRhythmGameTrackResources);
   els.audio.addEventListener('ended', endGame);
   setMode('setup');
 
@@ -932,7 +1094,18 @@
       nextBeatTime: game.chart?.beats[game.pathStep]?.time ?? null,
       resultStatus: game.resultStatus,
       score: game.stats?.score || 0,
-      combo: game.stats?.combo || 0
+      combo: game.stats?.combo || 0,
+      hasAudioBuffer: !!game.audioBuffer,
+      decodedPcmBytes: game.audioBuffer
+        ? game.audioBuffer.length * Math.max(1, game.audioBuffer.numberOfChannels || 1) * 4
+        : 0,
+      hasObjectUrl: !!game.objectUrl,
+      hasAudioSource: !!(
+        game.sourceUrl
+        || els.audio.currentSrc
+        || els.audio.getAttribute?.('src')
+      ),
+      audioContextState: game.audioContext?.state || 'released'
     })
   });
 })(window);

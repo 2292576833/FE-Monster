@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$pluginVersion = "2.0.1"
+$pluginVersion = "2.0.7"
 $upstreamVersion = "1.5.1"
 $upstreamCommit = "283f1e97b110726b208a64b486a657c0fc0a6126"
 

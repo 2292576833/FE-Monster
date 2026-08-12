@@ -3,9 +3,12 @@ package com.femonster.music;
 import com.femonster.core.ProjectPaths;
 import com.femonster.json.SimpleJson;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.URI;
@@ -35,6 +38,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -46,17 +51,36 @@ public final class MusicApiConfigService implements AutoCloseable {
     private static final long MAX_ZIP_BYTES = 25L * 1024 * 1024;
     private static final long MAX_EXTRACTED_BYTES = 100L * 1024 * 1024;
     private static final long MAX_ENTRY_BYTES = 16L * 1024 * 1024;
+    private static final long READY_HEALTH_RECHECK_NANOS = TimeUnit.SECONDS.toNanos(5);
+    private static final long MAX_READY_WAIT_NANOS = TimeUnit.SECONDS.toNanos(15);
+    private static final int MAX_MANAGED_LOG_LINE_CHARS = 16 * 1024;
     private static final int MAX_ZIP_ENTRIES = 256;
     private static final Set<String> SUPPORTED_IDS = Set.of("netease", "qq", "kugou", "qishui");
     private static final Set<String> PACKAGE_MANIFESTS = Set.of("music-api-package.json", "fe-music-api.json");
-    private static final String BUNDLED_KUGOU_VERSION = "2.0.1";
+    private static final String BUNDLED_NETEASE_VERSION = "4.32.0";
+    private static final String BUNDLED_NETEASE_FILE = "FE-Monster-Netease-API-Plugin-" + BUNDLED_NETEASE_VERSION + ".zip";
+    private static final String BUNDLED_QQ_VERSION = "2.4.1";
+    private static final String BUNDLED_QQ_FILE = "FE-Monster-QQ-API-Plugin-" + BUNDLED_QQ_VERSION + ".zip";
+    private static final String BUNDLED_KUGOU_VERSION = "2.0.7";
     private static final String BUNDLED_KUGOU_FILE = "FE-Monster-Kugou-API-Plugin-" + BUNDLED_KUGOU_VERSION + ".zip";
-    private static final String BUNDLED_QISHUI_VERSION = "3.1.0";
+    private static final String BUNDLED_QISHUI_VERSION = "3.1.1";
     private static final String BUNDLED_QISHUI_FILE = "FE-Monster-Qishui-OpenAPI-Plugin-" + BUNDLED_QISHUI_VERSION + ".zip";
     private static final Set<String> WINDOWS_RESERVED = Set.of(
         "con", "prn", "aux", "nul", "clock$",
         "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
         "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"
+    );
+    private static final String SENSITIVE_LOG_NAME = "(?:authorization|proxy-authorization|cookie|set-cookie|"
+        + "x-api-key|api[-_]?key|access[-_]?token|refresh[-_]?token|id[-_]?token|"
+        + "client[-_]?secret|secret|token)";
+    private static final Pattern SENSITIVE_LOG_QUERY = Pattern.compile(
+        "([?&]" + SENSITIVE_LOG_NAME + "=)[^&#\\s]*",
+        Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern SENSITIVE_LOG_LABEL = Pattern.compile(
+        "((?:[\\\"']?" + SENSITIVE_LOG_NAME + "[\\\"']?)\\s*[:=]\\s*)"
+            + "([\\\"']?)(?:Bearer\\s+)?(\\[REDACTED\\]|[^\\s,;}&\\]\\\"']+)\\2",
+        Pattern.CASE_INSENSITIVE
     );
 
     private final ProjectPaths paths;
@@ -65,15 +89,20 @@ public final class MusicApiConfigService implements AutoCloseable {
     private final Path packagesDir;
     private final Path stagingDir;
     private final Path logsDir;
-    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(1)).build();
-    private final ExecutorService starter = Executors.newSingleThreadExecutor(runnable -> {
+    private final ExecutorService starter = Executors.newFixedThreadPool(SUPPORTED_IDS.size(), runnable -> {
         Thread thread = new Thread(runnable, "fe-music-api-starter");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private final ExecutorService logPumps = Executors.newFixedThreadPool(SUPPORTED_IDS.size(), runnable -> {
+        Thread thread = new Thread(runnable, "fe-music-api-log");
         thread.setDaemon(true);
         return thread;
     });
     private final Map<String, Process> processes = new ConcurrentHashMap<>();
     private final Map<String, ProviderConfig> starting = new ConcurrentHashMap<>();
     private final Map<String, String> statuses = new ConcurrentHashMap<>();
+    private final Map<String, Long> healthRecheckAfter = new ConcurrentHashMap<>();
     private volatile Map<String, ProviderConfig> providers = Map.of();
     private volatile boolean closed;
 
@@ -89,6 +118,8 @@ public final class MusicApiConfigService implements AutoCloseable {
         Files.createDirectories(logsDir);
         load();
         cleanupRemovedProviderArtifacts();
+        migrateBundledNeteasePackage();
+        migrateBundledQqPackage();
         migrateBundledKugouPackage();
         migrateBundledQishuiPackage();
     }
@@ -112,12 +143,19 @@ public final class MusicApiConfigService implements AutoCloseable {
         Map<String, Object> root = parseConfigObject(json);
         List<Map<String, Object>> items = providerMaps(root);
         if (items.isEmpty()) throw new IllegalArgumentException("music API config has no providers");
+        if (items.size() > SUPPORTED_IDS.size()) {
+            throw new IllegalArgumentException("music API config cannot contain more than four providers");
+        }
 
         Map<String, ProviderConfig> previous = providers;
         Map<String, ProviderConfig> next = new LinkedHashMap<>(previous);
         List<ProviderConfig> imported = new ArrayList<>();
+        Set<String> importedIds = new LinkedHashSet<>();
         for (Map<String, Object> item : items) {
-            String id = normalizeSupportedId(SimpleJson.asString(item.get("id"), ""));
+            String id = requiredImportedProviderId(item, false);
+            if (!importedIds.add(id)) {
+                throw new IllegalArgumentException("music API config contains duplicate provider: " + id);
+            }
             ProviderConfig fallback = next.get(id);
             ProviderConfig parsed = parseProvider(item, fallback, "imported-json", "", "", null, true, false);
             next.put(id, parsed);
@@ -149,7 +187,7 @@ public final class MusicApiConfigService implements AutoCloseable {
             String schema = SimpleJson.asString(root.get("schema"), PACKAGE_SCHEMA);
             if (!PACKAGE_SCHEMA.equals(schema)) throw new IllegalArgumentException("unsupported music API package schema");
 
-            String id = normalizeSupportedId(SimpleJson.asString(root.get("id"), SimpleJson.asString(root.get("provider"), "")));
+            String id = requiredImportedProviderId(root, true);
             String manifestVersion = validateManifestVersion(SimpleJson.asString(root.get("version"), ""));
             if ("qishui".equals(id) && !isQishuiOpenApiPackageVersion(manifestVersion)) {
                 throw new IllegalArgumentException("legacy Qishui packages are unsupported; use the official OpenAPI plugin version 3 or newer");
@@ -240,6 +278,17 @@ public final class MusicApiConfigService implements AutoCloseable {
             statuses.put(config.id(), "autostart-disabled");
             return;
         }
+        Process managed = processes.get(config.id());
+        if (managed != null && !managed.isAlive()) {
+            processes.remove(config.id(), managed);
+            healthRecheckAfter.remove(config.id());
+            statuses.put(config.id(), "stopped");
+        }
+        long now = System.nanoTime();
+        if ("ready".equals(statuses.get(config.id()))
+            && now < healthRecheckAfter.getOrDefault(config.id(), 0L)) {
+            return;
+        }
         ProviderConfig previous = starting.put(config.id(), config);
         if (config.equals(previous)) return;
         statuses.put(config.id(), "checking");
@@ -249,6 +298,30 @@ public final class MusicApiConfigService implements AutoCloseable {
             starting.remove(config.id(), config);
             statuses.put(config.id(), "stopped");
         }
+    }
+
+    public boolean awaitReady(String provider, Duration timeout) {
+        String id = normalizeId(provider);
+        ensureStarted(id);
+        long requested = timeout == null ? 0L : Math.max(0L, timeout.toNanos());
+        long waitNanos = Math.min(requested, MAX_READY_WAIT_NANOS);
+        long deadline = System.nanoTime() + waitNanos;
+        while (!closed) {
+            String status = statuses.getOrDefault(id, "checking");
+            if ("ready".equals(status)) return true;
+            boolean pending = starting.containsKey(id)
+                || "checking".equals(status)
+                || "starting".equals(status)
+                || "replacing-stale-package".equals(status);
+            if (!pending || System.nanoTime() >= deadline) return false;
+            try {
+                Thread.sleep(40L);
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        return false;
     }
 
     public Map<String, Object> refreshStatus(String provider) {
@@ -263,7 +336,15 @@ public final class MusicApiConfigService implements AutoCloseable {
             return body;
         }
         boolean reachable = isReachable(config);
-        statuses.put(config.id(), reachable ? "ready" : statuses.getOrDefault(config.id(), "unavailable"));
+        if (reachable) {
+            markReady(config.id());
+        } else {
+            healthRecheckAfter.remove(config.id());
+            String current = statuses.getOrDefault(config.id(), "unavailable");
+            if ("ready".equals(current)) {
+                statuses.put(config.id(), "unavailable");
+            }
+        }
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("ok", true);
         body.put("provider", config.id());
@@ -273,7 +354,9 @@ public final class MusicApiConfigService implements AutoCloseable {
     }
 
     public void stop(String provider) {
-        Process process = processes.remove(normalizeId(provider));
+        String id = normalizeId(provider);
+        healthRecheckAfter.remove(id);
+        Process process = processes.remove(id);
         if (process == null) return;
         destroyProcessTree(process);
     }
@@ -289,6 +372,12 @@ public final class MusicApiConfigService implements AutoCloseable {
             Thread.currentThread().interrupt();
         }
         for (String id : List.copyOf(processes.keySet())) stop(id);
+        logPumps.shutdownNow();
+        try {
+            logPumps.awaitTermination(2, TimeUnit.SECONDS);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private void load() throws IOException {
@@ -364,7 +453,7 @@ public final class MusicApiConfigService implements AutoCloseable {
         try {
             if (closed || !isCurrent(config)) return;
             if (isReachable(config)) {
-                if (isCurrent(config)) statuses.put(config.id(), "ready");
+                if (isCurrent(config)) markReady(config.id());
                 return;
             }
             if (!isCurrent(config)) return;
@@ -383,9 +472,9 @@ public final class MusicApiConfigService implements AutoCloseable {
             statuses.put(config.id(), "starting");
             ProcessBuilder builder = processBuilder(config);
             Path logFile = logsDir.resolve(config.id() + ".log");
-            builder.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
-            builder.redirectError(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
+            builder.redirectErrorStream(true);
             process = builder.start();
+            startManagedLogPump(process, logFile);
             if (closed || !isCurrent(config)) {
                 destroyProcessTree(process);
                 if (closed) statuses.put(config.id(), "stopped");
@@ -395,13 +484,13 @@ public final class MusicApiConfigService implements AutoCloseable {
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(12);
             while (System.nanoTime() < deadline && process.isAlive()) {
                 if (isReachable(config)) {
-                    statuses.put(config.id(), "ready");
+                    markReady(config.id());
                     return;
                 }
                 Thread.sleep(300);
             }
             if (isReachable(config)) {
-                statuses.put(config.id(), "ready");
+                markReady(config.id());
             } else {
                 statuses.put(config.id(), process.isAlive() ? "startup-timeout" : "startup-failed");
                 if (process.isAlive()) destroyProcessTree(process);
@@ -423,6 +512,67 @@ public final class MusicApiConfigService implements AutoCloseable {
             }
             starting.remove(config.id(), config);
         }
+    }
+
+    private void startManagedLogPump(Process process, Path logFile) {
+        try {
+            logPumps.submit(() -> pumpManagedLog(process, logFile));
+        } catch (RejectedExecutionException ignored) {
+        }
+    }
+
+    private static void pumpManagedLog(Process process, Path logFile) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+            process.getInputStream(),
+            StandardCharsets.UTF_8
+        ))) {
+            BufferedWriter writer = null;
+            try {
+                writer = Files.newBufferedWriter(
+                    logFile,
+                    StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.APPEND
+                );
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    String safe = sanitizeManagedLogLine(line);
+                    if (safe.length() > MAX_MANAGED_LOG_LINE_CHARS) {
+                        safe = safe.substring(0, MAX_MANAGED_LOG_LINE_CHARS) + " [TRUNCATED]";
+                    }
+                    writer.write(safe);
+                    writer.newLine();
+                    writer.flush();
+                }
+            } finally {
+                if (writer != null) writer.close();
+            }
+        } catch (IOException ignored) {
+            try {
+                process.getInputStream().transferTo(java.io.OutputStream.nullOutputStream());
+            } catch (IOException ignoredAgain) {
+            }
+        }
+    }
+
+    static String sanitizeManagedLogLine(String value) {
+        String safe = SENSITIVE_LOG_QUERY.matcher(value == null ? "" : value).replaceAll("$1[REDACTED]");
+        Matcher matcher = SENSITIVE_LOG_LABEL.matcher(safe);
+        StringBuffer output = new StringBuffer(safe.length());
+        while (matcher.find()) {
+            String quote = matcher.group(2);
+            matcher.appendReplacement(
+                output,
+                Matcher.quoteReplacement(matcher.group(1) + quote + "[REDACTED]" + quote)
+            );
+        }
+        matcher.appendTail(output);
+        return output.toString();
+    }
+
+    private void markReady(String provider) {
+        statuses.put(provider, "ready");
+        healthRecheckAfter.put(provider, System.nanoTime() + READY_HEALTH_RECHECK_NANOS);
     }
 
     private boolean isCurrent(ProviderConfig config) {
@@ -640,7 +790,10 @@ public final class MusicApiConfigService implements AutoCloseable {
                 .timeout(Duration.ofSeconds(2))
                 .GET()
                 .build();
-            HttpResponse<InputStream> response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            HttpResponse<InputStream> response = HttpClientHolder.INSTANCE.send(
+                request,
+                HttpResponse.BodyHandlers.ofInputStream()
+            );
             try (InputStream body = response.body()) {
                 if (response.statusCode() < 200 || response.statusCode() >= 300) return false;
                 if (config.manifestVersion().isBlank()) return true;
@@ -655,6 +808,20 @@ public final class MusicApiConfigService implements AutoCloseable {
             if (error instanceof InterruptedException) Thread.currentThread().interrupt();
             return false;
         }
+    }
+
+    private static final class HttpClientHolder {
+        private static final HttpClient INSTANCE = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(1))
+            .build();
+    }
+
+    private void migrateBundledNeteasePackage() {
+        migrateBundledPackage("netease", BUNDLED_NETEASE_VERSION, BUNDLED_NETEASE_FILE);
+    }
+
+    private void migrateBundledQqPackage() {
+        migrateBundledPackage("qq", BUNDLED_QQ_VERSION, BUNDLED_QQ_FILE);
     }
 
     private void migrateBundledKugouPackage() {
@@ -684,6 +851,21 @@ public final class MusicApiConfigService implements AutoCloseable {
             statuses.put("qishui", "bundled-upgrade-port-conflict");
         } catch (IOException | RuntimeException error) {
             statuses.put("qishui", "bundled-upgrade-failed");
+        }
+    }
+
+    private void migrateBundledPackage(String providerId, String version, String fileName) {
+        ProviderConfig current = providers.get(providerId);
+        if (!eligibleForBundledMigration(current, version)) return;
+        Path packageZip = bundledPackage(fileName);
+        if (packageZip == null) return;
+
+        try (InputStream input = Files.newInputStream(packageZip)) {
+            importTrustedZip(input, true, providerId);
+        } catch (BundledMigrationDeferredException error) {
+            statuses.put(providerId, "bundled-upgrade-port-conflict");
+        } catch (IOException | RuntimeException error) {
+            statuses.put(providerId, "bundled-upgrade-failed");
         }
     }
 
@@ -723,7 +905,9 @@ public final class MusicApiConfigService implements AutoCloseable {
     }
 
     private boolean eligibleForBundledMigration(ProviderConfig current, String bundledVersionValue) {
-        if (current == null || !"imported-zip".equals(current.source()) || current.packageDirectory().isBlank()) {
+        if (current == null) return true;
+        if ("plugin-slot".equals(current.source())) return !current.configured();
+        if (!"imported-zip".equals(current.source()) || current.packageDirectory().isBlank()) {
             return false;
         }
         String installed = current.manifestVersion();
@@ -780,6 +964,8 @@ public final class MusicApiConfigService implements AutoCloseable {
 
     private static String bundledPackageVersion(String providerId) {
         return switch (providerId) {
+            case "netease" -> BUNDLED_NETEASE_VERSION;
+            case "qq" -> BUNDLED_QQ_VERSION;
             case "kugou" -> BUNDLED_KUGOU_VERSION;
             case "qishui" -> BUNDLED_QISHUI_VERSION;
             default -> throw new IllegalArgumentException("unsupported bundled music API provider");
@@ -788,9 +974,14 @@ public final class MusicApiConfigService implements AutoCloseable {
 
     private boolean stopManagedProviderForMigration(ProviderConfig previous) {
         if (previous == null) return true;
+        if (!"imported-zip".equals(previous.source()) || previous.packageDirectory().isBlank()) {
+            // An unconfigured plugin slot owns no process. A listener on its
+            // default port may belong to another installation and must not
+            // prevent this clean installation from importing its bundled zip.
+            return true;
+        }
         stop(previous.id());
         if (!isPortListening(previous)) return true;
-        if (!"imported-zip".equals(previous.source()) || previous.packageDirectory().isBlank()) return false;
         Path previousRoot;
         try {
             previousRoot = packageRoot(previous);
@@ -1195,6 +1386,20 @@ public final class MusicApiConfigService implements AutoCloseable {
         String id = normalizeId(value);
         if (!SUPPORTED_IDS.contains(id)) throw new IllegalArgumentException("unsupported music provider: " + id);
         return id;
+    }
+
+    private static String requiredImportedProviderId(Map<String, Object> map, boolean allowProviderAlias) {
+        if (map.containsKey("id")) {
+            String id = SimpleJson.asString(map.get("id"), "").trim();
+            if (id.isBlank()) throw new IllegalArgumentException("music API provider id is required");
+            return normalizeSupportedId(id);
+        }
+        if (allowProviderAlias && map.containsKey("provider")) {
+            String provider = SimpleJson.asString(map.get("provider"), "").trim();
+            if (provider.isBlank()) throw new IllegalArgumentException("music API provider id is required");
+            return normalizeSupportedId(provider);
+        }
+        throw new IllegalArgumentException("music API provider id is required");
     }
 
     private static String boundedText(Object value, String fallback, int maximum) {

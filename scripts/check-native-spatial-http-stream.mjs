@@ -129,12 +129,13 @@ try {
     `${baseUrl}/api/audio/spatial/start?sampleRate=48000&inputChannels=2&layoutChannels=8&algorithm=2`
   );
   const session = Number(start.session);
-  if (!start.ok || !session || start.rustUpmixActive !== true) {
+  const generation = Number(start.generation);
+  if (!start.ok || !session || !generation || start.rustUpmixActive !== true) {
     throw new Error(`Native start failed: ${JSON.stringify(start)}`);
   }
 
   const streamPromise = fetch(
-    `${baseUrl}/api/audio/spatial/stream?session=${session}&inputChannels=2`,
+    `${baseUrl}/api/audio/spatial/stream?session=${session}&generation=${generation}&inputChannels=2`,
     {
       method: 'POST',
       headers: {
@@ -150,11 +151,12 @@ try {
     (status) =>
       status.active === true
       && Number(status.session) === session
+      && Number(status.generation) === generation
       && Number(status.rustUpmixProcessCalls) >= 4
       && Number(status.obrProcessCalls) >= 4
   );
   const activated = await post(
-    `${baseUrl}/api/audio/spatial/activate?session=${session}`
+    `${baseUrl}/api/audio/spatial/activate?session=${session}&generation=${generation}`
   );
   if (!activated.ok) throw new Error(`Native activate failed: ${JSON.stringify(activated)}`);
 
@@ -177,6 +179,7 @@ try {
   const report = {
     pass,
     session,
+    generation,
     preroll: {
       rustCalls: preroll.rustUpmixProcessCalls,
       obrCalls: preroll.obrProcessCalls,

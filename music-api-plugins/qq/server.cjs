@@ -97,7 +97,7 @@ app.use(async (context, next) => {
     context.body = {
       ok: true,
       provider: "qq",
-      version: "2.4.0"
+      version: "2.4.1"
     };
     return;
   }
@@ -106,7 +106,7 @@ app.use(async (context, next) => {
 
 const port = numericPort();
 const server = app.listen(port, "127.0.0.1", () => {
-  process.stdout.write(`QQ Music API plugin 2.4.0 listening on http://127.0.0.1:${port}\n`);
+  process.stdout.write(`QQ Music API plugin 2.4.1 listening on http://127.0.0.1:${port}\n`);
 });
 server.on("error", (error) => {
   process.stderr.write(`QQ Music API plugin failed: ${error.message}\n`);

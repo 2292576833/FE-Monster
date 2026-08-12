@@ -2,6 +2,8 @@ $Script:PreferredJavaMajor = 17
 $Script:MinimumJavaMajor = 17
 $Script:TemurinJavaRuntimeUrl = "https://api.adoptium.net/v3/binary/latest/$Script:PreferredJavaMajor/ga/windows/x64/jre/hotspot/normal/eclipse"
 
+. (Join-Path $PSScriptRoot 'windows-no-console-process.ps1')
+
 function Update-JavaRuntimeEnvironment {
   $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
   $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
@@ -149,8 +151,16 @@ function Get-JavaMajorVersion {
     if (Test-Path $java) { $probe = $java }
   }
 
-  $command = '"' + $probe + '" -version 2>&1'
-  $text = (& cmd.exe /d /c $command) | Out-String
+  try {
+    $result = Invoke-NoConsoleProcess `
+      -FilePath $probe `
+      -ArgumentList @('-version') `
+      -Wait `
+      -CaptureOutput
+    $text = $result.StandardOutput + [Environment]::NewLine + $result.StandardError
+  } catch {
+    return 0
+  }
   $match = [regex]::Match($text, '"(?<first>\d+)(?:\.(?<second>\d+))?')
   if (!$match.Success) { return 0 }
   $first = [int]$match.Groups['first'].Value

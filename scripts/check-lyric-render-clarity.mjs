@@ -92,10 +92,62 @@ check(
   'The lyric scene does not request geometric precision text rendering.'
 );
 
+const multiRowCurrentShadows = ruleBodies('.multi-row-lyric-line.is-current')
+  .flatMap((body) => Array.from(body.matchAll(/text-shadow\s*:\s*([^;}]+)/g), (match) => match[1].trim()));
+
 check(
-  'semantic blur for unplayed multi-row lyrics is preserved',
-  anyRule('.multi-row-lyric-line.is-future', (body) => /filter\s*:\s*blur\(/.test(body)),
-  'Do not remove the intentional future/unplayed lyric blur while fixing raster blur.'
+  'multi-row current lyrics remain sharp while future blur stays capped',
+  ruleBodies('.multi-row-lyric-line.is-current').every((body) => !/filter\s*:\s*[^;}]*(?:blur|drop-shadow)\(/.test(body))
+    && ruleBodies('.multi-row-lyric-line.is-future').some((body) => (
+      /var\(--text-unplayed-blur-effective(?:,|\))/.test(body)
+      && /blur\(/.test(body)
+    ))
+    && multiRowCurrentShadows.every((value) => value === 'none'),
+  'The current line must stay sharp and the text-preset future blur must use the capped effective value.'
+);
+
+check(
+  'multi-row rows own fitted non-wrapping glyph geometry',
+  /function\s+multiRowLyricFontSize\s*\(/.test(app)
+    && /--multi-row-fit-font-size/.test(app)
+    && anyRule('.multi-row-lyric-main', (body) => (
+      /white-space\s*:\s*nowrap/.test(body)
+      && /font-size\s*:\s*var\(--multi-row-fit-font-size/.test(body)
+    )),
+  'Every row needs a width/slot-aware font size and nowrap geometry so wrapped glyphs cannot collide with adjacent rows.'
+);
+
+check(
+  'multi-row rows have a crisp contour without a horizontal separator',
+  anyRule('.multi-row-lyric-line', (body) => (
+    /-webkit-text-stroke\s*:/.test(body)
+  )) && anyRule('.multi-row-lyric-line::after', (body) => (
+    /content\s*:\s*none\s*!important/.test(body)
+    && /display\s*:\s*none\s*!important/.test(body)
+  )),
+  'Rows need a hard glyph contour, but the obsolete divider line must stay disabled.'
+);
+
+const focusEchoStart = css.indexOf('.playback-lyric-scene.is-focus-echo-text');
+const focusEchoEnd = css.indexOf('.playback-lyric-scene.is-rain-glass-text', focusEchoStart);
+const focusEchoRules = focusEchoStart >= 0 && focusEchoEnd > focusEchoStart
+  ? css.slice(focusEchoStart, focusEchoEnd)
+  : '';
+const focusEchoKeyframeStart = css.indexOf('@keyframes focusEchoConverge');
+const focusEchoKeyframeEnd = css.indexOf('.playback-lyric-scene.is-word-glow-text', focusEchoKeyframeStart);
+const focusEchoKeyframes = focusEchoKeyframeStart >= 0 && focusEchoKeyframeEnd > focusEchoKeyframeStart
+  ? css.slice(focusEchoKeyframeStart, focusEchoKeyframeEnd)
+  : '';
+
+check(
+  'focus echo keeps the settled main phrase sharp while only the background echoes stay soft',
+  !!focusEchoRules
+    && !!focusEchoKeyframes
+    && /is-focus-echo-text\s+\.lyric-depth-0\s*\{[\s\S]{0,680}filter\s*:\s*none[\s\S]{0,680}scale\(1\)/.test(focusEchoRules)
+    && /playback-lyric-layer\.is-text-composer-layer-visible\s*\{[\s\S]{0,520}blur\(var\(--focus-echo-blur\)\)/.test(focusEchoRules)
+    && /0%\s*\{[\s\S]{0,260}blur\(15px\)[\s\S]{0,260}scale\(1\.62\)/.test(focusEchoKeyframes)
+    && /100%\s*\{[\s\S]{0,300}blur\(0(?:px)?\)[\s\S]{0,300}scale\(1\)/.test(focusEchoKeyframes),
+  'The stable main layer must be clear at 1x; blur/scale belong only to the entry and the dark background echoes.'
 );
 
 const failures = checks.filter((item) => !item.ok);

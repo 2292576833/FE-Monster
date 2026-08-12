@@ -214,6 +214,8 @@ try {
     };
     updatePlaybackPageClass();
     renderCurrent(song);
+    state.textPreset = 'none';
+    syncPlaybackLyricVisibility();
     state.lyricSignature = lyricSignatureForSong(song);
     state.lyricLines = lines;
     state.lyricIndex = 0;
@@ -221,8 +223,54 @@ try {
 
     const card = document.getElementById('qishuiPlaybackCard');
     const page = document.getElementById('qishuiPlaybackLyricPage');
-    if (!card || !page || card.hidden) throw new Error('Playback card did not become visible');
+    const phone = document.getElementById('qishuiPlaybackPhone');
+    if (!card || !page || !phone || card.hidden) throw new Error('Playback card did not become visible');
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const compactLayoutWidth = card.offsetWidth;
+    setQishuiPlaybackExpanded(true);
+    const expandedLayoutWidth = card.offsetWidth;
+    const expansionAnimations = phone.getAnimations({ subtree: true })
+      .filter((animation) => animation.id?.startsWith('fe-qishui-playback-expand-'));
+    const expansionKeyframeProperties = [...new Set(expansionAnimations.flatMap((animation) => (
+      animation.effect.getKeyframes().flatMap((frame) => Object.keys(frame))
+    )))].filter((property) => ![
+      'offset', 'computedOffset', 'easing', 'composite'
+    ].includes(property));
+    const expansionTransitionProperties = getComputedStyle(card).transitionProperty
+      .split(',')
+      .map((property) => property.trim());
+    await new Promise((resolve) => setTimeout(resolve, PLAYBACK_CARD_EXPANSION_TRANSITION_MS + 60));
+    const expandedSettledTransform = getComputedStyle(phone).transform;
+    setQishuiPlaybackExpanded(false);
+    await new Promise((resolve) => setTimeout(resolve, PLAYBACK_CARD_EXPANSION_TRANSITION_MS + 60));
+    const collapsedSettledTransform = getComputedStyle(phone).transform;
+    const expansionMotion = {
+      compactLayoutWidth,
+      expandedLayoutWidth,
+      activeAnimationCount: expansionAnimations.length,
+      keyframeProperties: expansionKeyframeProperties,
+      transitionProperties: expansionTransitionProperties,
+      expandedSettledTransform,
+      collapsedSettledTransform
+    };
+    // Exclude cold Chromium/JIT/layout startup variance from the steady-state
+    // frame budget. The maximum-frame assertion still protects hard stalls.
+    const warmupCount = 30;
+    for (let warmupFrame = 0; warmupFrame < warmupCount; warmupFrame += 1) {
+      await new Promise((resolve) => requestAnimationFrame(() => {
+        const position = warmupFrame / Math.max(1, warmupCount - 1) * Math.min(duration - 0.001, 2.4);
+        state.playerClock.position = position;
+        state.playerClock.duration = duration;
+        state.playerClock.updatedAt = performance.now();
+        state.playerClock.playing = true;
+        renderManualProgress(position, duration);
+        card.getBoundingClientRect();
+        page.getBoundingClientRect();
+        resolve();
+      }));
+    }
+    state.textPreset = 'none';
+    syncPlaybackLyricVisibility();
 
     const glyphSelector = [
       '.book-lyric-glyph',
@@ -231,6 +279,11 @@ try {
     const glyphDomCount = page.querySelectorAll(glyphSelector).length;
     const lyricLineDomCount = page.querySelectorAll('.qishui-playback-lyric-line').length;
     const durations = [];
+    const renderDurations = [];
+    const layoutDurations = [];
+    const structuralDurations = [];
+    const steadyDurations = [];
+    const slowFrames = [];
 
     for (let frame = 0; frame < sampleCount; frame += 1) {
       await new Promise((resolve, reject) => {
@@ -245,11 +298,30 @@ try {
           state.playerClock.duration = duration;
           state.playerClock.updatedAt = performance.now();
           state.playerClock.playing = true;
+          const previousLyricIndex = state.qishuiPlaybackCard.lyricBookIndex;
+          const previousMainTime = els.currentTime.textContent;
+          const previousCardTime = els.qishuiPlaybackCurrentTime.textContent;
           const startedAt = performance.now();
           renderManualProgress(position, duration);
+          const renderedAt = performance.now();
           card.getBoundingClientRect();
           page.getBoundingClientRect();
-          durations.push(performance.now() - startedAt);
+          const laidOutAt = performance.now();
+          const elapsed = laidOutAt - startedAt;
+          durations.push(elapsed);
+          renderDurations.push(renderedAt - startedAt);
+          layoutDurations.push(laidOutAt - renderedAt);
+          const currentLyricIndex = state.qishuiPlaybackCard.lyricBookIndex;
+          (currentLyricIndex !== previousLyricIndex ? structuralDurations : steadyDurations).push(elapsed);
+          if (elapsed > 8) {
+            slowFrames.push({
+              frame,
+              position: Number(position.toFixed(3)),
+              duration: Number(elapsed.toFixed(3)),
+              mainTimeChanged: els.currentTime.textContent !== previousMainTime,
+              cardTimeChanged: els.qishuiPlaybackCurrentTime.textContent !== previousCardTime
+            });
+          }
           resolve();
         });
       });
@@ -262,6 +334,20 @@ try {
     ] || 0;
     const average = durations.reduce((sum, value) => sum + value, 0)
       / Math.max(1, durations.length);
+    const timingStats = (samples) => {
+      const ordered = [...samples].sort((left, right) => left - right);
+      const at = (ratio) => ordered[
+        Math.min(ordered.length - 1, Math.max(0, Math.ceil(ordered.length * ratio) - 1))
+      ] || 0;
+      return {
+        samples: ordered.length,
+        average: Number((
+          ordered.reduce((sum, value) => sum + value, 0) / Math.max(1, ordered.length)
+        ).toFixed(3)),
+        p95: Number(at(0.95).toFixed(3)),
+        max: Number((ordered[ordered.length - 1] || 0).toFixed(3))
+      };
+    };
     const stats = {
       samples: durations.length,
       average: Number(average.toFixed(3)),
@@ -273,6 +359,14 @@ try {
     const checks = {
       renderedAllLyrics: lyricLineDomCount === lyricCount,
       glyphDomBounded: glyphDomCount <= thresholds.maxGlyphDomCount,
+      expansionUsesFinalLayoutImmediately: expandedLayoutWidth > compactLayoutWidth,
+      expansionUsesCompositorAnimation: expansionAnimations.length >= 2,
+      expansionOnlyAnimatesTransformAndOpacity: expansionKeyframeProperties.every((property) => (
+        property === 'transform' || property === 'opacity'
+      )),
+      expansionAvoidsLayoutTransition: !expansionTransitionProperties.includes('width'),
+      expansionReleasesTextCompositor: expandedSettledTransform === 'none'
+        && collapsedSettledTransform === 'none',
       averageWithinBudget: stats.average <= thresholds.maxAverageMs,
       p95WithinBudget: stats.p95 <= thresholds.maxP95Ms,
       p99WithinBudget: stats.p99 <= thresholds.maxP99Ms,
@@ -284,7 +378,18 @@ try {
       lyricCount,
       lyricLineDomCount,
       glyphDomCount,
+      warmupCount,
+      expansionMotion,
       frameUpdateMs: stats,
+      frameClasses: {
+        structural: timingStats(structuralDurations),
+        steady: timingStats(steadyDurations),
+        renderWrites: timingStats(renderDurations),
+        forcedLayout: timingStats(layoutDurations),
+        slowFrames,
+        textPreset: state.textPreset,
+        threeDimensionalLyricsVisible: !document.getElementById('playbackLyricScene')?.hidden
+      },
       thresholds,
       checks
     };

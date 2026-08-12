@@ -673,6 +673,128 @@ try {
   assert(nestedImport.status === 400, "Deeply nested JSON import was not rejected", nestedImport.payload);
   passed("strict bounded JSON parsing", { malformed: malformedImport.status, nested: nestedImport.status });
 
+  const rejectedIdentityCases = [
+    {
+      label: "single JSON missing id",
+      name: "single-missing-id.json",
+      body: Buffer.from(JSON.stringify({ label: "Missing identity", baseUrl: kugouBaseUrl }), "utf8"),
+      contentType: "application/json",
+    },
+    {
+      label: "single JSON empty id",
+      name: "single-empty-id.json",
+      body: Buffer.from(JSON.stringify({ id: "   ", label: "Empty identity", baseUrl: kugouBaseUrl }), "utf8"),
+      contentType: "application/json",
+    },
+    {
+      label: "single JSON empty provider alias",
+      name: "single-empty-provider.json",
+      body: Buffer.from(JSON.stringify({ provider: "   ", label: "Empty provider", baseUrl: kugouBaseUrl }), "utf8"),
+      contentType: "application/json",
+    },
+    {
+      label: "provider array item missing id",
+      name: "array-missing-id.feapi",
+      body: Buffer.from(JSON.stringify({ providers: [{ label: "Missing identity", baseUrl: kugouBaseUrl }] }), "utf8"),
+      contentType: "application/json",
+    },
+    {
+      label: "provider array item empty id",
+      name: "array-empty-id.feapi",
+      body: Buffer.from(JSON.stringify({ providers: [{ id: "", label: "Empty identity", baseUrl: kugouBaseUrl }] }), "utf8"),
+      contentType: "application/json",
+    },
+    {
+      label: "provider array item empty provider alias",
+      name: "array-empty-provider.feapi",
+      body: Buffer.from(JSON.stringify({ providers: [{ provider: "", label: "Empty provider", baseUrl: kugouBaseUrl }] }), "utf8"),
+      contentType: "application/json",
+    },
+    {
+      label: "ZIP manifest missing id and provider",
+      name: "zip-missing-identity.zip",
+      trusted: true,
+      body: packageZip({
+        ...packageManifest("netease", "Missing identity", kugouBaseUrl),
+        id: undefined,
+      }),
+      contentType: "application/zip",
+    },
+    {
+      label: "ZIP manifest empty id",
+      name: "zip-empty-id.zip",
+      trusted: true,
+      body: packageZip({
+        ...packageManifest("netease", "Empty identity", kugouBaseUrl),
+        id: "   ",
+      }),
+      contentType: "application/zip",
+    },
+    {
+      label: "ZIP manifest empty provider alias",
+      name: "zip-empty-provider.zip",
+      trusted: true,
+      body: packageZip({
+        ...packageManifest("netease", "Empty provider", kugouBaseUrl),
+        id: undefined,
+        provider: "   ",
+      }),
+      contentType: "application/zip",
+    },
+  ];
+  const rejectedAtomicCases = [
+    ...rejectedIdentityCases,
+    {
+      label: "duplicate JSON provider id",
+      name: "duplicate-provider.json",
+      body: Buffer.from(JSON.stringify({
+        providers: [
+          { id: "qq", label: "QQ first", baseUrl: kugouBaseUrl },
+          { id: "qq", label: "QQ duplicate", baseUrl: `http://127.0.0.1:${kugouPort + 1}` },
+        ],
+      }), "utf8"),
+      contentType: "application/json",
+    },
+    {
+      label: "more than four JSON providers",
+      name: "too-many-providers.json",
+      body: Buffer.from(JSON.stringify({
+        providers: ["netease", "qq", "kugou", "qishui", "qq"].map((id, index) => ({
+          id,
+          label: `${id}-${index}`,
+          baseUrl: kugouBaseUrl,
+        })),
+      }), "utf8"),
+      contentType: "application/json",
+    },
+  ];
+  for (const testCase of rejectedAtomicCases) {
+    const beforeFileSignature = stableConfigSignature(JSON.parse(await readFile(providersFile, "utf8")));
+    const beforeApi = await requestJson(baseUrl, "/api/music-apis");
+    const beforeApiSignature = stableConfigSignature(beforeApi.payload);
+    const rejected = await importBinary(
+      baseUrl,
+      testCase.name,
+      testCase.trusted === true,
+      testCase.body,
+      testCase.contentType,
+    );
+    assert(rejected.status === 400, `${testCase.label} was not rejected with HTTP 400`, rejected.payload);
+    const afterApi = await requestJson(baseUrl, "/api/music-apis");
+    const afterFileSignature = stableConfigSignature(JSON.parse(await readFile(providersFile, "utf8")));
+    assert(afterFileSignature === beforeFileSignature, `${testCase.label} changed persisted provider configuration`, {
+      before: beforeFileSignature,
+      after: afterFileSignature,
+    });
+    assert(stableConfigSignature(afterApi.payload) === beforeApiSignature, `${testCase.label} changed live provider configuration`, {
+      before: beforeApi.payload,
+      after: afterApi.payload,
+    });
+  }
+  passed("provider identity, uniqueness, count, and atomic rejection", {
+    rejectedCases: rejectedAtomicCases.length,
+  });
+
   const jsonProvider = {
     version: 1,
     providers: [{ id: "qq", label: "QQ音乐", baseUrl: kugouBaseUrl }],
@@ -685,6 +807,11 @@ try {
     "application/json",
   );
   assert(importAccepted(jsonImport), `JSON import was rejected with HTTP ${jsonImport.status}`, jsonImport.text);
+  assert(
+    JSON.stringify(jsonImport.payload?.importedProviders) === JSON.stringify([{ id: "qq", label: "QQ音乐" }]),
+    "JSON import returned an unexpected importedProviders contract",
+    jsonImport.payload,
+  );
   const afterJsonApis = await requestJson(baseUrl, "/api/music-apis");
   const afterJsonProviders = await requestJson(baseUrl, "/api/providers");
   const configuredQq = objectWithId(afterJsonApis.payload, "qq");
@@ -719,6 +846,11 @@ try {
   const kugouZip = packageZip(packageManifest("kugou", "酷狗音乐", kugouBaseUrl));
   const zipImport = await importBinary(baseUrl, "kugou-api.zip", true, kugouZip, "application/zip");
   assert(importAccepted(zipImport), `trusted ZIP import was rejected with HTTP ${zipImport.status}`, zipImport.text);
+  assert(
+    JSON.stringify(zipImport.payload?.importedProviders) === JSON.stringify([{ id: "kugou", label: "酷狗音乐" }]),
+    "ZIP import returned an unexpected importedProviders contract",
+    zipImport.payload,
+  );
   const afterZipApis = await requestJson(baseUrl, "/api/music-apis");
   const afterZipProviders = await requestJson(baseUrl, "/api/providers");
   const kugouApi = objectWithId(afterZipApis.payload, "kugou");

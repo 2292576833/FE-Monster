@@ -29,6 +29,14 @@ public interface MusicProviderClient {
 
     void rememberBrowserSession(Map<String, String> cookies);
 
+    default Map<String, Object> beginProviderLogin() {
+        return Map.of();
+    }
+
+    default Map<String, Object> pollProviderLogin(String key) {
+        return Map.of("authenticated", false, "status", 0);
+    }
+
     default void clearBrowserSession() {
         // Providers without a persisted browser session have nothing to clear.
     }

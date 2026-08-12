@@ -735,7 +735,9 @@
     const maximumTextureSize = configuredMaximum || cachedTextureCapability.maximumTextureSize || 4096;
     const deviceMemory = Number(global.navigator?.deviceMemory) || 0;
     const minimumMemory = Math.max(4, Number(config.waterTextureMinDeviceMemoryGB) || 8);
-    const softwareRenderer = /swiftshader|llvmpipe|software/i.test(cachedTextureCapability.rendererName);
+    const softwareRenderer = /swiftshader|llvmpipe|lavapipe|software|microsoft basic render|warp|reference/i.test(
+      cachedTextureCapability.rendererName
+    );
     return {
       maximumTextureSize,
       deviceMemory,
