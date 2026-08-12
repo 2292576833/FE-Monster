@@ -75,7 +75,7 @@ QQ825522867
 
 
 # 支持作者
-<img width="1086" height="1448" alt="77dc40c0-1a34-4a3c-abf7-aa41f0cddfaa" src="https://github.com/user-attachments/assets/8f148cc2-8c77-4455-9d36-54cdc03cc307" />
+<img width="971" height="1619" alt="a93a813e-376d-4d4a-a54b-94c03ecd627a" src="https://github.com/user-attachments/assets/bc092d1c-fe39-40b2-9473-fd28ed04827f" />
 
 
 # 版权与授权
