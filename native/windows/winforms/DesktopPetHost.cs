@@ -280,6 +280,7 @@ internal sealed class DesktopPetWindow : Wpf.Window
     private bool moving;
     private bool autoHidden;
     private PetDockEdge dockEdge;
+    private Rectangle dockWorkingArea = Rectangle.Empty;
     private int dockOffset;
     private Point? animationTarget;
     private Point? glideStart;
@@ -436,6 +437,7 @@ internal sealed class DesktopPetWindow : Wpf.Window
         animationTarget = null;
         moving = true;
         dockEdge = PetDockEdge.None;
+        dockWorkingArea = Rectangle.Empty;
         Rectangle bounds = WindowBounds();
         Rectangle area = Forms.Screen.FromRectangle(bounds).WorkingArea;
         int minimumVisible = Dip(56);
@@ -450,7 +452,7 @@ internal sealed class DesktopPetWindow : Wpf.Window
     {
         if (handle == IntPtr.Zero) return new { available = false };
         Rectangle bounds = WindowBounds();
-        Rectangle WorkingArea = Forms.Screen.FromRectangle(bounds).WorkingArea;
+        Rectangle WorkingArea = WorkingAreaForDock(bounds);
         double xPercent = WorkingArea.Width <= bounds.Width
             ? 0
             : Math.Clamp((double)(bounds.Left - WorkingArea.Left) / (WorkingArea.Width - bounds.Width), 0, 1);
@@ -492,7 +494,7 @@ internal sealed class DesktopPetWindow : Wpf.Window
             _ => throw new ArgumentException("Provide a supported anchor or both xPercent and yPercent.")
         };
         Rectangle bounds = WindowBounds();
-        Rectangle WorkingArea = Forms.Screen.FromRectangle(bounds).WorkingArea;
+        Rectangle WorkingArea = WorkingAreaForDock(bounds);
         double clampedX = Math.Clamp(targetPercent.X, 0, 1);
         double clampedY = Math.Clamp(targetPercent.Y, 0, 1);
         Point target = new(
@@ -504,6 +506,7 @@ internal sealed class DesktopPetWindow : Wpf.Window
         animationTarget = null;
         moving = false;
         dockEdge = PetDockEdge.None;
+        dockWorkingArea = Rectangle.Empty;
         glideStart = bounds.Location;
         glideTarget = target;
         glideStartedAt = Environment.TickCount64;
@@ -556,7 +559,7 @@ internal sealed class DesktopPetWindow : Wpf.Window
         try
         {
             Rectangle bounds = WindowBounds();
-            Rectangle area = Forms.Screen.FromRectangle(bounds).WorkingArea;
+            Rectangle area = WorkingAreaForDock(bounds);
             Point persistedLocation = dockEdge == PetDockEdge.None
                 ? bounds.Location
                 : DockedLocation(area, false);
@@ -848,6 +851,7 @@ internal sealed class DesktopPetWindow : Wpf.Window
             && restoredEdge != PetDockEdge.None)
         {
             dockEdge = restoredEdge;
+            dockWorkingArea = area;
             SetLocation(DockedLocation(area, false));
             autoHidden = false;
         }
@@ -857,7 +861,7 @@ internal sealed class DesktopPetWindow : Wpf.Window
     {
         if (handle == IntPtr.Zero) return;
         Rectangle bounds = WindowBounds();
-        Rectangle area = Forms.Screen.FromRectangle(bounds).WorkingArea;
+        Rectangle area = WorkingAreaForDock(bounds);
         if (dockEdge != PetDockEdge.None)
         {
             SetLocation(DockedLocation(area, autoHidden));
@@ -886,11 +890,13 @@ internal sealed class DesktopPetWindow : Wpf.Window
         if (nearest.Distance > Dip(EdgeSnapDistance))
         {
             dockEdge = PetDockEdge.None;
+            dockWorkingArea = Rectangle.Empty;
             autoHidden = false;
             return;
         }
 
         dockEdge = nearest.Edge;
+        dockWorkingArea = area;
         dockOffset = dockEdge is PetDockEdge.Left or PetDockEdge.Right
             ? Math.Max(0, Math.Min(bounds.Top - area.Top, Math.Max(0, area.Height - bounds.Height)))
             : Math.Max(0, Math.Min(bounds.Left - area.Left, Math.Max(0, area.Width - bounds.Width)));
@@ -950,7 +956,7 @@ internal sealed class DesktopPetWindow : Wpf.Window
     private void SetAutoHidden(bool hidden, bool animate)
     {
         if (dockEdge == PetDockEdge.None) return;
-        Rectangle area = Forms.Screen.FromRectangle(WindowBounds()).WorkingArea;
+        Rectangle area = WorkingAreaForDock(WindowBounds());
         bool stateChanged = autoHidden != hidden;
         autoHidden = hidden;
         if (stateChanged) NotifyEdgeState(hidden);
@@ -1012,7 +1018,7 @@ internal sealed class DesktopPetWindow : Wpf.Window
 
         if (!IsVisible || panelOpen || moving || dockEdge == PetDockEdge.None) return;
         bounds = WindowBounds();
-        Rectangle area = Forms.Screen.FromRectangle(bounds).WorkingArea;
+        Rectangle area = WorkingAreaForDock(bounds);
         Point cursor = Forms.Cursor.Position;
         bool nearEdge = CursorNearDockEdge(cursor, area);
         if (autoHidden)
@@ -1036,7 +1042,29 @@ internal sealed class DesktopPetWindow : Wpf.Window
     private void HandleDisplaySettingsChanged(object? sender, EventArgs e)
     {
         if (IsClosed) return;
-        Dispatcher.BeginInvoke(new Action(ClampToVisibleScreen));
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (dockEdge != PetDockEdge.None)
+            {
+                Point monitorAnchor = dockWorkingArea.IsEmpty
+                    ? WindowBounds().Location
+                    : new Point(
+                        dockWorkingArea.Left + dockWorkingArea.Width / 2,
+                        dockWorkingArea.Top + dockWorkingArea.Height / 2);
+                dockWorkingArea = Forms.Screen.FromPoint(monitorAnchor).WorkingArea;
+            }
+            else dockWorkingArea = Rectangle.Empty;
+            ClampToVisibleScreen();
+        }));
+    }
+
+    private Rectangle WorkingAreaForDock(Rectangle bounds)
+    {
+        if (dockEdge != PetDockEdge.None && !dockWorkingArea.IsEmpty)
+        {
+            return dockWorkingArea;
+        }
+        return Forms.Screen.FromRectangle(bounds).WorkingArea;
     }
 
     private void HandleKeyDown(object? sender, WpfInput.KeyEventArgs e)

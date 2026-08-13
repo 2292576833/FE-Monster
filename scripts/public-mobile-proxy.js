@@ -7,12 +7,16 @@ const listenHost = process.env.FE_MONSTER_PUBLIC_PROXY_HOST || "127.0.0.1";
 const listenPort = Number(process.env.FE_MONSTER_PUBLIC_PROXY_PORT || 3099);
 const upstreamHost = process.env.FE_MONSTER_PUBLIC_UPSTREAM_HOST || "127.0.0.1";
 const upstreamPort = Number(process.env.FE_MONSTER_PUBLIC_UPSTREAM_PORT || 3000);
+const communityUpstreamHost = process.env.FE_MONSTER_PUBLIC_COMMUNITY_HOST || "127.0.0.1";
+const communityUpstreamPort = Number(process.env.FE_MONSTER_PUBLIC_COMMUNITY_PORT || 3020);
+const communityPrefix = "/community";
+const communityHealthPath = communityPrefix + "/health";
+const publicCommunityGateway = "fe-monster-public-community-gateway";
+const maxCommunityHealthBytes = 64 * 1024;
 const accessKey = String(process.env.FE_MONSTER_PUBLIC_ACCESS_KEY || "").trim();
+const defaultDownloadUrl = "https://fe-monster-download-201.affront-loony-6o.chatgpt.site/";
+const downloadUrl = String(process.env.FE_MONSTER_PUBLIC_DOWNLOAD_URL || defaultDownloadUrl).trim();
 const cookieName = "fe_public_access";
-
-if (accessKey.length < 32) {
-  throw new Error("FE_MONSTER_PUBLIC_ACCESS_KEY must contain at least 32 characters");
-}
 
 function sameSecret(left, right) {
   const a = Buffer.from(String(left || ""), "utf8");
@@ -34,6 +38,7 @@ function cookieValue(header, name) {
 }
 
 function authorized(request) {
+  if (accessKey.length < 32) return false;
   const headerKey = request.headers["x-fe-public-access"];
   const cookieKey = cookieValue(request.headers.cookie, cookieName);
   return sameSecret(headerKey, accessKey) || sameSecret(cookieKey, accessKey);
@@ -57,6 +62,73 @@ function sendJson(response, statusCode, value) {
   response.end(body);
 }
 
+function redirectToDownload(response) {
+  response.writeHead(302, {
+    Location: downloadUrl,
+    "Cache-Control": "no-store",
+    "Content-Length": "0"
+  });
+  response.end();
+}
+
+function publicCommunityHealth(value) {
+  const payload = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const protocolVersion = typeof payload.protocolVersion === "number" ||
+    typeof payload.protocolVersion === "string"
+    ? payload.protocolVersion
+    : null;
+  const capabilities = payload.capabilities &&
+    typeof payload.capabilities === "object" &&
+    !Array.isArray(payload.capabilities)
+    ? payload.capabilities
+    : {};
+  return {
+    ok: payload.ok === true,
+    service: typeof payload.service === "string" && payload.service.trim()
+      ? payload.service.trim()
+      : "fe-monster-community",
+    protocolVersion,
+    capabilities,
+    gateway: publicCommunityGateway
+  };
+}
+
+function relayPublicCommunityHealth(upstreamResponse, response) {
+  const chunks = [];
+  let size = 0;
+  let settled = false;
+
+  const fail = () => {
+    if (settled) return;
+    settled = true;
+    sendJson(response, 502, publicCommunityHealth({ ok: false }));
+  };
+
+  upstreamResponse.on("data", (chunk) => {
+    if (settled) return;
+    size += chunk.length;
+    if (size > maxCommunityHealthBytes) {
+      upstreamResponse.destroy();
+      fail();
+      return;
+    }
+    chunks.push(chunk);
+  });
+  upstreamResponse.on("end", () => {
+    if (settled) return;
+    let payload;
+    try {
+      payload = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    } catch (_) {
+      fail();
+      return;
+    }
+    settled = true;
+    sendJson(response, upstreamResponse.statusCode || 502, publicCommunityHealth(payload));
+  });
+  upstreamResponse.on("error", fail);
+}
+
 const server = http.createServer((request, response) => {
   let pathname = "/";
   try {
@@ -71,24 +143,56 @@ const server = http.createServer((request, response) => {
     return;
   }
 
-  if (pathname.startsWith("/api/") && request.method !== "OPTIONS" && !authorized(request)) {
+  if ((pathname === "/" || pathname === "/download") && (request.method === "GET" || request.method === "HEAD")) {
+    redirectToDownload(response);
+    return;
+  }
+
+  const communityRequest = pathname === communityHealthPath ||
+    pathname.startsWith(communityPrefix + "/api/");
+  if (communityRequest && (
+    pathname === communityPrefix + "/api/admin" ||
+    pathname.startsWith(communityPrefix + "/api/admin/")
+  )) {
+    sendJson(response, 404, { ok: false, error: "not found" });
+    return;
+  }
+
+  if (!communityRequest && pathname.startsWith("/api/") && request.method !== "OPTIONS" && !authorized(request)) {
     sendJson(response, 401, { ok: false, error: "FE Monster Android access credential is required" });
     return;
   }
 
-  const headers = { ...request.headers, host: `${upstreamHost}:${upstreamPort}` };
+  const selectedHost = communityRequest ? communityUpstreamHost : upstreamHost;
+  const selectedPort = communityRequest ? communityUpstreamPort : upstreamPort;
+  const originalHost = String(request.headers.host || "").trim();
+  const headers = {
+    ...request.headers,
+    host: communityRequest && originalHost ? originalHost : `${selectedHost}:${selectedPort}`
+  };
+  if (communityRequest) {
+    headers["x-forwarded-host"] = originalHost;
+    headers["x-forwarded-proto"] = "https";
+    if (!headers["x-forwarded-for"]) {
+      headers["x-forwarded-for"] = String(request.socket.remoteAddress || "").replace(/^::ffff:/, "");
+    }
+  }
   delete headers["x-fe-public-access"];
   const cookie = sanitizedCookie(headers.cookie);
   if (cookie) headers.cookie = cookie;
   else delete headers.cookie;
 
   const upstream = http.request({
-    host: upstreamHost,
-    port: upstreamPort,
+    host: selectedHost,
+    port: selectedPort,
     method: request.method,
-    path: request.url,
+    path: communityRequest ? request.url.slice(communityPrefix.length) || "/" : request.url,
     headers
   }, (upstreamResponse) => {
+    if (pathname === communityHealthPath) {
+      relayPublicCommunityHealth(upstreamResponse, response);
+      return;
+    }
     response.writeHead(upstreamResponse.statusCode || 502, upstreamResponse.headers);
     upstreamResponse.pipe(response);
   });
@@ -105,5 +209,9 @@ const server = http.createServer((request, response) => {
 
 server.on("clientError", (_, socket) => socket.end("HTTP/1.1 400 Bad Request\r\n\r\n"));
 server.listen(listenPort, listenHost, () => {
-  console.log(`[public-mobile] listening on http://${listenHost}:${listenPort} -> http://${upstreamHost}:${upstreamPort}`);
+  console.log(
+    `[public-mobile] listening on http://${listenHost}:${listenPort} -> ` +
+    `web http://${upstreamHost}:${upstreamPort}, community ${communityPrefix} -> ` +
+    `http://${communityUpstreamHost}:${communityUpstreamPort}`
+  );
 });

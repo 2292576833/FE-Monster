@@ -4,6 +4,10 @@ param(
   [int]$GatewayPort = 3000,
   [int]$CommunityPort = 3020,
   [int]$PublicPort = 3099,
+  [int]$DownloadPort = 3080,
+  [string]$DownloadSiteRoot = (Join-Path $Root 'download-site'),
+  [string]$DownloadUrl = 'https://fe-monster-download-201.affront-loony-6o.chatgpt.site/',
+  [string]$DownloadTunnelUrl = 'https://www.h3ef5461b.nyat.app:57374/',
   [string]$AccessKeyFile = (Join-Path $Env:LOCALAPPDATA 'FE Monster\public-access.key')
 )
 
@@ -13,6 +17,7 @@ $outDir = Join-Path $rootPath 'out'
 $jarPath = Join-Path $outDir 'fe-monster-java.jar'
 $communityScript = Join-Path $PSScriptRoot 'start-community-server.ps1'
 $publicProxyScript = Join-Path $PSScriptRoot 'public-mobile-proxy.js'
+$downloadSiteScript = Join-Path $PSScriptRoot 'start-download-site.ps1'
 $buildScript = Join-Path $rootPath 'build.cmd'
 
 if (!(Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir | Out-Null }
@@ -49,6 +54,22 @@ function Resolve-NodeExecutable {
     if (Test-Path $candidate) { return $candidate }
   }
   return ''
+}
+
+function Stop-StalePublicProxy {
+  param([int]$Port)
+
+  $listeners = Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue
+  foreach ($listener in $listeners) {
+    $process = Get-CimInstance Win32_Process -Filter "ProcessId=$($listener.OwningProcess)" -ErrorAction SilentlyContinue
+    if ($null -eq $process -or $process.Name -ne 'node.exe') { continue }
+    if ($process.CommandLine -notlike "*$publicProxyScript*") { continue }
+    Stop-Process -Id $listener.OwningProcess -Force
+    for ($attempt = 0; $attempt -lt 20; $attempt += 1) {
+      Start-Sleep -Milliseconds 100
+      if (!(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue)) { break }
+    }
+  }
 }
 
 function Resolve-PublicAccessKey {
@@ -111,15 +132,40 @@ if (!(Test-HttpEndpoint "http://127.0.0.1:$GatewayPort/")) {
   if (!$ready) { throw "FE Monster Java gateway did not become ready on port $GatewayPort." }
 }
 
+$node = Resolve-NodeExecutable
+if ([string]::IsNullOrWhiteSpace($node)) { throw 'Node.js runtime was not found.' }
+
+if (!(Test-HttpEndpoint "http://127.0.0.1:$DownloadPort/")) {
+  & $downloadSiteScript -Root $rootPath -DownloadSiteRoot $DownloadSiteRoot -Port $DownloadPort
+  if ($LASTEXITCODE -ne 0) { throw "FE Monster download site failed to start on port $DownloadPort." }
+}
+
 $publicAccessKey = Resolve-PublicAccessKey
+if (Test-HttpEndpoint "http://127.0.0.1:$PublicPort/health") {
+  try {
+    $response = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$PublicPort/" -MaximumRedirection 0 -TimeoutSec 3
+    $currentRedirect = [string]$response.Headers.Location
+  } catch {
+    $currentRedirect = if ($null -ne $_.Exception.Response) {
+      [string]$_.Exception.Response.Headers.Location
+    } else {
+      ''
+    }
+  }
+  if ($currentRedirect -ne $DownloadUrl) { Stop-StalePublicProxy -Port $PublicPort }
+}
+
 if (!(Test-HttpEndpoint "http://127.0.0.1:$PublicPort/health")) {
-  $node = Resolve-NodeExecutable
-  if ([string]::IsNullOrWhiteSpace($node)) { throw 'Node.js runtime was not found.' }
   if (!(Test-Path $publicProxyScript)) { throw "Public mobile proxy was not found: $publicProxyScript" }
 
   $Env:FE_MONSTER_PUBLIC_ACCESS_KEY = $publicAccessKey
   $Env:FE_MONSTER_PUBLIC_PROXY_PORT = [string]$PublicPort
   $Env:FE_MONSTER_PUBLIC_UPSTREAM_PORT = [string]$GatewayPort
+  # The legacy frp-boy endpoint uses SakuraFrp's self-signed certificate. If a
+  # visitor elects to continue past that warning, send them to the separately
+  # provisioned download tunnel whose public certificate is trusted instead of
+  # making the redirect depend on a particular Cloudflare egress decision.
+  $Env:FE_MONSTER_PUBLIC_DOWNLOAD_URL = $DownloadTunnelUrl
   $stamp = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
   $stdout = Join-Path $outDir "public-mobile-proxy-$stamp.out.log"
   $stderr = Join-Path $outDir "public-mobile-proxy-$stamp.err.log"
@@ -151,5 +197,7 @@ try {
 }
 
 Write-Host 'FE Monster public mobile services are ready.'
-Write-Host 'Public URL: https://frp-boy.com:53981'
+Write-Host 'Community/mobile tunnel: https://frp-boy.com:53981/community'
+Write-Host "Official public download page: $DownloadUrl"
+Write-Host "Trusted download tunnel: $DownloadTunnelUrl -> 127.0.0.1:$DownloadPort"
 Write-Host "Protected local proxy: 127.0.0.1:$PublicPort"

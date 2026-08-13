@@ -97,6 +97,28 @@ async function request(port, pathname, options = {}) {
   });
 }
 
+async function rawRequest(port, pathname, options = {}) {
+  return new Promise((resolve, reject) => {
+    const request = http.request({
+      host: '127.0.0.1',
+      port,
+      path: pathname,
+      method: options.method || 'GET',
+      headers: { host: 'community.example.test:443', ...(options.headers || {}) }
+    }, (response) => {
+      const chunks = [];
+      response.on('data', (chunk) => chunks.push(chunk));
+      response.on('end', () => resolve({
+        status: response.statusCode,
+        headers: response.headers,
+        body: Buffer.concat(chunks).toString('utf8')
+      }));
+    });
+    request.once('error', reject);
+    request.end();
+  });
+}
+
 async function streamingRequest(port, pathname, releaseStream) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('community API response was buffered instead of streamed')), 3000);
@@ -142,6 +164,7 @@ const community = await fixture(communityPort, 'fe-monster-community', {
   streamRelease: communityStreamRelease
 });
 const accessKey = 'fixture-public-access-key-that-is-long-enough';
+const officialDownloadUrl = 'https://download.example.test/fe-monster/';
 const proxy = spawn(process.execPath, [path.join(root, 'scripts', 'public-mobile-proxy.js')], {
   cwd: root,
   env: {
@@ -149,7 +172,8 @@ const proxy = spawn(process.execPath, [path.join(root, 'scripts', 'public-mobile
     FE_MONSTER_PUBLIC_PROXY_PORT: String(proxyPort),
     FE_MONSTER_PUBLIC_UPSTREAM_PORT: String(webPort),
     FE_MONSTER_PUBLIC_COMMUNITY_PORT: String(communityPort),
-    FE_MONSTER_PUBLIC_ACCESS_KEY: accessKey
+    FE_MONSTER_PUBLIC_ACCESS_KEY: accessKey,
+    FE_MONSTER_PUBLIC_DOWNLOAD_URL: officialDownloadUrl
   },
   stdio: ['ignore', 'pipe', 'pipe']
 });
@@ -209,11 +233,23 @@ try {
   assert.equal(authorizedMobileApi.body.service, 'web-fixture');
   assert.equal(authorizedMobileApi.body.publicAccessForwarded, false);
 
+  // The human-facing download route must remain available even when the
+  // desktop gateway behind this tunnel is offline.
+  await new Promise((resolve) => web.close(resolve));
+  const rootDownload = await rawRequest(proxyPort, '/');
+  assert.equal(rootDownload.status, 302);
+  assert.equal(rootDownload.headers.location, officialDownloadUrl);
+  assert.equal(rootDownload.headers['cache-control'], 'no-store');
+
+  const namedDownload = await rawRequest(proxyPort, '/download');
+  assert.equal(namedDownload.status, 302);
+  assert.equal(namedDownload.headers.location, officialDownloadUrl);
+
   console.log(JSON.stringify({ ok: true, communityBaseUrl: `https://community.example.test:${proxyPort}/community` }, null, 2));
 } finally {
   proxy.kill();
   await Promise.all([
-    new Promise((resolve) => web.close(resolve)),
+    web.listening ? new Promise((resolve) => web.close(resolve)) : Promise.resolve(),
     new Promise((resolve) => community.close(resolve))
   ]);
 }
