@@ -45,7 +45,7 @@ if ($installLog.StartsWith($installPathPrefix, [StringComparison]::OrdinalIgnore
 $sessionLogDirectory = Split-Path -Parent $installLog
 $dependencyLog = Join-Path $sessionLogDirectory ('dependencies-{0}.log' -f $PID)
 $updateAgentLog = Join-Path $sessionLogDirectory ('update-agent-{0}.log' -f $PID)
-$appVersion = '2.0.1'
+$appVersion = '2.1.0'
 $mainExecutable = Join-Path $installPath 'native\windows\build\winforms\FE Monster.exe'
 $payloadIntegrityManifestName = 'payload-integrity.json'
 $peMachineAmd64 = 0x8664

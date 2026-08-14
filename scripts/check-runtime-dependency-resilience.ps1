@@ -15,6 +15,21 @@ if (!(Test-Path -LiteralPath $installerScript -PathType Leaf)) {
   throw "Installer script is missing: $installerScript"
 }
 
+foreach ($webViewCheckName in @(
+  'check-webview-runtime-health.ps1',
+  'check-webview-runtime-repair.ps1'
+)) {
+  $webViewCheck = Join-Path $rootPath "scripts\$webViewCheckName"
+  if (!(Test-Path -LiteralPath $webViewCheck -PathType Leaf)) {
+    $failures.Add("WebView2 regression check is missing: $webViewCheckName") | Out-Null
+    continue
+  }
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $webViewCheck -Root $rootPath
+  if ($LASTEXITCODE -ne 0) {
+    $failures.Add("WebView2 regression check failed: $webViewCheckName") | Out-Null
+  }
+}
+
 # Isolate the production WebView2 installer function and mock the OS state in
 # which the Microsoft installer returns a non-success code even though the
 # Runtime is detectable immediately afterward. Detection must win over the

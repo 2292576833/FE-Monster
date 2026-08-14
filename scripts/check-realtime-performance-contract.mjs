@@ -50,6 +50,10 @@ const windowsHost = readFileSync(
   path.join(root, 'native', 'windows', 'winforms', 'FeMonsterForm.cs'),
   'utf8'
 );
+const webViewStartupPolicy = readFileSync(
+  path.join(root, 'native', 'windows', 'winforms', 'WebViewStartupPolicy.cs'),
+  'utf8'
+);
 const legacyWindowsHost = readFileSync(
   path.join(root, 'native', 'windows', 'fe_monster_client.cpp'),
   'utf8'
@@ -202,10 +206,6 @@ const nativeSpectrumAvoidsBoxedFloatLists =
 const jarArgumentIndex = windowsProgram.indexOf('startInfo.ArgumentList.Add("-jar")');
 const initialHeapArgumentIndex = windowsProgram.indexOf('startInfo.ArgumentList.Add("-Xms64m")');
 const maximumHeapArgumentIndex = windowsProgram.indexOf('startInfo.ArgumentList.Add("-Xmx512m")');
-const windowsBrowserArgumentsIndex = windowsHost.indexOf('BuildBrowserArguments()');
-const windowsBrowserArguments = windowsBrowserArgumentsIndex >= 0
-  ? windowsHost.slice(windowsBrowserArgumentsIndex, windowsBrowserArgumentsIndex + 900)
-  : '';
 const localLaunchFlagsIndex = localClientLauncher.indexOf('launchFlags(Map<String, Object> settings)');
 const localLaunchFlags = localLaunchFlagsIndex >= 0
   ? localClientLauncher.slice(localLaunchFlagsIndex, localLaunchFlagsIndex + 900)
@@ -285,23 +285,22 @@ const checks = {
     initialHeapArgumentIndex >= 0
     && maximumHeapArgumentIndex > initialHeapArgumentIndex
     && jarArgumentIndex > maximumHeapArgumentIndex,
-  windowsRenderHostForcesAngleD3D11:
-    /--enable-gpu-rasterization/.test(windowsBrowserArguments)
-    && /--enable-accelerated-2d-canvas/.test(windowsBrowserArguments)
-    && /--use-gl=angle/.test(windowsBrowserArguments)
-    && /--use-angle=d3d11/.test(windowsBrowserArguments)
-    && /--force_high_performance_gpu/.test(windowsBrowserArguments)
-    && /--disable-software-rasterizer/.test(windowsBrowserArguments)
-    && !/--force-high-performance-gpu/.test(windowsBrowserArguments)
-    && !/--disable-gpu/.test(windowsBrowserArguments)
-    && /--use-angle=d3d11/.test(localLaunchFlags)
-    && /--force_high_performance_gpu/.test(localLaunchFlags)
-    && /--disable-software-rasterizer/.test(localLaunchFlags)
-    && !/--force-high-performance-gpu/.test(localLaunchFlags)
-    && !/--disable-gpu/.test(localLaunchFlags)
+  windowsRenderHostsAllowAutomaticSoftwareFallback:
+    /--use-gl=angle/.test(webViewStartupPolicy)
+    && /--use-angle=default/.test(webViewStartupPolicy)
+    && /--enable-accelerated-2d-canvas/.test(webViewStartupPolicy)
+    && /--disable-gpu/.test(webViewStartupPolicy)
+    && !/(?:--force_high_performance_gpu|--force-high-performance-gpu|--ignore-gpu-blocklist|--disable-software-rasterizer)/.test(webViewStartupPolicy)
+    && /CreateWebViewControllerAsync\(options\.GpuAcceleration/.test(windowsHost)
+    && /WebViewStartupPolicy\.BrowserArguments\(gpuRequested\)/.test(windowsHost)
+    && /RecreateWebViewControllerAsync\(gpuRequested:\s*false/.test(windowsHost)
+    && /--use-angle=default/.test(localLaunchFlags)
+    && /GPU_DISABLED_FLAG/.test(localLaunchFlags)
+    && /GPU_DISABLED_FLAG\s*=\s*["']--disable-gpu["']/.test(localClientLauncher)
+    && !/(?:--force_high_performance_gpu|--force-high-performance-gpu|--ignore-gpu-blocklist|--disable-software-rasterizer)/.test(localLaunchFlags)
     && /WebView2EnvironmentOptions/.test(legacyWindowsHost)
-    && /--use-angle=d3d11/.test(legacyWindowsHost)
-    && /--disable-software-rasterizer/.test(legacyWindowsHost),
+    && /--use-angle=default/.test(legacyWindowsHost)
+    && !/(?:--force_high_performance_gpu|--force-high-performance-gpu|--ignore-gpu-blocklist|--disable-software-rasterizer)/.test(legacyWindowsHost),
   webRuntimeVerifiesHardwareD3D11:
     /function\s+directX11HardwareRendererActive\s*\(/.test(app)
     && /(?:direct3d11|d3d11)/i.test(functionBlock(app, 'directX11HardwareRendererActive'))
@@ -369,7 +368,7 @@ console.log(JSON.stringify({
       jarArgumentIndex
     },
     graphics: {
-      windowsBrowserArgumentsPresent: windowsBrowserArguments.length > 0,
+      windowsStartupPolicyPresent: webViewStartupPolicy.length > 0,
       localLaunchFlagsPresent: localLaunchFlags.length > 0,
       runtimeHardwareVerification: /function\s+directX11HardwareRendererActive\s*\(/.test(app)
     }

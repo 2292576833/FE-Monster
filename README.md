@@ -4,7 +4,11 @@
 
 
 
-# 当前 Windows 版本 2.0.1（已发布）：
+# 当前 Windows 版本 2.1.0（正式版）：
+
+- GitHub Release：https://github.com/2292576833/FE-Monster/releases/tag/v2.1.0
+- Windows x64 联网安装包：`FE-Monster-Setup-2.1.0.exe`
+- SHA-256：`C8B9A7D309BF5AB32EC7B4C1E5D63E4A108B5CC4DF4989F7B7E1C04DB8B87879`
 
 # 新增沙盒模式玩家可自行创建自己的预设
 # 修改了ui界面让画面更精准

@@ -1,8 +1,8 @@
 # FE Monster 项目状态说明
 
-更新时间：2026-08-11。
+更新时间：2026-08-14。
 
-当前 Windows 版本为 **2.0.1 正式版**。本文记录当前源码、回归契约与已发布联网安装包具备的能力。
+当前 Windows 源码版本为 **2.1.0 正式版**。本文记录当前源码、回归契约与已发布的 Windows 联网安装包。
 
 ## 当前架构
 
@@ -39,7 +39,7 @@
 
 - **Phase 5b 未实现**：binary WSS 与每个 live session 的单 owner actor 仍需先由部署遥测证明必要性。
 - **Phase 6 未完成**：Windows Java 代理、安装器和本机并发基线已有验证，但公网 10/50/100 会话持续 canary 尚未执行，不能写成已完成。
-- **代码签名仍未完成**：2.0.1 联网安装器已经发布并附带 SHA-256，但尚未配置 Authenticode，Windows SmartScreen 可能提示未知发布者。
+- **代码签名仍未完成**：2.1.0 联网安装器已提供外部 SHA-256 sidecar，但尚未配置 Authenticode，Windows SmartScreen 可能提示未知发布者。
 - 音乐、云端语音和社区公网能力仍受用户配置、第三方服务可用性、版权和账号权限约束。
 
 ## 回归覆盖入口
@@ -59,7 +59,7 @@
 ## 主要文件索引
 
 - `README.md`：产品入口、版本和授权边界。
-- `UPDATE.md`：2.0.1 正式版范围、安装器和校验信息。
+- `UPDATE.md`：2.1.0 正式版范围、安装器和校验信息。
 - `src/main/java/com/femonster/FeMonsterJavaApp.java`：Java 服务入口。
 - `src/main/java/com/femonster/desktop/LocalClientLauncher.java`：本地客户端启动。
 - `src/main/java/com/femonster/api/ApiRoutes.java`：HTTP API 与代理路由。

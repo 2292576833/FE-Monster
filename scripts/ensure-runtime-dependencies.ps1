@@ -71,13 +71,55 @@ function Test-WebView2Runtime {
     "HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients\$runtimeClientId"
   )
   foreach ($path in $registryPaths) {
-    $properties = Get-ItemProperty -LiteralPath $path -Name 'pv' -ErrorAction SilentlyContinue
+    $properties = Get-ItemProperty -LiteralPath $path -Name @('pv', 'location') -ErrorAction SilentlyContinue
     $version = if ($null -eq $properties) { '' } else { [string]$properties.pv }
     if (![string]::IsNullOrWhiteSpace($version)) {
       $parsedVersion = $null
       if ([version]::TryParse($version, [ref]$parsedVersion) -and
           $parsedVersion -gt [version]'0.0.0.0') {
-        return $true
+        $candidateLocations = New-Object System.Collections.Generic.List[string]
+        $location = [string]$properties.location
+        if (![string]::IsNullOrWhiteSpace($location)) {
+          $candidateLocations.Add($location) | Out-Null
+        }
+        foreach ($standardLocation in @(
+          (Join-Path ${Env:ProgramFiles(x86)} 'Microsoft\EdgeWebView\Application'),
+          (Join-Path $Env:ProgramFiles 'Microsoft\EdgeWebView\Application'),
+          (Join-Path $Env:LOCALAPPDATA 'Microsoft\EdgeWebView\Application')
+        )) {
+          if (!$candidateLocations.Contains($standardLocation)) {
+            $candidateLocations.Add($standardLocation) | Out-Null
+          }
+        }
+        foreach ($candidateLocation in $candidateLocations) {
+          $runtimeExecutable = Join-Path `
+            $candidateLocation `
+            (Join-Path $parsedVersion.ToString() 'msedgewebview2.exe')
+          if (Test-Path -LiteralPath $runtimeExecutable -PathType Leaf) {
+            try {
+              $runtimeFile = Get-Item -LiteralPath $runtimeExecutable
+              $fileVersion = $null
+              if ([version]::TryParse(
+                  [string]$runtimeFile.VersionInfo.ProductVersion,
+                  [ref]$fileVersion
+              ) -and $fileVersion -eq $parsedVersion) {
+                $probe = Start-Process `
+                  -FilePath $runtimeExecutable `
+                  -ArgumentList @('--embedded-browser-webview=1', '--version') `
+                  -WindowStyle Hidden `
+                  -PassThru
+                if ($null -ne $probe -and $probe.WaitForExit(5000)) {
+                  if ($probe.ExitCode -eq 0) { return $true }
+                  continue
+                }
+                if ($null -ne $probe) {
+                  try { Stop-Process -Id $probe.Id -Force -ErrorAction SilentlyContinue } catch {}
+                }
+              }
+            } catch {
+            }
+          }
+        }
       }
     }
   }
@@ -282,7 +324,7 @@ function Ensure-WebView2Runtime {
   Write-Host (
     'WebView2 could not be installed from the network. ' +
     'Connect this computer to the Internet and retry, or download or request ' +
-    'FE-Monster-Setup-2.0.1-Offline.exe, which includes the signed WebView2 Runtime.'
+    'FE-Monster-Setup-2.1.0-Offline.exe, which includes the signed WebView2 Runtime.'
   )
   $missing.Add($label) | Out-Null
 }

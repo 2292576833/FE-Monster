@@ -24098,7 +24098,7 @@ const PLAYBACK_CARD_PROVIDER_ACCENTS = Object.freeze({
   local: '#7dd3fc'
 });
 const PLAYBACK_CARD_VISIBILITY_TRANSITION_MS = 240;
-const PLAYBACK_CARD_EXPANSION_TRANSITION_MS = 360;
+const PLAYBACK_CARD_EXPANSION_TRANSITION_MS = 420;
 
 function playbackCardSong(song = state.currentSong) {
   return song || null;
@@ -24129,7 +24129,7 @@ function syncQishuiPlaybackExpansion() {
 }
 
 function cancelQishuiPlaybackExpansionAnimations() {
-  [els.qishuiPlaybackPhone, els.qishuiPlaybackPhone?.querySelector('.qishui-playback-content')]
+  [els.qishuiPlaybackCard, els.qishuiPlaybackPhone?.querySelector('.qishui-playback-content')]
     .filter(Boolean)
     .forEach((element) => {
       element.getAnimations().forEach((animation) => {
@@ -24139,21 +24139,25 @@ function cancelQishuiPlaybackExpansionAnimations() {
 }
 
 function animateQishuiPlaybackExpansion(previousBounds) {
-  if (!els.qishuiPlaybackPhone || reducedMotion || !previousBounds) return;
-  const nextBounds = els.qishuiPlaybackPhone.getBoundingClientRect();
+  if (!els.qishuiPlaybackCard || reducedMotion || !previousBounds) return;
+  cancelQishuiPlaybackExpansionAnimations();
+  const nextBounds = els.qishuiPlaybackCard.getBoundingClientRect();
   if (previousBounds.width <= 0 || nextBounds.width <= 0) return;
   const inlineScale = previousBounds.width / nextBounds.width;
   if (!Number.isFinite(inlineScale) || Math.abs(inlineScale - 1) < 0.01) return;
 
-  cancelQishuiPlaybackExpansionAnimations();
   const options = {
     duration: PLAYBACK_CARD_EXPANSION_TRANSITION_MS,
-    easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+    easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
     fill: 'both'
   };
-  const surfaceAnimation = els.qishuiPlaybackPhone.animate([
-    { transform: `scaleX(${inlineScale.toFixed(5)})`, opacity: 0.96 },
-    { transform: 'scaleX(1)', opacity: 1 }
+  const baseTransform = getComputedStyle(els.qishuiPlaybackCard).transform;
+  const scaledTransform = baseTransform === 'none'
+    ? `scaleX(${inlineScale.toFixed(5)})`
+    : `${baseTransform} scaleX(${inlineScale.toFixed(5)})`;
+  const surfaceAnimation = els.qishuiPlaybackCard.animate([
+    { transformOrigin: '100% 50%', transform: scaledTransform, opacity: 0.96 },
+    { transformOrigin: '100% 50%', transform: baseTransform, opacity: 1 }
   ], options);
   surfaceAnimation.id = 'fe-qishui-playback-expand-surface';
 
@@ -24175,7 +24179,7 @@ function animateQishuiPlaybackExpansion(previousBounds) {
 }
 
 function setQishuiPlaybackExpanded(expanded) {
-  const previousBounds = els.qishuiPlaybackPhone?.getBoundingClientRect();
+  const previousBounds = els.qishuiPlaybackCard?.getBoundingClientRect();
   state.qishuiPlaybackCard.expanded = !!expanded;
   syncQishuiPlaybackExpansion();
   animateQishuiPlaybackExpansion(previousBounds);

@@ -21,6 +21,7 @@ if ([string]::IsNullOrWhiteSpace($Root)) {
   $Root = Join-Path $scriptRoot '..'
 }
 $rootPath = (Resolve-Path -LiteralPath $Root).Path
+$expectedAppVersion = [string](Get-Content -Raw -LiteralPath (Join-Path $rootPath 'package.json') | ConvertFrom-Json).version
 $setupPath = (Resolve-Path -LiteralPath $SetupExe).Path
 $testPath = [IO.Path]::GetFullPath($TestRoot)
 $installPath = Join-Path $testPath 'app'
@@ -94,6 +95,9 @@ if (!(Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
   throw 'Installed payload integrity manifest is missing.'
 }
 $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
+if ([string]$manifest.appVersion -cne $expectedAppVersion) {
+  throw "Installed payload reports version '$($manifest.appVersion)', expected '$expectedAppVersion'."
+}
 foreach ($entry in @($manifest.files)) {
   $relative = ([string]$entry.path).Replace('/', '\')
   $installedFile = Join-Path $installPath $relative
@@ -114,10 +118,13 @@ $criticalRelativeFiles = @(
   'web\index.html',
   'web\cache-fingerprints.json',
   'web\app.js',
+  'web\pet-assistant.js',
+  'web\pet-assistant.css',
   'web\community-reward-runtime.js',
   'web\community-reward-runtime.css',
   'web\fe-identity-card.js',
   'web\fe-identity-card.css',
+  'native\windows\build\winforms\FE Monster.exe',
   'out\fe-monster-java.jar',
   'scripts\install-fe-monster.ps1',
   'scripts\ensure-runtime-dependencies.ps1',
@@ -140,7 +147,7 @@ foreach ($relative in $criticalRelativeFiles) {
 }
 
 $installedIndex = Get-Content -Raw -LiteralPath (Join-Path $installPath 'web\index.html')
-if (!$installedIndex.Contains($ExpectedCacheToken, [StringComparison]::Ordinal)) {
+if ($installedIndex.IndexOf($ExpectedCacheToken, [StringComparison]::Ordinal) -lt 0) {
   throw "Installed index does not contain cache token $ExpectedCacheToken."
 }
 $communityUrl = (
@@ -159,6 +166,16 @@ if ($tlsPin -cne $ExpectedTlsPin) {
   throw "Installed release TLS pin is incorrect: $tlsPin"
 }
 
+$installedClient = Get-Item -LiteralPath (Join-Path $installPath 'native\windows\build\winforms\FE Monster.exe')
+$installedClientVersion = [string]$installedClient.VersionInfo.ProductVersion
+if (!$installedClientVersion.StartsWith($expectedAppVersion, [StringComparison]::Ordinal)) {
+  throw "Installed client reports version '$installedClientVersion', expected '$expectedAppVersion'."
+}
+$setupProductVersion = [string](Get-Item -LiteralPath $setupPath).VersionInfo.ProductVersion
+if (!$setupProductVersion.StartsWith($expectedAppVersion, [StringComparison]::Ordinal)) {
+  throw "Setup reports version '$setupProductVersion', expected '$expectedAppVersion'."
+}
+
 $setupItem = Get-Item -LiteralPath $setupPath
 $setupSignature = Get-AuthenticodeSignature -LiteralPath $setupPath
 [pscustomobject]@{
@@ -171,6 +188,9 @@ $setupSignature = Get-AuthenticodeSignature -LiteralPath $setupPath
   systemDriveFreeBytes = $systemDriveFreeBytes
   installRoot = $installPath
   manifestFileCount = @($manifest.files).Count
+  appVersion = $expectedAppVersion
+  setupProductVersion = $setupProductVersion
+  installedClientVersion = $installedClientVersion
   cacheToken = $ExpectedCacheToken
   communityUrl = $communityUrl
   tlsPin = $tlsPin

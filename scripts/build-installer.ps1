@@ -483,92 +483,53 @@ function Stage-WebView2RuntimeInstaller {
 }
 
 function New-PayloadIntegrityManifest {
-  $relativeFiles = New-Object System.Collections.Generic.List[string]
+  $manifestPath = Join-Path $payloadRoot $payloadIntegrityManifestName
+  $allFiles = @(Get-ChildItem -LiteralPath $payloadRoot -Recurse -File -Force |
+    Where-Object {
+      ![string]::Equals($_.FullName, $manifestPath, [StringComparison]::OrdinalIgnoreCase)
+    })
+  $relativeFiles = [string[]]@($allFiles | ForEach-Object {
+    $_.FullName.Substring($payloadRoot.Length).TrimStart('\').Replace('\', '/')
+  })
+  [Array]::Sort($relativeFiles, [StringComparer]::Ordinal)
+
+  # Only the explicit native launch/runtime entry points we execute have an
+  # x64 machine contract. Their third-party trees (WebView2, JRE, and Node)
+  # may legitimately contain helper PE images with another machine type.
+  $nativeAmd64RelativeFiles = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::OrdinalIgnoreCase
+  )
   foreach ($relative in @(
-    'out\fe-monster-java.jar',
-    'web\index.html',
-    'web\cache-fingerprints.json',
-    'web\app.js',
-    'web\styles.css',
-    'web\lyric-render-quality.css',
-    'web\app-command.js',
-    'web\playback-intelligence.js',
-    'web\wallpaper-video-continuity.js',
-    'web\pet-emotion-runtime.js',
-    'web\pet-client-context.js',
-    'web\pet-live-turn-controller.js',
-    'web\pet-live-audio-worklet.js',
-    'web\pet-live-telemetry.js',
-    'web\pet-live-playout.js',
-    'web\pet-live-stt-client.js',
-    'web\pet-assistant.js',
-    'web\fe-identity-card.js',
-    'web\fe-identity-card.css',
-    'web\pet-product-tour.js',
-    'web\pet-product-tour.css',
-    'web\community-reward-runtime.js',
-    'web\community-reward-runtime.css',
-    'web\pet-particle-orb.js',
-    'web\pet-assistant.css',
-    'web\pet-companion-p2.js',
-    'web\pet-companion-p2.css',
-    'web\creative-community.js',
-    'web\assets\fe-monster-pet-mascot.png',
-    'web\assets\fe-monster-pet-mascot-chroma.png',
-    'scripts\install-fe-monster.ps1',
-    'scripts\ensure-runtime-dependencies.ps1',
-    'scripts\java-runtime.ps1',
-    'data\community-server-url.txt',
-    'data\community-server-tls-pin.txt',
-    'runtime\java\bin\java.exe',
-    'runtime\java\bin\javaw.exe',
-    'runtime\java\bin\FE Monster Backend.exe',
-    'native\windows\build\winforms\FE Monster.exe',
-    'native\windows\build\winforms\FE Monster.dll',
-    'native\windows\build\winforms\FE Monster.deps.json',
-    'native\windows\build\winforms\FE Monster.runtimeconfig.json',
-    'native\windows\build\winforms\WebView2Loader.dll',
-    'native\windows\build\fe-monster-xaudio2.dll',
-    'native\windows\build\fe_monster_upmix.dll',
-    'plugins\music-api\FE-Monster-Netease-API-Plugin-4.32.0.zip',
-    'plugins\music-api\FE-Monster-QQ-API-Plugin-2.4.1.zip',
-    'plugins\music-api\FE-Monster-Kugou-API-Plugin-2.0.7.zip',
-    'plugins\music-api\FE-Monster-Qishui-OpenAPI-Plugin-3.1.1.zip'
+    'runtime/java/bin/java.exe',
+    'runtime/java/bin/javaw.exe',
+    'runtime/java/bin/FE Monster Backend.exe',
+    'native/windows/build/winforms/FE Monster.exe',
+    'native/windows/build/winforms/WebView2Loader.dll',
+    'native/windows/build/fe-monster-xaudio2.dll',
+    'native/windows/build/fe_monster_upmix.dll'
   )) {
-    $relativeFiles.Add($relative) | Out-Null
-  }
-  if ($includeOfflineWebView2) {
-    $relativeFiles.Add('runtime\installers\MicrosoftEdgeWebView2RuntimeInstallerX64.exe') | Out-Null
-  }
-  if (!$NoNodeBundle) {
-    $relativeFiles.Add('runtime\node\node.exe') | Out-Null
+    [void]$nativeAmd64RelativeFiles.Add($relative)
   }
 
   $entries = foreach ($relative in $relativeFiles) {
-    $path = Join-Path $payloadRoot $relative
-    if (!(Test-Path -LiteralPath $path -PathType Leaf)) {
-      throw "Payload integrity source is missing: $relative"
-    }
-    $machine = Get-PeMachine $path
-    # Microsoft's x64 WebView2 standalone package uses an x86 bootstrap stub
-    # while installing only the x64 Runtime selected by its signed package.
-    $isSignedWebView2Installer =
-      $relative -eq 'runtime\installers\MicrosoftEdgeWebView2RuntimeInstallerX64.exe'
-    if ($machine -ne 0 -and $machine -ne $peMachineAmd64 -and !$isSignedWebView2Installer) {
-      throw "Payload contains a non-x64 PE image: $relative (machine=0x$('{0:X4}' -f $machine))"
+    $path = Join-Path $payloadRoot $relative.Replace('/', '\')
+    $machine = $null
+    if ($nativeAmd64RelativeFiles.Contains($relative)) {
+      $machine = Get-PeMachine $path
+      if ($machine -ne $peMachineAmd64) {
+        throw "Payload contains a non-x64 native release executable: $relative (machine=0x$('{0:X4}' -f $machine))"
+      }
     }
     [ordered]@{
-      path = $relative.Replace('\', '/')
+      path = $relative
       length = (Get-Item -LiteralPath $path).Length
       sha256 = Get-FileSha256 $path
-      peMachine = $(if ($machine -eq 0 -or $isSignedWebView2Installer) { $null } else { $machine })
+      peMachine = $machine
     }
   }
 
-  $allFiles = @(Get-ChildItem -LiteralPath $payloadRoot -Recurse -File -Force)
-  $maxRelativePathLength = ($allFiles | ForEach-Object {
-    $_.FullName.Substring($payloadRoot.Length).TrimStart('\').Length
-  } | Measure-Object -Maximum).Maximum
+  $maxRelativePathLength = ($relativeFiles | ForEach-Object { $_.Length } |
+    Measure-Object -Maximum).Maximum
   $requiredInstallBytes = ($allFiles | Measure-Object -Property Length -Sum).Sum
   $manifest = [ordered]@{
     schemaVersion = 1
@@ -581,7 +542,7 @@ function New-PayloadIntegrityManifest {
   }
   $manifest |
     ConvertTo-Json -Depth 5 |
-    Set-Content -LiteralPath (Join-Path $payloadRoot $payloadIntegrityManifestName) -Encoding UTF8
+    Set-Content -LiteralPath $manifestPath -Encoding UTF8
 }
 
 function ConvertTo-NormalizedCommunityTlsPins {
@@ -1506,6 +1467,15 @@ if ($ReusePayloadZip) {
     $payloadRoot
   if ($LASTEXITCODE -ne 0) {
     throw "Staged camera hand-control removal check failed with exit code $LASTEXITCODE"
+  }
+  & powershell.exe `
+    -NoProfile `
+    -ExecutionPolicy Bypass `
+    -File (Join-Path $rootPath 'scripts\check-payload-integrity-tamper.ps1') `
+    -Root $rootPath `
+    -PayloadRoot $payloadRoot
+  if ($LASTEXITCODE -ne 0) {
+    throw "Staged payload ordinary JS/DLL integrity check failed with exit code $LASTEXITCODE"
   }
   if ($StageOnly) {
     & powershell.exe `

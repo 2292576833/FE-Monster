@@ -1,14 +1,19 @@
-# FE Monster 2.0.1 Windows 正式版
+# FE Monster 2.1.0 Windows 正式版
 
-发布日期：2026-08-13
+发布日期：2026-08-14
 
 ## 版本范围
 
-- `2.0.1` 用于 Windows 客户端、安装器、Java 对外版本和官方下载页。
+- `2.1.0` 用于 Windows 客户端、安装器和 Java 对外版本，并通过本仓库 GitHub Release 正式发布。
 - Android、iOS 和 macOS 本轮不发版，原有版本保持不变。
 - Rust 音频库与各音乐 API 插件使用独立版本，不跟随 Windows 应用版本统一递增。
 
 ## 重点更新
+
+- 新播放栏采用可中途反向的合成层 FLIP 展开/收起，右边缘稳定，文本保持清晰，并兼容减少动态效果设置。
+- 安装器重做为白色 Fluent 风格界面，提供明确的准备、安装、完成和失败状态、可折叠详情、键盘与高 DPI 支持，并直接显示自身 2.1.0 版本。
+- Windows WebView2 启动增加严格后端就绪探测、导航超时、首次失败自动重试、渲染进程恢复和软件渲染回退，避免干净电脑出现空白界面。
+- 主程序内嵌桌宠支持四边自动隐藏与靠近唤醒，并保护拖拽、面板、实时对话与产品演示状态。
 
 - 修复正常播放过程中偶发无声、进度停顿的问题，统一音频缓冲、代理续流、XAudio2 / X3DAudio / OBR 状态切换与歌词时钟。
 - 空间音频关闭时完全绕过 OBR；开启时支持 5.1 / 7.1 上混与双耳渲染，并加强异常回退和连接稳定性。
@@ -23,9 +28,10 @@
 
 ## Windows 安装包
 
-- 推荐联网版：`FE-Monster-Setup-2.0.1.exe`
-  - 大小：361.81 MiB（379,384,967 bytes）。
-  - SHA-256：`88c64df2f5ce5cec135e37d2e8423065482932baa2e7de86b6a84717a2111361`。
+- 推荐联网版：`FE-Monster-Setup-2.1.0.exe`。
+- 大小：361.88 MiB（379,460,743 字节）。
+- SHA-256：`C8B9A7D309BF5AB32EC7B4C1E5D63E4A108B5CC4DF4989F7B7E1C04DB8B87879`。
+- 最终校验值写入安装包同目录的外部 sidecar 与发布页，避免安装载荷自引用旧哈希。
 - 系统：Windows 10 / 11 x64
 - 联网安装器包含应用所需的 Java、Node.js 和原生音频组件；不再携带未使用的 Python 视觉识别运行库。
 - 联网版不再重复携带约 194 MiB 的 WebView2 离线安装器；电脑缺少 WebView2 时会使用 winget 或微软官方签名引导程序补装。
@@ -35,17 +41,17 @@
 
 ## API 插件
 
-Release 同时提供以下可独立导入的 ZIP，以及包含全部平台插件的 `plugins.zip`：
+客户端继续支持导入以下平台 API 插件；这些插件使用独立版本，不属于本次 Windows 安装器的 Release 资产：
 
 - 网易云音乐：`FE-Monster-Netease-API-Plugin-4.32.0.zip`
 - QQ 音乐：`FE-Monster-QQ-API-Plugin-2.4.1.zip`
 - 酷狗音乐：`FE-Monster-Kugou-API-Plugin-2.0.7.zip`
 - 汽水音乐：`FE-Monster-Qishui-OpenAPI-Plugin-3.1.1.zip`
 
-`plugins.zip` 是汇总下载包，需先解压，再在 FE Monster 登录页导入对应平台的单独 ZIP。插件不会绕过会员、版权、地区或账号权限。
+插件需在 FE Monster 登录页导入对应平台的单独 ZIP。插件不会绕过会员、版权、地区或账号权限。
 
 ## 校验
 
-安装包与插件的 SHA-256 以 GitHub Release 同名 `.sha256` 文件及 Release 说明为准。
+安装包的 SHA-256 以 GitHub Release 同名 `.sha256` 文件及 Release 说明为准。
 
 发布前执行 Java、WinForms、原生音频、音乐插件、网页场景、安装器契约、全新静默安装和下载页生产构建验证。

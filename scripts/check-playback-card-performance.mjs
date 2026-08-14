@@ -229,7 +229,7 @@ try {
     const compactLayoutWidth = card.offsetWidth;
     setQishuiPlaybackExpanded(true);
     const expandedLayoutWidth = card.offsetWidth;
-    const expansionAnimations = phone.getAnimations({ subtree: true })
+    const expansionAnimations = card.getAnimations({ subtree: true })
       .filter((animation) => animation.id?.startsWith('fe-qishui-playback-expand-'));
     const expansionKeyframeProperties = [...new Set(expansionAnimations.flatMap((animation) => (
       animation.effect.getKeyframes().flatMap((frame) => Object.keys(frame))
@@ -240,10 +240,10 @@ try {
       .split(',')
       .map((property) => property.trim());
     await new Promise((resolve) => setTimeout(resolve, PLAYBACK_CARD_EXPANSION_TRANSITION_MS + 60));
-    const expandedSettledTransform = getComputedStyle(phone).transform;
+    const expandedSettledTransform = getComputedStyle(card).transform;
     setQishuiPlaybackExpanded(false);
     await new Promise((resolve) => setTimeout(resolve, PLAYBACK_CARD_EXPANSION_TRANSITION_MS + 60));
-    const collapsedSettledTransform = getComputedStyle(phone).transform;
+    const collapsedSettledTransform = getComputedStyle(card).transform;
     const expansionMotion = {
       compactLayoutWidth,
       expandedLayoutWidth,
@@ -365,8 +365,8 @@ try {
         property === 'transform' || property === 'opacity'
       )),
       expansionAvoidsLayoutTransition: !expansionTransitionProperties.includes('width'),
-      expansionReleasesTextCompositor: expandedSettledTransform === 'none'
-        && collapsedSettledTransform === 'none',
+      expansionReleasesTextCompositor: [expandedSettledTransform, collapsedSettledTransform]
+        .every((value) => value === 'none' || value === 'matrix(1, 0, 0, 1, 0, 0)'),
       averageWithinBudget: stats.average <= thresholds.maxAverageMs,
       p95WithinBudget: stats.p95 <= thresholds.maxP95Ms,
       p99WithinBudget: stats.p99 <= thresholds.maxP99Ms,

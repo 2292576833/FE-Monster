@@ -74,6 +74,7 @@ public final class InstalledRemotePetConversationProbe {
         Map<String, Object> history = Map.of();
         long deadline = System.nanoTime() + Duration.ofSeconds(90).toNanos();
         boolean assistantReply = false;
+        int completedReadOnlyActions = 0;
         while (System.nanoTime() < deadline) {
             history = service.petHistory("fixture", "Final Installer QA", provider, sessionId);
             Map<String, Object> historySession = SimpleJson.asMap(history.get("session"));
@@ -84,6 +85,56 @@ public final class InstalledRemotePetConversationProbe {
                     assistantReply = true;
                     break;
                 }
+            }
+            for (Object value : SimpleJson.asList(historySession.get("pendingActions"))) {
+                Map<String, Object> action = SimpleJson.asMap(value);
+                if (!"pending".equals(SimpleJson.asString(action.get("status"), "pending"))) continue;
+                String actionId = SimpleJson.asString(action.get("actionId"), "");
+                String actionName = SimpleJson.asString(action.get("name"), "");
+                Map<String, Object> arguments = SimpleJson.asMap(action.get("arguments"));
+                String command = SimpleJson.asString(arguments.get("command"), "");
+                require("control_app".equals(actionName) && "app.capabilities.query".equals(command),
+                    "probe refused to execute a non-read-only client action: " + action);
+                require(!SimpleJson.asBoolean(action.get("requiresConfirmation"), false),
+                    "read-only capability query unexpectedly requires confirmation: " + action);
+                Map<String, Object> claim = service.petMutation(
+                    "fixture", "Final Installer QA", provider, "action-claim",
+                    Map.of("sessionId", sessionId, "actionId", actionId)
+                );
+                if (!SimpleJson.asBoolean(claim.get("claimed"), false)) continue;
+                Map<String, Object> capabilityResult = new LinkedHashMap<>();
+                capabilityResult.put("version", 2);
+                capabilityResult.put("commands", List.of(
+                    capabilityDefinition(
+                        "app.capabilities.query", "Read available application commands",
+                        Map.of("query", "string?", "category", "string?", "cursor", "number?", "limit", "number 1..20?")
+                    ),
+                    capabilityDefinition("app.context.query", "Read current application context", Map.of())
+                ));
+                capabilityResult.put("total", 2);
+                capabilityResult.put("cursor", 0);
+                capabilityResult.put("limit", 12);
+                capabilityResult.put("nextCursor", null);
+                capabilityResult.put("defaultPolicy", "allow-registered");
+                capabilityResult.put("deniedCategories", List.of(
+                    "dangerous", "destructive", "code-execution", "credential",
+                    "credentials", "filesystem-write"
+                ));
+                capabilityResult.put("arbitraryCode", false);
+                capabilityResult.put("shell", false);
+                capabilityResult.put("localConfirmation", true);
+                Map<String, Object> actionResult = service.petMutation(
+                    "fixture", "Final Installer QA", provider, "action-result",
+                    Map.of(
+                        "sessionId", sessionId,
+                        "actionId", actionId,
+                        "ok", true,
+                        "result", capabilityResult
+                    )
+                );
+                require(SimpleJson.asBoolean(actionResult.get("ok"), false),
+                    "read-only client action result failed: " + actionResult);
+                completedReadOnlyActions += 1;
             }
             String sessionState = SimpleJson.asString(historySession.get("state"), "");
             if (assistantReply && "idle".equals(sessionState)) break;
@@ -117,9 +168,28 @@ public final class InstalledRemotePetConversationProbe {
         result.put("chat", 202);
         result.put("chatState", SimpleJson.asString(SimpleJson.asMap(history.get("session")).get("state"), ""));
         result.put("chatAssistantReply", true);
+        result.put("completedReadOnlyActions", completedReadOnlyActions);
         result.put("narrate", 200);
         result.put("audioId", audioId);
         System.out.println(SimpleJson.stringify(result));
+    }
+
+    private static Map<String, Object> capabilityDefinition(
+        String command,
+        String description,
+        Map<String, Object> parameters
+    ) {
+        Map<String, Object> definition = new LinkedHashMap<>();
+        definition.put("command", command);
+        definition.put("title", description);
+        definition.put("description", description);
+        definition.put("category", "read");
+        definition.put("aliases", List.of());
+        definition.put("parameters", parameters);
+        definition.put("requiredParameterGroups", List.of());
+        definition.put("readOnly", true);
+        definition.put("requiresConfirmation", false);
+        return definition;
     }
 
     private static void require(boolean condition, String message) {

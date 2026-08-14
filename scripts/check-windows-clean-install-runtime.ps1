@@ -7,6 +7,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $rootPath = (Resolve-Path -LiteralPath $Root).Path
+$expectedAppVersion = [string](Get-Content -Raw -LiteralPath (Join-Path $rootPath 'package.json') | ConvertFrom-Json).version
 if ([string]::IsNullOrWhiteSpace($PayloadRoot)) {
   $PayloadRoot = Join-Path $rootPath 'out\installer\work\payload\FE Monster'
 }
@@ -322,7 +323,10 @@ try {
   $backendProcess.BeginErrorReadLine()
 
   $baseUrl = "http://127.0.0.1:$port"
-  [void](Wait-Json "$baseUrl/api/app/version" 25)
+  $versionInfo = Wait-Json "$baseUrl/api/app/version" 25
+  if ([string]$versionInfo.version -cne $expectedAppVersion) {
+    throw "Installed backend reports version '$($versionInfo.version)', expected '$expectedAppVersion'."
+  }
   $configuration = Wait-Json "$baseUrl/api/music-apis" 10
   $providerStartupMilliseconds = [ordered]@{}
   foreach ($entry in $expectedPlugins.GetEnumerator()) {
@@ -352,7 +356,7 @@ try {
 
   [pscustomobject]@{
     passed = $true
-    version = '2.0.1'
+    version = $expectedAppVersion
     installerMode = if ([string]::IsNullOrWhiteSpace($setupPath)) { 'staged-payload' } else { 'bundled-setup-exe' }
     setupAuthenticodeStatus = $setupAuthenticodeStatus
     installRootWasTemporary = $true

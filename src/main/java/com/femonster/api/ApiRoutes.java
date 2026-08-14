@@ -1832,7 +1832,7 @@ public final class ApiRoutes {
     private static Map<String, Object> appVersion() {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("name", "FE Monster Java");
-        body.put("version", "2.0.1");
+        body.put("version", "2.1.0");
         body.put("runtime", System.getProperty("java.version"));
         body.put("ok", true);
         return body;
@@ -2047,7 +2047,7 @@ public final class ApiRoutes {
 
     private static Map<String, Object> updatePayload() {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("version", "2.0.1");
+        body.put("version", "2.1.0");
         body.put("downloadUrl", "");
         body.put("releaseNotes", "New translucent playback page, clearer lyrics, independent lyric colors, rhythm mode, and adaptive preset performance.");
         body.put("fileSize", 0);

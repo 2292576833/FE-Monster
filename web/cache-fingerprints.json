@@ -19,8 +19,8 @@
     },
     {
       "path": "web/app.js",
-      "version": "20260813-achievement-rewards-1",
-      "sha256": "7f59837062d8dbb508dd8e69334f80b5901d40894965d6e88370def466f59a79"
+      "version": "20260813-playback-expand-smooth-2",
+      "sha256": "4b37c2428fbdb6a72e9c7c01c07fdb82be55a3d722c3ae5f2735691d2d65d6e7"
     },
     {
       "path": "web/black-gold-buttons.css",
@@ -119,13 +119,13 @@
     },
     {
       "path": "web/pet-assistant.css",
-      "version": "20260811-conversation-emotion-2",
-      "sha256": "518c38afb166826858f145931858c359a41cf119d656cc2580037d4a4278018e"
+      "version": "20260813-in-app-edge-hide-2",
+      "sha256": "41a8b00e177b6cdc8e66036c14065abe5256dab4706b53c272b1c45360c176c1"
     },
     {
       "path": "web/pet-assistant.js",
-      "version": "20260811-server-tour-tts-2",
-      "sha256": "a61cd83c448e7d43e0d92c5daf34f8dc2037a02ea3f2fc0808d1134829389b1e"
+      "version": "20260813-in-app-edge-hide-2",
+      "sha256": "0b8b042fbac4c6b41b618af0bf77389a21c46aff0d0d43884ee5f5c712e13495"
     },
     {
       "path": "web/pet-client-context.js",

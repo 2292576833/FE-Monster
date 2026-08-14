@@ -135,8 +135,8 @@ public final class LocalClientLauncher {
                 "--url", url,
                 "--width", String.valueOf(DEFAULT_WINDOW_WIDTH),
                 "--height", String.valueOf(DEFAULT_WINDOW_HEIGHT),
-                "--gpu", "true",
-                "--dx11", "true",
+                "--gpu", String.valueOf(setting(settings, "gpuAcceleration", true)),
+                "--dx11", String.valueOf(setting(settings, "directX11", true)),
                 "--xaudio2", String.valueOf(setting(settings, "xAudio2", true)),
                 "--x3daudio", String.valueOf(setting(settings, "x3DAudio", true))
             );
@@ -169,23 +169,22 @@ public final class LocalClientLauncher {
 
     private static String embeddedClientUrl(String url, Map<String, Object> settings) {
         String separator = url.contains("?") ? "&" : "?";
-        String render = isWindows() || setting(settings, "directX11", true) ? "directx11" : "default";
+        boolean gpuEnabled = setting(settings, "gpuAcceleration", true);
+        String render = gpuEnabled && setting(settings, "directX11", isWindows()) ? "directx11" : "default";
         String audio = setting(settings, "xAudio2", true) ? "xaudio2" : "html-audio";
         return url + separator + "client=embedded&render=" + render + "&audio=" + audio;
     }
 
     private static List<String> launchFlags(Map<String, Object> settings) {
-        if (!isWindows() && !setting(settings, "gpuAcceleration", true)) return List.of(GPU_DISABLED_FLAG);
+        if (!setting(settings, "gpuAcceleration", true)) {
+            return List.of(GPU_DISABLED_FLAG, "--autoplay-policy=no-user-gesture-required");
+        }
         List<String> flags = new ArrayList<>();
         if (isWindows() || setting(settings, "directX11", true)) {
             flags.add("--use-gl=angle");
-            flags.add("--use-angle=d3d11");
+            flags.add("--use-angle=default");
         }
-        flags.add("--enable-gpu-rasterization");
         flags.add("--enable-accelerated-2d-canvas");
-        flags.add("--force_high_performance_gpu");
-        flags.add("--ignore-gpu-blocklist");
-        flags.add("--disable-software-rasterizer");
         flags.add("--autoplay-policy=no-user-gesture-required");
         return flags;
     }
@@ -194,8 +193,8 @@ public final class LocalClientLauncher {
         Map<String, Object> effective = new LinkedHashMap<>();
         if (settings != null) effective.putAll(settings);
         if (isWindows()) {
-            effective.put("gpuAcceleration", true);
-            effective.put("directX11", true);
+            effective.putIfAbsent("gpuAcceleration", true);
+            effective.putIfAbsent("directX11", true);
         }
         return effective;
     }

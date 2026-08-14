@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.IO.Compression;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -57,22 +58,42 @@ internal static class Program
 
 internal sealed class SetupForm : Form
 {
+    private static readonly Color Accent = Color.FromArgb(15, 108, 189);
+    private static readonly Color TextPrimary = Color.FromArgb(31, 31, 31);
+    private static readonly Color TextSecondary = Color.FromArgb(96, 94, 92);
+    private static readonly Color Border = Color.FromArgb(225, 223, 221);
+    private static readonly Color SubtleSurface = Color.FromArgb(250, 250, 250);
+
     private readonly string exePath;
     private readonly SetupOptions options;
     private readonly TextBox installPathBox;
     private readonly TextBox logBox;
     private readonly Label statusLabel;
+    private readonly Label statusDescriptionLabel;
+    private readonly Label packageModeLabel;
+    private readonly Label packageModeDescriptionLabel;
+    private readonly Panel statusAccent;
     private readonly Button installButton;
     private readonly Button closeButton;
     private readonly Button browseButton;
     private readonly Button openFolderButton;
+    private readonly Button detailsButton;
     private readonly CheckBox launchAfterInstallBox;
-    private readonly ProgressBar progressBar;
+    private readonly FluentProgressIndicator progressBar;
+    private readonly Control detailsHost;
     private readonly System.Windows.Forms.Timer logTimer;
     private Process? installProcess;
     private string? tempRoot;
     private string logPath = "";
     private long lastLogLength;
+    private bool detailsExpanded;
+
+    private static string DisplayProductVersion(string productVersion)
+    {
+        if (!Version.TryParse(productVersion, out Version? version)) return productVersion;
+        int patch = Math.Max(0, version.Build);
+        return $"{version.Major}.{version.Minor}.{patch}";
+    }
 
     public SetupForm(string exePath, SetupOptions options)
     {
@@ -82,198 +103,462 @@ internal sealed class SetupForm : Form
 
         Text = "FE Monster Setup";
         StartPosition = FormStartPosition.CenterScreen;
-        FormBorderStyle = FormBorderStyle.FixedSingle;
+        FormBorderStyle = FormBorderStyle.Sizable;
         MaximizeBox = false;
         MinimizeBox = true;
-        ClientSize = new Size(640, 520);
-        BackColor = Color.FromArgb(16, 20, 24);
-        ForeColor = Color.FromArgb(246, 252, 255);
-        Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
+        ClientSize = new Size(760, 650);
+        MinimumSize = new Size(680, 590);
+        BackColor = Color.White;
+        ForeColor = TextPrimary;
+        Font = new Font("Segoe UI", 9.25f, FontStyle.Regular, GraphicsUnit.Point);
+        AutoScaleMode = AutoScaleMode.Dpi;
+        AutoScaleDimensions = new SizeF(96f, 96f);
+        KeyPreview = true;
+        AccessibleName = "FE Monster 安装程序";
+        AccessibleDescription = "安装 FE Monster 桌面客户端。";
         Icon = SetupEngine.AssociatedIcon(exePath);
 
-        Panel header = new()
+        TableLayoutPanel page = new()
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.White,
+            ColumnCount = 1,
+            RowCount = 4,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        page.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+        page.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        page.RowStyles.Add(new RowStyle(SizeType.Absolute, 1f));
+        page.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+        page.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        TableLayoutPanel header = new()
         {
             Dock = DockStyle.Top,
-            Height = 116,
-            Padding = new Padding(22, 20, 22, 12),
-            BackColor = Color.FromArgb(22, 28, 33)
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            ColumnCount = 2,
+            RowCount = 1,
+            Padding = new Padding(32, 22, 32, 18),
+            BackColor = Color.White,
+            Margin = Padding.Empty
         };
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 64f));
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 
         PictureBox logo = new()
         {
-            Size = new Size(70, 70),
-            Location = new Point(22, 20),
+            Size = new Size(52, 52),
+            Margin = new Padding(0, 2, 12, 0),
             SizeMode = PictureBoxSizeMode.Zoom,
-            Image = Icon?.ToBitmap()
+            Image = Icon?.ToBitmap(),
+            AccessibleName = "FE Monster 图标",
+            TabStop = false
         };
-        header.Controls.Add(logo);
+        header.Controls.Add(logo, 0, 0);
+
+        TableLayoutPanel heading = new()
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            ColumnCount = 1,
+            RowCount = 2,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
 
         Label title = new()
         {
             AutoSize = true,
-            Location = new Point(110, 28),
-            Text = "FE Monster",
-            Font = new Font("Segoe UI", 22f, FontStyle.Bold),
-            ForeColor = Color.White
+            Dock = DockStyle.Fill,
+            Text = "安装 FE Monster",
+            Font = new Font("Segoe UI Semibold", 20f, FontStyle.Regular, GraphicsUnit.Point),
+            ForeColor = TextPrimary,
+            Margin = Padding.Empty
         };
-        header.Controls.Add(title);
+        heading.Controls.Add(title, 0, 0);
 
         Label subtitle = new()
         {
             AutoSize = true,
-            Location = new Point(114, 72),
-            Text = "Install the embedded desktop client and local music services.",
-            ForeColor = Color.FromArgb(184, 210, 220)
+            Dock = DockStyle.Fill,
+            Text = $"桌面客户端、桌宠与本地音乐服务 · 版本 {DisplayProductVersion(Application.ProductVersion)}",
+            ForeColor = TextSecondary,
+            Margin = new Padding(2, 4, 0, 0)
         };
-        header.Controls.Add(subtitle);
+        heading.Controls.Add(subtitle, 0, 1);
+        header.Controls.Add(heading, 1, 0);
+        page.Controls.Add(header, 0, 0);
 
-        Panel content = new()
+        Panel headerDivider = new()
         {
             Dock = DockStyle.Fill,
-            Padding = new Padding(22, 18, 22, 12),
-            BackColor = BackColor
+            BackColor = Border,
+            Margin = Padding.Empty,
+            TabStop = false
         };
+        page.Controls.Add(headerDivider, 0, 1);
+
+        Panel contentViewport = new()
+        {
+            Dock = DockStyle.Fill,
+            AutoScroll = true,
+            Padding = new Padding(32, 22, 32, 18),
+            BackColor = Color.White,
+            Margin = Padding.Empty
+        };
+        TableLayoutPanel content = new()
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            ColumnCount = 1,
+            RowCount = 9,
+            BackColor = Color.White,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
 
         Label pathLabel = new()
         {
             AutoSize = true,
             Text = "\u5b89\u88c5\u8def\u5f84",
-            ForeColor = Color.FromArgb(218, 236, 244),
-            Location = new Point(22, 18)
+            Font = new Font("Segoe UI Semibold", 10f, FontStyle.Regular, GraphicsUnit.Point),
+            ForeColor = TextPrimary,
+            Margin = new Padding(0, 0, 0, 4)
         };
-        content.Controls.Add(pathLabel);
+        content.Controls.Add(pathLabel, 0, 0);
+
+        Label pathHelp = new()
+        {
+            AutoSize = true,
+            Text = "应用与运行环境将安装到此文件夹。个人设置会在升级时保留。",
+            ForeColor = TextSecondary,
+            Margin = new Padding(0, 0, 0, 10)
+        };
+        content.Controls.Add(pathHelp, 0, 1);
+
+        TableLayoutPanel pathRow = new()
+        {
+            Dock = DockStyle.Top,
+            AutoSize = false,
+            Height = 34,
+            ColumnCount = 3,
+            RowCount = 1,
+            Margin = new Padding(0, 0, 0, 16),
+            Padding = Padding.Empty
+        };
+        pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+        pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 104f));
+        pathRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 104f));
 
         installPathBox = new TextBox
         {
-            Location = new Point(22, 44),
-            Size = new Size(394, 28),
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 1, 0, 1),
             Text = options.InstallDir,
-            BackColor = Color.FromArgb(28, 36, 42),
-            ForeColor = Color.White,
-            BorderStyle = BorderStyle.FixedSingle
+            BackColor = SystemInformation.HighContrast ? SystemColors.Window : Color.White,
+            ForeColor = SystemInformation.HighContrast ? SystemColors.WindowText : TextPrimary,
+            BorderStyle = BorderStyle.FixedSingle,
+            AccessibleName = "安装位置",
+            AccessibleDescription = "FE Monster 的安装文件夹路径。",
+            TabIndex = 0
         };
-        content.Controls.Add(installPathBox);
+        pathRow.Controls.Add(installPathBox, 0, 0);
 
-        browseButton = new Button
+        browseButton = new FluentButton(FluentButtonKind.Secondary)
         {
-            Location = new Point(426, 43),
-            Size = new Size(82, 30),
+            Dock = DockStyle.Fill,
+            Margin = new Padding(8, 0, 0, 0),
             Text = "\u9009\u62e9\u8def\u5f84",
-            BackColor = Color.FromArgb(42, 54, 62),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat
+            AccessibleName = "选择安装位置",
+            TabIndex = 1
         };
-        browseButton.FlatAppearance.BorderColor = Color.FromArgb(74, 96, 108);
         browseButton.Click += (_, _) => BrowseInstallPath();
-        content.Controls.Add(browseButton);
+        pathRow.Controls.Add(browseButton, 1, 0);
 
-        openFolderButton = new Button
+        openFolderButton = new FluentButton(FluentButtonKind.Secondary)
         {
-            Location = new Point(516, 43),
-            Size = new Size(80, 30),
+            Dock = DockStyle.Fill,
+            Margin = new Padding(8, 0, 0, 0),
             Text = "\u6253\u5f00\u76ee\u5f55",
-            BackColor = Color.FromArgb(42, 54, 62),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat
+            AccessibleName = "打开安装目录",
+            TabIndex = 2
         };
-        openFolderButton.FlatAppearance.BorderColor = Color.FromArgb(74, 96, 108);
         openFolderButton.Click += (_, _) => OpenInstallFolder();
-        content.Controls.Add(openFolderButton);
+        pathRow.Controls.Add(openFolderButton, 2, 0);
+        content.Controls.Add(pathRow, 0, 2);
+
+        FluentCardPanel packageCard = new()
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Padding = new Padding(16, 12, 16, 12),
+            Margin = new Padding(0, 0, 0, 16),
+            BackColor = SubtleSurface
+        };
+        TableLayoutPanel packageLayout = new()
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            ColumnCount = 1,
+            RowCount = 2,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        packageModeLabel = new Label
+        {
+            AutoSize = true,
+            Font = new Font("Segoe UI Semibold", 9.25f, FontStyle.Regular, GraphicsUnit.Point),
+            ForeColor = Accent,
+            Margin = Padding.Empty
+        };
+        packageModeDescriptionLabel = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(620, 0),
+            ForeColor = TextSecondary,
+            Margin = new Padding(0, 3, 0, 0)
+        };
+        packageLayout.Controls.Add(packageModeLabel, 0, 0);
+        packageLayout.Controls.Add(packageModeDescriptionLabel, 0, 1);
+        packageCard.Controls.Add(packageLayout);
+        content.Controls.Add(packageCard, 0, 3);
+
+        UpdateDistributionMode(SetupEngine.InferDistributionMode(exePath));
+
+        FluentCardPanel stateCard = new()
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Padding = new Padding(20, 16, 20, 16),
+            Margin = new Padding(0, 0, 0, 12),
+            BackColor = Color.White
+        };
+        statusAccent = new Panel
+        {
+            Dock = DockStyle.Left,
+            Width = 4,
+            BackColor = Accent,
+            Margin = Padding.Empty,
+            TabStop = false
+        };
+        TableLayoutPanel stateLayout = new()
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            ColumnCount = 1,
+            RowCount = 3,
+            Margin = Padding.Empty,
+            Padding = new Padding(10, 0, 0, 0)
+        };
 
         statusLabel = new Label
         {
-            AutoEllipsis = true,
-            Location = new Point(22, 92),
-            Size = new Size(574, 22),
-            Text = "Ready to install.",
-            ForeColor = Color.FromArgb(184, 226, 236)
+            AutoSize = true,
+            Dock = DockStyle.Fill,
+            Font = new Font("Segoe UI Semibold", 12f, FontStyle.Regular, GraphicsUnit.Point),
+            ForeColor = TextPrimary,
+            AccessibleName = "安装状态",
+            Margin = Padding.Empty
         };
-        content.Controls.Add(statusLabel);
+        stateLayout.Controls.Add(statusLabel, 0, 0);
 
-        progressBar = new ProgressBar
+        statusDescriptionLabel = new Label
         {
-            Location = new Point(22, 122),
-            Size = new Size(574, 10),
-            Style = ProgressBarStyle.Blocks
+            AutoSize = true,
+            Dock = DockStyle.Fill,
+            MaximumSize = new Size(620, 0),
+            ForeColor = TextSecondary,
+            Margin = new Padding(0, 4, 0, 12)
         };
-        content.Controls.Add(progressBar);
+        stateLayout.Controls.Add(statusDescriptionLabel, 0, 1);
+
+        progressBar = new FluentProgressIndicator
+        {
+            Dock = DockStyle.Top,
+            Height = 5,
+            AccessibleName = "安装进度",
+            AccessibleDescription = "显示安装准备、安装、完成或失败状态。",
+            AccessibleRole = AccessibleRole.ProgressBar,
+            Margin = Padding.Empty
+        };
+        stateLayout.Controls.Add(progressBar, 0, 2);
+        stateCard.Controls.Add(stateLayout);
+        stateCard.Controls.Add(statusAccent);
+        content.Controls.Add(stateCard, 0, 4);
 
         launchAfterInstallBox = new CheckBox
         {
-            Location = new Point(22, 140),
-            Size = new Size(574, 24),
+            AutoSize = true,
             Text = "安装完成后启动 FE Monster",
             Checked = options.LaunchAfterInstall,
-            BackColor = this.BackColor,
-            ForeColor = Color.FromArgb(218, 236, 244),
-            FlatStyle = FlatStyle.Flat
+            BackColor = Color.White,
+            ForeColor = TextPrimary,
+            AccessibleName = "安装完成后启动 FE Monster",
+            Margin = new Padding(0, 0, 0, 12),
+            TabIndex = 3
         };
-        content.Controls.Add(launchAfterInstallBox);
+        content.Controls.Add(launchAfterInstallBox, 0, 5);
+
+        detailsButton = new FluentButton(FluentButtonKind.Subtle)
+        {
+            AutoSize = false,
+            Dock = DockStyle.Top,
+            Height = 34,
+            Text = "显示安装详情",
+            TextAlign = ContentAlignment.MiddleLeft,
+            AccessibleName = "显示安装详情",
+            Margin = new Padding(0, 0, 0, 8),
+            TabIndex = 4
+        };
+        detailsButton.Click += (_, _) => ToggleDetails();
+        content.Controls.Add(detailsButton, 0, 6);
 
         logBox = new TextBox
         {
-            Location = new Point(22, 170),
-            Size = new Size(574, 156),
+            Dock = DockStyle.Fill,
             Multiline = true,
             ReadOnly = true,
             ScrollBars = ScrollBars.Vertical,
-            BackColor = Color.FromArgb(8, 10, 12),
-            ForeColor = Color.FromArgb(210, 232, 240),
-            BorderStyle = BorderStyle.FixedSingle,
-            Font = new Font("Consolas", 9f, FontStyle.Regular)
+            BackColor = SystemInformation.HighContrast ? SystemColors.Window : Color.White,
+            ForeColor = SystemInformation.HighContrast ? SystemColors.WindowText : TextPrimary,
+            BorderStyle = BorderStyle.None,
+            Font = new Font("Consolas", 9f, FontStyle.Regular, GraphicsUnit.Point),
+            AccessibleName = "安装详细信息",
+            AccessibleDescription = "安装过程日志与错误详情。",
+            TabIndex = 5
         };
-        content.Controls.Add(logBox);
+        FluentCardPanel logHost = new()
+        {
+            Dock = DockStyle.Top,
+            Height = 174,
+            Padding = new Padding(12),
+            Margin = new Padding(0, 0, 0, 4),
+            BackColor = Color.White,
+            Visible = false
+        };
+        logHost.Controls.Add(logBox);
+        detailsHost = logHost;
+        content.Controls.Add(detailsHost, 0, 7);
+        contentViewport.Controls.Add(content);
+        page.Controls.Add(contentViewport, 0, 2);
 
-        Panel footer = new()
+        TableLayoutPanel footer = new()
         {
             Dock = DockStyle.Bottom,
-            Height = 66,
-            Padding = new Padding(22, 14, 22, 14),
-            BackColor = BackColor
+            AutoSize = false,
+            Height = 68,
+            ColumnCount = 1,
+            RowCount = 1,
+            Padding = new Padding(32, 14, 32, 14),
+            BackColor = SubtleSurface,
+            Margin = Padding.Empty
         };
-
+        footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+        footer.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+        footer.Paint += (_, e) =>
+        {
+            Color dividerColor = SystemInformation.HighContrast
+                ? SystemColors.WindowText
+                : Border;
+            using Pen divider = new(dividerColor, 1f);
+            e.Graphics.DrawLine(divider, 0, 0, footer.Width, 0);
+        };
+        TableLayoutPanel footerLayout = new()
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = false,
+            ColumnCount = 2,
+            RowCount = 1,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        footerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+        footerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        Label scopeLabel = new()
+        {
+            AutoSize = true,
+            Anchor = AnchorStyles.Left,
+            Text = "仅为当前用户安装，无需管理员权限",
+            ForeColor = TextSecondary,
+            Margin = Padding.Empty
+        };
+        footerLayout.Controls.Add(scopeLabel, 0, 0);
         FlowLayoutPanel buttonRow = new()
         {
-            Dock = DockStyle.Right,
-            Width = 238,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Anchor = AnchorStyles.Right,
             FlowDirection = FlowDirection.RightToLeft,
             WrapContents = false,
-            BackColor = BackColor
+            BackColor = SubtleSurface,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
         };
 
-        installButton = new Button
+        installButton = new FluentButton(FluentButtonKind.Primary)
         {
-            Text = "点击安装",
-            Size = new Size(108, 34),
-            Margin = new Padding(6, 0, 0, 0),
-            BackColor = Color.FromArgb(92, 197, 220),
-            ForeColor = Color.FromArgb(4, 12, 16),
-            FlatStyle = FlatStyle.Flat
+            Text = "安装",
+            Size = new Size(116, 38),
+            Margin = new Padding(8, 0, 0, 0),
+            AccessibleName = "安装 FE Monster",
+            TabIndex = 6
         };
-        installButton.FlatAppearance.BorderSize = 0;
         installButton.Click += async (_, _) => await StartInstallAsync();
 
-        closeButton = new Button
+        closeButton = new FluentButton(FluentButtonKind.Secondary)
         {
             Text = "关闭",
-            Size = new Size(108, 34),
-            Margin = new Padding(6, 0, 0, 0),
-            BackColor = Color.FromArgb(40, 49, 56),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat
+            Size = new Size(96, 38),
+            Margin = Padding.Empty,
+            AccessibleName = "关闭安装程序",
+            TabIndex = 7
         };
-        closeButton.FlatAppearance.BorderColor = Color.FromArgb(72, 88, 98);
         closeButton.Click += (_, _) => Close();
         buttonRow.Controls.Add(closeButton);
         buttonRow.Controls.Add(installButton);
-        footer.Controls.Add(buttonRow);
-        content.Controls.Add(footer);
+        footerLayout.Controls.Add(buttonRow, 1, 0);
+        footer.Controls.Add(footerLayout, 0, 0);
+        page.Controls.Add(footer, 0, 3);
 
-        Controls.Add(content);
-        Controls.Add(header);
+        Controls.Add(page);
+        AcceptButton = installButton;
+        CancelButton = closeButton;
+
+        if (SystemInformation.HighContrast)
+        {
+            ApplyHighContrastPalette(page);
+            headerDivider.BackColor = SystemColors.WindowText;
+        }
 
         logTimer = new System.Windows.Forms.Timer { Interval = 500 };
         logTimer.Tick += (_, _) => RefreshLog();
+        ApplyVisualState(SetupVisualState.Ready);
+#if DEBUG
+        if (options.PreviewState is SetupVisualState previewState && previewState != SetupVisualState.Ready)
+        {
+            SetInstallControlsEnabled(previewState == SetupVisualState.Failed);
+            ApplyVisualState(
+                previewState,
+                previewState == SetupVisualState.Failed
+                    ? "安装包校验失败，文件可能下载不完整或已损坏。请重新下载安装包后重试。"
+                    : null
+            );
+            if (previewState == SetupVisualState.Failed)
+            {
+                AppendLog("示例错误：安装包完整性校验未通过。请重新下载安装包后重试。");
+                ExpandDetails();
+            }
+        }
+#endif
     }
 
     public int ExitCode { get; private set; }
@@ -364,27 +649,23 @@ internal sealed class SetupForm : Form
         string rawInstallDir = installPathBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(rawInstallDir))
         {
-            MessageBox.Show("\u8bf7\u5148\u9009\u62e9\u5b89\u88c5\u8def\u5f84\u3002", "FE Monster Setup", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            ApplyVisualState(SetupVisualState.Failed, "请先选择一个安装位置，然后重试。");
+            installPathBox.Focus();
             return;
         }
-        string installDir = Path.GetFullPath(Environment.ExpandEnvironmentVariables(rawInstallDir));
-        installPathBox.Text = installDir;
 
-        installButton.Enabled = false;
-        closeButton.Enabled = false;
-        installPathBox.Enabled = false;
-        browseButton.Enabled = false;
-        openFolderButton.Enabled = false;
-        launchAfterInstallBox.Enabled = false;
-        progressBar.Style = ProgressBarStyle.Marquee;
-        statusLabel.Text = "Preparing installer payload...";
+        SetInstallControlsEnabled(false);
+        ApplyVisualState(SetupVisualState.Preparing);
         logBox.Clear();
 
         try
         {
+            string installDir = Path.GetFullPath(Environment.ExpandEnvironmentVariables(rawInstallDir));
+            installPathBox.Text = installDir;
             SetupEngine.ValidateInstallDirectoryBoundary(installDir);
             tempRoot = await Task.Run(() => SetupEngine.ExtractBundle(exePath, installDir));
             PayloadPreparation payload = await Task.Run(() => SetupEngine.PreparePayload(tempRoot));
+            UpdateDistributionMode(payload.WebView2Mode);
             string installScript = Path.Combine(tempRoot, "install-fe-monster.ps1");
             if (!File.Exists(installScript))
             {
@@ -394,7 +675,7 @@ internal sealed class SetupForm : Form
 
             logPath = SetupEngine.CreateInstallerSessionLogPath(installDir);
             lastLogLength = 0;
-            statusLabel.Text = "Installing FE Monster...";
+            ApplyVisualState(SetupVisualState.Installing);
             logTimer.Start();
 
             ProcessStartInfo startInfo = SetupEngine.CreateInstallerStartInfo(
@@ -411,49 +692,166 @@ internal sealed class SetupForm : Form
 
             await Task.Run(() => installProcess.WaitForExit());
             RefreshLog(force: true);
-            progressBar.Style = ProgressBarStyle.Blocks;
 
             if (installProcess.ExitCode == 0)
             {
                 ExitCode = 0;
-                statusLabel.Text = "FE Monster setup completed.";
-                installButton.Text = "已完成";
-                closeButton.Text = "完成";
-                closeButton.Enabled = true;
+                ApplyVisualState(SetupVisualState.Completed);
             }
             else
             {
                 ExitCode = installProcess.ExitCode;
-                statusLabel.Text = "FE Monster setup failed. Check the log below.";
-                installButton.Text = "重新安装";
-                installButton.Enabled = true;
-                closeButton.Enabled = true;
-                installPathBox.Enabled = true;
-                browseButton.Enabled = true;
-                openFolderButton.Enabled = true;
-                launchAfterInstallBox.Enabled = true;
+                SetInstallControlsEnabled(true);
+                ApplyVisualState(
+                    SetupVisualState.Failed,
+                    "安装进程没有成功完成。关闭正在运行的 FE Monster 后重试，或查看安装详情。"
+                );
+                ExpandDetails();
             }
         }
         catch (Exception error)
         {
             SetupEngine.WriteDiagnosticLog("interactive-install", error);
             ExitCode = 1;
-            progressBar.Style = ProgressBarStyle.Blocks;
-            statusLabel.Text = "FE Monster setup failed.";
             AppendLog(error.Message);
-            installButton.Text = "重新安装";
-            installButton.Enabled = true;
-            closeButton.Enabled = true;
-            installPathBox.Enabled = true;
-            browseButton.Enabled = true;
-            openFolderButton.Enabled = true;
-            launchAfterInstallBox.Enabled = true;
+            SetInstallControlsEnabled(true);
+            ApplyVisualState(SetupVisualState.Failed, FriendlyFailureText(error));
+            ExpandDetails();
         }
         finally
         {
             logTimer.Stop();
             CleanupTempRoot();
         }
+    }
+
+    private void ApplyVisualState(SetupVisualState state, string? detail = null)
+    {
+        switch (state)
+        {
+            case SetupVisualState.Ready:
+                statusLabel.Text = "准备安装";
+                statusDescriptionLabel.Text = "安装程序会先校验文件完整性，再安全更新现有版本。";
+                statusAccent.BackColor = Accent;
+                progressBar.State = SetupProgressState.Ready;
+                installButton.Text = "安装";
+                installButton.Enabled = true;
+                closeButton.Text = "关闭";
+                closeButton.Enabled = true;
+                AcceptButton = installButton;
+                break;
+            case SetupVisualState.Preparing:
+                statusLabel.Text = "正在准备安装";
+                statusDescriptionLabel.Text = "正在校验安装包、磁盘空间和系统兼容性。";
+                statusAccent.BackColor = Accent;
+                progressBar.State = SetupProgressState.Running;
+                installButton.Text = "准备中";
+                installButton.Enabled = false;
+                closeButton.Enabled = false;
+                break;
+            case SetupVisualState.Installing:
+                statusLabel.Text = "正在安装 FE Monster";
+                statusDescriptionLabel.Text = "请保持此窗口打开。升级过程中会保留个人数据。";
+                statusAccent.BackColor = Accent;
+                progressBar.State = SetupProgressState.Running;
+                installButton.Text = "安装中";
+                installButton.Enabled = false;
+                closeButton.Enabled = false;
+                break;
+            case SetupVisualState.Completed:
+                statusLabel.Text = "安装完成";
+                statusDescriptionLabel.Text = "FE Monster 已准备就绪，可以立即开始使用。";
+                statusAccent.BackColor = Color.FromArgb(16, 124, 16);
+                progressBar.State = SetupProgressState.Completed;
+                installButton.Text = "已安装";
+                installButton.Enabled = false;
+                closeButton.Text = "完成";
+                closeButton.Enabled = true;
+                AcceptButton = closeButton;
+                closeButton.Focus();
+                break;
+            case SetupVisualState.Failed:
+                statusLabel.Text = "安装未完成";
+                statusDescriptionLabel.Text = string.IsNullOrWhiteSpace(detail)
+                    ? "请查看安装详情并重试。"
+                    : detail;
+                statusAccent.BackColor = Color.FromArgb(196, 43, 28);
+                progressBar.State = SetupProgressState.Failed;
+                installButton.Text = "重试安装";
+                installButton.Enabled = true;
+                closeButton.Text = "关闭";
+                closeButton.Enabled = true;
+                AcceptButton = installButton;
+                break;
+        }
+        statusLabel.AccessibleDescription = statusDescriptionLabel.Text;
+        installButton.Invalidate();
+        closeButton.Invalidate();
+    }
+
+    private void SetInstallControlsEnabled(bool enabled)
+    {
+        installPathBox.Enabled = enabled;
+        browseButton.Enabled = enabled;
+        openFolderButton.Enabled = enabled;
+        launchAfterInstallBox.Enabled = enabled;
+        closeButton.Enabled = enabled;
+    }
+
+    private void UpdateDistributionMode(string mode)
+    {
+        bool offline = string.Equals(mode, "offline", StringComparison.OrdinalIgnoreCase);
+        packageModeLabel.Text = offline ? "离线安装包" : "在线安装包";
+        packageModeDescriptionLabel.Text = offline
+            ? "基础运行环境已包含在安装包中。社区与桌宠对话功能仍需要网络连接。"
+            : "缺少 WebView2 时会从 Microsoft 安全获取。社区与桌宠对话功能需要网络连接。";
+        packageModeLabel.AccessibleDescription = packageModeDescriptionLabel.Text;
+    }
+
+    private void ToggleDetails()
+    {
+        detailsExpanded = !detailsExpanded;
+        detailsHost.Visible = detailsExpanded;
+        detailsButton.Text = detailsExpanded ? "隐藏安装详情" : "显示安装详情";
+        detailsButton.AccessibleName = detailsButton.Text;
+        if (detailsExpanded) logBox.Focus();
+    }
+
+    private void ExpandDetails()
+    {
+        if (detailsExpanded) return;
+        detailsExpanded = true;
+        detailsHost.Visible = true;
+        detailsButton.Text = "隐藏安装详情";
+        detailsButton.AccessibleName = detailsButton.Text;
+    }
+
+    private static string FriendlyFailureText(Exception error)
+    {
+        if (error is InvalidDataException)
+        {
+            return "安装包校验失败，文件可能下载不完整或已损坏。请重新下载安装包后重试。";
+        }
+        if (error is UnauthorizedAccessException)
+        {
+            return "无法写入所选文件夹。请选择当前用户有权限的位置后重试。";
+        }
+        if (error is IOException && error.Message.Contains("space", StringComparison.OrdinalIgnoreCase))
+        {
+            return "磁盘可用空间不足。释放空间或更换安装位置后重试。";
+        }
+        if (error is PlatformNotSupportedException) return error.Message;
+        return "安装没有完成。请查看安装详情，处理提示的问题后重试。";
+    }
+
+    private static void ApplyHighContrastPalette(Control root)
+    {
+        if (root is not FluentButton && root is not FluentProgressIndicator)
+        {
+            root.BackColor = SystemColors.Window;
+            root.ForeColor = SystemColors.WindowText;
+        }
+        foreach (Control child in root.Controls) ApplyHighContrastPalette(child);
     }
 
     private void RefreshLog(bool force = false)
@@ -491,20 +889,348 @@ internal sealed class SetupForm : Form
     }
 }
 
+internal enum SetupVisualState
+{
+    Ready,
+    Preparing,
+    Installing,
+    Completed,
+    Failed
+}
+
+internal enum SetupProgressState
+{
+    Ready,
+    Running,
+    Completed,
+    Failed
+}
+
+internal enum FluentButtonKind
+{
+    Primary,
+    Secondary,
+    Subtle
+}
+
+internal sealed class FluentButton : Button
+{
+    private readonly FluentButtonKind kind;
+    private bool hot;
+    private bool pressed;
+
+    public FluentButton(FluentButtonKind kind)
+    {
+        this.kind = kind;
+        FlatStyle = FlatStyle.Flat;
+        FlatAppearance.BorderSize = 0;
+        UseVisualStyleBackColor = false;
+        Cursor = Cursors.Hand;
+        Font = new Font("Segoe UI Semibold", 9.25f, FontStyle.Regular, GraphicsUnit.Point);
+        Padding = new Padding(12, 0, 12, 0);
+        SetStyle(
+            ControlStyles.AllPaintingInWmPaint |
+            ControlStyles.OptimizedDoubleBuffer |
+            ControlStyles.ResizeRedraw |
+            ControlStyles.UserPaint,
+            true
+        );
+    }
+
+    protected override void OnMouseEnter(EventArgs e)
+    {
+        hot = true;
+        Invalidate();
+        base.OnMouseEnter(e);
+    }
+
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        hot = false;
+        pressed = false;
+        Invalidate();
+        base.OnMouseLeave(e);
+    }
+
+    protected override void OnMouseDown(MouseEventArgs mevent)
+    {
+        if (mevent.Button == MouseButtons.Left) pressed = true;
+        Invalidate();
+        base.OnMouseDown(mevent);
+    }
+
+    protected override void OnMouseUp(MouseEventArgs mevent)
+    {
+        pressed = false;
+        Invalidate();
+        base.OnMouseUp(mevent);
+    }
+
+    protected override void OnGotFocus(EventArgs e)
+    {
+        Invalidate();
+        base.OnGotFocus(e);
+    }
+
+    protected override void OnLostFocus(EventArgs e)
+    {
+        Invalidate();
+        base.OnLostFocus(e);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        Rectangle bounds = new(0, 0, Math.Max(1, Width - 1), Math.Max(1, Height - 1));
+        bool highContrast = SystemInformation.HighContrast;
+        Color background;
+        Color foreground;
+        Color border;
+
+        if (!Enabled)
+        {
+            background = highContrast ? SystemColors.Control : Color.FromArgb(243, 242, 241);
+            foreground = highContrast ? SystemColors.GrayText : Color.FromArgb(161, 159, 157);
+            border = highContrast ? SystemColors.GrayText : Color.FromArgb(225, 223, 221);
+        }
+        else if (highContrast)
+        {
+            background = Focused ? SystemColors.Highlight : SystemColors.ButtonFace;
+            foreground = Focused ? SystemColors.HighlightText : SystemColors.ControlText;
+            border = SystemColors.ControlText;
+        }
+        else if (kind == FluentButtonKind.Primary)
+        {
+            background = pressed
+                ? Color.FromArgb(0, 72, 127)
+                : hot || Focused ? Color.FromArgb(17, 94, 163) : Color.FromArgb(15, 108, 189);
+            foreground = Color.White;
+            border = background;
+        }
+        else if (kind == FluentButtonKind.Subtle)
+        {
+            background = pressed
+                ? Color.FromArgb(237, 235, 233)
+                : hot || Focused ? Color.FromArgb(243, 242, 241) : Color.White;
+            foreground = Color.FromArgb(50, 49, 48);
+            border = background;
+        }
+        else
+        {
+            background = pressed
+                ? Color.FromArgb(237, 235, 233)
+                : hot || Focused ? Color.FromArgb(250, 249, 248) : Color.White;
+            foreground = Color.FromArgb(50, 49, 48);
+            border = hot || Focused ? Color.FromArgb(96, 94, 92) : Color.FromArgb(138, 136, 134);
+        }
+
+        using GraphicsPath path = RoundedRectangle(bounds, kind == FluentButtonKind.Subtle ? 5 : 4);
+        using SolidBrush backgroundBrush = new(background);
+        e.Graphics.FillPath(backgroundBrush, path);
+        if (kind != FluentButtonKind.Subtle || highContrast)
+        {
+            using Pen borderPen = new(border, 1f);
+            e.Graphics.DrawPath(borderPen, path);
+        }
+
+        TextFormatFlags flags = TextFormatFlags.VerticalCenter |
+            (TextAlign == ContentAlignment.MiddleLeft
+                ? TextFormatFlags.Left
+                : TextFormatFlags.HorizontalCenter) |
+            TextFormatFlags.SingleLine |
+            TextFormatFlags.EndEllipsis;
+        Rectangle textBounds = TextAlign == ContentAlignment.MiddleLeft
+            ? new Rectangle(12, 0, Math.Max(0, Width - 24), Height)
+            : ClientRectangle;
+        TextRenderer.DrawText(e.Graphics, Text, Font, textBounds, foreground, flags);
+
+        if (Focused && ShowFocusCues)
+        {
+            Rectangle focusBounds = Rectangle.Inflate(bounds, -3, -3);
+            ControlPaint.DrawFocusRectangle(e.Graphics, focusBounds, foreground, background);
+        }
+    }
+
+    private static GraphicsPath RoundedRectangle(Rectangle rectangle, int radius)
+    {
+        GraphicsPath path = new();
+        int diameter = radius * 2;
+        if (diameter <= 0)
+        {
+            path.AddRectangle(rectangle);
+            return path;
+        }
+        Rectangle arc = new(rectangle.Location, new Size(diameter, diameter));
+        path.AddArc(arc, 180, 90);
+        arc.X = rectangle.Right - diameter;
+        path.AddArc(arc, 270, 90);
+        arc.Y = rectangle.Bottom - diameter;
+        path.AddArc(arc, 0, 90);
+        arc.X = rectangle.Left;
+        path.AddArc(arc, 90, 90);
+        path.CloseFigure();
+        return path;
+    }
+}
+
+internal sealed class FluentCardPanel : Panel
+{
+    public FluentCardPanel()
+    {
+        SetStyle(
+            ControlStyles.AllPaintingInWmPaint |
+            ControlStyles.OptimizedDoubleBuffer |
+            ControlStyles.ResizeRedraw |
+            ControlStyles.UserPaint,
+            true
+        );
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        Color border = SystemInformation.HighContrast ? SystemColors.WindowText : Color.FromArgb(225, 223, 221);
+        using Pen pen = new(border, 1f);
+        Rectangle rectangle = new(0, 0, Math.Max(0, Width - 1), Math.Max(0, Height - 1));
+        e.Graphics.DrawRectangle(pen, rectangle);
+    }
+}
+
+internal sealed class FluentProgressIndicator : Control
+{
+    private readonly System.Windows.Forms.Timer animationTimer;
+    private int animationOffset;
+    private SetupProgressState state;
+
+    public FluentProgressIndicator()
+    {
+        SetStyle(
+            ControlStyles.AllPaintingInWmPaint |
+            ControlStyles.OptimizedDoubleBuffer |
+            ControlStyles.ResizeRedraw |
+            ControlStyles.UserPaint,
+            true
+        );
+        TabStop = false;
+        animationTimer = new System.Windows.Forms.Timer { Interval = 24 };
+        animationTimer.Tick += (_, _) =>
+        {
+            animationOffset = (animationOffset + 7) % Math.Max(1, Width + 120);
+            Invalidate();
+        };
+    }
+
+    public SetupProgressState State
+    {
+        get => state;
+        set
+        {
+            if (state == value) return;
+            state = value;
+            if (state == SetupProgressState.Running && Visible && !SystemInformation.TerminalServerSession)
+            {
+                animationTimer.Start();
+            }
+            else
+            {
+                animationTimer.Stop();
+            }
+            Invalidate();
+            AccessibilityNotifyClients(AccessibleEvents.ValueChange, -1);
+        }
+    }
+
+    protected override void OnVisibleChanged(EventArgs e)
+    {
+        if (!Visible) animationTimer.Stop();
+        else if (state == SetupProgressState.Running && !SystemInformation.TerminalServerSession)
+        {
+            animationTimer.Start();
+        }
+        base.OnVisibleChanged(e);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) animationTimer.Dispose();
+        base.Dispose(disposing);
+    }
+
+    protected override AccessibleObject CreateAccessibilityInstance() =>
+        new FluentProgressAccessibleObject(this);
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        Color track = SystemInformation.HighContrast ? SystemColors.ControlDark : Color.FromArgb(237, 235, 233);
+        Color accent = SystemInformation.HighContrast ? SystemColors.Highlight : Color.FromArgb(15, 108, 189);
+        if (state == SetupProgressState.Completed) accent = Color.FromArgb(16, 124, 16);
+        if (state == SetupProgressState.Failed) accent = Color.FromArgb(196, 43, 28);
+
+        using SolidBrush trackBrush = new(track);
+        e.Graphics.FillRectangle(trackBrush, ClientRectangle);
+        using SolidBrush accentBrush = new(accent);
+        switch (state)
+        {
+            case SetupProgressState.Ready:
+                e.Graphics.FillRectangle(accentBrush, 0, 0, Math.Max(3, Width / 12), Height);
+                break;
+            case SetupProgressState.Running:
+                int segment = Math.Max(48, Width / 5);
+                int x = animationOffset - 120;
+                e.Graphics.FillRectangle(accentBrush, x, 0, segment, Height);
+                break;
+            case SetupProgressState.Completed:
+            case SetupProgressState.Failed:
+                e.Graphics.FillRectangle(accentBrush, ClientRectangle);
+                break;
+        }
+    }
+
+    private sealed class FluentProgressAccessibleObject : ControlAccessibleObject
+    {
+        private readonly FluentProgressIndicator owner;
+
+        public FluentProgressAccessibleObject(FluentProgressIndicator owner) : base(owner)
+        {
+            this.owner = owner;
+        }
+
+        public override AccessibleRole Role => AccessibleRole.ProgressBar;
+
+        public override string? Value => owner.State switch
+        {
+            SetupProgressState.Ready => "准备就绪",
+            SetupProgressState.Running => "正在安装",
+            SetupProgressState.Completed => "安装完成",
+            SetupProgressState.Failed => "安装失败",
+            _ => ""
+        };
+    }
+}
+
 internal sealed class SetupOptions
 {
-    private SetupOptions(bool quiet, string installDir, bool launchAfterInstall, IReadOnlyList<string> forwardedArgs)
+    private SetupOptions(
+        bool quiet,
+        string installDir,
+        bool launchAfterInstall,
+        IReadOnlyList<string> forwardedArgs,
+        SetupVisualState? previewState
+    )
     {
         Quiet = quiet;
         InstallDir = installDir;
         LaunchAfterInstall = launchAfterInstall;
         ForwardedArgs = forwardedArgs;
+        PreviewState = previewState;
     }
 
     public bool Quiet { get; }
     public string InstallDir { get; }
     public bool LaunchAfterInstall { get; }
     public IReadOnlyList<string> ForwardedArgs { get; }
+    public SetupVisualState? PreviewState { get; }
 
     public string ForwardedArgumentLine => ForwardedArgs.Count == 0
         ? ""
@@ -516,6 +1242,7 @@ internal sealed class SetupOptions
         string installDir = GetDefaultInstallDir();
         bool launchAfterInstall = true;
         List<string> forwarded = new();
+        SetupVisualState? previewState = null;
 
         for (int i = 0; i < args.Length; i += 1)
         {
@@ -539,10 +1266,22 @@ internal sealed class SetupOptions
                 continue;
             }
 
+#if DEBUG
+            if (string.Equals(arg, "--ui-preview", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                if (Enum.TryParse(args[i + 1], ignoreCase: true, out SetupVisualState parsedState))
+                {
+                    previewState = parsedState;
+                }
+                i += 1;
+                continue;
+            }
+#endif
+
             forwarded.Add(arg);
         }
 
-        return new SetupOptions(quiet, installDir, launchAfterInstall, forwarded);
+        return new SetupOptions(quiet, installDir, launchAfterInstall, forwarded, previewState);
     }
 
     private static string GetDefaultInstallDir()
@@ -602,7 +1341,8 @@ internal sealed class SetupOptions
 internal sealed record PayloadPreparation(
     string Root,
     long RequiredInstallBytes,
-    int MaxRelativePathLength
+    int MaxRelativePathLength,
+    string WebView2Mode
 );
 
 internal static class SetupEngine
@@ -620,6 +1360,49 @@ internal static class SetupEngine
         "logs",
         "installer.log"
     );
+
+    public static string InferDistributionMode(string exePath)
+    {
+        try
+        {
+            using Stream? resource = Assembly.GetExecutingAssembly().GetManifestResourceStream(BundleFileName);
+            if (resource != null) return ReadDistributionMode(resource);
+
+            string? sidecarBundle = FindSidecarBundle(exePath);
+            if (!string.IsNullOrWhiteSpace(sidecarBundle))
+            {
+                using FileStream input = File.OpenRead(sidecarBundle);
+                return ReadDistributionMode(input);
+            }
+        }
+        catch
+        {
+        }
+        return "online";
+    }
+
+    private static string ReadDistributionMode(Stream bundleInput)
+    {
+        using ZipArchive archive = new(bundleInput, ZipArchiveMode.Read, leaveOpen: true);
+        ZipArchiveEntry? manifestEntry = archive.Entries.FirstOrDefault(entry =>
+            string.Equals(
+                entry.FullName.Replace('\\', '/'),
+                SetupManifestFileName,
+                StringComparison.OrdinalIgnoreCase
+            )
+        );
+        if (manifestEntry == null) return "online";
+        using Stream input = manifestEntry.Open();
+        using JsonDocument document = JsonDocument.Parse(input);
+        return NormalizeDistributionMode(
+            document.RootElement.TryGetProperty("webView2Mode", out JsonElement mode)
+                ? mode.GetString()
+                : null
+        );
+    }
+
+    private static string NormalizeDistributionMode(string? mode) =>
+        string.Equals(mode, "offline", StringComparison.OrdinalIgnoreCase) ? "offline" : "online";
 
     public static void ValidatePlatform()
     {
@@ -871,6 +1654,11 @@ internal static class SetupEngine
         string expectedSha256 = root.GetProperty("payloadSha256").GetString() ?? "";
         int maxRelativePathLength = root.GetProperty("maxRelativePathLength").GetInt32();
         long requiredInstallBytes = root.GetProperty("requiredInstallBytes").GetInt64();
+        string webView2Mode = NormalizeDistributionMode(
+            root.TryGetProperty("webView2Mode", out JsonElement modeElement)
+                ? modeElement.GetString()
+                : null
+        );
         if (schemaVersion != 1 || !string.Equals(architecture, "x64", StringComparison.Ordinal) ||
             minimumBuild != MinimumWindowsBuild || !string.Equals(payloadFile, PayloadFileName, StringComparison.Ordinal))
         {
@@ -904,7 +1692,7 @@ internal static class SetupEngine
         {
             throw new InvalidDataException("FE Monster payload root is missing after extraction.");
         }
-        return new PayloadPreparation(payloadRoot, requiredInstallBytes, maxRelativePathLength);
+        return new PayloadPreparation(payloadRoot, requiredInstallBytes, maxRelativePathLength, webView2Mode);
     }
 
     public static void ValidateInstallTarget(string requestedPath, PayloadPreparation payload)

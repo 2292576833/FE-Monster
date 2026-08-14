@@ -42,6 +42,12 @@
 
   const STORAGE_KEY = 'fe-monster-pet-assistant-v1';
   const INITIAL_DESKTOP_MODE = document.documentElement.getAttribute('data-fe-client') === 'desktop-pet';
+  const INITIAL_IN_APP_CLIENT = document.documentElement.getAttribute('data-fe-client') === 'embedded';
+  const EDGE_SNAP_DISTANCE_PX = 42;
+  const EDGE_HIDE_VISIBLE_PX = 24;
+  const EDGE_REVEAL_DISTANCE_PX = 52;
+  const EDGE_HIDE_DELAY_MS = 900;
+  const EDGE_HIDE_GRACE_MS = 700;
   const HISTORY_LIMIT = 48;
   const AUDIO_TURN_MAX_BYTES = 2 * 1024 * 1024;
   const LOCAL_STT_SAMPLE_RATE = 16000;
@@ -243,6 +249,11 @@
     transportFailureCount: 0,
     transportFailureSince: 0,
     drag: null,
+    inAppClient: INITIAL_IN_APP_CLIENT,
+    edgeDock: '',
+    edgeHidden: false,
+    edgeHideTimer: 0,
+    edgeHideGraceUntil: 0,
     characterActivationTimer: 0,
     suppressCharacterClick: false,
     online: navigator.onLine !== false
@@ -1185,6 +1196,9 @@
     if (!STATE_SET.has(next)) return false;
     const allowed = STATE_TRANSITIONS[pet.currentState] || ANY_STATE;
     if (!allowed.includes(next)) return false;
+    if (pet.edgeHidden && ['listening', 'transcribing', 'thinking', 'speaking', 'executing', 'success', 'error'].includes(next)) {
+      revealInAppPetFromEdge(`state-${next}`);
+    }
     if (next !== 'sleep' && next !== 'dragging' && next !== 'edge-peek') pet.resumeState = next;
     const shown = visibleState(next);
     pet.currentState = shown;
@@ -1326,7 +1340,12 @@
     }
     persistState();
     syncPetVisibility();
-    if (next) window.setTimeout(() => elements.character?.focus({ preventScroll: true }), 20);
+    if (next) {
+      revealInAppPetFromEdge('mascot-restored');
+      pet.edgeHideGraceUntil = performance.now() + EDGE_HIDE_GRACE_MS;
+      window.setTimeout(() => elements.character?.focus({ preventScroll: true }), 20);
+      scheduleInAppEdgeHide();
+    }
     return mascotVisibility();
   }
 
@@ -1372,8 +1391,136 @@
     return mascotVisibility();
   }
 
+  function inAppPetSize() {
+    return pet.collapsed
+      ? { width: 64, height: 64 }
+      : { width: 176, height: 218 };
+  }
+
+  function clearInAppEdgeHideTimer() {
+    window.clearTimeout(pet.edgeHideTimer);
+    pet.edgeHideTimer = 0;
+  }
+
+  function edgeHideBlocked() {
+    return !pet.inAppClient
+      || pet.desktopMode
+      || !pet.mascotVisible
+      || root.hidden
+      || document.hidden
+      || pet.panelOpen
+      || pet.liveConversationActive
+      || pet.drag
+      || pet.confirmationActive
+      || root.classList.contains('is-pet-tour-guide')
+      || pet.voiceActive
+      || elements.audio?.paused === false
+      || root.matches(':hover');
+  }
+
+  function applyInAppEdgeTranslation() {
+    let x = 0;
+    let y = 0;
+    if (pet.edgeHidden && pet.edgeDock) {
+      const { width, height } = inAppPetSize();
+      if (pet.edgeDock === 'left') x = -pet.x - width + EDGE_HIDE_VISIBLE_PX;
+      else if (pet.edgeDock === 'right') x = window.innerWidth - pet.x - EDGE_HIDE_VISIBLE_PX;
+      else if (pet.edgeDock === 'top') y = -pet.y - height + EDGE_HIDE_VISIBLE_PX;
+      else if (pet.edgeDock === 'bottom') y = window.innerHeight - pet.y - EDGE_HIDE_VISIBLE_PX;
+    }
+    root.style.setProperty('--pet-edge-x', `${Math.round(x)}px`);
+    root.style.setProperty('--pet-edge-y', `${Math.round(y)}px`);
+  }
+
+  function revealInAppPetFromEdge(reason = '') {
+    clearInAppEdgeHideTimer();
+    if (!pet.edgeHidden) return false;
+    pet.edgeHidden = false;
+    root.removeAttribute('data-in-app-edge-hidden');
+    applyInAppEdgeTranslation();
+    pet.edgeHideGraceUntil = performance.now() + EDGE_HIDE_GRACE_MS;
+    restoreInteractionState('edge-peek');
+    return true;
+  }
+
+  function hideInAppPetAtEdge() {
+    pet.edgeHideTimer = 0;
+    if (!pet.edgeDock || !pet.inAppClient || pet.desktopMode || !pet.mascotVisible || root.hidden || document.hidden) {
+      return false;
+    }
+    if (edgeHideBlocked()) {
+      scheduleInAppEdgeHide(250);
+      return false;
+    }
+    pet.edgeHidden = true;
+    root.setAttribute('data-in-app-edge-hidden', pet.edgeDock);
+    applyInAppEdgeTranslation();
+    enterInteractionState('edge-peek');
+    return true;
+  }
+
+  function scheduleInAppEdgeHide(delay = EDGE_HIDE_DELAY_MS) {
+    if (pet.edgeHideTimer) return true;
+    if (!pet.edgeDock || pet.edgeHidden || !pet.inAppClient || pet.desktopMode
+        || !pet.mascotVisible || root.hidden || document.hidden) return false;
+    const grace = Math.max(0, pet.edgeHideGraceUntil - performance.now());
+    pet.edgeHideTimer = window.setTimeout(
+      hideInAppPetAtEdge,
+      Math.max(delay, grace)
+    );
+    return true;
+  }
+
+  function updateInAppEdgeDock() {
+    if (!pet.inAppClient || pet.desktopMode) {
+      pet.edgeDock = '';
+      revealInAppPetFromEdge('client-mode');
+      return '';
+    }
+    const { width, height } = inAppPetSize();
+    const distances = [
+      ['left', pet.x],
+      ['right', window.innerWidth - pet.x - width],
+      ['top', pet.y],
+      ['bottom', window.innerHeight - pet.y - height]
+    ];
+    const nearest = distances.reduce((best, item) => item[1] < best[1] ? item : best);
+    const next = nearest[1] <= EDGE_SNAP_DISTANCE_PX ? nearest[0] : '';
+    if (pet.edgeDock !== next) revealInAppPetFromEdge('dock-changed');
+    pet.edgeDock = next;
+    root.toggleAttribute('data-in-app-edge-docked', Boolean(next));
+    if (next) root.setAttribute('data-in-app-edge-docked', next);
+    return next;
+  }
+
+  function handleInAppEdgePointerMove(event) {
+    if (!pet.inAppClient || pet.desktopMode) return;
+    if (!pet.edgeHidden) {
+      if (!pet.edgeHideTimer) scheduleInAppEdgeHide();
+      return;
+    }
+    const { width, height } = inAppPetSize();
+    const x = Number(event.clientX);
+    const y = Number(event.clientY);
+    const horizontalSpan = x >= pet.x - EDGE_REVEAL_DISTANCE_PX
+      && x <= pet.x + width + EDGE_REVEAL_DISTANCE_PX;
+    const verticalSpan = y >= pet.y - EDGE_REVEAL_DISTANCE_PX
+      && y <= pet.y + height + EDGE_REVEAL_DISTANCE_PX;
+    const near = pet.edgeDock === 'left'
+      ? x <= EDGE_REVEAL_DISTANCE_PX && verticalSpan
+      : pet.edgeDock === 'right'
+        ? x >= window.innerWidth - EDGE_REVEAL_DISTANCE_PX && verticalSpan
+        : pet.edgeDock === 'top'
+          ? y <= EDGE_REVEAL_DISTANCE_PX && horizontalSpan
+          : pet.edgeDock === 'bottom'
+            ? y >= window.innerHeight - EDGE_REVEAL_DISTANCE_PX && horizontalSpan
+            : false;
+    if (near) revealInAppPetFromEdge('pointer-near-edge');
+  }
+
   function applyPosition() {
     if (pet.desktopMode) {
+      revealInAppPetFromEdge('desktop-mode');
       root.style.removeProperty('left');
       root.style.removeProperty('top');
       root.classList.add('is-panel-left');
@@ -1386,6 +1533,8 @@
     root.style.left = `${Math.round(pet.x)}px`;
     root.style.top = `${Math.round(pet.y)}px`;
     root.classList.toggle('is-panel-left', pet.x > window.innerWidth * .52);
+    updateInAppEdgeDock();
+    applyInAppEdgeTranslation();
   }
 
   function setPanelOpen(open) {
@@ -1395,6 +1544,7 @@
     elements.character?.setAttribute('aria-expanded', String(pet.panelOpen));
     if (elements.speech) elements.speech.hidden = pet.panelOpen || pet.liveConversationActive;
     if (pet.panelOpen) {
+      revealInAppPetFromEdge('panel-open');
       clearProactiveBubble();
       scrollMessages();
       window.setTimeout(() => elements.input?.focus(), 30);
@@ -1402,6 +1552,7 @@
     }
     queueNativeTextBubbleSync();
     queueNativeBubbleSync();
+    if (!pet.panelOpen) scheduleInAppEdgeHide();
     return pet.panelOpen;
   }
 
@@ -4610,6 +4761,8 @@
 
   function beginDrag(event) {
     if (event.button !== 0 || event.target.closest('.pet-assistant__quick-actions')) return;
+    revealInAppPetFromEdge('drag-start');
+    clearInAppEdgeHideTimer();
     cancelCharacterActivation();
     enterInteractionState('dragging');
     pet.drag = {
@@ -4684,6 +4837,8 @@
     applyPosition();
     persistState();
     restoreInteractionState('dragging');
+    pet.edgeHideGraceUntil = performance.now() + EDGE_HIDE_GRACE_MS;
+    scheduleInAppEdgeHide();
   }
 
   function cancelCharacterActivation() {
@@ -4769,6 +4924,7 @@
   elements.character?.addEventListener('pointermove', moveDrag);
   elements.character?.addEventListener('pointerup', endDrag);
   elements.character?.addEventListener('pointercancel', endDrag);
+  elements.character?.addEventListener('lostpointercapture', endDrag);
   elements.character?.addEventListener('contextmenu', (event) => {
     if (!pet.desktopMode) return;
     event.preventDefault();
@@ -4941,6 +5097,19 @@
     if (event?.detail?.hidden === true) enterInteractionState('edge-peek');
     else restoreInteractionState('edge-peek');
   });
+  window.addEventListener('fe-monster-pet-tour-start', () => {
+    revealInAppPetFromEdge('product-tour-start');
+    clearInAppEdgeHideTimer();
+  });
+  window.addEventListener('fe-monster-pet-tour-move', () => {
+    revealInAppPetFromEdge('product-tour-move');
+    clearInAppEdgeHideTimer();
+  });
+  window.addEventListener('fe-monster-pet-tour-end', () => {
+    pet.edgeHideGraceUntil = performance.now() + EDGE_HIDE_GRACE_MS;
+    updateInAppEdgeDock();
+    scheduleInAppEdgeHide();
+  });
   window.addEventListener('fe-monster-pet-stream-ready', () => {
     pet.streamConnected = true;
     markTransportOnline();
@@ -4986,18 +5155,24 @@
   if (elements.panel) nativePanelResizeObserver?.observe(elements.panel);
 
   window.addEventListener('resize', () => {
+    revealInAppPetFromEdge('resize');
     applyPosition();
+    pet.edgeHideGraceUntil = performance.now() + EDGE_HIDE_GRACE_MS;
+    scheduleInAppEdgeHide();
     queueNativeBubbleSync();
     queueNativeTextBubbleSync();
   }, { passive: true });
   document.addEventListener('visibilitychange', () => {
     root.classList.toggle('is-page-hidden', document.hidden);
     if (document.hidden) {
+      clearInAppEdgeHideTimer();
       stopDeepSeekLiveConversation('页面已隐藏，实时对话已结束');
       setPetState('sleep');
     } else {
+      pet.edgeHideGraceUntil = performance.now() + EDGE_HIDE_GRACE_MS;
       setPetState(pet.online ? pet.resumeState || 'idle' : 'offline');
       refreshServerState().catch(() => {});
+      scheduleInAppEdgeHide();
     }
   });
   document.addEventListener('keydown', (event) => {
@@ -5008,6 +5183,7 @@
     }
   }, true);
   window.addEventListener('beforeunload', () => {
+    clearInAppEdgeHideTimer();
     nativeBubbleObserver?.disconnect();
     nativeBubbleResizeObserver?.disconnect();
     nativePanelResizeObserver?.disconnect();
@@ -5052,6 +5228,10 @@
   if (elements.desktopMain) elements.desktopMain.hidden = !pet.desktopMode;
   setCollapsed(pet.desktopMode ? false : pet.collapsed);
   applyPosition();
+  window.addEventListener('pointermove', handleInAppEdgePointerMove, { passive: true });
+  root.addEventListener('pointerenter', () => revealInAppPetFromEdge('pointer-enter'));
+  root.addEventListener('pointerleave', () => scheduleInAppEdgeHide());
+  if (pet.inAppClient) scheduleInAppEdgeHide(EDGE_HIDE_DELAY_MS + EDGE_HIDE_GRACE_MS);
   root.classList.toggle('is-page-hidden', document.hidden);
   setPetState(document.hidden || pet.collapsed ? 'sleep' : 'idle');
   scheduleServerReconcile(0);

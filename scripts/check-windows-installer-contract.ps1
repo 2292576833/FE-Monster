@@ -172,8 +172,8 @@ try {
 } catch {
   $failures.Add('package.json contains invalid JSON') | Out-Null
 }
-if ($releaseVersion -ne '2.0.1') {
-  $failures.Add("Windows installer release version must be 2.0.1, got '$releaseVersion'") | Out-Null
+if ($releaseVersion -ne '2.1.0') {
+  $failures.Add("Windows installer release version must be 2.1.0, got '$releaseVersion'") | Out-Null
 }
 if ($releaseVersion -match '^\d+\.\d+\.\d+$') {
   $releasePattern = [Regex]::Escape($releaseVersion)
@@ -254,6 +254,9 @@ Assert-SourceMatch 'installer stages the bundled QQ API plugin' $buildInstaller 
 Assert-SourceMatch 'installer writes pre-commit diagnostics outside the install root' $installer "FE Monster Setup"
 Assert-SourceMatch 'installer uses a cross-process mutation lock' $installer 'Enter-InstallMutationLock'
 Assert-SourceMatch 'installer verifies the installed payload manifest' $installer 'payload-integrity\.json'
+Assert-SourceMatch 'installer validates every payload manifest entry' $installer 'function\s+Test-PayloadIntegrity[\s\S]{0,900}foreach\s*\(\$entry\s+in\s+@\(\$manifest\.files\)\)'
+Assert-SourceMatch 'installer rejects missing manifest files' $installer 'function\s+Test-PayloadIntegrity[\s\S]{0,1500}is missing required file'
+Assert-SourceMatch 'installer rejects manifest hash mismatches' $installer 'function\s+Test-PayloadIntegrity[\s\S]{0,1900}SHA-256 mismatch'
 Assert-SourceMatch `
   'installer snapshots release-controlled community configuration before preserving user data' `
   $installer `
@@ -352,7 +355,7 @@ Assert-SourceMatch 'runtime check validates Microsoft Authenticode before execut
 Assert-SourceMatch 'runtime check retains the official online bootstrapper fallback' $dependencies 'LinkId=2124703'
 Assert-SourceMatch 'runtime bootstrapper download retries transient failures' $dependencies 'attempt\s*=\s*1;[\s\S]{0,100}attempt\s*-le\s*3'
 Assert-SourceMatch 'WebView2 reboot-required result is surfaced and rechecked' $dependencies 'ExitCode\s*-eq\s*3010[\s\S]{0,180}Runtime is already detectable'
-Assert-SourceMatch 'WebView2 network failure recommends the complete offline installer' $dependencies 'FE-Monster-Setup-2\.0\.1-Offline\.exe'
+Assert-SourceMatch 'WebView2 network failure recommends the complete offline installer' $dependencies 'FE-Monster-Setup-2\.1\.0-Offline\.exe'
 
 Assert-SourceMatch 'launcher delegates to the named main executable' $launcher "FE Monster\.exe"
 Assert-SourceNotMatch 'launcher does not directly start javaw' $launcher 'Start-Process\s+-FilePath\s+\$javaExe'
@@ -387,7 +390,8 @@ Assert-SourceMatch 'build defaults to the smaller online WebView2 installer mode
 Assert-SourceMatch 'build exposes a complete offline WebView2 installer mode' $buildInstaller "ValidateSet\('Online',\s*'Offline'\)"
 Assert-SourceMatch 'build downloads the WebView2 x64 standalone installer from the official link' $buildInstaller 'LinkId=2124701'
 Assert-SourceMatch 'build validates the WebView2 installer Microsoft signature' $buildInstaller 'Assert-MicrosoftSignedExecutable'
-Assert-SourceMatch 'payload integrity manifest hashes the WebView2 offline installer' $buildInstaller "New-PayloadIntegrityManifest[\s\S]+runtime\\installers\\MicrosoftEdgeWebView2RuntimeInstallerX64\.exe"
+Assert-SourceMatch 'payload integrity manifest enumerates every staged file' $buildInstaller 'function\s+New-PayloadIntegrityManifest[\s\S]{0,900}Get-ChildItem[\s\S]{0,180}-Recurse\s+-File\s+-Force'
+Assert-SourceMatch 'payload integrity manifest excludes itself from its file list' $buildInstaller 'function\s+New-PayloadIntegrityManifest[\s\S]{0,500}\$manifestPath[\s\S]{0,500}StringComparison\]::OrdinalIgnoreCase'
 Assert-SourceMatch 'reused payload zip is checked against the selected WebView2 mode' $buildInstaller 'hasOfflineWebView2[\s\S]{0,500}includeOfflineWebView2'
 Assert-SourceMatch 'build cleanup is isolated from installer smoke/output artifacts' $buildInstaller "out\\installer\\work"
 Assert-SourceMatch 'build validates PE x64 architecture' $buildInstaller 'Get-PeMachine'
@@ -447,7 +451,79 @@ if (![string]::IsNullOrWhiteSpace($PayloadRoot)) {
     $failures.Add('staged payload manifest is missing') | Out-Null
   } else {
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-    foreach ($entry in @($manifest.files)) {
+    $manifestEntries = @($manifest.files)
+    $manifestRelativePaths = @($manifestEntries | ForEach-Object {
+      ([string]$_.path).Replace('\', '/')
+    })
+    $ordinalSortedManifestPaths = [string[]]@($manifestRelativePaths)
+    [Array]::Sort($ordinalSortedManifestPaths, [StringComparer]::Ordinal)
+    for ($index = 0; $index -lt $manifestRelativePaths.Count; $index++) {
+      if (![string]::Equals(
+          $manifestRelativePaths[$index],
+          $ordinalSortedManifestPaths[$index],
+          [StringComparison]::Ordinal)) {
+        $failures.Add('staged payload manifest paths are not in stable ordinal order') | Out-Null
+        break
+      }
+    }
+
+    $manifestPathSet = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($relative in $manifestRelativePaths) {
+      if ([string]::IsNullOrWhiteSpace($relative)) {
+        $failures.Add('staged payload manifest contains an empty path') | Out-Null
+      } elseif (!$manifestPathSet.Add($relative)) {
+        $failures.Add("staged payload manifest contains a duplicate path: $relative") | Out-Null
+      }
+    }
+
+    $actualPayloadRelativePaths = @(Get-ChildItem -LiteralPath $payloadPath -Recurse -File -Force |
+      Where-Object {
+        ![string]::Equals($_.FullName, $manifestPath, [StringComparison]::OrdinalIgnoreCase)
+      } |
+      ForEach-Object {
+        $_.FullName.Substring($payloadPath.Length).TrimStart('\').Replace('\', '/')
+      })
+    if ($actualPayloadRelativePaths.Count -ne $manifestEntries.Count) {
+      $failures.Add(
+        "staged payload manifest covers $($manifestEntries.Count) files, but payload contains $($actualPayloadRelativePaths.Count) files besides the manifest"
+      ) | Out-Null
+    }
+    $actualPayloadPathSet = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($relative in $actualPayloadRelativePaths) {
+      [void]$actualPayloadPathSet.Add($relative)
+    }
+    foreach ($relative in $actualPayloadRelativePaths) {
+      if (!$manifestPathSet.Contains($relative)) {
+        $failures.Add("staged payload file is absent from manifest: $relative") | Out-Null
+      }
+    }
+    foreach ($relative in $manifestRelativePaths) {
+      if (!$actualPayloadPathSet.Contains($relative)) {
+        $failures.Add("staged payload manifest references an absent file: $relative") | Out-Null
+      }
+    }
+
+    $expectedNativeAmd64Paths = [string[]]@(
+      'native/windows/build/fe-monster-xaudio2.dll',
+      'native/windows/build/fe_monster_upmix.dll',
+      'native/windows/build/winforms/FE Monster.exe',
+      'native/windows/build/winforms/WebView2Loader.dll',
+      'runtime/java/bin/FE Monster Backend.exe',
+      'runtime/java/bin/java.exe',
+      'runtime/java/bin/javaw.exe'
+    )
+    [Array]::Sort($expectedNativeAmd64Paths, [StringComparer]::Ordinal)
+    $actualNativeAmd64Paths = [string[]]@($manifestEntries |
+      Where-Object { $null -ne $_.peMachine -and [int]$_.peMachine -ne 0 } |
+      ForEach-Object { ([string]$_.path).Replace('\', '/') })
+    [Array]::Sort($actualNativeAmd64Paths, [StringComparer]::Ordinal)
+    if (($actualNativeAmd64Paths -join '|') -cne ($expectedNativeAmd64Paths -join '|')) {
+      $failures.Add(
+        "staged payload x64 PE contract applies to an unexpected set: $($actualNativeAmd64Paths -join ', ')"
+      ) | Out-Null
+    }
+
+    foreach ($entry in $manifestEntries) {
       $relative = ([string]$entry.path).Replace('/', '\')
       $path = Join-Path $payloadPath $relative
       if (!(Test-Path -LiteralPath $path -PathType Leaf)) {
