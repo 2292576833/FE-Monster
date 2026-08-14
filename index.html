@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f3ee">
+  <meta name="description" content="FE Monster 2.1.0 Windows 正式版下载与完整性校验。">
+  <title>FE Monster 2.1.0 · 官方下载</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f5f3ee;
+      --ink: #161616;
+      --muted: #6e6b64;
+      --line: rgba(22, 22, 22, .14);
+      --accent: #dfff3f;
+      --card: rgba(255, 255, 255, .72);
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--paper); }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 84% 12%, rgba(223, 255, 63, .36), transparent 24rem),
+        linear-gradient(180deg, #faf9f6 0%, var(--paper) 72%);
+      font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    }
+    main { width: min(1120px, calc(100% - 36px)); margin: 0 auto; padding: 28px 0 56px; }
+    nav { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+    .brand { display: flex; align-items: center; gap: 11px; font-weight: 760; letter-spacing: -.02em; }
+    .mark { width: 18px; height: 18px; border-radius: 50%; background: var(--ink); box-shadow: 9px 0 0 var(--accent); }
+    .release-link { color: inherit; text-underline-offset: 4px; font-size: 14px; }
+    .hero { padding: clamp(78px, 13vw, 158px) 0 66px; }
+    .eyebrow { margin: 0 0 18px; color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
+    h1 { max-width: 890px; margin: 0; font-size: clamp(54px, 10vw, 128px); line-height: .86; letter-spacing: -.075em; font-weight: 780; }
+    .lead { max-width: 660px; margin: 34px 0 0; color: #46443f; font-size: clamp(18px, 2vw, 25px); line-height: 1.55; }
+    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 38px; }
+    .download {
+      display: inline-flex; align-items: center; justify-content: center; min-height: 58px; padding: 0 26px;
+      border: 1px solid var(--ink); border-radius: 999px; color: #fff; background: var(--ink);
+      font-size: 16px; font-weight: 720; text-decoration: none; transition: transform .18s ease, box-shadow .18s ease;
+    }
+    .download:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(0,0,0,.14); }
+    .meta { color: var(--muted); font-size: 14px; }
+    .grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 18px; }
+    .card { padding: clamp(24px, 4vw, 42px); border: 1px solid var(--line); border-radius: 28px; background: var(--card); backdrop-filter: blur(16px); }
+    h2 { margin: 0 0 24px; font-size: 25px; letter-spacing: -.035em; }
+    dl { display: grid; grid-template-columns: max-content 1fr; gap: 15px 24px; margin: 0; }
+    dt { color: var(--muted); }
+    dd { margin: 0; font-weight: 650; overflow-wrap: anywhere; }
+    code { font-family: ui-monospace, "Cascadia Code", monospace; font-size: 12px; line-height: 1.6; }
+    .note { margin: 0; color: #46443f; line-height: 1.7; }
+    .warning { display: flex; gap: 13px; margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--line); color: #5d4b10; line-height: 1.55; }
+    .dot { flex: 0 0 auto; width: 10px; height: 10px; margin-top: 7px; border-radius: 50%; background: #e2af00; }
+    footer { display: flex; justify-content: space-between; gap: 20px; padding-top: 42px; color: var(--muted); font-size: 13px; }
+    @media (max-width: 760px) {
+      main { width: min(100% - 24px, 1120px); padding-top: 20px; }
+      .hero { padding-top: 72px; }
+      .grid { grid-template-columns: 1fr; }
+      .card { border-radius: 22px; }
+      dl { grid-template-columns: 1fr; gap: 5px; }
+      dd { margin-bottom: 11px; }
+      footer { flex-direction: column; }
+    }
+    @media (prefers-reduced-motion: reduce) { .download { transition: none; } }
+  </style>
+</head>
+<body>
+  <main>
+    <nav aria-label="主导航">
+      <div class="brand"><span class="mark" aria-hidden="true"></span>FE Monster</div>
+      <a class="release-link" href="https://github.com/2292576833/FE-Monster/releases/tag/v2.1.0">查看 GitHub Release</a>
+    </nav>
+
+    <section class="hero">
+      <p class="eyebrow">Windows · Version 2.1.0</p>
+      <h1>让音乐<br>住进桌面。</h1>
+      <p class="lead">FE Monster 2.1.0 正式版。包含联网社区、可对话桌宠、身份卡系统，以及针对其他电脑首次启动的 WebView2 恢复修复。</p>
+      <div class="actions">
+        <a class="download" href="https://github.com/2292576833/FE-Monster/releases/download/v2.1.0/FE-Monster-Setup-2.1.0.exe">下载 Windows 安装包</a>
+        <span class="meta">361.88 MiB · Windows 10 1809+ · x64</span>
+      </div>
+    </section>
+
+    <section class="grid" aria-label="版本与安装信息">
+      <article class="card">
+        <h2>文件完整性</h2>
+        <dl>
+          <dt>文件</dt><dd>FE-Monster-Setup-2.1.0.exe</dd>
+          <dt>大小</dt><dd>379,460,743 bytes</dd>
+          <dt>SHA-256</dt><dd><code>C8B9A7D309BF5AB32EC7B4C1E5D63E4A108B5CC4DF4989F7B7E1C04DB8B87879</code></dd>
+        </dl>
+      </article>
+      <article class="card">
+        <h2>安装说明</h2>
+        <p class="note">安装器会校验完整载荷，并在缺失或损坏时检查、修复 Microsoft Edge WebView2。联网功能需要可以访问 FE Monster 社区服务器。</p>
+        <p class="warning"><span class="dot" aria-hidden="true"></span><span>当前安装包尚未进行 Authenticode 代码签名，Windows SmartScreen 可能显示来源提醒。请仅从本页或 GitHub Release 下载，并核对 SHA-256。</span></p>
+      </article>
+    </section>
+
+    <footer><span>© 2026 FE Monster</span><span>公开下载页 · 无需登录</span></footer>
+  </main>
+</body>
+</html>
