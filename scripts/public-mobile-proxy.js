@@ -14,7 +14,7 @@ const communityHealthPath = communityPrefix + "/health";
 const publicCommunityGateway = "fe-monster-public-community-gateway";
 const maxCommunityHealthBytes = 64 * 1024;
 const accessKey = String(process.env.FE_MONSTER_PUBLIC_ACCESS_KEY || "").trim();
-const defaultDownloadUrl = "https://fe-monster-download-201.affront-loony-6o.chatgpt.site/";
+const defaultDownloadUrl = "https://2292576833.github.io/FE-Monster/";
 const downloadUrl = String(process.env.FE_MONSTER_PUBLIC_DOWNLOAD_URL || defaultDownloadUrl).trim();
 const cookieName = "fe_public_access";
 
