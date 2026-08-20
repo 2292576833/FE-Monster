@@ -3,7 +3,7 @@ name = "fe-monster-upmix"
 version = "2.0.0"
 edition = "2024"
 license = "Apache-2.0"
-description = "FE Monster real-time-safe ABI wrapper for OxiMedia surround upmixing"
+description = "FE Monster real-time-safe ABI for OxiMedia surround upmixing and mixer DSP"
 
 [lib]
 name = "fe_monster_upmix"

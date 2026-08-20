@@ -1,7 +1,7 @@
-use oximedia_audiopost::surround_upmix::{
-    SurroundUpmixer, UpmixAlgorithm, UpmixConfig,
-};
+use oximedia_audiopost::surround_upmix::{SurroundUpmixer, UpmixAlgorithm, UpmixConfig};
 use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 const ABI_VERSION: u32 = 1;
 const RESULT_OK: i32 = 0;
@@ -241,8 +241,7 @@ pub unsafe extern "C" fn fe_rust_upmix_process(
         };
         // SAFETY: The caller guarantees both buffers have the stated lengths.
         let input_slice = unsafe { std::slice::from_raw_parts(input, input_len) };
-        let output_slice =
-            unsafe { std::slice::from_raw_parts_mut(output, required_output) };
+        let output_slice = unsafe { std::slice::from_raw_parts_mut(output, required_output) };
         process_block(upmixer, input_slice, frames, output_slice)
     }));
     result.unwrap_or(RESULT_PANIC)
@@ -292,6 +291,979 @@ pub extern "C" fn fe_rust_upmix_result_ok() -> i32 {
 #[unsafe(no_mangle)]
 pub extern "C" fn fe_rust_upmix_result_unsupported() -> i32 {
     RESULT_UNSUPPORTED
+}
+
+// Mixer ABI v1 is deliberately independent from the legacy upmix ABI above.
+pub const FE_RUST_MIXER_ABI_VERSION: u32 = 1;
+pub const FE_RUST_MIXER_EQ_BANDS: usize = 10;
+pub const FE_RUST_MIXER_OK: i32 = 0;
+pub const FE_RUST_MIXER_INVALID_ARGUMENT: i32 = -1;
+pub const FE_RUST_MIXER_INVALID_REVISION: i32 = -2;
+pub const FE_RUST_MIXER_UNSUPPORTED: i32 = -3;
+pub const FE_RUST_MIXER_PANIC: i32 = -4;
+const MIXER_MAX_CHANNELS: usize = 8;
+const MIXER_PARAM_WORDS: usize = 35;
+const EQ_FREQUENCIES: [f32; FE_RUST_MIXER_EQ_BANDS] = [
+    31.0, 62.0, 125.0, 250.0, 500.0, 1_000.0, 2_000.0, 4_000.0, 8_000.0, 16_000.0,
+];
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct FeRustMixerConfig {
+    pub struct_size: u32,
+    pub abi_version: u32,
+    pub sample_rate: u32,
+    pub max_frames_per_call: u32,
+    pub reserved: [u32; 4],
+}
+
+impl Default for FeRustMixerConfig {
+    fn default() -> Self {
+        Self {
+            struct_size: size_of::<Self>() as u32,
+            abi_version: FE_RUST_MIXER_ABI_VERSION,
+            sample_rate: 48_000,
+            max_frames_per_call: 4_096,
+            reserved: [0; 4],
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FeRustMixerParams {
+    pub struct_size: u32,
+    pub abi_version: u32,
+    pub enabled: u32,
+    pub compressor_enabled: u32,
+    pub limiter_enabled: u32,
+    pub reverb_enabled: u32,
+    pub input_gain_db: f32,
+    pub output_gain_db: f32,
+    pub balance: f32,
+    pub eq_db: [f32; FE_RUST_MIXER_EQ_BANDS],
+    pub stereo_width: f32,
+    pub center_gain: f32,
+    pub surround_gain: f32,
+    pub lfe_gain: f32,
+    pub compressor_threshold_db: f32,
+    pub compressor_ratio: f32,
+    pub compressor_attack_ms: f32,
+    pub compressor_release_ms: f32,
+    pub compressor_knee_db: f32,
+    pub compressor_makeup_db: f32,
+    pub limiter_ceiling_db: f32,
+    pub limiter_release_ms: f32,
+    pub reverb_room_size: f32,
+    pub reverb_decay_ms: f32,
+    pub reverb_damping: f32,
+    pub reverb_pre_delay_ms: f32,
+    pub reverb_wet: f32,
+    pub reverb_dry: f32,
+    pub reserved: [u32; 8],
+}
+
+impl Default for FeRustMixerParams {
+    fn default() -> Self {
+        mixer_preset_params(0).expect("clean preset exists")
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct FeRustMixerStatus {
+    pub struct_size: u32,
+    pub abi_version: u32,
+    pub active_revision: u64,
+    pub staged_revision: u64,
+    pub process_failures: u64,
+    pub enabled: u32,
+    pub reserved: [u32; 7],
+}
+
+impl Default for FeRustMixerStatus {
+    fn default() -> Self {
+        Self {
+            struct_size: size_of::<Self>() as u32,
+            abi_version: FE_RUST_MIXER_ABI_VERSION,
+            active_revision: 0,
+            staged_revision: 0,
+            process_failures: 0,
+            enabled: 1,
+            reserved: [0; 7],
+        }
+    }
+}
+
+fn clean_params() -> FeRustMixerParams {
+    FeRustMixerParams {
+        struct_size: size_of::<FeRustMixerParams>() as u32,
+        abi_version: FE_RUST_MIXER_ABI_VERSION,
+        enabled: 1,
+        compressor_enabled: 0,
+        limiter_enabled: 1,
+        reverb_enabled: 0,
+        input_gain_db: 0.0,
+        output_gain_db: 0.0,
+        balance: 0.0,
+        eq_db: [0.0; FE_RUST_MIXER_EQ_BANDS],
+        stereo_width: 1.0,
+        center_gain: 1.0,
+        surround_gain: 1.0,
+        lfe_gain: 1.0,
+        compressor_threshold_db: -18.0,
+        compressor_ratio: 2.0,
+        compressor_attack_ms: 10.0,
+        compressor_release_ms: 150.0,
+        compressor_knee_db: 6.0,
+        compressor_makeup_db: 0.0,
+        limiter_ceiling_db: -0.3,
+        limiter_release_ms: 100.0,
+        reverb_room_size: 0.35,
+        reverb_decay_ms: 800.0,
+        reverb_damping: 0.5,
+        reverb_pre_delay_ms: 12.0,
+        reverb_wet: 0.0,
+        reverb_dry: 1.0,
+        reserved: [0; 8],
+    }
+}
+
+/// Returns a complete deterministic snapshot for a stable preset id:
+/// clean, bathroom, hall, surround-3d, cinema, vocal-clear, bass-boost, night.
+pub fn mixer_preset_params(id: u32) -> Option<FeRustMixerParams> {
+    let mut p = clean_params();
+    match id {
+        0 => {}
+        1 => {
+            p.reverb_enabled = 1;
+            p.reverb_room_size = 0.22;
+            p.reverb_decay_ms = 650.0;
+            p.reverb_damping = 0.35;
+            p.reverb_pre_delay_ms = 8.0;
+            p.reverb_wet = 0.32;
+            p.reverb_dry = 0.82;
+            p.eq_db[7] = 1.5;
+        }
+        2 => {
+            p.reverb_enabled = 1;
+            p.reverb_room_size = 0.82;
+            p.reverb_decay_ms = 2_800.0;
+            p.reverb_damping = 0.62;
+            p.reverb_pre_delay_ms = 28.0;
+            p.reverb_wet = 0.36;
+            p.reverb_dry = 0.88;
+        }
+        3 => {
+            p.stereo_width = 1.7;
+            p.center_gain = 0.92;
+            p.surround_gain = 1.35;
+            p.lfe_gain = 1.08;
+            p.eq_db[6] = 1.0;
+            p.eq_db[7] = 1.5;
+        }
+        4 => {
+            p.input_gain_db = -1.5;
+            p.eq_db[1] = 2.0;
+            p.eq_db[2] = 1.5;
+            p.eq_db[6] = 1.0;
+            p.center_gain = 1.12;
+            p.surround_gain = 1.18;
+            p.lfe_gain = 1.22;
+            p.compressor_enabled = 1;
+            p.compressor_threshold_db = -16.0;
+            p.compressor_ratio = 2.2;
+            p.compressor_makeup_db = 1.0;
+        }
+        5 => {
+            p.eq_db[0] = -2.0;
+            p.eq_db[1] = -1.5;
+            p.eq_db[5] = 2.0;
+            p.eq_db[6] = 3.0;
+            p.eq_db[7] = 1.5;
+            p.center_gain = 1.15;
+            p.compressor_enabled = 1;
+            p.compressor_threshold_db = -20.0;
+            p.compressor_ratio = 2.0;
+            p.compressor_makeup_db = 1.0;
+        }
+        6 => {
+            p.input_gain_db = -1.0;
+            p.eq_db[0] = 4.0;
+            p.eq_db[1] = 4.5;
+            p.eq_db[2] = 3.0;
+            p.lfe_gain = 1.3;
+            p.limiter_ceiling_db = -0.8;
+        }
+        7 => {
+            p.input_gain_db = -3.0;
+            p.output_gain_db = -2.0;
+            p.compressor_enabled = 1;
+            p.compressor_threshold_db = -28.0;
+            p.compressor_ratio = 6.0;
+            p.compressor_attack_ms = 5.0;
+            p.compressor_release_ms = 350.0;
+            p.compressor_knee_db = 10.0;
+            p.compressor_makeup_db = 3.0;
+            p.limiter_ceiling_db = -3.0;
+        }
+        _ => return None,
+    }
+    Some(p)
+}
+
+fn bool_field(value: u32) -> bool {
+    value <= 1
+}
+
+fn validate_mixer_config(config: &FeRustMixerConfig) -> bool {
+    config.struct_size as usize >= size_of::<FeRustMixerConfig>()
+        && config.abi_version == FE_RUST_MIXER_ABI_VERSION
+        && (16_000..=192_000).contains(&config.sample_rate)
+        && (1..=MAX_FRAMES_PER_CALL as u32).contains(&config.max_frames_per_call)
+        && config.reserved == [0; 4]
+}
+
+fn validate_mixer_params(p: &FeRustMixerParams) -> bool {
+    p.struct_size as usize >= size_of::<FeRustMixerParams>()
+        && p.abi_version == FE_RUST_MIXER_ABI_VERSION
+        && bool_field(p.enabled)
+        && bool_field(p.compressor_enabled)
+        && bool_field(p.limiter_enabled)
+        && bool_field(p.reverb_enabled)
+        && finite_in_range(p.input_gain_db, -24.0, 24.0)
+        && finite_in_range(p.output_gain_db, -24.0, 24.0)
+        && finite_in_range(p.balance, -1.0, 1.0)
+        && p.eq_db.iter().all(|v| finite_in_range(*v, -12.0, 12.0))
+        && finite_in_range(p.stereo_width, 0.0, 2.0)
+        && finite_in_range(p.center_gain, 0.0, 2.0)
+        && finite_in_range(p.surround_gain, 0.0, 2.0)
+        && finite_in_range(p.lfe_gain, 0.0, 2.0)
+        && finite_in_range(p.compressor_threshold_db, -60.0, 0.0)
+        && finite_in_range(p.compressor_ratio, 1.0, 20.0)
+        && finite_in_range(p.compressor_attack_ms, 0.1, 200.0)
+        && finite_in_range(p.compressor_release_ms, 10.0, 2_000.0)
+        && finite_in_range(p.compressor_knee_db, 0.0, 24.0)
+        && finite_in_range(p.compressor_makeup_db, 0.0, 24.0)
+        && finite_in_range(p.limiter_ceiling_db, -12.0, 0.0)
+        && finite_in_range(p.limiter_release_ms, 10.0, 1_000.0)
+        && finite_in_range(p.reverb_room_size, 0.0, 1.0)
+        && finite_in_range(p.reverb_decay_ms, 50.0, 5_000.0)
+        && finite_in_range(p.reverb_damping, 0.0, 1.0)
+        && finite_in_range(p.reverb_pre_delay_ms, 0.0, 200.0)
+        && finite_in_range(p.reverb_wet, 0.0, 1.0)
+        && finite_in_range(p.reverb_dry, 0.0, 1.0)
+        && p.reserved == [0; 8]
+}
+
+fn params_to_words(p: &FeRustMixerParams) -> [u32; MIXER_PARAM_WORDS] {
+    let mut w = [0; MIXER_PARAM_WORDS];
+    w[0..4].copy_from_slice(&[
+        p.enabled,
+        p.compressor_enabled,
+        p.limiter_enabled,
+        p.reverb_enabled,
+    ]);
+    let values = [
+        p.input_gain_db,
+        p.output_gain_db,
+        p.balance,
+        p.eq_db[0],
+        p.eq_db[1],
+        p.eq_db[2],
+        p.eq_db[3],
+        p.eq_db[4],
+        p.eq_db[5],
+        p.eq_db[6],
+        p.eq_db[7],
+        p.eq_db[8],
+        p.eq_db[9],
+        p.stereo_width,
+        p.center_gain,
+        p.surround_gain,
+        p.lfe_gain,
+        p.compressor_threshold_db,
+        p.compressor_ratio,
+        p.compressor_attack_ms,
+        p.compressor_release_ms,
+        p.compressor_knee_db,
+        p.compressor_makeup_db,
+        p.limiter_ceiling_db,
+        p.limiter_release_ms,
+        p.reverb_room_size,
+        p.reverb_decay_ms,
+        p.reverb_damping,
+        p.reverb_pre_delay_ms,
+        p.reverb_wet,
+        p.reverb_dry,
+    ];
+    for (slot, value) in w[4..].iter_mut().zip(values) {
+        *slot = value.to_bits();
+    }
+    w
+}
+
+fn words_to_params(w: &[u32; MIXER_PARAM_WORDS]) -> FeRustMixerParams {
+    let f = |index: usize| f32::from_bits(w[index + 4]);
+    let mut p = clean_params();
+    p.enabled = w[0];
+    p.compressor_enabled = w[1];
+    p.limiter_enabled = w[2];
+    p.reverb_enabled = w[3];
+    p.input_gain_db = f(0);
+    p.output_gain_db = f(1);
+    p.balance = f(2);
+    for i in 0..10 {
+        p.eq_db[i] = f(3 + i);
+    }
+    p.stereo_width = f(13);
+    p.center_gain = f(14);
+    p.surround_gain = f(15);
+    p.lfe_gain = f(16);
+    p.compressor_threshold_db = f(17);
+    p.compressor_ratio = f(18);
+    p.compressor_attack_ms = f(19);
+    p.compressor_release_ms = f(20);
+    p.compressor_knee_db = f(21);
+    p.compressor_makeup_db = f(22);
+    p.limiter_ceiling_db = f(23);
+    p.limiter_release_ms = f(24);
+    p.reverb_room_size = f(25);
+    p.reverb_decay_ms = f(26);
+    p.reverb_damping = f(27);
+    p.reverb_pre_delay_ms = f(28);
+    p.reverb_wet = f(29);
+    p.reverb_dry = f(30);
+    p
+}
+
+struct PublishedParams {
+    sequence: AtomicU64,
+    revision: AtomicU64,
+    ramp_frames: AtomicU32,
+    words: [AtomicU32; MIXER_PARAM_WORDS],
+}
+
+impl PublishedParams {
+    fn new(params: &FeRustMixerParams) -> Self {
+        let words = params_to_words(params);
+        Self {
+            sequence: AtomicU64::new(0),
+            revision: AtomicU64::new(0),
+            ramp_frames: AtomicU32::new(0),
+            words: std::array::from_fn(|i| AtomicU32::new(words[i])),
+        }
+    }
+
+    fn publish(&self, revision: u64, ramp_frames: u32, params: &FeRustMixerParams) {
+        self.sequence.fetch_add(1, Ordering::AcqRel);
+        for (slot, word) in self.words.iter().zip(params_to_words(params)) {
+            slot.store(word, Ordering::Relaxed);
+        }
+        self.ramp_frames.store(ramp_frames, Ordering::Relaxed);
+        self.revision.store(revision, Ordering::Relaxed);
+        self.sequence.fetch_add(1, Ordering::Release);
+    }
+
+    fn load(&self) -> (u64, u32, FeRustMixerParams) {
+        loop {
+            let before = self.sequence.load(Ordering::Acquire);
+            if before & 1 != 0 {
+                std::hint::spin_loop();
+                continue;
+            }
+            let mut words = [0; MIXER_PARAM_WORDS];
+            for (destination, source) in words.iter_mut().zip(&self.words) {
+                *destination = source.load(Ordering::Relaxed);
+            }
+            let revision = self.revision.load(Ordering::Relaxed);
+            let ramp_frames = self.ramp_frames.load(Ordering::Relaxed);
+            let after = self.sequence.load(Ordering::Acquire);
+            if before == after {
+                return (revision, ramp_frames, words_to_params(&words));
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Default)]
+struct BiquadState {
+    x1: f32,
+    x2: f32,
+    y1: f32,
+    y2: f32,
+}
+
+#[derive(Clone, Copy, Default)]
+struct BiquadCoefficients {
+    b0: f32,
+    b1: f32,
+    b2: f32,
+    a1: f32,
+    a2: f32,
+}
+
+fn peaking_coefficients(sample_rate: f32, frequency: f32, gain_db: f32) -> BiquadCoefficients {
+    let frequency = frequency.min(sample_rate * 0.45);
+    let a = 10.0_f32.powf(gain_db / 40.0);
+    let omega = std::f32::consts::TAU * frequency / sample_rate;
+    let alpha = omega.sin() / 2.0_f32.sqrt();
+    let a0 = 1.0 + alpha / a;
+    BiquadCoefficients {
+        b0: (1.0 + alpha * a) / a0,
+        b1: -2.0 * omega.cos() / a0,
+        b2: (1.0 - alpha * a) / a0,
+        a1: -2.0 * omega.cos() / a0,
+        a2: (1.0 - alpha / a) / a0,
+    }
+}
+
+fn run_biquad(state: &mut BiquadState, c: BiquadCoefficients, x: f32) -> f32 {
+    let y = c.b0 * x + c.b1 * state.x1 + c.b2 * state.x2 - c.a1 * state.y1 - c.a2 * state.y2;
+    state.x2 = state.x1;
+    state.x1 = x;
+    state.y2 = state.y1;
+    state.y1 = if y.is_finite() { y } else { 0.0 };
+    state.y1
+}
+
+#[derive(Clone, Copy)]
+struct DerivedParameters {
+    input_gain: f32,
+    output_gain: f32,
+    eq: [BiquadCoefficients; FE_RUST_MIXER_EQ_BANDS],
+    compressor_threshold: f32,
+    compressor_strength: f32,
+    compressor_knee_width: f32,
+    compressor_attack: f32,
+    compressor_release: f32,
+    compressor_makeup: f32,
+    limiter_ceiling: f32,
+    limiter_release: f32,
+    reverb_feedback: f32,
+    reverb_delay: usize,
+}
+
+impl DerivedParameters {
+    fn from_params(p: &FeRustMixerParams, sample_rate: f32, reverb_stride: usize) -> Self {
+        let db_gain = |db: f32| 10.0_f32.powf(db / 20.0);
+        let time_coefficient =
+            |milliseconds: f32| (-1.0 / (milliseconds * 0.001 * sample_rate)).exp();
+        let pre = (p.reverb_pre_delay_ms * 0.001 * sample_rate) as usize;
+        let room = ((0.02 + p.reverb_room_size * 0.10) * sample_rate) as usize;
+        let reverb_delay = (pre + room).clamp(1, reverb_stride - 1);
+        Self {
+            input_gain: db_gain(p.input_gain_db),
+            output_gain: db_gain(p.output_gain_db),
+            eq: std::array::from_fn(|band| {
+                peaking_coefficients(sample_rate, EQ_FREQUENCIES[band], p.eq_db[band])
+            }),
+            compressor_threshold: db_gain(p.compressor_threshold_db),
+            compressor_strength: 1.0 - 1.0 / p.compressor_ratio,
+            compressor_knee_width: db_gain(p.compressor_knee_db * 0.5) - 1.0,
+            compressor_attack: time_coefficient(p.compressor_attack_ms),
+            compressor_release: time_coefficient(p.compressor_release_ms),
+            compressor_makeup: db_gain(p.compressor_makeup_db),
+            limiter_ceiling: db_gain(p.limiter_ceiling_db),
+            limiter_release: time_coefficient(p.limiter_release_ms),
+            reverb_feedback: 10.0_f32
+                .powf(-3.0 * reverb_delay as f32 / (p.reverb_decay_ms * 0.001 * sample_rate)),
+            reverb_delay,
+        }
+    }
+
+    fn approach(&mut self, target: Self, fraction: f32) {
+        macro_rules! field {
+            ($name:ident) => {
+                self.$name += (target.$name - self.$name) * fraction;
+            };
+        }
+        field!(input_gain);
+        field!(output_gain);
+        field!(compressor_threshold);
+        field!(compressor_strength);
+        field!(compressor_knee_width);
+        field!(compressor_attack);
+        field!(compressor_release);
+        field!(compressor_makeup);
+        field!(limiter_ceiling);
+        field!(limiter_release);
+        field!(reverb_feedback);
+        for band in 0..FE_RUST_MIXER_EQ_BANDS {
+            macro_rules! coefficient {
+                ($name:ident) => {
+                    self.eq[band].$name += (target.eq[band].$name - self.eq[band].$name) * fraction;
+                };
+            }
+            coefficient!(b0);
+            coefficient!(b1);
+            coefficient!(b2);
+            coefficient!(a1);
+            coefficient!(a2);
+        }
+        self.reverb_delay = target.reverb_delay;
+    }
+}
+
+struct MixerDsp {
+    sample_rate: f32,
+    max_frames: usize,
+    seen_revision: u64,
+    current: FeRustMixerParams,
+    target: FeRustMixerParams,
+    derived: DerivedParameters,
+    derived_target: DerivedParameters,
+    ramp_remaining: u32,
+    eq: [[BiquadState; FE_RUST_MIXER_EQ_BANDS]; MIXER_MAX_CHANNELS],
+    compressor_envelope: f32,
+    limiter_gain: f32,
+    reverb: Vec<f32>,
+    reverb_stride: usize,
+    reverb_position: usize,
+    reverb_damping: [f32; MIXER_MAX_CHANNELS],
+}
+
+impl MixerDsp {
+    fn new(config: &FeRustMixerConfig, params: FeRustMixerParams) -> Self {
+        let stride = ((config.sample_rate as f32 * 0.321).ceil() as usize).max(2);
+        let derived = DerivedParameters::from_params(&params, config.sample_rate as f32, stride);
+        Self {
+            sample_rate: config.sample_rate as f32,
+            max_frames: config.max_frames_per_call as usize,
+            seen_revision: 0,
+            current: params,
+            target: params,
+            derived,
+            derived_target: derived,
+            ramp_remaining: 0,
+            eq: [[BiquadState::default(); FE_RUST_MIXER_EQ_BANDS]; MIXER_MAX_CHANNELS],
+            compressor_envelope: 0.0,
+            limiter_gain: 1.0,
+            reverb: vec![0.0; stride * MIXER_MAX_CHANNELS],
+            reverb_stride: stride,
+            reverb_position: 0,
+            reverb_damping: [0.0; MIXER_MAX_CHANNELS],
+        }
+    }
+
+    fn reset_temporal(&mut self) {
+        self.eq = [[BiquadState::default(); FE_RUST_MIXER_EQ_BANDS]; MIXER_MAX_CHANNELS];
+        self.compressor_envelope = 0.0;
+        self.limiter_gain = 1.0;
+        self.reverb.fill(0.0);
+        self.reverb_position = 0;
+        self.reverb_damping = [0.0; MIXER_MAX_CHANNELS];
+    }
+
+    fn accept_snapshot(&mut self, revision: u64, ramp_frames: u32, params: FeRustMixerParams) {
+        if revision != self.seen_revision {
+            self.seen_revision = revision;
+            self.target = params;
+            self.derived_target =
+                DerivedParameters::from_params(&params, self.sample_rate, self.reverb_stride);
+            if ramp_frames == 0 {
+                self.current = params;
+                self.derived = self.derived_target;
+            }
+            self.ramp_remaining = ramp_frames;
+        }
+    }
+
+    fn ramp_one(&mut self) {
+        if self.ramp_remaining == 0 {
+            self.current = self.target;
+            self.derived = self.derived_target;
+            return;
+        }
+        let fraction = 1.0 / self.ramp_remaining as f32;
+        macro_rules! approach {
+            ($field:ident) => {
+                self.current.$field += (self.target.$field - self.current.$field) * fraction;
+            };
+        }
+        approach!(input_gain_db);
+        approach!(output_gain_db);
+        approach!(balance);
+        for i in 0..FE_RUST_MIXER_EQ_BANDS {
+            self.current.eq_db[i] += (self.target.eq_db[i] - self.current.eq_db[i]) * fraction;
+        }
+        approach!(stereo_width);
+        approach!(center_gain);
+        approach!(surround_gain);
+        approach!(lfe_gain);
+        approach!(compressor_threshold_db);
+        approach!(compressor_ratio);
+        approach!(compressor_attack_ms);
+        approach!(compressor_release_ms);
+        approach!(compressor_knee_db);
+        approach!(compressor_makeup_db);
+        approach!(limiter_ceiling_db);
+        approach!(limiter_release_ms);
+        approach!(reverb_room_size);
+        approach!(reverb_decay_ms);
+        approach!(reverb_damping);
+        approach!(reverb_pre_delay_ms);
+        approach!(reverb_wet);
+        approach!(reverb_dry);
+        self.derived.approach(self.derived_target, fraction);
+        self.current.enabled = self.target.enabled;
+        self.current.compressor_enabled = self.target.compressor_enabled;
+        self.current.limiter_enabled = self.target.limiter_enabled;
+        self.current.reverb_enabled = self.target.reverb_enabled;
+        self.ramp_remaining -= 1;
+    }
+
+    fn process(&mut self, pcm: &mut [f32], frames: usize, channels: usize) {
+        for frame in 0..frames {
+            self.ramp_one();
+            let p = self.current;
+            let d = self.derived;
+            let base = frame * channels;
+            for channel in 0..channels {
+                let sample = pcm[base + channel];
+                pcm[base + channel] = if sample.is_finite() { sample } else { 0.0 };
+            }
+            if p.enabled == 0 {
+                for channel in 0..channels {
+                    pcm[base + channel] = pcm[base + channel].clamp(-1.0, 1.0);
+                }
+                continue;
+            }
+
+            // 1. Input gain and balance.
+            for channel in 0..channels {
+                pcm[base + channel] *= d.input_gain;
+            }
+            pcm[base] *= if p.balance > 0.0 {
+                1.0 - p.balance
+            } else {
+                1.0
+            };
+            pcm[base + 1] *= if p.balance < 0.0 {
+                1.0 + p.balance
+            } else {
+                1.0
+            };
+
+            // 2. Ten fixed-frequency peaking EQ bands.
+            for band in 0..FE_RUST_MIXER_EQ_BANDS {
+                let c = d.eq[band];
+                for channel in 0..channels {
+                    pcm[base + channel] =
+                        run_biquad(&mut self.eq[channel][band], c, pcm[base + channel]);
+                }
+            }
+
+            // 3. Stereo width and multichannel spatial gains.
+            let mid = (pcm[base] + pcm[base + 1]) * 0.5;
+            let side = (pcm[base] - pcm[base + 1]) * 0.5 * p.stereo_width;
+            pcm[base] = mid + side;
+            pcm[base + 1] = mid - side;
+            if channels >= 6 {
+                pcm[base + 2] *= p.center_gain;
+                pcm[base + 3] *= p.lfe_gain;
+                for channel in 4..channels {
+                    pcm[base + channel] *= p.surround_gain;
+                }
+            }
+
+            // 4. Linked soft-knee compressor.
+            if p.compressor_enabled != 0 {
+                let peak = pcm[base..base + channels]
+                    .iter()
+                    .fold(0.0_f32, |m, value| m.max(value.abs()));
+                let coefficient = if peak > self.compressor_envelope {
+                    d.compressor_attack
+                } else {
+                    d.compressor_release
+                };
+                self.compressor_envelope =
+                    coefficient * self.compressor_envelope + (1.0 - coefficient) * peak;
+                let threshold = d.compressor_threshold.max(1.0e-6);
+                let normalized_over = (self.compressor_envelope - threshold) / threshold;
+                let knee = d.compressor_knee_width.max(1.0e-6);
+                let reduction = if normalized_over <= -knee {
+                    0.0
+                } else if normalized_over < knee {
+                    let x = (normalized_over + knee) / (2.0 * knee);
+                    x * x * normalized_over.max(0.0) * d.compressor_strength
+                } else {
+                    normalized_over * d.compressor_strength
+                };
+                let gain = d.compressor_makeup / (1.0 + reduction);
+                for channel in 0..channels {
+                    pcm[base + channel] *= gain;
+                }
+            }
+
+            // 5. Bounded feedback reverb; all memory was allocated by create.
+            if p.reverb_enabled != 0 {
+                let delay = d.reverb_delay;
+                let read = (self.reverb_position + self.reverb_stride - delay) % self.reverb_stride;
+                for channel in 0..channels {
+                    let delayed = self.reverb[channel * self.reverb_stride + read];
+                    self.reverb_damping[channel] +=
+                        (1.0 - p.reverb_damping) * (delayed - self.reverb_damping[channel]);
+                    let wet = self.reverb_damping[channel];
+                    let input = pcm[base + channel];
+                    self.reverb[channel * self.reverb_stride + self.reverb_position] =
+                        (input + wet * d.reverb_feedback).clamp(-4.0, 4.0);
+                    pcm[base + channel] = input * p.reverb_dry + wet * p.reverb_wet;
+                }
+                self.reverb_position = (self.reverb_position + 1) % self.reverb_stride;
+            }
+
+            // 6. Output gain and linked peak limiter.
+            for channel in 0..channels {
+                pcm[base + channel] *= d.output_gain;
+            }
+            if p.limiter_enabled != 0 {
+                let ceiling = d.limiter_ceiling;
+                let peak = pcm[base..base + channels]
+                    .iter()
+                    .fold(0.0_f32, |m, value| m.max(value.abs()));
+                let desired = if peak > ceiling { ceiling / peak } else { 1.0 };
+                if desired < 1.0 {
+                    self.limiter_gain = self.limiter_gain.min(desired);
+                } else {
+                    self.limiter_gain =
+                        d.limiter_release * self.limiter_gain + (1.0 - d.limiter_release);
+                }
+                for channel in 0..channels {
+                    pcm[base + channel] *= self.limiter_gain;
+                }
+            } else {
+                self.limiter_gain = 1.0;
+            }
+
+            // 7. Final sanitation and hard bounded output.
+            for channel in 0..channels {
+                let sample = pcm[base + channel];
+                pcm[base + channel] = if sample.is_finite() {
+                    sample.clamp(-1.0, 1.0)
+                } else {
+                    0.0
+                };
+            }
+        }
+    }
+}
+
+struct MixerHandle {
+    published: PublishedParams,
+    staged: Mutex<Option<(u64, FeRustMixerParams)>>,
+    process_failures: AtomicU64,
+    dsp: MixerDsp,
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn fe_rust_mixer_abi_version() -> u32 {
+    FE_RUST_MIXER_ABI_VERSION
+}
+
+/// # Safety
+/// `config` must point to a readable `FeRustMixerConfig` for this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fe_rust_mixer_create(
+    config: *const FeRustMixerConfig,
+) -> *mut std::ffi::c_void {
+    if config.is_null() {
+        return std::ptr::null_mut();
+    }
+    catch_unwind(AssertUnwindSafe(|| {
+        let config = unsafe { *config };
+        if !validate_mixer_config(&config) {
+            return std::ptr::null_mut();
+        }
+        let params = clean_params();
+        Box::into_raw(Box::new(MixerHandle {
+            published: PublishedParams::new(&params),
+            staged: Mutex::new(None),
+            process_failures: AtomicU64::new(0),
+            dsp: MixerDsp::new(&config, params),
+        }))
+        .cast()
+    }))
+    .unwrap_or(std::ptr::null_mut())
+}
+
+/// # Safety
+/// `handle` must be live and `params` must point to a readable full v1 structure.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fe_rust_mixer_stage_params(
+    handle: *mut std::ffi::c_void,
+    revision: u64,
+    params: *const FeRustMixerParams,
+) -> i32 {
+    if handle.is_null() || params.is_null() || revision == 0 {
+        return FE_RUST_MIXER_INVALID_ARGUMENT;
+    }
+    catch_unwind(AssertUnwindSafe(|| {
+        let mixer = unsafe { &*handle.cast::<MixerHandle>() };
+        let params = unsafe { *params };
+        if !validate_mixer_params(&params) {
+            return FE_RUST_MIXER_INVALID_ARGUMENT;
+        }
+        let active = mixer.published.revision.load(Ordering::Acquire);
+        if revision <= active {
+            return FE_RUST_MIXER_INVALID_REVISION;
+        }
+        let mut staged = match mixer.staged.lock() {
+            Ok(value) => value,
+            Err(_) => return FE_RUST_MIXER_PANIC,
+        };
+        if staged
+            .as_ref()
+            .is_some_and(|(existing, _)| revision <= *existing)
+        {
+            return FE_RUST_MIXER_INVALID_REVISION;
+        }
+        *staged = Some((revision, params));
+        FE_RUST_MIXER_OK
+    }))
+    .unwrap_or(FE_RUST_MIXER_PANIC)
+}
+
+/// # Safety
+/// `handle` must be a live mixer handle. This control-thread call may lock.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fe_rust_mixer_commit(
+    handle: *mut std::ffi::c_void,
+    revision: u64,
+    ramp_frames: u32,
+) -> i32 {
+    if handle.is_null() {
+        return FE_RUST_MIXER_INVALID_ARGUMENT;
+    }
+    catch_unwind(AssertUnwindSafe(|| {
+        let mixer = unsafe { &*handle.cast::<MixerHandle>() };
+        let mut staged = match mixer.staged.lock() {
+            Ok(value) => value,
+            Err(_) => return FE_RUST_MIXER_PANIC,
+        };
+        let Some((staged_revision, params)) = *staged else {
+            return FE_RUST_MIXER_INVALID_REVISION;
+        };
+        if revision != staged_revision
+            || revision <= mixer.published.revision.load(Ordering::Acquire)
+        {
+            return FE_RUST_MIXER_INVALID_REVISION;
+        }
+        mixer.published.publish(revision, ramp_frames, &params);
+        *staged = None;
+        FE_RUST_MIXER_OK
+    }))
+    .unwrap_or(FE_RUST_MIXER_PANIC)
+}
+
+/// # Safety
+/// `handle` must be live; `pcm` must contain `frames * channels` writable floats.
+/// Process calls for one handle must be serialized by the host.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fe_rust_mixer_process(
+    handle: *mut std::ffi::c_void,
+    pcm: *mut f32,
+    frames: u32,
+    channels: u32,
+) -> i32 {
+    if handle.is_null() || pcm.is_null() || frames == 0 || !matches!(channels, 2 | 6 | 8) {
+        return FE_RUST_MIXER_INVALID_ARGUMENT;
+    }
+    catch_unwind(AssertUnwindSafe(|| {
+        let mixer = unsafe { &mut *handle.cast::<MixerHandle>() };
+        if frames as usize > mixer.dsp.max_frames {
+            mixer.process_failures.fetch_add(1, Ordering::Relaxed);
+            return FE_RUST_MIXER_INVALID_ARGUMENT;
+        }
+        let samples = match (frames as usize).checked_mul(channels as usize) {
+            Some(value) => value,
+            None => return FE_RUST_MIXER_INVALID_ARGUMENT,
+        };
+        let (revision, ramp_frames, params) = mixer.published.load();
+        mixer.dsp.accept_snapshot(revision, ramp_frames, params);
+        let pcm = unsafe { std::slice::from_raw_parts_mut(pcm, samples) };
+        mixer.dsp.process(pcm, frames as usize, channels as usize);
+        FE_RUST_MIXER_OK
+    }))
+    .unwrap_or_else(|_| {
+        if !handle.is_null() {
+            unsafe { &*handle.cast::<MixerHandle>() }
+                .process_failures
+                .fetch_add(1, Ordering::Relaxed);
+        }
+        FE_RUST_MIXER_PANIC
+    })
+}
+
+/// # Safety
+/// Both pointers must be valid; status must advertise a writable full v1 structure.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fe_rust_mixer_get_status(
+    handle: *const std::ffi::c_void,
+    status: *mut FeRustMixerStatus,
+) -> i32 {
+    if handle.is_null() || status.is_null() {
+        return FE_RUST_MIXER_INVALID_ARGUMENT;
+    }
+    catch_unwind(AssertUnwindSafe(|| {
+        let requested_size = unsafe { std::ptr::addr_of!((*status).struct_size).read() };
+        let requested_version = unsafe { std::ptr::addr_of!((*status).abi_version).read() };
+        if (requested_size as usize) < size_of::<FeRustMixerStatus>()
+            || requested_version != FE_RUST_MIXER_ABI_VERSION
+        {
+            return FE_RUST_MIXER_INVALID_ARGUMENT;
+        }
+        let mixer = unsafe { &*handle.cast::<MixerHandle>() };
+        let (_, _, params) = mixer.published.load();
+        let staged_revision = mixer
+            .staged
+            .lock()
+            .ok()
+            .and_then(|v| v.as_ref().map(|x| x.0))
+            .unwrap_or(0);
+        unsafe {
+            *status = FeRustMixerStatus {
+                active_revision: mixer.published.revision.load(Ordering::Acquire),
+                staged_revision,
+                process_failures: mixer.process_failures.load(Ordering::Relaxed),
+                enabled: params.enabled,
+                ..FeRustMixerStatus::default()
+            }
+        };
+        FE_RUST_MIXER_OK
+    }))
+    .unwrap_or(FE_RUST_MIXER_PANIC)
+}
+
+/// # Safety
+/// `handle` must be a live mixer handle and serialized with process calls.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fe_rust_mixer_reset(handle: *mut std::ffi::c_void) -> i32 {
+    if handle.is_null() {
+        return FE_RUST_MIXER_INVALID_ARGUMENT;
+    }
+    catch_unwind(AssertUnwindSafe(|| {
+        let mixer = unsafe { &mut *handle.cast::<MixerHandle>() };
+        let (revision, _, params) = mixer.published.load();
+        mixer.dsp.current = params;
+        mixer.dsp.target = params;
+        mixer.dsp.seen_revision = revision;
+        mixer.dsp.ramp_remaining = 0;
+        mixer.dsp.reset_temporal();
+        FE_RUST_MIXER_OK
+    }))
+    .unwrap_or(FE_RUST_MIXER_PANIC)
+}
+
+/// # Safety
+/// `handle` must be null or a live mixer handle transferred exactly once.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fe_rust_mixer_destroy(handle: *mut std::ffi::c_void) {
+    if !handle.is_null() {
+        let _ = catch_unwind(AssertUnwindSafe(|| {
+            drop(unsafe { Box::from_raw(handle.cast::<MixerHandle>()) })
+        }));
+    }
 }
 
 #[cfg(test)]
@@ -367,16 +1339,10 @@ mod tests {
             for channels in [6_usize, 8_usize] {
                 let mut upmix_config = config(channels as u32);
                 upmix_config.algorithm = algorithm;
-                let mut one_call =
-                    create_handle(&upmix_config).expect("one-call handle");
+                let mut one_call = create_handle(&upmix_config).expect("one-call handle");
                 let mut one_call_output = vec![0.0_f32; total_frames * channels];
                 assert_eq!(
-                    process_block(
-                        &mut one_call,
-                        &input,
-                        total_frames,
-                        &mut one_call_output,
-                    ),
+                    process_block(&mut one_call, &input, total_frames, &mut one_call_output,),
                     RESULT_OK
                 );
 
@@ -404,8 +1370,7 @@ mod tests {
                 for frame in 0..total_frames {
                     let lfe_index = frame * channels + 3;
                     assert!(
-                        (one_call_output[lfe_index] - split_output[lfe_index]).abs()
-                            < 1.0e-6,
+                        (one_call_output[lfe_index] - split_output[lfe_index]).abs() < 1.0e-6,
                         "LFE diverged at frame {frame} for algorithm {algorithm}, {channels}ch"
                     );
                 }
