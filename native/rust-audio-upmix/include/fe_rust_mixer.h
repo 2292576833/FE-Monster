@@ -9,6 +9,7 @@
 #define FE_RUST_MIXER_INVALID_REVISION (-2)
 #define FE_RUST_MIXER_UNSUPPORTED (-3)
 #define FE_RUST_MIXER_PANIC (-4)
+#define FE_RUST_MIXER_BUSY (-5)
 
 #if defined(_WIN32)
 #define FE_RUST_MIXER_CALL __cdecl
@@ -92,8 +93,10 @@ typedef struct FeRustMixerStatus {
  * Threading contract: stage/commit/get_status may run concurrently with one
  * serialized audio owner calling process. reset must be serialized with
  * process. destroy requires all other calls to have stopped. Control calls
- * publish prepared immutable snapshots; process never locks, waits, allocates,
- * accesses files, or logs.
+ * publish prepared immutable snapshots through per-slot CAS ownership;
+ * process never locks, waits, allocates, accesses files, or logs. A transient
+ * FE_RUST_MIXER_BUSY commit leaves staged and active state unchanged and may be
+ * retried with the same revision.
  */
 
 typedef uint32_t(FE_RUST_MIXER_CALL* FeRustMixerAbiVersionFn)(void);

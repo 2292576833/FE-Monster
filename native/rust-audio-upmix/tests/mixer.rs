@@ -59,6 +59,7 @@ fn sine(frames: usize, channels: usize, frequency: f32, amplitude: f32) -> Vec<f
 #[test]
 fn abi_layout_and_legacy_upmix_v1_are_stable() {
     assert_eq!(fe_rust_mixer_abi_version(), 1);
+    assert_eq!(FE_RUST_MIXER_BUSY, -5);
     assert_eq!(fe_rust_upmix_abi_version(), 1);
     assert_eq!(size_of::<FeRustMixerConfig>(), 32);
     assert_eq!(size_of::<FeRustMixerParams>(), 180);

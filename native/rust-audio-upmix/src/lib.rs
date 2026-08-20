@@ -2,7 +2,7 @@ use oximedia_audiopost::surround_upmix::{SurroundUpmixer, UpmixAlgorithm, UpmixC
 use std::cell::UnsafeCell;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 const ABI_VERSION: u32 = 1;
 const RESULT_OK: i32 = 0;
@@ -302,8 +302,12 @@ pub const FE_RUST_MIXER_INVALID_ARGUMENT: i32 = -1;
 pub const FE_RUST_MIXER_INVALID_REVISION: i32 = -2;
 pub const FE_RUST_MIXER_UNSUPPORTED: i32 = -3;
 pub const FE_RUST_MIXER_PANIC: i32 = -4;
+pub const FE_RUST_MIXER_BUSY: i32 = -5;
 const MIXER_MAX_CHANNELS: usize = 8;
 const MIXER_SNAPSHOT_SLOTS: usize = 3;
+const SLOT_FREE: u32 = 0;
+const SLOT_READING: u32 = 1;
+const SLOT_WRITING: u32 = 2;
 const COMPRESSOR_LUT_SIZE: usize = 8_193;
 const COMPRESSOR_LUT_MAX_AMPLITUDE: f32 = 8.0;
 const EQ_FREQUENCIES: [f32; FE_RUST_MIXER_EQ_BANDS] = [
@@ -711,55 +715,91 @@ struct PreparedSnapshot {
     derived: DerivedParameters,
 }
 
-struct SnapshotPublication {
-    slots: [UnsafeCell<PreparedSnapshot>; MIXER_SNAPSHOT_SLOTS],
-    active_token: AtomicU64,
-    reader_token: AtomicU64,
+struct SnapshotSlot {
+    value: UnsafeCell<PreparedSnapshot>,
+    state: AtomicU32,
 }
 
-// SAFETY: writers are serialized by MixerHandle::control. A writer never
-// writes the active slot or the slot announced by the single serialized audio
-// reader. The reader announces a token, performs one acquire recheck, and only
-// copies the slot if the token is unchanged. It never retries, spins, or waits.
+struct SnapshotPublication {
+    slots: [SnapshotSlot; MIXER_SNAPSHOT_SLOTS],
+    active_token: AtomicU64,
+}
+
+// SAFETY: writers are serialized by MixerHandle::control. Every non-atomic
+// slot access is preceded by exclusive CAS ownership: FREE->WRITING for the
+// publisher or FREE->READING for the single serialized audio reader. The
+// publisher also excludes the active slot. A reader rechecks the generation
+// token after claiming and abandons stale claims. No read can overlap WRITING,
+// and no write can overlap READING.
 unsafe impl Sync for SnapshotPublication {}
 
 impl SnapshotPublication {
     fn new(initial: PreparedSnapshot) -> Self {
         Self {
-            slots: std::array::from_fn(|_| UnsafeCell::new(initial)),
+            slots: std::array::from_fn(|_| SnapshotSlot {
+                value: UnsafeCell::new(initial),
+                state: AtomicU32::new(SLOT_FREE),
+            }),
             active_token: AtomicU64::new(1 << 2),
-            reader_token: AtomicU64::new(0),
         }
     }
 
-    fn publish(&self, snapshot: PreparedSnapshot) {
+    fn publish(&self, snapshot: PreparedSnapshot) -> bool {
         let active = self.active_token.load(Ordering::Acquire);
         let active_slot = (active & 0x3) as usize;
-        let reader = self.reader_token.load(Ordering::Acquire);
-        let reader_slot = (reader != 0).then_some((reader & 0x3) as usize);
-        let slot = (0..MIXER_SNAPSHOT_SLOTS)
-            .find(|candidate| *candidate != active_slot && Some(*candidate) != reader_slot)
-            .expect("three slots always leave a writable slot");
-        // SAFETY: control calls are mutex-serialized; slot selection excludes
-        // both the published slot and any slot announced by the audio reader.
-        unsafe { self.slots[slot].get().write(snapshot) };
-        let generation = (active >> 2).wrapping_add(1).max(1);
-        self.active_token
-            .store((generation << 2) | slot as u64, Ordering::Release);
+        for slot in 0..MIXER_SNAPSHOT_SLOTS {
+            if slot == active_slot
+                || self.slots[slot]
+                    .state
+                    .compare_exchange(SLOT_FREE, SLOT_WRITING, Ordering::AcqRel, Ordering::Acquire)
+                    .is_err()
+            {
+                continue;
+            }
+            // SAFETY: FREE->WRITING is exclusive, and the active slot was
+            // excluded. Readers can only access slots held as READING.
+            unsafe { self.slots[slot].value.get().write(snapshot) };
+            let generation = (active >> 2).wrapping_add(1).max(1);
+            self.active_token
+                .store((generation << 2) | slot as u64, Ordering::Release);
+            self.slots[slot].state.store(SLOT_FREE, Ordering::Release);
+            return true;
+        }
+        false
+    }
+
+    fn try_claim_active(&self) -> Option<(u64, usize)> {
+        let token = self.active_token.load(Ordering::Acquire);
+        let slot = (token & 0x3) as usize;
+        if self.slots[slot]
+            .state
+            .compare_exchange(SLOT_FREE, SLOT_READING, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
+            return None;
+        }
+        if self.active_token.load(Ordering::Acquire) != token {
+            self.release_read(slot);
+            return None;
+        }
+        Some((token, slot))
+    }
+
+    fn copy_claimed(&self, slot: usize) -> PreparedSnapshot {
+        debug_assert_eq!(self.slots[slot].state.load(Ordering::Relaxed), SLOT_READING);
+        // SAFETY: caller owns the slot as READING. A publisher must acquire
+        // WRITING with CAS and therefore cannot touch this value concurrently.
+        unsafe { *self.slots[slot].value.get() }
+    }
+
+    fn release_read(&self, slot: usize) {
+        self.slots[slot].state.store(SLOT_FREE, Ordering::Release);
     }
 
     fn try_load(&self) -> Option<PreparedSnapshot> {
-        let token = self.active_token.load(Ordering::Acquire);
-        self.reader_token.store(token, Ordering::Release);
-        if self.active_token.load(Ordering::Acquire) != token {
-            self.reader_token.store(0, Ordering::Release);
-            return None;
-        }
-        let slot = (token & 0x3) as usize;
-        // SAFETY: the announcement/recheck protocol makes the writer exclude
-        // this slot until reader_token is cleared. PreparedSnapshot is Copy.
-        let snapshot = unsafe { *self.slots[slot].get() };
-        self.reader_token.store(0, Ordering::Release);
+        let (_, slot) = self.try_claim_active()?;
+        let snapshot = self.copy_claimed(slot);
+        self.release_read(slot);
         Some(snapshot)
     }
 }
@@ -1165,7 +1205,9 @@ pub unsafe extern "C" fn fe_rust_mixer_commit(
             return FE_RUST_MIXER_INVALID_REVISION;
         }
         snapshot.ramp_frames = ramp_frames;
-        mixer.publication.publish(snapshot);
+        if !mixer.publication.publish(snapshot) {
+            return FE_RUST_MIXER_BUSY;
+        }
         control.active_revision = revision;
         control.active_snapshot = snapshot;
         control.staged = None;
@@ -1428,5 +1470,96 @@ mod tests {
         let reset_lfe = reset[3];
         assert!(continued_lfe > first_lfe * 10.0);
         assert!((reset_lfe - first_lfe).abs() < 1.0e-7);
+    }
+
+    #[test]
+    fn slot_ownership_excludes_two_publishers_while_stale_reader_holds_slot() {
+        fn snapshot(revision: u64) -> PreparedSnapshot {
+            let mut params = clean_params();
+            params.input_gain_db = revision as f32;
+            PreparedSnapshot {
+                revision,
+                ramp_frames: 0,
+                params,
+                derived: DerivedParameters::from_params(&params, 48_000.0, 15_409),
+            }
+        }
+
+        let publication = SnapshotPublication::new(snapshot(0));
+        // Force the reviewed ordering: reader observes and owns old active A;
+        // two publications advance to B then would otherwise reuse A.
+        let (observed_token, reader_slot) = publication
+            .try_claim_active()
+            .expect("reader claims the old active slot");
+        assert_eq!(observed_token & 0x3, reader_slot as u64);
+        assert!(publication.publish(snapshot(1)));
+        assert!(publication.publish(snapshot(2)));
+        assert_eq!(publication.copy_claimed(reader_slot).revision, 0);
+        publication.release_read(reader_slot);
+    }
+
+    #[test]
+    fn writer_owned_slot_rejects_reader_claim_before_publication() {
+        let publication = SnapshotPublication::new({
+            let params = clean_params();
+            PreparedSnapshot {
+                revision: 0,
+                ramp_frames: 0,
+                params,
+                derived: DerivedParameters::from_params(&params, 48_000.0, 15_409),
+            }
+        });
+        let writer_slot = 1;
+        assert!(
+            publication.slots[writer_slot]
+                .state
+                .compare_exchange(SLOT_FREE, SLOT_WRITING, Ordering::AcqRel, Ordering::Acquire,)
+                .is_ok()
+        );
+        assert!(
+            publication.slots[writer_slot]
+                .state
+                .compare_exchange(SLOT_FREE, SLOT_READING, Ordering::AcqRel, Ordering::Acquire,)
+                .is_err()
+        );
+        publication.slots[writer_slot]
+            .state
+            .store(SLOT_FREE, Ordering::Release);
+    }
+
+    #[test]
+    fn busy_commit_preserves_staged_and_active_state_for_same_revision_retry() {
+        let config = FeRustMixerConfig::default();
+        let handle = unsafe { fe_rust_mixer_create(&config) };
+        assert!(!handle.is_null());
+        let mixer = unsafe { &*handle.cast::<MixerHandle>() };
+        let active_slot = (mixer.publication.active_token.load(Ordering::Acquire) & 0x3) as usize;
+        for slot in 0..MIXER_SNAPSHOT_SLOTS {
+            if slot != active_slot {
+                mixer.publication.slots[slot]
+                    .state
+                    .store(SLOT_READING, Ordering::Release);
+            }
+        }
+        let params = clean_params();
+        assert_eq!(unsafe { fe_rust_mixer_stage_params(handle, 1, &params) }, 0);
+        assert_eq!(
+            unsafe { fe_rust_mixer_commit(handle, 1, 0) },
+            FE_RUST_MIXER_BUSY
+        );
+        let mut status = FeRustMixerStatus::default();
+        assert_eq!(unsafe { fe_rust_mixer_get_status(handle, &mut status) }, 0);
+        assert_eq!((status.active_revision, status.staged_revision), (0, 1));
+        for slot in 0..MIXER_SNAPSHOT_SLOTS {
+            if slot != active_slot {
+                mixer.publication.slots[slot]
+                    .state
+                    .store(SLOT_FREE, Ordering::Release);
+            }
+        }
+        assert_eq!(unsafe { fe_rust_mixer_commit(handle, 1, 0) }, 0);
+        assert_eq!(unsafe { fe_rust_mixer_get_status(handle, &mut status) }, 0);
+        assert_eq!((status.active_revision, status.staged_revision), (1, 0));
+        unsafe { fe_rust_mixer_destroy(handle) };
     }
 }
