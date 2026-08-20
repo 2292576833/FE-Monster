@@ -1,6 +1,6 @@
 use fe_monster_upmix::{
-    FeRustUpmixConfig, fe_rust_upmix_create, fe_rust_upmix_destroy,
-    fe_rust_upmix_process, fe_rust_upmix_reset,
+    FeRustUpmixConfig, fe_rust_upmix_create, fe_rust_upmix_destroy, fe_rust_upmix_process,
+    fe_rust_upmix_reset,
 };
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};

@@ -73,16 +73,13 @@ fn main() {
     params.compressor_enabled = 1;
     params.reverb_enabled = 1;
     params.reverb_wet = 0.2;
-    let stage = unsafe { fe_rust_mixer_stage_params(handle, 1, &params) };
-    let commit = unsafe { fe_rust_mixer_commit(handle, 1, 256) };
-    if stage != 0 || commit != 0 {
-        panic!("setup failed: stage={stage}, commit={commit}");
-    }
     let mut pcm = vec![0.0_f32; frames as usize * channels as usize];
     for (frame, samples) in pcm.chunks_exact_mut(channels as usize).enumerate() {
         let value = (frame as f32 * 997.0 * std::f32::consts::TAU / 48_000.0).sin() * 0.2;
         samples.fill(value);
     }
+    // Warm only the initial clean snapshot. Every measured process below is
+    // deliberately the first callback after a newly prepared commit.
     let warmup = unsafe { fe_rust_mixer_process(handle, pcm.as_mut_ptr(), frames, channels) };
     if warmup != 0 {
         unsafe { fe_rust_mixer_destroy(handle) };
@@ -93,28 +90,40 @@ fn main() {
     REALLOCATIONS.store(0, Ordering::Relaxed);
     DEALLOCATIONS.store(0, Ordering::Relaxed);
     ALLOCATED_BYTES.store(0, Ordering::Relaxed);
-    let started = Instant::now();
-    TRACKING.store(true, Ordering::SeqCst);
     let mut result = 0;
-    for _ in 0..iterations {
+    let mut elapsed = 0_u128;
+    let mut maximum_process_micros = 0_u128;
+    for iteration in 0..iterations {
+        params.eq_db[0] = 1.0 + (iteration & 1) as f32 * 0.25;
+        let revision = iteration as u64 + 1;
+        let stage = unsafe { fe_rust_mixer_stage_params(handle, revision, &params) };
+        let commit = unsafe { fe_rust_mixer_commit(handle, revision, 256) };
+        if stage != 0 || commit != 0 {
+            result = if stage != 0 { stage } else { commit };
+            break;
+        }
+        let call_started = Instant::now();
+        TRACKING.store(true, Ordering::SeqCst);
         result = unsafe { fe_rust_mixer_process(handle, pcm.as_mut_ptr(), frames, channels) };
+        TRACKING.store(false, Ordering::SeqCst);
+        let call_micros = call_started.elapsed().as_micros();
+        elapsed += call_micros;
+        maximum_process_micros = maximum_process_micros.max(call_micros);
         if result != 0 {
             break;
         }
     }
-    TRACKING.store(false, Ordering::SeqCst);
-    let elapsed = started.elapsed().as_micros();
     let allocations = ALLOCATIONS.load(Ordering::Relaxed);
     let reallocations = REALLOCATIONS.load(Ordering::Relaxed);
     let deallocations = DEALLOCATIONS.load(Ordering::Relaxed);
     let bytes = ALLOCATED_BYTES.load(Ordering::Relaxed);
-    let real_time_budget_micros =
-        iterations as u128 * frames as u128 * 1_000_000 / config.sample_rate as u128;
-    let mixer_budget_micros = iterations as u128 * 20_000;
+    let audio_block_real_time_budget_micros =
+        frames as u128 * 1_000_000 / config.sample_rate as u128;
+    let total_mixer_budget_micros = iterations as u128 * 20_000;
     let micros_per_call = elapsed as f64 / iterations as f64;
     unsafe { fe_rust_mixer_destroy(handle) };
     println!(
-        "{{\"result\":{result},\"sampleRate\":{},\"frames\":{frames},\"channels\":{channels},\"iterations\":{iterations},\"allocations\":{allocations},\"reallocations\":{reallocations},\"deallocations\":{deallocations},\"allocatedBytes\":{bytes},\"elapsedMicros\":{elapsed},\"microsPerCall\":{micros_per_call:.2},\"mixerBudgetMicrosPerCall\":20000,\"realTimeBudgetMicros\":{real_time_budget_micros}}}",
+        "{{\"result\":{result},\"sampleRate\":{},\"frames\":{frames},\"channels\":{channels},\"iterations\":{iterations},\"measuredPoint\":\"first-process-after-each-commit\",\"allocations\":{allocations},\"reallocations\":{reallocations},\"deallocations\":{deallocations},\"allocatedBytes\":{bytes},\"totalProcessMicros\":{elapsed},\"averageProcessMicros\":{micros_per_call:.2},\"maximumProcessMicros\":{maximum_process_micros},\"mixerBudgetMicrosPerCall\":20000,\"totalMixerBudgetMicros\":{total_mixer_budget_micros},\"audioBlockRealTimeBudgetMicrosPerCall\":{audio_block_real_time_budget_micros}}}",
         config.sample_rate
     );
     if result != 0
@@ -122,7 +131,8 @@ fn main() {
         || reallocations != 0
         || deallocations != 0
         || bytes != 0
-        || elapsed > mixer_budget_micros
+        || elapsed > total_mixer_budget_micros
+        || maximum_process_micros > 20_000
     {
         std::process::exit(1);
     }

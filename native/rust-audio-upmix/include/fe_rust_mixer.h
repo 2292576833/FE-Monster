@@ -88,6 +88,14 @@ typedef struct FeRustMixerStatus {
     uint32_t reserved[7];
 } FeRustMixerStatus;
 
+/*
+ * Threading contract: stage/commit/get_status may run concurrently with one
+ * serialized audio owner calling process. reset must be serialized with
+ * process. destroy requires all other calls to have stopped. Control calls
+ * publish prepared immutable snapshots; process never locks, waits, allocates,
+ * accesses files, or logs.
+ */
+
 typedef uint32_t(FE_RUST_MIXER_CALL* FeRustMixerAbiVersionFn)(void);
 typedef void*(FE_RUST_MIXER_CALL* FeRustMixerCreateFn)(const FeRustMixerConfig* config);
 typedef int32_t(FE_RUST_MIXER_CALL* FeRustMixerStageParamsFn)(

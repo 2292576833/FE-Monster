@@ -1,7 +1,8 @@
 use oximedia_audiopost::surround_upmix::{SurroundUpmixer, UpmixAlgorithm, UpmixConfig};
+use std::cell::UnsafeCell;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 const ABI_VERSION: u32 = 1;
 const RESULT_OK: i32 = 0;
@@ -302,7 +303,9 @@ pub const FE_RUST_MIXER_INVALID_REVISION: i32 = -2;
 pub const FE_RUST_MIXER_UNSUPPORTED: i32 = -3;
 pub const FE_RUST_MIXER_PANIC: i32 = -4;
 const MIXER_MAX_CHANNELS: usize = 8;
-const MIXER_PARAM_WORDS: usize = 35;
+const MIXER_SNAPSHOT_SLOTS: usize = 3;
+const COMPRESSOR_LUT_SIZE: usize = 8_193;
+const COMPRESSOR_LUT_MAX_AMPLITUDE: f32 = 8.0;
 const EQ_FREQUENCIES: [f32; FE_RUST_MIXER_EQ_BANDS] = [
     31.0, 62.0, 125.0, 250.0, 500.0, 1_000.0, 2_000.0, 4_000.0, 8_000.0, 16_000.0,
 ];
@@ -556,136 +559,6 @@ fn validate_mixer_params(p: &FeRustMixerParams) -> bool {
         && p.reserved == [0; 8]
 }
 
-fn params_to_words(p: &FeRustMixerParams) -> [u32; MIXER_PARAM_WORDS] {
-    let mut w = [0; MIXER_PARAM_WORDS];
-    w[0..4].copy_from_slice(&[
-        p.enabled,
-        p.compressor_enabled,
-        p.limiter_enabled,
-        p.reverb_enabled,
-    ]);
-    let values = [
-        p.input_gain_db,
-        p.output_gain_db,
-        p.balance,
-        p.eq_db[0],
-        p.eq_db[1],
-        p.eq_db[2],
-        p.eq_db[3],
-        p.eq_db[4],
-        p.eq_db[5],
-        p.eq_db[6],
-        p.eq_db[7],
-        p.eq_db[8],
-        p.eq_db[9],
-        p.stereo_width,
-        p.center_gain,
-        p.surround_gain,
-        p.lfe_gain,
-        p.compressor_threshold_db,
-        p.compressor_ratio,
-        p.compressor_attack_ms,
-        p.compressor_release_ms,
-        p.compressor_knee_db,
-        p.compressor_makeup_db,
-        p.limiter_ceiling_db,
-        p.limiter_release_ms,
-        p.reverb_room_size,
-        p.reverb_decay_ms,
-        p.reverb_damping,
-        p.reverb_pre_delay_ms,
-        p.reverb_wet,
-        p.reverb_dry,
-    ];
-    for (slot, value) in w[4..].iter_mut().zip(values) {
-        *slot = value.to_bits();
-    }
-    w
-}
-
-fn words_to_params(w: &[u32; MIXER_PARAM_WORDS]) -> FeRustMixerParams {
-    let f = |index: usize| f32::from_bits(w[index + 4]);
-    let mut p = clean_params();
-    p.enabled = w[0];
-    p.compressor_enabled = w[1];
-    p.limiter_enabled = w[2];
-    p.reverb_enabled = w[3];
-    p.input_gain_db = f(0);
-    p.output_gain_db = f(1);
-    p.balance = f(2);
-    for i in 0..10 {
-        p.eq_db[i] = f(3 + i);
-    }
-    p.stereo_width = f(13);
-    p.center_gain = f(14);
-    p.surround_gain = f(15);
-    p.lfe_gain = f(16);
-    p.compressor_threshold_db = f(17);
-    p.compressor_ratio = f(18);
-    p.compressor_attack_ms = f(19);
-    p.compressor_release_ms = f(20);
-    p.compressor_knee_db = f(21);
-    p.compressor_makeup_db = f(22);
-    p.limiter_ceiling_db = f(23);
-    p.limiter_release_ms = f(24);
-    p.reverb_room_size = f(25);
-    p.reverb_decay_ms = f(26);
-    p.reverb_damping = f(27);
-    p.reverb_pre_delay_ms = f(28);
-    p.reverb_wet = f(29);
-    p.reverb_dry = f(30);
-    p
-}
-
-struct PublishedParams {
-    sequence: AtomicU64,
-    revision: AtomicU64,
-    ramp_frames: AtomicU32,
-    words: [AtomicU32; MIXER_PARAM_WORDS],
-}
-
-impl PublishedParams {
-    fn new(params: &FeRustMixerParams) -> Self {
-        let words = params_to_words(params);
-        Self {
-            sequence: AtomicU64::new(0),
-            revision: AtomicU64::new(0),
-            ramp_frames: AtomicU32::new(0),
-            words: std::array::from_fn(|i| AtomicU32::new(words[i])),
-        }
-    }
-
-    fn publish(&self, revision: u64, ramp_frames: u32, params: &FeRustMixerParams) {
-        self.sequence.fetch_add(1, Ordering::AcqRel);
-        for (slot, word) in self.words.iter().zip(params_to_words(params)) {
-            slot.store(word, Ordering::Relaxed);
-        }
-        self.ramp_frames.store(ramp_frames, Ordering::Relaxed);
-        self.revision.store(revision, Ordering::Relaxed);
-        self.sequence.fetch_add(1, Ordering::Release);
-    }
-
-    fn load(&self) -> (u64, u32, FeRustMixerParams) {
-        loop {
-            let before = self.sequence.load(Ordering::Acquire);
-            if before & 1 != 0 {
-                std::hint::spin_loop();
-                continue;
-            }
-            let mut words = [0; MIXER_PARAM_WORDS];
-            for (destination, source) in words.iter_mut().zip(&self.words) {
-                *destination = source.load(Ordering::Relaxed);
-            }
-            let revision = self.revision.load(Ordering::Relaxed);
-            let ramp_frames = self.ramp_frames.load(Ordering::Relaxed);
-            let after = self.sequence.load(Ordering::Acquire);
-            if before == after {
-                return (revision, ramp_frames, words_to_params(&words));
-            }
-        }
-    }
-}
-
 #[derive(Clone, Copy, Default)]
 struct BiquadState {
     x1: f32,
@@ -727,17 +600,39 @@ fn run_biquad(state: &mut BiquadState, c: BiquadCoefficients, x: f32) -> f32 {
     state.y1
 }
 
+/// Exact compressor transfer used to prepare the bounded process-time lookup table.
+/// Returns linear gain (including makeup) for a detector level expressed in dBFS.
+pub fn mixer_compressor_gain_for_db(p: &FeRustMixerParams, detector_db: f32) -> Option<f32> {
+    if !validate_mixer_params(p) || !detector_db.is_finite() {
+        return None;
+    }
+    Some(compressor_gain_for_db_unchecked(p, detector_db))
+}
+
+fn compressor_gain_for_db_unchecked(p: &FeRustMixerParams, detector_db: f32) -> f32 {
+    let knee = p.compressor_knee_db;
+    let lower = p.compressor_threshold_db - knee * 0.5;
+    let upper = p.compressor_threshold_db + knee * 0.5;
+    let slope = 1.0 - 1.0 / p.compressor_ratio;
+    let reduction_db = if p.compressor_ratio == 1.0 || detector_db <= lower {
+        0.0
+    } else if knee > 0.0 && detector_db < upper {
+        let distance = detector_db - lower;
+        slope * distance * distance / (2.0 * knee)
+    } else {
+        slope * (detector_db - p.compressor_threshold_db)
+    };
+    10.0_f32.powf((p.compressor_makeup_db - reduction_db) / 20.0)
+}
+
 #[derive(Clone, Copy)]
 struct DerivedParameters {
     input_gain: f32,
     output_gain: f32,
     eq: [BiquadCoefficients; FE_RUST_MIXER_EQ_BANDS],
-    compressor_threshold: f32,
-    compressor_strength: f32,
-    compressor_knee_width: f32,
     compressor_attack: f32,
     compressor_release: f32,
-    compressor_makeup: f32,
+    compressor_lut: [f32; COMPRESSOR_LUT_SIZE],
     limiter_ceiling: f32,
     limiter_release: f32,
     reverb_feedback: f32,
@@ -752,18 +647,25 @@ impl DerivedParameters {
         let pre = (p.reverb_pre_delay_ms * 0.001 * sample_rate) as usize;
         let room = ((0.02 + p.reverb_room_size * 0.10) * sample_rate) as usize;
         let reverb_delay = (pre + room).clamp(1, reverb_stride - 1);
+        let compressor_lut = std::array::from_fn(|index| {
+            let amplitude =
+                index as f32 * COMPRESSOR_LUT_MAX_AMPLITUDE / (COMPRESSOR_LUT_SIZE - 1) as f32;
+            let detector_db = if amplitude > 0.0 {
+                20.0 * amplitude.log10()
+            } else {
+                -160.0
+            };
+            compressor_gain_for_db_unchecked(p, detector_db)
+        });
         Self {
             input_gain: db_gain(p.input_gain_db),
             output_gain: db_gain(p.output_gain_db),
             eq: std::array::from_fn(|band| {
                 peaking_coefficients(sample_rate, EQ_FREQUENCIES[band], p.eq_db[band])
             }),
-            compressor_threshold: db_gain(p.compressor_threshold_db),
-            compressor_strength: 1.0 - 1.0 / p.compressor_ratio,
-            compressor_knee_width: db_gain(p.compressor_knee_db * 0.5) - 1.0,
             compressor_attack: time_coefficient(p.compressor_attack_ms),
             compressor_release: time_coefficient(p.compressor_release_ms),
-            compressor_makeup: db_gain(p.compressor_makeup_db),
+            compressor_lut,
             limiter_ceiling: db_gain(p.limiter_ceiling_db),
             limiter_release: time_coefficient(p.limiter_release_ms),
             reverb_feedback: 10.0_f32
@@ -780,12 +682,8 @@ impl DerivedParameters {
         }
         field!(input_gain);
         field!(output_gain);
-        field!(compressor_threshold);
-        field!(compressor_strength);
-        field!(compressor_knee_width);
         field!(compressor_attack);
         field!(compressor_release);
-        field!(compressor_makeup);
         field!(limiter_ceiling);
         field!(limiter_release);
         field!(reverb_feedback);
@@ -805,14 +703,75 @@ impl DerivedParameters {
     }
 }
 
+#[derive(Clone, Copy)]
+struct PreparedSnapshot {
+    revision: u64,
+    ramp_frames: u32,
+    params: FeRustMixerParams,
+    derived: DerivedParameters,
+}
+
+struct SnapshotPublication {
+    slots: [UnsafeCell<PreparedSnapshot>; MIXER_SNAPSHOT_SLOTS],
+    active_token: AtomicU64,
+    reader_token: AtomicU64,
+}
+
+// SAFETY: writers are serialized by MixerHandle::control. A writer never
+// writes the active slot or the slot announced by the single serialized audio
+// reader. The reader announces a token, performs one acquire recheck, and only
+// copies the slot if the token is unchanged. It never retries, spins, or waits.
+unsafe impl Sync for SnapshotPublication {}
+
+impl SnapshotPublication {
+    fn new(initial: PreparedSnapshot) -> Self {
+        Self {
+            slots: std::array::from_fn(|_| UnsafeCell::new(initial)),
+            active_token: AtomicU64::new(1 << 2),
+            reader_token: AtomicU64::new(0),
+        }
+    }
+
+    fn publish(&self, snapshot: PreparedSnapshot) {
+        let active = self.active_token.load(Ordering::Acquire);
+        let active_slot = (active & 0x3) as usize;
+        let reader = self.reader_token.load(Ordering::Acquire);
+        let reader_slot = (reader != 0).then_some((reader & 0x3) as usize);
+        let slot = (0..MIXER_SNAPSHOT_SLOTS)
+            .find(|candidate| *candidate != active_slot && Some(*candidate) != reader_slot)
+            .expect("three slots always leave a writable slot");
+        // SAFETY: control calls are mutex-serialized; slot selection excludes
+        // both the published slot and any slot announced by the audio reader.
+        unsafe { self.slots[slot].get().write(snapshot) };
+        let generation = (active >> 2).wrapping_add(1).max(1);
+        self.active_token
+            .store((generation << 2) | slot as u64, Ordering::Release);
+    }
+
+    fn try_load(&self) -> Option<PreparedSnapshot> {
+        let token = self.active_token.load(Ordering::Acquire);
+        self.reader_token.store(token, Ordering::Release);
+        if self.active_token.load(Ordering::Acquire) != token {
+            self.reader_token.store(0, Ordering::Release);
+            return None;
+        }
+        let slot = (token & 0x3) as usize;
+        // SAFETY: the announcement/recheck protocol makes the writer exclude
+        // this slot until reader_token is cleared. PreparedSnapshot is Copy.
+        let snapshot = unsafe { *self.slots[slot].get() };
+        self.reader_token.store(0, Ordering::Release);
+        Some(snapshot)
+    }
+}
+
 struct MixerDsp {
-    sample_rate: f32,
     max_frames: usize,
     seen_revision: u64,
     current: FeRustMixerParams,
     target: FeRustMixerParams,
     derived: DerivedParameters,
     derived_target: DerivedParameters,
+    compressor_lut_mix: f32,
     ramp_remaining: u32,
     eq: [[BiquadState; FE_RUST_MIXER_EQ_BANDS]; MIXER_MAX_CHANNELS],
     compressor_envelope: f32,
@@ -824,17 +783,16 @@ struct MixerDsp {
 }
 
 impl MixerDsp {
-    fn new(config: &FeRustMixerConfig, params: FeRustMixerParams) -> Self {
+    fn new(config: &FeRustMixerConfig, initial: PreparedSnapshot) -> Self {
         let stride = ((config.sample_rate as f32 * 0.321).ceil() as usize).max(2);
-        let derived = DerivedParameters::from_params(&params, config.sample_rate as f32, stride);
         Self {
-            sample_rate: config.sample_rate as f32,
             max_frames: config.max_frames_per_call as usize,
-            seen_revision: 0,
-            current: params,
-            target: params,
-            derived,
-            derived_target: derived,
+            seen_revision: initial.revision,
+            current: initial.params,
+            target: initial.params,
+            derived: initial.derived,
+            derived_target: initial.derived,
+            compressor_lut_mix: 1.0,
             ramp_remaining: 0,
             eq: [[BiquadState::default(); FE_RUST_MIXER_EQ_BANDS]; MIXER_MAX_CHANNELS],
             compressor_envelope: 0.0,
@@ -855,24 +813,40 @@ impl MixerDsp {
         self.reverb_damping = [0.0; MIXER_MAX_CHANNELS];
     }
 
-    fn accept_snapshot(&mut self, revision: u64, ramp_frames: u32, params: FeRustMixerParams) {
-        if revision != self.seen_revision {
-            self.seen_revision = revision;
-            self.target = params;
-            self.derived_target =
-                DerivedParameters::from_params(&params, self.sample_rate, self.reverb_stride);
-            if ramp_frames == 0 {
-                self.current = params;
-                self.derived = self.derived_target;
+    fn reset_to_snapshot(&mut self, snapshot: PreparedSnapshot) {
+        self.seen_revision = snapshot.revision;
+        self.current = snapshot.params;
+        self.target = snapshot.params;
+        self.derived = snapshot.derived;
+        self.derived_target = snapshot.derived;
+        self.compressor_lut_mix = 1.0;
+        self.ramp_remaining = 0;
+        self.reset_temporal();
+    }
+
+    fn accept_snapshot(&mut self, snapshot: PreparedSnapshot) {
+        if snapshot.revision != self.seen_revision {
+            for index in 0..COMPRESSOR_LUT_SIZE {
+                self.derived.compressor_lut[index] += (self.derived_target.compressor_lut[index]
+                    - self.derived.compressor_lut[index])
+                    * self.compressor_lut_mix;
             }
-            self.ramp_remaining = ramp_frames;
+            self.seen_revision = snapshot.revision;
+            self.target = snapshot.params;
+            self.derived_target = snapshot.derived;
+            if snapshot.ramp_frames == 0 {
+                self.current = snapshot.params;
+                self.derived = snapshot.derived;
+                self.compressor_lut_mix = 1.0;
+            } else {
+                self.compressor_lut_mix = 0.0;
+            }
+            self.ramp_remaining = snapshot.ramp_frames;
         }
     }
 
     fn ramp_one(&mut self) {
         if self.ramp_remaining == 0 {
-            self.current = self.target;
-            self.derived = self.derived_target;
             return;
         }
         let fraction = 1.0 / self.ramp_remaining as f32;
@@ -906,11 +880,27 @@ impl MixerDsp {
         approach!(reverb_wet);
         approach!(reverb_dry);
         self.derived.approach(self.derived_target, fraction);
+        self.compressor_lut_mix += (1.0 - self.compressor_lut_mix) * fraction;
         self.current.enabled = self.target.enabled;
         self.current.compressor_enabled = self.target.compressor_enabled;
         self.current.limiter_enabled = self.target.limiter_enabled;
         self.current.reverb_enabled = self.target.reverb_enabled;
         self.ramp_remaining -= 1;
+    }
+
+    fn compressor_gain(&self, amplitude: f32) -> f32 {
+        let position = amplitude.clamp(0.0, COMPRESSOR_LUT_MAX_AMPLITUDE)
+            * (COMPRESSOR_LUT_SIZE - 1) as f32
+            / COMPRESSOR_LUT_MAX_AMPLITUDE;
+        let lower = position as usize;
+        let upper = (lower + 1).min(COMPRESSOR_LUT_SIZE - 1);
+        let fraction = position - lower as f32;
+        let lookup = |table: &[f32; COMPRESSOR_LUT_SIZE]| {
+            table[lower] + (table[upper] - table[lower]) * fraction
+        };
+        let current = lookup(&self.derived.compressor_lut);
+        let target = lookup(&self.derived_target.compressor_lut);
+        current + (target - current) * self.compressor_lut_mix
     }
 
     fn process(&mut self, pcm: &mut [f32], frames: usize, channels: usize) {
@@ -979,18 +969,7 @@ impl MixerDsp {
                 };
                 self.compressor_envelope =
                     coefficient * self.compressor_envelope + (1.0 - coefficient) * peak;
-                let threshold = d.compressor_threshold.max(1.0e-6);
-                let normalized_over = (self.compressor_envelope - threshold) / threshold;
-                let knee = d.compressor_knee_width.max(1.0e-6);
-                let reduction = if normalized_over <= -knee {
-                    0.0
-                } else if normalized_over < knee {
-                    let x = (normalized_over + knee) / (2.0 * knee);
-                    x * x * normalized_over.max(0.0) * d.compressor_strength
-                } else {
-                    normalized_over * d.compressor_strength
-                };
-                let gain = d.compressor_makeup / (1.0 + reduction);
+                let gain = self.compressor_gain(self.compressor_envelope);
                 for channel in 0..channels {
                     pcm[base + channel] *= gain;
                 }
@@ -1023,11 +1002,12 @@ impl MixerDsp {
                     .iter()
                     .fold(0.0_f32, |m, value| m.max(value.abs()));
                 let desired = if peak > ceiling { ceiling / peak } else { 1.0 };
-                if desired < 1.0 {
-                    self.limiter_gain = self.limiter_gain.min(desired);
+                if desired < self.limiter_gain {
+                    self.limiter_gain = desired;
                 } else {
-                    self.limiter_gain =
-                        d.limiter_release * self.limiter_gain + (1.0 - d.limiter_release);
+                    self.limiter_gain = (d.limiter_release * self.limiter_gain
+                        + (1.0 - d.limiter_release) * desired)
+                        .min(desired);
                 }
                 for channel in 0..channels {
                     pcm[base + channel] *= self.limiter_gain;
@@ -1049,12 +1029,25 @@ impl MixerDsp {
     }
 }
 
-struct MixerHandle {
-    published: PublishedParams,
-    staged: Mutex<Option<(u64, FeRustMixerParams)>>,
-    process_failures: AtomicU64,
-    dsp: MixerDsp,
+struct MixerControl {
+    active_revision: u64,
+    active_snapshot: PreparedSnapshot,
+    staged: Option<PreparedSnapshot>,
 }
+
+struct MixerHandle {
+    publication: SnapshotPublication,
+    control: Mutex<MixerControl>,
+    process_failures: AtomicU64,
+    sample_rate: f32,
+    reverb_stride: usize,
+    dsp: UnsafeCell<MixerDsp>,
+}
+
+// SAFETY: all cross-thread fields are atomic or mutex-protected. `dsp` is
+// touched only by process/reset, and the C contract requires those two calls
+// to be serialized for a handle. Control calls never dereference `dsp`.
+unsafe impl Sync for MixerHandle {}
 
 #[unsafe(no_mangle)]
 pub extern "C" fn fe_rust_mixer_abi_version() -> u32 {
@@ -1076,11 +1069,28 @@ pub unsafe extern "C" fn fe_rust_mixer_create(
             return std::ptr::null_mut();
         }
         let params = clean_params();
+        let reverb_stride = ((config.sample_rate as f32 * 0.321).ceil() as usize).max(2);
+        let initial = PreparedSnapshot {
+            revision: 0,
+            ramp_frames: 0,
+            params,
+            derived: DerivedParameters::from_params(
+                &params,
+                config.sample_rate as f32,
+                reverb_stride,
+            ),
+        };
         Box::into_raw(Box::new(MixerHandle {
-            published: PublishedParams::new(&params),
-            staged: Mutex::new(None),
+            publication: SnapshotPublication::new(initial),
+            control: Mutex::new(MixerControl {
+                active_revision: 0,
+                active_snapshot: initial,
+                staged: None,
+            }),
             process_failures: AtomicU64::new(0),
-            dsp: MixerDsp::new(&config, params),
+            sample_rate: config.sample_rate as f32,
+            reverb_stride,
+            dsp: UnsafeCell::new(MixerDsp::new(&config, initial)),
         }))
         .cast()
     }))
@@ -1104,21 +1114,28 @@ pub unsafe extern "C" fn fe_rust_mixer_stage_params(
         if !validate_mixer_params(&params) {
             return FE_RUST_MIXER_INVALID_ARGUMENT;
         }
-        let active = mixer.published.revision.load(Ordering::Acquire);
-        if revision <= active {
-            return FE_RUST_MIXER_INVALID_REVISION;
-        }
-        let mut staged = match mixer.staged.lock() {
+        let mut control = match mixer.control.lock() {
             Ok(value) => value,
             Err(_) => return FE_RUST_MIXER_PANIC,
         };
-        if staged
-            .as_ref()
-            .is_some_and(|(existing, _)| revision <= *existing)
+        if revision <= control.active_revision
+            || control
+                .staged
+                .as_ref()
+                .is_some_and(|existing| revision <= existing.revision)
         {
             return FE_RUST_MIXER_INVALID_REVISION;
         }
-        *staged = Some((revision, params));
+        control.staged = Some(PreparedSnapshot {
+            revision,
+            ramp_frames: 0,
+            params,
+            derived: DerivedParameters::from_params(
+                &params,
+                mixer.sample_rate,
+                mixer.reverb_stride,
+            ),
+        });
         FE_RUST_MIXER_OK
     }))
     .unwrap_or(FE_RUST_MIXER_PANIC)
@@ -1137,20 +1154,21 @@ pub unsafe extern "C" fn fe_rust_mixer_commit(
     }
     catch_unwind(AssertUnwindSafe(|| {
         let mixer = unsafe { &*handle.cast::<MixerHandle>() };
-        let mut staged = match mixer.staged.lock() {
+        let mut control = match mixer.control.lock() {
             Ok(value) => value,
             Err(_) => return FE_RUST_MIXER_PANIC,
         };
-        let Some((staged_revision, params)) = *staged else {
+        let Some(mut snapshot) = control.staged else {
             return FE_RUST_MIXER_INVALID_REVISION;
         };
-        if revision != staged_revision
-            || revision <= mixer.published.revision.load(Ordering::Acquire)
-        {
+        if revision != snapshot.revision || revision <= control.active_revision {
             return FE_RUST_MIXER_INVALID_REVISION;
         }
-        mixer.published.publish(revision, ramp_frames, &params);
-        *staged = None;
+        snapshot.ramp_frames = ramp_frames;
+        mixer.publication.publish(snapshot);
+        control.active_revision = revision;
+        control.active_snapshot = snapshot;
+        control.staged = None;
         FE_RUST_MIXER_OK
     }))
     .unwrap_or(FE_RUST_MIXER_PANIC)
@@ -1170,8 +1188,12 @@ pub unsafe extern "C" fn fe_rust_mixer_process(
         return FE_RUST_MIXER_INVALID_ARGUMENT;
     }
     catch_unwind(AssertUnwindSafe(|| {
-        let mixer = unsafe { &mut *handle.cast::<MixerHandle>() };
-        if frames as usize > mixer.dsp.max_frames {
+        let mixer = unsafe { &*handle.cast::<MixerHandle>() };
+        // SAFETY: the public contract serializes process/reset for one handle;
+        // all concurrent control calls remain on shared references and never
+        // access the audio-owned UnsafeCell.
+        let dsp = unsafe { &mut *mixer.dsp.get() };
+        if frames as usize > dsp.max_frames {
             mixer.process_failures.fetch_add(1, Ordering::Relaxed);
             return FE_RUST_MIXER_INVALID_ARGUMENT;
         }
@@ -1179,10 +1201,11 @@ pub unsafe extern "C" fn fe_rust_mixer_process(
             Some(value) => value,
             None => return FE_RUST_MIXER_INVALID_ARGUMENT,
         };
-        let (revision, ramp_frames, params) = mixer.published.load();
-        mixer.dsp.accept_snapshot(revision, ramp_frames, params);
+        if let Some(snapshot) = mixer.publication.try_load() {
+            dsp.accept_snapshot(snapshot);
+        }
         let pcm = unsafe { std::slice::from_raw_parts_mut(pcm, samples) };
-        mixer.dsp.process(pcm, frames as usize, channels as usize);
+        dsp.process(pcm, frames as usize, channels as usize);
         FE_RUST_MIXER_OK
     }))
     .unwrap_or_else(|_| {
@@ -1214,19 +1237,16 @@ pub unsafe extern "C" fn fe_rust_mixer_get_status(
             return FE_RUST_MIXER_INVALID_ARGUMENT;
         }
         let mixer = unsafe { &*handle.cast::<MixerHandle>() };
-        let (_, _, params) = mixer.published.load();
-        let staged_revision = mixer
-            .staged
-            .lock()
-            .ok()
-            .and_then(|v| v.as_ref().map(|x| x.0))
-            .unwrap_or(0);
+        let control = match mixer.control.lock() {
+            Ok(value) => value,
+            Err(_) => return FE_RUST_MIXER_PANIC,
+        };
         unsafe {
             *status = FeRustMixerStatus {
-                active_revision: mixer.published.revision.load(Ordering::Acquire),
-                staged_revision,
+                active_revision: control.active_revision,
+                staged_revision: control.staged.as_ref().map_or(0, |value| value.revision),
                 process_failures: mixer.process_failures.load(Ordering::Relaxed),
-                enabled: params.enabled,
+                enabled: control.active_snapshot.params.enabled,
                 ..FeRustMixerStatus::default()
             }
         };
@@ -1243,13 +1263,14 @@ pub unsafe extern "C" fn fe_rust_mixer_reset(handle: *mut std::ffi::c_void) -> i
         return FE_RUST_MIXER_INVALID_ARGUMENT;
     }
     catch_unwind(AssertUnwindSafe(|| {
-        let mixer = unsafe { &mut *handle.cast::<MixerHandle>() };
-        let (revision, _, params) = mixer.published.load();
-        mixer.dsp.current = params;
-        mixer.dsp.target = params;
-        mixer.dsp.seen_revision = revision;
-        mixer.dsp.ramp_remaining = 0;
-        mixer.dsp.reset_temporal();
+        let mixer = unsafe { &*handle.cast::<MixerHandle>() };
+        let snapshot = match mixer.control.lock() {
+            Ok(value) => value.active_snapshot,
+            Err(_) => return FE_RUST_MIXER_PANIC,
+        };
+        // SAFETY: reset is required to be serialized with process.
+        let dsp = unsafe { &mut *mixer.dsp.get() };
+        dsp.reset_to_snapshot(snapshot);
         FE_RUST_MIXER_OK
     }))
     .unwrap_or(FE_RUST_MIXER_PANIC)
