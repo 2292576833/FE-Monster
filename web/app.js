@@ -200,6 +200,45 @@ const els = {
   cursorTrailSelect: $('#cursorTrailSelect'),
   cursorPreferencePreview: $('#cursorPreferencePreview'),
   cursorPreferenceStatus: $('#cursorPreferenceStatus'),
+  aiServiceModelModeSelect: $('#aiServiceModelModeSelect'),
+  aiServiceTtsModeSelect: $('#aiServiceTtsModeSelect'),
+  aiServiceTtsEnabledToggle: $('#aiServiceTtsEnabledToggle'),
+  aiServiceTtsEnabledState: $('#aiServiceTtsEnabledState'),
+  aiServiceModelFields: $('#aiServiceModelFields'),
+  aiServiceTtsFields: $('#aiServiceTtsFields'),
+  aiServiceModelProviderSelect: $('#aiServiceModelProviderSelect'),
+  aiServiceModelConsoleLink: $('#aiServiceModelConsoleLink'),
+  aiServiceModelDocsLink: $('#aiServiceModelDocsLink'),
+  aiServiceModelBaseUrl: $('#aiServiceModelBaseUrl'),
+  aiServiceModelApiKey: $('#aiServiceModelApiKey'),
+  aiServiceModelName: $('#aiServiceModelName'),
+  aiServiceModelNameList: $('#aiServiceModelNameList'),
+  aiServiceModelTestButton: $('#aiServiceModelTestButton'),
+  aiServiceModelKeyClearButton: $('#aiServiceModelKeyClearButton'),
+  aiServiceTtsProviderSelect: $('#aiServiceTtsProviderSelect'),
+  aiServiceTtsConsoleLink: $('#aiServiceTtsConsoleLink'),
+  aiServiceTtsDocsLink: $('#aiServiceTtsDocsLink'),
+  aiServiceTtsBaseUrl: $('#aiServiceTtsBaseUrl'),
+  aiServiceTtsApiKey: $('#aiServiceTtsApiKey'),
+  aiServiceTtsModel: $('#aiServiceTtsModel'),
+  aiServiceTtsModelList: $('#aiServiceTtsModelList'),
+  aiServiceTtsVoice: $('#aiServiceTtsVoice'),
+  aiServiceDoubaoFields: $('#aiServiceDoubaoFields'),
+  aiServiceDoubaoOutputFields: $('#aiServiceDoubaoOutputFields'),
+  aiServiceTtsAuthModeSelect: $('#aiServiceTtsAuthModeSelect'),
+  aiServiceTtsResourceId: $('#aiServiceTtsResourceId'),
+  aiServiceTtsAppId: $('#aiServiceTtsAppId'),
+  aiServiceTtsAccessKey: $('#aiServiceTtsAccessKey'),
+  aiServiceTtsFormat: $('#aiServiceTtsFormat'),
+  aiServiceTtsSampleRate: $('#aiServiceTtsSampleRate'),
+  aiServiceTtsEmotion: $('#aiServiceTtsEmotion'),
+  aiServiceTtsEmotionScale: $('#aiServiceTtsEmotionScale'),
+  aiServiceTtsSpeechRate: $('#aiServiceTtsSpeechRate'),
+  aiServiceTtsLoudnessRate: $('#aiServiceTtsLoudnessRate'),
+  aiServiceTtsTestButton: $('#aiServiceTtsTestButton'),
+  aiServiceTtsKeyClearButton: $('#aiServiceTtsKeyClearButton'),
+  aiServiceSaveButton: $('#aiServiceSaveButton'),
+  aiServiceStatus: $('#aiServiceStatus'),
   lowFrequencyGraph: $('#lowFrequencyGraph'),
   lowFrequencyValue: $('#lowFrequencyValue'),
   runtimeRecordingButton: $('#runtimeRecordingButton'),
@@ -383,6 +422,7 @@ const els = {
   diyFreeCubePreset: $('#diyFreeCubePreset'),
   diyVoidPrismPreset: $('#diyVoidPrismPreset'),
   diyTopographyPreset: $('#diyTopographyPreset'),
+  diySoundscapeWorkshopPreset: $('#diySoundscapeWorkshopPreset'),
   diyChladniPreset: $('#diyChladniPreset'),
   diyRainGlassPreset: $('#diyRainGlassPreset'),
   diyCoverParticlesPreset: $('#diyCoverParticlesPreset'),
@@ -409,6 +449,8 @@ const els = {
   diyBookLyricPreset: $('#diyBookLyricPreset'),
   diyCubeIntensityControl: $('#diyCubeIntensityControl'),
   sonicPresetControls: $('#sonicPresetControls'),
+  soundscapeWorkshopControls: $('#soundscapeWorkshopControls'),
+  soundscapeWorkshopStatus: $('#soundscapeWorkshopStatus'),
   sonicCenterColorInput: $('#sonicCenterColorInput'),
   sonicCoreColorInput: $('#sonicCoreColorInput'),
   sonicOuterColorInput: $('#sonicOuterColorInput'),
@@ -515,6 +557,8 @@ const els = {
   wallpaperStatus: $('#wallpaperStatus'),
   voidPrismScene: $('#voidPrismScene'),
   voidPrismCore: $('#voidPrismCore'),
+  soundscapeWorkshopScene: $('#soundscapeWorkshopScene'),
+  soundscapeWorkshopHost: $('#soundscapeWorkshopHost'),
   freeCubeScene: $('#freeCubeScene'),
   freeCubeCore: $('#freeCubeCore'),
   wallpaperOpacityRange: $('#wallpaperOpacityRange'),
@@ -960,9 +1004,10 @@ const GOOGLE_OBR_BACKEND = 'google-obr-official';
 const GOOGLE_OBR_NATIVE_BACKEND = 'native-rust-x3d-obr-xaudio2';
 const GOOGLE_OBR_REVISION = '478dc7c752d5eccae534635139ff0253eee3a14a';
 const GOOGLE_OBR_WORKLET_URL = 'vendor/google-obr/obr-worklet.js?v=478dc7c752d5-surround2';
-const GOOGLE_OBR_NATIVE_WORKLET_URL = 'vendor/native-spatial/native-pcm-worklet.js?v=20260728-direct-4096-1';
+const GOOGLE_OBR_NATIVE_WORKLET_URL = 'vendor/native-spatial/native-pcm-worklet.js?v=20260821-seek-epoch-3';
 const GOOGLE_OBR_NATIVE_TRANSPORT_FRAMES = 4096;
 const GOOGLE_OBR_NATIVE_RENDER_FRAMES = 256;
+const GOOGLE_OBR_NATIVE_MAX_PENDING_BLOCKS = 4;
 const GOOGLE_OBR_CHANNEL_LAYOUTS = Object.freeze({
   stereo: Object.freeze({ id: 'stereo', label: '2.0', channels: 2 }),
   '5.1': Object.freeze({ id: '5.1', label: '5.1', channels: 6 }),
@@ -1585,7 +1630,7 @@ const INITIAL_LYRIC_CLOCK_OFFSET_SECONDS = loadLyricClockOffsetPreference();
 function loadGoogleObrPreference() {
   try {
     const serialized = window.localStorage.getItem(GOOGLE_OBR_PREFS_KEY);
-    if (serialized === null) return true;
+    if (serialized === null) return false;
     const stored = JSON.parse(serialized);
     if (typeof stored === 'boolean') return stored;
     return stored?.enabled !== false;
@@ -1595,6 +1640,64 @@ function loadGoogleObrPreference() {
 }
 
 const INITIAL_GOOGLE_OBR_REQUESTED = loadGoogleObrPreference();
+
+function explicitLegacyGoogleObrPreference() {
+  try {
+    const serialized = window.localStorage.getItem(GOOGLE_OBR_PREFS_KEY);
+    if (serialized === null) return null;
+    const stored = JSON.parse(serialized);
+    const enabled = typeof stored === 'boolean' ? stored : stored?.enabled !== false;
+    const channelLayout = normalizeGoogleObrChannelLayout(stored?.channelLayout);
+    return { enabled, channelLayout };
+  } catch (error) {
+    return null;
+  }
+}
+
+const DEFAULT_NATIVE_MIXER_CONTROL = Object.freeze({
+  loaded: false,
+  attempted: false,
+  revision: 0,
+  enabled: false,
+  upmixEnabled: false,
+  upmixAlgorithm: 'matrix-decode',
+  upmixOutputLayout: '5.1',
+  obrEnabled: false,
+  obrFilterProfile: 'direct'
+});
+
+function normalizeNativeMixerControl(source = {}) {
+  const payload = source && typeof source === 'object' ? source : {};
+  const hasAuthoritativeSnapshot = payload.parameters && typeof payload.parameters === 'object';
+  const parameters = hasAuthoritativeSnapshot ? payload.parameters : payload;
+  const revision = Number(payload.revision);
+  return {
+    loaded: !!hasAuthoritativeSnapshot,
+    attempted: true,
+    revision: Number.isSafeInteger(revision) && revision >= 0 ? revision : 0,
+    enabled: parameters.enabled === true,
+    upmixEnabled: parameters.upmixEnabled === true,
+    upmixAlgorithm: ['passive', 'matrix-decode', 'ambient-extract'].includes(parameters.upmixAlgorithm)
+      ? parameters.upmixAlgorithm
+      : 'matrix-decode',
+    upmixOutputLayout: parameters.upmixOutputLayout === '7.1' ? '7.1' : '5.1',
+    obrEnabled: parameters.obrEnabled === true,
+    obrFilterProfile: ['direct', 'ambient', 'reverberant'].includes(parameters.obrFilterProfile)
+      ? parameters.obrFilterProfile
+      : 'direct'
+  };
+}
+
+function nativeMixerControlSignature(control = DEFAULT_NATIVE_MIXER_CONTROL) {
+  return [
+    control.enabled ? 1 : 0,
+    control.upmixEnabled ? 1 : 0,
+    control.upmixAlgorithm,
+    control.upmixOutputLayout,
+    control.obrEnabled ? 1 : 0,
+    control.obrFilterProfile
+  ].join(':');
+}
 
 function normalizeGoogleObrChannelLayout(value) {
   return GOOGLE_OBR_CHANNEL_LAYOUTS[value]?.id || 'stereo';
@@ -2480,6 +2583,7 @@ const state = {
   wallpaperMediaWidth: 0,
   wallpaperMediaHeight: 0,
   wallpapers: [],
+  wallpaperCatalogs: { imported: [], live: [] },
   wallpaperSource: 'imported',
   activeWallpaperId: '',
   activeWallpaperIds: { imported: '', live: '' },
@@ -2832,6 +2936,10 @@ const state = {
     eventCursor: '',
     eventReconnectTimer: 0,
     eventReconnectDelay: 1200,
+    eventReconnectAttempts: 0,
+    eventNextRetryAt: 0,
+    eventGeneration: 0,
+    eventConnectionState: 'idle',
     eventConnected: false,
     eventLastActivityAt: 0,
     eventHeartbeatTimer: 0,
@@ -3032,7 +3140,14 @@ const state = {
     }
   },
   obrSpatialAudio: {
-    requested: INITIAL_GOOGLE_OBR_REQUESTED,
+    // `requested` now means that the service-owned native Mixer chain is
+    // requested. OBR and upmix are independent controls inside that chain.
+    // The legacy localStorage value is retained only for explicit migration;
+    // it may no longer force the whole graph on before the service snapshot.
+    requested: false,
+    legacyRequested: INITIAL_GOOGLE_OBR_REQUESTED,
+    mixerControl: { ...DEFAULT_NATIVE_MIXER_CONTROL },
+    mixerControlPromise: null,
     channelLayout: INITIAL_GOOGLE_OBR_CHANNEL_LAYOUT,
     enabled: false,
     loading: false,
@@ -3168,6 +3283,13 @@ const state = {
     palette: null,
     frame: {},
     lastDiagnostics: null
+  },
+  soundscapeWorkshop: {
+    runtime: null,
+    lastDiagnostics: null,
+    controlsRendered: false,
+    lastMediaSignature: '',
+    previousUsablePreset: 'wallpaper'
   },
   sonicTopography: {
     built: false,
@@ -4453,12 +4575,591 @@ async function refreshClientRuntime() {
   applyRuntimeDataset();
 }
 
-function setRuntimeSettingsOpen(open) {
+function syncRuntimeSettingsOpenPresentation(open) {
   state.runtimeSettingsOpen = !!open;
-  if (els.runtimeSettingsPanel) els.runtimeSettingsPanel.hidden = !state.runtimeSettingsOpen;
   if (els.runtimeSettingsButton) {
+    els.runtimeSettingsButton.classList.toggle('is-active', state.runtimeSettingsOpen);
     els.runtimeSettingsButton.setAttribute('aria-expanded', String(state.runtimeSettingsOpen));
   }
+  syncPlaybackCardPanelState();
+}
+
+function setRuntimeSettingsOpen(open, options = {}) {
+  const requestedOpen = !!open;
+  const center = window.FeSettingsCenter;
+  if (center) {
+    if (requestedOpen) {
+      const snapshot = center.snapshot();
+      center.open(options.pageId || snapshot.selectedPage || 'general');
+    } else {
+      center.close(options.reason || 'app');
+    }
+    syncRuntimeSettingsOpenPresentation(center.snapshot().open);
+    return;
+  }
+  if (els.runtimeSettingsPanel) els.runtimeSettingsPanel.hidden = !requestedOpen;
+  syncRuntimeSettingsOpenPresentation(requestedOpen);
+}
+
+function initializeSettingsCenter() {
+  const center = window.FeSettingsCenter;
+  const panel = els.runtimeSettingsPanel;
+  if (!center || !panel || panel.dataset.settingsCenterInitialized === 'true') return;
+  panel.dataset.settingsCenterInitialized = 'true';
+
+  const page = (id) => panel.querySelector(`[data-settings-page="${id}"]`);
+  const moveControls = (pageId, controls) => {
+    const destination = page(pageId);
+    controls.filter(Boolean).forEach((control) => destination?.appendChild(control));
+  };
+  const containingLabel = (id) => document.getElementById(id)?.closest('label');
+
+  moveControls('general', [
+    containingLabel('xAudio2Toggle'),
+    containingLabel('x3DAudioToggle'),
+    containingLabel('achievementSoundToggle'),
+    document.getElementById('runtimeRecordingButton'),
+    document.querySelector('.runtime-low-frequency')
+  ]);
+  moveControls('visual', [
+    containingLabel('gpuAccelerationToggle'),
+    containingLabel('directX11Toggle'),
+    document.querySelector('.runtime-render-technology'),
+    document.querySelector('.runtime-clarity-control')
+  ]);
+  moveControls('pet', [
+    document.getElementById('petAssistantVoiceDisclosure'),
+    document.querySelector('.runtime-product-tour')
+  ]);
+  moveControls('ai-tts', [document.getElementById('aiServiceSettingsGroup')]);
+  moveControls('cursor', [document.getElementById('runtimeCursorSettingsGroup')]);
+
+  const mixerPage = page('mixer');
+  let mixerController = null;
+  if (mixerPage) {
+    try {
+      if (!window.FeAudioMixerUi?.mount) throw new Error('audio mixer UI module is unavailable');
+      mixerController = window.FeAudioMixerUi.mount(mixerPage, {
+        ensureNativeChain: (request) => ensureNativeAudioMixerChain(request),
+        getNativeChannelLayout: () => currentNativeAudioMixerChannelLayout(),
+        setNativeChannelLayout: (layout) => setNativeAudioMixerChannelLayout(layout),
+        onSeek: (ratio) => {
+          const duration = Number(els.audio?.duration);
+          if (!Number.isFinite(duration) || duration <= 0) return false;
+          return setAudioCurrentTimeWithNativeContinuity(
+            duration * clamp(Number(ratio) || 0, 0, 1),
+            'mixer-waveform-seek'
+          );
+        }
+      });
+    } catch {
+      const error = document.createElement('p');
+      error.className = 'settings-center-page-error';
+      error.setAttribute('role', 'alert');
+      error.textContent = '调音台界面暂时无法载入，音频将继续使用兼容播放。';
+      mixerPage.replaceChildren(error);
+    }
+  }
+
+  [
+    ['general', '常规'],
+    ['visual', '画面与场景'],
+    ['lyrics', '歌词'],
+    ['pet', '桌宠'],
+    ['ai-tts', '模型与 TTS'],
+    ['mixer', '调音台'],
+    ['cursor', '光标']
+  ].forEach(([id, label]) => center.registerPage({ id, label, node: page(id) }));
+
+  document.addEventListener('fe-settings-center:change', (event) => {
+    syncRuntimeSettingsOpenPresentation(event.detail?.open === true);
+  });
+  document.addEventListener('fe-native-audio-chain:change', () => {
+    mixerController?.refresh();
+  });
+  document.getElementById('settingsOpenTextParametersButton')?.addEventListener('click', () => {
+    setRuntimeSettingsOpen(false, { reason: 'lyrics-parameters' });
+    openPlaybackDiyPanel('text');
+  });
+  syncRuntimeSettingsOpenPresentation(center.snapshot().open);
+}
+
+let clientAiServiceClearModelKey = false;
+let clientAiServiceClearTtsKey = false;
+let clientAiServiceSaveTimer = 0;
+
+function clientAiServiceStatus(message, kind = '') {
+  if (!els.aiServiceStatus) return;
+  els.aiServiceStatus.textContent = message;
+  els.aiServiceStatus.dataset.status = kind;
+}
+
+function clientAiServiceFillProviderOptions(select, catalog, selected, kind) {
+  if (!select) return;
+  select.textContent = '';
+  const descriptors = window.FeMonsterClientAiService?.providers?.(kind) || [];
+  if (descriptors.length) {
+    descriptors.forEach((descriptor) => {
+      const option = document.createElement('option');
+      option.value = descriptor.id;
+      option.textContent = descriptor.implementationStatus === 'ready'
+        ? descriptor.displayName
+        : `${descriptor.displayName}（即将支持）`;
+      option.disabled = descriptor.implementationStatus !== 'ready';
+      select.appendChild(option);
+    });
+    if (![...select.options].some((option) => option.value === selected)) {
+      const legacy = document.createElement('option');
+      legacy.value = selected;
+      legacy.textContent = `${catalog[selected]?.label || selected || '旧配置'}（兼容）`;
+      select.appendChild(legacy);
+    }
+    select.value = selected;
+    return;
+  }
+  Object.entries(catalog).forEach(([value, preset]) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = preset.label;
+    select.appendChild(option);
+  });
+  select.value = selected in catalog ? selected : 'openai';
+}
+
+function clientAiServiceSyncOfficialLinks(kind, providerId) {
+  const service = window.FeMonsterClientAiService;
+  const consoleLink = kind === 'tts' ? els.aiServiceTtsConsoleLink : els.aiServiceModelConsoleLink;
+  const docsLink = kind === 'tts' ? els.aiServiceTtsDocsLink : els.aiServiceModelDocsLink;
+  for (const [element, type] of [[consoleLink, 'console'], [docsLink, 'docs']]) {
+    if (!element) continue;
+    const href = service?.officialLink?.(providerId, type) || '';
+    element.hidden = !href;
+    if (href) element.href = href;
+    else element.removeAttribute('href');
+  }
+}
+
+function clientAiServiceSyncDoubaoFields(tts = {}) {
+  const enabled = tts.provider === 'volcengine-doubao-tts-v3';
+  const keyField = els.aiServiceTtsApiKey?.closest('.runtime-ai-field');
+  if (els.aiServiceDoubaoFields) els.aiServiceDoubaoFields.hidden = !enabled;
+  if (els.aiServiceDoubaoOutputFields) els.aiServiceDoubaoOutputFields.hidden = !enabled;
+  if (els.aiServiceTtsBaseUrl) {
+    els.aiServiceTtsBaseUrl.disabled = enabled;
+    els.aiServiceTtsBaseUrl.value = enabled
+      ? 'wss://openspeech.bytedance.com/api/v3/tts/bidirection'
+      : tts.baseUrl || '';
+  }
+  if (!enabled) {
+    if (keyField) keyField.hidden = false;
+    return;
+  }
+  const authMode = tts.authMode === 'legacy-app-access' ? 'legacy-app-access' : 'api-key';
+  if (els.aiServiceTtsAuthModeSelect) els.aiServiceTtsAuthModeSelect.value = authMode;
+  if (els.aiServiceTtsResourceId) els.aiServiceTtsResourceId.value = tts.resourceId || 'seed-tts-2.0';
+  document.querySelectorAll('[data-doubao-auth]').forEach((field) => {
+    field.hidden = field.dataset.doubaoAuth !== authMode;
+  });
+  const output = tts.output || {};
+  const prosody = tts.prosody || {};
+  if (els.aiServiceTtsFormat) els.aiServiceTtsFormat.value = output.format || 'mp3';
+  if (els.aiServiceTtsSampleRate) els.aiServiceTtsSampleRate.value = String(output.sampleRate || 24000);
+  if (els.aiServiceTtsEmotion) els.aiServiceTtsEmotion.value = prosody.emotion || '';
+  if (els.aiServiceTtsEmotionScale) els.aiServiceTtsEmotionScale.value = String(prosody.emotionScale || 4);
+  if (els.aiServiceTtsSpeechRate) els.aiServiceTtsSpeechRate.value = String(prosody.speechRate || 0);
+  if (els.aiServiceTtsLoudnessRate) els.aiServiceTtsLoudnessRate.value = String(prosody.loudnessRate || 0);
+  if (keyField) keyField.hidden = authMode !== 'api-key';
+}
+
+function clientAiServiceFillModelOptions(list, models, selected) {
+  if (!list) return;
+  list.textContent = '';
+  const unique = Array.from(new Set([selected, ...models].filter(Boolean)));
+  unique.forEach((model) => {
+    const option = document.createElement('option');
+    option.value = model;
+    list.appendChild(option);
+  });
+}
+
+function clientAiServiceSyncControls(config = window.FeMonsterClientAiService?.load?.() || {}) {
+  const normalized = window.FeMonsterClientAiService?.publicSnapshot
+    ? window.FeMonsterClientAiService.publicSnapshot(config)
+    : clientAiServicePublicSnapshot(config);
+  if (els.aiServiceModelModeSelect) els.aiServiceModelModeSelect.value = normalized.modelMode;
+  if (els.aiServiceTtsModeSelect) {
+    els.aiServiceTtsModeSelect.value = normalized.modelMode;
+    els.aiServiceTtsModeSelect.disabled = true;
+    els.aiServiceTtsModeSelect.setAttribute('aria-disabled', 'true');
+  }
+  if (els.aiServiceModelFields) els.aiServiceModelFields.hidden = normalized.modelMode !== 'custom';
+  if (els.aiServiceTtsFields) els.aiServiceTtsFields.hidden = normalized.ttsMode !== 'custom';
+  const ttsEnabled = normalized.ttsEnabled !== false;
+  if (els.aiServiceTtsEnabledToggle) {
+    els.aiServiceTtsEnabledToggle.setAttribute('aria-checked', String(ttsEnabled));
+    els.aiServiceTtsEnabledToggle.setAttribute('aria-label', '客户端 TTS');
+    els.aiServiceTtsEnabledToggle.dataset.enabled = String(ttsEnabled);
+  }
+  if (els.aiServiceTtsEnabledState) els.aiServiceTtsEnabledState.textContent = ttsEnabled ? '已开启' : '已关闭';
+  if (els.aiServiceTtsTestButton) els.aiServiceTtsTestButton.disabled = !ttsEnabled;
+
+  clientAiServiceFillProviderOptions(
+    els.aiServiceModelProviderSelect,
+    CLIENT_AI_MODEL_PROVIDERS,
+    normalized.model.provider,
+    'chat'
+  );
+  clientAiServiceFillProviderOptions(
+    els.aiServiceTtsProviderSelect,
+    CLIENT_AI_TTS_PROVIDERS,
+    normalized.tts.provider,
+    'tts'
+  );
+  clientAiServiceSyncOfficialLinks('chat', normalized.model.provider);
+  clientAiServiceSyncOfficialLinks('tts', normalized.tts.provider);
+  clientAiServiceFillModelOptions(
+    els.aiServiceModelNameList,
+    clientAiServicePreset('model', normalized.model.provider).models,
+    normalized.model.model
+  );
+  clientAiServiceFillModelOptions(
+    els.aiServiceTtsModelList,
+    clientAiServicePreset('tts', normalized.tts.provider).models,
+    normalized.tts.model
+  );
+  if (els.aiServiceModelBaseUrl) els.aiServiceModelBaseUrl.value = normalized.model.baseUrl;
+  if (els.aiServiceModelName) els.aiServiceModelName.value = normalized.model.model;
+  if (els.aiServiceModelApiKey) {
+    els.aiServiceModelApiKey.value = '';
+    els.aiServiceModelApiKey.placeholder = normalized.model.hasApiKey
+      ? `已保存 ${window.FeMonsterClientAiService.redactKey(normalized.model.keyLast4)}`
+      : '未保存';
+  }
+  if (els.aiServiceTtsBaseUrl) els.aiServiceTtsBaseUrl.value = normalized.tts.baseUrl;
+  if (els.aiServiceTtsModel) els.aiServiceTtsModel.value = normalized.tts.model;
+  if (els.aiServiceTtsVoice) els.aiServiceTtsVoice.value = normalized.tts.voice;
+  if (els.aiServiceTtsApiKey) {
+    els.aiServiceTtsApiKey.value = '';
+    els.aiServiceTtsApiKey.placeholder = normalized.tts.hasApiKey
+      ? `已保存 ${window.FeMonsterClientAiService.redactKey(normalized.tts.keyLast4)}`
+      : '未保存';
+  }
+  clientAiServiceSyncDoubaoFields(normalized.tts);
+
+  const modelLabel = normalized.modelMode === 'custom' ? '自定义模型' : '服务器模型';
+  const ttsLabel = normalized.ttsMode === 'custom'
+    ? (ttsEnabled ? '自定义 TTS' : '客户端 TTS 已关闭')
+    : '服务器 TTS';
+  clientAiServiceStatus(`${modelLabel} · ${ttsLabel}`, normalized.modelMode === 'custom' || normalized.ttsMode === 'custom' ? 'custom' : 'server');
+}
+
+function clientAiServiceReadControls() {
+  const ttsProvider = els.aiServiceTtsProviderSelect?.value || 'openai-tts';
+  const doubao = ttsProvider === 'volcengine-doubao-tts-v3';
+  const modelMode = els.aiServiceModelModeSelect?.value || 'server';
+  const authMode = els.aiServiceTtsAuthModeSelect?.value === 'legacy-app-access'
+    ? 'legacy-app-access'
+    : 'api-key';
+  return {
+    modelMode,
+    ttsMode: modelMode,
+    ttsEnabled: els.aiServiceTtsEnabledToggle?.getAttribute('aria-checked') !== 'false',
+    model: {
+      provider: els.aiServiceModelProviderSelect?.value || 'openai',
+      baseUrl: els.aiServiceModelBaseUrl?.value || '',
+      apiKey: els.aiServiceModelApiKey?.value || '',
+      model: els.aiServiceModelName?.value || ''
+    },
+    tts: {
+      provider: ttsProvider,
+      ...(doubao ? {
+        resourceId: els.aiServiceTtsResourceId?.value || 'seed-tts-2.0',
+        modelVariant: els.aiServiceTtsModel?.value || 'seed-tts-2.0-standard',
+        voice: els.aiServiceTtsVoice?.value || '',
+        output: {
+          format: els.aiServiceTtsFormat?.value || 'mp3',
+          sampleRate: Number(els.aiServiceTtsSampleRate?.value) || 24000,
+          bitRate: (els.aiServiceTtsFormat?.value || 'mp3') === 'mp3' ? 128000 : 0
+        },
+        prosody: {
+          emotion: els.aiServiceTtsEmotion?.value || '',
+          emotionScale: Number(els.aiServiceTtsEmotionScale?.value) || 4,
+          speechRate: Number(els.aiServiceTtsSpeechRate?.value) || 0,
+          loudnessRate: Number(els.aiServiceTtsLoudnessRate?.value) || 0
+        },
+        credentialPatch: authMode === 'legacy-app-access'
+          ? {
+              authMode,
+              appId: els.aiServiceTtsAppId?.value || '',
+              accessKey: els.aiServiceTtsAccessKey?.value || ''
+            }
+          : { authMode, apiKey: els.aiServiceTtsApiKey?.value || '' }
+      } : {
+        baseUrl: els.aiServiceTtsBaseUrl?.value || '',
+        apiKey: els.aiServiceTtsApiKey?.value || '',
+        model: els.aiServiceTtsModel?.value || '',
+        voice: els.aiServiceTtsVoice?.value || ''
+      })
+    }
+  };
+}
+
+function clientAiServiceApplyProviderDefaults(kind) {
+  const provider = kind === 'tts'
+    ? els.aiServiceTtsProviderSelect?.value
+    : els.aiServiceModelProviderSelect?.value;
+  const preset = clientAiServicePreset(kind, provider);
+  if (kind === 'tts') {
+    if (els.aiServiceTtsApiKey) els.aiServiceTtsApiKey.value = '';
+    if (els.aiServiceTtsBaseUrl) els.aiServiceTtsBaseUrl.value = preset.baseUrl;
+    if (els.aiServiceTtsModel) els.aiServiceTtsModel.value = preset.model;
+    if (els.aiServiceTtsVoice) els.aiServiceTtsVoice.value = preset.voice;
+    clientAiServiceFillModelOptions(els.aiServiceTtsModelList, preset.models, preset.model);
+    const doubao = provider === 'volcengine-doubao-tts-v3';
+    clientAiServiceSyncOfficialLinks('tts', provider);
+    clientAiServiceSyncDoubaoFields(doubao ? {
+      provider,
+      resourceId: 'seed-tts-2.0',
+      output: { format: 'mp3', sampleRate: 24000, bitRate: 128000 },
+      prosody: { emotion: '', emotionScale: 4, speechRate: 0, loudnessRate: 0 }
+    } : { provider, baseUrl: preset.baseUrl });
+  } else {
+    if (els.aiServiceModelApiKey) els.aiServiceModelApiKey.value = '';
+    if (els.aiServiceModelBaseUrl) els.aiServiceModelBaseUrl.value = preset.baseUrl;
+    if (els.aiServiceModelName) els.aiServiceModelName.value = preset.model;
+    clientAiServiceFillModelOptions(els.aiServiceModelNameList, preset.models, preset.model);
+    clientAiServiceSyncOfficialLinks('chat', provider);
+  }
+}
+
+async function clientAiServicePersistControls(options = {}) {
+  const service = window.FeMonsterClientAiService;
+  if (!service) {
+    clientAiServiceStatus('AI 服务模块尚未加载');
+    return null;
+  }
+  const controls = clientAiServiceReadControls();
+  if (options.includeSecrets === false) {
+    controls.model.apiKey = '';
+    controls.tts.apiKey = '';
+    delete controls.tts.credentialPatch;
+  }
+  if (clientAiServiceKeyHasIllegalChars(controls.model.apiKey)
+    || clientAiServiceKeyHasIllegalChars(controls.tts.apiKey)
+    || clientAiServiceKeyHasIllegalChars(controls.tts.credentialPatch?.apiKey)
+    || clientAiServiceKeyHasIllegalChars(controls.tts.credentialPatch?.appId)
+    || clientAiServiceKeyHasIllegalChars(controls.tts.credentialPatch?.accessKey)) {
+    clientAiServiceStatus('API Key 包含换行或不可见字符，请检查后重新输入', 'error');
+    if (options.showToast !== false) toast('API Key 包含非法字符，未保存');
+    return null;
+  }
+  try {
+    const next = await service.save(controls, {
+      clearModelApiKey: clientAiServiceClearModelKey,
+      clearTtsApiKey: clientAiServiceClearTtsKey,
+      keepalive: options.keepalive === true,
+      syncControls: options.syncControls !== false
+    });
+    clientAiServiceClearModelKey = false;
+    clientAiServiceClearTtsKey = false;
+    if (options.includeSecrets !== false) {
+      if (els.aiServiceModelApiKey) els.aiServiceModelApiKey.value = '';
+      if (els.aiServiceTtsApiKey) els.aiServiceTtsApiKey.value = '';
+      if (els.aiServiceTtsAppId) els.aiServiceTtsAppId.value = '';
+      if (els.aiServiceTtsAccessKey) els.aiServiceTtsAccessKey.value = '';
+    }
+    if (options.syncControls !== false) {
+      clientAiServiceSyncControls(next);
+    } else {
+      const snapshot = service.publicSnapshot(next);
+      const modelLabel = snapshot.modelMode === 'custom' ? '自定义模型' : '服务器模型';
+      const ttsLabel = snapshot.ttsMode === 'custom'
+        ? (snapshot.ttsEnabled === false ? '客户端 TTS 已关闭' : '自定义 TTS')
+        : '服务器 TTS';
+      clientAiServiceStatus(`${modelLabel} · ${ttsLabel} · 已自动保存`, snapshot.modelMode === 'custom' || snapshot.ttsMode === 'custom' ? 'custom' : 'server');
+    }
+    if (options.showToast !== false) toast('AI 与语音服务配置已保存');
+    return next;
+  } catch (error) {
+    clientAiServiceStatus(error?.message || 'AI 服务配置保存失败', 'error');
+    if (options.showToast !== false) toast(error?.message || 'AI 服务配置保存失败');
+    return null;
+  }
+}
+
+function clientAiServiceSchedulePersist(delay = 250) {
+  window.clearTimeout(clientAiServiceSaveTimer);
+  clientAiServiceSaveTimer = window.setTimeout(() => {
+    clientAiServiceSaveTimer = 0;
+    clientAiServicePersistControls({ showToast: false, syncControls: false, includeSecrets: false });
+  }, delay);
+}
+
+async function clientAiServiceTest(kind) {
+  const service = window.FeMonsterClientAiService;
+  if (!service) {
+    clientAiServiceStatus('AI 服务模块尚未加载', 'error');
+    return;
+  }
+  const config = await clientAiServicePersistControls({ showToast: false });
+  if (!config) return;
+  const test = kind === 'tts' ? service.testTts : service.testModel;
+  clientAiServiceStatus(kind === 'tts' ? '正在测试 TTS…' : '正在测试模型连接…', 'testing');
+  try {
+    const result = await test(config);
+    clientAiServiceStatus(kind === 'tts'
+      ? `TTS 可用 · ${result.bytes} B`
+      : `模型可用 · ${result.model}`, 'ok');
+    toast(kind === 'tts' ? 'TTS 连接成功' : '模型连接成功');
+  } catch (error) {
+    clientAiServiceStatus(error.message || '连接失败', 'error');
+    toast(error.message || '连接失败');
+  }
+}
+
+async function clientAiCommandService() {
+  const service = window.FeMonsterClientAiService;
+  if (!service?.ready || !service?.save || !service?.provider) {
+    throw new Error('本地自备模型服务尚未就绪');
+  }
+  await service.ready();
+  return service;
+}
+
+function clientAiCommandText(value, label, maxLength = 240, options = {}) {
+  const text = String(value ?? '').trim();
+  if (!text) {
+    if (options.optional) return '';
+    throw new Error(`${label}不能为空`);
+  }
+  if (text.length > maxLength || /[\u0000-\u001f\u007f]/.test(text)) {
+    throw new Error(`${label}格式不正确`);
+  }
+  if (options.rejectAddress !== false && /(?:[a-z][a-z0-9+.-]*:\/\/|\\|\.\.\/)/i.test(text)) {
+    throw new Error(`${label}不能包含网址或路径`);
+  }
+  return text;
+}
+
+async function clientAiCommandProvider(kind, value) {
+  const service = await clientAiCommandService();
+  const providerId = clientAiCommandText(value, '厂商 ID', 80).toLowerCase();
+  const descriptor = service.provider(providerId);
+  if (!descriptor || descriptor.kind !== kind) throw new Error('该厂商不支持当前能力');
+  if (descriptor.implementationStatus !== 'ready') throw new Error('该厂商适配仍在计划中，当前不能启用');
+  return { service, providerId, descriptor };
+}
+
+async function clientAiCommandModelSelect(args = {}) {
+  const requested = args.providerId ?? args.provider;
+  const { service, providerId } = await clientAiCommandProvider('chat', requested);
+  const current = service.load();
+  const preset = clientAiServicePreset('model', providerId);
+  const custom = providerId === 'custom-openai-compatible';
+  if (custom && current.model?.provider !== providerId) {
+    throw new Error('自定义接口地址只能由用户在设置页配置，桌宠不能填写或更换地址');
+  }
+  const baseUrl = custom ? current.model.baseUrl : preset.baseUrl;
+  if (!baseUrl) throw new Error('该厂商尚无受信任的内置接口地址');
+  const model = clientAiCommandText(
+    args.model ?? (current.model?.provider === providerId ? current.model.model : preset.model),
+    '模型名称',
+    240
+  );
+  const snapshot = await service.save({
+    modelMode: 'custom',
+    model: { provider: providerId, baseUrl, model }
+  });
+  return { changed: true, modelMode: snapshot.modelMode, model: snapshot.model };
+}
+
+async function clientAiCommandTtsProviderSelect(args = {}) {
+  const requested = args.providerId ?? args.provider;
+  const { service, providerId } = await clientAiCommandProvider('tts', requested);
+  const current = service.load();
+  const preset = clientAiServicePreset('tts', providerId);
+  if (providerId === 'custom-openai-compatible-tts' && current.tts?.provider !== providerId) {
+    throw new Error('自定义 TTS 接口地址只能由用户在设置页配置');
+  }
+  const voice = clientAiCommandText(
+    args.voice ?? (current.tts?.provider === providerId ? current.tts.voice : preset.voice),
+    '音色 ID',
+    240,
+    { optional: providerId === 'volcengine-doubao-tts-v3' }
+  );
+  const patch = providerId === 'volcengine-doubao-tts-v3'
+    ? {
+        provider: providerId,
+        resourceId: 'seed-tts-2.0',
+        modelVariant: clientAiCommandText(args.modelVariant ?? 'seed-tts-2.0-standard', '豆包模型版本', 240),
+        voice: voice && !voice.startsWith('doubao:') ? `doubao:${voice}` : voice
+      }
+    : {
+        provider: providerId,
+        baseUrl: providerId === 'custom-openai-compatible-tts' ? current.tts.baseUrl : preset.baseUrl,
+        model: clientAiCommandText(args.model ?? preset.model ?? current.tts?.model, 'TTS 模型', 240),
+        voice
+      };
+  const snapshot = await service.save({ ttsMode: 'custom', tts: patch });
+  return { changed: true, ttsMode: snapshot.ttsMode, tts: snapshot.tts };
+}
+
+async function clientAiCommandTtsVoiceSelect(args = {}) {
+  const service = await clientAiCommandService();
+  const current = service.load();
+  const providerId = current.tts?.provider;
+  await clientAiCommandProvider('tts', providerId);
+  let voice = clientAiCommandText(args.voice ?? args.voiceId, '音色 ID', 240);
+  if (providerId === 'volcengine-doubao-tts-v3' && !voice.startsWith('doubao:')) voice = `doubao:${voice}`;
+  const snapshot = await service.save({ ttsMode: 'custom', tts: { provider: providerId, voice } });
+  return { changed: true, tts: snapshot.tts };
+}
+
+function clientAiCommandFinite(value, label, min, max, fallback) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const number = Number(value);
+  if (!Number.isFinite(number)) throw new Error(`${label}必须是数字`);
+  return Math.round(clamp(number, min, max));
+}
+
+async function clientAiCommandTtsProsodySet(args = {}) {
+  const service = await clientAiCommandService();
+  const current = service.load();
+  if (current.tts?.provider !== 'volcengine-doubao-tts-v3') throw new Error('当前 TTS 不是豆包实时语音');
+  const previous = current.tts.prosody || {};
+  const prosody = {
+    emotion: clientAiCommandText(args.emotion ?? previous.emotion, '情感', 64, { optional: true }),
+    emotionScale: clientAiCommandFinite(args.emotionScale, '情感强度', 1, 5, previous.emotionScale ?? 4),
+    speechRate: clientAiCommandFinite(args.speechRate, '语速', -50, 100, previous.speechRate ?? 0),
+    loudnessRate: clientAiCommandFinite(args.loudnessRate, '响度', -50, 100, previous.loudnessRate ?? 0)
+  };
+  const snapshot = await service.save({ tts: { provider: current.tts.provider, prosody } });
+  return { changed: true, prosody: snapshot.tts.prosody };
+}
+
+async function clientAiCommandTtsOutputSet(args = {}) {
+  const service = await clientAiCommandService();
+  const current = service.load();
+  if (current.tts?.provider !== 'volcengine-doubao-tts-v3') throw new Error('当前 TTS 不是豆包实时语音');
+  const previous = current.tts.output || {};
+  const format = clientAiCommandText(args.format ?? previous.format ?? 'mp3', '音频格式', 24).toLowerCase();
+  if (!['mp3', 'pcm', 'ogg_opus'].includes(format)) throw new Error('不支持的豆包音频格式');
+  const sampleRate = clientAiCommandFinite(args.sampleRate, '采样率', 8000, 48000, previous.sampleRate ?? 24000);
+  if (![8000, 16000, 22050, 24000, 32000, 44100, 48000].includes(sampleRate)) {
+    throw new Error('豆包采样率只能是 8000、16000、22050、24000、32000、44100 或 48000');
+  }
+  const previousMp3BitRate = previous.format === 'mp3' && Number(previous.bitRate) >= 64000
+    ? Number(previous.bitRate)
+    : 128000;
+  const output = {
+    format,
+    sampleRate,
+    bitRate: format === 'mp3'
+      ? clientAiCommandFinite(args.bitRate, '码率', 64000, 160000, previousMp3BitRate)
+      : 0
+  };
+  const snapshot = await service.save({ tts: { provider: current.tts.provider, output } });
+  return { changed: true, output: snapshot.tts.output };
 }
 
 async function saveRuntimeSettings() {
@@ -5212,6 +5913,10 @@ function isSonicTopographyPreset(preset = state.diyPreset) {
   return preset === 'topography';
 }
 
+function isSoundscapeWorkshopPreset(preset = state.diyPreset) {
+  return preset === 'soundscape-workshop';
+}
+
 function isChladniPreset(preset = state.diyPreset) {
   return preset === 'chladni';
 }
@@ -5257,6 +5962,7 @@ function normalizeDiyPreset(preset) {
     preset === 'free-cubes' ||
     preset === 'void-prism' ||
     preset === 'topography' ||
+    preset === 'soundscape-workshop' ||
     preset === 'chladni' ||
     preset === 'rain-glass' ||
     preset === 'cover-particles' ||
@@ -5275,7 +5981,7 @@ const PRESET_RUNTIME_SOURCES = Object.freeze({
     globalName: 'FeStormOceanRuntime'
   }),
   'free-cubes': Object.freeze({
-    src: 'free-cube-runtime.js?v=20260811-cache-audit-1',
+    src: 'free-cube-runtime.js?v=20260815-video-heart-2',
     globalName: 'FeFreeCubeRuntime'
   }),
   'void-prism': Object.freeze({
@@ -5285,6 +5991,10 @@ const PRESET_RUNTIME_SOURCES = Object.freeze({
   chladni: Object.freeze({
     src: 'chladni-runtime.js?v=20260811-cache-audit-1',
     globalName: 'FeChladniRuntime'
+  }),
+  'soundscape-workshop': Object.freeze({
+    src: 'soundscape-runtime.js?v=20260821-persistence-4',
+    globalName: 'FeSoundscapeRuntime'
   })
 });
 const presetRuntimePromises = new Map();
@@ -5296,7 +6006,7 @@ function stormOceanReactivityProfile(value) {
 }
 
 function activePresetRuntimeKey(preset = state.diyPreset) {
-  if (preset === 'free-cubes' || preset === 'void-prism' || preset === 'chladni') return preset;
+  if (preset === 'free-cubes' || preset === 'void-prism' || preset === 'chladni' || preset === 'soundscape-workshop') return preset;
   if (preset === 'sandbox-scene' && isStormOceanPreset(activeDiyScenePreset())) return 'storm-ocean';
   return '';
 }
@@ -5330,6 +6040,9 @@ function mountLoadedPresetRuntime(preset) {
       break;
     case 'chladni':
       updateChladniVisibility();
+      break;
+    case 'soundscape-workshop':
+      updateSoundscapeWorkshopVisibility();
       break;
     case 'sandbox-scene':
       syncSandboxPlaybackSurface();
@@ -5604,8 +6317,455 @@ const CLIENT_PREFERENCES_REVISION_KEY = 'fe-monster-client-preferences-revision'
 const CLIENT_PREFERENCES_SYNC_DEBOUNCE_MS = 480;
 const CLIENT_PREFERENCES_MAX_VALUE_BYTES = 1024 * 1024;
 const CLIENT_PREFERENCES_MAX_TOTAL_BYTES = 4 * 1024 * 1024;
+const CLIENT_PREFERENCES_LOCAL_KEYS = new Set([
+  'fe-monster-active-provider-v1',
+  'fe-monster-playback-quality-prefs-v1',
+  'fe-monster-render-clarity-v1',
+  'fe-monster-preset-fsr-v1',
+  'fe-monster-text-preset-palettes-v1',
+  'fe-monster-text-preset-fonts-v1',
+  'fe-monster-text-preset-transforms-v1',
+  'fe-monster-playback-lyric-palette-v1',
+  'fe-monster-bilingual-lyrics-v1',
+  'fe-monster-multi-row-lyrics-v1',
+  'fe-monster-lyric-clock-offset-v1',
+  'fe-monster-sonic-settings-v1',
+  'fe-monster.soundscape-workshop.settings.v2',
+  'fe-monster-cover-particle-v1',
+  'fe-monster-google-obr-spatial-audio-v1',
+  'fe-monster-visual-settings-v1',
+  'fe-monster-wallpaper-prefs',
+  'fe-monster-scene-wallpaper-prefs',
+  'fe-monster-login-character-v1',
+  'fe-monster-identity-card-muted-v1',
+  'fe-monster-community-message-dnd-v1',
+  'fe-monster-community-card-collapsed-v1'
+]);
 let clientPreferencesSyncTimer = 0;
 let clientPreferencesRevision = 0;
+let clientPreferencesCloudSyncPromise = null;
+let clientPreferencesCloudSyncPending = false;
+
+const CLIENT_AI_SERVICE_STORAGE_KEY = 'fe-monster.client-ai-service.v1';
+const CLIENT_AI_MODEL_PROVIDERS = Object.freeze({
+  openai: { label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', models: ['gpt-4.1-mini', 'gpt-4.1', 'gpt-4o-mini', 'gpt-4o', 'o3-mini'] },
+  deepseek: { label: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', models: ['deepseek-chat', 'deepseek-reasoner'] },
+  'volcengine-ark': { label: '豆包大模型 / Ark', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', models: [] },
+  'qwen-dashscope': { label: '通义千问', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', models: ['qwen-plus', 'qwen-max', 'qwen-turbo', 'qwen-long'] },
+  'moonshot-kimi': { label: 'Kimi / Moonshot', baseUrl: 'https://api.moonshot.cn/v1', models: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k', 'kimi-k2-0711-preview'] },
+  'zhipu-glm': { label: '智谱 GLM', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', models: ['glm-4-plus', 'glm-4-air', 'glm-4-flash', 'glm-4.5'] },
+  moonshot: { label: 'Moonshot', baseUrl: 'https://api.moonshot.cn/v1', models: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k', 'kimi-k2-0711-preview'] },
+  zhipu: { label: '智谱 GLM', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', models: ['glm-4-plus', 'glm-4-air', 'glm-4-flash', 'glm-4.5'] },
+  qwen: { label: '通义千问', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', models: ['qwen-plus', 'qwen-max', 'qwen-turbo', 'qwen-long'] },
+  siliconflow: { label: '硅基流动', baseUrl: 'https://api.siliconflow.cn/v1', models: ['Qwen/Qwen3-32B', 'Qwen/Qwen3-235B-A22B-Instruct-2507', 'deepseek-ai/DeepSeek-V3', 'deepseek-ai/DeepSeek-R1'] },
+  openrouter: { label: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', models: ['openai/gpt-4.1-mini', 'openai/gpt-4o-mini', 'anthropic/claude-3.5-sonnet', 'google/gemini-2.0-flash-001'] },
+  ollama: { label: 'Ollama（本机免密）', baseUrl: 'http://127.0.0.1:11434/v1', models: ['qwen2.5:7b', 'qwen3:8b', 'deepseek-r1:8b', 'llama3.2:3b'] },
+  'lm-studio': { label: 'LM Studio（本机免密）', baseUrl: 'http://127.0.0.1:1234/v1', models: [] },
+  'custom-openai-compatible': { label: '自定义 OpenAI 兼容', baseUrl: '', models: [] },
+  custom: { label: '自定义 OpenAI 兼容', baseUrl: '', models: [] }
+});
+const CLIENT_AI_TTS_PROVIDERS = Object.freeze({
+  openai: { label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', models: ['gpt-4o-mini-tts', 'tts-1', 'tts-1-hd'], voice: 'alloy' },
+  'openai-tts': { label: 'OpenAI TTS', baseUrl: 'https://api.openai.com/v1', models: ['gpt-4o-mini-tts', 'tts-1', 'tts-1-hd'], voice: 'alloy' },
+  siliconflow: { label: '硅基流动', baseUrl: 'https://api.siliconflow.cn/v1', models: ['FunAudioLLM/CosyVoice2-0.5B'], voice: 'FunAudioLLM/CosyVoice2-0.5B:alex' },
+  'siliconflow-cosyvoice': { label: '硅基流动 CosyVoice', baseUrl: 'https://api.siliconflow.cn/v1', models: ['FunAudioLLM/CosyVoice2-0.5B'], voice: 'FunAudioLLM/CosyVoice2-0.5B:alex' },
+  'volcengine-doubao-tts-v3': { label: '豆包实时语音', baseUrl: '', models: ['seed-tts-2.0-standard'], voice: '' },
+  'custom-openai-compatible-tts': { label: '自定义 OpenAI 兼容 TTS', baseUrl: '', models: [], voice: '' },
+  custom: { label: '自定义 OpenAI 兼容', baseUrl: '', models: [], voice: '' }
+});
+
+function clientAiServiceBounded(value, maxLength, fallback = '') {
+  return String(value ?? fallback).slice(0, maxLength).trim();
+}
+
+function clientAiServiceSanitizeKey(value) {
+  return clientAiServiceBounded(value, 4096).replace(/[\u0000-\u001f\u007f]/g, '');
+}
+
+function clientAiServiceKeyHasIllegalChars(value) {
+  return typeof value === 'string' && /[\u0000-\u001f\u007f]/.test(value);
+}
+
+function clientAiServiceMode(value, fallback) {
+  return clientAiServiceBounded(value, 20, fallback) === 'custom' ? 'custom' : 'server';
+}
+
+function clientAiServicePreset(kind, value) {
+  const catalog = kind === 'tts' ? CLIENT_AI_TTS_PROVIDERS : CLIENT_AI_MODEL_PROVIDERS;
+  const normalized = clientAiServiceBounded(value, 40, kind === 'tts' ? 'openai' : 'openai');
+  const preset = catalog[normalized] || (kind === 'tts' ? CLIENT_AI_TTS_PROVIDERS.custom : CLIENT_AI_MODEL_PROVIDERS.custom);
+  const models = Array.isArray(preset.models) && preset.models.length ? preset.models : [];
+  return {
+    provider: catalog[normalized] ? normalized : 'custom',
+    baseUrl: preset.baseUrl,
+    model: models[0] || '',
+    models,
+    voice: kind === 'tts' ? preset.voice : ''
+  };
+}
+
+function clientAiServiceEndpoint(value, fallback) {
+  const raw = clientAiServiceBounded(value, 800, fallback);
+  if (!raw) return fallback;
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return fallback;
+    return raw.replace(/\/+$/, '');
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function clientAiServiceNormalizeProvider(value, kind) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const preset = clientAiServicePreset(kind, source.provider);
+  return {
+    provider: preset.provider,
+    baseUrl: clientAiServiceEndpoint(source.baseUrl, preset.baseUrl),
+    apiKey: clientAiServiceSanitizeKey(source.apiKey),
+    model: clientAiServiceBounded(source.model, 200, preset.model),
+    voice: kind === 'tts' ? clientAiServiceBounded(source.voice, 200, preset.voice) : ''
+  };
+}
+
+function clientAiServiceNormalizeConfig(value) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  return {
+    version: 1,
+    modelMode: clientAiServiceMode(source.modelMode, 'server'),
+    ttsMode: clientAiServiceMode(source.ttsMode, 'server'),
+    ttsEnabled: source.ttsEnabled !== false,
+    model: clientAiServiceNormalizeProvider(source.model, 'model'),
+    tts: clientAiServiceNormalizeProvider(source.tts, 'tts')
+  };
+}
+
+function clientAiServiceLoad() {
+  return clientAiServiceNormalizeConfig({});
+}
+
+function clientAiServiceApplyPreset(config, kind, provider) {
+  const preset = clientAiServicePreset(kind, provider);
+  const target = kind === 'tts' ? config.tts : config.model;
+  target.provider = preset.provider;
+  if (!target.baseUrl) target.baseUrl = preset.baseUrl;
+  if (!target.model) target.model = preset.model;
+  if (kind === 'tts' && !target.voice) target.voice = preset.voice;
+  return config;
+}
+
+function clientAiServiceSave(updates, options = {}) {
+  const source = updates && typeof updates === 'object' && !Array.isArray(updates) ? updates : {};
+  const previous = clientAiServiceLoad();
+  const next = clientAiServiceNormalizeConfig({
+    ...previous,
+    modelMode: clientAiServiceMode(source.modelMode, previous.modelMode),
+    ttsMode: clientAiServiceMode(source.ttsMode, previous.ttsMode),
+    ttsEnabled: Object.hasOwn(source, 'ttsEnabled') ? source.ttsEnabled !== false : previous.ttsEnabled,
+    model: source.model && typeof source.model === 'object'
+      ? {
+          ...previous.model,
+          ...source.model,
+          apiKey: ''
+        }
+      : previous.model,
+    tts: source.tts && typeof source.tts === 'object'
+      ? {
+          ...previous.tts,
+          ...source.tts,
+          apiKey: ''
+        }
+      : previous.tts
+  });
+  if (source.model?.provider && source.model.provider !== previous.model.provider) {
+    clientAiServiceApplyPreset(next, 'model', source.model.provider);
+  }
+  if (source.tts?.provider && source.tts.provider !== previous.tts.provider) {
+    clientAiServiceApplyPreset(next, 'tts', source.tts.provider);
+  }
+  try {
+    window.dispatchEvent(new CustomEvent('fe-monster-client-ai-service-change', {
+      detail: clientAiServicePublicSnapshot(next)
+    }));
+    window.FeMonsterPetClientContext?.refresh?.('ai-service-change');
+  } catch (_) {}
+  return next;
+}
+
+function clientAiServiceValid(config, kind) {
+  const target = kind === 'tts' ? config.tts : config.model;
+  const key = clientAiServiceBounded(target.apiKey, 4096);
+  return Boolean(
+    target.baseUrl
+    && target.model
+    && key
+    && !/^\*+$/.test(key)
+    && key.length >= 4
+    && /^[\x20-\x7E]+$/.test(key)
+  );
+}
+
+function clientAiServiceIsCustomModel(value) {
+  const config = value === undefined ? clientAiServiceLoad() : clientAiServiceNormalizeConfig(value);
+  return config.modelMode === 'custom' && clientAiServiceValid(config, 'model');
+}
+
+function clientAiServiceIsCustomTts(value) {
+  const config = value === undefined ? clientAiServiceLoad() : clientAiServiceNormalizeConfig(value);
+  return config.ttsEnabled === true && config.ttsMode === 'custom' && clientAiServiceValid(config, 'tts');
+}
+
+function clientAiServiceRedactKey(value) {
+  const key = clientAiServiceBounded(value, 4096);
+  if (!key) return '';
+  return key.length <= 4 ? '••••' : `••••${key.slice(-4)}`;
+}
+
+function clientAiServiceExtractText(payload) {
+  const choices = Array.isArray(payload?.choices) ? payload.choices : [];
+  return clientAiServiceBounded(
+    choices[0]?.message?.content || choices[0]?.text || payload?.output_text || '',
+    8000
+  );
+}
+
+function clientAiServiceExtractDelta(payload) {
+  const choices = Array.isArray(payload?.choices) ? payload.choices : [];
+  return clientAiServiceBounded(choices[0]?.delta?.content || choices[0]?.text || '', 8000);
+}
+
+function clientAiServiceToolCallsFromPayload(payload) {
+  const choices = Array.isArray(payload?.choices) ? payload.choices : [];
+  const raw = Array.isArray(choices[0]?.message?.tool_calls)
+    ? choices[0].message.tool_calls
+    : Array.isArray(choices[0]?.tool_calls)
+      ? choices[0].tool_calls
+      : [];
+  return raw.slice(0, 24).map((call) => {
+    const name = clientAiServiceBounded(call?.function?.name || call?.name, 96);
+    let argumentsText = clientAiServiceBounded(call?.function?.arguments || call?.arguments, 4000);
+    if (!argumentsText) argumentsText = '{}';
+    try { argumentsText = JSON.stringify(JSON.parse(argumentsText)); } catch (_) {}
+    return {
+      id: clientAiServiceBounded(call?.id, 160, `call_${Date.now()}_${Math.random().toString(36).slice(2)}`),
+      name,
+      arguments: argumentsText
+    };
+  }).filter((call) => call.name);
+}
+
+async function clientAiServiceResponseError(response) {
+  let message = `HTTP ${response.status}`;
+  try {
+    const text = await response.text();
+    let body = {};
+    try { body = text ? JSON.parse(text) : {}; } catch (_) {}
+    const errorDetail = typeof body.error === 'string'
+      ? body.error
+      : (body.error?.message || body.message || text || message);
+    message = clientAiServiceBounded(errorDetail, 500, message);
+  } catch (_) {}
+  const error = new Error(message);
+  error.status = response.status;
+  return error;
+}
+
+async function clientAiServiceComplete(value, messages, options = {}) {
+  const config = clientAiServiceNormalizeConfig(value);
+  if (!clientAiServiceValid(config, 'model')) throw new Error('请先填写模型 API 地址、Key 和模型名');
+  const payload = {
+    model: config.model.model,
+    messages,
+    stream: false,
+    ...(options.body || {})
+  };
+  const response = await window.fetch('/api/client-ai/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      requestId: clientAiServiceBounded(options.requestId, 160, crypto.randomUUID()),
+      payload
+    }),
+    signal: options.signal
+  });
+  if (!response.ok) throw await clientAiServiceResponseError(response);
+  const upstreamPayload = await response.json();
+  return clientAiServiceExtractText(upstreamPayload);
+}
+
+async function clientAiServiceChatStream(value, messages, options = {}) {
+  const config = clientAiServiceNormalizeConfig(value);
+  if (!clientAiServiceValid(config, 'model')) throw new Error('请先填写模型 API 地址、Key 和模型名');
+  const onDelta = typeof options.onDelta === 'function' ? options.onDelta : () => {};
+  const onToolCalls = typeof options.onToolCalls === 'function' ? options.onToolCalls : () => {};
+  const tools = Array.isArray(options.tools) && options.tools.length
+    ? options.tools.slice(0, 32)
+    : null;
+  const payload = {
+    model: config.model.model,
+    messages,
+    stream: true,
+    ...(tools ? { tools, tool_choice: 'auto' } : {}),
+    ...(options.body || {})
+  };
+  const response = await window.fetch('/api/client-ai/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      requestId: clientAiServiceBounded(options.requestId, 160, crypto.randomUUID()),
+      payload
+    }),
+    signal: options.signal
+  });
+  if (!response.ok) throw await clientAiServiceResponseError(response);
+  if (!response.body || typeof response.body.getReader !== 'function') {
+    const text = await clientAiServiceComplete(config, messages, {
+      ...options,
+      body: {
+        stream: false,
+        ...(tools ? { tools, tool_choice: 'auto' } : {}),
+        ...(options.body || {})
+      }
+    });
+    const payloadText = typeof text === 'string' ? text : '';
+    if (text) onDelta(text);
+    return { text: payloadText, streamed: false, toolCalls: [] };
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let text = '';
+  let rawResponse = '';
+  const toolCallMap = new Map();
+  const mergeToolCall = (item) => {
+    if (!item || typeof item !== 'object') return;
+    const index = Number.isFinite(Number(item.index)) ? Number(item.index) : 0;
+    let call = toolCallMap.get(index) || { id: '', name: '', arguments: '' };
+    if (item.id) call.id = clientAiServiceBounded(item.id, 160, call.id);
+    if (item.function?.name) call.name = clientAiServiceBounded(item.function.name, 96);
+    if (item.function?.arguments) call.arguments += item.function.arguments;
+    toolCallMap.set(index, call);
+  };
+  const consume = (chunk) => {
+    rawResponse += chunk;
+    buffer += chunk;
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) continue;
+      const data = trimmed.slice(5).trim();
+      if (!data || data === '[DONE]') continue;
+      let payload;
+      try { payload = JSON.parse(data); } catch (_) { continue; }
+      const delta = clientAiServiceExtractDelta(payload);
+      if (delta) {
+        text += delta;
+        onDelta(delta);
+      }
+      const toolCalls = payload?.choices?.[0]?.delta?.tool_calls;
+      if (Array.isArray(toolCalls)) toolCalls.forEach(mergeToolCall);
+    }
+  };
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    consume(decoder.decode(value, { stream: true }));
+  }
+  consume(decoder.decode());
+  if (!text && toolCallMap.size === 0 && rawResponse.trim().startsWith('{')) {
+    try {
+      const payload = JSON.parse(rawResponse.trim());
+      text = clientAiServiceExtractText(payload);
+      if (text) onDelta(text);
+      const parsedToolCalls = clientAiServiceToolCallsFromPayload(payload);
+      parsedToolCalls.forEach((call, index) => toolCallMap.set(index, {
+        id: call.id,
+        name: call.name,
+        arguments: call.arguments
+      }));
+    } catch (_) {}
+  }
+  const toolCalls = Array.from(toolCallMap.values())
+    .map((call) => {
+      let args = clientAiServiceBounded(call.arguments || '{}', 4000);
+      if (!args) args = '{}';
+      try { args = JSON.stringify(JSON.parse(args)); } catch (_) {}
+      return {
+        id: call.id || `call_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        name: call.name,
+        arguments: args
+      };
+    })
+    .filter((call) => call.name);
+  if (toolCalls.length) onToolCalls(toolCalls);
+  return { text: clientAiServiceBounded(text, 8000), streamed: true, toolCalls };
+}
+
+async function clientAiServiceSynthesize(value, text, options = {}) {
+  const config = clientAiServiceNormalizeConfig(value);
+  if (config.ttsEnabled === false) throw new Error('客户端 TTS 已关闭');
+  if (!clientAiServiceValid(config, 'tts')) throw new Error('请先填写 TTS API 地址、Key、模型和音色');
+  const input = clientAiServiceBounded(text, 4000);
+  if (!input) throw new Error('没有可合成的语音文本');
+  const payload = {
+    model: config.tts.model,
+    input,
+    voice: config.tts.voice,
+    response_format: 'mp3'
+  };
+  const response = await window.fetch('/api/client-ai/tts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      requestId: clientAiServiceBounded(options.requestId, 160, crypto.randomUUID()),
+      payload
+    }),
+    signal: options.signal
+  });
+  if (!response.ok) throw await clientAiServiceResponseError(response);
+  const blob = await response.blob();
+  if (!blob || !blob.size) throw new Error('TTS 服务没有返回音频');
+  const url = URL.createObjectURL(blob);
+  return { blob, url, bytes: blob.size, type: blob.type };
+}
+
+async function clientAiServiceTestModel(value) {
+  const config = clientAiServiceNormalizeConfig(value);
+  const reply = await clientAiServiceComplete(config, [
+    { role: 'system', content: 'You are a concise connectivity test.' },
+    { role: 'user', content: 'Reply with the word OK.' }
+  ]);
+  return { ok: true, reply: clientAiServiceBounded(reply, 500), provider: config.model.provider, model: config.model.model };
+}
+
+async function clientAiServiceTestTts(value) {
+  const result = await clientAiServiceSynthesize(value, '这是 FE Monster 的语音连接测试。');
+  return { ok: true, bytes: result.bytes, type: result.type };
+}
+
+function clientAiServicePublicSnapshot(value) {
+  const config = clientAiServiceNormalizeConfig(value);
+  return {
+    modelMode: config.modelMode,
+    ttsMode: config.ttsMode,
+    ttsEnabled: config.ttsEnabled,
+    model: {
+      provider: config.model.provider,
+      baseUrl: config.model.baseUrl,
+      model: config.model.model,
+      hasApiKey: Boolean(config.model.apiKey)
+    },
+    tts: {
+      provider: config.tts.provider,
+      baseUrl: config.tts.baseUrl,
+      model: config.tts.model,
+      voice: config.tts.voice,
+      hasApiKey: Boolean(config.tts.apiKey)
+    }
+  };
+}
 
 function visualSettingsPreferenceSnapshot() {
   return normalizeVisualSettingsPreferences({
@@ -5663,21 +6823,7 @@ function collectClientPreferences() {
   const encoder = new TextEncoder();
   const values = {};
   let totalBytes = 0;
-  const keys = [];
-  try {
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index);
-      if (
-        key
-        && key.startsWith('fe-monster-')
-        && key !== CLIENT_PREFERENCES_REVISION_KEY
-      ) {
-        keys.push(key);
-      }
-    }
-  } catch (error) {
-    return values;
-  }
+  const keys = Array.from(CLIENT_PREFERENCES_LOCAL_KEYS);
   keys.sort().forEach((key) => {
     let value = null;
     try {
@@ -5713,9 +6859,75 @@ async function persistClientPreferences(updatedAt = clientPreferencesRevision ||
       method: 'POST',
       body: JSON.stringify(payload)
     });
+    void syncClientPreferencesCloud('local-change');
   } catch (error) {
     // localStorage remains the same-origin fallback when the backend is unavailable.
   }
+}
+
+function applyMissingCloudClientPreferences(snapshot) {
+  const source = snapshot && typeof snapshot === 'object' ? snapshot : {};
+  const values = source.values && typeof source.values === 'object' ? source.values : {};
+  let changed = false;
+  for (const [key, value] of Object.entries(values)) {
+    if (!CLIENT_PREFERENCES_LOCAL_KEYS.has(key) || typeof value !== 'string') continue;
+    try {
+      if (window.localStorage.getItem(key) === null) {
+        window.localStorage.setItem(key, value);
+        changed = true;
+      }
+    } catch (error) {
+    }
+  }
+  if (!changed) return false;
+  const updatedAt = Math.max(0, Number(source.updatedAt) || Date.now());
+  try {
+    window.localStorage.setItem(CLIENT_PREFERENCES_REVISION_KEY, String(updatedAt));
+    window.dispatchEvent(new CustomEvent('fe-client-preferences-restored', {
+      detail: { source: 'feid-backup', updatedAt }
+    }));
+  } catch (error) {
+  }
+  return true;
+}
+
+async function syncClientPreferencesCloud(reason = 'online') {
+  if (clientPreferencesCloudSyncPromise) {
+    clientPreferencesCloudSyncPending = true;
+    return clientPreferencesCloudSyncPromise;
+  }
+  const run = async () => {
+    let latest = null;
+    do {
+      clientPreferencesCloudSyncPending = false;
+      try {
+        latest = await apiJson('/api/app/preferences/cloud-sync', {
+          method: 'POST',
+          body: JSON.stringify({ provider: state.activeProvider, reason })
+        });
+        const restored = latest?.ok === true
+          && applyMissingCloudClientPreferences(latest.preferences);
+        if (restored) {
+          const reloadMarker = 'fe-monster-preferences-cloud-restored-v1';
+          let alreadyReloaded = false;
+          try {
+            alreadyReloaded = window.sessionStorage.getItem(reloadMarker) === '1';
+            window.sessionStorage.setItem(reloadMarker, '1');
+          } catch (error) {
+          }
+          if (!alreadyReloaded) window.location.reload();
+        }
+      } catch (error) {
+        // The durable local journal is the offline outbox. Reconnect/online and
+        // the next local change retry the exact same idempotent mutations.
+      }
+    } while (clientPreferencesCloudSyncPending);
+    return latest;
+  };
+  clientPreferencesCloudSyncPromise = run().finally(() => {
+    clientPreferencesCloudSyncPromise = null;
+  });
+  return clientPreferencesCloudSyncPromise;
 }
 
 function scheduleClientPreferencesSync() {
@@ -5908,10 +7120,67 @@ function saveGoogleObrPreference(enabled = state.obrSpatialAudio.requested) {
   }
 }
 
+function applyNativeMixerControl(source = {}) {
+  const spatial = state.obrSpatialAudio;
+  const previousSignature = nativeMixerControlSignature(spatial.mixerControl);
+  const control = normalizeNativeMixerControl(source);
+  spatial.mixerControl = control;
+  spatial.requested = control.enabled;
+  spatial.channelLayout = control.upmixOutputLayout;
+  const nextSignature = nativeMixerControlSignature(control);
+  if (previousSignature !== nextSignature) {
+    notifyNativeAudioChainChanged('mixer-control');
+  }
+  syncGoogleObrToggle();
+  return control;
+}
+
+async function refreshNativeMixerControl() {
+  const spatial = state.obrSpatialAudio;
+  if (spatial.mixerControlPromise) return spatial.mixerControlPromise;
+  const request = apiJson('/api/audio/mixer')
+    .then((snapshot) => applyNativeMixerControl(snapshot))
+    .catch(() => {
+      spatial.mixerControl = {
+        ...spatial.mixerControl,
+        attempted: true
+      };
+      return spatial.mixerControl;
+    })
+    .finally(() => {
+      if (spatial.mixerControlPromise === request) spatial.mixerControlPromise = null;
+    });
+  spatial.mixerControlPromise = request;
+  return request;
+}
+
+async function patchNativeMixerSpatialControl(parameters) {
+  const current = await apiJson('/api/audio/mixer');
+  const expectedRevision = Number(current?.revision);
+  if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
+    throw new Error('调音台修订号无效');
+  }
+  const updated = await apiJson('/api/audio/mixer', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expectedRevision, parameters })
+  });
+  applyNativeMixerControl(updated);
+  return updated;
+}
+
 function googleObrStatusLabel() {
   const spatial = state.obrSpatialAudio;
+  const control = spatial.mixerControl || DEFAULT_NATIVE_MIXER_CONTROL;
+  const serviceOwnsSpatial = control.loaded === true;
+  const desiredObr = serviceOwnsSpatial ? control.obrEnabled === true : spatial.requested === true;
   const layout = GOOGLE_OBR_CHANNEL_LAYOUTS[normalizeGoogleObrChannelLayout(spatial.channelLayout)];
-  if (spatial.enabled) return `Google OBR 官方内核运行中 · ${layout.label}`;
+  if (spatial.enabled && desiredObr) return `Google OBR 官方内核运行中 · ${layout.label}`;
+  if (spatial.enabled) {
+    return control.upmixEnabled
+      ? `原生调音链运行中 · 虚拟 ${control.upmixOutputLayout} 上混后双声道输出`
+      : '原生调音链运行中 · 立体声调音输出';
+  }
   if (spatial.recoveryTimer) return `Google OBR 正在恢复连接 · ${layout.label}`;
   if (spatial.loading) return '正在加载 Google OBR 官方内核';
   if (spatial.backend === 'waiting-for-audio' || (spatial.requested && spatial.backend === 'uninitialized')) {
@@ -5926,6 +7195,9 @@ function syncGoogleObrToggle() {
   const button = els.qishuiPlaybackObrToggle;
   const layoutButton = els.qishuiPlaybackObrLayoutToggle;
   const spatial = state.obrSpatialAudio;
+  const control = spatial.mixerControl || DEFAULT_NATIVE_MIXER_CONTROL;
+  const serviceOwnsSpatial = control.loaded === true;
+  const desiredObr = serviceOwnsSpatial ? control.obrEnabled === true : spatial.requested === true;
   const layout = GOOGLE_OBR_CHANNEL_LAYOUTS[normalizeGoogleObrChannelLayout(spatial.channelLayout)];
   document.documentElement.dataset.obrSpatialBackend = spatial.backend;
   document.documentElement.dataset.obrSpatialEnabled = String(spatial.enabled);
@@ -5939,15 +7211,16 @@ function syncGoogleObrToggle() {
   }
   if (!button) return;
   const status = googleObrStatusLabel();
-  const action = spatial.enabled ? '关闭' : spatial.requested ? '取消' : '开启';
+  const obrActive = spatial.enabled && desiredObr;
+  const action = desiredObr ? '关闭' : '开启';
   const label = spatial.loading ? status : `${action}${status}`;
-  button.classList.toggle('is-active', spatial.enabled);
+  button.classList.toggle('is-active', obrActive);
   button.classList.toggle('is-loading', spatial.loading);
-  button.setAttribute('aria-pressed', String(spatial.enabled));
+  button.setAttribute('aria-pressed', String(desiredObr));
   button.setAttribute('aria-busy', String(spatial.loading));
   button.dataset.obrBackend = spatial.backend;
   button.setAttribute('aria-label', label);
-  button.title = spatial.enabled && spatial.processedBlocks
+  button.title = obrActive && spatial.processedBlocks
     ? `${label} · 已处理 ${spatial.processedBlocks} 个 PCM 块`
     : label;
 }
@@ -5961,6 +7234,31 @@ function setAudioParamSmoothly(parameter, value, context, duration = 0.045) {
   parameter.linearRampToValueAtTime(value, now + duration);
 }
 
+function setAudioParamEqualPower(parameter, value, context, duration = 0.018) {
+  if (!parameter || !context) return;
+  const now = context.currentTime;
+  const target = Number.isFinite(Number(value)) ? Number(value) : 0;
+  const current = Number.isFinite(parameter.value) ? parameter.value : target;
+  const seconds = Math.max(0.001, Number(duration) || 0.018);
+  parameter.cancelScheduledValues(now);
+  parameter.setValueAtTime(current, now);
+  if (Math.abs(target - current) < 0.0001) return;
+
+  // AudioParam curves are rendered sample-accurately by the audio thread.
+  // Sine-in/cosine-out keeps the dry/native hand-off close to constant power
+  // while XAudio2 fades and flushes the obsolete timeline on its control path.
+  const curve = new Float32Array(33);
+  const increasing = target > current;
+  for (let index = 0; index < curve.length; index += 1) {
+    const progress = index / (curve.length - 1);
+    const interpolation = increasing
+      ? Math.sin(progress * Math.PI * 0.5)
+      : 1 - Math.cos(progress * Math.PI * 0.5);
+    curve[index] = current + (target - current) * interpolation;
+  }
+  parameter.setValueCurveAtTime(curve, now, seconds);
+}
+
 function ensureDryAudioOutput(analysis) {
   if (analysis.dryGain || !analysis.context || !analysis.analyser) return analysis.dryGain;
   analysis.dryGain = analysis.context.createGain();
@@ -5972,26 +7270,12 @@ function ensureDryAudioOutput(analysis) {
 }
 
 function canUseNativeGoogleObr(channelLayout = state.obrSpatialAudio.channelLayout) {
-  const layout = normalizeGoogleObrChannelLayout(channelLayout);
   const nativeAudio = state.clientRuntime.nativeAudio || {};
-  let streamingUpload = false;
-  try {
-    const request = new Request(window.location.href, {
-      method: 'POST',
-      body: new ReadableStream(),
-      duplex: 'half'
-    });
-    streamingUpload = request.body != null;
-  } catch (error) {
-  }
   return (
-    layout !== 'stereo'
-    && state.obrSpatialAudio.nativeFallback !== true
-    && state.clientRuntime.nativeAudioActive
+    state.clientRuntime.nativeAudioActive
     && state.clientRuntime.settings.xAudio2
     && nativeAudio.spatialStreaming === true
-    && streamingUpload
-    && typeof ReadableStream === 'function'
+    && typeof fetch === 'function'
     && typeof AudioWorkletNode === 'function'
   );
 }
@@ -6003,22 +7287,238 @@ function nativeSpatialRequest(path) {
   });
 }
 
+function notifyNativeAudioChainChanged(reason) {
+  document.dispatchEvent(new CustomEvent('fe-native-audio-chain:change', {
+    detail: {
+      reason: safeText(reason, 'state-change'),
+      backend: state.obrSpatialAudio.backend,
+      enabled: state.obrSpatialAudio.enabled === true
+    }
+  }));
+}
+
+function recycleNativeSpatialBlock(graph, block) {
+  if (!block || block.released) return false;
+  block.released = true;
+  const pcm = block.pcm;
+  block.pcm = null;
+  if (
+    graph.disposed
+    || !(pcm instanceof Float32Array)
+    || !Number.isInteger(block.bufferId)
+    || !Number.isInteger(block.poolEpoch)
+  ) return false;
+  try {
+    graph.node.port.postMessage({
+      type: 'recycle-pcm',
+      pcm,
+      bufferId: block.bufferId,
+      poolEpoch: block.poolEpoch
+    }, [pcm.buffer]);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function discardNativeSpatialBlocks(graph, options = {}) {
+  const recycle = options.recycle === true && !graph.disposed;
+  while (graph.blockQueue.length) {
+    const block = graph.blockQueue.shift();
+    if (recycle) {
+      recycleNativeSpatialBlock(graph, block);
+    } else if (block && !block.released) {
+      block.released = true;
+      block.pcm = null;
+    }
+  }
+}
+
+function enqueueNativeSpatialBlock(graph, pcm, ownership = {}) {
+  if (graph.disposed || !(pcm instanceof Float32Array)) return false;
+  const expectedBytes = GOOGLE_OBR_NATIVE_TRANSPORT_FRAMES * 2 * Float32Array.BYTES_PER_ELEMENT;
+  if (pcm.byteLength !== expectedBytes) {
+    failGoogleObr(new Error('原生 PCM 分块长度无效'), { announce: false, graph });
+    return false;
+  }
+  if (!Number.isInteger(ownership.bufferId) || !Number.isInteger(ownership.poolEpoch)) {
+    failGoogleObr(new Error('原生 PCM 分块所有权无效'), { announce: false, graph });
+    return false;
+  }
+  const timelineEpoch = Number.isInteger(ownership.timelineEpoch)
+    ? ownership.timelineEpoch
+    : (Number.isInteger(graph.captureTimelineEpoch) ? graph.captureTimelineEpoch : 1);
+  if (
+    Number.isInteger(graph.captureTimelineEpoch)
+    && timelineEpoch !== graph.captureTimelineEpoch
+  ) {
+    recycleNativeSpatialBlock(graph, {
+      pcm,
+      bufferId: ownership.bufferId,
+      poolEpoch: ownership.poolEpoch,
+      timelineEpoch,
+      released: false
+    });
+    return false;
+  }
+  if (graph.blockQueue.length >= GOOGLE_OBR_NATIVE_MAX_PENDING_BLOCKS) {
+    recycleNativeSpatialBlock(graph, graph.blockQueue.shift());
+    if (graph.timelineTransitionActive) {
+      graph.transportSeekDiscardedBlocks += 1;
+    } else {
+      graph.transportDroppedBlocks += 1;
+    }
+  }
+  graph.blockQueue.push({
+    pcm,
+    bufferId: ownership.bufferId,
+    poolEpoch: ownership.poolEpoch,
+    timelineEpoch,
+    nativeGeneration: graph.timelineTransitionActive ? 0 : graph.generation,
+    released: false
+  });
+  pumpNativeSpatialBlocks(graph);
+  return true;
+}
+
+async function pumpNativeSpatialBlocks(graph) {
+  if (graph.disposed || graph.blockUploadActive || graph.timelineTransitionActive) return;
+  graph.blockUploadActive = true;
+  try {
+    while (!graph.disposed && graph.blockQueue.length) {
+      const block = graph.blockQueue.shift();
+      if (
+        (
+          Number.isInteger(graph.captureTimelineEpoch)
+          && block.timelineEpoch !== graph.captureTimelineEpoch
+        )
+        || !Number.isSafeInteger(Number(block.nativeGeneration))
+        || Number(block.nativeGeneration) <= 0
+      ) {
+        recycleNativeSpatialBlock(graph, block);
+        continue;
+      }
+      graph.activeBlock = block;
+      try {
+        const sequence = graph.nextBlockSequence;
+        graph.nextBlockSequence += 1;
+        const params = new URLSearchParams({
+          session: String(graph.session),
+          generation: String(block.nativeGeneration),
+          inputChannels: '2',
+          sequence: String(sequence)
+        });
+        let response = null;
+        let payload = null;
+        let uploadError = null;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          try {
+            response = await fetch(`/api/audio/spatial/block?${params}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/octet-stream',
+                'X-FE-Monster-Audio': '1'
+              },
+              body: block.pcm,
+              signal: graph.streamAbort.signal
+            });
+            try {
+              payload = await response.json();
+            } catch (error) {
+              payload = null;
+            }
+            if (response.ok && payload?.ok === true && Number(payload.sequence) === sequence) {
+              if (attempt > 0) graph.transportRecoveredBlocks += 1;
+              uploadError = null;
+              break;
+            }
+            uploadError = new Error(
+              safeText(payload?.error, `原生 PCM 分块失败：HTTP ${response.status}`)
+            );
+          } catch (error) {
+            uploadError = error;
+          }
+          graph.transportRetryAttempts += 1;
+          const obsoleteAttempt = graph.disposed
+            || graph.timelineTransitionActive
+            || block.timelineEpoch !== graph.captureTimelineEpoch
+            || Number(block.nativeGeneration) !== Number(graph.generation);
+          if (obsoleteAttempt) break;
+        }
+        const obsolete = graph.disposed
+          || graph.timelineTransitionActive
+          || (
+            Number.isInteger(graph.captureTimelineEpoch)
+            && block.timelineEpoch !== graph.captureTimelineEpoch
+          )
+          || Number(block.nativeGeneration) !== Number(graph.generation);
+        if (
+          uploadError
+          && !obsolete
+        ) {
+          throw uploadError;
+        }
+        if (!obsolete) graph.uploadedBlocks += 1;
+      } catch (error) {
+        const obsolete = graph.disposed
+          || graph.timelineTransitionActive
+          || (
+            Number.isInteger(graph.captureTimelineEpoch)
+            && block.timelineEpoch !== graph.captureTimelineEpoch
+          )
+          || Number(block.nativeGeneration) !== Number(graph.generation);
+        if (!obsolete) throw error;
+      } finally {
+        if (graph.activeBlock === block) graph.activeBlock = null;
+        if (graph.disposed) {
+          block.released = true;
+          block.pcm = null;
+        } else {
+          recycleNativeSpatialBlock(graph, block);
+        }
+      }
+    }
+  } catch (error) {
+    discardNativeSpatialBlocks(graph, { recycle: !graph.disposed });
+    if (!graph.disposed && error?.name !== 'AbortError' && state.obrSpatialAudio.requested) {
+      graph.transportRecoveryCount += 1;
+      setAudioParamSmoothly(graph.dryGain?.gain, 1, graph.context, 0.018);
+      beginNativeSpatialTimelineTransition('transport-recovery').catch((recoveryError) => {
+        if (!graph.disposed) {
+          failGoogleObr(recoveryError || error, { announce: false, graph });
+        }
+      });
+    }
+  } finally {
+    graph.blockUploadActive = false;
+    if (!graph.disposed && graph.blockQueue.length) pumpNativeSpatialBlocks(graph);
+  }
+}
+
 async function createNativeGoogleObrGraph(analysis) {
   if (!analysis.context?.audioWorklet || typeof AudioWorkletNode !== 'function') {
     throw new Error('当前播放内核不支持原生 PCM AudioWorklet');
   }
-  const channelLayout = normalizeGoogleObrChannelLayout(state.obrSpatialAudio.channelLayout);
-  const layoutChannels = GOOGLE_OBR_CHANNEL_LAYOUTS[channelLayout]?.channels || 0;
+  const control = state.obrSpatialAudio.mixerControl || DEFAULT_NATIVE_MIXER_CONTROL;
+  const channelLayout = control.loaded === true
+    ? (control.upmixOutputLayout === '7.1' ? '7.1' : '5.1')
+    : normalizeGoogleObrChannelLayout(state.obrSpatialAudio.channelLayout);
+  const layoutChannels = channelLayout === '7.1' ? 8 : 6;
   if (layoutChannels !== 6 && layoutChannels !== 8) {
     throw new Error('Rust 上混只用于 5.1 或 7.1 空间音频');
   }
 
   const sampleRate = Math.round(Number(analysis.context.sampleRate) || 48000);
+  const algorithm = {
+    passive: 1,
+    'matrix-decode': 2,
+    'ambient-extract': 3
+  }[control.upmixAlgorithm] || 2;
   const startParams = new URLSearchParams({
     sampleRate: String(sampleRate),
     inputChannels: '2',
     layoutChannels: String(layoutChannels),
-    algorithm: '2'
+    algorithm: String(algorithm)
   });
   const start = await nativeSpatialRequest(`/api/audio/spatial/start?${startParams}`);
   if (!start?.ok || !Number(start.session) || !Number(start.generation)) {
@@ -6026,7 +7526,7 @@ async function createNativeGoogleObrGraph(analysis) {
   }
   const session = Number(start.session);
   const generation = Number(start.generation);
-  if (start.rustUpmixActive !== true) {
+  if (control.upmixEnabled && start.rustUpmixActive !== true) {
     await nativeSpatialRequest(
       `/api/audio/spatial/stop?session=${encodeURIComponent(session)}&generation=${encodeURIComponent(generation)}`
     ).catch(() => {});
@@ -6046,12 +7546,6 @@ async function createNativeGoogleObrGraph(analysis) {
     const wetGain = analysis.context.createGain();
     wetGain.gain.value = 0;
     const streamAbort = new AbortController();
-    let streamController = null;
-    const streamBody = new ReadableStream({
-      start(controller) {
-        streamController = controller;
-      }
-    });
     const graph = {
       context: analysis.context,
       inputNode: analysis.analyser,
@@ -6061,6 +7555,10 @@ async function createNativeGoogleObrGraph(analysis) {
       backend: GOOGLE_OBR_NATIVE_BACKEND,
       revision: GOOGLE_OBR_REVISION,
       channelLayout,
+      mixerControlSignature: nativeMixerControlSignature(control),
+      mixerControlRevision: control.revision,
+      upmixEnabled: control.upmixEnabled,
+      obrEnabled: control.obrEnabled,
       inputChannelCount: layoutChannels,
       ready: true,
       processedBlocks: 0,
@@ -6070,8 +7568,26 @@ async function createNativeGoogleObrGraph(analysis) {
       nativeStream: true,
       session,
       generation,
-      streamController,
       streamAbort,
+      blockQueue: [],
+      blockUploadActive: false,
+      activeBlock: null,
+      nextBlockSequence: 0,
+      uploadedBlocks: 0,
+      transportDroppedBlocks: 0,
+      transportSeekDiscardedBlocks: 0,
+      transportRetryAttempts: 0,
+      transportRecoveredBlocks: 0,
+      transportRecoveryCount: 0,
+      poolStarvedFrames: 0,
+      captureTimelineEpoch: 1,
+      appliedTimelineEpoch: 1,
+      timelineTransitionActive: false,
+      timelineResetPromise: null,
+      timelineResetCount: 0,
+      timelineResetFailures: 0,
+      timelineLastNativeResetMs: 0,
+      timelineWorstNativeResetMs: 0,
       disposed: false,
       inputRms: 0,
       outputRms: 0,
@@ -6086,12 +7602,14 @@ async function createNativeGoogleObrGraph(analysis) {
     node.port.onmessage = (event) => {
       const message = event.data || {};
       if (message.type === 'pcm') {
-        if (graph.disposed || !graph.streamController || !(message.pcm instanceof Float32Array)) return;
+        if (graph.disposed || !(message.pcm instanceof Float32Array)) return;
         try {
           const pcm = message.pcm;
-          graph.streamController.enqueue(
-            new Uint8Array(pcm.buffer, pcm.byteOffset, pcm.byteLength)
-          );
+          enqueueNativeSpatialBlock(graph, pcm, {
+            bufferId: message.bufferId,
+            poolEpoch: message.poolEpoch,
+            timelineEpoch: message.timelineEpoch
+          });
           graph.processedBlocks = Math.max(graph.processedBlocks, Number(message.blocks) || 0);
           graph.inputRms = Number(message.inputRms) || graph.inputRms;
           state.obrSpatialAudio.processedBlocks = graph.processedBlocks;
@@ -6106,6 +7624,10 @@ async function createNativeGoogleObrGraph(analysis) {
       if (message.type === 'metrics') {
         graph.processedBlocks = Math.max(graph.processedBlocks, Number(message.processedBlocks) || 0);
         graph.inputRms = Number(message.inputRms) || graph.inputRms;
+        graph.poolStarvedFrames = Math.max(
+          graph.poolStarvedFrames,
+          Math.max(0, Number(message.poolStarvedFrames) || 0)
+        );
         state.obrSpatialAudio.processedBlocks = graph.processedBlocks;
         state.obrSpatialAudio.inputRms = graph.inputRms;
         if (state.obrSpatialAudio.enabled) syncGoogleObrToggle();
@@ -6123,35 +7645,6 @@ async function createNativeGoogleObrGraph(analysis) {
     analysis.analyser.connect(node);
     node.connect(wetGain);
     wetGain.connect(analysis.context.destination);
-    const streamParams = new URLSearchParams({
-      session: String(session),
-      generation: String(generation),
-      inputChannels: '2'
-    });
-    graph.streamPromise = fetch(`/api/audio/spatial/stream?${streamParams}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/octet-stream',
-        'X-FE-Monster-Audio': '1'
-      },
-      body: streamBody,
-      duplex: 'half',
-      signal: streamAbort.signal
-    }).then(async (response) => {
-      if (response.ok || graph.disposed) return;
-      let message = `原生 PCM 流失败：HTTP ${response.status}`;
-      try {
-        const payload = await response.json();
-        message = safeText(payload?.error, message);
-      } catch (error) {
-      }
-      throw new Error(message);
-    }).catch((error) => {
-      if (graph.disposed || error?.name === 'AbortError') return;
-      if (state.obrSpatialAudio.requested) {
-        failGoogleObr(error, { announce: false, graph });
-      }
-    });
     return graph;
   } catch (error) {
     await nativeSpatialRequest(
@@ -6167,6 +7660,13 @@ async function waitForNativeGoogleObrPreroll(graph) {
     GOOGLE_OBR_NATIVE_TRANSPORT_FRAMES / GOOGLE_OBR_NATIVE_RENDER_FRAMES
   );
   while (!graph.disposed && performance.now() - startedAt < 5000) {
+    if (graph.transportDroppedBlocks > 0 || graph.poolStarvedFrames > 0) {
+      throw new Error(
+        graph.poolStarvedFrames > 0
+          ? `原生 PCM 缓冲池耗尽：丢失 ${graph.poolStarvedFrames} 帧`
+          : `原生 PCM 上传队列溢出：丢失 ${graph.transportDroppedBlocks} 块`
+      );
+    }
     const status = await apiJson('/api/audio/spatial/status');
     if (
       !status?.active
@@ -6185,11 +7685,19 @@ async function waitForNativeGoogleObrPreroll(graph) {
     }
     const processed = Number(status.obrProcessCalls) || 0;
     const rustCalls = Number(status.rustUpmixProcessCalls) || 0;
+    const mixerCalls = Number(status.mixerProcessCalls) || Number(status.processCalls) || 0;
+    const spatialRevisionCommitted = status.spatialRevisionCommitted === true;
+    const spatialRevisionMatches = Number(status.spatialActiveRevision)
+      === Number(graph.mixerControlRevision);
     if (
       status.voiceStarted === true
       && Number(status.buffersQueued) > 0
-      && processed >= renderBlocksPerTransport
-      && rustCalls >= 1
+      && status.transitionPending !== true
+      && spatialRevisionCommitted
+      && spatialRevisionMatches
+      && mixerCalls >= 1
+      && (!graph.obrEnabled || processed >= renderBlocksPerTransport)
+      && (!graph.upmixEnabled || rustCalls >= 1)
     ) {
       graph.outputRms = Number(status.outputEnergy) || 0;
       updateNativeGoogleObrMetrics(graph, status);
@@ -6300,11 +7808,17 @@ function refreshNativeGoogleObrHealth() {
       const underruns = Math.max(0, Number(status.queueUnderruns) || 0);
       const unhealthy = Number(status.droppedBuffers) > 0
         || Number(status.bufferPoolExhaustions) > 0
-        || Number(status.lastResult) < 0;
+        || Number(status.lastResult) < 0
+        || graph.transportDroppedBlocks > 0
+        || graph.poolStarvedFrames > 0;
       if (underruns > previousUnderruns || unhealthy) {
         const reason = underruns > previousUnderruns
           ? `Native XAudio2 queue underrun ${previousUnderruns} -> ${underruns}`
-          : 'Native OBR queue reported a render failure';
+          : graph.poolStarvedFrames > 0
+            ? `Native PCM pool starvation dropped ${graph.poolStarvedFrames} frames`
+            : graph.transportDroppedBlocks > 0
+              ? `Native PCM upload overflow dropped ${graph.transportDroppedBlocks} blocks`
+              : 'Native OBR queue reported a render failure';
         failGoogleObr(new Error(reason), { announce: false, graph });
       }
       return status;
@@ -6374,6 +7888,7 @@ function disposeOfficialGoogleObrGraph(graph = state.obrSpatialAudio.graph, opti
   }
   if (graph.nativeStream) {
     graph.disposed = true;
+    discardNativeSpatialBlocks(graph);
     if (graph.pendingProcess) {
       const pending = graph.pendingProcess;
       graph.pendingProcess = null;
@@ -6412,6 +7927,156 @@ function disposeOfficialGoogleObrGraph(graph = state.obrSpatialAudio.graph, opti
   graph.ready = false;
   if (state.obrSpatialAudio.graph === graph) state.obrSpatialAudio.graph = null;
   return Promise.resolve(null);
+}
+
+function beginNativeSpatialTimelineTransition(reason = 'seek') {
+  const spatial = state.obrSpatialAudio;
+  const graph = spatial.graph;
+  if (!graph?.nativeStream || graph.disposed) return Promise.resolve(false);
+
+  graph.captureTimelineEpoch = Math.max(
+    Number(graph.captureTimelineEpoch) || 1,
+    Number(graph.appliedTimelineEpoch) || 1
+  ) + 1;
+  graph.timelineTransitionActive = true;
+  graph.timelineResetReason = safeText(reason, 'seek');
+  graph.timelineResetRequestedAt = performance.now();
+  setAudioParamEqualPower(graph.dryGain?.gain, 1, graph.context, 0.018);
+  discardNativeSpatialBlocks(graph, { recycle: true });
+  try {
+    graph.node.port.postMessage({
+      type: 'reset-timeline',
+      timelineEpoch: graph.captureTimelineEpoch,
+      fadeFrames: Math.max(1, Math.round((Number(graph.context?.sampleRate) || 48000) * 0.015))
+    });
+  } catch (error) {
+    return Promise.reject(error);
+  }
+  return resetNativeSpatialTimeline(graph);
+}
+
+function resetNativeSpatialTimeline(graph) {
+  if (!graph?.nativeStream || graph.disposed) return Promise.resolve(false);
+  if (graph.timelineResetPromise) return graph.timelineResetPromise;
+
+  const reset = (async () => {
+    // The request starts immediately: browser dry gain and the XAudio2 voice
+    // follow complementary short fades while media seeking itself remains
+    // synchronous and neither audio render thread is blocked.
+    while (
+      !graph.disposed
+      && Number(graph.appliedTimelineEpoch) !== Number(graph.captureTimelineEpoch)
+    ) {
+      const targetEpoch = graph.captureTimelineEpoch;
+      const requestedGeneration = graph.generation;
+      let response = null;
+      let lastError = null;
+      for (let attempt = 0; attempt < 3 && !graph.disposed; attempt += 1) {
+        try {
+          response = await nativeSpatialRequest(
+            `/api/audio/spatial/timeline?session=${encodeURIComponent(graph.session)}`
+              + `&generation=${encodeURIComponent(requestedGeneration)}`
+          );
+          if (response?.ok === true) break;
+          lastError = new Error(safeText(response?.error, '原生音频时间线重置失败'));
+        } catch (error) {
+          lastError = error;
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 25 * (attempt + 1)));
+      }
+      if (graph.disposed) return false;
+      const nextGeneration = Number(response?.generation);
+      if (
+        response?.ok !== true
+        || Number(response?.session) !== Number(graph.session)
+        || !Number.isSafeInteger(nextGeneration)
+        || nextGeneration <= requestedGeneration
+      ) {
+        throw lastError || new Error('原生音频时间线 generation 未推进');
+      }
+      graph.generation = nextGeneration;
+      graph.appliedTimelineEpoch = targetEpoch;
+      graph.timelineResetCount += 1;
+      const nativeResetMs = Number(response?.resetElapsedMs);
+      if (Number.isFinite(nativeResetMs) && nativeResetMs >= 0) {
+        graph.timelineLastNativeResetMs = nativeResetMs;
+        graph.timelineWorstNativeResetMs = Math.max(
+          Number(graph.timelineWorstNativeResetMs) || 0,
+          nativeResetMs
+        );
+      }
+    }
+    if (graph.disposed) return false;
+
+    const currentBlocks = [];
+    while (graph.blockQueue.length) {
+      const block = graph.blockQueue.shift();
+      if (block?.timelineEpoch === graph.captureTimelineEpoch) {
+        currentBlocks.push(block);
+      } else {
+        recycleNativeSpatialBlock(graph, block);
+      }
+    }
+    // Keep only the newest 4096-frame block. It contributes sixteen of the
+    // 24 production preroll quanta; the next live worklet block completes the
+    // queue while browser dry audio remains audible. This bounds scrub latency.
+    while (currentBlocks.length > 1) {
+      recycleNativeSpatialBlock(graph, currentBlocks.shift());
+      graph.transportSeekDiscardedBlocks += 1;
+    }
+    for (const block of currentBlocks) {
+      block.nativeGeneration = graph.generation;
+      graph.blockQueue.push(block);
+    }
+    graph.timelineTransitionActive = false;
+    pumpNativeSpatialBlocks(graph);
+
+    if (
+      els.audio?.src
+      && !els.audio.paused
+      && !els.audio.ended
+      && state.obrSpatialAudio.requested
+    ) {
+      await waitForNativeGoogleObrPreroll(graph);
+      if (graph.disposed || graph.timelineTransitionActive) return false;
+      const activation = await nativeSpatialRequest(
+        `/api/audio/spatial/activate?session=${encodeURIComponent(graph.session)}`
+          + `&generation=${encodeURIComponent(graph.generation)}`
+      );
+      if (!activation?.ok) {
+        throw new Error(safeText(activation?.error, '原生空间音频无法恢复输出'));
+      }
+      setAudioParamEqualPower(graph.dryGain?.gain, 0, graph.context, 0.025);
+    }
+    return true;
+  })();
+  graph.timelineResetPromise = reset;
+  reset.catch((error) => {
+    graph.timelineResetFailures += 1;
+    graph.timelineTransitionActive = false;
+    setAudioParamEqualPower(graph.dryGain?.gain, 1, graph.context, 0.018);
+    if (!graph.disposed && state.obrSpatialAudio.requested) {
+      failGoogleObr(error, { announce: false, graph });
+    }
+  }).finally(() => {
+    if (graph.timelineResetPromise === reset) graph.timelineResetPromise = null;
+  });
+  return reset;
+}
+
+function setAudioCurrentTimeWithNativeContinuity(target, reason = 'seek') {
+  if (!els.audio || !Number.isFinite(Number(target))) return Promise.resolve(false);
+  const transition = beginNativeSpatialTimelineTransition(reason);
+  state.audioPositionSync.nativeSeekPromise = transition;
+  transition.catch(() => false).finally(() => {
+    if (state.audioPositionSync.nativeSeekPromise === transition) {
+      state.audioPositionSync.nativeSeekPromise = null;
+    }
+  });
+  // Move the media clock immediately. Native flush/preroll stays on the
+  // control path while browser dry playback protects audible continuity.
+  els.audio.currentTime = Number(target);
+  return transition;
 }
 
 async function invalidateNativeGoogleObrTimeline(reason = 'timeline-change') {
@@ -6482,6 +8147,7 @@ function failGoogleObr(error, options = {}) {
   }
   setGoogleObrRuntimeBackend(false);
   syncGoogleObrToggle();
+  notifyNativeAudioChainChanged('failed');
   if (options.announce !== false) toast(`Google OBR 未启用：${message}`);
   if (options.recover !== false) scheduleGoogleObrRecovery();
   return false;
@@ -6602,11 +8268,25 @@ async function createOfficialGoogleObrGraph(analysis) {
 
 async function ensureOfficialGoogleObrGraph(analysis = state.audioAnalysis) {
   const spatial = state.obrSpatialAudio;
-  const channelLayout = normalizeGoogleObrChannelLayout(spatial.channelLayout);
-  if (spatial.graph?.ready && spatial.graph.channelLayout === channelLayout) return spatial.graph;
+  const control = spatial.mixerControl || DEFAULT_NATIVE_MIXER_CONTROL;
+  const channelLayout = control.loaded === true
+    ? (control.upmixOutputLayout === '7.1' ? '7.1' : '5.1')
+    : normalizeGoogleObrChannelLayout(spatial.channelLayout);
+  const controlSignature = nativeMixerControlSignature(control);
+  if (
+    spatial.graph?.ready
+    && spatial.graph.channelLayout === channelLayout
+    && (!spatial.graph.nativeStream || spatial.graph.mixerControlSignature === controlSignature)
+  ) return spatial.graph;
   if (spatial.graph?.ready) disposeOfficialGoogleObrGraph(spatial.graph);
   if (spatial.graphPromise) return spatial.graphPromise;
   const createPreferredGraph = async () => {
+    if (control.loaded && control.enabled) {
+      if (!canUseNativeGoogleObr(channelLayout)) {
+        throw new Error('原生调音台链路不可用，已保留浏览器原声输出');
+      }
+      return createNativeGoogleObrGraph(analysis);
+    }
     if (canUseNativeGoogleObr(channelLayout)) {
       try {
         return await createNativeGoogleObrGraph(analysis);
@@ -6665,21 +8345,28 @@ async function activateOfficialGoogleObr(options = {}) {
     return failGoogleObr('当前音源只能使用 captureStream，无法安全替换原声输出', options);
   }
   const operationId = ++spatial.operationId;
+  let activationGraph = null;
+  const activationIsCurrent = () => spatial.requested && operationId === spatial.operationId;
+  const disposeStaleActivation = async (graph) => {
+    if (!graph) return false;
+    try { graph.node.port.postMessage({ type: 'set-enabled', enabled: false }); } catch (error) {}
+    await disposeOfficialGoogleObrGraph(graph);
+    return false;
+  };
   const activation = (async () => {
     spatial.loading = true;
     spatial.error = '';
     syncGoogleObrToggle();
     const graph = await ensureOfficialGoogleObrGraph(analysis);
+    activationGraph = graph;
+    if (!activationIsCurrent()) return disposeStaleActivation(graph);
     window.clearTimeout(graph.disableTimer);
     graph.disableTimer = 0;
     connectOfficialGoogleObrGraph(graph);
     const processed = waitForGoogleObrProcessedBlock(graph);
     graph.node.port.postMessage({ type: 'set-enabled', enabled: true });
     await processed;
-    if (!spatial.requested || operationId !== spatial.operationId) {
-      graph.node.port.postMessage({ type: 'set-enabled', enabled: false });
-      return false;
-    }
+    if (!activationIsCurrent()) return disposeStaleActivation(graph);
     if (graph.nativeStream) {
       const nativeActivation = await nativeSpatialRequest(
         `/api/audio/spatial/activate?session=${encodeURIComponent(graph.session)}&generation=${encodeURIComponent(graph.generation)}`
@@ -6687,6 +8374,7 @@ async function activateOfficialGoogleObr(options = {}) {
       if (!nativeActivation?.ok) {
         throw new Error(safeText(nativeActivation?.error, 'XAudio2 原生输出无法解除静音'));
       }
+      if (!activationIsCurrent()) return disposeStaleActivation(graph);
     }
     setAudioParamSmoothly(graph.dryGain.gain, 0, graph.context);
     setAudioParamSmoothly(graph.wetGain.gain, 1, graph.context);
@@ -6701,15 +8389,26 @@ async function activateOfficialGoogleObr(options = {}) {
     saveGoogleObrPreference(true);
     syncRealtimePolling();
     syncGoogleObrToggle();
-    if (options.announce !== false) toast(`Google OBR ${GOOGLE_OBR_CHANNEL_LAYOUTS[graph.channelLayout].label} 空间音频已开启`);
+    notifyNativeAudioChainChanged('activated');
+    if (options.announce !== false) {
+      const control = spatial.mixerControl || DEFAULT_NATIVE_MIXER_CONTROL;
+      toast(control.obrEnabled
+        ? `Google OBR ${GOOGLE_OBR_CHANNEL_LAYOUTS[graph.channelLayout].label} 空间音频已开启`
+        : control.upmixEnabled
+          ? `虚拟 ${control.upmixOutputLayout} 上混与调音台已开启（双声道输出）`
+          : '原生调音台已开启');
+    }
     return true;
   })();
   spatial.activationPromise = activation;
   try {
     return await activation;
   } catch (error) {
-    if (!spatial.requested || operationId !== spatial.operationId) {
+    if (!activationIsCurrent()) {
       spatial.loading = false;
+      if (activationGraph && !activationGraph.disposed) {
+        await disposeOfficialGoogleObrGraph(activationGraph);
+      }
       syncGoogleObrToggle();
       return false;
     }
@@ -6748,10 +8447,15 @@ async function setGoogleObrSpatialAudioEnabled(enabled, options = {}) {
       }, 70);
     }
     syncGoogleObrToggle();
+    notifyNativeAudioChainChanged('disabled');
     if (options.announce !== false) toast('Google OBR 空间音频已关闭');
     return true;
   }
 
+  if (options.preferNative === true) {
+    spatial.nativeFallback = false;
+    spatial.nativeError = '';
+  }
   spatial.requested = true;
   spatial.error = '';
   saveGoogleObrPreference(true);
@@ -6767,6 +8471,128 @@ async function setGoogleObrSpatialAudioEnabled(enabled, options = {}) {
   return ready && spatial.enabled;
 }
 
+async function ensureNativeAudioMixerChain(request = {}) {
+  const spatial = state.obrSpatialAudio;
+  let control;
+  if (request?.spatialMigrationNeeded === true) {
+    const legacy = explicitLegacyGoogleObrPreference();
+    if (legacy) {
+      const legacyParameters = legacy.enabled
+        ? legacy.channelLayout === 'stereo'
+          ? { upmixEnabled: false, obrEnabled: true }
+          : {
+              upmixEnabled: true,
+              obrEnabled: true,
+              upmixOutputLayout: legacy.channelLayout === '7.1' ? '7.1' : '5.1'
+            }
+        : { upmixEnabled: false, obrEnabled: false };
+      request = await patchNativeMixerSpatialControl(legacyParameters);
+    }
+  }
+  if (request?.parameters && typeof request.parameters === 'object') {
+    control = applyNativeMixerControl(request);
+  } else {
+    control = await refreshNativeMixerControl();
+  }
+
+  if (!control.enabled) {
+    spatial.operationId += 1;
+    spatial.requested = false;
+    spatial.enabled = false;
+    spatial.loading = false;
+    spatial.error = '';
+    clearGoogleObrRecovery();
+    const graph = spatial.graph;
+    if (graph) {
+      setAudioParamSmoothly(graph.dryGain?.gain, 1, graph.context, 0.03);
+      setAudioParamSmoothly(graph.wetGain?.gain, 0, graph.context, 0.03);
+      await disposeOfficialGoogleObrGraph(graph);
+    }
+    setGoogleObrRuntimeBackend(false);
+    syncRealtimePolling();
+    syncGoogleObrToggle();
+    notifyNativeAudioChainChanged('mixer-disabled');
+    return true;
+  }
+
+  spatial.requested = true;
+  spatial.channelLayout = control.upmixOutputLayout;
+  spatial.nativeFallback = false;
+  spatial.nativeError = '';
+  if (spatial.graph?.ready && spatial.graph.nativeStream !== true) {
+    spatial.operationId += 1;
+    spatial.enabled = false;
+    await disposeOfficialGoogleObrGraph(spatial.graph);
+    spatial.backend = 'uninitialized';
+  }
+  if (!els.audio?.src || !audioAnalysisPlaybackActive()) {
+    spatial.backend = 'waiting-for-audio';
+    spatial.loading = false;
+    syncGoogleObrToggle();
+    return true;
+  }
+  const enabled = await ensureAudioAnalysis({
+    announceObrFailure: false,
+    skipMixerControlRefresh: true
+  });
+  return enabled === true
+    && spatial.graph?.nativeStream === true
+    && spatial.backend === GOOGLE_OBR_NATIVE_BACKEND;
+}
+
+function currentNativeAudioMixerChannelLayout() {
+  return state.obrSpatialAudio.mixerControl?.upmixOutputLayout === '7.1' ? '7.1' : '5.1';
+}
+
+async function setNativeAudioMixerChannelLayout(value) {
+  const channelLayout = value === '7.1' ? '7.1' : value === '5.1' ? '5.1' : '';
+  if (!channelLayout) return false;
+  const snapshot = await patchNativeMixerSpatialControl({ upmixOutputLayout: channelLayout });
+  const nativeReady = await ensureNativeAudioMixerChain(snapshot);
+  if (!els.audio?.src || !audioAnalysisPlaybackActive()) {
+    return state.obrSpatialAudio.requested === true
+      && currentNativeAudioMixerChannelLayout() === channelLayout;
+  }
+  if (!nativeReady) return false;
+  const control = state.obrSpatialAudio.mixerControl || DEFAULT_NATIVE_MIXER_CONTROL;
+  const expectedChannels = control.upmixEnabled
+    ? (channelLayout === '7.1' ? 8 : 6)
+    : 2;
+  const startedAt = performance.now();
+  let status = null;
+  let committed = false;
+  while (performance.now() - startedAt < 2000) {
+    status = await apiJson('/api/audio/spatial/status');
+    const rustReady = control.upmixEnabled !== true
+      || (status.rustUpmixActive === true && Number(status.rustUpmixProcessCalls) > 0);
+    const obrReady = control.obrEnabled !== true || Number(status.obrProcessCalls) > 0;
+    committed = status?.active === true
+      && status.transitionPending !== true
+      && status.spatialRevisionCommitted === true
+      && Number(status.spatialActiveRevision) === Number(control.revision)
+      && Number(status.virtualBedChannels) === expectedChannels
+      && Number(status.mixerProcessCalls) > 0
+      && rustReady
+      && obrReady;
+    if (committed) break;
+    if (Number(status?.spatialDesiredRevision) > Number(control.revision)) break;
+    await new Promise((resolve) => window.setTimeout(resolve, 25));
+  }
+  // Layout changes are committed atomically inside the existing native
+  // session. Keep the browser graph's diagnostics/signature aligned with the
+  // confirmed route so a later health check does not rebuild a healthy graph.
+  const graph = state.obrSpatialAudio.graph;
+  if (committed && graph?.nativeStream === true) {
+    graph.channelLayout = channelLayout;
+    graph.inputChannelCount = expectedChannels;
+    graph.mixerControlSignature = nativeMixerControlSignature(control);
+    graph.mixerControlRevision = control.revision;
+    graph.upmixEnabled = control.upmixEnabled;
+    graph.obrEnabled = control.obrEnabled;
+  }
+  return committed;
+}
+
 async function setGoogleObrChannelLayout(value, options = {}) {
   const spatial = state.obrSpatialAudio;
   const channelLayout = normalizeGoogleObrChannelLayout(value);
@@ -6780,12 +8606,22 @@ async function setGoogleObrChannelLayout(value, options = {}) {
 
   spatial.channelLayout = channelLayout;
   spatial.operationId += 1;
+  spatial.nativeFallback = false;
+  spatial.nativeError = '';
   clearGoogleObrRecovery();
+  const staleActivation = spatial.activationPromise;
   const graph = spatial.graph;
   if (graph) {
     setAudioParamSmoothly(graph.dryGain.gain, 1, graph.context, 0.03);
     setAudioParamSmoothly(graph.wetGain.gain, 0, graph.context, 0.03);
-    disposeOfficialGoogleObrGraph(graph);
+    await disposeOfficialGoogleObrGraph(graph);
+  }
+  if (staleActivation) {
+    try {
+      await staleActivation;
+    } catch (error) {
+    }
+    if (spatial.activationPromise === staleActivation) spatial.activationPromise = null;
   }
   spatial.enabled = false;
   spatial.loading = false;
@@ -6794,6 +8630,7 @@ async function setGoogleObrChannelLayout(value, options = {}) {
   saveGoogleObrPreference(spatial.requested);
   syncRealtimePolling();
   syncGoogleObrToggle();
+  notifyNativeAudioChainChanged('layout-changed');
   if (!spatial.requested || !els.audio?.src) return true;
   if (!audioAnalysisPlaybackActive()) {
     spatial.backend = 'waiting-for-audio';
@@ -6810,17 +8647,25 @@ async function setGoogleObrChannelLayout(value, options = {}) {
 function cycleGoogleObrChannelLayout() {
   const order = ['stereo', '5.1', '7.1'];
   const current = order.indexOf(normalizeGoogleObrChannelLayout(state.obrSpatialAudio.channelLayout));
-  setGoogleObrChannelLayout(order[(current + 1) % order.length]).catch((error) => {
-    failGoogleObr(error);
-  });
+  const next = order[(current + 1) % order.length];
+  const parameters = next === 'stereo'
+    ? { upmixEnabled: false }
+    : { upmixEnabled: true, upmixOutputLayout: next };
+  patchNativeMixerSpatialControl(parameters)
+    .then((snapshot) => ensureNativeAudioMixerChain(snapshot))
+    .catch((error) => failGoogleObr(error));
 }
 
 function toggleGoogleObrSpatialAudio() {
   const spatial = state.obrSpatialAudio;
   if (spatial.loading) return;
-  setGoogleObrSpatialAudioEnabled(!spatial.enabled && !spatial.requested).catch((error) => {
-    failGoogleObr(error);
-  });
+  const enabled = spatial.mixerControl?.obrEnabled !== true;
+  patchNativeMixerSpatialControl({ obrEnabled: enabled })
+    .then((snapshot) => {
+      saveGoogleObrPreference(enabled);
+      return ensureNativeAudioMixerChain(snapshot);
+    })
+    .catch((error) => failGoogleObr(error));
 }
 
 async function ensureAudioAnalysis(options = {}) {
@@ -6828,6 +8673,12 @@ async function ensureAudioAnalysis(options = {}) {
   if (!AudioContextCtor || !els.audio) return false;
 
   const analysis = state.audioAnalysis;
+  if (
+    !options.skipMixerControlRefresh
+    && !state.obrSpatialAudio.mixerControl?.attempted
+  ) {
+    await refreshNativeMixerControl();
+  }
   if (!audioAnalysisPlaybackActive()) {
     await suspendAudioAnalysis();
     return false;
@@ -7636,8 +9487,12 @@ function syncFreeCubeControls() {
     els.freeCubeHeartButton.setAttribute('aria-pressed', String(heartActive));
   }
   if (els.freeCubeBackgroundButton) {
-    els.freeCubeBackgroundButton.classList.toggle('is-active', backgroundActive);
-    els.freeCubeBackgroundButton.setAttribute('aria-pressed', String(backgroundActive));
+    const effectiveBackgroundActive = backgroundActive && !heartActive;
+    els.freeCubeBackgroundButton.classList.toggle('is-active', effectiveBackgroundActive);
+    els.freeCubeBackgroundButton.setAttribute('aria-pressed', String(effectiveBackgroundActive));
+    els.freeCubeBackgroundButton.setAttribute('aria-disabled', String(heartActive));
+    els.freeCubeBackgroundButton.disabled = heartActive;
+    els.freeCubeBackgroundButton.title = heartActive ? '心动模式使用透明背景' : '切换柔光背景';
   }
 }
 
@@ -7731,6 +9586,7 @@ function updateFreeCubeMotion() {
   const frame = state.freeCube.frame;
   frame.now = performance.now();
   frame.bass = lowFrequency;
+  frame.lowFrequencyBands = playing ? state.visual.lowFrequencyBands : null;
   frame.energy = playing ? state.visual.energy : 0;
   frame.beat = playing ? state.visual.beat : 0;
   frame.yaw = state.playbackVisual.yaw;
@@ -7989,6 +9845,354 @@ function chladniRuntimeSnapshot() {
     selected: isChladniPreset(),
     displayMode: state.chladni.mode,
     canvasCount: els.chladniCore ? els.chladniCore.querySelectorAll('canvas').length : 0
+  };
+}
+
+const SOUNDSCAPE_WORKSHOP_ENTRY_URL = 'assets/soundscape-workshop/runtime.html';
+
+function soundscapeWorkshopApi() {
+  return window.FeSoundscapeRuntime || null;
+}
+
+function soundscapeWorkshopPropertyValue(sourceProperty) {
+  const api = soundscapeWorkshopApi();
+  if (!api?.get) return undefined;
+  return api.get(state.soundscapeWorkshop.runtime, sourceProperty);
+}
+
+function soundscapeWorkshopStateSnapshot() {
+  const api = soundscapeWorkshopApi();
+  if (!api?.get) return null;
+  const runtime = state.soundscapeWorkshop.runtime;
+  if (!runtime) return {
+    requestedParameters: api.diagnostics?.()?.requestedParameters || {},
+    effectiveParameters: api.get(null) || {}
+  };
+  return api.get(runtime);
+}
+
+function soundscapeWorkshopRequestedPropertyValue(sourceProperty) {
+  const snapshot = soundscapeWorkshopStateSnapshot();
+  return snapshot?.requestedParameters?.[sourceProperty]
+    ?? snapshot?.effectiveParameters?.[sourceProperty]
+    ?? soundscapeWorkshopPropertyValue(sourceProperty);
+}
+
+async function applySoundscapeWorkshopProperty(sourceProperty, value) {
+  const api = soundscapeWorkshopApi();
+  if (!api?.apply) throw new Error('音域回响运行模块尚未加载');
+  await api.apply(state.soundscapeWorkshop.runtime, { [sourceProperty]: value });
+  scheduleClientPreferencesSync();
+  renderSoundscapeWorkshopControls({ refreshOnly: true });
+  renderDiySelectedPresetConfig();
+  return sourceProperty === 'gridSize'
+    ? soundscapeWorkshopRequestedPropertyValue(sourceProperty)
+    : soundscapeWorkshopPropertyValue(sourceProperty);
+}
+
+function soundscapeWorkshopControlValueLabel(parameter, value) {
+  if (parameter.sourceProperty === 'gridSize') {
+    const snapshot = soundscapeWorkshopStateSnapshot();
+    const requested = snapshot?.requestedParameters?.gridSize ?? value;
+    const effective = snapshot?.effectiveParameters?.gridSize ?? value;
+    if (Number(requested) !== Number(effective)) {
+      return `已保存 ${requested}×${requested} · 当前 ${effective}×${effective}`;
+    }
+    return `${effective}×${effective}`;
+  }
+  if (parameter.type === 'boolean') return value ? '开启' : '关闭';
+  if (parameter.type === 'enum') {
+    return parameter.options?.find((option) => String(option.value) === String(value))?.label || String(value);
+  }
+  return String(value);
+}
+
+function renderSoundscapeWorkshopControls(options = {}) {
+  const host = els.soundscapeWorkshopControls;
+  const api = soundscapeWorkshopApi();
+  if (!host || !api?.catalog) return;
+  const parameters = api.catalog();
+  if (!Array.isArray(parameters)) return;
+  if (options.refreshOnly === true && host.childElementCount) {
+    parameters.forEach((parameter) => {
+      const control = host.querySelector(`[data-soundscape-property="${CSS.escape(parameter.sourceProperty)}"]`);
+      if (!control) return;
+      const effectiveValue = soundscapeWorkshopPropertyValue(parameter.sourceProperty);
+      const value = parameter.sourceProperty === 'gridSize'
+        ? soundscapeWorkshopRequestedPropertyValue(parameter.sourceProperty)
+        : effectiveValue;
+      if (control.type === 'checkbox') control.checked = value === true;
+      else control.value = String(value);
+      const output = host.querySelector(`[data-soundscape-output="${CSS.escape(parameter.sourceProperty)}"]`);
+      if (output) output.textContent = soundscapeWorkshopControlValueLabel(parameter, effectiveValue);
+    });
+    return;
+  }
+  host.replaceChildren();
+  const fragment = document.createDocumentFragment();
+  parameters.forEach((parameter) => {
+    const row = document.createElement('label');
+    row.className = `soundscape-workshop-control soundscape-workshop-control--${parameter.type}`;
+    row.dataset.soundscapeGroup = safeText(parameter.group, 'appearance');
+    const copy = document.createElement('span');
+    const title = document.createElement('strong');
+    title.textContent = parameter.name;
+    const meta = document.createElement('small');
+    meta.textContent = parameter.purpose;
+    copy.append(title, meta);
+    const controlId = `soundscape-${parameter.sourceProperty}-control`;
+    let control;
+    if (parameter.type === 'boolean') {
+      control = document.createElement('input');
+      control.type = 'checkbox';
+      control.className = 'ui-switch';
+      control.checked = soundscapeWorkshopPropertyValue(parameter.sourceProperty) === true;
+    } else if (parameter.type === 'enum') {
+      control = document.createElement('select');
+      (parameter.options || []).forEach((option) => {
+        const element = document.createElement('option');
+        element.value = String(option.value);
+        element.textContent = option.label;
+        control.appendChild(element);
+      });
+      control.value = String(parameter.sourceProperty === 'gridSize'
+        ? soundscapeWorkshopRequestedPropertyValue(parameter.sourceProperty)
+        : soundscapeWorkshopPropertyValue(parameter.sourceProperty));
+    } else {
+      control = document.createElement('input');
+      control.type = 'range';
+      control.min = String(parameter.range.min);
+      control.max = String(parameter.range.max);
+      control.step = String(parameter.range.step);
+      control.value = String(soundscapeWorkshopPropertyValue(parameter.sourceProperty));
+    }
+    control.id = controlId;
+    control.dataset.petParameterIgnore = 'true';
+    control.dataset.soundscapeProperty = parameter.sourceProperty;
+    const output = document.createElement('output');
+    output.htmlFor = controlId;
+    output.dataset.soundscapeOutput = parameter.sourceProperty;
+    output.textContent = soundscapeWorkshopControlValueLabel(parameter, soundscapeWorkshopPropertyValue(parameter.sourceProperty));
+    const commit = async () => {
+      let nextValue = parameter.type === 'boolean'
+        ? control.checked === true
+        : parameter.type === 'number' ? Number(control.value) : control.value;
+      if (parameter.requiresExplicitSelection && parameter.highImpactValues?.map(Number).includes(Number(nextValue))) {
+        const confirmed = window.confirm(`网格 ${nextValue}×${nextValue} 会显著增加显存和功耗，确认应用吗？`);
+        if (!confirmed) {
+          renderSoundscapeWorkshopControls({ refreshOnly: true });
+          return;
+        }
+      }
+      try {
+        nextValue = await applySoundscapeWorkshopProperty(parameter.sourceProperty, nextValue);
+        output.textContent = soundscapeWorkshopControlValueLabel(parameter, nextValue);
+      } catch (error) {
+        renderSoundscapeWorkshopControls({ refreshOnly: true });
+        showToast(error?.message || '音域回响参数应用失败');
+      }
+    };
+    if (parameter.type === 'number') {
+      control.addEventListener('input', () => {
+        output.textContent = soundscapeWorkshopControlValueLabel(parameter, Number(control.value));
+      });
+    }
+    control.addEventListener('change', commit);
+    row.append(copy, control, output);
+    fragment.appendChild(row);
+  });
+  host.appendChild(fragment);
+  state.soundscapeWorkshop.controlsRendered = true;
+}
+
+function soundscapeWorkshopGestureEvent(gesture) {
+  const iframe = state.soundscapeWorkshop.runtime?.iframe
+    || els.soundscapeWorkshopHost?.querySelector('iframe');
+  const rect = iframe?.getBoundingClientRect();
+  if (!rect?.width || !rect?.height || !els.stage) return null;
+  return {
+    target: els.stage,
+    currentTarget: els.stage,
+    clientX: rect.left + Number(gesture.x) * rect.width,
+    clientY: rect.top + Number(gesture.y) * rect.height,
+    pointerId: Number(gesture.pointerId) || 0,
+    button: Number(gesture.button) || 0,
+    buttons: Number(gesture.buttons) || 0,
+    isPrimary: gesture.isPrimary !== false,
+    altKey: gesture.altKey === true,
+    ctrlKey: gesture.ctrlKey === true,
+    metaKey: gesture.metaKey === true,
+    shiftKey: gesture.shiftKey === true,
+    deltaX: Number(gesture.deltaX) || 0,
+    deltaY: Number(gesture.deltaY) || 0,
+    deltaZ: Number(gesture.deltaZ) || 0,
+    preventDefault() {},
+    stopPropagation() {}
+  };
+}
+
+function resetSoundscapeWorkshopTextTransform(event) {
+  if (resetTextPresetTransform(event)) return true;
+  if (
+    !isSoundscapeWorkshopPreset()
+    || state.textPreset === 'none'
+    || state.textPreset === 'book'
+    || state.multiRowLyricsEnabled
+    || state.textComposerSettings?.layoutMode === 'multi'
+  ) return false;
+  clearTextPresetHoldTimer();
+  state.textPresetTransforms[state.textPreset] = normalizeTextPresetTransform();
+  updateTextPresetTransform({ persist: true });
+  return true;
+}
+
+function handleSoundscapeWorkshopGesture(gesture) {
+  if (!isSoundscapeWorkshopPreset() || !state.playbackPage) return;
+  const event = soundscapeWorkshopGestureEvent(gesture);
+  if (!event) return;
+  if (gesture.kind === 'pointerdown') beginTextPresetGesture(event);
+  else if (gesture.kind === 'pointermove') moveTextPresetGesture(event);
+  else if (gesture.kind === 'pointerup' || gesture.kind === 'pointercancel') endTextPresetGesture(event);
+  else if (gesture.kind === 'wheel') scaleTextPresetFromWheel(event);
+  else if (gesture.kind === 'dblclick') resetSoundscapeWorkshopTextTransform(event);
+}
+
+function handleSoundscapeWorkshopPlayerIntent(intent) {
+  if (!intent || !isSoundscapeWorkshopPreset() || !state.playbackPage) return;
+  if (intent.kind === 'seek') {
+    if (!els.qishuiPlaybackProgressRange) return;
+    els.qishuiPlaybackProgressRange.value = String(Math.round(clamp(Number(intent.ratio) || 0, 0, 1) * 1000));
+    if (!beginQishuiPlaybackSeek()) return;
+    previewQishuiPlaybackSeek();
+    void commitQishuiPlaybackSeek();
+    return;
+  }
+  if (intent.kind === 'previous' || intent.kind === 'next') {
+    switchQishuiPlaybackTrack(intent.kind === 'previous' ? -1 : 1);
+    return;
+  }
+  if (intent.kind !== 'controller-drag') return;
+  const api = soundscapeWorkshopApi();
+  const runtime = state.soundscapeWorkshop.runtime;
+  if (!api?.apply || !runtime) return;
+  const controllerX = Math.round(clamp((1 - Number(intent.x)) * 100, 0, 80));
+  const controllerY = Math.round(clamp(Number(intent.y) * 100, 0, 90));
+  try {
+    api.apply(runtime, { controllerX, controllerY });
+    scheduleClientPreferencesSync();
+    renderSoundscapeWorkshopControls({ refreshOnly: true });
+    renderDiySelectedPresetConfig();
+  } catch (error) {
+    showToast(error?.message || '播放器位置更新失败');
+  }
+}
+
+function handleSoundscapeWorkshopTerminalError(snapshot) {
+  state.soundscapeWorkshop.lastDiagnostics = snapshot || null;
+  if (els.soundscapeWorkshopStatus) {
+    els.soundscapeWorkshopStatus.hidden = false;
+    els.soundscapeWorkshopStatus.dataset.state = 'error';
+    els.soundscapeWorkshopStatus.textContent = '音域回响加载失败 · 重新选择可重试';
+  }
+  const fallback = normalizeDiyPreset(state.soundscapeWorkshop.previousUsablePreset || 'wallpaper');
+  showToast('音域回响加载失败，已恢复上一个可用场景；重新选择可重试');
+  window.setTimeout(() => {
+    if (isSoundscapeWorkshopPreset()) setDiyPreset(fallback);
+  }, 0);
+}
+
+function buildSoundscapeWorkshop() {
+  const api = soundscapeWorkshopApi();
+  if (!els.soundscapeWorkshopHost || state.soundscapeWorkshop.runtime || !api?.create) return;
+  renderSoundscapeWorkshopControls();
+  if (els.soundscapeWorkshopStatus) {
+    els.soundscapeWorkshopStatus.hidden = false;
+    delete els.soundscapeWorkshopStatus.dataset.state;
+    els.soundscapeWorkshopStatus.textContent = '正在加载音域回响';
+  }
+  state.soundscapeWorkshop.runtime = api.create(els.soundscapeWorkshopHost, {
+    entryUrl: SOUNDSCAPE_WORKSHOP_ENTRY_URL,
+    onReady: () => {
+      if (els.soundscapeWorkshopStatus) els.soundscapeWorkshopStatus.hidden = true;
+      renderSoundscapeWorkshopControls({ refreshOnly: true });
+    },
+    onTerminalError: handleSoundscapeWorkshopTerminalError,
+    onGesture: handleSoundscapeWorkshopGesture,
+    onPlayerIntent: handleSoundscapeWorkshopPlayerIntent
+  });
+  api.activate?.(state.soundscapeWorkshop.runtime);
+}
+
+function disposeSoundscapeWorkshop() {
+  const runtime = state.soundscapeWorkshop.runtime;
+  const api = soundscapeWorkshopApi();
+  if (!runtime || !api) return;
+  state.soundscapeWorkshop.lastDiagnostics = api.diagnostics?.(runtime) || null;
+  api.deactivate?.(runtime);
+  api.dispose?.(runtime);
+  state.soundscapeWorkshop.runtime = null;
+  state.soundscapeWorkshop.lastMediaSignature = '';
+}
+
+function updateSoundscapeWorkshopVisibility() {
+  const visible = state.playbackPage && isSoundscapeWorkshopPreset();
+  if (els.soundscapeWorkshopScene) els.soundscapeWorkshopScene.hidden = !visible;
+  if (els.appShell) els.appShell.classList.toggle('has-soundscape-workshop', visible);
+  if (visible) buildSoundscapeWorkshop();
+  else disposeSoundscapeWorkshop();
+  syncPlaybackChromeClasses();
+}
+
+function soundscapeWorkshopAudioValues() {
+  if (state.audioAnalysis.live) {
+    return state.audioAnalysis.data || state.audioAnalysis.frequencyData || [];
+  }
+  // Desktop client native-audio path: the Web Audio analyser is suspended in
+  // favor of XAudio2 loopback capture, so state.visual carries the 512-bin
+  // low-frequency spectrum (20-150 Hz) reported by the native audio bridge.
+  // That spectrum is pre-amplified and often pinned near 1.0, so soft-compress
+  // it into the Workshop's 0-1 working range: beats keep dynamic movement
+  // instead of pinning every cube at full lift.
+  const bands = state.visual.lowFrequencyBands;
+  if (!bands || !bands.length) return [];
+  const values = new Float32Array(bands.length);
+  for (let index = 0; index < bands.length; index += 1) {
+    const value = Number(bands[index]) || 0;
+    values[index] = Math.min(1, value * 0.6 + value * value * 0.15);
+  }
+  return values;
+}
+
+function updateSoundscapeWorkshopMotion() {
+  const runtime = state.soundscapeWorkshop.runtime;
+  const api = soundscapeWorkshopApi();
+  if (!runtime || !api || !state.playbackPage || !isSoundscapeWorkshopPreset()) return;
+  const analysis = state.audioAnalysis.live ? state.audioAnalysis : state.visual;
+  api.updateAudio?.(runtime, soundscapeWorkshopAudioValues(), {
+    playing: isPlaybackClockRunning(),
+    bass: Number(analysis.bass) || 0,
+    energy: Number(analysis.energy) || 0
+  });
+  const media = {
+    title: safeText(state.currentSong?.title, ''),
+    artist: safeText(state.currentSong?.artist, ''),
+    thumbnail: safeText(state.currentSong?.cover || state.currentSong?.coverUrl, ''),
+    isPlaying: isPlaybackClockRunning(),
+    position: Number(els.audio?.currentTime) || 0,
+    duration: Number(els.audio?.duration) || Number(state.currentSong?.duration) || 0
+  };
+  api.updateMedia?.(runtime, media);
+}
+
+function soundscapeWorkshopRuntimeSnapshot() {
+  const api = soundscapeWorkshopApi();
+  const runtime = state.soundscapeWorkshop.runtime;
+  if (runtime && api?.diagnostics) return api.diagnostics(runtime);
+  return {
+    ...(state.soundscapeWorkshop.lastDiagnostics || {}),
+    mounted: false,
+    ready: false,
+    parameters: api?.get?.(null) || {}
   };
 }
 
@@ -12076,9 +14280,17 @@ function sceneWallpaperChoices() {
   });
 }
 
-function mergeWallpaperCatalog(items) {
+function replaceLoadedWallpaperCatalogs(items, sources = []) {
+  const input = Array.isArray(items) ? items : [];
+  const requested = new Set(Array.isArray(sources) ? sources : []);
+  if (requested.has('imported')) {
+    state.wallpaperCatalogs.imported = input.filter((wallpaper) => wallpaper?.source === 'imported');
+  }
+  if (requested.has('live')) {
+    state.wallpaperCatalogs.live = input.filter((wallpaper) => wallpaper?.source === 'wallpaper-engine');
+  }
   const merged = new Map();
-  [...state.wallpapers, ...(Array.isArray(items) ? items : [])].forEach((wallpaper) => {
+  [...state.wallpaperCatalogs.imported, ...state.wallpaperCatalogs.live].forEach((wallpaper) => {
     const id = safeText(wallpaper?.id, '');
     if (id) merged.set(id, wallpaper);
   });
@@ -12092,10 +14304,10 @@ async function refreshSceneWallpaperCatalog(options = {}) {
   state.community.messageBackgroundCatalogError = '';
   try {
     const payload = await apiJson(`/api/wallpapers?${query({ scan: true })}`);
-    if (options.live === true) {
-      state.wallpapers = state.wallpapers.filter((wallpaper) => wallpaper?.source !== 'wallpaper-engine');
-    }
-    mergeWallpaperCatalog(payload.wallpapers);
+    const items = Array.isArray(payload.wallpapers) ? payload.wallpapers : [];
+    const sources = ['live'];
+    if (items.some((wallpaper) => wallpaper?.source === 'imported')) sources.push('imported');
+    replaceLoadedWallpaperCatalogs(items, sources);
     state.wallpaperEngineCatalogRevision = safeText(payload.catalogRevision, '');
     state.wallpaperEngineActiveId = safeText(
       payload.activeWallpaperId,
@@ -12759,8 +14971,13 @@ async function refreshWallpapers(options = {}) {
     const scan = options.scan ?? requestedSource === 'live';
     const payload = await apiJson(`/api/wallpapers?${query({ scan })}`);
     if (state.wallpaperSource !== requestedSource) return;
+    const items = Array.isArray(payload.wallpapers) ? payload.wallpapers : [];
+    const sources = [requestedSource];
+    const otherSource = requestedSource === 'live' ? 'imported' : 'live';
+    const otherCatalogSource = otherSource === 'live' ? 'wallpaper-engine' : 'imported';
+    if (items.some((wallpaper) => wallpaper?.source === otherCatalogSource)) sources.push(otherSource);
+    replaceLoadedWallpaperCatalogs(items, sources);
     if (requestedSource === 'live') {
-      state.wallpapers = Array.isArray(payload.wallpapers) ? payload.wallpapers : [];
       state.wallpaperEngineCatalogRevision = safeText(payload.catalogRevision, '');
       state.wallpaperEngineActiveId = safeText(
         payload.activeWallpaperId,
@@ -12773,10 +14990,6 @@ async function refreshWallpapers(options = {}) {
       }
       state.wallpaperEngineCatalogLoaded = true;
       syncAllSceneWallpaperSurfaces();
-    } else {
-      const engineItems = state.wallpapers.filter((wallpaper) => wallpaper?.source === 'wallpaper-engine');
-      state.wallpapers = [];
-      mergeWallpaperCatalog([...(Array.isArray(payload.wallpapers) ? payload.wallpapers : []), ...engineItems]);
     }
     syncCommunityMessageBackground();
     if (state.community.messageBackgroundMenuOpen) renderCommunityMessageBackgroundChoices();
@@ -15151,7 +17364,7 @@ function seekToBookLyric(time) {
   const target = Math.max(0, Number(time) || 0);
   if (!els.audio) return;
   try {
-    els.audio.currentTime = target;
+    setAudioCurrentTimeWithNativeContinuity(target, 'book-lyric-seek');
     updateProgress();
   } catch (error) {
   }
@@ -16022,7 +18235,7 @@ function totalFavoriteCount() {
 
 function setFavoriteLibraryOpen(open, provider = state.favoriteLibrary.provider) {
   if (!els.favoriteLibrary) return;
-  state.favoriteLibrary.open = !!open;
+  state.favoriteLibrary.open = !!open && playbackTopSearchAvailable();
   state.favoriteLibrary.provider = providerInfo(provider || state.activeProvider).id;
   els.favoriteLibrary.hidden = !state.favoriteLibrary.open;
   if (els.topFavoritesButton) {
@@ -16313,7 +18526,7 @@ function renderPlaylistFavoritePopover() {
 
 function setPlaylistFavoriteOpen(open, song = state.playlistFavorite.song, options = {}) {
   if (!els.playlistFavoritePopover) return;
-  state.playlistFavorite.open = !!open;
+  state.playlistFavorite.open = !!open && playbackTopSearchAvailable();
   if (song) {
     const normalized = normalizedSong(song, song.provider || state.activeProvider);
     state.playlistFavorite.song = normalized;
@@ -16442,6 +18655,7 @@ function searchSuggestionSubtitle(song) {
 
 function setSearchSuggestionsOpen(open) {
   if (!els.searchSuggestions) return;
+  open = !!open && playbackTopSearchAvailable();
   if (open && state.favoriteLibrary.open) setFavoriteLibraryOpen(false);
   if (open && state.playlistFavorite.open) setPlaylistFavoriteOpen(false);
   els.searchSuggestions.hidden = !open;
@@ -17624,7 +19838,7 @@ function currentCommunitySongPayload() {
 function normalizeCommunitySharedScene(scene = {}) {
   if (!scene || typeof scene !== 'object' || Array.isArray(scene)) return null;
   const allowedPresets = new Set([
-    'lyric', 'cube', 'free-cubes', 'void-prism', 'topography', 'chladni',
+    'lyric', 'cube', 'free-cubes', 'void-prism', 'topography', 'soundscape-workshop', 'chladni',
     'rain-glass', 'cover-particles', 'sandbox-scene', 'wallpaper', 'book'
   ]);
   const allowedTextPresets = new Set([
@@ -18798,18 +21012,28 @@ function scheduleCommunityRefresh(delay = 400, options = {}) {
   }, Math.max(0, dueAt - performance.now()));
 }
 
+function communityEventStreamRole() {
+  const clientMode = safeText(document.documentElement?.getAttribute?.('data-fe-client'), '').toLowerCase();
+  if (clientMode === 'desktop-scene') return '';
+  if (clientMode === 'desktop-pet') return 'desktop-pet';
+  if (clientMode === 'embedded') return 'embedded';
+  return 'browser';
+}
+
 function communityEventIdentityKey() {
   const profile = state.community.profile || {};
   const feId = safeText(profile.feId, '');
   const serverUrl = safeText(state.community.serverUrl, '');
-  return feId && serverUrl ? `${serverUrl}|${feId}` : '';
+  const streamRole = communityEventStreamRole();
+  return feId && serverUrl && streamRole ? `${serverUrl}|${feId}|${streamRole}` : '';
 }
 
 function communityEventUrl() {
   const profile = state.community.profile || {};
   const feId = safeText(profile.feId, '');
-  if (!feId || typeof window.EventSource === 'undefined') return '';
-  const params = { feId };
+  const streamRole = communityEventStreamRole();
+  if (!feId || !streamRole || typeof window.EventSource === 'undefined') return '';
+  const params = { feId, streamRole };
   if (state.community.eventCursor) params.after = state.community.eventCursor;
   return `/api/community/events?${query(params)}`;
 }
@@ -18819,6 +21043,7 @@ function stopCommunityEventStream(reset = false) {
   window.clearTimeout(state.community.eventHeartbeatTimer);
   state.community.eventReconnectTimer = 0;
   state.community.eventHeartbeatTimer = 0;
+  state.community.eventNextRetryAt = 0;
   if (state.community.eventSource) {
     try { state.community.eventSource.close(); } catch (error) {}
   }
@@ -18828,26 +21053,60 @@ function stopCommunityEventStream(reset = false) {
   if (reset) {
     state.community.eventKey = '';
     state.community.eventReconnectDelay = 1200;
+    state.community.eventReconnectAttempts = 0;
+    state.community.eventNextRetryAt = 0;
   }
 }
 
-function scheduleCommunityEventReconnect() {
-  window.clearTimeout(state.community.eventReconnectTimer);
+function scheduleCommunityEventReconnect(reason = 'transport-error') {
+  if (
+    document.hidden
+    || (typeof navigator !== 'undefined' && navigator.onLine === false)
+    || !communityEventIdentityKey()
+  ) return false;
+  if (state.community.eventReconnectTimer) return false;
   const delay = clamp(state.community.eventReconnectDelay || 1200, 1000, 12000);
   state.community.eventReconnectDelay = Math.min(12000, Math.round(delay * 1.45));
-  const jitteredDelay = Math.round(delay * (0.85 + Math.random() * 0.3));
+  const jitteredDelay = Math.min(12000, Math.round(delay * (0.85 + Math.random() * 0.3)));
+  state.community.eventReconnectAttempts = Math.max(0, Number(state.community.eventReconnectAttempts) || 0) + 1;
+  state.community.eventNextRetryAt = Date.now() + jitteredDelay;
+  emitPetStreamState('reconnecting', {
+    reason: safeText(reason, 'transport-error'),
+    attempt: state.community.eventReconnectAttempts,
+    retryInMs: jitteredDelay
+  });
   state.community.eventReconnectTimer = window.setTimeout(() => {
     state.community.eventReconnectTimer = 0;
+    state.community.eventNextRetryAt = 0;
     ensureCommunityEventStream();
   }, jitteredDelay);
+  return true;
+}
+
+function restartCommunityEventStreamNow(reason = 'recovery') {
+  if (document.hidden || (typeof navigator !== 'undefined' && navigator.onLine === false)) return false;
+  const key = communityEventIdentityKey();
+  if (!key) {
+    stopCommunityEventStream(true);
+    return false;
+  }
+  stopCommunityEventStream(false);
+  state.community.eventReconnectDelay = 1200;
+  state.community.eventReconnectAttempts = 0;
+  emitPetStreamState('reconnecting', { reason: safeText(reason, 'recovery'), immediate: true });
+  ensureCommunityEventStream();
+  return !!state.community.eventSource;
 }
 
 function emitPetStreamState(streamState, detail = {}) {
+  const nextState = safeText(streamState, 'unknown');
+  state.community.eventConnectionState = nextState;
   window.dispatchEvent(new CustomEvent('fe-monster-pet-stream-state', {
     detail: {
-      state: safeText(streamState, 'unknown'),
+      state: nextState,
       connected: state.community.eventConnected === true,
       activityAt: Date.now(),
+      generation: Math.max(0, Number(state.community.eventGeneration) || 0),
       ...detail
     }
   }));
@@ -18873,7 +21132,9 @@ function checkCommunityEventHeartbeat() {
     stopCommunityEventStream(false);
     scheduleCommunitySceneDisconnectRestore();
     scheduleCommunityRefresh(80);
-    if (state.community.eventKey || communityEventIdentityKey()) scheduleCommunityEventReconnect();
+    if (state.community.eventKey || communityEventIdentityKey()) {
+      scheduleCommunityEventReconnect('heartbeat-timeout');
+    }
     return;
   }
   state.community.eventHeartbeatTimer = window.setTimeout(
@@ -18976,19 +21237,23 @@ function ensureCommunityEventStream() {
   if (!url) return;
   stopCommunityEventStream(false);
   state.community.eventKey = key;
+  const generation = Math.max(0, Number(state.community.eventGeneration) || 0) + 1;
+  state.community.eventGeneration = generation;
 
   try {
     const source = new window.EventSource(url);
     state.community.eventSource = source;
     source.addEventListener('open', () => {
-      if (state.community.eventSource !== source) return;
+      if (state.community.eventSource !== source || state.community.eventGeneration !== generation) return;
       state.community.eventConnected = true;
       state.community.eventReconnectDelay = 1200;
+      state.community.eventReconnectAttempts = 0;
+      state.community.eventNextRetryAt = 0;
       clearCommunitySceneDisconnectRestore();
       touchCommunityEventStream();
     });
     source.addEventListener('community-ready', (event) => {
-      if (state.community.eventSource !== source) return;
+      if (state.community.eventSource !== source || state.community.eventGeneration !== generation) return;
       state.community.eventConnected = true;
       clearCommunitySceneDisconnectRestore();
       if (!state.community.eventHistoryCalibrated) {
@@ -19007,30 +21272,29 @@ function ensureCommunityEventStream() {
       scheduleCommunityRefresh(80);
     });
     source.addEventListener('community-heartbeat', () => {
-      if (state.community.eventSource !== source) return;
+      if (state.community.eventSource !== source || state.community.eventGeneration !== generation) return;
       state.community.eventConnected = true;
       clearCommunitySceneDisconnectRestore();
       touchCommunityEventStream();
     });
     source.addEventListener('community', (event) => {
-      if (state.community.eventSource !== source) return;
+      if (state.community.eventSource !== source || state.community.eventGeneration !== generation) return;
       touchCommunityEventStream();
       handleCommunityServerEvent(event);
     });
     source.addEventListener('error', () => {
-      if (state.community.eventSource !== source) return;
+      if (state.community.eventSource !== source || state.community.eventGeneration !== generation) return;
       source.close();
       state.community.eventSource = null;
       state.community.eventConnected = false;
-      emitPetStreamState('reconnecting');
       scheduleCommunitySceneDisconnectRestore();
       scheduleCommunityRefresh(80);
-      if (communityEventIdentityKey()) scheduleCommunityEventReconnect();
+      if (communityEventIdentityKey()) scheduleCommunityEventReconnect('transport-error');
     });
   } catch (error) {
     state.community.eventSource = null;
     state.community.eventConnected = false;
-    scheduleCommunityEventReconnect();
+    scheduleCommunityEventReconnect('constructor-error');
   }
 }
 
@@ -19043,7 +21307,17 @@ function handleCommunityServerEvent(event) {
   }
   const type = safeText(envelope.type, '');
   const payload = envelope.payload || {};
-  const seq = safeText(envelope.seq || event.lastEventId, '');
+  const seq = safeText(
+    Object.prototype.hasOwnProperty.call(envelope, 'seq') ? envelope.seq : event.lastEventId,
+    ''
+  );
+  const normalizedSeq = normalizeCommunityEventCursor(seq);
+  const acknowledgedCursor = normalizeCommunityEventCursor(state.community.eventCursor);
+  if (
+    normalizedSeq
+    && acknowledgedCursor
+    && Number(normalizedSeq) <= Number(acknowledgedCursor)
+  ) return;
   const cursorAdvanced = advanceCommunityEventCursor(seq);
   const duplicate = communityEventAlreadyHandled(communityEventKey(envelope, event), false);
   const historical = communityEventIsHistorical(envelope);
@@ -23955,11 +26229,31 @@ function positionShelfNearCard(card) {
   );
 }
 
+function playbackTopSearchAvailable() {
+  return true;
+}
+
 function syncPlaybackChromeClasses() {
   const playback = state.playbackPage;
   const pinned = state.playbackChrome.dockPinned;
   const communityOpen = state.playbackChrome.communityVisible;
-  els.appShell.classList.toggle('is-search-peek', playback && state.playbackChrome.searchVisible);
+  const searchAvailable = playbackTopSearchAvailable();
+  if (!searchAvailable) {
+    state.playbackChrome.searchVisible = false;
+    state.favoriteLibrary.open = false;
+    state.playlistFavorite.open = false;
+    if (els.searchSuggestions) els.searchSuggestions.hidden = true;
+    if (els.favoriteLibrary) els.favoriteLibrary.hidden = true;
+    if (els.playlistFavoritePopover) els.playlistFavoritePopover.hidden = true;
+    if (els.topFavoritesButton) els.topFavoritesButton.setAttribute('aria-expanded', 'false');
+    els.appShell.classList.remove(
+      'is-search-suggestions-open',
+      'is-favorite-library-open',
+      'is-playlist-favorite-open'
+    );
+  }
+  if (els.searchForm) els.searchForm.hidden = !searchAvailable;
+  els.appShell.classList.toggle('is-search-peek', searchAvailable && playback && state.playbackChrome.searchVisible);
   els.appShell.classList.toggle('is-dock-peek', state.playbackChrome.dockVisible || pinned);
   els.appShell.classList.toggle('is-dock-pinned', pinned);
   els.appShell.classList.toggle('is-community-summoned', communityOpen);
@@ -23989,8 +26283,10 @@ function syncPlaybackChromeClasses() {
 function setPlaybackChromeVisibility(next = {}) {
   let changed = false;
   for (const key of ['searchVisible', 'dockVisible', 'communityVisible', 'controlsHidden']) {
-    if (typeof next[key] !== 'boolean' || state.playbackChrome[key] === next[key]) continue;
-    state.playbackChrome[key] = next[key];
+    if (typeof next[key] !== 'boolean') continue;
+    const value = key === 'searchVisible' ? next[key] && playbackTopSearchAvailable() : next[key];
+    if (state.playbackChrome[key] === value) continue;
+    state.playbackChrome[key] = value;
     changed = true;
   }
   if (changed) syncPlaybackChromeClasses();
@@ -24061,7 +26357,9 @@ function updatePlaybackChromeFromPointer(event) {
   const overSearchChrome = !!target && !!target.closest('.top-search, .search-suggestions, .favorite-library, .playlist-favorite-popover');
   const overDock = !!target && !!target.closest('.player-dock');
   setPlaybackChromeVisibility({
-    searchVisible: state.playbackPage && (overSearchChrome || isPointerNearSearchBar(event)),
+    searchVisible: state.playbackPage
+      && playbackTopSearchAvailable()
+      && (overSearchChrome || isPointerNearSearchBar(event)),
     dockVisible: state.playbackChrome.dockPinned || overDock || event.clientY >= window.innerHeight - 128
   });
 }
@@ -24098,7 +26396,7 @@ const PLAYBACK_CARD_PROVIDER_ACCENTS = Object.freeze({
   local: '#7dd3fc'
 });
 const PLAYBACK_CARD_VISIBILITY_TRANSITION_MS = 240;
-const PLAYBACK_CARD_EXPANSION_TRANSITION_MS = 360;
+const PLAYBACK_CARD_EXPANSION_TRANSITION_MS = 420;
 
 function playbackCardSong(song = state.currentSong) {
   return song || null;
@@ -24129,7 +26427,7 @@ function syncQishuiPlaybackExpansion() {
 }
 
 function cancelQishuiPlaybackExpansionAnimations() {
-  [els.qishuiPlaybackPhone, els.qishuiPlaybackPhone?.querySelector('.qishui-playback-content')]
+  [els.qishuiPlaybackCard, els.qishuiPlaybackPhone?.querySelector('.qishui-playback-content')]
     .filter(Boolean)
     .forEach((element) => {
       element.getAnimations().forEach((animation) => {
@@ -24139,21 +26437,25 @@ function cancelQishuiPlaybackExpansionAnimations() {
 }
 
 function animateQishuiPlaybackExpansion(previousBounds) {
-  if (!els.qishuiPlaybackPhone || reducedMotion || !previousBounds) return;
-  const nextBounds = els.qishuiPlaybackPhone.getBoundingClientRect();
+  if (!els.qishuiPlaybackCard || reducedMotion || !previousBounds) return;
+  cancelQishuiPlaybackExpansionAnimations();
+  const nextBounds = els.qishuiPlaybackCard.getBoundingClientRect();
   if (previousBounds.width <= 0 || nextBounds.width <= 0) return;
   const inlineScale = previousBounds.width / nextBounds.width;
   if (!Number.isFinite(inlineScale) || Math.abs(inlineScale - 1) < 0.01) return;
 
-  cancelQishuiPlaybackExpansionAnimations();
   const options = {
     duration: PLAYBACK_CARD_EXPANSION_TRANSITION_MS,
-    easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+    easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
     fill: 'both'
   };
-  const surfaceAnimation = els.qishuiPlaybackPhone.animate([
-    { transform: `scaleX(${inlineScale.toFixed(5)})`, opacity: 0.96 },
-    { transform: 'scaleX(1)', opacity: 1 }
+  const baseTransform = getComputedStyle(els.qishuiPlaybackCard).transform;
+  const scaledTransform = baseTransform === 'none'
+    ? `scaleX(${inlineScale.toFixed(5)})`
+    : `${baseTransform} scaleX(${inlineScale.toFixed(5)})`;
+  const surfaceAnimation = els.qishuiPlaybackCard.animate([
+    { transformOrigin: '100% 50%', transform: scaledTransform, opacity: 0.96 },
+    { transformOrigin: '100% 50%', transform: baseTransform, opacity: 1 }
   ], options);
   surfaceAnimation.id = 'fe-qishui-playback-expand-surface';
 
@@ -24175,7 +26477,7 @@ function animateQishuiPlaybackExpansion(previousBounds) {
 }
 
 function setQishuiPlaybackExpanded(expanded) {
-  const previousBounds = els.qishuiPlaybackPhone?.getBoundingClientRect();
+  const previousBounds = els.qishuiPlaybackCard?.getBoundingClientRect();
   state.qishuiPlaybackCard.expanded = !!expanded;
   syncQishuiPlaybackExpansion();
   animateQishuiPlaybackExpansion(previousBounds);
@@ -24197,6 +26499,13 @@ function syncQishuiPlaybackHiddenState() {
   );
   if (els.qishuiPlaybackScaleToggle) {
     els.qishuiPlaybackScaleToggle.disabled = hiddenByUser;
+  }
+  if (els.runtimeSettingsButton) {
+    els.runtimeSettingsButton.hidden = hiddenByUser;
+    els.runtimeSettingsButton.setAttribute('aria-hidden', String(hiddenByUser));
+    if (hiddenByUser && document.activeElement === els.runtimeSettingsButton) {
+      els.qishuiPlaybackVisibilityToggle?.focus({ preventScroll: true });
+    }
   }
   if (els.qishuiPlaybackVisibilityToggle) {
     const label = hiddenByUser ? '显示播放页' : '隐藏播放页';
@@ -24834,12 +27143,11 @@ async function commitQishuiPlaybackSeek() {
     return false;
   }
   const resumeNativeAfterSeek = !!els.audio?.src && !els.audio.paused && !els.audio.ended;
-  await invalidateNativeGoogleObrTimeline('seek');
   const audioDuration = Number(els.audio && els.audio.duration);
   if (Number.isFinite(audioDuration) && audioDuration > 0) {
     state.qishuiPlaybackCard.seekHandoffTarget = target;
     state.qishuiPlaybackCard.seekHandoffStartedAt = performance.now();
-    els.audio.currentTime = target;
+    setAudioCurrentTimeWithNativeContinuity(target, 'qishui-progress-seek');
     state.qishuiPlaybackCard.pendingAudioSeekTarget = null;
   } else if (els.audio?.src) {
     state.qishuiPlaybackCard.pendingAudioSeekTarget = target;
@@ -24944,21 +27252,28 @@ function syncPlaybackCardPanelState() {
   const diyPanelOpen = visible && state.diyOpen && state.diyCardOpen;
   const playlistPickerOpen = visible && state.playbackPlaylistPickerOpen && !state.playlistSongPageOpen;
   const songPanelOpen = visible && state.playlistSongPageOpen;
+  const rhythmGameOpen = visible && els.appShell.classList.contains('has-rhythm-game');
   const sidePanelOpen = diyPanelOpen || playlistPickerOpen || songPanelOpen;
   els.appShell.classList.toggle('has-playback-side-panel', sidePanelOpen);
   els.appShell.classList.toggle('is-playback-diy-panel-open', diyPanelOpen);
   els.appShell.classList.toggle('is-playback-playlist-picker-open', playlistPickerOpen);
   els.appShell.classList.toggle('is-playback-song-panel-open', songPanelOpen);
   if (els.qishuiPlaybackPhone) {
-    els.qishuiPlaybackPhone.classList.toggle('is-panel-open', sidePanelOpen);
+    els.qishuiPlaybackPhone.classList.toggle('is-panel-open', sidePanelOpen || state.runtimeSettingsOpen);
     els.qishuiPlaybackPhone.inert = sidePanelOpen
       && window.matchMedia('(max-width: 767px)').matches;
+  }
+  if (els.runtimeSettingsButton) {
+    els.runtimeSettingsButton.classList.toggle('is-active', state.runtimeSettingsOpen);
+    els.runtimeSettingsButton.setAttribute('aria-expanded', String(state.runtimeSettingsOpen));
   }
   if (!els.qishuiPlaybackTools) return;
   els.qishuiPlaybackTools.querySelectorAll('[data-playback-tool]').forEach((button) => {
     const tool = button.dataset.playbackTool;
     const active = tool === 'playlists'
       ? playlistPickerOpen || songPanelOpen
+      : tool === 'rhythm'
+        ? rhythmGameOpen
       : tool === 'preset' || tool === 'text' || tool === 'wallpaper'
         ? diyPanelOpen && state.diyPage === tool
         : false;
@@ -25041,8 +27356,10 @@ function openPlaybackRhythmGame() {
   state.playbackPlaylistPickerOpen = false;
   if (state.playlistSongPageOpen) closePlaylistShelf({ reopenPicker: false });
   if (state.diyOpen) setDiyOpen(false);
-  syncPlaybackCardPanelState();
   els.diyRhythmGameButton?.click();
+  // The rhythm module toggles `has-rhythm-game` synchronously. Sync afterward
+  // so the mirrored playback-bar button reflects the actual mode immediately.
+  syncPlaybackCardPanelState();
 }
 
 function handlePlaybackCardTool(event) {
@@ -25189,6 +27506,7 @@ function updatePlaybackPageClass() {
   updateChladniVisibility();
   updateChladniTextTransform();
   updateSonicTopographyVisibility();
+  updateSoundscapeWorkshopVisibility();
   updateCoverParticleVisibility();
   updateWallpaperVisibility();
   syncSandboxPlaybackSurface();
@@ -25211,6 +27529,11 @@ function enterPresetPlaybackPage(preset) {
   state.sandbox.playbackKeepBackground = false;
   state.sandbox.playbackPreviewUrl = '';
   setDiyOpen(false);
+  // A preset selected through the command bus may start while the DIY sidebar
+  // still remembers its wallpaper tab. Persist the preset workspace together
+  // with the selected scene so startup does not restore that stale tab and
+  // immediately replace the scene with `wallpaper`.
+  commitDiyPage('preset', { persist: false });
   setDiyPreset(preset);
   enterPlaybackPage();
   if (normalizeDiyPreset(preset) !== 'lyric') unlockAppAchievement('visual-first');
@@ -27922,7 +30245,7 @@ function textComposerOutputText(key, value) {
 function syncTextComposerControls() {
   if (!els.textComposerControl) return;
   let settings = normalizeTextComposerSettings(state.textComposerSettings);
-  const editable = state.textPreset !== 'book';
+  const editable = state.diyPreset !== 'book';
   const enabled = editable && textLyricsEnabled();
   const focusEchoLocked = state.textPreset === 'focus-echo';
   const singleRowLocked = singleRowOnlyTextPreset();
@@ -27968,6 +30291,7 @@ function syncTextComposerControls() {
   const translationKeys = new Set(['translationFontSize', 'translationGap', 'translationOpacity']);
   const singleRowEffectKeys = new Set(['lyricHighlightMode']);
   els.textComposerControl.disabled = !editable;
+  els.textComposerControl.setAttribute('aria-disabled', String(!editable));
   els.textComposerControl.classList.toggle('is-disabled', !editable);
   els.textTranslationSettingsGroup?.classList.toggle('is-disabled', !enabled);
   els.textAnimationSettingsGroup?.classList.toggle('is-disabled', !editable);
@@ -28465,7 +30789,7 @@ function refreshTextFontAvailability() {
 
 function syncTextFontControls() {
   if (!els.textFontControl || !els.textFontSelect) return;
-  const enabled = textLyricsEnabled();
+  const enabled = state.diyPreset !== 'book' && textLyricsEnabled();
   const option = textFontPreference();
   const fallback = TEXT_FONT_FALLBACKS[option.category] || TEXT_FONT_FALLBACKS.system;
   const detectedFamily = state.textFontAvailability[option.id] || '';
@@ -29924,6 +32248,7 @@ function saveTextPresetTransforms() {
     }));
   } catch (error) {
   }
+  scheduleClientPreferencesSync();
 }
 
 function updateTextPresetTransform({ persist = false } = {}) {
@@ -30190,7 +32515,39 @@ function setWallpaperSource(source) {
       : '刷新';
   }
   saveWallpaperPrefs();
-  refreshWallpapers({ source: state.wallpaperSource });
+  return refreshWallpapers({ source: state.wallpaperSource });
+}
+
+async function waitForWallpaperRefresh(timeoutMs = 15_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (state.wallpaperLoading) {
+    if (Date.now() >= deadline) throw new Error('Wallpaper catalog refresh timed out.');
+    await new Promise((resolve) => window.setTimeout(resolve, 16));
+  }
+}
+
+async function applyCompanionWallpaper(candidate) {
+  const source = candidate?.source === 'wallpaper-engine' || candidate?.source === 'live'
+    ? 'live'
+    : 'imported';
+  if (state.wallpaperSource !== source) await setWallpaperSource(source);
+  await waitForWallpaperRefresh();
+  let loaded = wallpaperById(candidate?.id);
+  if (!loaded) {
+    await refreshWallpapers({ source, scan: source === 'live' });
+    await waitForWallpaperRefresh();
+    loaded = wallpaperById(candidate?.id);
+  }
+  const expectedCatalogSource = source === 'live' ? 'wallpaper-engine' : 'imported';
+  if (!loaded || loaded.source !== expectedCatalogSource) {
+    throw new Error('The selected wallpaper is no longer present in the loaded catalog.');
+  }
+  if (state.wallpaperSource !== source) {
+    await setWallpaperSource(source);
+    await waitForWallpaperRefresh();
+  }
+  selectWallpaper(loaded.id);
+  return wallpaperById(loaded.id);
 }
 
 function commitDiyPage(page, options = {}) {
@@ -30198,6 +32555,7 @@ function commitDiyPage(page, options = {}) {
   const presetPage = state.diyPage === 'preset';
   const textPage = state.diyPage === 'text';
   const wallpaperPage = state.diyPage === 'wallpaper';
+  if (els.diyTextPage) els.diyTextPage.dataset.parametersReady = 'false';
   if (presetPage) setDiySandboxPresetGroupExpanded(false);
   if (els.diyCardTitle) {
     els.diyCardTitle.textContent = presetPage ? '场景预设' : textPage ? '歌词效果' : '壁纸模式';
@@ -30217,6 +32575,35 @@ function commitDiyPage(page, options = {}) {
   if (els.diyPresetPage) els.diyPresetPage.hidden = !presetPage;
   if (els.diyTextPage) els.diyTextPage.hidden = !textPage;
   if (els.diyWallpaperPage) els.diyWallpaperPage.hidden = !wallpaperPage;
+  if (textPage) {
+    // A `book` text preset (book-page lyrics) has no composer parameters, so
+    // syncTextComposerControls disables the whole fieldset. When the user is
+    // not actually in the book scene preset, the book text state can persist
+    // (e.g. restored from saved preferences), leaving every parameter greyed
+    // out. Restore the last selectable text preset so the text preset page
+    // parameters render again.
+    if (state.textPreset === 'book' && state.diyPreset !== 'book') {
+      const fallback = TEXT_PALETTE_PRESET_IDS.includes(state.lastSelectableTextPreset)
+        && state.lastSelectableTextPreset !== 'book'
+        ? state.lastSelectableTextPreset
+        : DEFAULT_TEXT_PRESET;
+      setTextPreset(fallback, { applyTemplate: false, persist: false });
+    }
+    // The text composer's font picker and parameter states are initialized by
+    // the async boot chain (initializeTextFontOptions / syncTextComposerControls).
+    // When the preset page is opened before that chain has finished, the
+    // parameters would otherwise stay unrendered (empty font select, unsynced
+    // values). Both calls are idempotent, so re-syncing on every open keeps the
+    // text preset page correct regardless of boot timing.
+    initializeTextFontOptions();
+    syncTextFontControls();
+    syncTextPaletteControls();
+    syncPlaybackLyricPaletteControls();
+    syncBilingualLyricsControl();
+    syncMultiRowLyricsControl();
+    syncTextComposerControls();
+    if (els.diyTextPage) els.diyTextPage.dataset.parametersReady = 'true';
+  }
   if (wallpaperPage) {
     setDiyPreset('wallpaper', { persist: options.persist });
     enterPlaybackPage();
@@ -30235,6 +32622,9 @@ function setDiyCardOpen(open) {
 
 function setDiyPage(page) {
   const nextPage = page === 'wallpaper' ? 'wallpaper' : page === 'text' ? 'text' : 'preset';
+  if (nextPage === 'text' && els.diyTextPage) {
+    els.diyTextPage.dataset.parametersReady = 'false';
+  }
   if (state.diyPageTransitionTimer) {
     window.clearTimeout(state.diyPageTransitionTimer);
     state.diyPageTransitionTimer = 0;
@@ -30348,6 +32738,7 @@ function builtinDiyPresetConfiguration() {
     'free-cubes': '自由方块',
     'void-prism': '虚空棱镜',
     topography: 'Sonic Terrain',
+    'soundscape-workshop': '音域回响',
     chladni: '克拉尼',
     'rain-glass': '雨天玻璃',
     'cover-particles': '粒子封面',
@@ -30406,6 +32797,9 @@ function builtinDiyPresetConfiguration() {
     runtimeControls.sonicColumnHeight = `${Math.round(settings.columnHeight * 100)}%`;
     runtimeControls.sonicFov = `${Math.round(settings.fov)}°`;
     runtimeControls.sonicSmoothing = `${Math.round(settings.smoothing * 100)}%`;
+  } else if (preset === 'soundscape-workshop') {
+    const diagnostics = soundscapeWorkshopRuntimeSnapshot();
+    Object.assign(runtimeControls, diagnostics.parameters || {});
   } else if (preset === 'chladni') {
     const diagnostics = chladniRuntimeSnapshot();
     runtimeControls.chladniDisplayMode = state.chladni.mode === 'plane' ? '平面' : '3D六面';
@@ -30456,6 +32850,7 @@ function syncScenePresetSettingsGroup(stormOcean = false, activeScenePreset = nu
   if (!els.scenePresetSettingsGroup) return;
   let sceneName = '';
   if (state.diyPreset === 'topography') sceneName = 'Sonic';
+  else if (state.diyPreset === 'soundscape-workshop') sceneName = '音域回响';
   else if (state.diyPreset === 'chladni') sceneName = '克拉尼';
   else if (state.diyPreset === 'cover-particles') sceneName = '粒子封面';
   else if (state.diyPreset === 'cube') sceneName = '动态魔方';
@@ -30501,6 +32896,7 @@ function syncDiyPresetAdjustmentVisibility() {
   if (els.sonicPresetControls) {
     els.sonicPresetControls.hidden = state.diyPreset !== 'topography';
   }
+  if (isSoundscapeWorkshopPreset()) renderSoundscapeWorkshopControls();
   if (els.freeCubePresetControls) {
     els.freeCubePresetControls.hidden = !isFreeCubePreset();
   }
@@ -30744,9 +33140,16 @@ async function enterDiyScenePresetPlayback(id) {
 
 function setDiyPreset(preset, options = {}) {
   const wasBookPreset = state.diyPreset === 'book';
+  const previousPreset = normalizeDiyPreset(state.diyPreset);
+  const nextPreset = normalizeDiyPreset(preset);
+  if (nextPreset === 'soundscape-workshop' && previousPreset !== 'soundscape-workshop') {
+    state.soundscapeWorkshop.previousUsablePreset = previousPreset;
+  } else if (nextPreset !== 'soundscape-workshop') {
+    state.soundscapeWorkshop.previousUsablePreset = nextPreset;
+  }
   presetSceneSelectionToken += 1;
   const activationToken = ++presetRuntimeActivationToken;
-  state.diyPreset = normalizeDiyPreset(preset);
+  state.diyPreset = nextPreset;
   if (state.diyPreset !== 'sandbox-scene') state.sandbox.selectedPresetId = '';
   if (state.diyPreset !== 'wallpaper') state.scenePreset = state.diyPreset;
   if (els.diySceneNonePreset) els.diySceneNonePreset.classList.toggle('is-active', state.diyPreset === 'lyric');
@@ -30754,6 +33157,7 @@ function setDiyPreset(preset, options = {}) {
   if (els.diyFreeCubePreset) els.diyFreeCubePreset.classList.toggle('is-active', isFreeCubePreset());
   if (els.diyVoidPrismPreset) els.diyVoidPrismPreset.classList.toggle('is-active', isVoidPrismPreset());
   if (els.diyTopographyPreset) els.diyTopographyPreset.classList.toggle('is-active', state.diyPreset === 'topography');
+  if (els.diySoundscapeWorkshopPreset) els.diySoundscapeWorkshopPreset.classList.toggle('is-active', isSoundscapeWorkshopPreset());
   if (els.diyChladniPreset) els.diyChladniPreset.classList.toggle('is-active', isChladniPreset());
   if (els.diyRainGlassPreset) els.diyRainGlassPreset.classList.toggle('is-active', isRainGlassPreset());
   if (els.diyCoverParticlesPreset) els.diyCoverParticlesPreset.classList.toggle('is-active', isCoverParticlePreset());
@@ -30768,6 +33172,7 @@ function setDiyPreset(preset, options = {}) {
   updateChladniVisibility();
   updateChladniTextTransform();
   updateSonicTopographyVisibility();
+  updateSoundscapeWorkshopVisibility();
   updateCoverParticleVisibility();
   updateWallpaperVisibility();
   if (state.diyPreset === 'book' && state.textPreset !== 'book') {
@@ -30785,7 +33190,7 @@ function setDiyPreset(preset, options = {}) {
   renderDiySelectedPresetConfig();
   applyPresetUpscaler({ force: true });
   scheduleDesktopSceneSnapshot();
-  if (options.persist !== false) saveVisualSettingsPreferences();
+  if (options.persist !== false) saveVisualSettingsPreferences({ immediate: true });
   void ensureActivePresetRuntime(state.diyPreset, activationToken);
 }
 
@@ -34783,7 +37188,19 @@ async function petAssistantSetDesktopMode(argumentsValue = {}) {
 async function petAssistantSetDesktopVisibility(argumentsValue = {}) {
   const args = petAssistantArguments(argumentsValue);
   const visible = petAssistantBoolean(args.visible ?? args.enabled ?? args.value, true);
-  return requestNativeDesktopPet(visible ? 'show' : 'hide');
+  const beforeState = await petAssistantDesktopStateQuery();
+  const before = beforeState.visible === true;
+  const result = before === visible
+    ? beforeState
+    : await requestNativeDesktopPet(visible ? 'show' : 'hide');
+  const after = result.visible === true;
+  return {
+    ...result,
+    status: before === after ? 'unchanged' : 'changed',
+    before,
+    after,
+    undo: { command: 'pet.desktop.visibility.set', parameters: { visible: before } }
+  };
 }
 
 async function petAssistantDesktopPositionQuery() {
@@ -34960,7 +37377,7 @@ function setAudioPlaybackPosition(position, tolerance = 1.25) {
   try {
     const current = Number.isFinite(els.audio.currentTime) ? els.audio.currentTime : 0;
     const shouldSeek = Math.abs(current - target) >= tolerance;
-    if (shouldSeek) els.audio.currentTime = target;
+    if (shouldSeek) setAudioCurrentTimeWithNativeContinuity(target, 'position-sync');
     syncPlaybackLyricAtTime(shouldSeek ? target : currentPlaybackLyricTime(target));
   } catch (error) {
   }
@@ -35002,7 +37419,7 @@ function smoothlySyncAudioPlaybackPosition(position, options = {}) {
     }
     if (!activelyPlaying || absoluteDrift >= hardTolerance) {
       if (absoluteDrift >= (activelyPlaying ? hardTolerance : softTolerance)) {
-        els.audio.currentTime = target;
+        setAudioCurrentTimeWithNativeContinuity(target, 'remote-clock-hard-sync');
       }
       resetSyncedAudioPlaybackRate();
       syncPlaybackLyricAtTime(target);
@@ -36177,6 +38594,107 @@ function bindEvents() {
   if (els.listenCallButton) els.listenCallButton.addEventListener('click', startCommunityCall);
   if (els.listenHangupButton) els.listenHangupButton.addEventListener('click', () => stopCommunityCall(true));
   if (els.runtimeSettingsButton) els.runtimeSettingsButton.addEventListener('click', () => setRuntimeSettingsOpen(!state.runtimeSettingsOpen));
+  if (els.aiServiceModelModeSelect) {
+    els.aiServiceModelModeSelect.addEventListener('change', () => {
+      if (els.aiServiceTtsModeSelect) els.aiServiceTtsModeSelect.value = els.aiServiceModelModeSelect.value;
+      clientAiServicePersistControls({ showToast: false, includeSecrets: false });
+    });
+  }
+  if (els.aiServiceModelProviderSelect) {
+    els.aiServiceModelProviderSelect.addEventListener('change', () => {
+      clientAiServiceApplyProviderDefaults('model');
+      clientAiServiceSchedulePersist(0);
+    });
+  }
+  if (els.aiServiceTtsProviderSelect) {
+    els.aiServiceTtsProviderSelect.addEventListener('change', () => {
+      clientAiServiceApplyProviderDefaults('tts');
+      clientAiServiceSchedulePersist(0);
+    });
+  }
+  if (els.aiServiceTtsEnabledToggle) {
+    els.aiServiceTtsEnabledToggle.addEventListener('click', async () => {
+      const service = window.FeMonsterClientAiService;
+      if (!service?.save) return;
+      const previous = service.load?.().ttsEnabled !== false;
+      const ttsEnabled = !previous;
+      els.aiServiceTtsEnabledToggle.disabled = true;
+      try {
+        const next = await service.save({ ttsEnabled });
+        clientAiServiceSyncControls(next);
+        toast(ttsEnabled ? '客户端 TTS 已开启' : '客户端 TTS 已关闭，仅保留文字回复');
+      } catch (error) {
+        clientAiServiceSyncControls(service.load?.() || {});
+        clientAiServiceStatus(error?.message || '客户端 TTS 状态保存失败', 'error');
+      } finally {
+        els.aiServiceTtsEnabledToggle.disabled = false;
+      }
+    });
+  }
+  if (els.aiServiceTtsAuthModeSelect) {
+    els.aiServiceTtsAuthModeSelect.addEventListener('change', () => {
+      clientAiServiceSyncDoubaoFields({
+        ...window.FeMonsterClientAiService?.load?.().tts,
+        provider: 'volcengine-doubao-tts-v3',
+        authMode: els.aiServiceTtsAuthModeSelect.value
+      });
+      clientAiServiceSchedulePersist(0);
+    });
+  }
+  if (els.aiServiceModelKeyClearButton) {
+    els.aiServiceModelKeyClearButton.addEventListener('click', () => {
+      clientAiServiceClearModelKey = true;
+      if (els.aiServiceModelApiKey) {
+        els.aiServiceModelApiKey.value = '';
+        els.aiServiceModelApiKey.placeholder = '将在保存时清除';
+      }
+      clientAiServicePersistControls({ showToast: false, includeSecrets: false });
+    });
+  }
+  if (els.aiServiceTtsKeyClearButton) {
+    els.aiServiceTtsKeyClearButton.addEventListener('click', () => {
+      clientAiServiceClearTtsKey = true;
+      if (els.aiServiceTtsApiKey) {
+        els.aiServiceTtsApiKey.value = '';
+        els.aiServiceTtsApiKey.placeholder = '将在保存时清除';
+      }
+      if (els.aiServiceTtsAppId) els.aiServiceTtsAppId.value = '';
+      if (els.aiServiceTtsAccessKey) els.aiServiceTtsAccessKey.value = '';
+      clientAiServicePersistControls({ showToast: false, includeSecrets: false });
+    });
+  }
+  if (els.aiServiceModelTestButton) els.aiServiceModelTestButton.addEventListener('click', () => clientAiServiceTest('model'));
+  if (els.aiServiceTtsTestButton) els.aiServiceTtsTestButton.addEventListener('click', () => clientAiServiceTest('tts'));
+  if (els.aiServiceSaveButton) els.aiServiceSaveButton.addEventListener('click', () => clientAiServicePersistControls());
+  [
+    els.aiServiceModelBaseUrl,
+    els.aiServiceModelName,
+    els.aiServiceTtsBaseUrl,
+    els.aiServiceTtsModel,
+    els.aiServiceTtsVoice,
+    els.aiServiceTtsResourceId,
+    els.aiServiceTtsFormat,
+    els.aiServiceTtsSampleRate,
+    els.aiServiceTtsEmotion,
+    els.aiServiceTtsEmotionScale,
+    els.aiServiceTtsSpeechRate,
+    els.aiServiceTtsLoudnessRate
+  ].forEach((input) => {
+    if (!input) return;
+    input.addEventListener('input', () => clientAiServiceSchedulePersist());
+    input.addEventListener('change', () => clientAiServiceSchedulePersist(0));
+  });
+  window.addEventListener('pagehide', () => {
+    if (!clientAiServiceSaveTimer) return;
+    window.clearTimeout(clientAiServiceSaveTimer);
+    clientAiServiceSaveTimer = 0;
+    clientAiServicePersistControls({
+      showToast: false,
+      syncControls: false,
+      keepalive: true,
+      includeSecrets: false
+    });
+  });
   if (els.runtimeRecordingButton) els.runtimeRecordingButton.addEventListener('click', openRecordingDialog);
   if (els.recordingCloseButton) els.recordingCloseButton.addEventListener('click', closeRecordingDialog);
   if (els.recordingStartButton) els.recordingStartButton.addEventListener('click', startProgramRecording);
@@ -36398,6 +38916,7 @@ function bindEvents() {
   if (els.diyFreeCubePreset) els.diyFreeCubePreset.addEventListener('click', () => enterPresetPlaybackPage('free-cubes'));
   if (els.diyVoidPrismPreset) els.diyVoidPrismPreset.addEventListener('click', () => enterPresetPlaybackPage('void-prism'));
   if (els.diyTopographyPreset) els.diyTopographyPreset.addEventListener('click', () => enterPresetPlaybackPage('topography'));
+  if (els.diySoundscapeWorkshopPreset) els.diySoundscapeWorkshopPreset.addEventListener('click', () => enterPresetPlaybackPage('soundscape-workshop'));
   if (els.diyChladniPreset) els.diyChladniPreset.addEventListener('click', () => enterPresetPlaybackPage('chladni'));
   if (els.diyRainGlassPreset) els.diyRainGlassPreset.addEventListener('click', () => enterPresetPlaybackPage('rain-glass'));
   if (els.diyCoverParticlesPreset) els.diyCoverParticlesPreset.addEventListener('click', () => enterPresetPlaybackPage('cover-particles'));
@@ -37031,6 +39550,15 @@ function bindEvents() {
   });
   window.addEventListener('fe-achievement-ornament-change', handleCommunityOrnamentChange);
   window.addEventListener('fe-client-preferences-change', scheduleClientPreferencesSync);
+  window.addEventListener('online', () => {
+    void syncClientPreferencesCloud('online');
+  });
+  window.addEventListener('fe-monster-community-profile', () => {
+    void syncClientPreferencesCloud('community-profile');
+  });
+  window.setTimeout(() => {
+    void syncClientPreferencesCloud('startup');
+  }, 1400);
   window.addEventListener('pointermove', scheduleCommunityDanmakuRepulsion, { passive: true });
   window.addEventListener('pointerout', (event) => {
     if (event.relatedTarget) return;
@@ -37126,11 +39654,10 @@ function bindEvents() {
   }, { passive: true });
   window.addEventListener('online', () => {
     if (bootVisual.servicesStarted) scheduleUserPlaylistsRefresh(160);
-    state.community.eventReconnectDelay = 1200;
     state.community.refreshRetryDelay = 1200;
     if (bootVisual.servicesStarted) {
       scheduleCommunityRefresh(160);
-      ensureCommunityEventStream();
+      restartCommunityEventStreamNow('online');
       void checkGitHubClientUpdate();
     }
     if (state.obrSpatialAudio.requested && !state.obrSpatialAudio.enabled) scheduleGoogleObrRecovery();
@@ -37250,23 +39777,12 @@ function bindEvents() {
     }
   });
 
-  els.progressRange.addEventListener('input', async () => {
+  els.progressRange.addEventListener('input', () => {
     const duration = Number.isFinite(els.audio.duration) ? els.audio.duration : 0;
     if (!duration) return;
     const target = (Number(els.progressRange.value) / 1000) * duration;
-    const nativeSeek = (async () => {
-      await invalidateNativeGoogleObrTimeline('seek');
-      els.audio.currentTime = target;
-      updateProgress();
-    })();
-    state.audioPositionSync.nativeSeekPromise = nativeSeek;
-    try {
-      await nativeSeek;
-    } finally {
-      if (state.audioPositionSync.nativeSeekPromise === nativeSeek) {
-        state.audioPositionSync.nativeSeekPromise = null;
-      }
-    }
+    setAudioCurrentTimeWithNativeContinuity(target, 'progress-scrub');
+    updateProgress();
   });
 
   els.progressRange.addEventListener('change', async () => {
@@ -38858,6 +41374,9 @@ function updatePlaybackSceneMotion() {
     case 'topography':
       updateSonicTopographyMotion();
       break;
+    case 'soundscape-workshop':
+      updateSoundscapeWorkshopMotion();
+      break;
     default:
       break;
   }
@@ -39217,6 +41736,7 @@ function drawPlaybackParticles(context, rect, dpr, width, height) {
   if (sandboxSceneOwnsFrame || isFreeCubePreset()) return;
   if (state.textPreset === 'book') return;
   if (isSonicTopographyPreset()) return;
+  if (isSoundscapeWorkshopPreset()) return;
   if (isCoverParticlePreset()) {
     drawCoverParticleScene(width, height, dpr);
     return;
@@ -39892,6 +42412,19 @@ const PET_BUILTIN_SCENE_PRESETS = Object.freeze([
   Object.freeze({ id: 'free-cubes', name: '自由方块', aliases: ['自由方块'] }),
   Object.freeze({ id: 'void-prism', name: '虚空棱镜', aliases: ['虚空棱镜'] }),
   Object.freeze({ id: 'topography', name: '声波地形', aliases: ['地形', '声波地形'] }),
+  Object.freeze({
+    id: 'soundscape-workshop',
+    name: '音域回响',
+    aliases: ['Sonic Topography', '音域回响', 'soundscape'],
+    author: 'CmZya',
+    platform: 'Wallpaper Engine',
+    workshopId: '3747222633',
+    resource: Object.freeze({
+      kind: 'sandboxed-web',
+      entryUrl: SOUNDSCAPE_WORKSHOP_ENTRY_URL,
+      previewUrl: 'assets/soundscape-workshop/preview.gif'
+    })
+  }),
   Object.freeze({ id: 'chladni', name: '克拉尼', aliases: ['克拉尼'] }),
   Object.freeze({ id: 'rain-glass', name: '雨玻璃', aliases: ['雨玻璃'] }),
   Object.freeze({ id: 'cover-particles', name: '封面粒子', aliases: ['封面粒子'] }),
@@ -40136,6 +42669,7 @@ function petAssistantPlaybackSnapshot() {
     queueIndex: Number.isInteger(live?.queueIndex) ? live.queueIndex : state.queueIndex,
     queueLength: Number.isInteger(live?.queueLength) ? live.queueLength : state.queueLength || state.queue.length,
     volume: Math.round(clamp(Number(els.audio?.volume) || 0, 0, 1) * 100),
+    muted: els.audio?.muted === true,
     energy: clamp(Number(state.visual.energy) || 0, 0, 1),
     bass: clamp(Math.max(Number(state.visual.bass) || 0, Number(state.visual.lowFrequencyAmplitude) || 0), 0, 1),
     mid: clamp(Math.max(Number(state.visual.mid) || 0, Number(state.visual.lowMid) || 0), 0, 1),
@@ -40505,6 +43039,9 @@ function petAssistantClientContextSnapshot(options = {}) {
         fit: state.wallpaperFitMode
       },
       cursor: { ...state.cursorPreferences },
+      aiService: window.FeMonsterClientAiService
+        ? window.FeMonsterClientAiService.publicSnapshot()
+        : { modelMode: 'server', ttsMode: 'server' },
       messageDoNotDisturb: state.community.messageBubbleMuted === true,
       recording: { active: state.recording.active === true, paused: state.recording.paused === true }
     },
@@ -40555,6 +43092,10 @@ const PET_SCENE_ALIASES = Object.freeze({
   topography: 'topography',
   地形: 'topography',
   声波地形: 'topography',
+  'soundscape-workshop': 'soundscape-workshop',
+  soundscape: 'soundscape-workshop',
+  'sonic topography': 'soundscape-workshop',
+  音域回响: 'soundscape-workshop',
   chladni: 'chladni',
   克拉尼: 'chladni',
   'rain-glass': 'rain-glass',
@@ -40609,7 +43150,7 @@ function petAssistantPresetCatalog(argumentsValue = {}) {
   ));
 }
 
-async function petAssistantSwitchPreset(argumentsValue = {}) {
+async function petAssistantSwitchPreset(argumentsValue = {}, context = {}) {
   const args = petAssistantArguments(argumentsValue);
   const requested = petAssistantBoundedText(
     args.preset || args.id || args.name || args.query,
@@ -40625,11 +43166,32 @@ async function petAssistantSwitchPreset(argumentsValue = {}) {
   if (!candidates.length) throw new Error(`未找到已注册预设 ${requested}`);
   if (candidates.length > 1) throw new Error(`预设名称 ${requested} 不唯一，请使用预设 ID`);
   const preset = candidates[0];
+  const before = petAssistantPresetCatalog().find((candidate) => candidate.active) || null;
+  if (context?.automatic === true && !before) {
+    return {
+      status: 'rejected',
+      changed: false,
+      reason: 'automatic_requires_reversible_preset'
+    };
+  }
+  if (before?.id === preset.id) {
+    return {
+      ...petAssistantPlaybackSnapshot(),
+      status: 'unchanged',
+      changed: false,
+      selectedPreset: { id: preset.id, name: preset.name, source: preset.source }
+    };
+  }
   if (preset.source === 'builtin') enterPresetPlaybackPage(preset.id);
   else await enterDiyScenePresetPlayback(preset.id);
   return {
     ...petAssistantPlaybackSnapshot(),
-    selectedPreset: { id: preset.id, name: preset.name, source: preset.source }
+    status: 'changed',
+    changed: true,
+    selectedPreset: { id: preset.id, name: preset.name, source: preset.source },
+    ...(before ? {
+      undo: { command: 'scene.preset.set', parameters: { preset: before.id } }
+    } : {})
   };
 }
 const PET_PAGE_ALIASES = Object.freeze({
@@ -40890,6 +43452,9 @@ function petAssistantSetVolume(argumentsValue, relative = false) {
   const raw = relative ? args.delta ?? args.amount ?? args.value : args.volume ?? args.value;
   const numeric = Number(raw);
   if (!Number.isFinite(numeric)) throw new Error('音量参数必须是数字');
+  if ((relative && (numeric < -100 || numeric > 100)) || (!relative && (numeric < 0 || numeric > 100))) {
+    throw new Error(relative ? '音量增量必须在 -100 到 100 之间' : '音量必须在 0 到 100 之间');
+  }
   const current = Math.round(clamp(Number(els.audio?.volume) || 0, 0, 1) * 100);
   const volume = Math.round(clamp(relative ? current + numeric : numeric, 0, 100));
   els.volumeRange.value = String(volume);
@@ -40898,7 +43463,48 @@ function petAssistantSetVolume(argumentsValue, relative = false) {
   syncElasticRangeVisual(els.volumeRange);
   schedulePlayerVolumeCommit(volume / 100, { immediate: true });
   notifyPlaybackIntelligence('volume-change', { volume });
-  return petAssistantPlaybackSnapshot();
+  return {
+    ...petAssistantPlaybackSnapshot(),
+    status: current === volume ? 'unchanged' : 'changed',
+    before: current,
+    after: volume,
+    undo: { command: 'playback.volume.set', parameters: { volume: current } }
+  };
+}
+
+function petAssistantSetMuted(argumentsValue, toggle = false) {
+  const args = petAssistantArguments(argumentsValue);
+  if (!els.audio) throw new Error('播放器尚未就绪');
+  const before = els.audio.muted === true;
+  const after = toggle
+    ? !before
+    : petAssistantBoolean(args.muted ?? args.enabled ?? args.value, false);
+  els.audio.muted = after;
+  return {
+    status: before === after ? 'unchanged' : 'changed',
+    before,
+    after,
+    volume: Math.round(clamp(Number(els.audio.volume) || 0, 0, 1) * 100),
+    undo: { command: 'playback.mute.set', parameters: { muted: before } }
+  };
+}
+
+async function petAssistantSeekTo(seconds) {
+  if (!els.audio) throw new Error('播放器尚未就绪');
+  const numeric = Number(seconds);
+  if (!Number.isFinite(numeric) || numeric < 0) throw new Error('播放进度必须是非负秒数');
+  const before = Math.max(0, Number(els.audio.currentTime) || 0);
+  const duration = Number(els.audio.duration);
+  const target = Number.isFinite(duration) && duration > 0 ? clamp(numeric, 0, duration) : numeric;
+  setAudioCurrentTimeWithNativeContinuity(target, 'pet-command-seek');
+  await apiJson(`/api/player/seek?${query({ position: Math.round(target) })}`).catch(() => {});
+  return {
+    ...petAssistantPlaybackSnapshot(),
+    positionSeconds: target,
+    beforeSeconds: before,
+    afterSeconds: target,
+    undo: { command: 'playback.seek', parameters: { seconds: before } }
+  };
 }
 
 async function petAssistantOpenPage(argumentsValue) {
@@ -40959,6 +43565,13 @@ function petAssistantSetLyricMode(argumentsValue) {
 
 function petAssistantSetWallpaperAppearance(argumentsValue) {
   const args = petAssistantArguments(argumentsValue);
+  const before = {
+    opacity: state.wallpaperOpacity * 100,
+    brightness: state.wallpaperBrightness * 100,
+    blur: state.wallpaperBlur,
+    scale: state.wallpaperScale * 100,
+    fit: state.wallpaperFitMode
+  };
   let changed = false;
   const applyPercent = (key, target, minimum, maximum) => {
     if (args[key] === undefined) return;
@@ -40987,12 +43600,19 @@ function petAssistantSetWallpaperAppearance(argumentsValue) {
   updateWallpaperDiyVars();
   scheduleWallpaperAutoSize();
   saveWallpaperPrefs({ immediate: true });
-  return {
-    opacity: Math.round(state.wallpaperOpacity * 100),
-    brightness: Math.round(state.wallpaperBrightness * 100),
-    blur: Math.round(state.wallpaperBlur),
-    scale: Math.round(state.wallpaperScale * 100),
+  const after = {
+    opacity: state.wallpaperOpacity * 100,
+    brightness: state.wallpaperBrightness * 100,
+    blur: state.wallpaperBlur,
+    scale: state.wallpaperScale * 100,
     fit: state.wallpaperFitMode
+  };
+  const changedAppearance = Object.keys(before).some((key) => before[key] !== after[key]);
+  return {
+    ...after,
+    status: changedAppearance ? 'changed' : 'unchanged',
+    changed: changedAppearance,
+    undo: { command: 'wallpaper.setting.set', parameters: before }
   };
 }
 
@@ -41031,7 +43651,7 @@ function petAssistantParameterPurpose(control) {
 
 function petAssistantControlParameter(control) {
   const id = safeText(control?.id, '');
-  if (!id || PET_PARAMETER_CONTROL_EXCLUSIONS.test(id)) return null;
+  if (!id || control?.dataset?.petParameterIgnore === 'true' || PET_PARAMETER_CONTROL_EXCLUSIONS.test(id)) return null;
   const tag = safeText(control.tagName, '').toLowerCase();
   const inputType = safeText(control.type, '').toLowerCase();
   if (tag !== 'select' && !['range', 'number', 'checkbox', 'color'].includes(inputType)) return null;
@@ -41097,6 +43717,31 @@ function petAssistantControlParameter(control) {
   };
 }
 
+function petAssistantSoundscapeWorkshopParameters() {
+  const api = soundscapeWorkshopApi();
+  if (!api?.catalog) return [];
+  const catalog = api.catalog();
+  if (!Array.isArray(catalog)) return [];
+  return catalog.map((parameter) => ({
+    key: `preset.soundscape-workshop.${parameter.sourceProperty}`,
+    sourceProperty: parameter.sourceProperty,
+    name: parameter.name,
+    purpose: parameter.purpose,
+    scope: parameter.scope || 'scene',
+    category: parameter.category || parameter.scope || 'scene',
+    preset: 'soundscape-workshop',
+    type: parameter.type,
+    impact: parameter.impact || 'low',
+    range: parameter.range ? { ...parameter.range } : null,
+    options: Array.isArray(parameter.options) ? parameter.options.map((option) => ({ ...option })) : null,
+    highImpactValues: Array.isArray(parameter.highImpactValues) ? [...parameter.highImpactValues] : null,
+    requiresExplicitSelection: parameter.requiresExplicitSelection === true,
+    available: true,
+    get: () => soundscapeWorkshopPropertyValue(parameter.sourceProperty),
+    set: async (value) => applySoundscapeWorkshopProperty(parameter.sourceProperty, value)
+  }));
+}
+
 function petAssistantSemanticParameters() {
   return [
     {
@@ -41139,7 +43784,8 @@ function petAssistantSemanticParameters() {
         renderCommunityDndButton();
         return state.community.messageBubbleMuted === true;
       }
-    }
+    },
+    ...petAssistantSoundscapeWorkshopParameters()
   ];
 }
 
@@ -41165,6 +43811,9 @@ function petAssistantPublicParameter(entry, includeValue = true) {
     impact: entry.impact,
     available: entry.available !== false
   };
+  if (entry.sourceProperty) parameter.sourceProperty = entry.sourceProperty;
+  if (entry.requiresExplicitSelection === true) parameter.requiresExplicitSelection = true;
+  if (Array.isArray(entry.highImpactValues)) parameter.highImpactValues = [...entry.highImpactValues];
   if (entry.range) parameter.range = { ...entry.range };
   if (entry.options) parameter.options = entry.options.map((option) => ({ ...option }));
   if (includeValue) parameter.currentValue = entry.get();
@@ -41227,8 +43876,10 @@ function petAssistantNormalizeParameterValue(entry, rawValue) {
     throw new Error(`${entry.name} 的值包含不允许的网址或代码`);
   }
   if (entry.type === 'color' && !/^#[0-9a-f]{6}$/i.test(value)) throw new Error(`${entry.name} 必须是六位十六进制颜色`);
-  if (entry.type === 'enum' && !entry.options.some((option) => option.value === value)) {
-    throw new Error(`${entry.name} 不支持值 ${value}`);
+  if (entry.type === 'enum') {
+    const option = entry.options.find((candidate) => String(candidate.value) === value);
+    if (!option) throw new Error(`${entry.name} 不支持值 ${value}`);
+    return option.value;
   }
   return value;
 }
@@ -41268,8 +43919,18 @@ function petAssistantParameterChanges(argumentsValue = {}) {
   });
 }
 
-async function petAssistantApplyParameterBatch(argumentsValue = {}) {
+async function petAssistantApplyParameterBatch(argumentsValue = {}, context = {}) {
   const changes = petAssistantParameterChanges(argumentsValue);
+  const highLoad = changes.filter((change) => (
+    change.entry.requiresExplicitSelection === true
+    && Array.isArray(change.entry.highImpactValues)
+    && change.entry.highImpactValues.map(Number).includes(Number(change.value))
+  ));
+  if (highLoad.length) {
+    if (context.automatic === true) throw new Error('高负载场景参数不能由桌宠主动执行');
+    if (petAssistantArguments(argumentsValue).explicit !== true) throw new Error('高负载场景参数必须明确选择');
+    if (context.confirmed !== true) throw new Error('高负载场景参数需要用户确认');
+  }
   const applied = [];
   const attempted = [];
   try {
@@ -41560,7 +44221,10 @@ function registerPetAssistantAppCommands() {
     {
       command: 'app.capabilities.query', category: 'read', readOnly: true,
       title: '读取可用程序命令', description: '分页读取客户端当前注册的安全命令目录，可按关键词或类别筛选。',
-      parameters: { query: 'string?', category: 'string?', cursor: 'number?', limit: 'number 1..20?' },
+      parameters: {
+        query: 'string?', category: 'string?', automaticOnly: 'boolean?',
+        cursor: 'number?', limit: 'number 1..20?'
+      },
       handler: (args) => commands.capabilities(args)
     },
     {
@@ -41593,7 +44257,7 @@ function registerPetAssistantAppCommands() {
     {
       command: 'app.parameters.catalog.query', aliases: ['app.parameters.list'], category: 'read', readOnly: true,
       title: '读取客户端参数目录',
-      description: '分页读取真实注册参数的名称、用途、类型、范围、影响等级与当前值；支持 category/query/preset/cursor/limit。',
+      description: '分页读取场景颜色、光效、歌词、壁纸、音频、渲染等真实注册参数的名称、用途、类型、范围、影响等级与当前值；支持 category/query/preset/cursor/limit。',
       parameters: { category: 'string?', query: 'string?', preset: 'string?', cursor: 'number?', limit: 'number 1..20?' },
       handler: (args) => petAssistantParameterPage(args, true)
     },
@@ -41614,8 +44278,13 @@ function registerPetAssistantAppCommands() {
     {
       command: 'app.parameters.batch.apply', aliases: ['app.parameters.apply'], category: 'settings',
       title: '批量应用客户端参数',
-      description: '批量设置或增减已注册参数；拒绝 path/url/code，复用现有设置事件与持久化并返回 before/after。',
+      description: '批量设置或增减已发现的场景颜色、光效、歌词、壁纸、音频、渲染等注册参数；拒绝 path/url/code，复用现有设置事件与持久化并返回 before/after。',
       parameters: { changes: '[{key,value|delta}]' },
+      requiresConfirmation: (args) => Array.isArray(args?.changes) && args.changes.some((change) => (
+        change?.key === 'preset.soundscape-workshop.gridSize'
+        && [640, 1080, 4096].includes(Number(change?.value))
+      )),
+      confirmationMessage: () => '高负载网格会显著增加显存、功耗和卡顿风险，确认应用吗？',
       handler: petAssistantApplyParameterBatch
     },
     {
@@ -41632,13 +44301,22 @@ function registerPetAssistantAppCommands() {
     {
       command: 'pet.mascot.visibility.set', aliases: ['pet.visibility.set'], category: 'appearance',
       title: '显示或隐藏桌宠形象', description: '隐藏后保留页面恢复按钮；原生桌宠窗口隐藏后可从系统托盘恢复。',
-      parameters: { visible: 'boolean' },
+      parameters: { visible: 'boolean', operationId: 'string?' },
       requiredParameterGroups: [['visible', 'enabled', 'value']], handler: async (args) => {
         const visible = petAssistantBoolean(args.visible ?? args.enabled ?? args.value, true);
         const assistant = window.FeMonsterPetAssistant;
         if (!assistant?.setVisible) throw new Error('桌宠显示控制尚未就绪');
-        await assistant.setVisible(visible);
-        return assistant.visibility();
+        const beforeState = assistant.visibility();
+        const before = beforeState.visible === true;
+        const result = await assistant.setVisible(visible);
+        const after = result.visible === true;
+        return {
+          ...result,
+          status: before === after ? 'unchanged' : 'changed',
+          before,
+          after,
+          undo: { command: 'pet.mascot.visibility.set', parameters: { visible: before } }
+        };
       }
     },
     {
@@ -41655,7 +44333,7 @@ function registerPetAssistantAppCommands() {
     {
       command: 'pet.desktop.visibility.set', category: 'appearance',
       title: '显示或隐藏原生桌宠窗口', description: '控制原生桌宠小窗；隐藏后始终可从 Windows 系统托盘恢复。',
-      parameters: { visible: 'boolean' },
+      parameters: { visible: 'boolean', operationId: 'string?' },
       requiredParameterGroups: [['visible', 'enabled', 'value']], handler: petAssistantSetDesktopVisibility
     },
     {
@@ -41680,11 +44358,13 @@ function registerPetAssistantAppCommands() {
     {
       command: 'pet.desktop.show', category: 'appearance', title: '显示原生桌宠窗口',
       description: '显示 Windows 原生桌宠小窗；若模式尚未启用则进入桌宠模式。',
+      parameters: { operationId: 'string?' },
       handler: () => requestNativeDesktopPet('show')
     },
     {
       command: 'pet.desktop.hide', category: 'appearance', title: '隐藏原生桌宠窗口',
       description: '隐藏 Windows 原生桌宠小窗，并保留系统托盘恢复入口。',
+      parameters: { operationId: 'string?' },
       handler: () => requestNativeDesktopPet('hide')
     },
     {
@@ -41772,30 +44452,57 @@ function registerPetAssistantAppCommands() {
     {
       command: 'playback.play', aliases: ['play'], category: 'playback',
       title: '播放', description: '继续播放当前歌曲。',
+      reversible: true, automaticAllowed: true,
+      parameters: { operationId: 'string?' },
       handler: async () => {
         if (!els.audio?.src && !state.currentSong && !state.queue.length) throw new Error('播放栏暂无歌曲');
-        if (els.audio.paused || els.audio.ended) await togglePlay();
-        return petAssistantPlaybackSnapshot();
+        const before = !(els.audio.paused || els.audio.ended);
+        if (!before) await togglePlay();
+        const snapshot = petAssistantPlaybackSnapshot();
+        return {
+          ...snapshot,
+          status: before === snapshot.playing ? 'unchanged' : 'changed',
+          changed: before !== snapshot.playing,
+          undo: { command: before ? 'playback.play' : 'playback.pause', parameters: {} }
+        };
       }
     },
     {
       command: 'playback.pause', aliases: ['pause'], category: 'playback',
       title: '暂停', description: '暂停当前歌曲。',
+      reversible: true, automaticAllowed: true,
+      parameters: { operationId: 'string?' },
       handler: async () => {
-        if (els.audio?.src && !els.audio.paused) await togglePlay();
-        return petAssistantPlaybackSnapshot();
+        const before = !!els.audio?.src && !els.audio.paused && !els.audio.ended;
+        if (before) await togglePlay();
+        const snapshot = petAssistantPlaybackSnapshot();
+        return {
+          ...snapshot,
+          status: before === snapshot.playing ? 'unchanged' : 'changed',
+          changed: before !== snapshot.playing,
+          undo: { command: before ? 'playback.play' : 'playback.pause', parameters: {} }
+        };
       }
     },
     {
       command: 'playback.toggle', category: 'playback', title: '切换播放状态',
-      description: '在播放和暂停之间切换。', handler: async () => {
+      description: '在播放和暂停之间切换。', reversible: true, automaticAllowed: true,
+      parameters: { operationId: 'string?' }, handler: async () => {
+        const before = !!els.audio?.src && !els.audio.paused && !els.audio.ended;
         await togglePlay();
-        return petAssistantPlaybackSnapshot();
+        const snapshot = petAssistantPlaybackSnapshot();
+        return {
+          ...snapshot,
+          status: before === snapshot.playing ? 'unchanged' : 'changed',
+          changed: before !== snapshot.playing,
+          undo: { command: before ? 'playback.play' : 'playback.pause', parameters: {} }
+        };
       }
     },
     {
       command: 'playback.next', aliases: ['next'], category: 'playback', title: '下一曲',
-      description: '切换到下一首歌曲。', handler: async (_args, context) => {
+      description: '切换到下一首歌曲。',
+      parameters: { operationId: 'string?' }, handler: async (_args, context) => {
         const executeNext = async () => {
           if (await transport('/api/player/next') === false) throw new Error('无法切换到下一首');
           return petAssistantPlaybackSnapshot();
@@ -41811,7 +44518,8 @@ function registerPetAssistantAppCommands() {
     },
     {
       command: 'playback.previous', aliases: ['previous'], category: 'playback', title: '上一曲',
-      description: '切换到上一首歌曲。', handler: async () => {
+      description: '切换到上一首歌曲。',
+      parameters: { operationId: 'string?' }, handler: async () => {
         if (await transport('/api/player/previous') === false) throw new Error('无法切换到上一首');
         return petAssistantPlaybackSnapshot();
       }
@@ -41819,24 +44527,77 @@ function registerPetAssistantAppCommands() {
     {
       command: 'playback.volume.set', aliases: ['set_volume'], category: 'playback',
       title: '设置音量', description: '把音量设置为 0 到 100。',
-      parameters: { volume: 'number 0..100' }, handler: (args) => petAssistantSetVolume(args)
+      reversible: true, automaticAllowed: true,
+      requiresConfirmation: (args, context) => (
+        (context?.automatic === true || args.automatic === true || args.proactive === true)
+        && Number(args.volume ?? args.value) > Math.round(clamp(Number(els.audio?.volume) || 0, 0, 1) * 100)
+      ),
+      parameters: { volume: 'number 0..100', automatic: 'boolean?', operationId: 'string?' },
+      requiredParameterGroups: [['volume', 'value']], handler: (args) => petAssistantSetVolume(args)
     },
     {
       command: 'playback.volume.adjust', category: 'playback', title: '增减音量',
-      description: '按百分点提高或降低音量。', parameters: { delta: 'number -100..100' },
+      description: '按百分点提高或降低音量。', reversible: true, automaticAllowed: true,
+      requiresConfirmation: (args, context) => (
+        (context?.automatic === true || args.automatic === true || args.proactive === true)
+        && Number(args.delta ?? args.amount ?? args.value) > 0
+      ),
+      parameters: { delta: 'number -100..100', automatic: 'boolean?', operationId: 'string?' },
+      requiredParameterGroups: [['delta', 'amount', 'value']],
       handler: (args) => petAssistantSetVolume(args, true)
     },
     {
+      command: 'playback.mute.query', category: 'read', readOnly: true,
+      title: '读取静音状态', description: '读取播放器真实静音状态和当前音量。',
+      handler: () => ({ muted: els.audio?.muted === true, volume: petAssistantPlaybackSnapshot().volume })
+    },
+    {
+      command: 'playback.mute.set', category: 'playback',
+      title: '设置静音状态', description: '只切换播放器静音，不改写用户保存的音量。',
+      reversible: true, automaticAllowed: true,
+      requiresConfirmation: (args, context) => (
+        (context?.automatic === true || args.automatic === true || args.proactive === true)
+        && petAssistantBoolean(args.muted ?? args.enabled ?? args.value, false) === false
+      ),
+      parameters: { muted: 'boolean', operationId: 'string?' },
+      requiredParameterGroups: [['muted', 'enabled', 'value']],
+      handler: (args) => petAssistantSetMuted(args)
+    },
+    {
+      command: 'playback.mute.toggle', category: 'playback',
+      title: '切换静音', description: '在静音与恢复原音量之间切换。',
+      reversible: true, automaticAllowed: true,
+      requiresConfirmation: (args, context) => (
+        (context?.automatic === true || args.automatic === true || args.proactive === true)
+        && els.audio?.muted === true
+      ),
+      parameters: { operationId: 'string?' }, handler: (args) => petAssistantSetMuted(args, true)
+    },
+    {
       command: 'playback.seek', category: 'playback', title: '调整播放进度',
-      description: '跳转到歌曲中的秒数。', parameters: { seconds: 'number' }, handler: async (args) => {
+      description: '跳转到歌曲中的秒数。', reversible: true,
+      parameters: { seconds: 'number', operationId: 'string?' },
+      requiredParameterGroups: [['seconds', 'position']], handler: async (args) => {
         const seconds = Number(args.seconds ?? args.position);
-        if (!Number.isFinite(seconds) || seconds < 0) throw new Error('播放进度必须是非负秒数');
-        const duration = Number(els.audio?.duration);
-        const target = Number.isFinite(duration) && duration > 0 ? clamp(seconds, 0, duration) : seconds;
-        els.audio.currentTime = target;
-        await apiJson(`/api/player/seek?${query({ position: Math.round(target) })}`).catch(() => {});
-        return { ...petAssistantPlaybackSnapshot(), positionSeconds: target };
+        return petAssistantSeekTo(seconds);
       }
+    },
+    {
+      command: 'playback.seek.adjust', category: 'playback', title: '快进或后退',
+      description: '相对当前真实进度前后移动，单次限制在 10 分钟内。', reversible: true,
+      parameters: { deltaSeconds: 'number -600..600', operationId: 'string?' },
+      requiredParameterGroups: [['deltaSeconds', 'delta', 'seconds']], handler: (args) => {
+        const delta = Number(args.deltaSeconds ?? args.delta ?? args.seconds);
+        if (!Number.isFinite(delta) || delta < -600 || delta > 600 || delta === 0) {
+          throw new Error('进度增量必须是 -600 到 600 之间的非零秒数');
+        }
+        return petAssistantSeekTo(Math.max(0, (Number(els.audio?.currentTime) || 0) + delta));
+      }
+    },
+    {
+      command: 'playback.restart', category: 'playback', title: '从头播放当前歌曲',
+      description: '把当前歌曲进度返回到开头，不改变队列。', reversible: true, automaticAllowed: true,
+      parameters: { operationId: 'string?' }, handler: () => petAssistantSeekTo(0)
     },
     {
       command: 'music.search', category: 'music', readOnly: true, title: '搜索歌曲',
@@ -41852,16 +44613,31 @@ function registerPetAssistantAppCommands() {
     {
       command: 'music.search.play', aliases: ['music.search_and_play', 'music.play', 'search_and_play', 'play_song'], category: 'music',
       title: '搜索并播放歌曲', description: '容错搜索歌手和歌名，并播放最佳匹配。',
+      parameters: {
+        query: 'string?', title: 'string?', artist: 'string?', songId: 'string?',
+        automatic: 'boolean?', operationId: 'string?'
+      },
       handler: petAssistantSearchAndPlayFuzzy
     },
     {
       command: 'music.play.similar', aliases: ['play_similar'], category: 'music',
       title: '播放类似歌曲', description: '以指定歌曲或当前歌曲为参考播放相似歌曲。',
+      parameters: {
+        query: 'string?', title: 'string?', artist: 'string?', songId: 'string?',
+        automatic: 'boolean?', operationId: 'string?'
+      },
       handler: petAssistantPlaySimilar
     },
     {
       command: 'navigation.open', aliases: ['open_page'], category: 'navigation',
-      title: '打开页面', description: '打开客户端或社区中的只读页面。', handler: petAssistantOpenPage
+      title: '打开页面', description: '打开客户端或社区中的只读页面。',
+      parameters: { page: 'registered page name', operationId: 'string?' },
+      requiredParameterGroups: [['page', 'tab', 'name']], handler: petAssistantOpenPage
+    },
+    {
+      command: 'navigation.current.query', category: 'read', readOnly: true,
+      title: '读取当前页面', description: '返回客户端当前页面、子区域和已打开的安全界面摘要。',
+      handler: () => ({ page: petAssistantClientContextPage(), ui: petAssistantClientContextUi() })
     },
     {
       command: 'community.page.open', aliases: ['open_community_page', 'open_community_tab'], category: 'navigation',
@@ -42225,6 +45001,84 @@ function registerPetAssistantAppCommands() {
       handler: petAssistantServerUpdateOpen
     },
     {
+      command: 'ai.providers.query', category: 'read', readOnly: true,
+      title: '读取本地 AI 厂商目录',
+      description: '读取已安装客户端内置的模型与 TTS 厂商、实现状态、能力和官方链接；不返回任何凭据。',
+      parameters: { kind: 'chat|tts?' },
+      handler: async (args) => {
+        const service = await clientAiCommandService();
+        const kind = clientAiCommandText(args.kind, '能力类型', 16, { optional: true }).toLowerCase();
+        if (kind && !['chat', 'tts'].includes(kind)) throw new Error('能力类型只能是 chat 或 tts');
+        return { schema: service.catalog().schema, revision: service.catalog().revision, providers: service.providers(kind) };
+      }
+    },
+    {
+      command: 'ai.model.config.query', category: 'read', readOnly: true,
+      title: '读取本地模型配置',
+      description: '读取本机自备模型的脱敏配置与就绪状态；不会返回 API Key。',
+      handler: async () => {
+        const service = await clientAiCommandService();
+        const snapshot = service.publicSnapshot();
+        return { mode: snapshot.modelMode, revision: snapshot.revision, config: snapshot.model };
+      }
+    },
+    {
+      command: 'ai.tts.config.query', category: 'read', readOnly: true,
+      title: '读取本地 TTS 配置',
+      description: '读取本机 TTS 厂商、音色、输出和情感参数的脱敏快照；不会返回凭据。',
+      handler: async () => {
+        const service = await clientAiCommandService();
+        const snapshot = service.publicSnapshot();
+        return {
+          mode: snapshot.ttsMode,
+          enabled: snapshot.ttsEnabled !== false,
+          revision: snapshot.revision,
+          config: snapshot.tts
+        };
+      }
+    },
+    {
+      command: 'ai.model.select', category: 'settings',
+      title: '切换本地自备模型',
+      description: '只可选择客户端内置的受信任厂商和模型名称；不能设置接口地址、请求头或凭据。',
+      parameters: { providerId: 'registered chat provider id', model: 'model id?' },
+      requiredParameterGroups: [['providerId', 'provider']],
+      handler: clientAiCommandModelSelect
+    },
+    {
+      command: 'ai.tts.provider.select', category: 'settings',
+      title: '切换本地 TTS 厂商',
+      description: '只可选择客户端内置且已实现的 TTS 厂商；凭据仍必须由用户在设置页填写。',
+      parameters: { providerId: 'registered tts provider id', model: 'model id?', voice: 'voice id?' },
+      requiredParameterGroups: [['providerId', 'provider']],
+      handler: clientAiCommandTtsProviderSelect
+    },
+    {
+      command: 'ai.tts.voice.select', category: 'settings',
+      title: '切换本地 TTS 音色',
+      description: '切换当前本地 TTS 的音色 ID；不接受网址、路径或凭据。',
+      parameters: { voice: 'voice id' }, requiredParameterGroups: [['voice', 'voiceId']],
+      handler: clientAiCommandTtsVoiceSelect
+    },
+    {
+      command: 'ai.tts.prosody.set', category: 'settings',
+      title: '调整豆包语音情感与韵律',
+      description: '调整当前豆包实时语音的情感、情感强度、语速和响度，值会被限制在厂商安全范围内。',
+      parameters: { emotion: 'string?', emotionScale: 'number 1..5?', speechRate: 'number -50..100?', loudnessRate: 'number -50..100?' },
+      handler: clientAiCommandTtsProsodySet
+    },
+    {
+      command: 'ai.tts.output.set', category: 'settings',
+      title: '调整豆包语音输出',
+      description: '调整当前豆包实时语音的格式、采样率和码率；不修改凭据。',
+      parameters: {
+        format: 'mp3|pcm|ogg_opus?',
+        sampleRate: '8000|16000|22050|24000|32000|44100|48000?',
+        bitRate: 'MP3 only, number 64000..160000?'
+      },
+      handler: clientAiCommandTtsOutputSet
+    },
+    {
       command: 'scene.preset.catalog.query', aliases: ['preset.list', 'scene.preset.list'], category: 'read', readOnly: true,
       title: '列出已注册场景预设',
       description: '列出全部内置及 state.sandbox.presets 动态注册的本地或市场场景预设。',
@@ -42248,11 +45102,37 @@ function registerPetAssistantAppCommands() {
       command: 'scene.preset.set', aliases: ['preset.switch', 'switch_preset'], category: 'appearance',
       title: '切换场景预设',
       description: '按名称或 ID 切换任意已注册内置、本地或市场场景预设；动态预设复用 enterDiyScenePresetPlayback。',
+      reversible: true, automaticAllowed: true,
+      parameters: { preset: 'registered preset id or exact name', operationId: 'string?' },
+      requiredParameterGroups: [['preset', 'id', 'name', 'query']],
       handler: petAssistantSwitchPreset
     },
     {
+      command: 'scene.preset.current.query', category: 'read', readOnly: true,
+      title: '读取当前场景预设', description: '读取当前真实场景和匹配的注册预设摘要。',
+      handler: () => {
+        const active = petAssistantPresetCatalog().find((preset) => preset.active) || null;
+        return {
+          preset: active ? {
+            id: active.id,
+            name: active.name,
+            source: active.source,
+            presetType: active.presetType,
+            ...(active.author ? { author: active.author } : {}),
+            ...(active.platform ? { platform: active.platform } : {}),
+            ...(active.workshopId ? { workshopId: active.workshopId } : {})
+          } : null,
+          diyPreset: normalizeDiyPreset(state.diyPreset),
+          scenePreset: normalizeDiyPreset(state.scenePreset),
+          ...(active?.id === 'soundscape-workshop' ? { runtime: soundscapeWorkshopRuntimeSnapshot() } : {})
+        };
+      }
+    },
+    {
       command: 'lyrics.mode.set', aliases: ['set_lyric_mode'], category: 'lyrics',
-      title: '设置歌词模式', description: '设置单排、多排、双语或视觉歌词模式。', handler: petAssistantSetLyricMode
+      title: '设置歌词模式', description: '设置单排、多排、双语或视觉歌词模式。',
+      parameters: { mode: 'none|single|multi|bilingual|depth|flow|book|focus-echo|glitch', operationId: 'string?' },
+      requiredParameterGroups: [['mode', 'preset', 'value']], handler: petAssistantSetLyricMode
     },
     {
       command: 'lyrics.offset.set', aliases: ['set_lyric_offset'], category: 'lyrics',
@@ -42274,25 +45154,149 @@ function registerPetAssistantAppCommands() {
     },
     {
       command: 'lyrics.bilingual.set', category: 'lyrics', title: '切换双语歌词',
-      description: '开启或关闭双语歌词。', parameters: { enabled: 'boolean' },
+      description: '开启或关闭双语歌词。', parameters: { enabled: 'boolean', operationId: 'string?' },
+      reversible: true, automaticAllowed: true,
       requiredParameterGroups: [['enabled', 'value']], handler: (args) => {
+        const before = state.bilingualLyricsEnabled !== false;
         setBilingualLyricsEnabled(petAssistantBoolean(args.enabled ?? args.value, true));
-        return { bilingual: state.bilingualLyricsEnabled !== false };
+        const after = state.bilingualLyricsEnabled !== false;
+        return {
+          status: before === after ? 'unchanged' : 'changed',
+          changed: before !== after,
+          bilingual: after,
+          undo: { command: 'lyrics.bilingual.set', parameters: { enabled: before } }
+        };
       }
     },
     {
       command: 'lyrics.multi.row.set', category: 'lyrics', title: '切换多排歌词',
-      description: '开启或关闭多排歌词。', parameters: { enabled: 'boolean' },
-      requiredParameterGroups: [['enabled', 'value']], handler: (args) => ({
-        multiRow: setMultiRowLyricsEnabled(petAssistantBoolean(args.enabled ?? args.value, true))
+      description: '开启或关闭多排歌词。', parameters: { enabled: 'boolean', operationId: 'string?' },
+      reversible: true, automaticAllowed: true,
+      requiredParameterGroups: [['enabled', 'value']], handler: (args) => {
+        const before = state.multiRowLyricsEnabled === true;
+        setMultiRowLyricsEnabled(petAssistantBoolean(args.enabled ?? args.value, true));
+        const after = state.multiRowLyricsEnabled === true;
+        return {
+          status: before === after ? 'unchanged' : 'changed',
+          changed: before !== after,
+          multiRow: after,
+          undo: { command: 'lyrics.multi.row.set', parameters: { enabled: before } }
+        };
+      }
+    },
+    {
+      command: 'lyrics.state.query', category: 'read', readOnly: true,
+      title: '读取歌词状态', description: '读取当前歌词模式、双语、多排、偏移及活动歌词，不返回完整歌词文本。',
+      handler: () => {
+        const line = state.lyricLines[state.lyricIndex] || null;
+        return {
+          mode: safeText(state.textPreset, ''),
+          visible: state.textPreset !== 'none',
+          focusEcho: state.textPreset === 'focus-echo',
+          bilingual: state.bilingualLyricsEnabled !== false,
+          multiRow: state.multiRowLyricsEnabled === true,
+          offsetSeconds: lyricClockOffsetSeconds(),
+          activeIndex: state.lyricIndex,
+          activeText: safeText(state.lyricDisplayText || line?.text, '').slice(0, 300),
+          translation: safeText(state.lyricSubtitleText || line?.translation, '').slice(0, 300)
+        };
+      }
+    },
+    {
+      command: 'lyrics.focus.echo.set', category: 'lyrics',
+      title: '切换焦点回声歌词', description: '开启焦点回声；关闭时恢复默认清晰歌词预设。',
+      reversible: true, automaticAllowed: true,
+      parameters: { enabled: 'boolean', operationId: 'string?' },
+      requiredParameterGroups: [['enabled', 'value']], handler: (args) => {
+        const before = safeText(state.textPreset, DEFAULT_TEXT_PRESET);
+        const enabled = petAssistantBoolean(args.enabled ?? args.value, true);
+        if (enabled) setTextPreset('focus-echo', { applyTemplate: true });
+        else if (state.textPreset === 'focus-echo') setTextPreset(DEFAULT_TEXT_PRESET, { applyTemplate: true });
+        const after = safeText(state.textPreset, DEFAULT_TEXT_PRESET);
+        return {
+          status: before === after ? 'unchanged' : 'changed', before, after,
+          focusEcho: after === 'focus-echo',
+          undo: { command: 'lyrics.mode.set', parameters: { mode: before } }
+        };
+      }
+    },
+    {
+      command: 'lyrics.visibility.set', category: 'lyrics',
+      title: '显示或隐藏歌词', description: '隐藏歌词视觉层，重新显示时恢复默认清晰歌词预设。',
+      reversible: true, automaticAllowed: true,
+      parameters: { visible: 'boolean', operationId: 'string?' },
+      requiredParameterGroups: [['visible', 'enabled', 'value']], handler: (args) => {
+        const before = safeText(state.textPreset, DEFAULT_TEXT_PRESET);
+        const visible = petAssistantBoolean(args.visible ?? args.enabled ?? args.value, true);
+        if (!visible) setTextPreset('none', { applyTemplate: false });
+        else if (state.textPreset === 'none') setTextPreset(DEFAULT_TEXT_PRESET, { applyTemplate: true });
+        const after = safeText(state.textPreset, DEFAULT_TEXT_PRESET);
+        return {
+          status: before === after ? 'unchanged' : 'changed', before, after,
+          visible: after !== 'none',
+          undo: { command: 'lyrics.mode.set', parameters: { mode: before } }
+        };
+      }
+    },
+    {
+      command: 'wallpaper.appearance.query', category: 'read', readOnly: true,
+      title: '读取壁纸外观', description: '读取当前壁纸 ID、来源、透明度、亮度、模糊、缩放和适配模式。',
+      handler: () => ({
+        id: petAssistantClientContextId(state.activeWallpaperId),
+        source: safeText(state.wallpaperSource, ''),
+        opacity: Math.round(state.wallpaperOpacity * 100),
+        brightness: Math.round(state.wallpaperBrightness * 100),
+        blur: Math.round(state.wallpaperBlur),
+        scale: Math.round(state.wallpaperScale * 100),
+        fit: state.wallpaperFitMode
       })
     },
     {
       command: 'wallpaper.setting.set', aliases: ['set_wallpaper_appearance'], category: 'wallpaper',
       title: '调整壁纸外观', description: '调整现有壁纸的透明度、亮度、模糊、缩放和适配方式；不导入或删除文件。',
+      reversible: true, automaticAllowed: true,
+      parameters: {
+        opacity: 'number 30..100?', brightness: 'number 35..150?', blur: 'number 0..24?',
+        scale: 'number 70..100?', fit: 'fill|fit|stretch?', operationId: 'string?'
+      },
       handler: petAssistantSetWallpaperAppearance
     }
   ]);
+  const careActions = window.FeMonsterCompanionCareActions;
+  if (!careActions?.create) throw new Error('Companion care action module is unavailable.');
+  const companionMemory = {
+    query: () => communityApiJson(`/api/community/pet/memories?${query({ provider: state.activeProvider })}`),
+    forget: (selector) => communityApiJson(`/api/community/pet/memory/forget?${query({ provider: state.activeProvider })}`, {
+      method: 'POST',
+      body: JSON.stringify(selector)
+    })
+  };
+  const companionCareRuntime = careActions.create({
+    commandBus: commands,
+    catalog: () => state.wallpapers,
+    wallpaper: {
+      currentId: () => state.activeWallpaperId,
+      apply: applyCompanionWallpaper
+    },
+    playback: {
+      search: (args) => commands.execute('music.search', args, { source: 'companion-care' }),
+      playSearch: (args) => commands.execute('music.search.play', args, { source: 'companion-care' }),
+      playSimilar: (args) => commands.execute('music.play.similar', args, { source: 'companion-care' }),
+      snapshot: () => petAssistantPlaybackSnapshot(),
+      volume: () => Math.round(clamp(Number(els.audio?.volume) || 0, 0, 1) * 100),
+      setVolume: (volume) => commands.execute(
+        'playback.volume.set',
+        { volume },
+        { source: 'companion-care' }
+      )
+    },
+    habits: () => ensurePlaybackIntelligence().execute('habit.summary'),
+    memory: companionMemory,
+    clock: () => new Date()
+  });
+  window.FeMonsterCompanionCareBridge = Object.freeze({
+    proactiveContext: (detail) => companionCareRuntime.proactiveContext(detail)
+  });
 }
 
 registerPetAssistantAppCommands();
@@ -42305,6 +45309,20 @@ function resolvePetAssistantRoutableCommand(name) {
   } catch (_) {
     return '';
   }
+}
+
+function petAssistantCommandContext(context = {}, source = 'pet-assistant') {
+  return {
+    source,
+    confirmed: context.confirmed === true,
+    automatic: context.automatic === true || context.automaticExecutionRequested === true,
+    proactive: context.proactive === true,
+    operationId: safeText(context.operationId, ''),
+    actionId: safeText(context.actionId, ''),
+    requestId: safeText(context.requestId, ''),
+    taintedByExternalContent: context.taintedByExternalContent === true,
+    sourceTrust: context.sourceTrust
+  };
 }
 
 function inspectPetAssistantAction(command = {}, context = {}) {
@@ -42322,19 +45340,22 @@ function inspectPetAssistantAction(command = {}, context = {}) {
   if (name === 'control_app' || name === 'execute_app_command') {
     const requestedCommand = petAssistantBoundedText(args.command, '程序命令', 96);
     const parameters = petAssistantArguments(args.arguments || args.parameters);
-    return window.FeMonsterAppCommands.inspect(requestedCommand, parameters, {
-      source: 'pet-assistant',
-      taintedByExternalContent: context.taintedByExternalContent === true,
-      sourceTrust: context.sourceTrust
-    });
+    return window.FeMonsterAppCommands.inspect(
+      requestedCommand,
+      parameters,
+      petAssistantCommandContext(context, 'pet-assistant')
+    );
   }
   const routedCommand = resolvePetAssistantRoutableCommand(name);
   if (!routedCommand) throw new Error('当前客户端不支持这个程序命令');
-  return window.FeMonsterAppCommands.inspect(routedCommand, args, {
-    source: PET_ASSISTANT_LEGACY_COMMANDS[name] ? 'pet-assistant-legacy' : 'pet-assistant-direct',
-    taintedByExternalContent: context.taintedByExternalContent === true,
-    sourceTrust: context.sourceTrust
-  });
+  return window.FeMonsterAppCommands.inspect(
+    routedCommand,
+    args,
+    petAssistantCommandContext(
+      context,
+      PET_ASSISTANT_LEGACY_COMMANDS[name] ? 'pet-assistant-legacy' : 'pet-assistant-direct'
+    )
+  );
 }
 
 async function executePetAssistantAction(command = {}, context = {}) {
@@ -42346,21 +45367,22 @@ async function executePetAssistantAction(command = {}, context = {}) {
   if (name === 'control_app' || name === 'execute_app_command') {
     const requestedCommand = petAssistantBoundedText(args.command, '程序命令', 96);
     const parameters = petAssistantArguments(args.arguments || args.parameters);
-    return window.FeMonsterAppCommands.execute(requestedCommand, parameters, {
-      source: 'pet-assistant',
-      confirmed: context.confirmed === true,
-      taintedByExternalContent: context.taintedByExternalContent === true,
-      sourceTrust: context.sourceTrust
-    });
+    return window.FeMonsterAppCommands.execute(
+      requestedCommand,
+      parameters,
+      petAssistantCommandContext(context, 'pet-assistant')
+    );
   }
   const routedCommand = resolvePetAssistantRoutableCommand(name);
   if (!routedCommand) throw new Error('当前客户端不支持这个程序命令');
-  return window.FeMonsterAppCommands.execute(routedCommand, args, {
-    source: PET_ASSISTANT_LEGACY_COMMANDS[name] ? 'pet-assistant-legacy' : 'pet-assistant-direct',
-    confirmed: context.confirmed === true,
-    taintedByExternalContent: context.taintedByExternalContent === true,
-    sourceTrust: context.sourceTrust
-  });
+  return window.FeMonsterAppCommands.execute(
+    routedCommand,
+    args,
+    petAssistantCommandContext(
+      context,
+      PET_ASSISTANT_LEGACY_COMMANDS[name] ? 'pet-assistant-legacy' : 'pet-assistant-direct'
+    )
+  );
 }
 
 window.FeMonsterPetActionBridge = Object.freeze({
@@ -42375,9 +45397,17 @@ window.FeMonsterPetActionBridge = Object.freeze({
 
 async function init() {
   initCursorPreferences();
+  clientAiServiceSyncControls();
   initCursorMotionRuntime();
   initDesktopSceneBridge();
   initBootScreen();
+  initializeSettingsCenter();
+  applyTextComposerSettings({
+    persist: false,
+    renderLyrics: false,
+    measureSubtitle: false,
+    syncGlitch: false
+  });
   const identityBootstrap = refreshMusicApiProviders({ silent: true }).then(() => {
     void refreshLoginStatus(state.activeProvider).finally(() => scheduleCommunityRefresh(0));
   });

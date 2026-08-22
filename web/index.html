@@ -22,16 +22,16 @@
     <link rel="stylesheet" href="/components/BorderGlow.css?v=20260811-cache-audit-1" />
     <link rel="stylesheet" href="border-glow-buttons.css?v=20260811-cache-audit-1" />
   <link rel="stylesheet" href="text-fonts.css?v=20260811-cache-audit-1" />
-    <link rel="stylesheet" href="styles.css?v=20260812-friend-card-1" />
+    <link rel="stylesheet" href="styles.css?v=20260821-professional-mixer-3" />
     <link rel="stylesheet" href="rhythm-game.css?v=20260811-cache-audit-1" />
     <link rel="stylesheet" href="black-gold-buttons.css?v=20260811-cache-audit-1" />
     <link rel="stylesheet" href="pixel-adventure.css?v=20260813-achievement-rewards-1" />
-    <link rel="stylesheet" href="pet-assistant.css?v=20260811-conversation-emotion-2" />
+    <link rel="stylesheet" href="pet-assistant.css?v=20260816-pet-chain-fix-1" />
     <link rel="stylesheet" href="pet-companion-p2.css?v=20260811-cache-audit-1" />
     <link rel="stylesheet" href="pet-product-tour.css?v=20260811-moving-guide-1" />
     <link rel="stylesheet" href="community-reward-runtime.css?v=20260812-reward-stages-2" />
   <link rel="stylesheet" href="fe-identity-card.css?v=20260813-material-texture-2" />
-    <link rel="stylesheet" href="lyric-render-quality.css?v=20260811-cache-audit-1" />
+    <link rel="stylesheet" href="lyric-render-quality.css?v=20260819-playbar-straight-1" />
   </head>
   <body>
     <section class="boot-screen" id="bootScreen" aria-label="FE moster launch screen">
@@ -43,9 +43,6 @@
 
     <div class="app-shell">
       <div class="runtime-topbar">
-        <button class="window-control-button window-control-button--settings" id="runtimeSettingsButton" type="button" title="Runtime settings" aria-label="Runtime settings" aria-expanded="false" aria-controls="runtimeSettingsPanel">
-          <span aria-hidden="true"></span>
-        </button>
         <button class="window-control-button window-control-button--fullscreen" id="windowExitFullscreenButton" type="button" title="Toggle fullscreen" aria-label="Toggle fullscreen">
           <span aria-hidden="true"></span>
         </button>
@@ -60,7 +57,56 @@
         </button>
       </div>
 
-      <section class="runtime-settings-panel" id="runtimeSettingsPanel" aria-label="Runtime settings" hidden>
+      <section
+        class="runtime-settings-panel settings-center"
+        id="runtimeSettingsPanel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="runtimeSettingsTitle"
+        aria-hidden="true"
+        tabindex="-1"
+        hidden
+      >
+        <header class="settings-center-titlebar">
+          <span>
+            <small>FE MONSTER</small>
+            <strong id="runtimeSettingsTitle">设置中心</strong>
+          </span>
+          <button
+            class="settings-center-close"
+            id="runtimeSettingsCloseButton"
+            type="button"
+            data-settings-center-close
+            aria-label="关闭设置中心"
+          ><span aria-hidden="true">×</span></button>
+        </header>
+        <div class="settings-center-body">
+          <nav class="settings-center-nav" role="tablist" aria-label="设置类别" aria-orientation="vertical">
+            <button id="settingsNavGeneral" type="button" role="tab" data-settings-page-id="general" aria-controls="settingsCenterPageGeneral" aria-selected="true">常规</button>
+            <button id="settingsNavVisual" type="button" role="tab" data-settings-page-id="visual" aria-controls="settingsCenterPageVisual" aria-selected="false" tabindex="-1">画面与场景</button>
+            <button id="settingsNavLyrics" type="button" role="tab" data-settings-page-id="lyrics" aria-controls="settingsCenterPageLyrics" aria-selected="false" tabindex="-1">歌词</button>
+            <button id="settingsNavPet" type="button" role="tab" data-settings-page-id="pet" aria-controls="settingsCenterPagePet" aria-selected="false" tabindex="-1">桌宠</button>
+            <button id="settingsNavAiTts" type="button" role="tab" data-settings-page-id="ai-tts" aria-controls="settingsCenterPageAiTts" aria-selected="false" tabindex="-1">模型与 TTS</button>
+            <button id="settingsNavMixer" type="button" role="tab" data-settings-page-id="mixer" aria-controls="settingsCenterPageMixer" aria-selected="false" tabindex="-1">调音台</button>
+            <button id="settingsNavCursor" type="button" role="tab" data-settings-page-id="cursor" aria-controls="settingsCenterPageCursor" aria-selected="false" tabindex="-1">光标</button>
+          </nav>
+          <div class="settings-center-content" id="settingsCenterContent">
+            <section class="settings-center-page" id="settingsCenterPageGeneral" data-settings-page="general" aria-labelledby="settingsNavGeneral"></section>
+            <section class="settings-center-page" id="settingsCenterPageVisual" data-settings-page="visual" aria-labelledby="settingsNavVisual" aria-hidden="true" inert hidden></section>
+            <section class="settings-center-page" id="settingsCenterPageLyrics" data-settings-page="lyrics" aria-labelledby="settingsNavLyrics" aria-hidden="true" inert hidden>
+              <div class="settings-center-page-intro">
+                <small>LYRICS</small>
+                <strong>歌词与文字参数</strong>
+                <p>字体、排版、调色、翻译和动画继续使用播放栏里的同一套文字控件。</p>
+                <button id="settingsOpenTextParametersButton" type="button">打开文字参数</button>
+              </div>
+            </section>
+            <section class="settings-center-page" id="settingsCenterPagePet" data-settings-page="pet" aria-labelledby="settingsNavPet" aria-hidden="true" inert hidden></section>
+            <section class="settings-center-page" id="settingsCenterPageAiTts" data-settings-page="ai-tts" aria-labelledby="settingsNavAiTts" aria-hidden="true" inert hidden></section>
+            <section class="settings-center-page" id="settingsCenterPageMixer" data-settings-page="mixer" aria-labelledby="settingsNavMixer" aria-hidden="true" inert hidden></section>
+            <section class="settings-center-page" id="settingsCenterPageCursor" data-settings-page="cursor" aria-labelledby="settingsNavCursor" aria-hidden="true" inert hidden></section>
+          </div>
+        </div>
         <label class="runtime-toggle">
           <input class="ui-switch" id="gpuAccelerationToggle" type="checkbox" role="switch" />
           <span>GPU</span>
@@ -149,6 +195,174 @@
               </span>
               <small id="petAssistantShortcutHint">按一次开始连续实时对话，再按一次结束；输入框中不会误输入快捷键。</small>
             </div>
+          </div>
+        </details>
+        <details class="runtime-settings-group runtime-ai-service-settings" id="aiServiceSettingsGroup">
+          <summary>
+            <span>AI 与语音服务</span>
+            <small>自备模型 / TTS，或继续使用服务器</small>
+          </summary>
+          <div class="runtime-settings-group-content runtime-ai-service-content">
+            <label class="runtime-ai-field" for="aiServiceModelModeSelect">
+              <span>模型来源</span>
+              <select id="aiServiceModelModeSelect">
+                <option value="server">FE Monster 服务器</option>
+                <option value="custom">使用我的模型 API</option>
+              </select>
+            </label>
+            <div class="runtime-ai-service-section" id="aiServiceModelFields" hidden>
+              <div class="runtime-ai-service-head">
+                <span>
+                  <strong>模型 API</strong>
+                  <small>使用 OpenAI 兼容接口，可直接选择常用国内/国际模型服务。</small>
+                </span>
+                <span class="runtime-ai-provider-links" aria-label="模型服务商官方入口">
+                  <a id="aiServiceModelConsoleLink" target="_blank" rel="noopener noreferrer" hidden>获取 API Key</a>
+                  <a id="aiServiceModelDocsLink" target="_blank" rel="noopener noreferrer" hidden>官方文档</a>
+                </span>
+              </div>
+              <label class="runtime-ai-field" for="aiServiceModelProviderSelect">
+                <span>模型服务商</span>
+                <select id="aiServiceModelProviderSelect"></select>
+              </label>
+              <label class="runtime-ai-field" for="aiServiceModelBaseUrl">
+                <span>Base URL</span>
+                <input id="aiServiceModelBaseUrl" type="url" inputmode="url" autocomplete="off" spellcheck="false" />
+              </label>
+              <label class="runtime-ai-field" for="aiServiceModelApiKey">
+                <span>API Key</span>
+                <span class="runtime-ai-secret-row">
+                  <input id="aiServiceModelApiKey" class="runtime-ai-secret-input" type="password" autocomplete="new-password" placeholder="留空保持不变" />
+                  <button id="aiServiceModelKeyClearButton" type="button">清除</button>
+                </span>
+              </label>
+              <label class="runtime-ai-field" for="aiServiceModelName">
+                <span>模型名</span>
+                <input id="aiServiceModelName" type="text" list="aiServiceModelNameList" autocomplete="off" spellcheck="false" />
+                <datalist id="aiServiceModelNameList"></datalist>
+              </label>
+              <button class="runtime-ai-test-button" id="aiServiceModelTestButton" type="button">测试模型连接</button>
+            </div>
+            <label class="runtime-ai-field" for="aiServiceTtsModeSelect">
+              <span>TTS 来源（跟随模型）</span>
+              <select id="aiServiceTtsModeSelect" disabled aria-disabled="true" aria-describedby="aiServiceTtsModeHint">
+                <option value="server">FE Monster 服务器</option>
+                <option value="custom">使用我的云 TTS API</option>
+              </select>
+              <small id="aiServiceTtsModeHint">服务器模型使用服务器语音；客户端自备模型仅使用客户端配置的云端 TTS。</small>
+            </label>
+            <div class="runtime-ai-service-section" id="aiServiceTtsFields" hidden>
+              <div class="runtime-ai-service-head">
+                <span>
+                  <strong>云语音 TTS</strong>
+                  <small>支持 OpenAI 兼容服务和豆包 V3 双向实时语音。</small>
+                </span>
+                <span class="runtime-ai-provider-links" aria-label="TTS 服务商官方入口">
+                  <a id="aiServiceTtsConsoleLink" target="_blank" rel="noopener noreferrer" hidden>获取 API Key</a>
+                  <a id="aiServiceTtsDocsLink" target="_blank" rel="noopener noreferrer" hidden>官方文档</a>
+                </span>
+              </div>
+              <button
+                class="runtime-ai-tts-toggle"
+                id="aiServiceTtsEnabledToggle"
+                type="button"
+                role="switch"
+                aria-label="客户端 TTS"
+                aria-checked="true"
+                aria-describedby="aiServiceTtsEnabledHint"
+              >
+                <span>
+                  <strong>客户端 TTS</strong>
+                  <small id="aiServiceTtsEnabledHint">关闭后本地模型继续回复文字，不会合成或回退到服务器语音。</small>
+                </span>
+                <span class="runtime-ai-tts-toggle__state" id="aiServiceTtsEnabledState" aria-hidden="true">已开启</span>
+              </button>
+              <label class="runtime-ai-field" for="aiServiceTtsProviderSelect">
+                <span>TTS 服务商</span>
+                <select id="aiServiceTtsProviderSelect"></select>
+              </label>
+              <div class="runtime-ai-doubao-fields" id="aiServiceDoubaoFields" hidden>
+                <label class="runtime-ai-field" for="aiServiceTtsAuthModeSelect">
+                  <span>豆包鉴权方式</span>
+                  <select id="aiServiceTtsAuthModeSelect">
+                    <option value="api-key">API Key（新版控制台）</option>
+                    <option value="legacy-app-access">App ID + Access Key（旧版）</option>
+                  </select>
+                </label>
+                <label class="runtime-ai-field" for="aiServiceTtsResourceId">
+                  <span>Resource ID</span>
+                  <select id="aiServiceTtsResourceId">
+                    <option value="seed-tts-2.0">seed-tts-2.0</option>
+                    <option value="seed-icl-2.0">seed-icl-2.0（声音复刻）</option>
+                  </select>
+                </label>
+                <label class="runtime-ai-field" for="aiServiceTtsAppId" data-doubao-auth="legacy-app-access" hidden>
+                  <span>App ID</span>
+                  <input id="aiServiceTtsAppId" class="runtime-ai-secret-input" type="password" autocomplete="new-password" placeholder="留空保持不变" />
+                </label>
+                <label class="runtime-ai-field" for="aiServiceTtsAccessKey" data-doubao-auth="legacy-app-access" hidden>
+                  <span>Access Key</span>
+                  <input id="aiServiceTtsAccessKey" class="runtime-ai-secret-input" type="password" autocomplete="new-password" placeholder="留空保持不变" />
+                </label>
+              </div>
+              <label class="runtime-ai-field" for="aiServiceTtsBaseUrl">
+                <span>Base URL</span>
+                <input id="aiServiceTtsBaseUrl" type="url" inputmode="url" autocomplete="off" spellcheck="false" />
+              </label>
+              <label class="runtime-ai-field" for="aiServiceTtsApiKey">
+                <span>TTS Key</span>
+                <span class="runtime-ai-secret-row">
+                  <input id="aiServiceTtsApiKey" class="runtime-ai-secret-input" type="password" autocomplete="new-password" placeholder="留空保持不变" />
+                  <button id="aiServiceTtsKeyClearButton" type="button">清除</button>
+                </span>
+              </label>
+              <label class="runtime-ai-field" for="aiServiceTtsModel">
+                <span>TTS 模型</span>
+                <input id="aiServiceTtsModel" type="text" list="aiServiceTtsModelList" autocomplete="off" spellcheck="false" />
+                <datalist id="aiServiceTtsModelList"></datalist>
+              </label>
+              <label class="runtime-ai-field" for="aiServiceTtsVoice">
+                <span>音色</span>
+                <input id="aiServiceTtsVoice" type="text" autocomplete="off" spellcheck="false" />
+              </label>
+              <div class="runtime-ai-doubao-fields runtime-ai-doubao-output" id="aiServiceDoubaoOutputFields" hidden>
+                <label class="runtime-ai-field" for="aiServiceTtsFormat">
+                  <span>实时音频格式</span>
+                  <select id="aiServiceTtsFormat">
+                    <option value="mp3">MP3（推荐）</option>
+                    <option value="ogg_opus">Ogg Opus</option>
+                    <option value="pcm">PCM</option>
+                  </select>
+                </label>
+                <label class="runtime-ai-field" for="aiServiceTtsSampleRate">
+                  <span>采样率</span>
+                  <select id="aiServiceTtsSampleRate">
+                    <option value="16000">16 kHz</option>
+                    <option value="24000">24 kHz（推荐）</option>
+                    <option value="48000">48 kHz</option>
+                  </select>
+                </label>
+                <label class="runtime-ai-field" for="aiServiceTtsEmotion">
+                  <span>语音情绪</span>
+                  <input id="aiServiceTtsEmotion" type="text" maxlength="64" autocomplete="off" placeholder="留空自动；需音色支持" />
+                </label>
+                <label class="runtime-ai-field" for="aiServiceTtsEmotionScale">
+                  <span>情绪强度</span>
+                  <input id="aiServiceTtsEmotionScale" type="number" min="1" max="5" step="1" value="4" />
+                </label>
+                <label class="runtime-ai-field" for="aiServiceTtsSpeechRate">
+                  <span>语速</span>
+                  <input id="aiServiceTtsSpeechRate" type="number" min="-50" max="100" step="1" value="0" />
+                </label>
+                <label class="runtime-ai-field" for="aiServiceTtsLoudnessRate">
+                  <span>响度</span>
+                  <input id="aiServiceTtsLoudnessRate" type="number" min="-50" max="100" step="1" value="0" />
+                </label>
+              </div>
+              <button class="runtime-ai-test-button" id="aiServiceTtsTestButton" type="button">测试 TTS 连接</button>
+            </div>
+            <button class="runtime-action-button runtime-ai-save-button" id="aiServiceSaveButton" type="button">保存服务配置</button>
+            <output class="runtime-ai-service-status" id="aiServiceStatus" aria-live="polite">服务器提供 AI 与 TTS 服务</output>
           </div>
         </details>
         <div class="runtime-product-tour" aria-label="桌宠程序演示">
@@ -1258,6 +1472,10 @@
             <div class="sonic-topography-core" id="sonicTopographyCore"></div>
           </div>
         </section>
+        <section class="soundscape-workshop-scene" id="soundscapeWorkshopScene" aria-label="音域回响 · CmZya · Wallpaper Engine" hidden>
+          <div class="soundscape-workshop-host" id="soundscapeWorkshopHost" aria-label="音域回响实时音频场景"></div>
+          <span class="soundscape-workshop-status" id="soundscapeWorkshopStatus" role="status" aria-live="polite">正在加载音域回响</span>
+        </section>
         <section class="chladni-scene" id="chladniScene" aria-label="克拉尼 3D 粒子图形" hidden>
           <div class="chladni-core" id="chladniCore" aria-hidden="true"></div>
         </section>
@@ -1311,6 +1529,16 @@
         </section>
         <section class="qishui-playback-card" id="qishuiPlaybackCard" aria-label="音乐悬浮播放页" hidden>
           <article class="qishui-playback-phone" id="qishuiPlaybackPhone" aria-expanded="false">
+            <button
+              class="qishui-playback-settings-button"
+              id="runtimeSettingsButton"
+              type="button"
+              title="设置"
+              aria-label="打开设置中心"
+              aria-haspopup="dialog"
+              aria-expanded="false"
+              aria-controls="runtimeSettingsPanel"
+            ><span aria-hidden="true"></span></button>
             <div
               class="qishui-playback-ambient glass-surface glass-surface--fallback"
               aria-hidden="true"
@@ -1705,6 +1933,10 @@
                 <strong>Sonic</strong>
                 <small>Terrain</small>
               </button>
+              <button class="diy-preset-card" id="diySoundscapeWorkshopPreset" type="button" data-preset="soundscape-workshop">
+                <strong>音域回响</strong>
+                <small>CmZya · Wallpaper Engine</small>
+              </button>
               <button class="diy-preset-card" id="diyChladniPreset" type="button" data-preset="chladni">
                 <strong>克拉尼</strong>
                 <small>平面 · 3D六面</small>
@@ -1857,6 +2089,10 @@
               </div>
             </details>
           </section>
+          <details class="scene-feature-group" id="soundscapeWorkshopFeatureGroup" data-scene-feature-preset="soundscape-workshop" open hidden>
+            <summary><strong>音域回响</strong><small>CmZya · Wallpaper Engine · 27 项参数</small></summary>
+            <div class="scene-feature-group__content soundscape-workshop-controls" id="soundscapeWorkshopControls" aria-label="音域回响场景参数"></div>
+          </details>
           <details class="scene-feature-group" id="cubeIntensityFeatureGroup" data-scene-feature-preset="cube" open hidden>
             <summary><strong>动态魔方</strong><small>音频响应强度</small></summary>
             <div class="scene-feature-group__content diy-control" id="diyCubeIntensityControl" data-diy-preset-control="cube">
@@ -2849,26 +3085,18 @@
     <script type="module" src="client-runtime-loader.js?v=20260811-cache-audit-1"></script>
     <script src="render-quality.js?v=20260811-cache-audit-1"></script>
     <script src="wallpaper-video-continuity.js?v=20260811-cache-audit-1"></script>
-    <script src="app-command.js?v=20260811-cache-audit-1"></script>
+    <script src="app-command.js?v=20260817-boot-command-1"></script>
     <script src="playback-intelligence.js?v=20260811-cache-audit-1"></script>
+    <script src="companion-care-actions.js?v=20260817-care-autonomy-1"></script>
     <script src="music-api-package-client.js?v=20260811-cache-audit-1"></script>
     <script src="community-reward-runtime.js?v=20260812-reward-stages-2"></script>
-    <script src="app.js?v=20260813-achievement-rewards-1"></script>
-  <script src="fe-identity-card.js?v=20260812-friend-card-2"></script>
-    <script src="pet-emotion-runtime.js?v=20260811-conversation-emotion-1"></script>
-    <script src="pet-client-context.js?v=20260811-cache-audit-1"></script>
-    <script src="pet-live-turn-controller.js?v=20260811-cache-audit-1"></script>
-    <script src="pet-live-telemetry.js?v=20260811-cache-audit-1"></script>
-    <script src="pet-live-playout.js?v=20260811-cache-audit-1"></script>
-    <script src="pet-live-stt-client.js?v=20260811-cache-audit-1"></script>
-    <script src="pet-assistant.js?v=20260811-server-tour-tts-2"></script>
-    <script src="pet-product-tour.js?v=20260811-moving-guide-2"></script>
-  <script src="pet-particle-orb.js?v=20260812-audio-reactive-sphere-2"></script>
-    <script src="pet-companion-p2.js?v=20260811-cache-audit-1"></script>
-    <script src="pixel-achievements.js?v=20260813-achievement-rewards-1"></script>
-    <script src="pixel-login-adventure.js?v=20260811-cache-audit-1"></script>
-    <script src="cursor-trails.js?v=20260811-cache-audit-1"></script>
-    <script src="creative-community.js?v=20260812-friend-card-1"></script>
-    <script src="rhythm-game.js?v=20260811-cache-audit-1"></script>
+    <script src="soundscape-runtime.js?v=20260821-persistence-4"></script>
+    <script src="client-ai-service.js?v=20260819-soundscape-parity-1"></script>
+    <script src="settings-center.js?v=20260820-settings-center-1"></script>
+    <script src="audio-mixer-visuals.js?v=20260821-professional-metering-1"></script>
+    <script src="audio-mixer-ui.js?v=20260821-spatial-controls-9"></script>
+    <script src="app.js?v=20260821-audio-atomic-6"></script>
+    <script src="pet-affect-plan.js?v=20260818-seven-affect-3"></script>
+    <script src="runtime-module-loader.js?v=20260819-soundscape-parity-loader-1"></script>
   </body>
 </html>

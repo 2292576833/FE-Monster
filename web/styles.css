@@ -165,6 +165,110 @@ html[data-fe-platform="desktop"] {
   background: #020202;
 }
 
+.soundscape-workshop-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  background: #000;
+  contain: strict;
+}
+
+.soundscape-workshop-host,
+.soundscape-workshop-host > iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  background: #000;
+}
+
+.soundscape-workshop-status {
+  position: absolute;
+  left: 50%;
+  bottom: 8%;
+  translate: -50% 0;
+  padding: 8px 13px;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 999px;
+  color: rgb(255 255 255 / 78%);
+  background: rgb(8 7 13 / 72%);
+  backdrop-filter: blur(16px);
+  font-size: 12px;
+}
+
+.soundscape-workshop-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 16px;
+}
+
+.soundscape-workshop-control {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(42px, auto);
+  grid-template-areas:
+    "copy output"
+    "control control";
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 14px;
+  padding: 10px 11px;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 3%);
+}
+
+.soundscape-workshop-control > span {
+  grid-area: copy;
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.soundscape-workshop-control strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.soundscape-workshop-control small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text-muted, rgb(255 255 255 / 48%));
+  font-size: 10px;
+  line-height: 1.35;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.soundscape-workshop-control output {
+  grid-area: output;
+  min-width: 38px;
+  color: rgb(208 184 255 / 90%);
+  font-size: 11px;
+  text-align: right;
+}
+
+.soundscape-workshop-control select,
+.soundscape-workshop-control input[type='range'] {
+  grid-area: control;
+  min-width: 0;
+  width: 100%;
+}
+
+.soundscape-workshop-control--boolean {
+  grid-template-columns: minmax(0, 1fr) auto minmax(38px, auto);
+  grid-template-areas: "copy control output";
+}
+
+.soundscape-workshop-control--boolean input[type='checkbox'] {
+  grid-area: control;
+  justify-self: end;
+}
+
 html[data-fe-platform="desktop"] body {
   background: #020202;
 }
@@ -4247,6 +4351,13 @@ button {
   visibility: visible;
 }
 
+/* The opaque Workshop iframe owns pointer input, while the existing host lyric
+   renderer remains the visual/transform authority above it. */
+.app-shell.has-soundscape-workshop .playback-lyric-scene {
+  z-index: 3;
+  pointer-events: none;
+}
+
 .qishui-playback-card {
   --playback-lyric-base: rgba(238, 248, 255, 0.94);
   --playback-lyric-base-rgb: 238, 248, 255;
@@ -6518,6 +6629,16 @@ button {
 
 .free-cube-scene.has-soft-background .free-cube-soft-background {
   opacity: 0.76;
+}
+
+.free-cube-scene.is-heart-mode {
+  background: transparent;
+}
+
+.free-cube-scene.is-heart-mode .free-cube-soft-background,
+.free-cube-scene.is-heart-mode::after {
+  opacity: 0;
+  visibility: hidden;
 }
 
 .free-cube-scene::after {
@@ -12063,6 +12184,228 @@ button {
   display: grid;
   gap: 8px;
   padding: 0 8px 8px;
+}
+
+.runtime-ai-service-content {
+  gap: 9px;
+}
+
+.runtime-ai-field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: rgba(218, 236, 246, 0.74);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.runtime-ai-field select,
+.runtime-ai-field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  border: 1px solid rgba(232, 249, 255, 0.14);
+  border-radius: 9px;
+  padding: 0 8px;
+  color: rgba(248, 253, 255, 0.94);
+  background: rgba(4, 9, 13, 0.82);
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.runtime-ai-field .runtime-ai-secret-input {
+  -webkit-text-security: disc;
+}
+
+.runtime-ai-field select:focus-visible,
+.runtime-ai-field input:focus-visible,
+.runtime-ai-test-button:focus-visible,
+.runtime-ai-secret-row button:focus-visible,
+.runtime-ai-tts-toggle:focus-visible,
+.runtime-ai-save-button:focus-visible {
+  outline: 2px solid rgba(131, 228, 255, 0.78);
+  outline-offset: 2px;
+}
+
+.runtime-ai-tts-toggle {
+  display: flex;
+  width: 100%;
+  min-height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(131, 228, 255, 0.22);
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: rgba(248, 253, 255, 0.94);
+  background: rgba(42, 140, 174, 0.1);
+  text-align: left;
+}
+
+.runtime-ai-tts-toggle > span:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.runtime-ai-tts-toggle strong {
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.runtime-ai-tts-toggle small {
+  color: rgba(201, 224, 235, 0.64);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.runtime-ai-tts-toggle__state {
+  flex: 0 0 auto;
+  min-width: 50px;
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: #dffaff;
+  background: rgba(27, 177, 207, 0.2);
+  font-size: 9px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.runtime-ai-tts-toggle[aria-checked="false"] {
+  border-color: rgba(232, 249, 255, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.runtime-ai-tts-toggle[aria-checked="false"] .runtime-ai-tts-toggle__state {
+  color: rgba(218, 236, 246, 0.7);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.runtime-ai-secret-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.runtime-ai-secret-row button {
+  min-width: 42px;
+  border: 1px solid rgba(232, 249, 255, 0.14);
+  border-radius: 9px;
+  color: rgba(248, 253, 255, 0.9);
+  background: rgba(255, 255, 255, 0.055);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.runtime-ai-secret-row button:hover {
+  border-color: rgba(255, 199, 199, 0.62);
+  color: #fff2f2;
+  background: rgba(115, 24, 24, 0.24);
+}
+
+.runtime-ai-service-section {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid rgba(232, 249, 255, 0.1);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.runtime-ai-service-section[hidden] {
+  display: none;
+}
+
+.runtime-ai-service-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.runtime-ai-service-head > span:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: min(180px, 100%);
+}
+
+.runtime-ai-service-head span {
+  color: rgba(247, 253, 255, 0.94);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.runtime-ai-service-head small,
+.runtime-ai-service-status {
+  color: rgba(201, 224, 235, 0.62);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.runtime-ai-provider-links {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.runtime-ai-provider-links a {
+  display: inline-flex;
+  min-height: 25px;
+  align-items: center;
+  border: 1px solid rgba(131, 228, 255, 0.22);
+  border-radius: 999px;
+  padding: 0 8px;
+  color: rgba(166, 235, 255, 0.92);
+  background: rgba(42, 140, 174, 0.1);
+  font-size: 9px;
+  font-weight: 820;
+  text-decoration: none;
+}
+
+.runtime-ai-provider-links a:hover,
+.runtime-ai-provider-links a:focus-visible {
+  border-color: rgba(131, 228, 255, 0.58);
+  background: rgba(42, 140, 174, 0.2);
+  outline: none;
+}
+
+.runtime-ai-doubao-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  border: 1px solid rgba(131, 228, 255, 0.12);
+  border-radius: 10px;
+  padding: 8px;
+  background: rgba(31, 116, 151, 0.07);
+}
+
+.runtime-ai-doubao-fields[hidden] {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .runtime-ai-doubao-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.runtime-ai-test-button,
+.runtime-ai-save-button {
+  min-height: 34px;
+  border: 1px solid rgba(232, 249, 255, 0.14);
+  border-radius: 9px;
+  color: rgba(248, 253, 255, 0.94);
+  background: rgba(255, 255, 255, 0.055);
+  font-size: 10px;
+  font-weight: 820;
+}
+
+.runtime-ai-test-button:hover,
+.runtime-ai-save-button:hover {
+  border-color: rgba(131, 228, 255, 0.52);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .runtime-cursor-field {
@@ -24647,5 +24990,2080 @@ html .runtime-settings-panel .runtime-low-frequency canvas {
 
   .community-summary-row .community-listening-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Settings center: presentation only. Existing controls keep their original
+ * IDs, values, and listeners when app.js moves their nodes into these pages. */
+html #runtimeSettingsPanel.runtime-settings-panel.settings-center {
+  position: fixed;
+  z-index: 1000;
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  left: 50%;
+  display: grid;
+  box-sizing: border-box;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(1120px, calc(100vw - 48px));
+  height: min(760px, calc(100dvh - 48px));
+  max-height: none;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid rgba(139, 216, 187, 0.22) !important;
+  border-radius: 30px;
+  color: rgba(241, 249, 246, 0.94);
+  background-color: rgb(4, 17, 13) !important;
+  background-image: linear-gradient(145deg, rgb(7, 32, 24) 0%, rgb(3, 18, 14) 48%, rgb(2, 7, 7) 100%) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow:
+    0 0 0 100vmax rgba(0, 6, 5, 0.68),
+    0 22px 52px rgba(0, 0, 0, 0.46) !important;
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  text-rendering: auto;
+  transform: translate(-50%, -50%);
+  opacity: 1;
+  transition: opacity 180ms cubic-bezier(0.22, 0.76, 0.28, 1);
+  will-change: opacity;
+}
+
+html #runtimeSettingsPanel.runtime-settings-panel.settings-center[data-settings-motion-state="entering"],
+html #runtimeSettingsPanel.runtime-settings-panel.settings-center[data-settings-motion-state="exiting"] {
+  pointer-events: none;
+  opacity: 0;
+}
+
+html #runtimeSettingsPanel.runtime-settings-panel.settings-center[data-settings-motion-state="open"] {
+  opacity: 1;
+}
+
+html #runtimeSettingsPanel.runtime-settings-panel.settings-center[hidden] {
+  display: none !important;
+}
+
+.settings-center-titlebar {
+  display: flex;
+  min-width: 0;
+  min-height: 76px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 15px 18px 14px 26px;
+  border-bottom: 1px solid rgba(139, 216, 187, 0.14);
+}
+
+.settings-center-titlebar > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  filter: none;
+  transform: none;
+}
+
+.settings-center-titlebar small,
+.settings-center-page-intro > small {
+  color: rgba(151, 211, 187, 0.62);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1.2;
+}
+
+#runtimeSettingsTitle {
+  color: rgba(248, 253, 251, 0.97);
+  font-size: 22px;
+  font-weight: 680;
+  line-height: 1.25;
+  filter: none;
+  text-shadow: none;
+  transform: none;
+}
+
+.settings-center-close {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  place-items: center;
+  border: 1px solid rgba(168, 224, 202, 0.18);
+  border-radius: 50%;
+  color: rgba(234, 248, 242, 0.84);
+  background: rgba(9, 35, 27, 0.62);
+  box-shadow: none;
+  font: 400 24px/1 "Segoe UI", system-ui, sans-serif;
+}
+
+.settings-center-close:is(:hover, :focus-visible) {
+  border-color: rgba(171, 244, 215, 0.58);
+  color: #fff;
+  background: rgba(18, 55, 43, 0.78);
+}
+
+.settings-center-close:focus-visible,
+.settings-center-nav button:focus-visible,
+.settings-center-page :is(button, input, select, summary):focus-visible {
+  outline: 2px solid rgba(151, 255, 213, 0.9);
+  outline-offset: 3px;
+}
+
+.settings-center-body {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: clamp(112px, 22vw, 236px) minmax(0, 1fr);
+}
+
+.settings-center-nav {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  padding: 18px 12px;
+  border-right: 1px solid rgba(139, 216, 187, 0.12);
+  background: rgba(1, 13, 10, 0.24);
+}
+
+.settings-center-nav button {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: flex-start;
+  border: 0;
+  border-radius: 12px;
+  padding: 8px 12px;
+  color: rgba(193, 216, 207, 0.74);
+  background: transparent;
+  box-shadow: none;
+  font: 650 13px/1.35 "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  text-align: left;
+  transform: none;
+}
+
+.settings-center-nav button:is(:hover, .is-selected, [aria-selected="true"]) {
+  color: rgba(248, 255, 252, 0.96);
+  background: rgba(78, 139, 114, 0.16);
+}
+
+.settings-center-nav button.is-selected::before,
+.settings-center-nav button[aria-selected="true"]::before {
+  content: "";
+  position: absolute;
+  top: 11px;
+  bottom: 11px;
+  left: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: rgba(151, 255, 213, 0.9);
+}
+
+.settings-center-content {
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: clamp(16px, 2.5vw, 30px);
+  scrollbar-color: rgba(136, 203, 177, 0.38) transparent;
+}
+
+.settings-center-page {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  gap: 12px;
+}
+
+.settings-center-page:not([hidden]) {
+  display: grid;
+}
+
+.settings-center-page[hidden] {
+  display: none !important;
+}
+
+.settings-center-page > :is(label, div, details, button, section, output),
+.settings-center-page :is(label, div, details, section) {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.settings-center-page :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.settings-center-page-intro {
+  display: grid;
+  min-height: 190px;
+  align-content: center;
+  justify-items: start;
+  gap: 9px;
+  border: 1px solid rgba(139, 216, 187, 0.12);
+  border-radius: 20px;
+  padding: clamp(20px, 4vw, 38px);
+  background: rgba(8, 29, 23, 0.42);
+}
+
+.settings-center-page-intro > strong {
+  color: rgba(247, 253, 250, 0.96);
+  font-size: 19px;
+  font-weight: 670;
+  line-height: 1.35;
+}
+
+.settings-center-page-intro > p {
+  max-width: 48ch;
+  margin: 0;
+  color: rgba(199, 222, 213, 0.76);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.settings-center-page-intro > button {
+  min-height: 40px;
+  margin-top: 5px;
+  border: 1px solid rgba(151, 234, 200, 0.25);
+  border-radius: 11px;
+  padding: 8px 14px;
+  color: rgba(239, 253, 247, 0.94);
+  background: rgba(39, 102, 77, 0.34);
+  box-shadow: none;
+}
+
+.settings-center-page-error {
+  margin: 0;
+  border: 1px solid rgba(255, 174, 174, 0.28);
+  border-radius: 12px;
+  padding: 12px;
+  color: rgba(255, 221, 221, 0.94);
+  background: rgba(72, 21, 25, 0.36);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* Native mixer UI. The controls remain ordinary semantic inputs; this layer
+ * only gives the settings-center module a bounded, responsive presentation. */
+.audio-mixer-ui {
+  display: grid;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  gap: 16px;
+  color: rgba(235, 248, 242, 0.92);
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  text-rendering: auto;
+}
+
+.audio-mixer-ui :is(section, div, label, button, input, select, option, output, p, h2, h3, span) {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.audio-mixer-ui :is(h2, h3, p) {
+  margin: 0;
+}
+
+.audio-mixer-overview,
+.audio-mixer-presets,
+.audio-mixer-family,
+.audio-mixer-channel-panel,
+.audio-mixer-diagnostics {
+  border: 1px solid rgba(139, 216, 187, 0.13);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(15, 49, 38, 0.58), rgba(4, 21, 17, 0.72));
+  box-shadow: inset 0 1px 0 rgba(218, 255, 240, 0.035);
+}
+
+.audio-mixer-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px 18px;
+  padding: 20px;
+}
+
+.audio-mixer-overview h2,
+.audio-mixer-presets h3,
+.audio-mixer-family h3,
+.audio-mixer-diagnostics h3 {
+  color: rgba(248, 255, 252, 0.97);
+  font-weight: 680;
+  letter-spacing: 0.01em;
+  line-height: 1.32;
+  text-shadow: none;
+}
+
+.audio-mixer-overview h2 {
+  font-size: 20px;
+}
+
+.audio-mixer-overview > p:not(.audio-mixer-status),
+.audio-mixer-family-description,
+.audio-mixer-custom-state,
+.audio-mixer-diagnostics > p {
+  color: rgba(193, 219, 208, 0.72);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.audio-mixer-overview > p,
+.audio-mixer-status {
+  grid-column: 1 / -1;
+}
+
+.audio-mixer-revision {
+  justify-self: end;
+  color: rgba(151, 211, 187, 0.72);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+.audio-mixer-channel-layout {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  border: 1px solid rgba(139, 216, 187, 0.12);
+  border-radius: 12px;
+  padding: 8px 10px 8px 12px;
+  color: rgba(224, 241, 234, 0.88);
+  background: rgba(2, 18, 14, 0.3);
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.audio-mixer-channel-layout select {
+  min-width: 104px;
+  min-height: 34px;
+  border: 1px solid rgba(151, 234, 200, 0.22);
+  border-radius: 9px;
+  padding: 5px 30px 5px 10px;
+  color: rgba(242, 255, 249, 0.96);
+  background: rgb(10, 38, 29);
+  font: 650 12px/1.3 "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+.audio-mixer-channel-layout select:focus-visible {
+  outline: 2px solid rgba(151, 255, 213, 0.72);
+  outline-offset: 2px;
+}
+
+.audio-mixer-status {
+  min-height: 20px;
+  color: rgba(206, 230, 220, 0.82);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.audio-mixer-status[data-tone="success"] {
+  color: rgba(161, 242, 207, 0.94);
+}
+
+.audio-mixer-status[data-tone="warning"] {
+  color: rgba(244, 220, 151, 0.92);
+}
+
+.audio-mixer-status[data-tone="error"] {
+  color: rgba(255, 185, 185, 0.94);
+}
+
+.audio-mixer-retry,
+.audio-mixer-preset {
+  min-height: 40px;
+  border: 1px solid rgba(151, 234, 200, 0.2);
+  border-radius: 11px;
+  padding: 8px 13px;
+  color: rgba(226, 244, 236, 0.86);
+  background: rgba(29, 76, 59, 0.3);
+  box-shadow: none;
+  font: 650 12px/1.3 "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+}
+
+.audio-mixer-retry {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.audio-mixer-retry:is(:hover, :focus-visible),
+.audio-mixer-preset:is(:hover, :focus-visible, .is-selected, [aria-pressed="true"]) {
+  border-color: rgba(151, 255, 213, 0.52);
+  color: #fff;
+  background: rgba(47, 116, 88, 0.42);
+}
+
+.audio-mixer-ui button:disabled,
+.audio-mixer-ui input:disabled,
+.audio-mixer-ui select:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.audio-mixer-presets,
+.audio-mixer-diagnostics {
+  display: grid;
+  gap: 12px;
+  padding: 18px 20px;
+}
+
+.audio-mixer-family-toolbar {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 9px;
+  margin: 0;
+  border: 1px solid rgba(139, 216, 187, 0.13);
+  border-radius: 14px;
+  padding: 12px 14px 14px;
+  color: rgba(235, 248, 242, 0.9);
+  background: linear-gradient(145deg, rgba(12, 43, 33, 0.5), rgba(3, 19, 15, 0.66));
+}
+
+.audio-mixer-family-toolbar legend {
+  padding: 0 6px;
+  color: rgba(211, 235, 225, 0.76);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+}
+
+.audio-mixer-family-chooser {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.audio-mixer-family-visibility {
+  display: inline-flex;
+  min-height: 32px;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(151, 234, 200, 0.13);
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: rgba(212, 235, 226, 0.82);
+  background: rgba(7, 30, 23, 0.52);
+  font-size: 11px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.audio-mixer-family-visibility:has(input:focus-visible) {
+  outline: 2px solid rgba(151, 255, 213, 0.72);
+  outline-offset: 2px;
+}
+
+.audio-mixer-family-visibility input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: rgb(104, 214, 169);
+}
+
+.audio-mixer-preset-grid {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(auto-fit, minmax(min(112px, 100%), 1fr));
+  gap: 8px;
+}
+
+.audio-mixer-parameters {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 14px;
+}
+
+.audio-mixer-family {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  padding: 18px;
+}
+
+.audio-mixer-family[hidden],
+.audio-mixer-family [hidden] {
+  display: none !important;
+}
+
+.audio-mixer-family-header {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+}
+
+.audio-mixer-family-heading {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.audio-mixer-family-tools {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.audio-mixer-family-tool {
+  min-width: 32px;
+  min-height: 32px;
+  border: 1px solid rgba(151, 234, 200, 0.15);
+  border-radius: 9px;
+  padding: 5px 8px;
+  color: rgba(219, 240, 231, 0.82);
+  background: rgba(8, 34, 26, 0.62);
+  font: 650 10px/1.2 "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.audio-mixer-family-drag {
+  cursor: grab;
+  letter-spacing: -0.08em;
+}
+
+.audio-mixer-family-drag:active {
+  cursor: grabbing;
+}
+
+.audio-mixer-family-tool:is(:hover, :focus-visible) {
+  border-color: rgba(151, 255, 213, 0.48);
+  color: #fff;
+  background: rgba(41, 103, 78, 0.46);
+  outline: none;
+}
+
+.audio-mixer-family[data-dragging="true"] {
+  border-color: rgba(151, 255, 213, 0.42);
+  opacity: 0.72;
+}
+
+.audio-mixer-family[data-collapsed="true"] {
+  gap: 0;
+}
+
+.audio-mixer-family[data-density="compact"] {
+  padding: 12px;
+}
+
+.audio-mixer-family[data-density="compact"] .audio-mixer-control-grid {
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.audio-mixer-family[data-density="compact"] .audio-mixer-control-range {
+  gap: 5px 8px;
+  padding: 8px 9px;
+}
+
+.audio-mixer-family[data-density="wide"] {
+  grid-column: 1 / -1;
+}
+
+.audio-mixer-family-equalizer,
+.audio-mixer-family-compressor,
+.audio-mixer-family-reverb {
+  grid-column: 1 / -1;
+}
+
+.audio-mixer-control-grid {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.audio-mixer-family-equalizer .audio-mixer-control-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.audio-mixer-control {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(139, 216, 187, 0.1);
+  border-radius: 12px;
+  background: rgba(2, 18, 14, 0.34);
+}
+
+.audio-mixer-control-range {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(70px, 88px);
+  align-items: center;
+  gap: 8px 12px;
+  padding: 11px 12px 12px;
+}
+
+.audio-mixer-control-label,
+.audio-mixer-control-switch > span {
+  overflow: hidden;
+  color: rgba(224, 241, 234, 0.88);
+  font-size: 12px;
+  font-weight: 620;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audio-mixer-control-value {
+  color: rgba(151, 229, 197, 0.86);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.audio-mixer-control-range input[type="range"] {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
+  accent-color: rgb(104, 214, 169);
+}
+
+.audio-mixer-control-number {
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  border: 1px solid rgba(151, 234, 200, 0.16);
+  border-radius: 7px;
+  padding: 4px 6px;
+  color: rgba(238, 252, 246, 0.92);
+  background: rgba(3, 25, 18, 0.72);
+  color-scheme: dark;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.audio-mixer-control-number:focus-visible {
+  outline: 2px solid rgba(151, 255, 213, 0.72);
+  outline-offset: 2px;
+}
+
+.audio-mixer-control-switch {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+}
+
+.audio-mixer-control-switch input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  margin: 0;
+  accent-color: rgb(104, 214, 169);
+}
+
+.audio-mixer-diagnostics > p {
+  border-left: 2px solid rgba(112, 215, 174, 0.46);
+  padding-left: 10px;
+  overflow-wrap: anywhere;
+}
+
+.audio-mixer-channel-panel {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 14px;
+  padding: 18px 20px;
+}
+
+.audio-mixer-channel-panel[aria-busy="true"] {
+  cursor: progress;
+}
+
+.audio-mixer-channel-panel__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px 18px;
+}
+
+.audio-mixer-channel-panel__heading {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.audio-mixer-channel-panel__heading :is(h3, p),
+.audio-mixer-custom-matrix :is(h4, p) {
+  margin: 0;
+}
+
+.audio-mixer-channel-panel__heading h3 {
+  color: rgba(248, 255, 252, 0.97);
+  font-size: 15px;
+  font-weight: 680;
+  line-height: 1.35;
+}
+
+.audio-mixer-channel-panel__heading p,
+.audio-mixer-custom-matrix p {
+  color: rgba(193, 219, 208, 0.72);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.audio-mixer-channel-physical-output {
+  border: 1px solid rgba(118, 231, 184, 0.2);
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: rgba(165, 241, 209, 0.9);
+  background: rgba(23, 72, 52, 0.24);
+  font-size: 10px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.audio-mixer-channel-toolbar {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.audio-mixer-channel-toolbar__control {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  border: 1px solid rgba(139, 216, 187, 0.1);
+  border-radius: 11px;
+  padding: 9px 10px;
+  color: rgba(212, 235, 226, 0.82);
+  background: rgba(2, 18, 14, 0.32);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.audio-mixer-channel-toolbar__control select,
+.audio-mixer-channel-toolbar__control input[type="number"] {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  border: 1px solid rgba(151, 234, 200, 0.17);
+  border-radius: 8px;
+  padding: 5px 8px;
+  color: rgba(238, 252, 246, 0.94);
+  background: rgb(7, 31, 23);
+  color-scheme: dark;
+  font: 620 11px/1.3 "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+}
+
+.audio-mixer-channel-toolbar__control--number {
+  grid-template-columns: minmax(0, 1fr) 72px auto;
+  align-items: center;
+}
+
+.audio-mixer-channel-toolbar__control--number > span:first-child {
+  grid-column: 1 / -1;
+}
+
+.audio-mixer-channel-toolbar__control--number input[type="range"] {
+  width: 100%;
+  min-width: 0;
+  accent-color: rgb(104, 214, 169);
+}
+
+.audio-mixer-channel-strips {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(270px, 100%), 1fr));
+  align-items: start;
+  gap: 9px;
+}
+
+.audio-mixer-channel-strip {
+  display: grid;
+  box-sizing: border-box;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  border: 1px solid rgba(139, 216, 187, 0.11);
+  border-radius: 13px;
+  padding: 11px;
+  background: rgba(1, 16, 12, 0.38);
+}
+
+.audio-mixer-channel-strip > * {
+  box-sizing: border-box;
+  width: auto;
+  min-width: 0;
+  justify-self: stretch;
+}
+
+.audio-mixer-channel-strip__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 7px;
+}
+
+.audio-mixer-channel-strip__identity {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.audio-mixer-channel-strip__identity strong {
+  color: rgba(248, 255, 252, 0.96);
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.audio-mixer-channel-strip__identity span,
+.audio-mixer-channel-strip__meter {
+  color: rgba(184, 215, 202, 0.72);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+}
+
+.audio-mixer-channel-strip__meter {
+  text-align: end;
+  white-space: nowrap;
+}
+
+.audio-mixer-channel-strip__overload {
+  min-width: 30px;
+  border: 1px solid rgba(139, 216, 187, 0.12);
+  border-radius: 999px;
+  padding: 3px 5px;
+  color: rgba(167, 221, 199, 0.7);
+  background: rgba(28, 72, 54, 0.2);
+  font-size: 8px;
+  font-weight: 750;
+  line-height: 1;
+  text-align: center;
+}
+
+.audio-mixer-channel-strip__overload.is-over {
+  border-color: rgba(255, 116, 106, 0.58);
+  color: rgba(255, 218, 214, 0.98);
+  background: rgba(145, 37, 31, 0.5);
+}
+
+.audio-mixer-channel-strip__control {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 48px minmax(0, 1fr) 66px 18px;
+  align-items: center;
+  gap: 6px;
+  color: rgba(213, 235, 226, 0.82);
+  font-size: 10px;
+}
+
+.audio-mixer-channel-strip__control input[type="range"] {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  accent-color: rgb(104, 214, 169);
+}
+
+.audio-mixer-channel-strip__control input[type="number"] {
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  border: 1px solid rgba(151, 234, 200, 0.15);
+  border-radius: 7px;
+  padding: 4px 5px;
+  color: rgba(238, 252, 246, 0.92);
+  background: rgba(3, 25, 18, 0.72);
+  color-scheme: dark;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.audio-mixer-channel-test {
+  min-height: 40px;
+  border: 1px solid rgba(151, 234, 200, 0.18);
+  border-radius: 9px;
+  padding: 7px 10px;
+  color: rgba(224, 244, 235, 0.88);
+  background: rgba(34, 88, 67, 0.3);
+  font-size: 10px;
+  font-weight: 680;
+  cursor: pointer;
+}
+
+.audio-mixer-channel-strip > .audio-mixer-channel-test {
+  grid-column: 1 / -1;
+  grid-row: auto;
+  width: auto;
+  min-width: 0;
+  justify-self: stretch;
+}
+
+.audio-mixer-channel-test:is(:hover, :focus-visible) {
+  border-color: rgba(151, 255, 213, 0.48);
+  color: #fff;
+  background: rgba(46, 111, 85, 0.44);
+}
+
+.audio-mixer-custom-matrix {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  border-top: 1px solid rgba(139, 216, 187, 0.1);
+  padding-top: 12px;
+}
+
+.audio-mixer-custom-matrix h4 {
+  color: rgba(237, 251, 245, 0.9);
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.audio-mixer-custom-matrix__grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.audio-mixer-custom-matrix__cell {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  color: rgba(189, 218, 206, 0.72);
+  font-size: 9px;
+}
+
+.audio-mixer-custom-matrix__cell input {
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  border: 1px solid rgba(151, 234, 200, 0.14);
+  border-radius: 7px;
+  padding: 4px 5px;
+  color: rgba(238, 252, 246, 0.92);
+  background: rgba(3, 25, 18, 0.68);
+  color-scheme: dark;
+  font-size: 9px;
+  text-align: end;
+}
+
+.audio-mixer-channel-status {
+  min-height: 18px;
+  color: rgba(201, 228, 216, 0.8);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.audio-mixer-channel-status[data-tone="success"] { color: rgba(161, 242, 207, 0.94); }
+.audio-mixer-channel-status[data-tone="warning"] { color: rgba(244, 220, 151, 0.92); }
+.audio-mixer-channel-status[data-tone="error"] { color: rgba(255, 185, 185, 0.94); }
+
+.audio-mixer-channel-panel :is(input, select, button):focus-visible {
+  outline: 2px solid rgba(151, 255, 213, 0.72);
+  outline-offset: 2px;
+}
+
+.audio-mixer-ui[data-mixer-busy="true"] {
+  cursor: progress;
+}
+
+/* Professional audio monitoring workspace. It is data-driven: cards keep an
+ * explicit unavailable state until bounded engine telemetry is published. */
+.audio-mixer-visuals {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+  border: 1px solid rgba(139, 216, 187, 0.15);
+  border-radius: 18px;
+  padding: 18px;
+  color: rgba(235, 248, 242, 0.92);
+  background: linear-gradient(145deg, rgba(10, 42, 32, 0.72), rgba(3, 18, 14, 0.82));
+  box-shadow: inset 0 1px 0 rgba(218, 255, 240, 0.04);
+}
+
+.audio-mixer-visuals [hidden] {
+  display: none !important;
+}
+
+.audio-mixer-visuals :is(button, input, select, output) {
+  font: inherit;
+}
+
+.audio-mixer-visuals :is(button, input, select):focus-visible,
+.audio-mixer-visual-canvas:focus-visible,
+.audio-mixer-automation-canvas:focus-visible {
+  outline: 2px solid rgba(151, 255, 213, 0.78);
+  outline-offset: 2px;
+}
+
+.audio-mixer-visuals__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px 20px;
+}
+
+.audio-mixer-visuals__heading {
+  display: grid;
+  gap: 4px;
+}
+
+.audio-mixer-visuals__heading h3,
+.audio-mixer-visuals__heading p,
+.audio-mixer-visual-card__title h4,
+.audio-mixer-visual-card__title p {
+  margin: 0;
+}
+
+.audio-mixer-visuals__heading h3 {
+  color: rgba(248, 255, 252, 0.98);
+  font-size: 15px;
+  font-weight: 680;
+  line-height: 1.35;
+}
+
+.audio-mixer-visuals__heading p,
+.audio-mixer-visual-card__title p,
+.audio-mixer-channel-order-note,
+.audio-mixer-spatial-boundary,
+.audio-mixer-test-signal-state {
+  color: rgba(193, 219, 208, 0.72);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.audio-mixer-visuals__telemetry-status {
+  margin: 0;
+  border: 1px solid rgba(239, 197, 116, 0.23);
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: rgba(246, 221, 169, 0.9);
+  background: rgba(55, 41, 16, 0.24);
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.audio-mixer-visuals[data-telemetry-state="live"] .audio-mixer-visuals__telemetry-status {
+  border-color: rgba(118, 231, 184, 0.24);
+  color: rgba(165, 241, 209, 0.92);
+  background: rgba(23, 72, 52, 0.25);
+}
+
+.audio-mixer-visuals__toolbar {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-block: 1px solid rgba(139, 216, 187, 0.09);
+  padding-block: 10px;
+}
+
+.audio-mixer-visuals__visibility {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  padding: 5px 8px;
+  color: rgba(215, 237, 228, 0.8);
+  background: rgba(2, 18, 14, 0.24);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.audio-mixer-visuals__visibility input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: rgb(104, 214, 169);
+}
+
+.audio-mixer-visuals__grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: start;
+  gap: 10px;
+}
+
+.audio-mixer-visual-card {
+  grid-column: span 6;
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(139, 216, 187, 0.11);
+  border-radius: 14px;
+  background: rgba(2, 18, 14, 0.4);
+  box-shadow: inset 0 1px 0 rgba(218, 255, 240, 0.025);
+}
+
+.audio-mixer-visual-card[data-size="wide"],
+.audio-mixer-visual-card--spatial {
+  grid-column: 1 / -1;
+}
+
+.audio-mixer-visual-card[data-size="tall"] .audio-mixer-visual-canvas {
+  height: 330px;
+}
+
+.audio-mixer-visual-card[data-dragging="true"] {
+  border-color: rgba(151, 255, 213, 0.55);
+  opacity: 0.68;
+}
+
+.audio-mixer-visual-card__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+  border-bottom: 1px solid rgba(139, 216, 187, 0.08);
+  padding: 11px 12px;
+  background: rgba(17, 52, 40, 0.2);
+}
+
+.audio-mixer-visual-card[data-collapsed="true"] .audio-mixer-visual-card__header {
+  border-bottom: 0;
+}
+
+.audio-mixer-visual-card__title {
+  display: grid;
+  gap: 2px;
+}
+
+.audio-mixer-visual-card__title h4 {
+  color: rgba(243, 253, 249, 0.95);
+  font-size: 12px;
+  font-weight: 680;
+  line-height: 1.35;
+}
+
+.audio-mixer-visual-card__tools {
+  display: flex;
+  gap: 2px;
+}
+
+.audio-mixer-visual-card__tool {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  padding: 0;
+  color: rgba(196, 225, 213, 0.76);
+  background: transparent;
+  cursor: pointer;
+}
+
+.audio-mixer-visual-card__tool:is(:hover, :focus-visible) {
+  color: #fff;
+  background: rgba(70, 139, 109, 0.28);
+}
+
+.audio-mixer-visual-card__drag {
+  cursor: grab;
+  letter-spacing: -4px;
+}
+
+.audio-mixer-visual-card__drag:active {
+  cursor: grabbing;
+}
+
+.audio-mixer-visual-card__body {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+  padding: 12px;
+}
+
+.audio-mixer-visual-unavailable {
+  margin: 0;
+  border: 1px dashed rgba(224, 197, 128, 0.2);
+  border-radius: 9px;
+  padding: 8px 10px;
+  color: rgba(235, 209, 153, 0.8);
+  background: rgba(46, 35, 14, 0.16);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.audio-mixer-visual-canvas,
+.audio-mixer-automation-canvas {
+  display: block;
+  width: 100%;
+  height: 220px;
+  border: 1px solid rgba(139, 216, 187, 0.09);
+  border-radius: 9px;
+  background: linear-gradient(180deg, rgba(4, 25, 19, 0.84), rgba(2, 14, 11, 0.96));
+  touch-action: none;
+}
+
+.audio-mixer-visual-scale,
+.audio-mixer-correlation,
+.audio-mixer-playback-readout {
+  color: rgba(160, 208, 189, 0.72);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+
+.audio-mixer-visual-scale {
+  display: flex;
+  justify-content: space-between;
+  word-spacing: 1.8em;
+}
+
+.audio-mixer-meter-rack {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.audio-mixer-meter-strip {
+  display: grid;
+  grid-template-columns: auto auto minmax(20px, 1fr);
+  align-items: start;
+  gap: 6px 8px;
+  border: 1px solid rgba(139, 216, 187, 0.08);
+  border-radius: 10px;
+  padding: 9px;
+  background: rgba(0, 12, 9, 0.34);
+}
+
+.audio-mixer-meter-strip > strong {
+  color: rgba(237, 250, 245, 0.9);
+  font-size: 11px;
+}
+
+.audio-mixer-overload-lamp {
+  justify-self: end;
+  border-radius: 4px;
+  padding: 2px 5px;
+  color: rgba(233, 196, 194, 0.46);
+  background: rgba(86, 27, 25, 0.22);
+  font-size: 8px;
+  font-weight: 760;
+  letter-spacing: 0.08em;
+}
+
+.audio-mixer-overload-lamp.is-over {
+  color: #fff;
+  background: rgb(215, 65, 58);
+  box-shadow: 0 0 10px rgba(255, 74, 65, 0.42);
+}
+
+.audio-mixer-meter-track {
+  position: relative;
+  grid-row: span 2;
+  width: 24px;
+  height: 150px;
+  justify-self: end;
+  overflow: hidden;
+  border-radius: 5px;
+  background: repeating-linear-gradient(to top, rgba(137, 214, 183, 0.09) 0 7px, rgba(0, 0, 0, 0.2) 7px 9px);
+}
+
+.audio-mixer-meter-fill,
+.audio-mixer-meter-hold {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform-origin: bottom;
+}
+
+.audio-mixer-meter-fill--rms {
+  height: 100%;
+  background: linear-gradient(to top, #36a876, #75dfa8 74%, #e3ca66 90%, #df5b55);
+  opacity: 0.55;
+}
+
+.audio-mixer-meter-fill--peak {
+  left: 7px;
+  width: 10px;
+  height: 100%;
+  background: linear-gradient(to top, #52c68f, #9aefbd 78%, #f0d36e 91%, #f06961);
+}
+
+.audio-mixer-meter-hold {
+  height: 2px;
+  background: rgba(244, 255, 249, 0.95);
+}
+
+.audio-mixer-meter-values {
+  display: grid;
+  grid-column: 1 / 3;
+  align-self: end;
+  gap: 3px;
+  color: rgba(180, 216, 201, 0.76);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.audio-mixer-gain-reduction {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  border-radius: 7px;
+  padding: 6px 8px;
+  color: rgba(231, 216, 161, 0.82);
+  background: rgba(56, 45, 17, 0.24);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.audio-mixer-gain-reduction__bar {
+  display: block;
+  height: 5px;
+  transform-origin: left;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #e2c664, #dd755f);
+}
+
+.audio-mixer-spatial-boundary,
+.audio-mixer-channel-order-note,
+.audio-mixer-test-signal-state {
+  margin: 0;
+  border-left: 2px solid rgba(112, 215, 174, 0.42);
+  padding-left: 9px;
+}
+
+.audio-mixer-spatial-controls {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.audio-mixer-spatial-toggle,
+.audio-mixer-spatial-select {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  border: 1px solid rgba(139, 216, 187, 0.09);
+  border-radius: 9px;
+  padding: 8px 9px;
+  color: rgba(218, 238, 230, 0.82);
+  background: rgba(0, 13, 10, 0.28);
+  font-size: 10px;
+}
+
+.audio-mixer-spatial-toggle {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.audio-mixer-spatial-toggle input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: rgb(104, 214, 169);
+}
+
+.audio-mixer-spatial-select select {
+  width: 100%;
+  min-height: 32px;
+  border: 1px solid rgba(151, 234, 200, 0.16);
+  border-radius: 7px;
+  padding: 4px 6px;
+  color: rgba(240, 253, 247, 0.94);
+  background: rgb(8, 31, 24);
+  color-scheme: dark;
+  font-size: 10px;
+}
+
+.audio-mixer-spatial-select option:disabled {
+  color: rgba(194, 204, 199, 0.48);
+}
+
+.audio-mixer-route-summary {
+  margin: 0;
+  color: rgba(175, 234, 210, 0.85);
+  font: 650 11px/1.4 "Segoe UI Variable Text", "Segoe UI", sans-serif;
+}
+
+.audio-mixer-route-graph {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(139, 216, 187, 0.09);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(0, 13, 10, 0.3);
+}
+
+.audio-mixer-route-core,
+.audio-mixer-route-outputs {
+  display: grid;
+  gap: 6px;
+}
+
+.audio-mixer-route-core {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.audio-mixer-route-outputs {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+
+.audio-mixer-route-node {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(139, 216, 187, 0.13);
+  border-radius: 7px;
+  padding: 6px 5px;
+  color: rgba(217, 239, 230, 0.82);
+  background: rgba(16, 54, 41, 0.28);
+  font-size: 9px;
+  line-height: 1.3;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audio-mixer-route-node[data-route-state="active"] {
+  border-color: rgba(126, 238, 192, 0.36);
+  color: rgba(235, 255, 247, 0.96);
+  background: rgba(39, 106, 79, 0.42);
+}
+
+.audio-mixer-route-node[data-route-state="bypass"] {
+  opacity: 0.48;
+}
+
+.audio-mixer-channel-meter-rack {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.audio-mixer-channel-meter {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 6px;
+  border: 1px solid rgba(139, 216, 187, 0.08);
+  border-radius: 8px;
+  padding: 7px;
+  color: rgba(213, 235, 226, 0.8);
+  background: rgba(0, 13, 10, 0.26);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+.audio-mixer-channel-meter[data-route-state="bypass"] {
+  opacity: 0.48;
+}
+
+.audio-mixer-channel-meter__track {
+  grid-column: 2;
+  grid-row: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(139, 216, 187, 0.1);
+}
+
+.audio-mixer-channel-meter__peak,
+.audio-mixer-channel-meter__rms {
+  grid-column: 2;
+  grid-row: 1;
+  height: 6px;
+  transform-origin: left;
+  border-radius: 999px;
+}
+
+.audio-mixer-channel-meter__peak {
+  height: 2px;
+  background: rgba(225, 251, 240, 0.92);
+}
+
+.audio-mixer-channel-meter__rms {
+  background: linear-gradient(90deg, #45bd86, #d8c861 85%, #dc625a);
+  opacity: 0.68;
+}
+
+.audio-mixer-channel-meter > output {
+  grid-column: 2;
+  color: rgba(158, 205, 186, 0.72);
+  font-size: 8px;
+}
+
+.audio-mixer-channel-test {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  min-width: 34px;
+  min-height: 26px;
+  border: 1px solid rgba(139, 216, 187, 0.15);
+  border-radius: 6px;
+  padding: 3px 5px;
+  color: rgba(201, 231, 219, 0.76);
+  background: rgba(31, 78, 60, 0.26);
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.audio-mixer-channel-test:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.audio-mixer-pan-group {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  color: rgba(211, 234, 225, 0.8);
+  font-size: 10px;
+}
+
+.audio-mixer-pan-surface {
+  position: relative;
+  height: 42px;
+  border: 1px solid rgba(139, 216, 187, 0.11);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, transparent 49.7%, rgba(146, 225, 194, 0.22) 49.7% 50.3%, transparent 50.3%),
+    linear-gradient(180deg, rgba(12, 44, 33, 0.36), rgba(0, 13, 10, 0.52));
+  touch-action: none;
+}
+
+.audio-mixer-pan-handle {
+  position: absolute;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(185, 255, 225, 0.5);
+  border-radius: 50%;
+  padding: 0;
+  color: rgba(223, 255, 241, 0.98);
+  background: rgba(51, 135, 99, 0.76);
+  box-shadow: 0 0 0 4px rgba(92, 213, 162, 0.08);
+  cursor: ew-resize;
+}
+
+.audio-mixer-automation-state {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(139, 216, 187, 0.09);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(0, 13, 10, 0.26);
+}
+
+.audio-mixer-automation-state__header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 12px;
+  color: rgba(223, 242, 234, 0.88);
+  font-size: 10px;
+}
+
+.audio-mixer-automation-state__header span {
+  color: rgba(222, 202, 143, 0.8);
+}
+
+.audio-mixer-automation-controls {
+  display: grid;
+  grid-template-columns: auto minmax(140px, 1fr) repeat(2, minmax(92px, 0.5fr)) auto auto;
+  align-items: center;
+  gap: 7px;
+}
+
+.audio-mixer-automation-controls label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: rgba(213, 234, 226, 0.8);
+  font-size: 10px;
+}
+
+.audio-mixer-automation-controls label:has(input[type="number"]) {
+  display: grid;
+  grid-template-columns: auto minmax(58px, 1fr);
+}
+
+.audio-mixer-automation-controls input {
+  accent-color: rgb(104, 214, 169);
+}
+
+.audio-mixer-automation-controls select,
+.audio-mixer-automation-controls input[type="number"],
+.audio-mixer-automation-controls button {
+  min-height: 32px;
+  border: 1px solid rgba(151, 234, 200, 0.15);
+  border-radius: 7px;
+  padding: 4px 8px;
+  color: rgba(235, 249, 243, 0.9);
+  background: rgb(8, 31, 24);
+  color-scheme: dark;
+  font-size: 10px;
+}
+
+.audio-mixer-automation-controls input[type="number"] {
+  width: 100%;
+  min-width: 0;
+  text-align: end;
+}
+
+.audio-mixer-automation-canvas {
+  height: 160px;
+  cursor: crosshair;
+}
+
+.audio-mixer-automation-state > output {
+  color: rgba(160, 208, 189, 0.72);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .audio-mixer-parameters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .audio-mixer-family-equalizer,
+  .audio-mixer-family-compressor,
+  .audio-mixer-family-reverb {
+    grid-column: auto;
+  }
+
+  .audio-mixer-family-equalizer .audio-mixer-control-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .audio-mixer-visual-card {
+    grid-column: 1 / -1;
+  }
+
+  .audio-mixer-spatial-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .audio-mixer-route-outputs,
+  .audio-mixer-channel-meter-rack {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .audio-mixer-channel-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .audio-mixer-channel-toolbar__control--number {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .audio-mixer-overview,
+  .audio-mixer-presets,
+  .audio-mixer-family,
+  .audio-mixer-channel-panel,
+  .audio-mixer-diagnostics {
+    border-radius: 14px;
+    padding: 14px;
+  }
+
+  .audio-mixer-family-toolbar {
+    border-radius: 12px;
+    padding: 10px;
+  }
+
+  .audio-mixer-family-visibility {
+    flex: 1 1 calc(50% - 4px);
+  }
+
+  .audio-mixer-family-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .audio-mixer-family-tools {
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .audio-mixer-family-tool {
+    min-width: 44px;
+    min-height: 44px;
+    flex: 1 1 44px;
+  }
+
+  .audio-mixer-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .audio-mixer-revision {
+    justify-self: start;
+  }
+
+  .audio-mixer-family-equalizer .audio-mixer-control-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .audio-mixer-visuals {
+    gap: 10px;
+    border-radius: 14px;
+    padding: 12px;
+  }
+
+  .audio-mixer-visuals__header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .audio-mixer-visuals__telemetry-status {
+    justify-self: start;
+    white-space: normal;
+  }
+
+  .audio-mixer-visuals__visibility {
+    flex: 1 1 calc(50% - 6px);
+  }
+
+  .audio-mixer-visual-card__header,
+  .audio-mixer-visual-card__body {
+    padding: 10px;
+  }
+
+  .audio-mixer-visual-card__header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .audio-mixer-visual-card {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .audio-mixer-visual-card__title :is(h4, p) {
+    overflow-wrap: anywhere;
+  }
+
+  .audio-mixer-visual-card__tools {
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .audio-mixer-visual-card__tool {
+    width: auto;
+    height: 44px;
+    min-width: 44px;
+    flex: 1 1 44px;
+  }
+
+  .audio-mixer-meter-rack {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .audio-mixer-visual-scale {
+    overflow: hidden;
+    gap: 3px;
+    word-spacing: 0;
+    font-size: 8px;
+  }
+
+  .audio-mixer-channel-order-note,
+  .audio-mixer-spatial-boundary,
+  .audio-mixer-test-signal-state {
+    overflow-wrap: anywhere;
+  }
+
+  .audio-mixer-meter-track {
+    height: 118px;
+  }
+
+  .audio-mixer-spatial-controls,
+  .audio-mixer-route-core,
+  .audio-mixer-route-outputs,
+  .audio-mixer-channel-meter-rack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .audio-mixer-pan-group,
+  .audio-mixer-automation-state__header,
+  .audio-mixer-automation-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .audio-mixer-visual-canvas {
+    height: 180px;
+  }
+
+  .audio-mixer-channel-panel__header,
+  .audio-mixer-channel-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .audio-mixer-channel-strips {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .audio-mixer-channel-strip {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .audio-mixer-channel-physical-output {
+    justify-self: start;
+  }
+
+  .audio-mixer-channel-toolbar__control--number {
+    grid-column: auto;
+  }
+
+  .audio-mixer-channel-strip__header {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .audio-mixer-channel-strip__meter {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    text-align: start;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .audio-mixer-channel-strip__overload {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .audio-mixer-channel-strip__control {
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) minmax(58px, 72px) auto;
+    width: auto;
+    max-width: 100%;
+    justify-self: stretch;
+  }
+
+  .audio-mixer-channel-strip__control input[type="range"] {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .audio-mixer-channel-strip__control input[type="number"] {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .audio-mixer-channel-strip__control > span:last-child {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .audio-mixer-custom-matrix__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 400px) {
+  .audio-mixer-spatial-controls,
+  .audio-mixer-route-core,
+  .audio-mixer-route-outputs,
+  .audio-mixer-channel-meter-rack,
+  .audio-mixer-test-signal-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .audio-mixer-route-node,
+  .audio-mixer-spatial-toggle,
+  .audio-mixer-spatial-select {
+    overflow-wrap: anywhere;
+  }
+}
+
+/* Playback-surface controls keep their semantic buttons and hit areas while
+ * removing every visible tray, capsule, border, blur, and shadow. */
+#qishuiPlaybackCard #runtimeSettingsButton.qishui-playback-settings-button {
+  position: absolute;
+  z-index: 7;
+  /* Keep the only settings affordance physically on the playback glass.
+   * The previous negative top offset made it a DOM child of the card while
+   * rendering the entire 44px hit target outside the visible surface. */
+  top: 8px;
+  right: 8px;
+  display: grid;
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  place-items: center;
+  border: 0 !important;
+  border-radius: 0;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.92) !important;
+  background: transparent !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  text-shadow: none;
+}
+
+/* The collapsed playback affordance only keeps its restore arrow. The
+ * settings control must leave both layout and hit-testing with the phone. */
+#qishuiPlaybackCard.is-user-hidden #runtimeSettingsButton.qishui-playback-settings-button,
+#qishuiPlaybackCard #runtimeSettingsButton.qishui-playback-settings-button[hidden] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+#qishuiPlaybackCard #runtimeSettingsButton.qishui-playback-settings-button::before {
+  content: "⚙";
+  font: 400 22px/1 "Segoe UI Symbol", "Segoe UI", system-ui, sans-serif;
+}
+
+#qishuiPlaybackCard #runtimeSettingsButton.qishui-playback-settings-button:is(:hover, :active, .is-active, [aria-expanded="true"]) {
+  border: 0 !important;
+  color: #fff !important;
+  background: transparent !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+#qishuiPlaybackCard #runtimeSettingsButton.qishui-playback-settings-button:focus,
+#qishuiPlaybackCard #runtimeSettingsButton.qishui-playback-settings-button:focus-visible {
+  outline: 2px solid rgba(151, 255, 213, 0.96) !important;
+  outline-offset: 2px !important;
+}
+
+html #qishuiPlaybackCard #qishuiPlaybackTools {
+  border: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+html #qishuiPlaybackCard #qishuiPlaybackTools > button,
+html #qishuiPlaybackCard #qishuiPlaybackTools > button:is(:hover, :active, :focus-visible, .is-active, [aria-pressed="true"]) {
+  box-sizing: border-box;
+  width: auto;
+  height: 44px;
+  min-width: 40px;
+  min-height: 44px;
+  border: 0 !important;
+  border-radius: 0;
+  padding: 0 3px;
+  color: rgba(255, 255, 255, 0.72) !important;
+  background: transparent !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+html #qishuiPlaybackCard #qishuiPlaybackTools > button:is(:hover, :focus-visible, .is-active, [aria-pressed="true"]) {
+  color: #fff !important;
+}
+
+html #qishuiPlaybackCard #qishuiPlaybackTools > button:focus-visible {
+  outline: 2px solid rgba(151, 255, 213, 0.96);
+  outline-offset: -3px;
+}
+
+html #qishuiPlaybackCard #qishuiPlaybackTools > button:is(.is-active, [aria-pressed="true"]) {
+  text-decoration: underline;
+  text-decoration-color: rgba(151, 255, 213, 0.9);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 5px;
+}
+
+@media (max-width: 560px) {
+  html #runtimeSettingsPanel.runtime-settings-panel.settings-center {
+    border-radius: 28px;
+  }
+
+  .settings-center-titlebar {
+    min-height: 68px;
+    padding: 12px 13px 11px 18px;
+  }
+
+  #runtimeSettingsTitle {
+    font-size: 19px;
+  }
+
+  .settings-center-body {
+    grid-template-columns: 108px minmax(0, 1fr);
+  }
+
+  .settings-center-nav {
+    padding: 13px 8px;
+  }
+
+  .settings-center-nav button {
+    min-height: 42px;
+    padding: 7px 8px;
+    font-size: 12px;
+  }
+
+  .settings-center-content {
+    padding: 14px 12px;
+  }
+
+  .settings-center-page-intro {
+    padding: 18px 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html #runtimeSettingsPanel.runtime-settings-panel.settings-center,
+  .settings-center-nav button,
+  #qishuiPlaybackCard #runtimeSettingsButton.qishui-playback-settings-button,
+  html #qishuiPlaybackCard #qishuiPlaybackTools > button {
+    transition: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  html #runtimeSettingsPanel.runtime-settings-panel.settings-center {
+    border-color: CanvasText !important;
+    color: CanvasText;
+    background: Canvas !important;
+    box-shadow: none !important;
+    forced-color-adjust: auto;
+  }
+
+  #qishuiPlaybackCard #runtimeSettingsButton.qishui-playback-settings-button,
+  html #qishuiPlaybackCard #qishuiPlaybackTools > button {
+    color: ButtonText !important;
   }
 }

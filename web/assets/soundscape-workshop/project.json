@@ -1,0 +1,536 @@
+{
+	"approved" : true,
+	"audio" : 
+	{
+		"enabled" : true
+	},
+	"contentrating" : "Everyone",
+	"description" : "Afdian Page: https://www.ifdian.net/a/CmzYa?utm_source=copylink&utm_medium=link\r\nYour support keeps me updating this wallpaper!\r\nFeatures\r\nAudio Response — 160×160 grid bars pulse to music with real-time FFT frequency analysis\r\nRipple Effect — Ground ripples spread and bars bounce when low frequencies hit\r\nMeteor Effect — Shooting stars fall on high frequencies, spawning particle explosions on impact\r\nIdle Waves — Gentle breathing motion for bars when no audio is playing to keep the scene alive\r\n10 Color Themes — Indigo Violet, Deep Sea Blue, Ice Blue, Emerald Green, Warm Gold, Amber Orange, Blood Red, Coral Pink, Neon Magenta, Minimal Black & White\r\nAlbum Art — Supports Wallpaper Engine Media Integration; displays album cover, track title and artist with smooth transition animations\r\nPlayer Controller — Floating frosted-glass panel with three size presets\r\nTunable Parameters — Render resolution, audio sensitivity, frequency range, camera view, rotation speed, ripple & meteor trigger sensitivity and intensity\r\nChangelog\r\nv15 — Optimized frequency distribution (primary response: 0–3.5kHz); refined render resolution range (80–320); anti-jitter for idle waves; fixed wallpaper config reload bugs; expanded spawn range for ripples and meteors; adjusted pulse trigger counter range (5–13)\r\nv15 — Major performance improvements\r\nv14 — Added render resolution setting; fixed response decay issue; idle-click meteor spawn\r\nv13 — Album art transition animations; project size reduction; build optimizations\r\nv12 — Media Integration support, built-in player UI\r\nv11 — Idle wave system\r\nv10 — Particle system & spring animations\r\nv9 — Meteor effect + automatic beat detection\r\nv8 — Ground ripple effect\r\nv7 — 8-band FFT + tone metrics\r\nv6 — 10 built-in color themes\r\nv5 — Camera controls & shader optimizations\r\nv4 — Wallpaper Engine audio integration\r\nv3 — 160×160 instanced grid\r\nv2 — Three.js 3D scene foundation\r\nv1 — Initial Release\r\nTech Stack\r\nReact 19 · Three.js · React Three Fiber · Framer Motion · Tailwind CSS · GLSL Shaders",
+	"file" : "index.html",
+	"general" : 
+	{
+		"properties" : 
+		{
+			"audioIntensity" : 
+			{
+				"index" : 11,
+				"max" : 2.5,
+				"min" : 0.3,
+				"order" : 111,
+				"step" : 0.1,
+				"text" : "音频响应强度 / Audio Intensity",
+				"type" : "slider",
+				"value" : 1
+			},
+			"autoRotateEnabled" : 
+			{
+				"index" : 34,
+				"order" : 134,
+				"text" : "自动旋转 / Auto Rotate",
+				"type" : "bool",
+				"value" : false
+			},
+			"autoRotateSpeed" : 
+			{
+				"index" : 35,
+				"max" : 60,
+				"min" : 1,
+				"order" : 135,
+				"step" : 1,
+				"text" : "旋转速度 / Rotate Speed",
+				"type" : "slider",
+				"value" : 10
+			},
+			"cameraAngleX" : 
+			{
+				"index" : 32,
+				"max" : 360,
+				"min" : 0,
+				"order" : 132,
+				"step" : 5,
+				"text" : "水平角度 / Horizontal Angle",
+				"type" : "slider",
+				"value" : 120
+			},
+			"cameraAngleY" : 
+			{
+				"index" : 33,
+				"max" : 70,
+				"min" : 10,
+				"order" : 133,
+				"step" : 5,
+				"text" : "垂直仰角 / Vertical Angle",
+				"type" : "slider",
+				"value" : 25
+			},
+			"cameraDistance" : 
+			{
+				"index" : 31,
+				"max" : 100,
+				"min" : 20,
+				"order" : 131,
+				"step" : 5,
+				"text" : "视角距离 / Camera Distance",
+				"type" : "slider",
+				"value" : 85
+			},
+			"controllerSize" : 
+			{
+				"index" : 40,
+				"options" : 
+				[
+					{
+						"label" : "小 / Small",
+						"value" : "small"
+					},
+					{
+						"label" : "中 / Medium",
+						"value" : "medium"
+					},
+					{
+						"label" : "大 / Large",
+						"value" : "large"
+					}
+				],
+				"order" : 140,
+				"text" : "控制器尺寸 / Controller Size",
+				"type" : "combo",
+				"value" : "large"
+			},
+			"controllerX" : 
+			{
+				"index" : 41,
+				"max" : 80,
+				"min" : 0,
+				"order" : 141,
+				"step" : 1,
+				"text" : "控制器水平位置 (%) / Controller X (%)",
+				"type" : "slider",
+				"value" : 2
+			},
+			"controllerY" : 
+			{
+				"index" : 42,
+				"max" : 90,
+				"min" : 0,
+				"order" : 142,
+				"step" : 1,
+				"text" : "控制器垂直位置 (%) / Controller Y (%)",
+				"type" : "slider",
+				"value" : 3
+			},
+			"gridSize" : 
+			{
+				"index" : 2,
+				"options" : 
+				[
+					{
+						"label" : "120x120",
+						"value" : 120
+					},
+					{
+						"label" : "160x160",
+						"value" : 160
+					},
+					{
+						"label" : "320x320",
+						"value" : 320
+					},
+					{
+						"label" : "640x640",
+						"value" : 640
+					},
+					{
+						"label" : "1080x1080",
+						"value" : 1080
+					},
+					{
+						"label" : "4096x4096",
+						"value" : 4096
+					}
+				],
+				"order" : 102,
+				"text" : "渲染精度 / Render Resolution",
+				"type" : "combo",
+				"value" : 160
+			},
+			"idleWaveDebounce" : 
+			{
+				"index" : 27,
+				"max" : 5,
+				"min" : 0.5,
+				"order" : 127,
+				"step" : 0.5,
+				"text" : "空闲波浪防抖 (秒) / Idle Debounce (s)",
+				"type" : "slider",
+				"value" : 1
+			},
+			"idleWaveEnabled" : 
+			{
+				"index" : 26,
+				"order" : 126,
+				"text" : "空闲波浪 / Idle Wave",
+				"type" : "bool",
+				"value" : true
+			},
+			"idleWaveFadeDuration" : 
+			{
+				"index" : 28,
+				"max" : 5,
+				"min" : 0.5,
+				"order" : 128,
+				"step" : 0.5,
+				"text" : "空闲波浪过渡 (秒) / Idle Fade (s)",
+				"type" : "slider",
+				"value" : 1
+			},
+			"meteorClickEnabled" : 
+			{
+				"index" : 23,
+				"order" : 123,
+				"text" : "点击触发流星 / Click Meteor",
+				"type" : "bool",
+				"value" : true
+			},
+			"meteorCooldown" : 
+			{
+				"index" : 22,
+				"max" : 400,
+				"min" : 0,
+				"order" : 122,
+				"step" : 10,
+				"text" : "流星冷却 (帧) / Meteor Cooldown (frames)",
+				"type" : "slider",
+				"value" : 60
+			},
+			"meteorEnabled" : 
+			{
+				"index" : 20,
+				"order" : 120,
+				"text" : "启用流星 / Enable Meteor",
+				"type" : "bool",
+				"value" : true
+			},
+			"meteorSensitivity" : 
+			{
+				"index" : 21,
+				"max" : 0.8,
+				"min" : 0.1,
+				"order" : 121,
+				"step" : 0.05,
+				"text" : "流星灵敏度 / Meteor Sensitivity",
+				"type" : "slider",
+				"value" : 0.35
+			},
+			"peakColorEnabled" : 
+			{
+				"index" : 7,
+				"order" : 107,
+				"text" : "启用强调色 / Peak Color",
+				"type" : "bool",
+				"value" : true
+			},
+			"peakColorIntensity" : 
+			{
+				"index" : 8,
+				"max" : 2,
+				"min" : 0,
+				"order" : 108,
+				"step" : 0.1,
+				"text" : "强调色强度 / Peak Color Intensity",
+				"type" : "slider",
+				"value" : 1
+			},
+			"pulseCooldown" : 
+			{
+				"index" : 17,
+				"max" : 200,
+				"min" : 0,
+				"order" : 117,
+				"step" : 5,
+				"text" : "波纹冷却 (帧) / Ripple Cooldown (frames)",
+				"type" : "slider",
+				"value" : 0
+			},
+			"pulseEnabled" : 
+			{
+				"index" : 15,
+				"order" : 115,
+				"text" : "启用波纹 / Enable Ripple",
+				"type" : "bool",
+				"value" : true
+			},
+			"pulseSensitivity" : 
+			{
+				"index" : 16,
+				"max" : 0.5,
+				"min" : 0.05,
+				"order" : 116,
+				"step" : 0.01,
+				"text" : "波纹灵敏度 / Ripple Sensitivity",
+				"type" : "slider",
+				"value" : 0.2
+			},
+			"responseRange" : 
+			{
+				"index" : 12,
+				"max" : 2,
+				"min" : 0.3,
+				"order" : 112,
+				"step" : 0.1,
+				"text" : "响应范围 / Response Range",
+				"type" : "slider",
+				"value" : 1
+			},
+			"schemecolor" : 
+			{
+				"order" : 0,
+				"text" : "ui_browse_properties_scheme_color",
+				"type" : "color",
+				"value" : "0.3333333333333333 0.0196078431372549 0.3333333333333333"
+			},
+			"sep_appearance" : 
+			{
+				"index" : 3,
+				"order" : 103,
+				"text" : " ",
+				"type" : "text",
+				"value" : ""
+			},
+			"sep_appearance_title" : 
+			{
+				"index" : 4,
+				"order" : 104,
+				"text" : "===外观 / Appearance===",
+				"type" : "text",
+				"value" : ""
+			},
+			"sep_audio" : 
+			{
+				"index" : 9,
+				"order" : 109,
+				"text" : " ",
+				"type" : "text",
+				"value" : ""
+			},
+			"sep_audio_title" : 
+			{
+				"index" : 10,
+				"order" : 110,
+				"text" : "===音频响应 / Audio Response===",
+				"type" : "text",
+				"value" : ""
+			},
+			"sep_camera" : 
+			{
+				"index" : 29,
+				"order" : 129,
+				"text" : " ",
+				"type" : "text",
+				"value" : ""
+			},
+			"sep_camera_title" : 
+			{
+				"index" : 30,
+				"order" : 130,
+				"text" : "===视角 / Camera===",
+				"type" : "text",
+				"value" : ""
+			},
+			"sep_idle" : 
+			{
+				"index" : 24,
+				"order" : 124,
+				"text" : " ",
+				"type" : "text",
+				"value" : ""
+			},
+			"sep_idle_title" : 
+			{
+				"index" : 25,
+				"order" : 125,
+				"text" : "===效果-空闲波浪 / Effect-Idle Wave===",
+				"type" : "text",
+				"value" : ""
+			},
+			"sep_meteor" : 
+			{
+				"index" : 18,
+				"order" : 118,
+				"text" : " ",
+				"type" : "text",
+				"value" : ""
+			},
+			"sep_meteor_title" : 
+			{
+				"index" : 19,
+				"order" : 119,
+				"text" : "===效果-流星 / Effect-Meteor===",
+				"type" : "text",
+				"value" : ""
+			},
+			"sep_player" : 
+			{
+				"index" : 36,
+				"order" : 136,
+				"text" : " ",
+				"type" : "text",
+				"value" : ""
+			},
+			"sep_player_title" : 
+			{
+				"index" : 37,
+				"order" : 137,
+				"text" : "===播放器 / Player===",
+				"type" : "text",
+				"value" : ""
+			},
+			"sep_render" : 
+			{
+				"index" : 0,
+				"order" : 100,
+				"text" : " ",
+				"type" : "text",
+				"value" : ""
+			},
+			"sep_render_title" : 
+			{
+				"index" : 1,
+				"order" : 101,
+				"text" : "===渲染 / Render===",
+				"type" : "text",
+				"value" : ""
+			},
+			"sep_ripple" : 
+			{
+				"index" : 13,
+				"order" : 113,
+				"text" : " ",
+				"type" : "text",
+				"value" : ""
+			},
+			"sep_ripple_title" : 
+			{
+				"index" : 14,
+				"order" : 114,
+				"text" : "===效果-波纹 / Effect-Ripple===",
+				"type" : "text",
+				"value" : ""
+			},
+			"showAlbumCover" : 
+			{
+				"index" : 39,
+				"order" : 139,
+				"text" : "显示专辑封面 / Show Album Cover",
+				"type" : "bool",
+				"value" : true
+			},
+			"showPlayerController" : 
+			{
+				"index" : 38,
+				"order" : 138,
+				"text" : "显示播放器控制器 / Show Player",
+				"type" : "bool",
+				"value" : true
+			},
+			"theme" : 
+			{
+				"index" : 5,
+				"options" : 
+				[
+					{
+						"label" : "自动轮询 / Auto Cycle",
+						"value" : "cycle"
+					},
+					{
+						"label" : "霁紫 / Violet",
+						"value" : "nocturnal"
+					},
+					{
+						"label" : "沧蓝 / Deep Blue",
+						"value" : "ocean-deep"
+					},
+					{
+						"label" : "冰蓝 / Ice Blue",
+						"value" : "arctic-aurora"
+					},
+					{
+						"label" : "碧翠 / Emerald",
+						"value" : "cyber-forest"
+					},
+					{
+						"label" : "流金 / Gold",
+						"value" : "golden-hour"
+					},
+					{
+						"label" : "余烬 / Ember",
+						"value" : "ember-fire"
+					},
+					{
+						"label" : "赤焰 / Crimson",
+						"value" : "crimson-sunset"
+					},
+					{
+						"label" : "霞粉 / Coral",
+						"value" : "coral-mirage"
+					},
+					{
+						"label" : "幻紫 / Neon",
+						"value" : "neon-tokyo"
+					},
+					{
+						"label" : "水墨 / Ink",
+						"value" : "minimal-monochrome"
+					},
+					{
+						"label" : "幽青 / Teal",
+						"value" : "teal-depth"
+					},
+					{
+						"label" : "薰衣草 / Lavender",
+						"value" : "lavender-dream"
+					},
+					{
+						"label" : "樱 / Cherry Blossom",
+						"value" : "cherry-blossom"
+					},
+					{
+						"label" : "锻铜 / Copper",
+						"value" : "copper-forge"
+					},
+					{
+						"label" : "薄荷 / Mint",
+						"value" : "mint-fresh"
+					}
+				],
+				"order" : 105,
+				"text" : "颜色主题 / Color Theme",
+				"type" : "combo",
+				"value" : "nocturnal"
+			},
+			"themeCycleInterval" : 
+			{
+				"index" : 6,
+				"max" : 300,
+				"min" : 10,
+				"order" : 106,
+				"step" : 10,
+				"text" : "轮询间隔 (秒) / Cycle Interval (s)",
+				"type" : "slider",
+				"value" : 60
+			}
+		},
+		"supportsaudioprocessing" : true
+	},
+	"name" : "Sonic Topography",
+	"preview" : "preview.gif",
+	"ratingsex" : "none",
+	"ratingviolence" : "none",
+	"tags" : [ "Sci-Fi" ],
+	"title" : "音域回响",
+	"type" : "web",
+	"version" : 1,
+	"visibility" : "public",
+	"workshopid" : "3747222633",
+	"workshopurl" : "steam://url/CommunityFilePage/3747222633"
+}
