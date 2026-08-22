@@ -663,8 +663,9 @@ internal sealed class BackendHost : IDisposable
 
     private static void WaitUntilReady(Process process, string baseUrl, string logPath)
     {
-        using HttpClient client = new() { Timeout = TimeSpan.FromMilliseconds(700) };
+        using HttpClient client = new() { Timeout = TimeSpan.FromMilliseconds(900) };
         DateTime deadline = DateTime.UtcNow.AddSeconds(25);
+        BackendStartupProbeResult lastProbe = new(false, "starting", "backend has not answered yet");
         while (DateTime.UtcNow < deadline)
         {
             if (process.HasExited)
@@ -675,18 +676,21 @@ internal sealed class BackendHost : IDisposable
             }
             try
             {
-                using HttpResponseMessage response = client
-                    .GetAsync(new Uri(new Uri(baseUrl), "/api/app/version"))
+                lastProbe = BackendStartupProbe
+                    .ProbeOnceAsync(client, new Uri(baseUrl))
                     .GetAwaiter()
                     .GetResult();
-                if ((int)response.StatusCode is >= 200 and < 500) return;
+                if (lastProbe.Ready) return;
             }
             catch
             {
             }
             Thread.Sleep(50);
         }
-        throw new TimeoutException($"FE Monster backend did not become ready. See {logPath}");
+        throw new TimeoutException(
+            $"FE Monster backend did not become ready during '{lastProbe.Phase}' " +
+            $"({lastProbe.Detail}). See {logPath}"
+        );
     }
 
     private static void WriteProcessTree(string outDir, int backendProcessId, string javaExe, int port)
@@ -715,6 +719,13 @@ internal static class StartupDiagnostics
     {
         get
         {
+            string configuredDataRoot = Environment.GetEnvironmentVariable("FE_MONSTER_DATA_DIR")?.Trim() ?? "";
+            if (configuredDataRoot.Length != 0)
+            {
+                string dataRoot = Path.GetFullPath(Environment.ExpandEnvironmentVariables(configuredDataRoot));
+                string appDataRoot = Directory.GetParent(dataRoot)?.FullName ?? dataRoot;
+                return Path.Combine(appDataRoot, "logs", "startup.log");
+            }
             string root = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             return Path.Combine(root, "FE Monster", "logs", "startup.log");
         }
@@ -722,7 +733,17 @@ internal static class StartupDiagnostics
 
     public static void Write(Exception error, string? additionalPath = null)
     {
-        string text = $"[{DateTimeOffset.Now:O}] {error}{Environment.NewLine}";
+        WriteText(error.ToString(), additionalPath);
+    }
+
+    public static void WriteMessage(string message, string? additionalPath = null)
+    {
+        WriteText(message, additionalPath);
+    }
+
+    private static void WriteText(string message, string? additionalPath)
+    {
+        string text = $"[{DateTimeOffset.Now:O}] {message}{Environment.NewLine}";
         foreach (string path in new[] { LogPath, additionalPath ?? "" })
         {
             if (string.IsNullOrWhiteSpace(path)) continue;

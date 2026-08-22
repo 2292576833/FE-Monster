@@ -23,7 +23,7 @@ namespace FeMonster.Client;
 // preferences and conversation storage remain shared without color-key hacks.
 internal sealed class DesktopPetHost : IDisposable
 {
-    private readonly WinFormsWebView2 mainWebView;
+    private readonly Func<WinFormsWebView2?> mainWebViewProvider;
     private readonly Action showMainWindow;
     private readonly string appUrl;
     private DesktopPetWindow? window;
@@ -31,11 +31,11 @@ internal sealed class DesktopPetHost : IDisposable
     private int generation;
 
     public DesktopPetHost(
-        WinFormsWebView2 mainWebView,
+        Func<WinFormsWebView2?> mainWebViewProvider,
         Action showMainWindow,
         string appUrl)
     {
-        this.mainWebView = mainWebView;
+        this.mainWebViewProvider = mainWebViewProvider;
         this.showMainWindow = showMainWindow;
         this.appUrl = appUrl;
     }
@@ -50,6 +50,8 @@ internal sealed class DesktopPetHost : IDisposable
 
     public void Enable()
     {
+        WinFormsWebView2 mainWebView = mainWebViewProvider()
+            ?? throw new InvalidOperationException("WebView2 is not ready.");
         if (mainWebView.CoreWebView2 is null)
         {
             throw new InvalidOperationException("WebView2 is not ready.");
@@ -63,7 +65,8 @@ internal sealed class DesktopPetHost : IDisposable
             {
                 if (ReferenceEquals(window, created)) window = null;
                 StateChanged?.Invoke();
-                if (!disabling && !mainWebView.IsDisposed) showMainWindow();
+                WinFormsWebView2? currentMainWebView = mainWebViewProvider();
+                if (!disabling && currentMainWebView is { IsDisposed: false }) showMainWindow();
             };
             window = created;
             int currentGeneration = ++generation;
@@ -151,6 +154,8 @@ internal sealed class DesktopPetHost : IDisposable
     {
         try
         {
+            WinFormsWebView2 mainWebView = mainWebViewProvider()
+                ?? throw new InvalidOperationException("WebView2 is not ready.");
             CoreWebView2Environment environment = mainWebView.CoreWebView2?.Environment
                 ?? throw new InvalidOperationException("WebView2 environment is not ready.");
             WebView2CompositionControl petWebView = target.PetWebView;

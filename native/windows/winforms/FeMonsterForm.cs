@@ -22,11 +22,7 @@ internal sealed class FeMonsterForm : Form
     private const int WindowWorkAreaMargin = 24;
     private readonly ClientOptions options;
     private readonly bool ownsBackendProcess;
-    private readonly WebView2 webView = new()
-    {
-        Dock = DockStyle.Fill,
-        Margin = Padding.Empty
-    };
+    private WebView2 webView;
     private readonly DesktopSceneHost desktopSceneHost;
     private readonly DesktopPetHost desktopPetHost;
     private readonly NotifyIcon trayIcon;
@@ -45,11 +41,18 @@ internal sealed class FeMonsterForm : Form
     private int appliedCornerPreference = -1;
     private int cachedResizeFrameDpi;
     private Size cachedResizeFrameSize;
+    private TaskCompletionSource<CoreWebView2NavigationCompletedEventArgs>? pendingStartupNavigation;
+    private string webViewUserDataFolder = "";
+    private bool startupPageReady;
+    private bool runtimeRecoveryStarted;
+    private readonly System.Windows.Forms.Timer backgroundMemoryTimer;
+    private DateTime lastBackgroundMemoryTrimAt = DateTime.MinValue;
 
     public FeMonsterForm(ClientOptions options, bool ownsBackendProcess = false)
     {
         this.options = options;
         this.ownsBackendProcess = ownsBackendProcess;
+        webView = CreateMainWebView();
         desktopSceneHost = new DesktopSceneHost(options);
         Text = "FE Monster";
         Icon = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath);
@@ -62,11 +65,12 @@ internal sealed class FeMonsterForm : Form
         Rectangle initialWorkingArea = Screen.FromPoint(Cursor.Position).WorkingArea;
         Bounds = FitWindowBoundsToWorkingArea(Bounds, initialWorkingArea, center: true);
         BackColor = WindowSurfaceColor;
-        webView.DefaultBackgroundColor = WindowSurfaceColor;
         Controls.Add(webView);
-        desktopPetHost = new DesktopPetHost(webView, ShowMainWindow, options.Url);
+        desktopPetHost = new DesktopPetHost(() => webView, ShowMainWindow, options.Url);
         desktopPetHost.WebMessageReceived += HandleWebMessage;
         desktopPetHost.StateChanged += HandleDesktopPetStateChanged;
+        backgroundMemoryTimer = new System.Windows.Forms.Timer { Interval = 120000 };
+        backgroundMemoryTimer.Tick += (_, _) => TrimBackgroundMemoryIfNeeded();
 
         trayMenu = new ContextMenuStrip();
         trayMenu.Items.Add("显示窗口", null, (_, _) => ShowMainWindow());
@@ -159,10 +163,11 @@ internal sealed class FeMonsterForm : Form
             StartupDiagnostics.Write(error);
             MessageBox.Show(
                 this,
-                "FE Monster could not create its application window.\n\n" +
+                "FE Monster 无法创建应用窗口。\n\n" +
                 error.Message +
-                "\n\nIf Microsoft Edge WebView2 is missing, install or repair it and retry.\n\n" +
-                "Diagnostic log:\n" +
+                "\n\n程序已经尝试了网络重试、浏览器控件重建和软件渲染。" +
+                "如果仍然失败，请修复 Microsoft Edge WebView2 Runtime 后重试。\n\n" +
+                "诊断日志：\n" +
                 StartupDiagnostics.LogPath,
                 "FE Monster",
                 MessageBoxButtons.OK,
@@ -177,6 +182,7 @@ internal sealed class FeMonsterForm : Form
         base.OnResize(e);
         ApplyWindowSurfacePolicy();
         ApplyWindowCornerPolicy();
+        UpdateBackgroundMemoryTimer();
     }
 
     protected override void OnDpiChanged(DpiChangedEventArgs e)
@@ -193,6 +199,8 @@ internal sealed class FeMonsterForm : Form
         if (e.Cancel) return;
         RunShutdownStep("desktop pet", desktopPetHost.Dispose);
         RunShutdownStep("desktop scene", desktopSceneHost.Dispose);
+        backgroundMemoryTimer.Stop();
+        backgroundMemoryTimer.Dispose();
         RunShutdownStep("tray icon", DisposeTrayResources);
         RunShutdownStep("recording toolbar", () =>
         {
@@ -275,6 +283,7 @@ internal sealed class FeMonsterForm : Form
         ShowInTaskbar = true;
         if (!Visible) Show();
         if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+        UpdateBackgroundMemoryTimer();
         Activate();
         BringToFront();
     }
@@ -283,6 +292,39 @@ internal sealed class FeMonsterForm : Form
     {
         Hide();
         ShowInTaskbar = false;
+        UpdateBackgroundMemoryTimer();
+    }
+
+    private void UpdateBackgroundMemoryTimer()
+    {
+        if (backgroundMemoryTimer == null) return;
+        bool shouldRun = !Visible || WindowState == FormWindowState.Minimized;
+        if (shouldRun)
+        {
+            backgroundMemoryTimer.Start();
+        }
+        else
+        {
+            backgroundMemoryTimer.Stop();
+        }
+    }
+
+    private void TrimBackgroundMemoryIfNeeded()
+    {
+        if (Visible && WindowState != FormWindowState.Minimized)
+        {
+            backgroundMemoryTimer.Stop();
+            return;
+        }
+
+        DateTime now = DateTime.UtcNow;
+        if (now - lastBackgroundMemoryTrimAt < TimeSpan.FromMinutes(1))
+        {
+            return;
+        }
+
+        lastBackgroundMemoryTrimAt = now;
+        MemoryOptimizer.TrimCurrentProcess();
     }
 
     private void ShowDesktopPet()
@@ -342,6 +384,17 @@ internal sealed class FeMonsterForm : Form
         );
     }
 
+    private static WebView2 CreateMainWebView()
+    {
+        return new WebView2
+        {
+            Dock = DockStyle.Fill,
+            Margin = Padding.Empty,
+            DefaultBackgroundColor = WindowSurfaceColor,
+            AllowExternalDrop = true
+        };
+    }
+
     private async Task InitializeWebViewAsync()
     {
         string testStorageKey = Program.DesktopPetTestStorageKey();
@@ -351,33 +404,331 @@ internal sealed class FeMonsterForm : Form
         string profileRoot = testStorageKey.Length == 0
             ? ResolveWebView2DataRoot()
             : Path.Combine(Path.GetTempPath(), "FE Monster", "WebView2");
-        var userDataFolder = Path.Combine(profileRoot, profileFolder);
-        Directory.CreateDirectory(userDataFolder);
+        webViewUserDataFolder = Path.Combine(profileRoot, profileFolder);
 
-        var environment = await CoreWebView2Environment.CreateAsync(
+        try
+        {
+            await CreateWebViewControllerAsync(options.GpuAcceleration, "startup");
+            await NavigateToAppShellWithRecoveryAsync(webView.CoreWebView2, "startup");
+        }
+        catch (Exception firstFailure)
+        {
+            StartupDiagnostics.Write(new InvalidOperationException(
+                "WebView2 hardware startup did not become ready; rebuilding the browser controller with software rendering.",
+                firstFailure
+            ));
+            await RecreateWebViewControllerAsync(gpuRequested: false, "startup software recovery");
+            await NavigateToAppShellWithRecoveryAsync(webView.CoreWebView2, "startup software recovery");
+        }
+        startupPageReady = true;
+    }
+
+    private async Task CreateWebViewControllerAsync(
+        bool gpuRequested,
+        string phase,
+        string? userDataFolder = null)
+    {
+        string activeUserDataFolder = userDataFolder ?? webViewUserDataFolder;
+        Directory.CreateDirectory(activeUserDataFolder);
+        CoreWebView2Environment environment = await CoreWebView2Environment.CreateAsync(
             browserExecutableFolder: null,
-            userDataFolder: userDataFolder,
-            options: new CoreWebView2EnvironmentOptions(BuildBrowserArguments())
+            userDataFolder: activeUserDataFolder,
+            options: new CoreWebView2EnvironmentOptions(
+                WebViewStartupPolicy.BrowserArguments(gpuRequested)
+            )
         );
         webEnvironment = environment;
-
-        webView.DefaultBackgroundColor = WindowSurfaceColor;
-        webView.AllowExternalDrop = true;
         await webView.EnsureCoreWebView2Async(environment);
-        webView.CoreWebView2.WebMessageReceived += HandleWebMessage;
-        webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
-        webView.CoreWebView2.Settings.AreDevToolsEnabled = true;
-        webView.CoreWebView2.Settings.IsWebMessageEnabled = true;
-        webView.CoreWebView2.Navigate(options.Url);
+        CoreWebView2 core = webView.CoreWebView2;
+        core.WebMessageReceived += HandleWebMessage;
+        core.ProcessFailed += HandleWebViewProcessFailed;
+        core.Settings.AreDefaultContextMenusEnabled = false;
+        core.Settings.AreDevToolsEnabled = true;
+        core.Settings.IsWebMessageEnabled = true;
+        StartupDiagnostics.WriteMessage(
+            $"WebView2 controller ready: phase={phase}; renderMode={(gpuRequested ? "automatic" : "software")}; " +
+            $"browserVersion={environment.BrowserVersionString}; userDataFolder={activeUserDataFolder}; URL={options.Url}"
+        );
     }
 
-    private string BuildBrowserArguments()
+    private async Task RecreateWebViewControllerAsync(bool gpuRequested, string phase)
     {
-        return "--use-gl=angle --use-angle=d3d11 " +
-            "--enable-gpu-rasterization --enable-accelerated-2d-canvas " +
-            "--force_high_performance_gpu --ignore-gpu-blocklist " +
-            "--disable-software-rasterizer";
+        if (IsDisposed) throw new ObjectDisposedException(nameof(FeMonsterForm));
+        if (desktopSceneHost.IsEnabled) desktopSceneHost.Disable();
+        if (desktopPetHost.IsEnabled) desktopPetHost.Disable();
+
+        WebView2 previous = webView;
+        try
+        {
+            if (previous.CoreWebView2 is not null)
+            {
+                previous.CoreWebView2.WebMessageReceived -= HandleWebMessage;
+                previous.CoreWebView2.ProcessFailed -= HandleWebViewProcessFailed;
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // BrowserProcessExited closes the controller before the host can detach events.
+        }
+        Controls.Remove(previous);
+        previous.Dispose();
+        await Task.Delay(200);
+
+        Exception? lastFailure = null;
+        foreach (string candidateUserDataFolder in new[]
+        {
+            webViewUserDataFolder,
+            webViewUserDataFolder + "-SoftwareRecovery"
+        }.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            for (int attempt = 1; attempt <= 3; attempt += 1)
+            {
+                WebView2 candidate = CreateMainWebView();
+                webView = candidate;
+                Controls.Add(candidate);
+                candidate.BringToFront();
+                try
+                {
+                    await CreateWebViewControllerAsync(
+                        gpuRequested,
+                        phase,
+                        candidateUserDataFolder
+                    );
+                    return;
+                }
+                catch (Exception error) when (error is not OutOfMemoryException)
+                {
+                    webEnvironment = null;
+                    Controls.Remove(candidate);
+                    candidate.Dispose();
+                    lastFailure = error;
+                    StartupDiagnostics.Write(new InvalidOperationException(
+                        $"WebView2 controller recreation attempt {attempt} failed: phase={phase}; " +
+                        $"userDataFolder={candidateUserDataFolder}.",
+                        error
+                    ));
+                    if (attempt < 3) await Task.Delay(attempt * 350);
+                }
+            }
+        }
+        webView = CreateMainWebView();
+        Controls.Add(webView);
+        webView.BringToFront();
+        throw new InvalidOperationException(
+            $"WebView2 could not recreate its browser controller for {phase}.",
+            lastFailure
+        );
     }
+
+    private async Task NavigateToAppShellWithRecoveryAsync(CoreWebView2 core, string phase)
+    {
+        Exception? lastFailure = null;
+        for (int attempt = 1; attempt <= WebViewStartupPolicy.NavigationAttemptCount; attempt += 1)
+        {
+            try
+            {
+                await NavigateToAppShellOnceAsync(core);
+                return;
+            }
+            catch (Exception error)
+            {
+                if (error is WebViewProcessFailureException) throw;
+                lastFailure = error;
+                StartupDiagnostics.Write(new InvalidOperationException(
+                    $"WebView2 {phase} navigation attempt {attempt} failed for {options.Url}.",
+                    error
+                ));
+                if (attempt < WebViewStartupPolicy.NavigationAttemptCount)
+                {
+                    await Task.Delay(WebViewStartupPolicy.RetryDelay(attempt));
+                }
+            }
+        }
+
+        throw new InvalidOperationException(
+            "FE Monster 本地应用页面在多次有界恢复后仍未加载完成。" +
+            "程序已经尝试了软件渲染浏览器；请检查安全软件是否拦截 localhost。" +
+            $"启动阶段：{phase}；地址：{options.Url}",
+            lastFailure
+        );
+    }
+
+    private async Task NavigateToAppShellOnceAsync(CoreWebView2 core)
+    {
+        TaskCompletionSource<CoreWebView2NavigationCompletedEventArgs> navigation = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        TaskCompletionSource<CoreWebView2ContentLoadingEventArgs> contentLoading = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        ulong navigationId = 0;
+        pendingStartupNavigation = navigation;
+        void NavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs args)
+        {
+            navigationId = args.NavigationId;
+            StartupDiagnostics.WriteMessage(
+                $"WebView2 navigation starting: id={navigationId}; source={args.Uri}; target={options.Url}"
+            );
+        }
+
+        void ContentLoading(object? sender, CoreWebView2ContentLoadingEventArgs args)
+        {
+            if (navigationId != 0 && args.NavigationId == navigationId && !args.IsErrorPage)
+            {
+                contentLoading.TrySetResult(args);
+            }
+        }
+
+        void NavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs args)
+        {
+            if (navigationId == 0 || args.NavigationId == navigationId)
+            {
+                navigation.TrySetResult(args);
+            }
+        }
+
+        core.NavigationStarting += NavigationStarting;
+        core.ContentLoading += ContentLoading;
+        core.NavigationCompleted += NavigationCompleted;
+        try
+        {
+            core.Navigate(options.Url);
+            Task finished = await Task.WhenAny(
+                contentLoading.Task,
+                navigation.Task,
+                Task.Delay(TimeSpan.FromSeconds(20))
+            );
+            if (ReferenceEquals(finished, navigation.Task))
+            {
+                CoreWebView2NavigationCompletedEventArgs result = await navigation.Task;
+                if (!result.IsSuccess || result.HttpStatusCode >= 400)
+                {
+                    throw new InvalidOperationException(
+                        $"WebView2 navigation failed: id={result.NavigationId}; " +
+                        $"status={result.WebErrorStatus}; http={result.HttpStatusCode}; source={core.Source}."
+                    );
+                }
+                await Task.WhenAny(contentLoading.Task, Task.Delay(TimeSpan.FromSeconds(2)));
+            }
+            else if (!ReferenceEquals(finished, contentLoading.Task))
+            {
+                try { core.Stop(); } catch (InvalidOperationException) { }
+                throw new TimeoutException(
+                    $"WebView2 navigation {navigationId} did not expose the app shell within 20 seconds (source={core.Source})."
+                );
+            }
+
+            bool shellReady = false;
+            string lastPageState = "";
+            for (int probeAttempt = 1; probeAttempt <= 20 && !shellReady; probeAttempt += 1)
+            {
+                string pageStateJson = await core.ExecuteScriptAsync(
+                    "JSON.stringify({readyState:document.readyState,hasBody:!!document.body&&document.body.childElementCount>0,hasAppShell:!!document.getElementById('bootScreen'),hasApplication:!!document.querySelector('.app-shell')})"
+                );
+                lastPageState = pageStateJson;
+                shellReady = IsAppShellReady(pageStateJson);
+                if (!shellReady && probeAttempt < 20) await Task.Delay(150);
+            }
+            if (!shellReady)
+            {
+                throw new InvalidOperationException(
+                    $"WebView2 returned a page without the FE Monster app shell: id={navigationId}; " +
+                    $"source={core.Source}; state={lastPageState}."
+                );
+            }
+            StartupDiagnostics.WriteMessage(
+                $"WebView2 app shell ready: id={navigationId}; source={core.Source}; state={lastPageState}"
+            );
+        }
+        finally
+        {
+            core.NavigationStarting -= NavigationStarting;
+            core.ContentLoading -= ContentLoading;
+            core.NavigationCompleted -= NavigationCompleted;
+            if (ReferenceEquals(pendingStartupNavigation, navigation)) pendingStartupNavigation = null;
+        }
+    }
+
+    private static bool IsAppShellReady(string pageStateJson)
+    {
+        try
+        {
+            using JsonDocument pageState = JsonDocument.Parse(pageStateJson);
+            string serializedState = pageState.RootElement.ValueKind == JsonValueKind.String
+                ? pageState.RootElement.GetString() ?? ""
+                : pageState.RootElement.GetRawText();
+            using JsonDocument state = JsonDocument.Parse(serializedState);
+            JsonElement root = state.RootElement;
+            bool hasBody = root.TryGetProperty("hasBody", out JsonElement body) && body.GetBoolean();
+            bool hasAppShell = root.TryGetProperty("hasAppShell", out JsonElement shell) && shell.GetBoolean();
+            // The shell is deliberately near the start of index.html. Once it
+            // exists, let the window render while later scripts/fonts continue
+            // loading instead of cancelling a healthy slow navigation.
+            return hasBody && hasAppShell;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private void HandleWebViewProcessFailed(object? sender, CoreWebView2ProcessFailedEventArgs args)
+    {
+        StartupDiagnostics.WriteMessage(
+            $"WebView2 process failed: kind={args.ProcessFailedKind}; reason={args.Reason}; " +
+            $"exitCode={args.ExitCode}; process={args.ProcessDescription}; module={args.FailureSourceModulePath}; " +
+            $"startupReady={startupPageReady}."
+        );
+        if (args.ProcessFailedKind == CoreWebView2ProcessFailedKind.GpuProcessExited)
+        {
+            // Chromium normally recreates the GPU process itself. Escalate only
+            // if the main browser/renderer also fails or the navigation times out.
+            return;
+        }
+        if (!WebViewStartupPolicy.RequiresControllerRecreation(args.ProcessFailedKind.ToString())) return;
+
+        WebViewProcessFailureException failure = new(args.ProcessFailedKind.ToString());
+        if (!startupPageReady)
+        {
+            pendingStartupNavigation?.TrySetException(failure);
+            return;
+        }
+
+        if (runtimeRecoveryStarted || IsDisposed)
+        {
+            return;
+        }
+        runtimeRecoveryStarted = true;
+        BeginInvoke(async () =>
+        {
+            try
+            {
+                await RecreateWebViewControllerAsync(gpuRequested: false, "runtime software recovery");
+                await NavigateToAppShellWithRecoveryAsync(webView.CoreWebView2, "runtime software recovery");
+                startupPageReady = true;
+            }
+            catch (Exception error)
+            {
+                StartupDiagnostics.Write(error);
+                MessageBox.Show(
+                    this,
+                    "FE Monster's page process stopped and could not be restored.\n\n" +
+                    error.Message + "\n\nRestart FE Monster. If this repeats, repair Microsoft Edge WebView2.\n\n" +
+                    "Diagnostic log:\n" + StartupDiagnostics.LogPath,
+                    "FE Monster",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+            }
+            finally
+            {
+                runtimeRecoveryStarted = false;
+            }
+        });
+    }
+
+    private sealed class WebViewProcessFailureException(string kind)
+        : InvalidOperationException($"WebView2 process failed and its controller must be recreated ({kind}).");
 
     private void HandleWebMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {

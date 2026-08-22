@@ -56,6 +56,8 @@ native/windows/winforms/bin/
 native/windows/winforms/obj/
 native/windows/edge-harness/bin/
 native/windows/edge-harness/obj/
+native/windows/startup-harness/bin/
+native/windows/startup-harness/obj/
 
 # Android build output
 android/.gradle/
