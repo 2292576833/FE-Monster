@@ -2,8 +2,11 @@
   'use strict';
 
   const CHANNEL = 'fe-soundscape:v1';
-  const STORAGE_KEY = 'fe-monster.soundscape-workshop.settings.v2';
-  const LEGACY_STORAGE_KEY = 'fe-monster.soundscape-workshop.settings.v1';
+  const STORAGE_KEY = 'fe-monster-soundscape-workshop-settings-v3';
+  const LEGACY_STORAGE_KEYS = Object.freeze([
+    'fe-monster.soundscape-workshop.settings.v2',
+    'fe-monster.soundscape-workshop.settings.v1'
+  ]);
   const AUDIO_INTERVAL_MS = 1000 / 30;
   const MEDIA_INTERVAL_MS = 250;
   const READY_TIMEOUT_MS = 4500;
@@ -230,12 +233,13 @@
       if (!global.localStorage) {
         return persistenceSnapshot({ requestedParameters: defaults, effectiveParameters: defaults });
       }
-      const savedV2 = JSON.parse(global.localStorage.getItem(STORAGE_KEY) || 'null');
+      const readStoredValue = (key) => JSON.parse(global.localStorage.getItem(key) || 'null');
+      const savedV2 = readStoredValue(STORAGE_KEY) || readStoredValue(LEGACY_STORAGE_KEYS[0]);
       let restored;
       if (savedV2?.version === 2) {
         restored = persistenceSnapshot(savedV2);
       } else {
-        const savedV1 = JSON.parse(global.localStorage.getItem(LEGACY_STORAGE_KEY) || 'null');
+        const savedV1 = readStoredValue(LEGACY_STORAGE_KEYS[1]);
         const requestedParameters = Object.assign(defaults, sanitizeChanges(savedV1, false));
         const lastKnownSafeGridSize = safeStartupGrid(requestedParameters.gridSize);
         restored = persistenceSnapshot({
@@ -246,6 +250,9 @@
         });
       }
       global.localStorage.setItem(STORAGE_KEY, JSON.stringify(restored));
+      LEGACY_STORAGE_KEYS.forEach((key) => {
+        try { global.localStorage.removeItem(key); } catch (_error) { /* Migration cleanup is optional. */ }
+      });
       return restored;
     } catch (_error) {
       return persistenceSnapshot({ requestedParameters: defaults, effectiveParameters: defaults });

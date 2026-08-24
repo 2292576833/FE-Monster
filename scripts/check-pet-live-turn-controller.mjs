@@ -30,12 +30,12 @@ assert.ok(endpoint({ speechMs: 1_200, transcript: '还有，' }) > 650,
   'soft punctuation must hold longer than the old fixed threshold');
 
 const assistant = fs.readFileSync(path.join(root, 'web', 'pet-assistant.js'), 'utf8');
-const index = fs.readFileSync(path.join(root, 'web', 'index.html'), 'utf8');
+const loader = fs.readFileSync(path.join(root, 'web', 'runtime-module-loader.js'), 'utf8');
 assert.match(assistant, /resolveLiveEndpointSilenceMs/,
   'the microphone VAD path does not consult the adaptive controller');
 assert.match(assistant, /capture\.endpointSilenceMs/,
   'the active turn does not expose its resolved endpoint for diagnostics');
-assert.match(index, /pet-live-turn-controller\.js[^>]*><\/script>[\s\S]*pet-assistant\.js/,
+assert.ok(loader.indexOf('pet-live-turn-controller.js') < loader.indexOf('pet-assistant.js'),
   'the controller must load before pet-assistant.js');
 
 for (const forbidden of [

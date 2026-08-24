@@ -161,6 +161,7 @@ try {
   });
   await command('Page.navigate', { url: baseUrl });
   await waitFor(`document.readyState === 'complete'
+    && document.documentElement.dataset.interactiveServices === 'deferred'
     && typeof setPlaybackLyricPalettePreference === 'function'
     && typeof applyQishuiPlaybackPalette === 'function'
     && typeof parseLyricPayload === 'function'
@@ -307,7 +308,19 @@ try {
       cardTranslation: cardTranslationBase?.textContent.trim() || ''
     };
 
+    const playbackToggleBeforeClick = {
+      connected: playbackToggle.isConnected,
+      disabled: playbackToggle.disabled,
+      state: state.bilingualLyricsEnabled,
+      pressed: playbackToggle.getAttribute('aria-pressed')
+    };
     playbackToggle.click();
+    const playbackToggleAfterClick = {
+      connected: playbackToggle.isConnected,
+      disabled: playbackToggle.disabled,
+      state: state.bilingualLyricsEnabled,
+      pressed: playbackToggle.getAttribute('aria-pressed')
+    };
     updatePlaybackLyricAtTime(1.5);
     renderBookLyricList(els.bookLyricList, lines);
     renderBookLyricList(els.qishuiPlaybackLyricPage, lines, {
@@ -413,6 +426,8 @@ try {
       checks,
       enabledDisplay,
       disabledDisplay,
+      playbackToggleBeforeClick,
+      playbackToggleAfterClick,
       multiRowDisplay,
       subtitleStyle: {
         fontSize: subtitleStyle.fontSize,
@@ -1040,6 +1055,7 @@ try {
   await command('Page.reload', { ignoreCache: true });
   await waitFor(`performance.timeOrigin !== ${JSON.stringify(timeOriginBeforeReload)}
     && document.readyState === 'complete'
+    && document.documentElement.dataset.interactiveServices === 'deferred'
     && state.playbackLyricPalettePreference
     && document.getElementById('playbackLyricPaletteCustomInput')`);
   const reloadPass = await evaluate(`(() => {
@@ -1275,6 +1291,124 @@ try {
     };
   })()`, true);
 
+  const playbackBarClarityPass = await evaluate(`(async () => {
+    const card = els.qishuiPlaybackCard;
+    const phone = els.qishuiPlaybackPhone;
+    const list = els.qishuiPlaybackLyricPage;
+    const scene = els.playbackLyricScene;
+    const regularLine = els.playbackLyricText;
+    if (!card || !phone || !list || !scene || !regularLine) {
+      return { pass: false, ready: false };
+    }
+
+    const previous = {
+      cardHidden: card.hidden,
+      hasCardClass: els.appShell.classList.contains('has-qishui-playback-card'),
+      playbackPage: state.playbackPage,
+      textPreset: state.textPreset,
+      multiRowLyricsEnabled: state.multiRowLyricsEnabled,
+      zoom: state.playbackVisual.zoom,
+      transforms: JSON.parse(JSON.stringify(state.textPresetTransforms)),
+      lyricsEnabled: state.textComposerSettings.lyricsEnabled,
+      echoLayers: state.textComposerSettings.echoLayers,
+      echoSpacing: state.textComposerSettings.echoSpacing
+    };
+
+    const matrixFrom = (value) => (
+      value && value !== 'none' ? new DOMMatrixReadOnly(value) : new DOMMatrixReadOnly()
+    );
+    const axisScaleX = (matrix) => Math.hypot(matrix.m11, matrix.m12, matrix.m13);
+    const yawFromMatrix = (matrix) => Math.atan2(matrix.m13, matrix.m11) * 180 / Math.PI;
+
+    card.hidden = false;
+    els.appShell.classList.add('has-qishui-playback-card', 'is-playback-page');
+    state.playbackPage = true;
+    list.innerHTML = [
+      '<button class="book-lyric-line qishui-playback-lyric-line" style="--book-line-distance:2">',
+      '<span class="book-lyric-line-text"><span class="book-lyric-copy book-lyric-copy--base">普通播放栏歌词需要保持锐利</span></span>',
+      '</button>',
+      '<button class="book-lyric-line qishui-playback-lyric-line is-current is-scroll-arrived" style="--book-line-distance:0">',
+      '<span class="book-lyric-line-text"><span class="book-lyric-copy book-lyric-copy--base">当前歌词</span>',
+      '<span class="book-lyric-copy book-lyric-copy--hot">当前歌词</span></span>',
+      '</button>'
+    ].join('');
+
+    setTextComposerSetting('lyricsEnabled', true);
+    setTextPreset('depth');
+    state.multiRowLyricsEnabled = false;
+    state.playbackVisual.zoom = 1.8;
+    state.textPresetTransforms.depth = normalizeTextPresetTransform({ scale: 1.25 });
+    updateTextPresetTransform();
+    updateLyricRasterScale();
+    setPlaybackLyricLine('普通歌词在缩放后仍保持清晰', 'Regular lyric remains crisp after zoom', 0.46, 12);
+
+    const phoneMatrix = matrixFrom(getComputedStyle(phone).transform);
+    const phoneYaw = yawFromMatrix(phoneMatrix);
+    const leftEdge = new DOMPoint(-100, 0, 0).matrixTransform(phoneMatrix);
+    const rightEdge = new DOMPoint(100, 0, 0).matrixTransform(phoneMatrix);
+    const cardLine = list.querySelector('.qishui-playback-lyric-line');
+    const cardLineMatrix = matrixFrom(getComputedStyle(cardLine).transform);
+    const cardLineScaleX = axisScaleX(cardLineMatrix);
+    const regularBaseStyle = getComputedStyle(regularLine, '::before');
+    const regularHighlightStyle = getComputedStyle(regularLine, '::after');
+    const regularRasterScale = scene.style.getPropertyValue('--lyric-raster-scale').trim();
+
+    setTextPreset('focus-echo');
+    state.textPresetTransforms['focus-echo'] = normalizeTextPresetTransform({ scale: 1.25 });
+    setTextComposerSetting('echoLayers', 3);
+    setTextComposerSetting('echoSpacing', 22);
+    updateTextPresetTransform();
+    updateLyricRasterScale();
+    setPlaybackLyricLine('焦点回声歌词在缩放后仍保持清晰', '', 0.58, 18);
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const focusEcho = scene.querySelector('.playback-lyric-layer.lyric-depth-1');
+    const focusEchoStyle = getComputedStyle(focusEcho);
+    const focusRasterScale = scene.style.getPropertyValue('--lyric-raster-scale').trim();
+
+    card.hidden = previous.cardHidden;
+    els.appShell.classList.toggle('has-qishui-playback-card', previous.hasCardClass);
+    els.appShell.classList.toggle('is-playback-page', previous.playbackPage);
+    state.playbackPage = previous.playbackPage;
+    state.multiRowLyricsEnabled = previous.multiRowLyricsEnabled;
+    state.playbackVisual.zoom = previous.zoom;
+    state.textPresetTransforms = previous.transforms;
+    setTextComposerSetting('lyricsEnabled', previous.lyricsEnabled);
+    setTextComposerSetting('echoLayers', previous.echoLayers);
+    setTextComposerSetting('echoSpacing', previous.echoSpacing);
+    setTextPreset(previous.textPreset);
+    updateTextPresetTransform();
+    updateLyricRasterScale();
+
+    const checks = {
+      playbackBarTiltsLeftBackward: leftEdge.z < rightEdge.z - 0.1,
+      playbackBarTiltNearTenDegrees: Math.abs(phoneYaw - 10) < 1.1,
+      playbackCardOrdinaryLineAvoidsScaleBlur: Math.abs(cardLineScaleX - 1) < 0.01,
+      regularLyricsUseRasterScaleForZoom: regularRasterScale === '2.250',
+      regularLyricsKeepContrast: regularBaseStyle.textShadow !== 'none'
+        && regularHighlightStyle.backgroundImage.includes('linear-gradient')
+        && (regularHighlightStyle.maskImage || regularHighlightStyle.webkitMaskImage || '').includes('linear-gradient'),
+      focusEchoUsesRasterScaleForZoom: focusRasterScale === '2.250',
+      focusEchoKeepsContrast: focusEchoStyle.textShadow !== 'none'
+        && focusEchoStyle.filter !== 'none'
+    };
+
+    return {
+      pass: Object.values(checks).every(Boolean),
+      checks,
+      phoneYaw,
+      leftEdgeZ: leftEdge.z,
+      rightEdgeZ: rightEdge.z,
+      cardLineScaleX,
+      regularRasterScale,
+      focusRasterScale,
+      regularBaseTextShadow: regularBaseStyle.textShadow,
+      regularHighlightBackgroundImage: regularHighlightStyle.backgroundImage,
+      regularHighlightMask: regularHighlightStyle.maskImage || regularHighlightStyle.webkitMaskImage || '',
+      focusEchoTextShadow: focusEchoStyle.textShadow,
+      focusEchoFilter: focusEchoStyle.filter
+    };
+  })()`, true);
+
   const result = {
     pass: lyricMaterialStaticPass.pass === true
       && bilingualPass.pass === true
@@ -1285,7 +1419,8 @@ try {
       && firstPass.pass === true
       && reloadPass.pass === true
       && lyricContinuityPass.pass === true
-      && qishuiLyricClockPass.pass === true,
+      && qishuiLyricClockPass.pass === true
+      && playbackBarClarityPass.pass === true,
     lyricMaterialStaticPass,
     bilingualPass,
     bilingualUiPass,
@@ -1295,7 +1430,8 @@ try {
     firstPass,
     reloadPass,
     lyricContinuityPass,
-    qishuiLyricClockPass
+    qishuiLyricClockPass,
+    playbackBarClarityPass
   };
   console.log(JSON.stringify(result, null, 2));
   if (!result.pass) process.exitCode = 1;

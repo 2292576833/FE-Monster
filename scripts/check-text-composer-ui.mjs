@@ -955,6 +955,8 @@ try {
   server.close();
   try {
     await delay(200);
-    rmSync(profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    try {
+      rmSync(profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    } catch {}
   } catch {}
 }

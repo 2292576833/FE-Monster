@@ -8,6 +8,7 @@ const source = readFileSync(path.join(rootPath, 'web', 'pet-companion-p2.js'), '
 const css = readFileSync(path.join(rootPath, 'web', 'pet-companion-p2.css'), 'utf8');
 const app = readFileSync(path.join(rootPath, 'web', 'app.js'), 'utf8');
 const html = readFileSync(path.join(rootPath, 'web', 'index.html'), 'utf8');
+const loader = readFileSync(path.join(rootPath, 'web', 'runtime-module-loader.js'), 'utf8');
 const buildInstaller = readFileSync(path.join(rootPath, 'scripts', 'build-installer.ps1'), 'utf8');
 const installScript = readFileSync(path.join(rootPath, 'scripts', 'install-fe-monster.ps1'), 'utf8');
 
@@ -231,7 +232,8 @@ assert.match(app, /function petAssistantExplicitPlaybackSection\s*\(/);
 assert.match(app, /FeMonsterPetCompanionP2[\s\S]{0,260}runNext/);
 assert.match(app, /pet\.weekly\.summary\.query/);
 assert.match(app, /pet\.weekly\.summary\.show/);
-assert.ok(html.indexOf('pet-assistant.js') < html.indexOf('pet-companion-p2.js'));
+assert.ok(loader.indexOf('pet-assistant.js') < loader.indexOf('pet-companion-p2.js'),
+  'the companion runtime must load after pet-assistant.js');
 assert.match(html, /pet-companion-p2\.css/);
 for (const required of ['web\\pet-companion-p2.js', 'web\\pet-companion-p2.css']) {
   assert.ok(buildInstaller.includes(required), `build integrity manifest is missing ${required}`);

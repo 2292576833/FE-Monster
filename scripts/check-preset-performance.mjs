@@ -200,7 +200,8 @@ try {
     if (boot && !boot.hidden && bootButton) {
       bootButton.disabled = false;
       bootButton.click();
-      await wait(700);
+      const bootDismissed = await poll(() => boot.hidden === true);
+      if (!bootDismissed) throw new Error('FE Monster boot screen did not finish dismissing');
     }
     window.__fePerfLongTasks = [];
     if (typeof PerformanceObserver === 'function' && PerformanceObserver.supportedEntryTypes?.includes('longtask')) {
@@ -241,14 +242,13 @@ try {
           const freeX = runtime.freePositions[offset] + driftX;
           const freeY = runtime.freePositions[offset + 1] + driftY;
           const freeZ = runtime.freePositions[offset + 2] + driftZ;
-          const heartX = runtime.heartPositions[offset];
-          const heartY = runtime.heartPositions[offset + 1];
-          const heartZ = runtime.heartPositions[offset + 2];
-          const length = Math.max(0.001, Math.hypot(heartX, heartY, heartZ));
-          const pulse = runtime.pulseWeights[index] * 0.1;
-          const targetX = heartX + heartX / length * pulse;
-          const targetY = heartY + heartY / length * pulse;
-          const targetZ = heartZ + heartZ / length * pulse;
+          const activeHeartCube = runtime.heartActive[index] === 1;
+          const pulse = activeHeartCube
+            ? runtime.heartPulseWeights[index] * runtime.heartCubeSize * 0.1
+            : 0;
+          const targetX = activeHeartCube ? runtime.heartPositions[offset] : 0;
+          const targetY = activeHeartCube ? runtime.heartPositions[offset + 1] : 0;
+          const targetZ = activeHeartCube ? runtime.heartPositions[offset + 2] + pulse : 0;
           const x = freeX + (targetX - freeX) * blend;
           const y = freeY + (targetY - freeY) * blend;
           const z = freeZ + (targetZ - freeZ) * blend;
@@ -269,10 +269,13 @@ try {
           let y;
           let z;
           if (heartMode) {
-            const pulse = runtime.pulseWeights[index] * 0.1;
-            x = runtime.heartPositions[offset] + runtime.heartDirections[offset] * pulse;
-            y = runtime.heartPositions[offset + 1] + runtime.heartDirections[offset + 1] * pulse;
-            z = runtime.heartPositions[offset + 2] + runtime.heartDirections[offset + 2] * pulse;
+            const activeHeartCube = runtime.heartActive[index] === 1;
+            const pulse = activeHeartCube
+              ? runtime.heartPulseWeights[index] * runtime.heartCubeSize * 0.1
+              : 0;
+            x = activeHeartCube ? runtime.heartPositions[offset] : 0;
+            y = activeHeartCube ? runtime.heartPositions[offset + 1] : 0;
+            z = activeHeartCube ? runtime.heartPositions[offset + 2] + pulse : 0;
           } else {
             const phase = runtime.phases[index];
             const speed = runtime.speeds[index];
@@ -303,7 +306,9 @@ try {
     return {
       referenceMs: reference.ms,
       optimizedMs: optimized.ms,
-      ratio: optimized.ms / Math.max(0.001, reference.ms)
+      ratio: optimized.ms / Math.max(0.001, reference.ms),
+      checksumRelativeError: Math.abs(reference.checksum - optimized.checksum)
+        / Math.max(1, Math.abs(reference.checksum))
     };
   })()`);
 
@@ -2980,7 +2985,8 @@ try {
     uiPointerWorkCoalesced: uiPointerSample.available === true
       && uiPointerSample.layoutReads <= 2
       && uiPointerSample.classWrites <= 12,
-    stableModeFastPath: kernelComparison?.ratio < 0.9,
+    stableModeFastPath: kernelComparison?.ratio < 0.9
+      && kernelComparison?.checksumRelativeError <= 0.000001,
     boundedLongTasks: activeSample.maxLongTaskMs < 120 && activeSample.longTaskMs < 260,
     hiddenPresetPaused: lifecycle.hiddenFrameDelta <= 1,
     hiddenPollingPaused: lifecycle.hiddenNetworkRequests.length === 0,
@@ -3455,7 +3461,8 @@ try {
     kernelComparison: kernelComparison ? {
       referenceMs: Number(kernelComparison.referenceMs.toFixed(1)),
       optimizedMs: Number(kernelComparison.optimizedMs.toFixed(1)),
-      ratio: Number(kernelComparison.ratio.toFixed(3))
+      ratio: Number(kernelComparison.ratio.toFixed(3)),
+      checksumRelativeError: Number(kernelComparison.checksumRelativeError.toFixed(8))
     } : null,
     uiPointerSample,
     hiddenRequests: lifecycle.hiddenNetworkRequests,

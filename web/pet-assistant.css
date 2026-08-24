@@ -1,6 +1,8 @@
 .pet-assistant {
   --pet-accent: 112, 238, 255;
   --pet-violet: 170, 112, 255;
+  --pet-edge-x: 0px;
+  --pet-edge-y: 0px;
   position: fixed;
   left: max(24px, env(safe-area-inset-left));
   top: calc(100vh - 238px - max(20px, env(safe-area-inset-bottom)));
@@ -13,8 +15,28 @@
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
-  transform: translate3d(var(--pet-drag-x, 0), var(--pet-drag-y, 0), 0);
+  transform:
+    translate3d(var(--pet-drag-x, 0), var(--pet-drag-y, 0), 0)
+    translate3d(var(--pet-edge-x), var(--pet-edge-y), 0);
+  transition: transform 280ms cubic-bezier(.22, .82, .24, 1);
   will-change: transform;
+}
+
+html[data-fe-client="embedded"] .pet-assistant[data-in-app-edge-hidden] {
+  transition-duration: 320ms;
+}
+
+.pet-assistant[data-in-app-edge-hidden="left"],
+.pet-assistant[data-in-app-edge-hidden="right"],
+.pet-assistant[data-in-app-edge-hidden="top"],
+.pet-assistant[data-in-app-edge-hidden="bottom"] {
+  cursor: pointer;
+}
+
+.pet-assistant[data-in-app-edge-hidden] .pet-assistant__speech,
+.pet-assistant[data-in-app-edge-hidden] .pet-assistant__quick-actions {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .pet-assistant-restore {
@@ -127,6 +149,10 @@ html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__quick-actions {
 
 .pet-assistant.is-dragging .pet-assistant__dock {
   cursor: grabbing;
+}
+
+.pet-assistant.is-dragging {
+  transition: none;
 }
 
 .pet-assistant .pet-assistant__character,
@@ -1401,6 +1427,10 @@ html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__privacy {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .pet-assistant[data-in-app-edge-hidden] {
+    transition-duration: .001ms !important;
+  }
+
   .pet-assistant *,
   .pet-assistant *::before,
   .pet-assistant *::after {
@@ -2088,6 +2118,7 @@ html[data-fe-client="desktop-pet"] #petAssistant #petAssistantPanel[data-pet-tex
   #petAssistant:has(#petAssistantPanel[data-pet-text-bubble]:not([hidden])) {
     contain: style;
     transform: none;
+    transition: none;
     will-change: auto;
   }
 
@@ -2108,6 +2139,7 @@ html[data-fe-client="desktop-pet"] #petAssistant #petAssistantPanel[data-pet-tex
   #petAssistant:has(#petAssistantPanel[data-pet-text-bubble]:not([hidden])) {
     contain: style;
     transform: none;
+    transition: none;
     will-change: auto;
   }
 

@@ -7,6 +7,7 @@ const rootPath = path.resolve(import.meta.dirname, '..');
 const source = readFileSync(path.join(rootPath, 'web', 'pet-product-tour.js'), 'utf8');
 const css = readFileSync(path.join(rootPath, 'web', 'pet-product-tour.css'), 'utf8');
 const html = readFileSync(path.join(rootPath, 'web', 'index.html'), 'utf8');
+const loader = readFileSync(path.join(rootPath, 'web', 'runtime-module-loader.js'), 'utf8');
 const app = readFileSync(path.join(rootPath, 'web', 'app.js'), 'utf8');
 const pet = readFileSync(path.join(rootPath, 'web', 'pet-assistant.js'), 'utf8');
 const buildInstaller = readFileSync(path.join(rootPath, 'scripts', 'build-installer.ps1'), 'utf8');
@@ -115,9 +116,9 @@ for (const step of api.steps) {
 
 assert.match(html, /href="pet-product-tour\.css\?v=[^"]+"/,
   'tour stylesheet must be versioned in the production page');
-assert.match(html, /src="pet-product-tour\.js\?v=[^"]+"/,
-  'tour runtime must be versioned in the production page');
-assert.ok(html.indexOf('pet-assistant.js') < html.indexOf('pet-product-tour.js'),
+assert.match(loader, /pet-product-tour\.js\?v=[^"\s]+/,
+  'tour runtime must be versioned in the runtime module loader');
+assert.ok(loader.indexOf('pet-assistant.js') < loader.indexOf('pet-product-tour.js'),
   'tour must load after the pet bubble API');
 assert.match(html, /id="petProductTourReplay"[^>]*>[^<]*重新演示/,
   'runtime settings need an explicit replay control');

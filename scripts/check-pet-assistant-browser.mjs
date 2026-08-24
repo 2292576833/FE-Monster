@@ -465,9 +465,12 @@ const fixture = `<!doctype html><html><head><meta charset="utf-8">
         return json({
           ok: true,
           sessionId: body.sessionId || 'session-qa',
-          requestId: proactive
+          // The real pet endpoint echoes the client-created stable request ID.
+          // Keep the browser fixture on that contract so retry/idempotency guards
+          // are exercised instead of tripping on an obsolete server-created ID.
+          requestId: body.requestId || (proactive
             ? 'request-proactive-qa'
-            : emotionExample ? 'request-emotion-qa' : 'request-qa',
+            : emotionExample ? 'request-emotion-qa' : 'request-qa'),
           conversationEmotionSource: proactive ? 'proactive' : 'user-text',
           conversationEmotionSequence,
           sevenEmotion: {
@@ -1902,7 +1905,7 @@ try {
   assert.equal(proactiveRequest.proactiveContext.playback.song.name, '星际漫游');
   await evaluate(`window.dispatchEvent(new CustomEvent('fe-monster-pet-event', { detail: {
     type: 'pet.ai.complete', payload: {
-      sessionId: 'session-qa', requestId: 'request-proactive-qa', sequence: 1,
+      sessionId: 'session-qa', requestId: window.__petFixtureChatRequests.at(-1).requestId, sequence: 1,
       text: '这段像把星光折进了低频里，你觉得它更像在漂浮，还是在靠近？'
     }
   }}))`);
@@ -2108,7 +2111,7 @@ try {
     historical: true,
     payload: {
       sessionId: 'session-qa',
-      requestId: 'request-qa',
+      requestId: window.__petFixtureChatRequests.at(-1).requestId,
       sequence: 4,
       text: 'recovered complete answer'
     }
@@ -2116,7 +2119,10 @@ try {
   await delay(80);
   await evaluate(`window.dispatchEvent(new CustomEvent('fe-monster-pet-event', { detail: {
     type: 'pet.ai.complete', historical: true,
-    payload: { sessionId: 'session-qa', requestId: 'request-qa', sequence: 5, text: 'recovered complete answer' }
+    payload: {
+      sessionId: 'session-qa', requestId: window.__petFixtureChatRequests.at(-1).requestId,
+      sequence: 5, text: 'recovered complete answer'
+    }
   }}))`);
   await delay(180);
   const replay = await evaluate(`(() => ({
@@ -2603,7 +2609,7 @@ try {
   });
   await evaluate(`window.dispatchEvent(new CustomEvent('fe-monster-pet-event', { detail: {
     type: 'pet.ai.complete', payload: {
-      sessionId: 'session-qa', requestId: 'request-qa', sequence: 20,
+      sessionId: 'session-qa', requestId: window.__petFixtureChatRequests.at(-1).requestId, sequence: 20,
       text: 'muted audio response', audioId: 'audio1234'
     }
   }}))`);

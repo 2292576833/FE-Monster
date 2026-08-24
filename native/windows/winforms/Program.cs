@@ -455,41 +455,34 @@ internal sealed class BackendHost : IDisposable
 
     private static void MigrateLegacyDataDirectory(string source, string destination)
     {
-        if (!Directory.Exists(source)) return;
         try
         {
-            EnumerationOptions options = new()
+            LegacyDataMigrationResult result = LegacyDataDirectoryMigration.Migrate(
+                source,
+                destination
+            );
+            if (result.Completed)
             {
-                RecurseSubdirectories = true,
-                IgnoreInaccessible = true,
-                ReturnSpecialDirectories = false,
-                AttributesToSkip = FileAttributes.ReparsePoint
-            };
-            foreach (string sourceFile in Directory.EnumerateFiles(source, "*", options))
-            {
-                string relative = Path.GetRelativePath(source, sourceFile);
-                if (relative.StartsWith("..", StringComparison.Ordinal)) continue;
-                string destinationFile = Path.GetFullPath(Path.Combine(destination, relative));
-                string destinationPrefix = destination.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-                if (!destinationFile.StartsWith(destinationPrefix, StringComparison.OrdinalIgnoreCase)) continue;
-
-                string? parent = Path.GetDirectoryName(destinationFile);
-                if (!string.IsNullOrWhiteSpace(parent)) Directory.CreateDirectory(parent);
-                bool releaseControlled = relative.Equals("community-server-url.txt", StringComparison.OrdinalIgnoreCase)
-                    || relative.Equals("community-server-tls-pin.txt", StringComparison.OrdinalIgnoreCase);
-                if (releaseControlled || !File.Exists(destinationFile))
-                {
-                    File.Copy(sourceFile, destinationFile, overwrite: releaseControlled);
-                }
+                StartupDiagnostics.WriteMessage(
+                    "Migrated legacy custom-install data into the stable user profile: " +
+                    $"copied={result.CopiedFiles}; replaced={result.ReplacedFiles}; " +
+                    $"backedUp={result.BackedUpFiles}."
+                );
             }
         }
-        catch (IOException)
+        catch (IOException error)
         {
-            // Existing stable state remains authoritative if a legacy file is locked.
+            StartupDiagnostics.Write(new IOException(
+                "Legacy custom-install data migration was incomplete and will retry on the next launch.",
+                error
+            ));
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException error)
         {
-            // The backend will report a writable-data error if the stable root itself is unavailable.
+            StartupDiagnostics.Write(new UnauthorizedAccessException(
+                "Legacy custom-install data migration could not access every user-state file and will retry on the next launch.",
+                error
+            ));
         }
     }
 

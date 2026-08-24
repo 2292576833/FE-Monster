@@ -202,6 +202,11 @@ try {
     [System.Text.Encoding]::ASCII
   )
   [System.IO.File]::WriteAllText($upgradeUserState, 'old-user-state', [System.Text.Encoding]::ASCII)
+  [System.IO.File]::WriteAllText(
+    (Join-Path $upgradeInstallDir '.fe-monster-upgrade-transaction.json'),
+    '{"schemaVersion":1,"targetPath":"stale-before-first-rename","backupName":".fm-backup-dead0001"}',
+    [System.Text.UTF8Encoding]::new($false)
+  )
   New-TestPayload $upgradePayloadRoot
   New-Item -ItemType Directory -Path (Join-Path $upgradePayloadRoot 'data') -Force | Out-Null
   [System.IO.File]::WriteAllText(
@@ -221,6 +226,9 @@ try {
   if ((Get-Content -LiteralPath $upgradeUserState -Raw) -ne 'old-user-state') {
     throw 'Upgrade rollback did not restore the previous user data.'
   }
+  if (Test-Path -LiteralPath (Join-Path $upgradeInstallDir '.fe-monster-upgrade-transaction.json')) {
+    throw 'Upgrade rollback leaked its durable recovery marker into the restored installation.'
+  }
   if (Test-Path -LiteralPath (Join-Path $upgradeInstallDir 'marker.txt')) {
     throw 'Upgrade rollback left the activated new payload in place.'
   }
@@ -229,6 +237,62 @@ try {
       $upgradeLog -notmatch 'Preserving existing data user data' -or
       $upgradeLog -notmatch 'Installed computer ID is ready') {
     throw 'Fast-stage upgrade did not preserve user data or reach post-integrity activation before rollback.'
+  }
+
+  # Reproduce a hard interruption between the two commit-point renames:
+  # the previous installation has already moved to .fm-backup-*, while the
+  # verified stage has not yet reached the registered installation path.
+  $interruptedInstallDir = Join-Path $testRoot 'interrupted-upgrade-install'
+  $interruptedBackupRoot = Join-Path $testRoot '.fm-backup-a11ce123'
+  $interruptedPayloadRoot = Join-Path $testRoot 'interrupted-upgrade-payload'
+  $interruptedLogPath = Join-Path $testRoot 'interrupted-upgrade.log'
+  $interruptedLegacyJar = Join-Path $interruptedBackupRoot 'out\fe-monster-java.jar'
+  $interruptedLegacyRun = Join-Path $interruptedBackupRoot 'run.cmd'
+  $interruptedUserState = Join-Path $interruptedBackupRoot 'data\user-state.txt'
+  $interruptedRecoveryMarker = Join-Path $interruptedBackupRoot '.fe-monster-upgrade-transaction.json'
+  New-Item -ItemType Directory -Path (Split-Path -Parent $interruptedLegacyJar) -Force | Out-Null
+  New-Item -ItemType Directory -Path (Split-Path -Parent $interruptedUserState) -Force | Out-Null
+  [System.IO.File]::WriteAllText($interruptedLegacyJar, 'legacy-jar', [System.Text.Encoding]::ASCII)
+  [System.IO.File]::WriteAllText($interruptedLegacyRun, 'legacy-run', [System.Text.Encoding]::ASCII)
+  [System.IO.File]::WriteAllText(
+    $interruptedUserState,
+    'hard-interruption-user-state',
+    [System.Text.Encoding]::ASCII
+  )
+  [System.IO.File]::WriteAllText(
+    $interruptedRecoveryMarker,
+    ([ordered]@{
+      schemaVersion = 1
+      targetPath = [System.IO.Path]::GetFullPath($interruptedInstallDir)
+      backupName = Split-Path -Leaf $interruptedBackupRoot
+    } | ConvertTo-Json -Compress),
+    [System.Text.UTF8Encoding]::new($false)
+  )
+  # The native Setup host creates and probes the requested directory before it
+  # launches PowerShell, so the real restart arrives with an empty placeholder.
+  New-Item -ItemType Directory -Path $interruptedInstallDir -Force | Out-Null
+  New-TestPayload $interruptedPayloadRoot
+
+  $interruptedExitCode = Invoke-TestInstall `
+    $interruptedPayloadRoot `
+    $interruptedInstallDir `
+    $interruptedLogPath
+  if ($interruptedExitCode -ne 1) {
+    throw "Interrupted-upgrade fixture should fail after activation, but installer returned $interruptedExitCode."
+  }
+  $recoveredUserState = Join-Path $interruptedInstallDir 'data\user-state.txt'
+  if (!(Test-Path -LiteralPath $recoveredUserState -PathType Leaf) -or
+      (Get-Content -LiteralPath $recoveredUserState -Raw) -ne 'hard-interruption-user-state') {
+    throw 'A hard-interrupted upgrade did not recover the previous user data before retrying.'
+  }
+  if (Test-Path -LiteralPath (Join-Path $interruptedInstallDir 'marker.txt')) {
+    throw 'A hard-interrupted upgrade left the retry payload active instead of rolling back to recovered data.'
+  }
+  if (Test-Path -LiteralPath $interruptedBackupRoot) {
+    throw 'The recovered hard-interruption backup remained orphaned beside the installation.'
+  }
+  if (Test-Path -LiteralPath (Join-Path $interruptedInstallDir '.fe-monster-upgrade-transaction.json')) {
+    throw 'Hard-interruption recovery leaked its transaction marker into the restored installation.'
   }
 
   $payloadVolume = [System.IO.Path]::GetPathRoot($testRoot)
@@ -278,6 +342,125 @@ try {
   }
   if (@(Get-ChildItem -LiteralPath $testRoot -Directory -Filter '.fm-*' -Force).Count -ne 0) {
     throw 'Fast-stage fixtures left transaction stage or upgrade-backup directories behind.'
+  }
+
+  $unrelatedInstallDir = Join-Path $testRoot 'unrelated-backup-install'
+  $unrelatedBackupRoot = Join-Path $testRoot '.fm-backup-badc0ffe'
+  $unrelatedPayloadRoot = Join-Path $testRoot 'unrelated-backup-payload'
+  $unrelatedLogPath = Join-Path $testRoot 'unrelated-backup.log'
+  New-Item -ItemType Directory -Path $unrelatedBackupRoot -Force | Out-Null
+  [System.IO.File]::WriteAllText(
+    (Join-Path $unrelatedBackupRoot 'not-fe-monster.txt'),
+    'unrelated-directory-must-not-move',
+    [System.Text.Encoding]::ASCII
+  )
+  [System.IO.File]::WriteAllText(
+    (Join-Path $unrelatedBackupRoot '.fe-monster-upgrade-transaction.json'),
+    ([ordered]@{
+      schemaVersion = 1
+      targetPath = [System.IO.Path]::GetFullPath($unrelatedInstallDir)
+      backupName = Split-Path -Leaf $unrelatedBackupRoot
+    } | ConvertTo-Json -Compress),
+    [System.Text.UTF8Encoding]::new($false)
+  )
+  New-TestPayload $unrelatedPayloadRoot
+
+  $unrelatedExitCode = Invoke-TestInstall `
+    $unrelatedPayloadRoot `
+    $unrelatedInstallDir `
+    $unrelatedLogPath
+  if ($unrelatedExitCode -ne 1) {
+    throw "Unrelated-backup fixture should fail after activation, but installer returned $unrelatedExitCode."
+  }
+  $unrelatedSentinel = Join-Path $unrelatedBackupRoot 'not-fe-monster.txt'
+  if (!(Test-Path -LiteralPath $unrelatedSentinel -PathType Leaf) -or
+      (Get-Content -LiteralPath $unrelatedSentinel -Raw) -ne 'unrelated-directory-must-not-move') {
+    throw 'Installer recovery consumed a .fm-backup-* directory that was not an FE Monster installation.'
+  }
+  if (!(Test-Path -LiteralPath (Join-Path $unrelatedInstallDir 'marker.txt') -PathType Leaf)) {
+    throw 'The unrelated-backup fixture did not reach payload activation.'
+  }
+
+  $foreignInstallDir = Join-Path $testRoot 'foreign-target-install'
+  $foreignBackupRoot = Join-Path $testRoot '.fm-backup-face0001'
+  $foreignPayloadRoot = Join-Path $testRoot 'foreign-target-payload'
+  $foreignLogPath = Join-Path $testRoot 'foreign-target.log'
+  $foreignLegacyJar = Join-Path $foreignBackupRoot 'out\fe-monster-java.jar'
+  New-Item -ItemType Directory -Path (Split-Path -Parent $foreignLegacyJar) -Force | Out-Null
+  [System.IO.File]::WriteAllText($foreignLegacyJar, 'legacy-jar', [System.Text.Encoding]::ASCII)
+  [System.IO.File]::WriteAllText(
+    (Join-Path $foreignBackupRoot 'run.cmd'),
+    'legacy-run',
+    [System.Text.Encoding]::ASCII
+  )
+  [System.IO.File]::WriteAllText(
+    (Join-Path $foreignBackupRoot '.fe-monster-upgrade-transaction.json'),
+    ([ordered]@{
+      schemaVersion = 1
+      targetPath = [System.IO.Path]::GetFullPath((Join-Path $testRoot 'different-install-target'))
+      backupName = Split-Path -Leaf $foreignBackupRoot
+    } | ConvertTo-Json -Compress),
+    [System.Text.UTF8Encoding]::new($false)
+  )
+  New-TestPayload $foreignPayloadRoot
+  $foreignExitCode = Invoke-TestInstall `
+    $foreignPayloadRoot `
+    $foreignInstallDir `
+    $foreignLogPath
+  if ($foreignExitCode -ne 1 -or
+      !(Test-Path -LiteralPath (Join-Path $foreignInstallDir 'marker.txt') -PathType Leaf)) {
+    throw 'A backup bound to another FE Monster target blocked the requested fresh installation.'
+  }
+  if (!(Test-Path -LiteralPath $foreignBackupRoot -PathType Container)) {
+    throw 'Installer recovery consumed a valid FE Monster backup that was bound to another target.'
+  }
+
+  # If two structurally valid, target-bound backups exist, recovery cannot
+  # safely guess which one is newest. It must leave both untouched.
+  $ambiguousInstallDir = Join-Path $testRoot 'ambiguous-backup-install'
+  $ambiguousPayloadRoot = Join-Path $testRoot 'ambiguous-backup-payload'
+  $ambiguousLogPath = Join-Path $testRoot 'ambiguous-backup.log'
+  $ambiguousBackupRoots = @(
+    (Join-Path $testRoot '.fm-backup-cafe0001'),
+    (Join-Path $testRoot '.fm-backup-cafe0002')
+  )
+  foreach ($ambiguousBackupRoot in $ambiguousBackupRoots) {
+    $ambiguousJar = Join-Path $ambiguousBackupRoot 'out\fe-monster-java.jar'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $ambiguousJar) -Force | Out-Null
+    [System.IO.File]::WriteAllText($ambiguousJar, 'legacy-jar', [System.Text.Encoding]::ASCII)
+    [System.IO.File]::WriteAllText(
+      (Join-Path $ambiguousBackupRoot 'run.cmd'),
+      'legacy-run',
+      [System.Text.Encoding]::ASCII
+    )
+    [System.IO.File]::WriteAllText(
+      (Join-Path $ambiguousBackupRoot '.fe-monster-upgrade-transaction.json'),
+      ([ordered]@{
+        schemaVersion = 1
+        targetPath = [System.IO.Path]::GetFullPath($ambiguousInstallDir)
+        backupName = Split-Path -Leaf $ambiguousBackupRoot
+      } | ConvertTo-Json -Compress),
+      [System.Text.UTF8Encoding]::new($false)
+    )
+  }
+  New-TestPayload $ambiguousPayloadRoot
+  $ambiguousExitCode = Invoke-TestInstall `
+    $ambiguousPayloadRoot `
+    $ambiguousInstallDir `
+    $ambiguousLogPath
+  if ($ambiguousExitCode -ne 1) {
+    throw "Ambiguous-backup fixture should fail closed, but installer returned $ambiguousExitCode."
+  }
+  if (Test-Path -LiteralPath $ambiguousInstallDir) {
+    throw 'Ambiguous interrupted-upgrade recovery activated or restored an installation.'
+  }
+  if (!(Test-Path -LiteralPath $ambiguousPayloadRoot -PathType Container)) {
+    throw 'Ambiguous interrupted-upgrade recovery consumed the pending payload.'
+  }
+  foreach ($ambiguousBackupRoot in $ambiguousBackupRoots) {
+    if (!(Test-Path -LiteralPath $ambiguousBackupRoot -PathType Container)) {
+      throw 'Ambiguous interrupted-upgrade recovery moved a backup instead of failing closed.'
+    }
   }
 
   Write-Host 'Windows installer fast-stage contract: OK'

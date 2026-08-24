@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class CommunityPetProxyContractProbe {
     private CommunityPetProxyContractProbe() {
@@ -25,13 +26,18 @@ public final class CommunityPetProxyContractProbe {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         ExecutorService executor = Executors.newSingleThreadExecutor();
         AtomicReference<Map<String, Object>> chatBody = new AtomicReference<>(Map.of());
+        AtomicInteger chatStatus = new AtomicInteger(200);
         AtomicReference<Map<String, Object>> narrationBody = new AtomicReference<>(Map.of());
         AtomicReference<Map<String, Object>> narrationCancelBody = new AtomicReference<>(Map.of());
+        AtomicReference<String> narrationAudioQuery = new AtomicReference<>("");
         AtomicReference<Map<String, Object>> transcriptBody = new AtomicReference<>(Map.of());
         AtomicReference<Map<String, Object>> voiceChunkBody = new AtomicReference<>(Map.of());
         AtomicReference<Map<String, Object>> habitsBody = new AtomicReference<>(Map.of());
+        AtomicReference<String> habitsQuery = new AtomicReference<>("");
         AtomicReference<Map<String, Object>> cancelBody = new AtomicReference<>(Map.of());
         AtomicReference<Map<String, Object>> liveSttBody = new AtomicReference<>(Map.of());
+        AtomicReference<String> memoriesQuery = new AtomicReference<>("");
+        AtomicReference<Map<String, Object>> memoryForgetBody = new AtomicReference<>(Map.of());
         server.createContext("/health", exchange -> send(exchange, Map.of(
             "ok", true,
             "service", "fe-monster-community"
@@ -41,13 +47,51 @@ public final class CommunityPetProxyContractProbe {
             "profile", Map.of("feId", "12345678", "username", "proxy-probe"),
             "friends", List.of()
         )));
+        server.createContext("/api/community/device/enroll", exchange -> send(exchange, Map.of("ok", true)));
+        server.createContext("/api/community/pet/memories", exchange -> {
+            memoriesQuery.set(exchange.getRequestURI().getRawQuery());
+            send(exchange, Map.of(
+                "ok", true,
+                "feId", "12345678",
+                "memories", List.of(Map.of(
+                    "id", "memory-safe-1",
+                    "category", "care_preference",
+                    "value", "comfort",
+                    "source", "explicit",
+                    "confidence", 1
+                ))
+            ));
+        });
+        server.createContext("/api/community/pet/memory/forget", exchange -> {
+            memoryForgetBody.set(SimpleJson.parseObject(readBody(exchange)));
+            send(exchange, Map.of("ok", true, "removed", 1, "memories", List.of()));
+        });
         server.createContext("/api/community/pet/chat", exchange -> {
             chatBody.set(SimpleJson.parseObject(readBody(exchange)));
-            send(exchange, Map.of("ok", true));
+            int status = chatStatus.get();
+            if (status >= 400) {
+                send(exchange, status, Map.of("ok", false, "error", "chat upstream " + status));
+            } else {
+                send(exchange, Map.of("ok", true));
+            }
         });
         server.createContext("/api/community/pet/narrate", exchange -> {
             narrationBody.set(SimpleJson.parseObject(readBody(exchange)));
-            send(exchange, Map.of("ok", true, "requestId", "tour-request", "audioId", "pet-audio-tour"));
+            send(exchange, Map.of(
+                "ok", true,
+                "requestId", "tour-request",
+                "audioId", "pet-audio-00000000-0000-4000-8000-000000000001",
+                "mimeType", "audio/mpeg"
+            ));
+        });
+        server.createContext("/api/community/pet/audio/pet-audio-00000000-0000-4000-8000-000000000001", exchange -> {
+            narrationAudioQuery.set(exchange.getRequestURI().getRawQuery());
+            byte[] audio = "ID3-java-proxy-audio".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "audio/mpeg");
+            exchange.getResponseHeaders().set("Cache-Control", "private, no-store");
+            exchange.sendResponseHeaders(200, audio.length);
+            exchange.getResponseBody().write(audio);
+            exchange.close();
         });
         server.createContext("/api/community/pet/narrate/cancel", exchange -> {
             narrationCancelBody.set(SimpleJson.parseObject(readBody(exchange)));
@@ -62,8 +106,19 @@ public final class CommunityPetProxyContractProbe {
             send(exchange, Map.of("ok", true));
         });
         server.createContext("/api/community/pet/habits", exchange -> {
-            habitsBody.set(SimpleJson.parseObject(readBody(exchange)));
-            send(exchange, Map.of("ok", true));
+            if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                habitsQuery.set(exchange.getRequestURI().getRawQuery());
+                send(exchange, Map.of(
+                    "ok", true,
+                    "habits", Map.of(
+                        "enabled", true,
+                        "topArtists", List.of(Map.of("name", "fixture artist", "listenMs", 1200))
+                    )
+                ));
+            } else {
+                habitsBody.set(SimpleJson.parseObject(readBody(exchange)));
+                send(exchange, Map.of("ok", true));
+            }
         });
         server.createContext("/api/community/pet/cancel", exchange -> {
             cancelBody.set(SimpleJson.parseObject(readBody(exchange)));
@@ -79,12 +134,76 @@ public final class CommunityPetProxyContractProbe {
         try {
             Path config = root.resolve("community-server-url.txt");
             Files.writeString(config, "http://127.0.0.1:" + server.getAddress().getPort(), StandardCharsets.UTF_8);
-            CommunityService service = new CommunityService(config);
+            MachineIdentityService machine = new MachineIdentityService(ProjectPaths.detect());
+            CommunityService service = new CommunityService(config, machine, null);
             Map<String, Object> account = Map.of(
                 "loggedIn", true,
                 "account", Map.of("userId", "proxy-account", "nickname", "Proxy Probe")
             );
-            Map<String, Object> response = service.petMutation(
+            Map<String, Object> response = service.petMemories("netease", "NetEase", account);
+            require(SimpleJson.asBoolean(response.get("ok"), false), "memory query proxy failed: " + response);
+            String forwardedMemoryQuery = memoriesQuery.get();
+            require(forwardedMemoryQuery.contains("feId=12345678"),
+                "memory query did not bind the authenticated FE ID: " + forwardedMemoryQuery);
+            require(forwardedMemoryQuery.contains("computerId="),
+                "memory query did not bind this computer: " + forwardedMemoryQuery);
+            require(forwardedMemoryQuery.contains("computerIdSource="),
+                "memory query did not bind the computer ID source: " + forwardedMemoryQuery);
+
+            response = service.petHabits("netease", "NetEase", account);
+            require(SimpleJson.asBoolean(response.get("ok"), false), "habit query proxy failed: " + response);
+            String forwardedHabitQuery = habitsQuery.get();
+            require(forwardedHabitQuery.contains("feId=12345678"),
+                "habit query did not bind the authenticated FE ID: " + forwardedHabitQuery);
+            require(forwardedHabitQuery.contains("computerId="),
+                "habit query did not bind this computer: " + forwardedHabitQuery);
+            require(forwardedHabitQuery.contains("computerIdSource="),
+                "habit query did not bind the computer ID source: " + forwardedHabitQuery);
+            String personalizationScope = service.petPersonalizationScope("netease", "NetEase", account);
+            require(personalizationScope.contains("12345678"),
+                "personalization cache scope was not derived from the authenticated FE ID");
+
+            response = service.forgetPetMemory(
+                "netease",
+                "NetEase",
+                account,
+                Map.of(
+                    "memoryId", "memory-safe-1",
+                    "feId", "87654321",
+                    "computerId", "attacker-computer",
+                    "category", "care_preference"
+                )
+            );
+            require(SimpleJson.asBoolean(response.get("ok"), false), "memory forget proxy failed: " + response);
+            Map<String, Object> forwardedMemoryForget = memoryForgetBody.get();
+            require("memory-safe-1".equals(SimpleJson.asString(forwardedMemoryForget.get("memoryId"), "")),
+                "exact memory ID was not forwarded: " + forwardedMemoryForget);
+            require("12345678".equals(SimpleJson.asString(forwardedMemoryForget.get("feId"), "")),
+                "caller FE ID escaped authenticated binding: " + forwardedMemoryForget);
+            require(!"attacker-computer".equals(SimpleJson.asString(forwardedMemoryForget.get("computerId"), "")),
+                "caller computer ID escaped device binding: " + forwardedMemoryForget);
+            require(!forwardedMemoryForget.containsKey("category"),
+                "broad memory selector escaped the exact-ID allowlist: " + forwardedMemoryForget);
+            expectRejected(
+                () -> service.forgetPetMemory(
+                    "netease",
+                    "NetEase",
+                    account,
+                    Map.of("category", "care_preference")
+                ),
+                "memory id"
+            );
+            expectRejected(
+                () -> service.forgetPetMemory(
+                    "netease",
+                    "NetEase",
+                    account,
+                    Map.of("memoryId", "../other-account")
+                ),
+                "memory id"
+            );
+
+            response = service.petMutation(
                 "netease",
                 "NetEase",
                 account,
@@ -93,6 +212,7 @@ public final class CommunityPetProxyContractProbe {
                     "sessionId", "session-chat",
                     "requestId", "remote-chat-request",
                     "text", "hello",
+                    "clientRole", "embedded",
                     "proactiveContext", Map.of("reason", "returned"),
                     "realtimeVoice", true,
                     "unexpected", "must-not-pass"
@@ -107,9 +227,36 @@ public final class CommunityPetProxyContractProbe {
                 "chat realtimeVoice was not forwarded: " + forwarded);
             require("remote-chat-request".equals(SimpleJson.asString(forwarded.get("requestId"), "")),
                 "chat requestId was not forwarded: " + forwarded);
+            require("embedded".equals(SimpleJson.asString(forwarded.get("clientRole"), "")),
+                "chat client role was not forwarded: " + forwarded);
             require(!forwarded.containsKey("unexpected"), "unknown chat field escaped the allowlist: " + forwarded);
             require("12345678".equals(SimpleJson.asString(forwarded.get("feId"), "")),
                 "authenticated FE ID was not attached: " + forwarded);
+
+            chatStatus.set(503);
+            response = service.petMutation(
+                "netease", "NetEase", account, "chat",
+                Map.of("sessionId", "session-chat", "requestId", "proxy-503", "text", "retry me")
+            );
+            require(SimpleJson.asInt(response.get("upstreamStatus"), -1) == 503,
+                "pet proxy dropped the upstream 503 status: " + response);
+            require(SimpleJson.asBoolean(response.get("retryable"), false),
+                "pet proxy did not mark upstream 503 retryable: " + response);
+            require("upstream-transient".equals(SimpleJson.asString(response.get("errorClass"), "")),
+                "pet proxy did not classify upstream 503: " + response);
+
+            chatStatus.set(400);
+            response = service.petMutation(
+                "netease", "NetEase", account, "chat",
+                Map.of("sessionId", "session-chat", "requestId", "proxy-400", "text", "do not retry")
+            );
+            require(SimpleJson.asInt(response.get("upstreamStatus"), -1) == 400,
+                "pet proxy dropped the upstream 400 status: " + response);
+            require(!SimpleJson.asBoolean(response.get("retryable"), true),
+                "pet proxy incorrectly marked upstream 400 retryable: " + response);
+            require("upstream-business".equals(SimpleJson.asString(response.get("errorClass"), "")),
+                "pet proxy did not classify upstream 400: " + response);
+            chatStatus.set(200);
 
             response = service.petMutation(
                 "netease",
@@ -132,6 +279,26 @@ public final class CommunityPetProxyContractProbe {
             require(!forwarded.containsKey("unexpected"), "unknown narration field escaped the allowlist: " + forwarded);
             require("12345678".equals(SimpleJson.asString(forwarded.get("feId"), "")),
                 "authenticated narration FE ID was not attached: " + forwarded);
+
+            String narrationAudioId = SimpleJson.asString(response.get("audioId"), "");
+            require("pet-audio-00000000-0000-4000-8000-000000000001".equals(narrationAudioId),
+                "narration audio ID was not returned intact: " + response);
+            var audioResponse = service.petAudio("netease", "NetEase", account, narrationAudioId);
+            require(audioResponse.statusCode() == 200, "narration audio proxy failed: " + audioResponse.statusCode());
+            require(audioResponse.headers().firstValue("content-type").orElse("").startsWith("audio/mpeg"),
+                "narration audio proxy lost the upstream MIME type: " + audioResponse.headers().map());
+            byte[] proxiedAudio;
+            try (var audioInput = audioResponse.body()) {
+                proxiedAudio = audioInput.readAllBytes();
+            }
+            require(java.util.Arrays.equals(
+                proxiedAudio,
+                "ID3-java-proxy-audio".getBytes(StandardCharsets.UTF_8)
+            ), "narration audio proxy returned empty or corrupted bytes");
+            require(narrationAudioQuery.get().contains("feId=12345678"),
+                "narration audio proxy did not bind the authenticated FE ID: " + narrationAudioQuery.get());
+            require(narrationAudioQuery.get().contains("computerId="),
+                "narration audio proxy did not bind this computer: " + narrationAudioQuery.get());
 
             response = service.petMutation(
                 "netease",
@@ -562,9 +729,13 @@ public final class CommunityPetProxyContractProbe {
     }
 
     private static void send(HttpExchange exchange, Map<String, Object> payload) throws IOException {
+        send(exchange, 200, payload);
+    }
+
+    private static void send(HttpExchange exchange, int status, Map<String, Object> payload) throws IOException {
         byte[] body = SimpleJson.stringify(payload).getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
-        exchange.sendResponseHeaders(200, body.length);
+        exchange.sendResponseHeaders(status, body.length);
         exchange.getResponseBody().write(body);
         exchange.close();
     }

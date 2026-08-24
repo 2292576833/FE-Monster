@@ -61,6 +61,9 @@ function fixture(port, service, options = {}) {
         host: request.headers.host,
         forwardedHost: request.headers['x-forwarded-host'] || '',
         forwardedProto: request.headers['x-forwarded-proto'] || '',
+        forwardedFor: request.headers['x-forwarded-for'] || '',
+        forwarded: request.headers.forwarded || '',
+        realIp: request.headers['x-real-ip'] || '',
         publicAccessForwarded: Boolean(request.headers['x-fe-public-access']),
         body: Buffer.concat(chunks).toString('utf8')
       });
@@ -206,11 +209,29 @@ try {
 
   const publicCommunity = await request(proxyPort, '/community/api/community/register', {
     method: 'POST',
+    headers: {
+      // Model the public tunnel appending the address it observed after a
+      // caller-supplied spoofed prefix.
+      'x-forwarded-for': '203.0.113.99, 198.51.100.42',
+      forwarded: 'for=203.0.113.99;proto=https',
+      'x-real-ip': '203.0.113.99'
+    },
     body: '{"fixture":true}'
   });
   assert.equal(publicCommunity.status, 200);
   assert.equal(publicCommunity.body.url, '/api/community/register');
   assert.equal(publicCommunity.body.publicAccessForwarded, false);
+  assert.equal(publicCommunity.body.forwardedFor, '198.51.100.42',
+    'the edge proxy must overwrite a spoofed X-Forwarded-For prefix with the trusted tunnel hop');
+  assert.equal(publicCommunity.body.forwarded, '',
+    'the edge proxy must remove an untrusted Forwarded value');
+  assert.equal(publicCommunity.body.realIp, '',
+    'the edge proxy must remove an untrusted X-Real-IP value');
+
+  const directCommunity = await request(proxyPort, '/community/api/community/profile');
+  assert.equal(directCommunity.status, 200);
+  assert.equal(directCommunity.body.forwardedFor, '127.0.0.1',
+    'a loopback proxy request without a tunnel-provided hop must fall back to its socket peer');
 
   const streamedCommunity = await streamingRequest(
     proxyPort,

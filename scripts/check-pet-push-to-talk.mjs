@@ -5,10 +5,11 @@ import path from 'node:path';
 const root = path.resolve(import.meta.dirname, '..');
 const read = (relativePath) => readFileSync(path.join(root, relativePath), 'utf8');
 const html = read('web/index.html');
+const loader = read('web/runtime-module-loader.js');
 const css = read('web/pet-assistant.css');
 const pet = read('web/pet-assistant.js');
 
-assert.match(html, /pet-live-turn-controller\.js\?v=[^"\s]+[\s\S]{0,420}pet-live-playout\.js\?v=[^"\s]+[\s\S]{0,240}pet-live-stt-client\.js\?v=[^"\s]+[\s\S]{0,180}pet-assistant\.js\?v=[^"\s]+/,
+assert.match(loader, /pet-live-turn-controller\.js\?v=[^"\s]+[\s\S]{0,420}pet-live-playout\.js\?v=[^"\s]+[\s\S]{0,240}pet-live-stt-client\.js\?v=[^"\s]+[\s\S]{0,180}pet-assistant\.js\?v=[^"\s]+/,
   'the client must invalidate cached pre-streaming pet assistant scripts');
 assert.match(html, /pet-assistant\.css\?v=[^"\s]+/,
   'the client must invalidate the retired full-panel desktop pet styles');

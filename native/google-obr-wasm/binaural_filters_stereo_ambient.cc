@@ -1,9 +1,9 @@
 /*
  * Runtime asset selector for FE Monster's stereo Google OBR build.
  *
- * This keeps only the official third-order Ambient left/right filter assets
- * needed by AudioElementType::kLayoutStereo. The filter data and renderer are
- * unmodified Google OBR sources.
+ * This packages the official third-order Direct, Ambient, and Reverberant
+ * left/right filter assets used by the native renderer. The filter data and
+ * renderer are unmodified Google OBR sources.
  */
 
 #include "obr/ambisonic_binaural_decoder/binaural_filters/binaural_filters_wrapper.h"
@@ -14,6 +14,10 @@
 #include "absl/types/span.h"
 #include "obr/ambisonic_binaural_decoder/binaural_filters/binaural_filters_3_oa_ambient_l.h"
 #include "obr/ambisonic_binaural_decoder/binaural_filters/binaural_filters_3_oa_ambient_r.h"
+#include "obr/ambisonic_binaural_decoder/binaural_filters/binaural_filters_3_oa_direct_l.h"
+#include "obr/ambisonic_binaural_decoder/binaural_filters/binaural_filters_3_oa_direct_r.h"
+#include "obr/ambisonic_binaural_decoder/binaural_filters/binaural_filters_3_oa_reverberant_l.h"
+#include "obr/ambisonic_binaural_decoder/binaural_filters/binaural_filters_3_oa_reverberant_r.h"
 
 namespace obr {
 
@@ -28,6 +32,14 @@ std::unique_ptr<std::string> BinauralFiltersWrapper::GetFile(
     data = filter_files::BinauralFilters3OAAmbientL();
   } else if (filename == "3OAAmbientR") {
     data = filter_files::BinauralFilters3OAAmbientR();
+  } else if (filename == "3OADirectL") {
+    data = filter_files::BinauralFilters3OADirectL();
+  } else if (filename == "3OADirectR") {
+    data = filter_files::BinauralFilters3OADirectR();
+  } else if (filename == "3OAReverberantL") {
+    data = filter_files::BinauralFilters3OAReverberantL();
+  } else if (filename == "3OAReverberantR") {
+    data = filter_files::BinauralFilters3OAReverberantR();
   } else {
     return nullptr;
   }

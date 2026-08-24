@@ -190,7 +190,7 @@ try {
     check(button?.parentElement === controls, 'OBR toggle is not inside the playback top controls.');
     check(layoutButton?.parentElement === controls, 'OBR channel layout switch is missing from the playback top controls.');
     check(button?.getAttribute('aria-pressed') === 'false', 'OBR toggle must start unpressed.');
-    check(state.obrSpatialAudio.requested === true, 'Official OBR must be requested by default for new users.');
+    check(state.obrSpatialAudio.requested === false, 'Official OBR must default off until the user enables it.');
     check(state.obrSpatialAudio.channelLayout === 'stereo', 'OBR must default to the stereo input layout.');
     check(
       browserAudioUrl('https://music.example/song.mp3').startsWith('/api/audio/stream?url='),
@@ -214,7 +214,9 @@ try {
     await audio.play();
     const enabled = await setGoogleObrSpatialAudioEnabled(true, { announce: false });
     const processed = await wait(
-      () => state.obrSpatialAudio.processedBlocks > 1 && state.obrSpatialAudio.outputRms > 0,
+      () => state.obrSpatialAudio.graph?.processedBlocks > 1
+        && state.obrSpatialAudio.processedBlocks > 1
+        && state.obrSpatialAudio.outputRms > 0,
       20000
     );
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -233,8 +235,8 @@ try {
         && document.documentElement.dataset.audioSpatialBackend === 'google-obr-official',
       'Runtime diagnostics did not switch to the verified Google OBR backend.'
     );
-    check(Number(state.obrSpatialAudio.graph.dryGain.gain.value) < 0.05, 'Dry path remained audible after OBR activation.');
-    check(Number(state.obrSpatialAudio.graph.wetGain.gain.value) > 0.95, 'Official OBR wet path was not audible.');
+    check(Number(state.obrSpatialAudio.graph?.dryGain?.gain?.value) < 0.05, 'Dry path remained audible after OBR activation.');
+    check(Number(state.obrSpatialAudio.graph?.wetGain?.gain?.value) > 0.95, 'Official OBR wet path was not audible.');
 
     const fiveOneEnabled = await setGoogleObrChannelLayout('5.1', { announce: false });
     const fiveOneProcessed = await wait(
@@ -305,8 +307,8 @@ try {
         && document.documentElement.dataset.audioSpatialBackend === previousSpatialBackend,
       'Runtime diagnostics did not restore the previous spatial backend.'
     );
-    check(Number(state.obrSpatialAudio.graph.dryGain.gain.value) > 0.95, 'Dry path did not recover after disabling OBR.');
-    check(Number(state.obrSpatialAudio.graph.wetGain.gain.value) < 0.05, 'OBR wet path remained audible after disabling.');
+    check(Number(state.obrSpatialAudio.graph?.dryGain?.gain?.value) > 0.95, 'Dry path did not recover after disabling OBR.');
+    check(Number(state.obrSpatialAudio.graph?.wetGain?.gain?.value) < 0.05, 'OBR wet path remained audible after disabling.');
     const disabledGraph = state.obrSpatialAudio.graph;
     disabledGraph.node.onprocessorerror?.();
     await new Promise((resolve) => setTimeout(resolve, 400));

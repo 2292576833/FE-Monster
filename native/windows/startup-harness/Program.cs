@@ -29,7 +29,7 @@ static async Task<BackendStartupProbeResult> Probe(
     return await BackendStartupProbe.ProbeOnceAsync(client, new Uri("http://127.0.0.1:30123/"));
 }
 
-const string validVersion = "{\"version\":\"2.1.0\"}";
+const string validVersion = "{\"version\":\"2.1.1\"}";
 const string validIndex = "<!doctype html><title>FE Monster Java</title><section id=\"bootScreen\"></section>";
 
 BackendStartupProbeResult falseReady = await Probe(

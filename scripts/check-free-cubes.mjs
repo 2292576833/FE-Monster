@@ -132,7 +132,8 @@ try {
     if (boot && !boot.hidden && bootButton) {
       bootButton.disabled = false;
       bootButton.click();
-      await wait(900);
+      const bootDismissed = await poll(() => boot.hidden === true);
+      if (!bootDismissed) throw new Error('FE Monster boot screen did not finish dismissing');
     }
     document.querySelector('#diyButton')?.click();
     await wait(180);
@@ -280,7 +281,7 @@ try {
     const y = Math.round(stage.top + stage.height * 0.52);
     const startX = Math.round(stage.left + Math.min(120, stage.width * 0.12));
     const endX = Math.round(stage.left + stage.width - Math.min(100, stage.width * 0.1));
-    await command("Input.dispatchMouseEvent", { type: "mousePressed", x: startX, y, button: "left", buttons: 1, clickCount: 1 });
+    await command("Input.dispatchMouseEvent", { type: "mousePressed", x: startX, y, button: "left", buttons: 1, clickCount: 1, modifiers: 8 });
     for (let step = 1; step <= 8; step += 1) {
       await command("Input.dispatchMouseEvent", {
         type: "mouseMoved",
@@ -288,10 +289,11 @@ try {
         y: y + Math.round(Math.sin(step) * 8),
         button: "left",
         buttons: 1,
+        modifiers: 8,
       });
       await delay(24);
     }
-    await command("Input.dispatchMouseEvent", { type: "mouseReleased", x: endX, y, button: "left", buttons: 0, clickCount: 1 });
+    await command("Input.dispatchMouseEvent", { type: "mouseReleased", x: endX, y, button: "left", buttons: 0, clickCount: 1, modifiers: 8 });
     await delay(320);
   }
   const rotated = await evaluate(`window.FeSandboxDiagnostics.freeCube()`);
@@ -328,29 +330,37 @@ try {
       ) < 0.002,
     freeCoverage: initial.after.coverage.width >= 0.7 && initial.after.coverage.height >= 0.7,
     heartMode: heart.mode === "heart" && heart.transition >= 0.98,
-    orderedHeart: heart.heartLayout === "rounded-double-surface"
-      && heart.heartProfile === "rounded-bezier"
-      && heart.heartGridSpacing >= 1,
-    frontBackSurfaces: heart.heartDepthLayerCount === 2
-      && heart.heartMiddleLayerCount === 0
-      && heart.heartSurfaceCounts.length === 2
-      && heart.heartSurfaceCounts[0] + heart.heartSurfaceCounts[1] === heart.cubeCount
-      && Math.abs(heart.heartSurfaceCounts[0] - heart.heartSurfaceCounts[1]) <= 1,
-    controlledJitter: heart.heartJitter >= 0.25 && heart.heartJitter <= 0.5,
+    orderedHeart: heart.heartLayout === "voxel-prism"
+      && heart.heartProfile === "voxel-heart-13x12"
+      && heart.heartGridColumns === 13
+      && heart.heartGridRows === 12,
+    fourDepthBands: heart.heartDepthLayerCount === 4
+      && heart.heartMiddleLayerCount > 0
+      && heart.heartSurfaceCounts.length === 4
+      && heart.heartSurfaceCounts.reduce((sum, value) => sum + value, 0) === heart.heartActiveCubeCount
+      && heart.heartActiveCubeCount >= 85
+      && heart.heartActiveCubeCount <= 115,
+    deterministicGrid: heart.heartJitter === 0 && heart.heartAxisAligned === true,
     largeHeart: heart.coverage.height >= 0.52 && heart.coverage.height <= 0.95,
     volumetricHeart: heart.bounds.depth / Math.max(1, heart.bounds.width) >= 0.14,
-    coverPalette: palette.length === 3 && paletteDistances.every((distance) => distance >= 48),
-    softBackground: heart.backgroundEnabled === true && heart.particleVisible === false,
-    galaxyMode: galaxy.backgroundEnabled === false && galaxy.particleVisible === true && galaxy.particleCount >= 1000,
-    galaxyQuality: galaxy.pointSize <= 2.5 && galaxy.blending === "additive",
-    glassMaterial: heart.material.type === "MeshPhysicalMaterial"
-      && heart.material.roughness >= 0.19
-      && heart.material.roughness <= 0.21
-      && heart.material.transmission >= 0.25
-      && heart.material.clearcoat >= 0.7
-      && heart.material.clearcoat <= 0.74
-      && heart.material.clearcoatRoughness >= 0.13
-      && heart.material.clearcoatRoughness <= 0.15,
+    freeCoverPalette: palette.length === 3 && paletteDistances.every((distance) => distance >= 48),
+    videoBackground: heart.backgroundEnabled === true
+      && heart.backgroundProfile === "sunset-night-cut-v1"
+      && heart.backgroundMode === "sunset"
+      && heart.sunsetOpacity >= 0.98
+      && heart.groundVisible === true
+      && heart.particleVisible === false,
+    nightTransition: galaxy.backgroundEnabled === false
+      && galaxy.backgroundTransitioning === true
+      && galaxy.sunsetOpacity < 0.05
+      && galaxy.nightOpacity > 0
+      && galaxy.particleVisible === false,
+    opaqueSatinMaterial: heart.material.type === "MeshPhysicalMaterial"
+      && heart.material.roughness >= 0.3
+      && heart.material.roughness <= 0.42
+      && heart.material.transmission <= 0.02
+      && heart.material.clearcoat >= 0.12
+      && heart.material.clearcoat <= 0.24,
     opaqueInstanceMaterial: heart.material.transparent === false
       && heart.material.opacity === 1
       && heart.material.depthWrite === true,
@@ -392,10 +402,13 @@ try {
       && freeBass.loud.freeDepthReleaseMs === 340
       && freeBass.loud.freeDepthHistorySize === 64,
     staggeredDepthResponse: freeBass.early.freeDepthLayerBass[0] > 0.05
-      && freeBass.early.freeDepthLayerBass[1] <= 0.02
-      && freeBass.early.freeDepthLayerBass[2] <= 0.02
-      && freeBass.onset.freeDepthLayerBass[0] > freeBass.onset.freeDepthLayerBass[1] + 0.05
-      && freeBass.onset.freeDepthLayerBass[1] > freeBass.onset.freeDepthLayerBass[2] + 0.04,
+      && freeBass.early.freeDepthLayerBass[0] > freeBass.early.freeDepthLayerBass[1] + 0.2
+      && (
+        (freeBass.early.freeDepthLayerBass[1] <= 0.02 && freeBass.early.freeDepthLayerBass[2] <= 0.02)
+        || freeBass.early.freeDepthLayerBass[1] > freeBass.early.freeDepthLayerBass[2] + 0.04
+      )
+      && freeBass.onset.freeDepthLayerBass[0] > freeBass.onset.freeDepthLayerBass[1] + 0.08
+      && freeBass.onset.freeDepthLayerBass[1] > freeBass.onset.freeDepthLayerBass[2] + 0.08,
     freeBassResponse: freeBass.quiet.mode === "free"
       && freeBass.loud.mode === "free"
       && freeBass.loud.freeBassAxis === "depth-z"
@@ -412,16 +425,18 @@ try {
       && freeBass.loud.freeTiltDegrees <= 3.01
       && freeBass.loud.material.envMapIntensity >= 0.85
       && freeBass.loud.material.envMapIntensity <= 0.875,
-    bassResponse: bass.loud.pulseDisplacement - bass.quiet.pulseDisplacement >= 1.2
+    bassResponse: bass.loud.heartAudioAxis === "camera-z"
+      && bass.loud.heartAudioScaleInvariant === true
+      && bass.loud.heartFrontDisplacement - bass.quiet.heartFrontDisplacement >= bass.loud.heartCubeSize * 0.9
+      && bass.loud.heartBackDisplacement <= bass.loud.heartCubeSize * 0.4
       && bass.loud.freeDepthDisplacement === 0
       && bass.loud.freeScalePulse === 0
       && bass.loud.freeReflectionBoost === 0
-      && bass.loud.freeTiltDegrees === 0
-      && Math.abs(bass.loud.material.envMapIntensity - 0.78) <= 0.001,
-    rotation: Math.hypot(
+      && bass.loud.freeTiltDegrees === 0,
+    stableHeartOrientation: Math.hypot(
       rotated.rotation.yaw - galaxy.rotation.yaw,
       rotated.rotation.pitch - galaxy.rotation.pitch
-    ) >= 0.15,
+    ) <= 0.02,
     drawCalls: freeBass.loud.drawCalls === freeBass.quiet.drawCalls
       && freeBass.loud.drawCalls <= 4
       && heart.drawCalls <= 4

@@ -85,6 +85,10 @@ set(OBR_CORE_SOURCES
   "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/wav_reader.cc"
   "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/binaural_filters/binaural_filters_3_oa_ambient_l.cc"
   "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/binaural_filters/binaural_filters_3_oa_ambient_r.cc"
+  "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/binaural_filters/binaural_filters_3_oa_direct_l.cc"
+  "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/binaural_filters/binaural_filters_3_oa_direct_r.cc"
+  "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/binaural_filters/binaural_filters_3_oa_reverberant_l.cc"
+  "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/binaural_filters/binaural_filters_3_oa_reverberant_r.cc"
   "${OBR_SOURCE_DIR}/obr/ambisonic_encoder/ambisonic_encoder.cc"
   "${OBR_SOURCE_DIR}/obr/ambisonic_encoder/associated_legendre_polynomials_generator.cc"
   "${OBR_SOURCE_DIR}/obr/ambisonic_rotator/ambisonic_rotator.cc"
@@ -156,7 +160,15 @@ target_include_directories(fe_audio_probe PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/a
 target_compile_definitions(fe_audio_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
 target_link_libraries(fe_audio_probe PRIVATE google_obr_official ${FE_AUDIO_SYSTEM_LIBS})
 
-foreach(target fe_monster_xaudio2 fe_audio_probe)
+add_executable(fe_channel_router_probe
+  "${CMAKE_CURRENT_SOURCE_DIR}/audio/fe_channel_router_probe.cpp"
+  ${FE_AUDIO_PIPELINE_SOURCE}
+)
+target_include_directories(fe_channel_router_probe PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/audio")
+target_compile_definitions(fe_channel_router_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(fe_channel_router_probe PRIVATE google_obr_official ${FE_AUDIO_SYSTEM_LIBS})
+
+foreach(target fe_monster_xaudio2 fe_audio_probe fe_channel_router_probe)
   if(MSVC)
     target_compile_options(${target} PRIVATE /O2 /EHsc /permissive- /Zc:__cplusplus /utf-8)
   endif()

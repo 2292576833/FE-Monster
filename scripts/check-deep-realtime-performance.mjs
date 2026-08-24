@@ -166,6 +166,11 @@ const worklet = {
   transportFrames: workletTransportFrames,
   typedArrayAllocationsInSource: count(pcmWorklet, /new\s+Float32Array\s*\(/g),
   transfersCompletedBuffer: /\[block\.buffer\]/.test(pcmWorklet),
+  fixedBufferPoolSize: Number(
+    /FE_NATIVE_PCM_BUFFER_POOL_SIZE\s*=\s*(\d+)/.exec(pcmWorklet)?.[1] || 0
+  ),
+  recyclesTransferredBuffer: /message\.type\s*===\s*['"]recycle-pcm['"]/.test(pcmWorklet)
+    && /message\.poolEpoch\s*!==\s*this\.poolEpoch/.test(pcmWorklet),
   estimatedTransportArraysPerSecond: workletTransportFrames > 0
     ? Number((48_000 / workletTransportFrames).toFixed(3))
     : null
@@ -269,7 +274,9 @@ try {
     jsLyricFunctionsFound: Object.values(jsFunctions).every(Boolean),
     jsSteadyHotPathsHaveNoTrackedAllocations: jsSteadyAllocationSiteCount === 0,
     audioWorkletAllocatesOnlyAtTransportBoundary: worklet.transportFrames === 4096
-      && worklet.typedArrayAllocationsInSource === 2
+      && worklet.typedArrayAllocationsInSource === 1
+      && worklet.fixedBufferPoolSize >= 6
+      && worklet.recyclesTransferredBuffer
       && worklet.transfersCompletedBuffer,
     spectrumUses512PrimitiveBands: spectrum.bandCount === 512
       && spectrum.nativePrimitiveArray

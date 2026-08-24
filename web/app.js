@@ -5993,7 +5993,7 @@ const PRESET_RUNTIME_SOURCES = Object.freeze({
     globalName: 'FeChladniRuntime'
   }),
   'soundscape-workshop': Object.freeze({
-    src: 'soundscape-runtime.js?v=20260821-persistence-4',
+    src: 'soundscape-runtime.js?v=20260824-durable-state-1',
     globalName: 'FeSoundscapeRuntime'
   })
 });
@@ -6330,7 +6330,7 @@ const CLIENT_PREFERENCES_LOCAL_KEYS = new Set([
   'fe-monster-multi-row-lyrics-v1',
   'fe-monster-lyric-clock-offset-v1',
   'fe-monster-sonic-settings-v1',
-  'fe-monster.soundscape-workshop.settings.v2',
+  'fe-monster-soundscape-workshop-settings-v3',
   'fe-monster-cover-particle-v1',
   'fe-monster-google-obr-spatial-audio-v1',
   'fe-monster-visual-settings-v1',
@@ -10010,11 +10010,21 @@ function soundscapeWorkshopGestureEvent(gesture) {
     || els.soundscapeWorkshopHost?.querySelector('iframe');
   const rect = iframe?.getBoundingClientRect();
   if (!rect?.width || !rect?.height || !els.stage) return null;
+  const clientX = rect.left + Number(gesture.x) * rect.width;
+  const clientY = rect.top + Number(gesture.y) * rect.height;
+  const screenLeft = Number.isFinite(Number(globalThis.screenX))
+    ? Number(globalThis.screenX)
+    : Number(globalThis.screenLeft) || 0;
+  const screenTop = Number.isFinite(Number(globalThis.screenY))
+    ? Number(globalThis.screenY)
+    : Number(globalThis.screenTop) || 0;
   return {
     target: els.stage,
     currentTarget: els.stage,
-    clientX: rect.left + Number(gesture.x) * rect.width,
-    clientY: rect.top + Number(gesture.y) * rect.height,
+    clientX,
+    clientY,
+    screenX: screenLeft + clientX,
+    screenY: screenTop + clientY,
     pointerId: Number(gesture.pointerId) || 0,
     button: Number(gesture.button) || 0,
     buttons: Number(gesture.buttons) || 0,
@@ -10050,9 +10060,23 @@ function handleSoundscapeWorkshopGesture(gesture) {
   if (!isSoundscapeWorkshopPreset() || !state.playbackPage) return;
   const event = soundscapeWorkshopGestureEvent(gesture);
   if (!event) return;
-  if (gesture.kind === 'pointerdown') beginTextPresetGesture(event);
-  else if (gesture.kind === 'pointermove') moveTextPresetGesture(event);
-  else if (gesture.kind === 'pointerup' || gesture.kind === 'pointercancel') endTextPresetGesture(event);
+  if (gesture.kind === 'pointerdown') {
+    beginWindowDragGesture(event);
+    if (state.windowDragPointerId === event.pointerId) return;
+    beginTextPresetGesture(event);
+  } else if (gesture.kind === 'pointermove') {
+    if (state.windowDragPointerId === event.pointerId) {
+      moveWindowDragGesture(event);
+      return;
+    }
+    moveTextPresetGesture(event);
+  } else if (gesture.kind === 'pointerup' || gesture.kind === 'pointercancel') {
+    if (state.windowDragPointerId === event.pointerId) {
+      endWindowDragGesture(event);
+      return;
+    }
+    endTextPresetGesture(event);
+  }
   else if (gesture.kind === 'wheel') scaleTextPresetFromWheel(event);
   else if (gesture.kind === 'dblclick') resetSoundscapeWorkshopTextTransform(event);
 }

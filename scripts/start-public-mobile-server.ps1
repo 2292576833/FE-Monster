@@ -6,7 +6,7 @@ param(
   [int]$PublicPort = 3099,
   [int]$DownloadPort = 3080,
   [string]$DownloadSiteRoot = (Join-Path $Root 'download-site'),
-  [string]$DownloadUrl = 'https://fe-monster-download-201.affront-loony-6o.chatgpt.site/',
+  [string]$DownloadUrl = 'https://2292576833.github.io/FE-Monster/',
   [string]$DownloadTunnelUrl = 'https://www.h3ef5461b.nyat.app:57374/',
   [string]$AccessKeyFile = (Join-Path $Env:LOCALAPPDATA 'FE Monster\public-access.key')
 )
@@ -162,10 +162,10 @@ if (!(Test-HttpEndpoint "http://127.0.0.1:$PublicPort/health")) {
   $Env:FE_MONSTER_PUBLIC_PROXY_PORT = [string]$PublicPort
   $Env:FE_MONSTER_PUBLIC_UPSTREAM_PORT = [string]$GatewayPort
   # The legacy frp-boy endpoint uses SakuraFrp's self-signed certificate. If a
-  # visitor elects to continue past that warning, send them to the separately
-  # provisioned download tunnel whose public certificate is trusted instead of
-  # making the redirect depend on a particular Cloudflare egress decision.
-  $Env:FE_MONSTER_PUBLIC_DOWNLOAD_URL = $DownloadTunnelUrl
+  # visitor elects to continue past that warning, send them to the permanent,
+  # public GitHub Pages download page. Keep the trusted tunnel as a secondary
+  # origin for the full download-site application.
+  $Env:FE_MONSTER_PUBLIC_DOWNLOAD_URL = $DownloadUrl
   $stamp = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
   $stdout = Join-Path $outDir "public-mobile-proxy-$stamp.out.log"
   $stderr = Join-Path $outDir "public-mobile-proxy-$stamp.err.log"

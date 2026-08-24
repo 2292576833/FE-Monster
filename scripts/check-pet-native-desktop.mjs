@@ -10,11 +10,11 @@ const pet = read('web/pet-assistant.js');
 const css = read('web/pet-assistant.css');
 const html = read('web/index.html');
 
-assert.match(form, /private readonly WebView2 webView = new\(\)/,
-  'main WinForms host no longer owns the primary WebView2');
+assert.match(form, /private WebView2 webView;[\s\S]*webView\s*=\s*CreateMainWebView\(\)/,
+  'main WinForms host no longer owns the replaceable primary WebView2');
 assert.match(host, /private readonly WebView2CompositionControl webView = new\(\)/,
   'desktop pet is not rendered by the WPF composition controller');
-assert.match(host, /mainWebView\.CoreWebView2\?\.Environment[\s\S]*EnsureCoreWebView2Async\(environment\)/,
+assert.match(host, /mainWebViewProvider\(\)[\s\S]*mainWebView\.CoreWebView2\?\.Environment[\s\S]*EnsureCoreWebView2Async\(environment\)/,
   'desktop pet does not share the main WebView2 profile/environment');
 assert.match(form, /ResolveWebView2DataRoot\(\)[\s\S]*FE_MONSTER_DATA_DIR[\s\S]*Path\.Combine\([^;]*"WebView2"/,
   'main WebView2 profile must follow the explicit FE data root when Local AppData is full');

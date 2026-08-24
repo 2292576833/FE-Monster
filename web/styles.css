@@ -13323,6 +13323,13 @@ html[data-fe-cursor-motion="glow"] :where(
   transform: translate(-50%, 0) scale(1);
 }
 
+.app-shell.is-playback-page.has-soundscape-workshop .top-search {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transform: translate(-50%, 0) scale(1);
+}
+
 .search-suggestions,
 .favorite-library,
 .playlist-favorite-popover {
@@ -25420,6 +25427,29 @@ html #runtimeSettingsPanel.runtime-settings-panel.settings-center[hidden] {
   padding: 18px 20px;
 }
 
+.audio-mixer-presets,
+.audio-mixer-family-toolbar,
+.audio-mixer-parameters,
+.audio-mixer-channel-panel,
+.audio-mixer-diagnostics {
+  content-visibility: auto;
+  contain: layout paint style;
+}
+
+.audio-mixer-presets,
+.audio-mixer-family-toolbar,
+.audio-mixer-diagnostics {
+  contain-intrinsic-block-size: auto 180px;
+}
+
+.audio-mixer-parameters {
+  contain-intrinsic-block-size: auto 1680px;
+}
+
+.audio-mixer-channel-panel {
+  contain-intrinsic-block-size: auto 860px;
+}
+
 .audio-mixer-family-toolbar {
   display: grid;
   width: 100%;
@@ -25497,6 +25527,7 @@ html #runtimeSettingsPanel.runtime-settings-panel.settings-center[hidden] {
   min-width: 0;
   gap: 6px;
   padding: 18px;
+  contain: layout paint style;
 }
 
 .audio-mixer-family[hidden],
@@ -25692,6 +25723,7 @@ html #runtimeSettingsPanel.runtime-settings-panel.settings-center[hidden] {
   min-width: 0;
   gap: 14px;
   padding: 18px 20px;
+  contain: layout paint style;
 }
 
 .audio-mixer-channel-panel[aria-busy="true"] {
@@ -26004,6 +26036,7 @@ html #runtimeSettingsPanel.runtime-settings-panel.settings-center[hidden] {
   color: rgba(235, 248, 242, 0.92);
   background: linear-gradient(145deg, rgba(10, 42, 32, 0.72), rgba(3, 18, 14, 0.82));
   box-shadow: inset 0 1px 0 rgba(218, 255, 240, 0.04);
+  contain: layout paint style;
 }
 
 .audio-mixer-visuals [hidden] {
@@ -26121,6 +26154,7 @@ html #runtimeSettingsPanel.runtime-settings-panel.settings-center[hidden] {
   border-radius: 14px;
   background: rgba(2, 18, 14, 0.4);
   box-shadow: inset 0 1px 0 rgba(218, 255, 240, 0.025);
+  contain: layout paint style;
 }
 
 .audio-mixer-visual-card[data-size="wide"],
@@ -26128,7 +26162,7 @@ html #runtimeSettingsPanel.runtime-settings-panel.settings-center[hidden] {
   grid-column: 1 / -1;
 }
 
-.audio-mixer-visual-card[data-size="tall"] .audio-mixer-visual-canvas {
+.audio-mixer-visual-card[data-size="tall"] :is(.audio-mixer-visual-canvas, .audio-mixer-visual-vector) {
   height: 330px;
 }
 
@@ -26216,6 +26250,7 @@ html #runtimeSettingsPanel.runtime-settings-panel.settings-center[hidden] {
 }
 
 .audio-mixer-visual-canvas,
+.audio-mixer-visual-vector,
 .audio-mixer-automation-canvas {
   display: block;
   width: 100%;
@@ -26224,6 +26259,24 @@ html #runtimeSettingsPanel.runtime-settings-panel.settings-center[hidden] {
   border-radius: 9px;
   background: linear-gradient(180deg, rgba(4, 25, 19, 0.84), rgba(2, 14, 11, 0.96));
   touch-action: none;
+}
+
+.audio-mixer-visual-vector {
+  height: 128px;
+  background: rgb(2, 16, 12);
+}
+
+.audio-mixer-spectrum-vector__grid {
+  fill: none;
+  stroke: rgba(139, 216, 187, 0.11);
+  stroke-width: 1;
+}
+
+.audio-mixer-spectrum-vector__path {
+  fill: rgba(92, 214, 164, 0.34);
+  stroke: rgba(177, 255, 222, 0.88);
+  stroke-width: 1.25;
+  stroke-linejoin: round;
 }
 
 .audio-mixer-visual-scale,
@@ -26298,6 +26351,7 @@ html #runtimeSettingsPanel.runtime-settings-panel.settings-center[hidden] {
   bottom: 0;
   left: 0;
   transform-origin: bottom;
+  will-change: transform;
 }
 
 .audio-mixer-meter-fill--rms {
@@ -26348,6 +26402,7 @@ html #runtimeSettingsPanel.runtime-settings-panel.settings-center[hidden] {
   transform-origin: left;
   border-radius: 999px;
   background: linear-gradient(90deg, #e2c664, #dd755f);
+  will-change: transform;
 }
 
 .audio-mixer-spatial-boundary,
@@ -26498,6 +26553,7 @@ html #runtimeSettingsPanel.runtime-settings-panel.settings-center[hidden] {
   height: 6px;
   transform-origin: left;
   border-radius: 999px;
+  will-change: transform;
 }
 
 .audio-mixer-channel-meter__peak {
@@ -26956,7 +27012,6 @@ html #runtimeSettingsPanel.runtime-settings-panel.settings-center[hidden] {
   box-shadow: none !important;
 }
 
-#qishuiPlaybackCard #runtimeSettingsButton.qishui-playback-settings-button:focus,
 #qishuiPlaybackCard #runtimeSettingsButton.qishui-playback-settings-button:focus-visible {
   outline: 2px solid rgba(151, 255, 213, 0.96) !important;
   outline-offset: 2px !important;

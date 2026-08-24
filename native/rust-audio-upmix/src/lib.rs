@@ -4,6 +4,8 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
+pub mod channel_router;
+
 const ABI_VERSION: u32 = 1;
 const RESULT_OK: i32 = 0;
 const RESULT_INVALID_ARGUMENT: i32 = -1;
@@ -163,7 +165,7 @@ fn process_block(
         for channel in 0..handle.output_channels {
             let sample = channels[channel][frame];
             output[frame * handle.output_channels + channel] = if sample.is_finite() {
-                sample.clamp(-1.0, 1.0)
+                sample
             } else {
                 0.0
             };
@@ -304,6 +306,7 @@ pub const FE_RUST_MIXER_UNSUPPORTED: i32 = -3;
 pub const FE_RUST_MIXER_PANIC: i32 = -4;
 pub const FE_RUST_MIXER_BUSY: i32 = -5;
 const MIXER_MAX_CHANNELS: usize = 8;
+const REVERB_FDN_LINES: usize = 4;
 const MIXER_SNAPSHOT_SLOTS: usize = 3;
 const SLOT_FREE: u32 = 0;
 const SLOT_READING: u32 = 1;
@@ -462,12 +465,11 @@ pub fn mixer_preset_params(id: u32) -> Option<FeRustMixerParams> {
             p.reverb_dry = 0.88;
         }
         3 => {
-            p.stereo_width = 1.7;
-            p.center_gain = 0.92;
-            p.surround_gain = 1.35;
-            p.lfe_gain = 1.08;
-            p.eq_db[6] = 1.0;
-            p.eq_db[7] = 1.5;
+            // Conservative headroom for MatrixDecode -> Mixer -> OBR. Spatial
+            // extent now comes from real 5.1/7.1 object geometry, not boosted
+            // channel gain or an over-wide stereo stage.
+            p.input_gain_db = -6.0;
+            p.stereo_width = 1.2;
         }
         4 => {
             p.input_gain_db = -1.5;
@@ -639,8 +641,40 @@ struct DerivedParameters {
     compressor_lut: [f32; COMPRESSOR_LUT_SIZE],
     limiter_ceiling: f32,
     limiter_release: f32,
-    reverb_feedback: f32,
-    reverb_delay: usize,
+    reverb_feedback: [f32; REVERB_FDN_LINES],
+    reverb_delays: [usize; REVERB_FDN_LINES],
+}
+
+fn is_prime(value: usize) -> bool {
+    if value < 2 {
+        return false;
+    }
+    if value % 2 == 0 {
+        return value == 2;
+    }
+    let mut divisor = 3;
+    while divisor <= value / divisor {
+        if value % divisor == 0 {
+            return false;
+        }
+        divisor += 2;
+    }
+    true
+}
+
+fn prime_delay_near(target: usize, maximum: usize) -> usize {
+    let target = target.clamp(2, maximum);
+    for candidate in target..=maximum {
+        if is_prime(candidate) {
+            return candidate;
+        }
+    }
+    for candidate in (2..target).rev() {
+        if is_prime(candidate) {
+            return candidate;
+        }
+    }
+    1
 }
 
 impl DerivedParameters {
@@ -650,7 +684,18 @@ impl DerivedParameters {
             |milliseconds: f32| (-1.0 / (milliseconds * 0.001 * sample_rate)).exp();
         let pre = (p.reverb_pre_delay_ms * 0.001 * sample_rate) as usize;
         let room = ((0.02 + p.reverb_room_size * 0.10) * sample_rate) as usize;
-        let reverb_delay = (pre + room).clamp(1, reverb_stride - 1);
+        let total_reverb_delay = (pre + room).clamp(2, reverb_stride - 1);
+        // Four distinct prime lengths prevent the periodic ringing and same-
+        // phase echoes of the former single feedback delay.  Preparation runs
+        // on the control path, never in the audio callback.
+        const DELAY_RATIOS: [f32; REVERB_FDN_LINES] = [0.73, 0.83, 0.91, 1.0];
+        let reverb_delays = std::array::from_fn(|line| {
+            prime_delay_near(
+                (total_reverb_delay as f32 * DELAY_RATIOS[line]).round() as usize,
+                reverb_stride - 1,
+            )
+        });
+        let decay_samples = (p.reverb_decay_ms * 0.001 * sample_rate).max(1.0);
         let compressor_lut = std::array::from_fn(|index| {
             let amplitude =
                 index as f32 * COMPRESSOR_LUT_MAX_AMPLITUDE / (COMPRESSOR_LUT_SIZE - 1) as f32;
@@ -672,9 +717,10 @@ impl DerivedParameters {
             compressor_lut,
             limiter_ceiling: db_gain(p.limiter_ceiling_db),
             limiter_release: time_coefficient(p.limiter_release_ms),
-            reverb_feedback: 10.0_f32
-                .powf(-3.0 * reverb_delay as f32 / (p.reverb_decay_ms * 0.001 * sample_rate)),
-            reverb_delay,
+            reverb_feedback: std::array::from_fn(|line| {
+                10.0_f32.powf(-3.0 * reverb_delays[line] as f32 / decay_samples)
+            }),
+            reverb_delays,
         }
     }
 
@@ -690,7 +736,10 @@ impl DerivedParameters {
         field!(compressor_release);
         field!(limiter_ceiling);
         field!(limiter_release);
-        field!(reverb_feedback);
+        for line in 0..REVERB_FDN_LINES {
+            self.reverb_feedback[line] +=
+                (target.reverb_feedback[line] - self.reverb_feedback[line]) * fraction;
+        }
         for band in 0..FE_RUST_MIXER_EQ_BANDS {
             macro_rules! coefficient {
                 ($name:ident) => {
@@ -703,7 +752,7 @@ impl DerivedParameters {
             coefficient!(a1);
             coefficient!(a2);
         }
-        self.reverb_delay = target.reverb_delay;
+        self.reverb_delays = target.reverb_delays;
     }
 }
 
@@ -819,7 +868,7 @@ struct MixerDsp {
     reverb: Vec<f32>,
     reverb_stride: usize,
     reverb_position: usize,
-    reverb_damping: [f32; MIXER_MAX_CHANNELS],
+    reverb_damping: [f32; MIXER_MAX_CHANNELS * REVERB_FDN_LINES],
 }
 
 impl MixerDsp {
@@ -837,10 +886,10 @@ impl MixerDsp {
             eq: [[BiquadState::default(); FE_RUST_MIXER_EQ_BANDS]; MIXER_MAX_CHANNELS],
             compressor_envelope: 0.0,
             limiter_gain: 1.0,
-            reverb: vec![0.0; stride * MIXER_MAX_CHANNELS],
+            reverb: vec![0.0; stride * MIXER_MAX_CHANNELS * REVERB_FDN_LINES],
             reverb_stride: stride,
             reverb_position: 0,
-            reverb_damping: [0.0; MIXER_MAX_CHANNELS],
+            reverb_damping: [0.0; MIXER_MAX_CHANNELS * REVERB_FDN_LINES],
         }
     }
 
@@ -850,7 +899,7 @@ impl MixerDsp {
         self.limiter_gain = 1.0;
         self.reverb.fill(0.0);
         self.reverb_position = 0;
-        self.reverb_damping = [0.0; MIXER_MAX_CHANNELS];
+        self.reverb_damping = [0.0; MIXER_MAX_CHANNELS * REVERB_FDN_LINES];
     }
 
     fn reset_to_snapshot(&mut self, snapshot: PreparedSnapshot) {
@@ -954,9 +1003,6 @@ impl MixerDsp {
                 pcm[base + channel] = if sample.is_finite() { sample } else { 0.0 };
             }
             if p.enabled == 0 {
-                for channel in 0..channels {
-                    pcm[base + channel] = pcm[base + channel].clamp(-1.0, 1.0);
-                }
                 continue;
             }
 
@@ -977,6 +1023,12 @@ impl MixerDsp {
 
             // 2. Ten fixed-frequency peaking EQ bands.
             for band in 0..FE_RUST_MIXER_EQ_BANDS {
+                // The clean snapshot is a true wire path. Running nominal
+                // 0 dB biquads adds avoidable floating-point residue and keeps
+                // off/off from being sample-transparent.
+                if p.eq_db[band].abs() <= 1.0e-6 {
+                    continue;
+                }
                 let c = d.eq[band];
                 for channel in 0..channels {
                     pcm[base + channel] =
@@ -1015,19 +1067,62 @@ impl MixerDsp {
                 }
             }
 
-            // 5. Bounded feedback reverb; all memory was allocated by create.
+            // 5. Four-line feedback delay network. All delay and damping
+            // memory is allocated by create; the normalized Hadamard matrix
+            // is energy-preserving and the per-line T60 gains remain < 1.
             if p.reverb_enabled != 0 {
-                let delay = d.reverb_delay;
-                let read = (self.reverb_position + self.reverb_stride - delay) % self.reverb_stride;
+                const OUTPUT_SIGNS: [[f32; REVERB_FDN_LINES]; REVERB_FDN_LINES] = [
+                    [1.0, 1.0, 1.0, 1.0],
+                    [1.0, -1.0, 1.0, -1.0],
+                    [1.0, 1.0, -1.0, -1.0],
+                    [1.0, -1.0, -1.0, 1.0],
+                ];
+                let blend_norm = p.reverb_wet.hypot(p.reverb_dry);
+                let (wet_gain, dry_gain) = if blend_norm > 1.0e-6 {
+                    (p.reverb_wet / blend_norm, p.reverb_dry / blend_norm)
+                } else {
+                    (0.0, 1.0)
+                };
+                let damping_alpha = (1.0 - p.reverb_damping).clamp(0.02, 1.0);
                 for channel in 0..channels {
-                    let delayed = self.reverb[channel * self.reverb_stride + read];
-                    self.reverb_damping[channel] +=
-                        (1.0 - p.reverb_damping) * (delayed - self.reverb_damping[channel]);
-                    let wet = self.reverb_damping[channel];
                     let input = pcm[base + channel];
-                    self.reverb[channel * self.reverb_stride + self.reverb_position] =
-                        (input + wet * d.reverb_feedback).clamp(-4.0, 4.0);
-                    pcm[base + channel] = input * p.reverb_dry + wet * p.reverb_wet;
+                    let mut delayed = [0.0_f32; REVERB_FDN_LINES];
+                    for line in 0..REVERB_FDN_LINES {
+                        let read = (self.reverb_position + self.reverb_stride
+                            - d.reverb_delays[line])
+                            % self.reverb_stride;
+                        let state_index = channel * REVERB_FDN_LINES + line;
+                        let delay_index = state_index * self.reverb_stride + read;
+                        self.reverb_damping[state_index] += damping_alpha
+                            * (self.reverb[delay_index]
+                                - self.reverb_damping[state_index]);
+                        delayed[line] = self.reverb_damping[state_index];
+                    }
+
+                    let feedback = [
+                        (delayed[0] + delayed[1] + delayed[2] + delayed[3]) * 0.5,
+                        (delayed[0] - delayed[1] + delayed[2] - delayed[3]) * 0.5,
+                        (delayed[0] + delayed[1] - delayed[2] - delayed[3]) * 0.5,
+                        (delayed[0] - delayed[1] - delayed[2] + delayed[3]) * 0.5,
+                    ];
+                    for line in 0..REVERB_FDN_LINES {
+                        const INPUT_NORMALIZATION: f32 = 0.5;
+                        let write = input * INPUT_NORMALIZATION
+                            + feedback[line] * d.reverb_feedback[line];
+                        let state_index = channel * REVERB_FDN_LINES + line;
+                        let write_index = state_index * self.reverb_stride
+                            + self.reverb_position;
+                        self.reverb[write_index] = if write.is_finite() { write } else { 0.0 };
+                    }
+
+                    let signs = OUTPUT_SIGNS[channel % REVERB_FDN_LINES];
+                    let wet = delayed
+                        .iter()
+                        .zip(signs)
+                        .map(|(sample, sign)| sample * sign)
+                        .sum::<f32>()
+                        * 0.5;
+                    pcm[base + channel] = input * dry_gain + wet * wet_gain;
                 }
                 self.reverb_position = (self.reverb_position + 1) % self.reverb_stride;
             }
@@ -1056,14 +1151,13 @@ impl MixerDsp {
                 self.limiter_gain = 1.0;
             }
 
-            // 7. Final sanitation and hard bounded output.
+            // 7. Final finite sanitation. The linked limiter above (when
+            // enabled) and the native pipeline's final safety limiter own
+            // output protection; an extra hard clamp here would add avoidable
+            // flat-top distortion and break disabled-mode transparency.
             for channel in 0..channels {
                 let sample = pcm[base + channel];
-                pcm[base + channel] = if sample.is_finite() {
-                    sample.clamp(-1.0, 1.0)
-                } else {
-                    0.0
-                };
+                pcm[base + channel] = if sample.is_finite() { sample } else { 0.0 };
             }
         }
     }
@@ -1388,6 +1482,27 @@ mod tests {
     }
 
     #[test]
+    fn upmix_preserves_finite_headroom_without_internal_hard_clip() {
+        let mut upmix_config = config(6);
+        upmix_config.center_gain = 2.0;
+        upmix_config.surround_gain = 2.0;
+        upmix_config.lfe_gain = 2.0;
+        let mut handle = create_handle(&upmix_config).expect("upmix handle");
+        let frames = 256;
+        let input = vec![1.0_f32; frames * 2];
+        let mut output = vec![0.0_f32; frames * 6];
+        assert_eq!(
+            process_block(&mut handle, &input, frames, &mut output),
+            RESULT_OK
+        );
+        assert!(output.iter().all(|sample| sample.is_finite()));
+        assert!(
+            output.iter().any(|sample| sample.abs() > 1.0),
+            "upmix unexpectedly hard-clipped all internal headroom"
+        );
+    }
+
+    #[test]
     fn lfe_is_continuous_across_transport_batches() {
         let batch_frames = 4096_usize;
         let total_frames = batch_frames * 2;
@@ -1525,6 +1640,157 @@ mod tests {
         publication.slots[writer_slot]
             .state
             .store(SLOT_FREE, Ordering::Release);
+    }
+
+    fn mixer_dsp_for(params: FeRustMixerParams) -> MixerDsp {
+        let config = FeRustMixerConfig {
+            max_frames_per_call: 256,
+            ..FeRustMixerConfig::default()
+        };
+        let stride = ((config.sample_rate as f32 * 0.321).ceil() as usize).max(2);
+        let snapshot = PreparedSnapshot {
+            revision: 1,
+            ramp_frames: 0,
+            params,
+            derived: DerivedParameters::from_params(
+                &params,
+                config.sample_rate as f32,
+                stride,
+            ),
+        };
+        MixerDsp::new(&config, snapshot)
+    }
+
+    fn render_reverb_impulse(params: FeRustMixerParams, frames: usize) -> Vec<[f32; 2]> {
+        let mut dsp = mixer_dsp_for(params);
+        let mut rendered = Vec::with_capacity(frames);
+        let mut processed = 0;
+        while processed < frames {
+            let block_frames = (frames - processed).min(256);
+            let mut block = vec![0.0_f32; block_frames * 2];
+            if processed == 0 {
+                block[0] = 0.5;
+                block[1] = 0.5;
+            }
+            dsp.process(&mut block, block_frames, 2);
+            rendered.extend(block.chunks_exact(2).map(|frame| [frame[0], frame[1]]));
+            processed += block_frames;
+        }
+        rendered
+    }
+
+    #[test]
+    fn reverb_uses_four_line_decorrelated_stable_fdn() {
+        let mut params = mixer_preset_params(2).expect("hall preset");
+        params.limiter_enabled = 0;
+        params.reverb_wet = 1.0;
+        params.reverb_dry = 0.0;
+        let frames = 48_000 * 3;
+        let rendered = render_reverb_impulse(params, frames);
+        assert!(rendered.iter().flatten().all(|sample| sample.is_finite()));
+        assert!(rendered.iter().flatten().all(|sample| sample.abs() < 2.0));
+
+        let tail = &rendered[9_600..];
+        let mut dot = 0.0_f64;
+        let mut left_square = 0.0_f64;
+        let mut right_square = 0.0_f64;
+        let mut dense_frames = 0_usize;
+        for frame in tail {
+            dot += frame[0] as f64 * frame[1] as f64;
+            left_square += frame[0] as f64 * frame[0] as f64;
+            right_square += frame[1] as f64 * frame[1] as f64;
+            if frame[0].abs() + frame[1].abs() > 1.0e-7 {
+                dense_frames += 1;
+            }
+        }
+        let correlation = dot / (left_square * right_square).sqrt().max(1.0e-20);
+        assert!(correlation.abs() < 0.85, "stereo tail correlation={correlation}");
+        assert!(
+            dense_frames * 5 > tail.len(),
+            "tail is too sparse: {dense_frames}/{}",
+            tail.len()
+        );
+
+        let window_energy = |start: usize, end: usize| -> f64 {
+            rendered[start..end]
+                .iter()
+                .map(|frame| frame[0] as f64 * frame[0] as f64
+                    + frame[1] as f64 * frame[1] as f64)
+                .sum::<f64>()
+                / (2 * (end - start)) as f64
+        };
+        let early = window_energy(9_600, 38_400);
+        let late = window_energy(96_000, 134_400);
+        println!(
+            "fdn_quality correlation={correlation:.6} dense_ratio={:.6} early_energy={early:.9} late_energy={late:.9}",
+            dense_frames as f64 / tail.len() as f64,
+        );
+        assert!(early > 1.0e-10, "missing audible early tail");
+        assert!(late > 1.0e-14, "tail ended discontinuously");
+        assert!(late < early, "unstable decay: early={early}, late={late}");
+    }
+
+    #[test]
+    fn reverb_process_keeps_preallocated_storage_and_realtime_budget() {
+        let mut params = mixer_preset_params(1).expect("bathroom preset");
+        params.limiter_enabled = 0;
+        let mut dsp = mixer_dsp_for(params);
+        let pointer = dsp.reverb.as_ptr();
+        let capacity = dsp.reverb.capacity();
+        assert_eq!(dsp.reverb.len(), dsp.reverb_stride * MIXER_MAX_CHANNELS * 4);
+        let mut block = vec![0.01_f32; 256 * 8];
+        let started = std::time::Instant::now();
+        for _ in 0..375 {
+            dsp.process(&mut block, 256, 8);
+        }
+        let elapsed = started.elapsed();
+        println!(
+            "fdn_performance rendered_seconds=2.0 elapsed_ms={:.3}",
+            elapsed.as_secs_f64() * 1_000.0,
+        );
+        assert_eq!(dsp.reverb.as_ptr(), pointer);
+        assert_eq!(dsp.reverb.capacity(), capacity);
+        assert!(elapsed.as_secs_f64() < 0.5, "2 s render took {elapsed:?}");
+    }
+
+    #[test]
+    fn mixer_has_no_internal_hard_clip_and_zero_blend_is_dry_through() {
+        let mut disabled = clean_params();
+        disabled.enabled = 0;
+        disabled.limiter_enabled = 0;
+        let mut disabled_dsp = mixer_dsp_for(disabled);
+        let mut disabled_pcm = [1.25_f32, -1.25_f32];
+        disabled_dsp.process(&mut disabled_pcm, 1, 2);
+        assert_eq!(disabled_pcm, [1.25, -1.25]);
+
+        let mut boosted = clean_params();
+        boosted.limiter_enabled = 0;
+        boosted.output_gain_db = 6.0;
+        let mut boosted_dsp = mixer_dsp_for(boosted);
+        let mut boosted_pcm = [0.8_f32, -0.8_f32];
+        boosted_dsp.process(&mut boosted_pcm, 1, 2);
+        assert!(boosted_pcm[0] > 1.5 && boosted_pcm[1] < -1.5);
+
+        let mut zero_blend = clean_params();
+        zero_blend.reverb_enabled = 1;
+        zero_blend.limiter_enabled = 0;
+        zero_blend.reverb_wet = 0.0;
+        zero_blend.reverb_dry = 0.0;
+        let mut zero_dsp = mixer_dsp_for(zero_blend);
+        let mut zero_pcm = [0.25_f32, -0.25_f32];
+        zero_dsp.process(&mut zero_pcm, 1, 2);
+        assert!((zero_pcm[0] - 0.25).abs() < 1.0e-6);
+        assert!((zero_pcm[1] + 0.25).abs() < 1.0e-6);
+    }
+
+    #[test]
+    fn surround_preset_does_not_double_attenuate_upmix_stage() {
+        let params = mixer_preset_params(3).expect("surround preset");
+        assert_eq!(params.input_gain_db, -6.0);
+        assert_eq!(params.stereo_width, 1.2);
+        assert_eq!(params.center_gain, 1.0);
+        assert_eq!(params.surround_gain, 1.0);
+        assert_eq!(params.lfe_gain, 1.0);
     }
 
     #[test]

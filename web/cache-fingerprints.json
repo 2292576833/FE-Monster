@@ -14,13 +14,33 @@
     },
     {
       "path": "web/app-command.js",
-      "version": "20260811-cache-audit-1",
-      "sha256": "0912db53b84dd741b7b21bdf010dd4e0d38f1646cf1336cc9fecb5a9a0203080"
+      "version": "20260817-boot-command-1",
+      "sha256": "9090c921883bd3f528c9e3268094bd1b5a401bb61514743a275ee8a06918c87a"
     },
     {
       "path": "web/app.js",
-      "version": "20260813-achievement-rewards-1",
-      "sha256": "7f59837062d8dbb508dd8e69334f80b5901d40894965d6e88370def466f59a79"
+      "version": "20260824-soundscape-state-drag-1",
+      "sha256": "181c47043c20fe8889b1ca54654d4350350ef1225b8748f000db1c220f4c4814"
+    },
+    {
+      "path": "web/assets/soundscape-workshop/assets/index-CSU_B_T9.js",
+      "version": "20260819-soundscape-gc-fallback-1",
+      "sha256": "e84063e440609aae4dad2b728fb8e419f78abc7e37d8e030f3067dbd90183feb"
+    },
+    {
+      "path": "web/audio-mixer-render-worker.js",
+      "version": "20260824-mixer-render-4",
+      "sha256": "839655cb3151a13659b8cd893ad47d39c1e756e8d3a7d478567ea950a6cdb5b7"
+    },
+    {
+      "path": "web/audio-mixer-ui.js",
+      "version": "20260824-mixer-open-perf-2",
+      "sha256": "cead9f320b1f33b353d7198688c1f9a093b7ca239afca8c31b4117cf8d1c38cc"
+    },
+    {
+      "path": "web/audio-mixer-visuals.js",
+      "version": "20260824-worker-render-8",
+      "sha256": "c9f4c67df836ba9e4510e1f6c20fd61b3d5586a113821cf28b704d57730dbbb3"
     },
     {
       "path": "web/black-gold-buttons.css",
@@ -63,6 +83,11 @@
       "sha256": "710232e72459bf60a428cbf358c635041f30f7839667262e2a6efe69eb4e2fe7"
     },
     {
+      "path": "web/client-ai-service.js",
+      "version": "20260819-soundscape-parity-1",
+      "sha256": "bc6e71e61bc9715c023e67946d6ef4ca4b29b726c54cfe0df7a82979c92be9bb"
+    },
+    {
       "path": "web/client-runtime-loader.js",
       "version": "20260811-cache-audit-1",
       "sha256": "82420ba9a829228c493abc99461354cfb6a4e6fe8abe3fcd8c82f79ca9ebf6da"
@@ -76,6 +101,11 @@
       "path": "web/community-reward-runtime.js",
       "version": "20260812-reward-stages-2",
       "sha256": "ce60de2c8625b0165268c1d1ce28cb392a798ae87faab6ae7ef4ea16e4b9adc9"
+    },
+    {
+      "path": "web/companion-care-actions.js",
+      "version": "20260817-care-autonomy-1",
+      "sha256": "293164357b630db3da30fbf3eb538ca037ad25b13645c9ceb397ff2302116f4a"
     },
     {
       "path": "web/creative-community.js",
@@ -99,8 +129,8 @@
     },
     {
       "path": "web/free-cube-runtime.js",
-      "version": "20260811-cache-audit-1",
-      "sha256": "f504e96e39e253509ed2d2b82bed96c7d966d6335f240375e6eb9dc5d1bffcdf"
+      "version": "20260815-video-heart-2",
+      "sha256": "41f1d4025de4c6103574182a2464a45baf9e8ced898b2d250ff0b1f8525c5ebb"
     },
     {
       "path": "web/liquid-ether-switches.js",
@@ -109,8 +139,8 @@
     },
     {
       "path": "web/lyric-render-quality.css",
-      "version": "20260811-cache-audit-1",
-      "sha256": "aeec30704a605a9a6868a154a77b909973c89696fa9b21096ba25fd6c90a2975"
+      "version": "20260819-playbar-straight-1",
+      "sha256": "b33fddde95b6b5f73d6255b6e7579cf1d272b16934125014bde0850d1cb18e4a"
     },
     {
       "path": "web/music-api-package-client.js",
@@ -118,14 +148,19 @@
       "sha256": "34e000b4e32a1d3e83180076b1f37aba12c1345af20fa1b32d5f90026a41ab2d"
     },
     {
+      "path": "web/pet-affect-plan.js",
+      "version": "20260818-seven-affect-3",
+      "sha256": "c0b49bf9e16f8094c65f896efc8c62156089523fd480a7016e711ce80ef06116"
+    },
+    {
       "path": "web/pet-assistant.css",
-      "version": "20260811-conversation-emotion-2",
-      "sha256": "518c38afb166826858f145931858c359a41cf119d656cc2580037d4a4278018e"
+      "version": "20260816-pet-chain-fix-1",
+      "sha256": "d9a48595d18748b67eed2b86aa078ccbcff3974d8db2a6676ad48535c1f432f2"
     },
     {
       "path": "web/pet-assistant.js",
-      "version": "20260811-server-tour-tts-2",
-      "sha256": "a61cd83c448e7d43e0d92c5daf34f8dc2037a02ea3f2fc0808d1134829389b1e"
+      "version": "20260819-command-parity-2",
+      "sha256": "faf4e87848385dac63d882e84c542c4855fff51fbce7568474a2a4574afa0b12"
     },
     {
       "path": "web/pet-client-context.js",
@@ -223,14 +258,29 @@
       "sha256": "3a07bbd9a6fe3d07ec45a5741f9f07b397b4d75b0b2160895e215ef2a8a0446d"
     },
     {
+      "path": "web/runtime-module-loader.js",
+      "version": "20260819-soundscape-parity-loader-1",
+      "sha256": "df666e8c91dcbd7b89b1ca925c83fcbfa26cad114080d52ab350c796c4caa2e1"
+    },
+    {
+      "path": "web/settings-center.js",
+      "version": "20260824-dialog-perf-5",
+      "sha256": "d0c78039b9b3925cfbba355f080f97c67661e2a375bfdf9d13e82a921164b70d"
+    },
+    {
+      "path": "web/soundscape-runtime.js",
+      "version": "20260824-durable-state-1",
+      "sha256": "3471e6d97775206527a451cb7ab06a2a9f03bf827ec611ae41cea1bcea9ca679"
+    },
+    {
       "path": "web/storm-ocean-runtime.js",
       "version": "20260811-cache-audit-1",
       "sha256": "30b34a337d06e2ae81428b06b9e21f9c6d2d483f34bc190a8b73a28526937603"
     },
     {
       "path": "web/styles.css",
-      "version": "20260812-friend-card-1",
-      "sha256": "7803b56020a932b2ffdf7bfb046fef84a29b49d9ea08e028ec4abb622ad0ebe9"
+      "version": "20260824-soundscape-mixer-6",
+      "sha256": "9f716821f1c5b40f9ee605b3a5ebc1179d7584feb8664d4f9ffaff94de648033"
     },
     {
       "path": "web/text-fonts.css",
@@ -249,8 +299,8 @@
     },
     {
       "path": "web/vendor/native-spatial/native-pcm-worklet.js",
-      "version": "20260728-direct-4096-1",
-      "sha256": "7e4991f058c6deecec755aa09da0388ded1702af9094f45ebc7aed9107bc1725"
+      "version": "20260821-seek-epoch-3",
+      "sha256": "e719f729e94f81a41a0fbc718a2b7688e714dee99f38f5fceb463ba66579b996"
     },
     {
       "path": "web/vendor/three.r128.min.js",

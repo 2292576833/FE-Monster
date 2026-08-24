@@ -63,7 +63,7 @@ try {
   const home = await get(port, '/');
   assert.equal(home.status, 200);
   assert.match(home.body, /FE Monster/i);
-  assert.match(home.body, /FE-Monster-Setup-2\.0\.1\.exe/i);
+  assert.match(home.body, /FE-Monster-Setup-2\.1\.1\.exe/i);
 
   const robots = await get(port, '/robots.txt');
   assert.equal(robots.status, 200);

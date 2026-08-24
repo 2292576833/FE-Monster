@@ -14,6 +14,36 @@
   const FREE_DEPTH_ATTACK_RATE = 14.2857;
   const FREE_DEPTH_RELEASE_RATE = 2.9412;
   const FREE_DEPTH_HISTORY_SIZE = 64;
+  const HEART_GRID_COLUMNS = 17;
+  const HEART_GRID_ROWS = 15;
+  const HEART_DEPTH_LAYER_COUNT = 4;
+  const HEART_GRID_SPACING = 0.93;
+  const HEART_GRID_SPACING_Y = 0.82;
+  const HEART_CUBE_SCALE = 1.08;
+  const HEART_CUBE_SIZE = 0.78 * HEART_CUBE_SCALE;
+  const HEART_DEPTH_SPACING = HEART_CUBE_SIZE * 1.2;
+  const HEART_CAMERA_Z = 18;
+  const HEART_CAMERA_FOV = 55;
+  const HEART_OFFSET_X = 3.45;
+  const HEART_OFFSET_Y = -2.15;
+  const HEART_REST_YAW = 0.16;
+  const HEART_REST_PITCH = -0.08;
+  const PLAYBACK_REST_YAW = 0.22;
+  const PLAYBACK_REST_PITCH = -0.16;
+  const HEART_ATTACK_RATE = 10.46;
+  const HEART_RELEASE_RATE = 12.2;
+  const HEART_PUSH_CUBES = 1.25;
+  const HEART_SPECTRUM_BAND_COUNT = 4;
+  const HEART_SPECTRUM_RANGES_HZ = Object.freeze([
+    Object.freeze([20, 52.5]),
+    Object.freeze([52.5, 85]),
+    Object.freeze([85, 117.5]),
+    Object.freeze([117.5, 150])
+  ]);
+  const SUNSET_FADE_MS = 296;
+  const SKY_BLACK_GAP_MS = 36;
+  const NIGHT_FADE_MS = 2459;
+  const SKY_TRANSITION_MS = SUNSET_FADE_MS + SKY_BLACK_GAP_MS + NIGHT_FADE_MS;
   let disposeCount = 0;
 
   function clamp(value, min, max) {
@@ -96,131 +126,99 @@
     return `#${part(color.r)}${part(color.g)}${part(color.b)}`;
   }
 
-  function distributeRingCounts(total, ringCount) {
-    const weightTotal = ringCount * (ringCount + 1) * 0.5;
-    const counts = Array.from({ length: ringCount }, (_, index) => (
-      Math.max(3, Math.floor(total * (index + 1) / weightTotal))
-    ));
-    let assigned = counts.reduce((sum, value) => sum + value, 0);
-    let cursor = ringCount - 1;
-    while (assigned < total) {
-      counts[cursor] += 1;
-      assigned += 1;
-      cursor = cursor > 0 ? cursor - 1 : ringCount - 1;
-    }
-    cursor = 0;
-    while (assigned > total) {
-      if (counts[cursor] > 3) {
-        counts[cursor] -= 1;
-        assigned -= 1;
-      }
-      cursor = (cursor + 1) % ringCount;
-    }
-    return counts;
-  }
-
-  function cubicBezierPoint(segment, t) {
-    const inverse = 1 - t;
-    const a = inverse * inverse * inverse;
-    const b = 3 * inverse * inverse * t;
-    const c = 3 * inverse * t * t;
-    const d = t * t * t;
-    return {
-      x: segment[0][0] * a + segment[1][0] * b + segment[2][0] * c + segment[3][0] * d,
-      y: segment[0][1] * a + segment[1][1] * b + segment[2][1] * c + segment[3][1] * d
-    };
-  }
-
-  function buildHeartOutlineLookup() {
-    const notch = [0, 7.2];
-    const leftLobe = [-15.6, 15.8];
-    const leftLower = [-13.5, -8.5];
-    const bottom = [0, -14.6];
-    const rightLower = [13.5, -8.5];
-    const rightLobe = [15.6, 15.8];
-    const segments = [
-      [notch, [-2.2, 14.4], [-9.2, 19.2], leftLobe],
-      [leftLobe, [-23.2, 13.5], [-22.2, 0.2], leftLower],
-      [leftLower, [-10.5, -12], [-7.2, -14.6], bottom],
-      [bottom, [7.2, -14.6], [10.5, -12], rightLower],
-      [rightLower, [22.2, 0.2], [23.2, 13.5], rightLobe],
-      [rightLobe, [9.2, 19.2], [2.2, 14.4], notch]
-    ];
-    const lookup = [{ ...cubicBezierPoint(segments[0], 0), length: 0 }];
-    let length = 0;
-    let previous = lookup[0];
-    for (const segment of segments) {
-      for (let step = 1; step <= 96; step += 1) {
-        const point = cubicBezierPoint(segment, step / 96);
-        length += Math.hypot(point.x - previous.x, point.y - previous.y);
-        lookup.push({ ...point, length });
-        previous = point;
-      }
-    }
-    return { points: lookup, length };
-  }
-
-  function sampleHeartOutline(outline, progress) {
-    const normalized = ((progress % 1) + 1) % 1;
-    const target = normalized * outline.length;
-    let low = 0;
-    let high = outline.points.length - 1;
-    while (low + 1 < high) {
-      const middle = (low + high) >> 1;
-      if (outline.points[middle].length < target) low = middle;
-      else high = middle;
-    }
-    const before = outline.points[low];
-    const after = outline.points[high];
-    const span = Math.max(0.0001, after.length - before.length);
-    const amount = (target - before.length) / span;
-    return {
-      x: before.x + (after.x - before.x) * amount,
-      y: before.y + (after.y - before.y) * amount
-    };
-  }
-
   function buildHeartPositions(count) {
     const positions = new Float32Array(count * 3);
-    const depthLayerCount = 2;
-    const baseLayerCount = Math.floor(count / depthLayerCount);
-    const outline = buildHeartOutlineLookup();
-    const jitterRandom = seededRandom(0x4A11CE5);
-    const surfaceCounts = [];
+    const active = new Uint8Array(count);
+    const layers = new Uint8Array(count);
+    layers.fill(255);
+    const columns = new Int8Array(count);
+    const rows = new Int8Array(count);
+    const pulseWeights = new Float32Array(count);
+    const depthSigns = new Int8Array(count);
+    const mirrorIndices = new Int32Array(count);
+    mirrorIndices.fill(-1);
+    const spectrumBands = new Uint8Array(count);
+    spectrumBands.fill(255);
+    const spectrumSamples = new Uint8Array(count);
+    const mask = [
+      [-5, -4, -3, -2, 2, 3, 4, 5],
+      [-7, -6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6, 7],
+      [-8, -7, -6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6, 7, 8],
+      [-8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8],
+      [-8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8],
+      [-8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8],
+      [-8, -7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8],
+      [-7, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7],
+      [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6],
+      [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5],
+      [-4, -3, -2, -1, 0, 1, 2, 3, 4],
+      [-3, -2, -1, 0, 1, 2, 3],
+      [-2, -1, 0, 1, 2],
+      [-1, 0, 1],
+      [0]
+    ];
     let written = 0;
-    let representativeRingCount = 1;
-
-    for (let layerIndex = 0; layerIndex < depthLayerCount; layerIndex += 1) {
-      const layerCount = baseLayerCount + (layerIndex < count % depthLayerCount ? 1 : 0);
-      surfaceCounts.push(layerCount);
-      const ringCount = Math.round(clamp(Math.sqrt(layerCount) * 0.54, 11, 17));
-      representativeRingCount = Math.max(representativeRingCount, ringCount);
-      const ringCounts = distributeRingCounts(layerCount, ringCount);
-      const z = layerIndex === 0 ? -4.35 : 4.35;
-
-      for (let ringIndex = 0; ringIndex < ringCount; ringIndex += 1) {
-        const radius = (ringIndex + 1) / ringCount;
-        const pointsOnRing = ringCounts[ringIndex];
-        const stagger = (ringIndex % 2) * 0.5 + layerIndex * 0.37;
-        const jitter = 0.4 + (1 - radius) * 0.18;
-        for (let pointIndex = 0; pointIndex < pointsOnRing; pointIndex += 1) {
-          const point = sampleHeartOutline(outline, (pointIndex + stagger) / pointsOnRing);
-          const offset = written * 3;
-          positions[offset] = point.x * radius + (jitterRandom() - 0.5) * jitter;
-          positions[offset + 1] = point.y * radius + 0.4 + (jitterRandom() - 0.5) * jitter;
-          positions[offset + 2] = z + (jitterRandom() - 0.5) * 0.34;
-          written += 1;
-        }
+    const surfaceCounts = new Array(HEART_DEPTH_LAYER_COUNT).fill(0);
+    const spectrumCubeCounts = new Array(HEART_SPECTRUM_BAND_COUNT).fill(0);
+    const cells = [];
+    for (let row = 0; row < mask.length; row += 1) {
+      for (const column of mask[row]) {
+        const spectrumBand = row >= 10 ? 0 : row >= 7 ? 1 : row >= 4 ? 2 : 3;
+        const sampleHash = Math.abs(column) * 37 + row * 53 + (Math.abs(column) + row) * 11;
+        cells.push({ column, row, spectrumBand, spectrumSample: sampleHash % 128 });
+      }
+    }
+    const completeCellCount = Math.min(cells.length, Math.floor(count / HEART_DEPTH_LAYER_COUNT));
+    const depthCoordinates = [-1.5, -0.5, 0.5, 1.5];
+    const depthPulseGains = [1, 0.72, 0.72, 1];
+    for (const cell of cells) {
+      if (written / HEART_DEPTH_LAYER_COUNT >= completeCellCount) break;
+      const cellStart = written;
+      for (let layer = 0; layer < HEART_DEPTH_LAYER_COUNT; layer += 1) {
+        const offset = written * 3;
+        const depth = depthCoordinates[layer];
+        positions[offset] = cell.column * HEART_GRID_SPACING;
+        positions[offset + 1] = (7 - cell.row) * HEART_GRID_SPACING_Y;
+        positions[offset + 2] = depth * HEART_DEPTH_SPACING;
+        active[written] = 1;
+        layers[written] = layer;
+        columns[written] = cell.column;
+        rows[written] = cell.row;
+        pulseWeights[written] = depthPulseGains[layer];
+        depthSigns[written] = depth < 0 ? -1 : 1;
+        mirrorIndices[written] = cellStart + (HEART_DEPTH_LAYER_COUNT - 1 - layer);
+        spectrumBands[written] = cell.spectrumBand;
+        spectrumSamples[written] = cell.spectrumSample;
+        surfaceCounts[layer] += 1;
+        spectrumCubeCounts[cell.spectrumBand] += 1;
+        written += 1;
       }
     }
     return {
       positions,
-      gridSpacing: 18.4 / representativeRingCount,
-      depthLayerCount,
-      middleLayerCount: 0,
+      active,
+      layers,
+      columns,
+      rows,
+      pulseWeights,
+      depthSigns,
+      mirrorIndices,
+      spectrumBands,
+      spectrumSamples,
+      spectrumCubeCounts,
+      activeCount: written,
+      surfaceCellCount: completeCellCount,
+      frontLayerCount: (surfaceCounts[2] || 0) + (surfaceCounts[3] || 0),
+      gridColumns: HEART_GRID_COLUMNS,
+      gridRows: HEART_GRID_ROWS,
+      gridSpacing: HEART_GRID_SPACING,
+      cubeScale: HEART_CUBE_SCALE,
+      cubeSize: HEART_CUBE_SIZE,
+      depthLayerCount: HEART_DEPTH_LAYER_COUNT,
+      middleLayerCount: (surfaceCounts[1] || 0) + (surfaceCounts[2] || 0),
       surfaceCounts,
-      profile: 'rounded-bezier',
-      jitter: 0.4
+      profile: 'voxel-heart-symmetric-spectrum-v2',
+      jitter: 0
     };
   }
 
@@ -297,6 +295,192 @@
     if (THREE.LinearFilter !== undefined) texture.magFilter = THREE.LinearFilter;
     texture.needsUpdate = true;
     return texture;
+  }
+
+  function canvasTexture(THREE, canvas) {
+    const texture = new THREE.CanvasTexture(canvas);
+    if ('encoding' in texture && THREE.sRGBEncoding !== undefined) texture.encoding = THREE.sRGBEncoding;
+    if (THREE.LinearFilter !== undefined) {
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+    }
+    texture.generateMipmaps = false;
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  function buildSkyCanvas(mode) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 768;
+    canvas.height = 432;
+    const context = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    if (mode === 'sunset') {
+      const gradient = context.createLinearGradient(0, 0, 0, height);
+      gradient.addColorStop(0, '#713ca0');
+      gradient.addColorStop(0.35, '#b95899');
+      gradient.addColorStop(0.66, '#ee7b79');
+      gradient.addColorStop(0.82, '#f7ad73');
+      gradient.addColorStop(1, '#7e4d78');
+      context.fillStyle = gradient;
+      context.fillRect(0, 0, width, height);
+
+      const horizon = context.createRadialGradient(width * 0.84, height * 0.61, 2, width * 0.84, height * 0.61, width * 0.39);
+      horizon.addColorStop(0, 'rgba(255, 249, 190, .98)');
+      horizon.addColorStop(0.14, 'rgba(255, 196, 112, .84)');
+      horizon.addColorStop(0.55, 'rgba(255, 117, 112, .22)');
+      horizon.addColorStop(1, 'rgba(255, 100, 130, 0)');
+      context.fillStyle = horizon;
+      context.fillRect(0, 0, width, height);
+
+      const random = seededRandom(0x51A7C10D);
+      context.save();
+      context.filter = 'blur(9px)';
+      for (let cloud = 0; cloud < 42; cloud += 1) {
+        const x = (random() * 1.18 - 0.12) * width;
+        const y = (0.05 + random() * 0.58) * height;
+        const radiusX = (0.035 + random() * 0.12) * width;
+        const radiusY = (0.018 + random() * 0.05) * height;
+        const bright = random() > 0.34;
+        context.fillStyle = bright
+          ? `rgba(255, ${Math.round(154 + random() * 66)}, ${Math.round(131 + random() * 72)}, ${0.16 + random() * 0.28})`
+          : `rgba(104, 46, 118, ${0.12 + random() * 0.22})`;
+        context.beginPath();
+        context.ellipse(x, y, radiusX, radiusY, random() * 0.18 - 0.09, 0, TAU);
+        context.fill();
+      }
+      context.restore();
+      context.fillStyle = 'rgba(55, 35, 88, .36)';
+      context.fillRect(0, height * 0.79, width, height * 0.21);
+    } else {
+      const gradient = context.createLinearGradient(0, 0, 0, height);
+      gradient.addColorStop(0, '#050715');
+      gradient.addColorStop(0.48, '#111127');
+      gradient.addColorStop(0.78, '#21152f');
+      gradient.addColorStop(1, '#090a18');
+      context.fillStyle = gradient;
+      context.fillRect(0, 0, width, height);
+      const haze = context.createRadialGradient(width * 0.26, height * 0.12, 1, width * 0.26, height * 0.12, width * 0.45);
+      haze.addColorStop(0, 'rgba(115, 76, 151, .23)');
+      haze.addColorStop(0.5, 'rgba(47, 35, 89, .13)');
+      haze.addColorStop(1, 'rgba(15, 11, 38, 0)');
+      context.fillStyle = haze;
+      context.fillRect(0, 0, width, height);
+      const random = seededRandom(0xA57A119);
+      for (let star = 0; star < 145; star += 1) {
+        const x = random() * width;
+        const y = random() * height * 0.8;
+        const radius = 0.35 + Math.pow(random(), 2) * 1.45;
+        context.fillStyle = `rgba(${Math.round(187 + random() * 68)}, ${Math.round(188 + random() * 62)}, 255, ${0.22 + random() * 0.62})`;
+        context.beginPath();
+        context.arc(x, y, radius, 0, TAU);
+        context.fill();
+      }
+    }
+    return canvas;
+  }
+
+  function buildGroundCanvas() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const context = canvas.getContext('2d');
+    const gradient = context.createRadialGradient(236, 214, 18, 256, 256, 360);
+    gradient.addColorStop(0, '#fff0df');
+    gradient.addColorStop(0.55, '#e7b9ce');
+    gradient.addColorStop(1, '#6d4c82');
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 512, 512);
+    const random = seededRandom(0xC1AC1E);
+    for (let patch = 0; patch < 54; patch += 1) {
+      const x = random() * 512;
+      const y = random() * 512;
+      const size = 8 + random() * 25;
+      context.save();
+      context.translate(x, y);
+      context.rotate((random() - 0.5) * 0.42);
+      context.fillStyle = random() > 0.42
+        ? `rgba(160, 112, 190, ${0.12 + random() * 0.24})`
+        : `rgba(94, 133, 198, ${0.1 + random() * 0.2})`;
+      context.fillRect(-size, -size * 0.44, size * 2, size * 0.88);
+      context.restore();
+    }
+    return canvas;
+  }
+
+  function buildShadowCanvas() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 128;
+    const context = canvas.getContext('2d');
+    const gradient = context.createRadialGradient(128, 64, 4, 128, 64, 112);
+    gradient.addColorStop(0, 'rgba(34, 2, 8, .72)');
+    gradient.addColorStop(0.34, 'rgba(48, 5, 18, .46)');
+    gradient.addColorStop(0.72, 'rgba(38, 5, 28, .16)');
+    gradient.addColorStop(1, 'rgba(25, 3, 28, 0)');
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    return canvas;
+  }
+
+  function buildVideoBackdrop(THREE, scene) {
+    const skyGeometry = new THREE.PlaneGeometry(126, 72);
+    const nightTexture = canvasTexture(THREE, buildSkyCanvas('night'));
+    const sunsetTexture = canvasTexture(THREE, buildSkyCanvas('sunset'));
+    const skyMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uNight: { value: 0 },
+        uSunset: { value: 1 },
+        uNightMap: { value: nightTexture },
+        uSunsetMap: { value: sunsetTexture }
+      },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+      fragmentShader: 'uniform float uNight; uniform float uSunset; uniform sampler2D uNightMap; uniform sampler2D uSunsetMap; varying vec2 vUv; void main(){ vec3 color=vec3(0.006,0.006,0.018); color=mix(color,texture2D(uNightMap,vUv).rgb,clamp(uNight,0.0,1.0)); color=mix(color,texture2D(uSunsetMap,vUv).rgb,clamp(uSunset,0.0,1.0)); gl_FragColor=vec4(color,1.0); }',
+      transparent: false,
+      depthTest: false,
+      depthWrite: false,
+      fog: false,
+      toneMapped: false
+    });
+    const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+    sky.position.z = -45;
+    sky.renderOrder = -100;
+    sky.frustumCulled = false;
+    scene.add(sky);
+
+    const groundTexture = canvasTexture(THREE, buildGroundCanvas());
+    const groundGeometry = new THREE.CircleGeometry(27, 64);
+    const groundMaterial = new THREE.MeshBasicMaterial({ map: groundTexture, color: 0xffe6df, transparent: true, opacity: 0.92, depthWrite: true, toneMapped: false });
+    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.set(HEART_OFFSET_X, -9.3, -2.4);
+    scene.add(ground);
+
+    const shadowTexture = canvasTexture(THREE, buildShadowCanvas());
+    const shadowGeometry = new THREE.PlaneGeometry(13.5, 6.6);
+    const shadowMaterial = new THREE.MeshBasicMaterial({ map: shadowTexture, transparent: true, opacity: 0.72, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, toneMapped: false });
+    const shadow = new THREE.Mesh(shadowGeometry, shadowMaterial);
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.set(HEART_OFFSET_X, -9.22, 0.25);
+    shadow.renderOrder = 2;
+    scene.add(shadow);
+
+    return {
+      skyGeometry,
+      sky,
+      skyMaterial,
+      nightTexture,
+      sunsetTexture,
+      groundTexture,
+      groundGeometry,
+      groundMaterial,
+      ground,
+      shadowTexture,
+      shadowGeometry,
+      shadowMaterial,
+      shadow
+    };
   }
 
   function softenBoxNormals(geometry, amount = CUBE_NORMAL_BLEND) {
@@ -441,6 +625,56 @@
     paletteTarget.style.setProperty('--free-cube-color-a', rgbCss(runtime.palette[0], 0.62));
     paletteTarget.style.setProperty('--free-cube-color-b', rgbCss(runtime.palette[1], 0.54));
     paletteTarget.style.setProperty('--free-cube-color-c', rgbCss(runtime.palette[2], 0.48));
+    if (runtime.mode === 'heart') applyHeartColors(runtime);
+  }
+
+  function applyHeartColors(runtime) {
+    if (!runtime || runtime.disposed) return;
+    const THREE = runtime.THREE;
+    const color = new THREE.Color();
+    const depthColors = [
+      [1, 0.17, 0.012],
+      [0.72, 0.042, 0.003],
+      [0.72, 0.042, 0.003],
+      [1, 0.17, 0.012]
+    ];
+    for (let index = 0; index < runtime.count; index += 1) {
+      if (!runtime.heartActive[index]) {
+        color.setRGB(0.05, 0.002, 0.002);
+      } else {
+        const layer = runtime.heartDepthLayers[index];
+        const source = depthColors[layer] || depthColors[3];
+        const accent = (runtime.heartPulseWeights[index] - 0.15) * 0.045;
+        color.setRGB(
+          clamp(source[0] + accent, 0, 1),
+          clamp(source[1] + accent * 0.12, 0, 1),
+          clamp(source[2] + accent * 0.04, 0, 1)
+        );
+      }
+      runtime.mesh.setColorAt(index, color);
+    }
+    if (runtime.mesh.instanceColor) runtime.mesh.instanceColor.needsUpdate = true;
+    runtime.material.emissive.setRGB(0.78, 0.008, 0.001);
+  }
+
+  function syncScenePresentation(runtime) {
+    if (!runtime || runtime.disposed) return;
+    const heart = runtime.mode === 'heart';
+    const sceneHost = runtime.host.closest('.free-cube-scene');
+    if (sceneHost) {
+      sceneHost.classList.toggle('is-heart-mode', heart);
+      sceneHost.classList.toggle('has-soft-background', !heart && runtime.backgroundEnabled);
+    }
+    runtime.backdrop.sky.visible = false;
+    runtime.backdrop.ground.visible = false;
+    runtime.backdrop.shadow.visible = false;
+    runtime.particles.visible = !heart && !runtime.backgroundEnabled;
+    runtime.backgroundMode = heart ? 'none' : runtime.backgroundEnabled ? 'soft-glow' : 'particles';
+    runtime.backgroundTransitioning = false;
+    runtime.sunsetOpacity = 0;
+    runtime.nightOpacity = 0;
+    runtime.backdrop.skyMaterial.uniforms.uSunset.value = 0;
+    runtime.backdrop.skyMaterial.uniforms.uNight.value = 0;
   }
 
   function resize(runtime, pixelRatio) {
@@ -476,14 +710,17 @@
     if (!runtime || runtime.disposed) return false;
     runtime.mode = mode === 'heart' ? 'heart' : 'free';
     runtime.targetModeProgress = runtime.mode === 'heart' ? 1 : 0;
+    if (runtime.mode === 'heart') applyHeartColors(runtime);
+    else applyPalette(runtime, runtime.palette);
+    syncScenePresentation(runtime);
     return true;
   }
 
   function setBackgroundEnabled(runtime, enabled) {
     if (!runtime || runtime.disposed) return false;
     runtime.backgroundEnabled = enabled !== false;
-    runtime.particles.visible = !runtime.backgroundEnabled;
-    runtime.host.closest('.free-cube-scene')?.classList.toggle('has-soft-background', runtime.backgroundEnabled);
+    runtime.backgroundInitialized = true;
+    syncScenePresentation(runtime);
     return true;
   }
 
@@ -550,6 +787,78 @@
     runtime.motionChecksum = checksum;
   }
 
+  function heartSymmetryDiagnostics(runtime, bounds) {
+    let pairedCubeCount = 0;
+    let maxPairPositionError = 0;
+    let maxPairDisplacementError = 0;
+    for (let index = 0; index < runtime.heartActiveCount; index += 1) {
+      const mirrorIndex = runtime.heartMirrorIndices[index];
+      if (mirrorIndex < 0 || runtime.heartActive[mirrorIndex] !== 1) continue;
+      pairedCubeCount += 1;
+      const offset = index * 3;
+      const mirrorOffset = mirrorIndex * 3;
+      maxPairPositionError = Math.max(
+        maxPairPositionError,
+        Math.abs(runtime.heartPositions[offset] - runtime.heartPositions[mirrorOffset]),
+        Math.abs(runtime.heartPositions[offset + 1] - runtime.heartPositions[mirrorOffset + 1]),
+        Math.abs(runtime.heartPositions[offset + 2] + runtime.heartPositions[mirrorOffset + 2])
+      );
+      maxPairDisplacementError = Math.max(
+        maxPairDisplacementError,
+        Math.abs(runtime.heartCurrentDisplacements[index] - runtime.heartCurrentDisplacements[mirrorIndex])
+      );
+    }
+    const frontExtent = Math.max(0, bounds.maxZ);
+    const backExtent = Math.max(0, -bounds.minZ);
+    return {
+      layerCounts: runtime.heartSurfaceCounts.slice(),
+      pairedCubeCount,
+      unpairedCubeCount: runtime.heartActiveCount - pairedCubeCount,
+      maxPairPositionError: Number(maxPairPositionError.toFixed(6)),
+      maxPairDisplacementError: Number(maxPairDisplacementError.toFixed(6)),
+      bounds: {
+        frontExtent: Number(frontExtent.toFixed(4)),
+        backExtent: Number(backExtent.toFixed(4)),
+        centerZ: Number(((bounds.maxZ + bounds.minZ) * 0.5).toFixed(4))
+      }
+    };
+  }
+
+  function inspectHeartSpectrum(bands) {
+    const length = Math.max(0, Number(bands && bands.length) || 0);
+    if (length < HEART_SPECTRUM_BAND_COUNT) return { valid: false, silent: true, length };
+    let minimum = Infinity;
+    let maximum = 0;
+    for (let index = 0; index < length; index += 1) {
+      const value = clamp(Number(bands[index]) || 0, 0, 1.25);
+      minimum = Math.min(minimum, value);
+      maximum = Math.max(maximum, value);
+    }
+    const silent = maximum <= 0.0001;
+    // Some bridge fallbacks duplicate one aggregate bass value into every bin.
+    // Treat that uniform non-zero array as unavailable spectrum so it cannot
+    // make every heart column move at once.
+    return {
+      valid: silent || maximum - minimum >= 0.0005,
+      silent,
+      length
+    };
+  }
+
+  function sampleHeartSpectrum(bands, spectrumInfo, macroBand, sampleSlot) {
+    if (!spectrumInfo.valid || spectrumInfo.silent) return 0;
+    const bandStart = Math.floor(macroBand * spectrumInfo.length / HEART_SPECTRUM_BAND_COUNT);
+    const bandEnd = Math.max(bandStart + 1, Math.floor((macroBand + 1) * spectrumInfo.length / HEART_SPECTRUM_BAND_COUNT));
+    const bandLength = Math.max(1, bandEnd - bandStart);
+    const center = bandStart + Math.min(bandLength - 1, Math.floor(sampleSlot / 127 * (bandLength - 1)));
+    let peak = 0;
+    for (let offset = -2; offset <= 2; offset += 1) {
+      const index = Math.max(bandStart, Math.min(bandEnd - 1, center + offset));
+      peak = Math.max(peak, clamp(Number(bands[index]) || 0, 0, 1.25));
+    }
+    return peak;
+  }
+
   function update(runtime, frame) {
     if (!runtime || runtime.disposed) return false;
     const updateStartedAt = performance.now();
@@ -587,6 +896,11 @@
       runtime.freeDepthLayerBass[layer] = delayedDepthSample(runtime, now, FREE_DEPTH_STAGGER_MS[layer]);
     }
     runtime.smoothedEnergy += (clamp(frame && frame.energy, 0, 1.25) - runtime.smoothedEnergy) * (1 - Math.exp(-dt * 4));
+    const sourceBeat = clamp(frame && frame.beat, 0, 1.25);
+    runtime.heartBeatEnvelope = Math.max(
+      sourceBeat,
+      runtime.heartBeatEnvelope * Math.exp(-dt * 10.8)
+    );
     runtime.modeProgress += (runtime.targetModeProgress - runtime.modeProgress) * (1 - Math.exp(-dt * 4.8));
     if (Math.abs(runtime.targetModeProgress - runtime.modeProgress) < 0.0005) runtime.modeProgress = runtime.targetModeProgress;
 
@@ -596,7 +910,7 @@
     runtime.fastPath = stableFree ? 'free' : stableHeart ? 'heart' : 'transition';
     const time = now / 1000;
     const motion = frame && frame.reducedMotion ? 0.22 : 1;
-    const outward = blend * runtime.smoothedBass * 2.45 * motion;
+    const outward = 0;
     const freeDepthBlend = (1 - blend) * motion;
     const foregroundDepth = runtime.freeDepthLayerBass[0] * FREE_DEPTH_LAYER_DISPLACEMENTS[0] * freeDepthBlend;
     runtime.pulseDisplacement = outward;
@@ -604,6 +918,19 @@
     runtime.freeScalePulse = runtime.freeDepthLayerBass[0] * 0.08 * freeDepthBlend;
     runtime.freeReflectionBoost = runtime.freeDepthLayerBass[0] * 0.12 * freeDepthBlend;
     runtime.freeTiltDegrees = runtime.freeDepthLayerBass[0] * 3 * freeDepthBlend;
+    runtime.heartFrontDisplacement = 0;
+    runtime.heartBackDisplacement = 0;
+    runtime.heartSpectrumDisplacements.fill(0);
+    runtime.heartCurrentDisplacements.fill(0);
+    const heartSpectrumBands = frame && frame.lowFrequencyBands;
+    const heartSpectrumInfo = inspectHeartSpectrum(heartSpectrumBands);
+    runtime.heartSpectrumValid = heartSpectrumInfo.valid;
+    runtime.heartSpectrumSource = runtime.bassPreview !== null
+      ? 'preview'
+      : heartSpectrumInfo.valid
+        ? 'frequency-bins'
+        : 'unavailable';
+    runtime.heartSpectrumPeak = 0;
     const dummy = runtime.dummy;
 
     for (let index = 0; index < runtime.count; index += 1) {
@@ -631,10 +958,36 @@
       let targetY = 0;
       let targetZ = 0;
       if (!stableFree) {
-        const localPulse = outward * (0.86 + runtime.pulseWeights[index] * 0.14);
-        targetX = runtime.heartPositions[offset] + runtime.heartDirections[offset] * localPulse;
-        targetY = runtime.heartPositions[offset + 1] + runtime.heartDirections[offset + 1] * localPulse;
-        targetZ = runtime.heartPositions[offset + 2] + runtime.heartDirections[offset + 2] * localPulse;
+        const activeHeartCube = runtime.heartActive[index] === 1;
+        const macroBand = runtime.heartSpectrumBands[index];
+        const localSource = runtime.bassPreview !== null
+          ? runtime.bassPreview
+          : activeHeartCube
+            ? sampleHeartSpectrum(heartSpectrumBands, heartSpectrumInfo, macroBand, runtime.heartSpectrumSamples[index])
+            : 0;
+        const localTarget = activeHeartCube
+          ? Math.pow(clamp(localSource, 0, 1), 0.76)
+          : 0;
+        const localEnvelope = runtime.heartCubeEnvelopes[index];
+        const localRate = localTarget > localEnvelope ? HEART_ATTACK_RATE : HEART_RELEASE_RATE;
+        const nextEnvelope = localEnvelope + (localTarget - localEnvelope) * (1 - Math.exp(-dt * localRate));
+        runtime.heartCubeEnvelopes[index] = nextEnvelope;
+        const localPulse = activeHeartCube
+          ? nextEnvelope * runtime.heartPulseWeights[index] * HEART_CUBE_SIZE * HEART_PUSH_CUBES * motion
+          : 0;
+        targetX = runtime.heartPositions[offset];
+        targetY = runtime.heartPositions[offset + 1];
+        targetZ = runtime.heartPositions[offset + 2] + runtime.heartDepthSigns[index] * localPulse;
+        runtime.heartCurrentDisplacements[index] = localPulse;
+        if (activeHeartCube && macroBand < HEART_SPECTRUM_BAND_COUNT) {
+          runtime.heartSpectrumDisplacements[macroBand] = Math.max(runtime.heartSpectrumDisplacements[macroBand], localPulse);
+          runtime.heartSpectrumPeak = Math.max(runtime.heartSpectrumPeak, localSource);
+        }
+        if (activeHeartCube && runtime.heartDepthSigns[index] > 0) {
+          runtime.heartFrontDisplacement = Math.max(runtime.heartFrontDisplacement, localPulse);
+        } else if (activeHeartCube) {
+          runtime.heartBackDisplacement = Math.max(runtime.heartBackDisplacement, localPulse);
+        }
       }
 
       const x = stableFree ? freeX : stableHeart ? targetX : freeX + (targetX - freeX) * blend;
@@ -643,18 +996,17 @@
 
       dummy.position.set(x, y, z);
       const freeTilt = (1 - blend) * motion;
-      const heartTilt = blend;
       const freeBass = runtime.freeDepthLayerBass[runtime.freeDepthLayers[index]] * freeDepthBlend;
       const freeBassTilt = freeBass * (0.035 + runtime.pulseWeights[index] * 0.017);
       dummy.rotation.set(
-        runtime.tiltWaveX[index] * (0.16 * freeTilt + 0.06 * heartTilt + freeBassTilt),
-        runtime.tiltWaveY[index] * (0.2 * freeTilt + 0.07 * heartTilt + freeBassTilt),
-        runtime.tiltWaveZ[index] * (0.12 * freeTilt + 0.05 * heartTilt + freeBassTilt)
+        runtime.tiltWaveX[index] * (0.16 * freeTilt + freeBassTilt),
+        runtime.tiltWaveY[index] * (0.2 * freeTilt + freeBassTilt),
+        runtime.tiltWaveZ[index] * (0.12 * freeTilt + freeBassTilt)
       );
-      const baseScale = 0.68 + blend * 0.28;
+      const heartScale = runtime.heartActive[index] ? HEART_CUBE_SCALE : 0;
+      const baseScale = 0.68 + (heartScale - 0.68) * blend;
       const freeBassScale = freeBass * (0.04 + runtime.pulseWeights[index] * 0.04);
-      const scale = baseScale * (1 + freeBassScale)
-        + runtime.smoothedBass * blend * (0.05 + runtime.pulseWeights[index] * 0.04);
+      const scale = baseScale * (1 + freeBassScale * (1 - blend));
       dummy.scale.setScalar(scale);
       dummy.updateMatrix();
       runtime.mesh.setMatrixAt(index, dummy.matrix);
@@ -663,7 +1015,15 @@
 
     const yaw = Number(frame && frame.yaw) || 0;
     const pitch = Number(frame && frame.pitch) || 0;
-    runtime.group.rotation.set(pitch, yaw, 0);
+    const heartYaw = HEART_REST_YAW + (yaw - PLAYBACK_REST_YAW) * 0.72;
+    const heartPitch = HEART_REST_PITCH + (pitch - PLAYBACK_REST_PITCH) * 0.72;
+    runtime.group.rotation.set(
+      pitch + (heartPitch - pitch) * blend,
+      yaw + (heartYaw - yaw) * blend,
+      0
+    );
+    runtime.group.position.set(HEART_OFFSET_X * blend, HEART_OFFSET_Y * blend, 0);
+    syncScenePresentation(runtime);
     if (runtime.particles.visible) {
       runtime.particleGroup.rotation.set(
         -0.16 + Math.sin(time * 0.09) * 0.08,
@@ -676,10 +1036,44 @@
     }
 
     const zoom = clamp(frame && frame.zoom, 0.58, 2.35);
-    runtime.camera.position.z = 64 / zoom;
+    const targetFov = 43 + (HEART_CAMERA_FOV - 43) * blend;
+    if (Math.abs(runtime.camera.fov - targetFov) > 0.001) {
+      runtime.camera.fov = targetFov;
+      runtime.camera.updateProjectionMatrix();
+    }
+    runtime.camera.position.z = (64 + (HEART_CAMERA_Z - 64) * blend) / zoom;
     runtime.camera.lookAt(0, 0, 0);
-    runtime.material.envMapIntensity = 0.78 * (1 + runtime.freeReflectionBoost);
-    runtime.material.emissiveIntensity = 0.045 + runtime.smoothedEnergy * 0.08 + runtime.smoothedBass * 0.06;
+    const lighting = runtime.lighting;
+    lighting.hemisphere.color.copy(lighting.freeHemisphereSky).lerp(lighting.heartHemisphereSky, blend);
+    lighting.hemisphere.groundColor.copy(lighting.freeHemisphereGround).lerp(lighting.heartHemisphereGround, blend);
+    lighting.hemisphere.intensity = 1.42 + (1.05 - 1.42) * blend;
+    lighting.key.color.copy(lighting.freeKey).lerp(lighting.heartKey, blend);
+    lighting.key.intensity = 1.82 + (1.45 - 1.82) * blend;
+    lighting.key.position.set(
+      -16 + 16 * blend,
+      22 - 4 * blend,
+      38 + 4 * blend
+    );
+    lighting.rim.color.copy(lighting.freeRim).lerp(lighting.heartRim, blend);
+    lighting.rim.intensity = 1.54 + (1.1 - 1.54) * blend;
+    lighting.rim.position.set(
+      28 - 4 * blend,
+      -10 + 14 * blend,
+      18 + 10 * blend
+    );
+    lighting.glow.color.copy(lighting.freeGlow).lerp(lighting.heartGlow, blend);
+    lighting.glow.intensity = 1.72 + (1.55 - 1.72) * blend;
+    runtime.material.roughness = 0.2 + blend * 0.16;
+    runtime.material.transmission = 0.42 * (1 - blend);
+    runtime.material.thickness = 0.72 + (0.08 - 0.72) * blend;
+    runtime.material.clearcoat = 0.72 + (0.18 - 0.72) * blend;
+    runtime.material.clearcoatRoughness = 0.14 + blend * 0.16;
+    runtime.material.envMapIntensity = (0.78 + (0.08 - 0.78) * blend) * (1 + runtime.freeReflectionBoost);
+    const freeEmissiveIntensity = 0.045 + runtime.smoothedEnergy * 0.08 + runtime.smoothedBass * 0.06;
+    const heartEmissiveIntensity = 0.22 + runtime.smoothedEnergy * 0.03 + runtime.heartSpectrumPeak * 0.19;
+    runtime.material.emissiveIntensity = freeEmissiveIntensity
+      + (heartEmissiveIntensity - freeEmissiveIntensity) * blend;
+    runtime.pulseDisplacement = runtime.heartFrontDisplacement;
     let renderedByRenderQuality = false;
     if (runtime.renderQuality) {
       try {
@@ -724,13 +1118,15 @@
     scene.fog = new THREE.FogExp2(0x050810, 0.0045);
     const environment = buildEnvironmentTexture(THREE);
     scene.environment = environment;
+    const backdrop = buildVideoBackdrop(THREE, scene);
     const camera = new THREE.PerspectiveCamera(43, 1, 0.1, 240);
     camera.position.set(0, 0, 64);
     camera.lookAt(0, 0, 0);
     const group = new THREE.Group();
     scene.add(group);
 
-    scene.add(new THREE.HemisphereLight(0xe7f7ff, 0x080912, 1.42));
+    const hemisphere = new THREE.HemisphereLight(0xe7f7ff, 0x080912, 1.42);
+    scene.add(hemisphere);
     const key = new THREE.DirectionalLight(0xffffff, 1.82);
     key.position.set(-16, 22, 38);
     scene.add(key);
@@ -801,6 +1197,23 @@
       particleGeometry: particleData.geometry,
       particleMaterial,
       environment,
+      backdrop,
+      lighting: {
+        hemisphere,
+        key,
+        rim,
+        glow,
+        freeHemisphereSky: new THREE.Color(0xe7f7ff),
+        heartHemisphereSky: new THREE.Color(0xff1802),
+        freeHemisphereGround: new THREE.Color(0x080912),
+        heartHemisphereGround: new THREE.Color(0x160303),
+        freeKey: new THREE.Color(0xffffff),
+        heartKey: new THREE.Color(0xff2604),
+        freeRim: new THREE.Color(0xb38cff),
+        heartRim: new THREE.Color(0xff3d18),
+        freeGlow: new THREE.Color(0x7ce7ff),
+        heartGlow: new THREE.Color(0xff2a08)
+      },
       environmentFaceSize: ENVIRONMENT_FACE_SIZE,
       normalBlend,
       particlePhases: particleData.phases,
@@ -818,7 +1231,27 @@
       freeDepthHistoryCount: 0,
       heartPositions: heartLayout.positions,
       heartDirections: new Float32Array(count * 3),
+      heartActive: heartLayout.active,
+      heartDepthLayers: heartLayout.layers,
+      heartColumns: heartLayout.columns,
+      heartRows: heartLayout.rows,
+      heartPulseWeights: heartLayout.pulseWeights,
+      heartDepthSigns: heartLayout.depthSigns,
+      heartMirrorIndices: heartLayout.mirrorIndices,
+      heartSpectrumBands: heartLayout.spectrumBands,
+      heartSpectrumSamples: heartLayout.spectrumSamples,
+      heartSpectrumCubeCounts: heartLayout.spectrumCubeCounts,
+      heartSpectrumDisplacements: new Float32Array(HEART_SPECTRUM_BAND_COUNT),
+      heartCurrentDisplacements: new Float32Array(count),
+      heartCubeEnvelopes: new Float32Array(count),
+      heartActiveCount: heartLayout.activeCount,
+      heartSurfaceCellCount: heartLayout.surfaceCellCount,
+      heartFrontLayerCount: heartLayout.frontLayerCount,
+      heartGridColumns: heartLayout.gridColumns,
+      heartGridRows: heartLayout.gridRows,
       heartGridSpacing: heartLayout.gridSpacing,
+      heartCubeScale: heartLayout.cubeScale,
+      heartCubeSize: heartLayout.cubeSize,
       heartDepthLayerCount: heartLayout.depthLayerCount,
       heartMiddleLayerCount: heartLayout.middleLayerCount,
       heartSurfaceCounts: heartLayout.surfaceCounts,
@@ -843,6 +1276,9 @@
       bassPreview: null,
       smoothedBass: 0,
       smoothedEnergy: 0,
+      heartBeatEnvelope: 0,
+      heartFrontDisplacement: 0,
+      heartBackDisplacement: 0,
       pulseDisplacement: 0,
       freeDepthDisplacement: 0,
       freeScalePulse: 0,
@@ -850,6 +1286,13 @@
       freeTiltDegrees: 0,
       motionChecksum: 0,
       particleChecksum: 0,
+      sunsetOpacity: config.backgroundEnabled === false ? 0 : 1,
+      nightOpacity: config.backgroundEnabled === false ? 1 : 0,
+      backgroundMode: config.mode === 'heart' ? 'none' : config.backgroundEnabled === false ? 'particles' : 'soft-glow',
+      backgroundTransitioning: false,
+      backgroundInitialized: false,
+      backgroundTransitionStartedAt: performance.now(),
+      backgroundTransitionFrom: '',
       bounds: { minX: 0, maxX: 0, minY: 0, maxY: 0, minZ: 0, maxZ: 0 },
       width: 0,
       height: 0,
@@ -882,13 +1325,9 @@
       const depthLayer = freeZ >= FREE_DEPTH_LAYER_LIMIT ? 0 : freeZ <= -FREE_DEPTH_LAYER_LIMIT ? 2 : 1;
       runtime.freeDepthLayers[index] = depthLayer;
       runtime.freeDepthLayerCounts[depthLayer] += 1;
-      const heartX = runtime.heartPositions[offset];
-      const heartY = runtime.heartPositions[offset + 1];
-      const heartZ = runtime.heartPositions[offset + 2];
-      const heartLength = Math.max(0.001, Math.hypot(heartX, heartY, heartZ));
-      runtime.heartDirections[offset] = heartX / heartLength;
-      runtime.heartDirections[offset + 1] = heartY / heartLength;
-      runtime.heartDirections[offset + 2] = heartZ / heartLength;
+      runtime.heartDirections[offset] = 0;
+      runtime.heartDirections[offset + 1] = 0;
+      runtime.heartDirections[offset + 2] = runtime.heartDepthSigns[index];
     }
     applyPalette(runtime, config.palette);
     setBackgroundEnabled(runtime, runtime.backgroundEnabled);
@@ -921,7 +1360,19 @@
       pixelRatio: Number(runtime.pixelRatio.toFixed(3)),
       toneMappingExposure: Number(runtime.renderer.toneMappingExposure.toFixed(3)),
       particleVisible: runtime.particles.visible,
-      backgroundEnabled: runtime.backgroundEnabled,
+      backgroundEnabled: runtime.mode === 'heart' ? false : runtime.backgroundEnabled,
+      backgroundProfile: runtime.mode === 'heart' ? 'none' : runtime.backgroundEnabled ? 'soft-glow' : 'particles',
+      backgroundMode: runtime.backgroundMode,
+      backgroundTransitioning: runtime.backgroundTransitioning,
+      backgroundTransitionMs: SKY_TRANSITION_MS,
+      sunsetFadeMs: SUNSET_FADE_MS,
+      blackGapMs: SKY_BLACK_GAP_MS,
+      nightFadeMs: NIGHT_FADE_MS,
+      sunsetOpacity: Number(runtime.sunsetOpacity.toFixed(4)),
+      nightOpacity: Number(runtime.nightOpacity.toFixed(4)),
+      skyVisible: runtime.backdrop.sky.visible,
+      groundVisible: runtime.backdrop.ground.visible,
+      shadowVisible: runtime.backdrop.shadow.visible,
       palette: runtime.paletteHex.slice(),
       environment: {
         faceSize: runtime.environmentFaceSize,
@@ -955,13 +1406,33 @@
       },
       autoRotation: false,
       cubeSpin: false,
-      heartLayout: 'rounded-double-surface',
+      heartLayout: 'symmetric-frequency-volume',
+      heartAxisAligned: false,
+      heartGridColumns: runtime.heartGridColumns,
+      heartGridRows: runtime.heartGridRows,
+      heartActiveCubeCount: runtime.heartActiveCount,
+      heartSurfaceCellCount: runtime.heartSurfaceCellCount,
+      heartFrontLayerCount: runtime.heartFrontLayerCount,
       heartGridSpacing: Number(runtime.heartGridSpacing.toFixed(3)),
+      heartCubeScale: Number(runtime.heartCubeScale.toFixed(4)),
+      heartCubeSize: Number(runtime.heartCubeSize.toFixed(4)),
       heartDepthLayerCount: runtime.heartDepthLayerCount,
       heartMiddleLayerCount: runtime.heartMiddleLayerCount,
       heartSurfaceCounts: runtime.heartSurfaceCounts.slice(),
       heartProfile: runtime.heartProfile,
       heartJitter: runtime.heartJitter,
+      heartSymmetry: heartSymmetryDiagnostics(runtime, bounds),
+      heartSpectrum: {
+        bandCount: HEART_SPECTRUM_BAND_COUNT,
+        exclusive: true,
+        rangesHz: HEART_SPECTRUM_RANGES_HZ.map((range) => range.slice()),
+        cubeCounts: runtime.heartSpectrumCubeCounts.slice(),
+        displacements: Array.from(runtime.heartSpectrumDisplacements, (value) => Number(value.toFixed(4)))
+      },
+      heartFrontDisplacement: Number(runtime.heartFrontDisplacement.toFixed(4)),
+      heartBackDisplacement: Number(runtime.heartBackDisplacement.toFixed(4)),
+      heartAudioAxis: 'camera-z',
+      heartAudioScaleInvariant: true,
       bass: Number(runtime.smoothedBass.toFixed(4)),
       freeBassAxis: 'depth-z',
       freeDepthProfile: 'three-layer-staggered-impact',
@@ -1016,6 +1487,16 @@
     runtime.particleGeometry.dispose();
     runtime.particleMaterial.dispose();
     runtime.environment.dispose();
+    runtime.backdrop.skyGeometry.dispose();
+    runtime.backdrop.skyMaterial.dispose();
+    runtime.backdrop.nightTexture.dispose();
+    runtime.backdrop.sunsetTexture.dispose();
+    runtime.backdrop.groundTexture.dispose();
+    runtime.backdrop.groundGeometry.dispose();
+    runtime.backdrop.groundMaterial.dispose();
+    runtime.backdrop.shadowTexture.dispose();
+    runtime.backdrop.shadowGeometry.dispose();
+    runtime.backdrop.shadowMaterial.dispose();
     if (runtime.renderer.renderLists && typeof runtime.renderer.renderLists.dispose === 'function') {
       runtime.renderer.renderLists.dispose();
     }

@@ -1,5 +1,5 @@
 param(
-  [string]$SetupExe = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..')).Path 'dist\FE-Monster-Setup-2.0.1-Offline.exe'),
+  [string]$SetupExe = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..')).Path 'dist\FE-Monster-Setup-2.1.1.exe'),
   [string]$InstallDir = (Join-Path $Env:LOCALAPPDATA 'FE Monster'),
   [string]$PayloadRoot = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..')).Path 'out\installer\work\payload\FE Monster')
 )

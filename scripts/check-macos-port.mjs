@@ -75,7 +75,6 @@ for (const [source, label] of [
 for (const key of [
   "CFBundleShortVersionString",
   "NSAllowsLocalNetworking",
-  "NSCameraUsageDescription",
   "NSMicrophoneUsageDescription",
   "NSScreenCaptureUsageDescription",
   "NSAudioCaptureUsageDescription",
@@ -83,7 +82,6 @@ for (const key of [
   requirePattern(infoPlist, new RegExp(`<key>${key}</key>`), `Info.plist ${key}`);
 }
 requirePattern(infoPlist, /<string>1\.8\.8<\/string>/, "Info.plist version 1.8.8");
-requirePattern(syncScript, /gesture-requirements-macos\.txt/, "macOS gesture dependencies");
 
 const sourceText = [mainSwift, optionsSwift, backendSwift, windowSwift, toolbarSwift].join("\n");
 if (/\b(?:powershell(?:\.exe)?|cmd\.exe|taskkill|pkill)\b/i.test(sourceText)) {

@@ -50,7 +50,14 @@ function run(command, args) {
     encoding: 'utf8',
     timeout: 30_000,
     windowsHide: true,
-    env: { ...process.env, TEMP: path.join(root, 'tmp'), TMP: path.join(root, 'tmp') },
+    env: {
+      ...process.env,
+      TEMP: path.join(root, 'tmp'),
+      TMP: path.join(root, 'tmp'),
+      FE_MONSTER_ROOT: root,
+      FE_MONSTER_WEB_ROOT: path.join(root, 'web'),
+      FE_MONSTER_DATA_DIR: path.join(scratch, 'data'),
+    },
   });
   if (result.status !== 0) {
     throw new Error([result.stdout, result.stderr].filter(Boolean).join('\n'));

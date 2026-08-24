@@ -1,6 +1,8 @@
 package com.femonster.api;
 
 import com.femonster.core.AppContext;
+import com.femonster.core.AudioMixerService;
+import com.femonster.core.ClientAiException;
 import com.femonster.core.WallpaperService;
 import com.femonster.desktop.LocalClientLauncher;
 import com.femonster.http.HttpUtil;
@@ -34,6 +36,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class ApiRoutes {
@@ -44,8 +47,15 @@ public final class ApiRoutes {
     private static final String CREATIVE_MARKET_ASSET_PREFIX = "/api/creative-market/assets/";
     private static final String COMMUNITY_PET_AUDIO_PREFIX = "/api/community/pet/audio/";
     private static final long MAX_CREATIVE_MARKET_UPLOAD_BYTES = 512L * 1024 * 1024;
+    private static final Duration COMMUNITY_SSE_IDLE_TIMEOUT = Duration.ofSeconds(75);
     private static final String COVER_CACHE_CONTROL = "private, max-age=86400, stale-while-revalidate=604800";
     private static final int MAX_QISHUI_LIBRARY_METADATA_BYTES = 2 * 1024 * 1024;
+    private static final int MAX_AUDIO_MIXER_JSON_BYTES = 64 * 1024;
+    private static final int NATIVE_SPATIAL_TRANSPORT_FRAMES = 4096;
+    private static final ThreadLocal<ByteBuffer> NATIVE_SPATIAL_BLOCK_BUFFER =
+        ThreadLocal.withInitial(() -> ByteBuffer.allocateDirect(
+            NATIVE_SPATIAL_TRANSPORT_FRAMES * 2 * Float.BYTES
+        ).order(ByteOrder.LITTLE_ENDIAN));
     private static final String WALLPAPER_WEB_CSP = String.join(" ",
         "sandbox allow-scripts allow-same-origin allow-forms allow-pointer-lock;",
         "default-src 'self' data: blob: https:;",
@@ -62,6 +72,7 @@ public final class ApiRoutes {
         "frame-ancestors http://127.0.0.1:* http://localhost:* http://[::1]:*;"
     );
     private final AppContext context;
+    private final ClientAiHttpModule clientAiHttpModule;
     private final AudioStreamProxy audioStreamProxy = new AudioStreamProxy();
     private final AtomicBoolean quitRequested = new AtomicBoolean(false);
 
@@ -71,8 +82,12 @@ public final class ApiRoutes {
             .build();
     }
 
+    private static final class AudioMixerPersistenceException extends RuntimeException {
+    }
+
     private ApiRoutes(AppContext context) {
         this.context = context;
+        this.clientAiHttpModule = new ClientAiHttpModule(context.clientAi, context.clientTtsSessions);
     }
 
     public static void register(HttpServer server, AppContext context) {
@@ -90,10 +105,14 @@ public final class ApiRoutes {
                 return;
             }
             if (path.startsWith("/api/community/pet/") || "/api/community/events".equals(path)) {
-                requireLocalPetAssistant(exchange);
+                LocalPetAssistantGuard.require(exchange);
+            }
+            if (path.startsWith("/api/audio/mixer")) {
+                LocalPetAssistantGuard.require(exchange);
             }
             if (HttpUtil.handleOptions(exchange)) return;
             Map<String, String> query = HttpUtil.query(exchange);
+            if (clientAiHttpModule.tryHandle(exchange)) return;
 
             if ("/api/audio/stream".equals(path)) {
                 audioStreamProxy.handle(exchange, query);
@@ -110,7 +129,27 @@ public final class ApiRoutes {
                 return;
             }
 
+            if ("PATCH".equals(method)) {
+                handlePatch(exchange, path);
+                return;
+            }
+
             HttpUtil.sendJson(exchange, 405, HttpUtil.error("method not allowed"));
+        } catch (AudioMixerService.RevisionConflictException e) {
+            Map<String, Object> body = HttpUtil.error("audio mixer revision conflict");
+            body.put("ok", false);
+            body.put("errorCode", "audio_mixer_revision_conflict");
+            body.put("currentRevision", e.currentRevision());
+            HttpUtil.sendJson(exchange, 409, body);
+        } catch (AudioMixerPersistenceException e) {
+            Map<String, Object> body = HttpUtil.error("audio mixer state is unavailable");
+            body.put("ok", false);
+            body.put("errorCode", "audio_mixer_persistence_failed");
+            HttpUtil.sendJson(exchange, 500, body);
+        } catch (ClientAiException e) {
+            Map<String, Object> body = HttpUtil.error(e.getMessage());
+            body.put("errorCode", e.errorCode());
+            HttpUtil.sendJson(exchange, e.status(), body);
         } catch (SecurityException e) {
             HttpUtil.sendJson(exchange, 403, HttpUtil.error(e.getMessage() == null ? "forbidden" : e.getMessage()));
         } catch (IllegalArgumentException e) {
@@ -190,6 +229,12 @@ public final class ApiRoutes {
             );
             case "/api/audio/runtime" -> HttpUtil.sendJson(exchange, context.audioEngine.runtimePayload());
             case "/api/audio/sample" -> HttpUtil.sendJson(exchange, context.audioEngine.samplePayload());
+            case "/api/audio/mixer" -> HttpUtil.sendJson(exchange, context.audioMixer.snapshot());
+            case "/api/audio/mixer/presets" -> HttpUtil.sendJson(exchange, context.audioMixer.presets());
+            case "/api/audio/mixer/channels" -> HttpUtil.sendJson(
+                exchange,
+                context.audioMixer.channelSnapshot()
+            );
             case "/api/audio/stream/status" -> HttpUtil.sendJson(exchange, audioStreamProxy.status());
             case "/api/audio/spatial/status" -> HttpUtil.sendJson(exchange, context.audioEngine.spatialPayload());
             case "/api/app/window/fullscreen" -> HttpUtil.sendJson(exchange, LocalClientLauncher.controlPayload("fullscreen"));
@@ -244,6 +289,8 @@ public final class ApiRoutes {
             case "/api/community/friends/identity-card" -> handleCommunityFriendIdentityCard(exchange, query);
             case "/api/community/pet/status" -> handleCommunityPetStatus(exchange, query);
             case "/api/community/pet/history" -> handleCommunityPetHistory(exchange, query);
+            case "/api/community/pet/memories" -> handleCommunityPetMemories(exchange, query);
+            case "/api/community/pet/personalization" -> handleCommunityPetPersonalization(exchange, query);
             case "/api/community/call/signals" -> handleCommunityCallSignals(exchange, query);
             case "/api/community/events" -> handleCommunityEvents(exchange, query);
             case "/api/search", "/api/netease/search", "/api/qq/search", "/api/kugou/search", "/api/qishui/search" -> HttpUtil.sendJson(exchange, context.music.search(
@@ -353,7 +400,97 @@ public final class ApiRoutes {
         }
     }
 
+    private void handlePatch(HttpExchange exchange, String path) throws IOException {
+        if ("/api/audio/mixer/channels".equals(path)) {
+            Map<String, Object> root = readStrictAudioMixerBody(exchange);
+            validateAudioMixerMutationRoot(root, Set.of("expectedRevision", "parameters"));
+            Object parameters = root.get("parameters");
+            if (!(parameters instanceof Map<?, ?>)) {
+                throw new IllegalArgumentException("channel router parameters must be an object");
+            }
+            Map<String, Object> payload;
+            try {
+                payload = context.audioMixer.patchChannels(
+                    root.get("expectedRevision"),
+                    SimpleJson.asMap(parameters)
+                );
+            } catch (IOException persistenceFailure) {
+                throw new AudioMixerPersistenceException();
+            }
+            HttpUtil.sendJson(exchange, payload);
+            return;
+        }
+        if (!"/api/audio/mixer".equals(path)) {
+            HttpUtil.notFound(exchange);
+            return;
+        }
+        Map<String, Object> root = readStrictAudioMixerBody(exchange);
+        validateAudioMixerMutationRoot(root, Set.of("expectedRevision", "parameters"));
+        Object parameters = root.get("parameters");
+        if (!(parameters instanceof Map<?, ?>)) {
+            throw new IllegalArgumentException("audio mixer parameters must be an object");
+        }
+        Map<String, Object> payload;
+        try {
+            payload = context.audioMixer.patch(
+                root.get("expectedRevision"),
+                SimpleJson.asMap(parameters)
+            );
+        } catch (IOException persistenceFailure) {
+            throw new AudioMixerPersistenceException();
+        }
+        HttpUtil.sendJson(exchange, payload);
+    }
+
+    private static Map<String, Object> readStrictAudioMixerBody(HttpExchange exchange)
+        throws IOException {
+        String contentType = exchange.getRequestHeaders().getFirst("Content-Type");
+        if (contentType == null
+            || !contentType.toLowerCase().startsWith("application/json")) {
+            throw new IllegalArgumentException("audio mixer mutation requires application/json");
+        }
+        byte[] bytes = exchange.getRequestBody().readNBytes(MAX_AUDIO_MIXER_JSON_BYTES + 1);
+        if (bytes.length > MAX_AUDIO_MIXER_JSON_BYTES) {
+            throw new IllegalArgumentException("audio mixer request is too large");
+        }
+        return SimpleJson.parseObjectStrict(new String(bytes, StandardCharsets.UTF_8));
+    }
+
+    private static void validateAudioMixerMutationRoot(
+        Map<String, Object> root,
+        Set<String> expectedKeys
+    ) {
+        if (!root.keySet().equals(expectedKeys)) {
+            throw new IllegalArgumentException("audio mixer request contains unknown or missing fields");
+        }
+    }
+
     private void handlePost(HttpExchange exchange, String path, Map<String, String> query) throws IOException {
+        if ("/api/audio/mixer/channels/test".equals(path)) {
+            Map<String, Object> root = readStrictAudioMixerBody(exchange);
+            HttpUtil.sendJson(exchange, context.audioMixer.playChannelTestSignal(root));
+            return;
+        }
+        if (path.startsWith("/api/audio/mixer/presets/") && path.endsWith("/apply")) {
+            String prefix = "/api/audio/mixer/presets/";
+            String id = path.substring(prefix.length(), path.length() - "/apply".length());
+            if (id.isBlank() || id.indexOf('/') >= 0) {
+                throw new IllegalArgumentException("invalid audio mixer preset id");
+            }
+            Map<String, Object> root = readStrictAudioMixerBody(exchange);
+            validateAudioMixerMutationRoot(root, Set.of("expectedRevision"));
+            Map<String, Object> payload;
+            try {
+                payload = context.audioMixer.applyPreset(
+                    id,
+                    root.get("expectedRevision")
+                );
+            } catch (IOException persistenceFailure) {
+                throw new AudioMixerPersistenceException();
+            }
+            HttpUtil.sendJson(exchange, payload);
+            return;
+        }
         if ("/api/creative-market/uploads/content".equals(path)) {
             requireLocalCreativeMarketUpload(exchange);
             handleCreativeMarketUpload(exchange, query);
@@ -378,6 +515,14 @@ public final class ApiRoutes {
             ));
             return;
         }
+        if ("/api/audio/spatial/timeline".equals(path)) {
+            requireLocalNativeAudio(exchange);
+            HttpUtil.sendJson(exchange, context.audioEngine.resetSpatialTimeline(
+                longParam(query, "session", 0),
+                longParam(query, "generation", 0)
+            ));
+            return;
+        }
         if ("/api/audio/spatial/pause".equals(path)) {
             requireLocalNativeAudio(exchange);
             HttpUtil.sendJson(exchange, context.audioEngine.pauseSpatialStream(
@@ -397,6 +542,11 @@ public final class ApiRoutes {
         if ("/api/audio/spatial/stream".equals(path)) {
             requireLocalNativeAudio(exchange);
             handleNativeSpatialStream(exchange, query);
+            return;
+        }
+        if ("/api/audio/spatial/block".equals(path)) {
+            requireLocalNativeAudio(exchange);
+            handleNativeSpatialBlock(exchange, query);
             return;
         }
         if (path.equals("/api/netease/login/browser/start") || path.equals("/api/qq/login/browser/start")
@@ -484,6 +634,15 @@ public final class ApiRoutes {
                 requireSameOriginClientPreferences(exchange);
                 HttpUtil.sendJson(exchange, context.clientPreferences.update(root));
             }
+            case "/api/app/preferences/cloud-sync" -> {
+                requireSameOriginClientPreferences(exchange);
+                String provider = MusicProviderRegistry.normalize(SimpleJson.asString(root.get("provider"), "netease"));
+                HttpUtil.sendJson(exchange, context.clientPreferenceSync.sync(
+                    provider,
+                    providerLabel(provider),
+                    context.music.accountPayload(provider)
+                ));
+            }
             case "/api/app/runtime/settings" -> HttpUtil.sendJson(exchange, context.runtimeSettings.update(root));
             case "/api/app/interactive/activate" -> {
                 String provider = SimpleJson.asString(root.get("provider"), "netease");
@@ -529,6 +688,7 @@ public final class ApiRoutes {
             case "/api/community/listen/leave" -> handleCommunityListenLeave(exchange, query, root);
             case "/api/community/call/signal" -> handleCommunityCallSignal(exchange, query, root);
             case "/api/community/relay" -> handleCommunityRelay(exchange, query, root);
+            case "/api/community/pet/memory/forget" -> handleCommunityPetMemoryForget(exchange, query, root);
             case "/api/community/pet/sessions",
                 "/api/community/pet/voice",
                 "/api/community/pet/habits",
@@ -642,68 +802,6 @@ public final class ApiRoutes {
             }
         } catch (IllegalArgumentException error) {
             throw new IllegalArgumentException("client preferences require the application origin");
-        }
-    }
-
-    private static void requireLocalPetAssistant(HttpExchange exchange) {
-        exchange.setAttribute("fe.cors.same-origin", Boolean.TRUE);
-        var remote = exchange.getRemoteAddress();
-        if (remote == null || remote.getAddress() == null || !remote.getAddress().isLoopbackAddress()) {
-            throw new SecurityException("pet assistant is only available from this device");
-        }
-
-        int servicePort = exchange.getLocalAddress().getPort();
-        URI requestUri;
-        try {
-            String requestHost = exchange.getRequestHeaders().getFirst("Host");
-            if (requestHost == null || requestHost.isBlank()) throw new IllegalArgumentException();
-            requestUri = URI.create("http://" + requestHost);
-            int requestPort = requestUri.getPort() >= 0 ? requestUri.getPort() : servicePort;
-            if (!isApplicationLoopbackHost(requestUri.getHost()) || requestPort != servicePort) {
-                throw new IllegalArgumentException();
-            }
-        } catch (IllegalArgumentException error) {
-            throw new SecurityException("pet assistant requires the local application host");
-        }
-
-        String fetchSite = exchange.getRequestHeaders().getFirst("Sec-Fetch-Site");
-        if (
-            fetchSite != null
-                && !fetchSite.isBlank()
-                && !"same-origin".equalsIgnoreCase(fetchSite)
-                && !"none".equalsIgnoreCase(fetchSite)
-        ) {
-            throw new SecurityException("pet assistant requires the application origin");
-        }
-
-        String source = exchange.getRequestHeaders().getFirst("Origin");
-        if (source == null || source.isBlank()) source = exchange.getRequestHeaders().getFirst("Referer");
-        if (source == null || source.isBlank()) {
-            if (
-                !"same-origin".equalsIgnoreCase(fetchSite)
-                    && !"none".equalsIgnoreCase(fetchSite)
-            ) {
-                throw new SecurityException("pet assistant requires an application origin header");
-            }
-            return;
-        }
-        if ("null".equalsIgnoreCase(source.trim())) {
-            throw new SecurityException("pet assistant rejects opaque origins");
-        }
-        try {
-            URI sourceUri = URI.create(source);
-            int sourcePort = sourceUri.getPort() >= 0 ? sourceUri.getPort() : defaultPort(sourceUri.getScheme());
-            if (
-                !"http".equalsIgnoreCase(sourceUri.getScheme())
-                    || !isApplicationLoopbackHost(sourceUri.getHost())
-                    || requestUri.getHost() == null
-                    || !sourceUri.getHost().equalsIgnoreCase(requestUri.getHost())
-                    || sourcePort != servicePort
-            ) {
-                throw new IllegalArgumentException();
-            }
-        } catch (IllegalArgumentException error) {
-            throw new SecurityException("pet assistant requires the application origin");
         }
     }
 
@@ -925,6 +1023,59 @@ public final class ApiRoutes {
         HttpUtil.sendJson(exchange, body);
     }
 
+    private void handleNativeSpatialBlock(
+        HttpExchange exchange,
+        Map<String, String> query
+    ) throws IOException {
+        long session = longParam(query, "session", 0);
+        long generation = longParam(query, "generation", 0);
+        long sequence = longParam(query, "sequence", -1);
+        int inputChannels = HttpUtil.intParam(query, "inputChannels", 2, 1, 2);
+        if (session <= 0) throw new IllegalArgumentException("native spatial session is required");
+        if (generation <= 0) throw new IllegalArgumentException("native spatial generation is required");
+        if (sequence < 0) throw new IllegalArgumentException("native spatial block sequence is required");
+
+        int expectedBytes = Math.multiplyExact(
+            Math.multiplyExact(NATIVE_SPATIAL_TRANSPORT_FRAMES, inputChannels),
+            Float.BYTES
+        );
+        long contentLength = parseContentLength(exchange);
+        if (contentLength != expectedBytes) {
+            throw new IllegalArgumentException("native spatial PCM block has an invalid byte length");
+        }
+
+        ByteBuffer encodedBlock = NATIVE_SPATIAL_BLOCK_BUFFER.get();
+        encodedBlock.clear();
+        encodedBlock.limit(expectedBytes);
+        try (InputStream input = exchange.getRequestBody();
+             ReadableByteChannel channel = Channels.newChannel(input)) {
+            while (encodedBlock.hasRemaining()) {
+                int read = channel.read(encodedBlock);
+                if (read < 0) break;
+            }
+        }
+        if (encodedBlock.hasRemaining()) {
+            throw new IllegalArgumentException("native spatial PCM block ended early");
+        }
+        encodedBlock.flip();
+        int result = context.audioEngine.submitSpatialPcm(
+            session,
+            generation,
+            sequence,
+            encodedBlock,
+            NATIVE_SPATIAL_TRANSPORT_FRAMES
+        );
+        if (result < 0) {
+            throw new IllegalArgumentException("native spatial PCM block was rejected: " + result);
+        }
+
+        Map<String, Object> body = HttpUtil.ok();
+        body.put("blocks", 1);
+        body.put("sequence", sequence);
+        body.put("lastResult", result);
+        HttpUtil.sendJson(exchange, body);
+    }
+
     private static long parseContentLength(HttpExchange exchange) {
         String value = exchange.getRequestHeaders().getFirst("Content-Length");
         if (value == null || value.isBlank()) return -1;
@@ -1071,7 +1222,8 @@ public final class ApiRoutes {
         try {
             HttpResponse<InputStream> response = context.community.eventStream(
                 HttpUtil.param(query, "feId", ""),
-                HttpUtil.param(query, "after", "")
+                HttpUtil.param(query, "after", ""),
+                HttpUtil.param(query, "streamRole", "browser")
             );
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 String type = response.headers().firstValue("content-type").orElse("application/json; charset=utf-8");
@@ -1088,14 +1240,13 @@ public final class ApiRoutes {
             exchange.getResponseHeaders().set("Cache-Control", "no-cache, no-transform");
             exchange.getResponseHeaders().set("Connection", "keep-alive");
             exchange.getResponseHeaders().set("X-Accel-Buffering", "no");
+            exchange.getResponseHeaders().set(
+                "X-FE-SSE-Idle-Timeout-Ms",
+                String.valueOf(COMMUNITY_SSE_IDLE_TIMEOUT.toMillis())
+            );
             exchange.sendResponseHeaders(200, 0);
             try (InputStream input = response.body(); OutputStream output = exchange.getResponseBody()) {
-                byte[] buffer = new byte[8192];
-                int read;
-                while ((read = input.read(buffer)) >= 0) {
-                    output.write(buffer, 0, read);
-                    output.flush();
-                }
+                SseProxyPump.copy(input, output, COMMUNITY_SSE_IDLE_TIMEOUT);
             } catch (IOException ignored) {
             }
         } catch (InterruptedException e) {
@@ -1261,6 +1412,50 @@ public final class ApiRoutes {
             context.music.accountPayload(provider),
             HttpUtil.param(query, "sessionId", "")
         ));
+    }
+
+    private void handleCommunityPetMemories(HttpExchange exchange, Map<String, String> query) throws IOException {
+        String provider = communityProvider(query);
+        HttpUtil.sendJson(exchange, context.community.petMemories(
+            provider,
+            providerLabel(provider),
+            context.music.accountPayload(provider)
+        ));
+    }
+
+    private void handleCommunityPetPersonalization(
+        HttpExchange exchange,
+        Map<String, String> query
+    ) throws IOException {
+        String provider = communityProvider(query);
+        exchange.getResponseHeaders().set("Cache-Control", "private, no-store, max-age=0");
+        HttpUtil.sendJson(exchange, context.petPersonalization.projection(
+            provider,
+            providerLabel(provider),
+            context.music.accountPayload(provider)
+        ));
+    }
+
+    private void handleCommunityPetMemoryForget(
+        HttpExchange exchange,
+        Map<String, String> query,
+        Map<String, Object> root
+    ) throws IOException {
+        String provider = communityProvider(query);
+        Map<String, Object> result = context.community.forgetPetMemory(
+            provider,
+            providerLabel(provider),
+            context.music.accountPayload(provider),
+            root
+        );
+        if (SimpleJson.asBoolean(result.get("ok"), false)) {
+            context.petPersonalization.invalidate(
+                provider,
+                providerLabel(provider),
+                context.music.accountPayload(provider)
+            );
+        }
+        HttpUtil.sendJson(exchange, result);
     }
 
     private void handleCommunityPetMutation(
@@ -1832,7 +2027,7 @@ public final class ApiRoutes {
     private static Map<String, Object> appVersion() {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("name", "FE Monster Java");
-        body.put("version", "2.0.1");
+        body.put("version", "2.1.1");
         body.put("runtime", System.getProperty("java.version"));
         body.put("ok", true);
         return body;
@@ -2047,7 +2242,7 @@ public final class ApiRoutes {
 
     private static Map<String, Object> updatePayload() {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("version", "2.0.1");
+        body.put("version", "2.1.1");
         body.put("downloadUrl", "");
         body.put("releaseNotes", "New translucent playback page, clearer lyrics, independent lyric colors, rhythm mode, and adaptive preset performance.");
         body.put("fileSize", 0);

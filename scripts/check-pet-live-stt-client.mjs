@@ -97,10 +97,10 @@ assert.deepEqual(cancelledRequests, ['open', 'cancel']);
 assert.equal(cancelled.snapshot().state, 'cancelled');
 
 const assistant = fs.readFileSync(path.join(root, 'web', 'pet-assistant.js'), 'utf8');
-const indexHtml = fs.readFileSync(path.join(root, 'web', 'index.html'), 'utf8');
+const loader = fs.readFileSync(path.join(root, 'web', 'runtime-module-loader.js'), 'utf8');
 const installer = fs.readFileSync(path.join(root, 'scripts', 'build-installer.ps1'), 'utf8');
 const installScript = fs.readFileSync(path.join(root, 'scripts', 'install-fe-monster.ps1'), 'utf8');
-assert.ok(indexHtml.indexOf('pet-live-stt-client.js') < indexHtml.indexOf('pet-assistant.js'),
+assert.ok(loader.indexOf('pet-live-stt-client.js') < loader.indexOf('pet-assistant.js'),
   'the online STT client must load before pet-assistant.js');
 assert.match(assistant, /startOnlineStreamingSttCapture\(capture\)/,
   'the microphone capture never opens the online STT stream');
@@ -112,8 +112,10 @@ assert.match(assistant, /finalizeOnlineStreamingSttCapture\(capture,\s*autoSend/
   'turn completion does not finalize the authoritative online transcript');
 assert.match(assistant, /queueLocalPcmFallback\(capture,\s*autoSend/,
   'online STT failures lost the existing whole-turn WAV fallback');
-assert.ok((installer.match(/web\\pet-live-stt-client\.js/g) || []).length >= 2,
-  'both installer manifests must require the online STT client');
+assert.ok((installer.match(/web\\pet-live-stt-client\.js/g) || []).length >= 1,
+  'the installer payload list must stage the online STT client');
+assert.match(installer, /function\s+New-PayloadIntegrityManifest[\s\S]{0,900}Get-ChildItem[\s\S]{0,180}-Recurse\s+-File\s+-Force/,
+  'the integrity manifest no longer auto-covers the staged online STT client');
 assert.match(installScript, /web\\pet-live-stt-client\.js/,
   'installed-payload verification must require the online STT client');
 

@@ -6,14 +6,14 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
 
-const index = read('web', 'index.html');
+const loader = read('web', 'runtime-module-loader.js');
 const assistant = read('web', 'pet-assistant.js');
 const installer = read('scripts', 'build-installer.ps1');
 const installScript = read('scripts', 'install-fe-monster.ps1');
 const installerContract = read('scripts', 'check-windows-installer-contract.ps1');
 
-const playoutScript = index.indexOf('pet-live-playout.js');
-const assistantScript = index.indexOf('pet-assistant.js');
+const playoutScript = loader.indexOf('pet-live-playout.js');
+const assistantScript = loader.indexOf('pet-assistant.js');
 assert.ok(playoutScript >= 0 && playoutScript < assistantScript,
   'the continuous playout module must load before pet-assistant.js');
 
@@ -37,8 +37,10 @@ for (const stage of ['speech_start', 'stt_final', 'endpoint', 'llm_first_token',
 }
 
 for (const requiredFile of ['web\\pet-live-playout.js', 'web\\pet-live-telemetry.js']) {
-  assert.ok((installer.match(new RegExp(requiredFile.replace(/\\/g, '\\\\'), 'g')) || []).length >= 2,
-    `${requiredFile} is not required by both installer manifests`);
+  assert.ok((installer.match(new RegExp(requiredFile.replace(/\\/g, '\\\\'), 'g')) || []).length >= 1,
+    `${requiredFile} is not staged by the installer payload list`);
+  assert.match(installer, /function\s+New-PayloadIntegrityManifest[\s\S]{0,900}Get-ChildItem[\s\S]{0,180}-Recurse\s+-File\s+-Force/,
+    'the integrity manifest no longer auto-covers every staged pet runtime file');
   assert.ok(installScript.includes(`'${requiredFile}'`),
     `${requiredFile} is missing from installed-payload verification`);
   assert.ok(installerContract.includes(`'${requiredFile}'`),

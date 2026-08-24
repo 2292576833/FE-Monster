@@ -92,7 +92,7 @@ assert.match(syncVoiceCatalog, /remotePet\.selectedVoiceId/, 'server FE ID voice
 assert.match(syncVoiceCatalog, /voice\.available\s*===\s*true/, 'unavailable voices can enter the selection whitelist');
 assert.match(syncVoiceCatalog, /availableVoices\[0\]/, 'invalid selections do not fall back to the first available voice');
 assert.match(pet, /availableVoiceById\(event\.currentTarget\.value\)/, 'dropdown changes bypass the returned voice whitelist');
-assert.match(sendText, /requestPetChat\(message,\s*sessionId\)/,
+assert.match(sendText, /requestPetChat\(message,\s*sessionId,\s*\{\s*requestId:/,
   'chat submission bypasses the voice-aware pet request builder');
 
 for (const [requestName, body, owner] of [

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 
 const html = readFileSync('web/index.html', 'utf8');
+const loader = readFileSync('web/runtime-module-loader.js', 'utf8');
 const css = readFileSync('web/pet-assistant.css', 'utf8');
 const installerBuild = readFileSync('scripts/build-installer.ps1', 'utf8');
 const installerRuntime = readFileSync('scripts/install-fe-monster.ps1', 'utf8');
@@ -15,9 +16,9 @@ assert.match(characterMarkup, /<canvas[^>]+id="petAssistantParticleOrb"[^>]+clas
   'desktop pet must render the particle orb in one canvas');
 assert.match(css, /\.pet-assistant__vector\s*\{[\s\S]*?display:\s*none\s*!important/,
   'the replaced dragon rig must not render behind the particle orb');
-assert.ok(html.indexOf('vendor/three.r128.min.js') < html.indexOf('pet-particle-orb.js'),
-  'Three.js must load before the particle-orb runtime');
-assert.match(html, /pet-particle-orb\.js\?v=[^"\s]+/,
+assert.ok(html.indexOf('vendor/three.r128.min.js') < html.indexOf('runtime-module-loader.js'),
+  'Three.js must load before the pet runtime module loader');
+assert.match(loader, /pet-particle-orb\.js\?v=[^"\s]+/,
   'the particle runtime cache key must change whenever its alpha surface changes');
 assert.match(runtime, /data-pet-behavior[\s\S]*data-pet-reaction/,
   'the particle surface must consume the companion behavior and reaction state');

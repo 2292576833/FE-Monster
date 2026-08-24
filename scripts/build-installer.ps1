@@ -114,6 +114,152 @@ function Copy-File {
   Copy-Item -LiteralPath $Source -Destination $Destination -Force
 }
 
+function Get-NativeAudioSourceFiles {
+  $explicitFiles = @(
+    (Join-Path $rootPath 'native\windows\CMakeLists.txt'),
+    (Join-Path $rootPath 'native\windows\fe_monster_xaudio2.cpp'),
+    (Join-Path $rootPath 'native\rust-audio-upmix\Cargo.toml'),
+    (Join-Path $rootPath 'native\rust-audio-upmix\Cargo.lock'),
+    (Join-Path $rootPath 'native\rust-audio-upmix\build.rs'),
+    (Join-Path $rootPath 'native\google-obr-wasm\CMakeLists.txt')
+  )
+  foreach ($sourceFile in $explicitFiles) {
+    if (Test-Path -LiteralPath $sourceFile -PathType Leaf) {
+      Get-Item -LiteralPath $sourceFile
+    }
+  }
+
+  foreach ($sourceDirectory in @(
+    (Join-Path $rootPath 'native\windows\audio'),
+    (Join-Path $rootPath 'native\rust-audio-upmix\src'),
+    (Join-Path $rootPath 'native\rust-audio-upmix\include'),
+    (Join-Path $rootPath 'native\google-obr-wasm')
+  )) {
+    if (!(Test-Path -LiteralPath $sourceDirectory -PathType Container)) { continue }
+    Get-ChildItem -LiteralPath $sourceDirectory -Recurse -File | Where-Object {
+      $_.Extension -in @('.c', '.cc', '.cpp', '.h', '.hpp', '.rs')
+    }
+  }
+}
+
+function Test-NativeAudioSourcesNewerThanRuntime {
+  param([string[]]$RuntimeFiles)
+
+  $runtimeItems = @($RuntimeFiles | ForEach-Object {
+    if (Test-Path -LiteralPath $_ -PathType Leaf) { Get-Item -LiteralPath $_ }
+  })
+  if ($runtimeItems.Count -ne $RuntimeFiles.Count) { return $true }
+  $latestSource = Get-NativeAudioSourceFiles |
+    Sort-Object LastWriteTimeUtc -Descending |
+    Select-Object -First 1
+  if ($null -eq $latestSource) { return $true }
+  $oldestRuntime = $runtimeItems |
+    Sort-Object LastWriteTimeUtc |
+    Select-Object -First 1
+  return $latestSource.LastWriteTimeUtc -gt $oldestRuntime.LastWriteTimeUtc
+}
+
+function Get-TextSha256 {
+  param([Parameter(Mandatory)][string]$Value)
+
+  $sha256 = [Security.Cryptography.SHA256]::Create()
+  try {
+    $bytes = [Text.Encoding]::UTF8.GetBytes($Value)
+    return ([BitConverter]::ToString($sha256.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant()
+  } finally {
+    $sha256.Dispose()
+  }
+}
+
+function Assert-NativeAudioBuildPair {
+  param([Parameter(Mandatory)][string]$Directory)
+
+  $xaudio = Join-Path $Directory 'fe-monster-xaudio2.dll'
+  $upmix = Join-Path $Directory 'fe_monster_upmix.dll'
+  $manifestPath = Join-Path $Directory 'native-audio-build.json'
+  foreach ($required in @($xaudio, $upmix, $manifestPath)) {
+    if (!(Test-Path -LiteralPath $required -PathType Leaf)) {
+      throw "Native audio build pair is incomplete: $required"
+    }
+  }
+
+  try {
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  } catch {
+    throw "Native audio build manifest is invalid: $manifestPath ($($_.Exception.Message))"
+  }
+  if ([int]$manifest.schemaVersion -ne 1) {
+    throw "Unsupported native audio build manifest schema: $($manifest.schemaVersion)"
+  }
+  $buildId = [string]$manifest.buildId
+  if ($buildId -notmatch '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$') {
+    throw "Native audio build manifest has an invalid build ID: $buildId"
+  }
+  if ([string]$manifest.architecture -cne 'x64') {
+    throw "Native audio build manifest is not x64: $($manifest.architecture)"
+  }
+  if ([string]$manifest.configuration -cne 'Release') {
+    throw "Native audio build manifest is not a Release build: $($manifest.configuration)"
+  }
+  if ([string]$manifest.obrRevision -cne '478dc7c752d5eccae534635139ff0253eee3a14a') {
+    throw "Native audio build manifest has an unexpected Google OBR revision."
+  }
+  foreach ($hashName in @('xaudio2Sha256', 'upmixSha256', 'pairSha256')) {
+    if ([string]$manifest.$hashName -notmatch '^[0-9a-f]{64}$') {
+      throw "Native audio build manifest has an invalid $hashName value."
+    }
+  }
+
+  $xaudioSha256 = (Get-FileHash -LiteralPath $xaudio -Algorithm SHA256).Hash.ToLowerInvariant()
+  $upmixSha256 = (Get-FileHash -LiteralPath $upmix -Algorithm SHA256).Hash.ToLowerInvariant()
+  if ($xaudioSha256 -cne [string]$manifest.xaudio2Sha256) {
+    throw "Native audio XAudio2 DLL does not match build $buildId."
+  }
+  if ($upmixSha256 -cne [string]$manifest.upmixSha256) {
+    throw "Native audio Rust DLL does not match build $buildId."
+  }
+  $pairMaterial = "fe-monster-xaudio2.dll=$xaudioSha256`nfe_monster_upmix.dll=$upmixSha256"
+  $pairSha256 = Get-TextSha256 -Value $pairMaterial
+  if ($pairSha256 -cne [string]$manifest.pairSha256) {
+    throw "Native audio pair digest does not match build $buildId."
+  }
+  try {
+    $createdAtUtc = [DateTimeOffset]::Parse(
+      [string]$manifest.createdAtUtc,
+      [Globalization.CultureInfo]::InvariantCulture,
+      [Globalization.DateTimeStyles]::AssumeUniversal -bor [Globalization.DateTimeStyles]::AdjustToUniversal
+    ).UtcDateTime
+  } catch {
+    throw "Native audio build manifest has an invalid UTC timestamp."
+  }
+  return [pscustomobject]@{
+    Path = $Directory
+    BuildId = $buildId
+    CreatedAtUtc = $createdAtUtc
+  }
+}
+
+function Resolve-NativeAudioRuntimeSource {
+  $candidates = @(
+    (Join-Path $rootPath 'native\windows\build'),
+    (Join-Path $rootPath 'native\windows\build-next')
+  )
+  $complete = foreach ($candidate in $candidates) {
+    try {
+      Assert-NativeAudioBuildPair -Directory $candidate
+    } catch {
+      Write-Warning "Ignoring unpaired native audio runtime '$candidate': $($_.Exception.Message)"
+    }
+  }
+  $selected = $complete |
+    Sort-Object CreatedAtUtc -Descending |
+    Select-Object -First 1
+  if ($null -eq $selected) {
+    throw 'No hash-verified native audio build pair was found under build or build-next.'
+  }
+  return [string]$selected.Path
+}
+
 function Assert-GlbImagesAreEmbedded {
   param([string]$Path)
 
@@ -299,7 +445,25 @@ function Build-App {
 
   $xaudioDll = Join-Path $rootPath 'native\windows\build\fe-monster-xaudio2.dll'
   $upmixDll = Join-Path $rootPath 'native\windows\build\fe_monster_upmix.dll'
-  $nativeNeedsRebuild = !(Test-Path $xaudioDll) -or !(Test-Path $upmixDll)
+  $nativeBuildDirectory = Join-Path $rootPath 'native\windows\build'
+  $nativeBuildManifest = Join-Path $nativeBuildDirectory 'native-audio-build.json'
+  $nativeNeedsRebuild = !(Test-Path $xaudioDll) `
+    -or !(Test-Path $upmixDll) `
+    -or !(Test-Path $nativeBuildManifest)
+  if (!$nativeNeedsRebuild) {
+    try {
+      $null = Assert-NativeAudioBuildPair -Directory $nativeBuildDirectory
+    } catch {
+      Write-Host "== Native runtime pair manifest is stale or invalid: $($_.Exception.Message)"
+      $nativeNeedsRebuild = $true
+    }
+  }
+  $nativeSourceIsNewer = Test-NativeAudioSourcesNewerThanRuntime `
+    -RuntimeFiles @($xaudioDll, $upmixDll)
+  if ($nativeSourceIsNewer) {
+    Write-Host '== Native audio sources are newer than the installed runtime; rebuilding.'
+    $nativeNeedsRebuild = $true
+  }
   if (!$nativeNeedsRebuild) {
     try {
       Assert-NoDynamicVcRuntime $xaudioDll
@@ -483,92 +647,53 @@ function Stage-WebView2RuntimeInstaller {
 }
 
 function New-PayloadIntegrityManifest {
-  $relativeFiles = New-Object System.Collections.Generic.List[string]
+  $manifestPath = Join-Path $payloadRoot $payloadIntegrityManifestName
+  $allFiles = @(Get-ChildItem -LiteralPath $payloadRoot -Recurse -File -Force |
+    Where-Object {
+      ![string]::Equals($_.FullName, $manifestPath, [StringComparison]::OrdinalIgnoreCase)
+    })
+  $relativeFiles = [string[]]@($allFiles | ForEach-Object {
+    $_.FullName.Substring($payloadRoot.Length).TrimStart('\').Replace('\', '/')
+  })
+  [Array]::Sort($relativeFiles, [StringComparer]::Ordinal)
+
+  # Only the explicit native launch/runtime entry points we execute have an
+  # x64 machine contract. Their third-party trees (WebView2, JRE, and Node)
+  # may legitimately contain helper PE images with another machine type.
+  $nativeAmd64RelativeFiles = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::OrdinalIgnoreCase
+  )
   foreach ($relative in @(
-    'out\fe-monster-java.jar',
-    'web\index.html',
-    'web\cache-fingerprints.json',
-    'web\app.js',
-    'web\styles.css',
-    'web\lyric-render-quality.css',
-    'web\app-command.js',
-    'web\playback-intelligence.js',
-    'web\wallpaper-video-continuity.js',
-    'web\pet-emotion-runtime.js',
-    'web\pet-client-context.js',
-    'web\pet-live-turn-controller.js',
-    'web\pet-live-audio-worklet.js',
-    'web\pet-live-telemetry.js',
-    'web\pet-live-playout.js',
-    'web\pet-live-stt-client.js',
-    'web\pet-assistant.js',
-    'web\fe-identity-card.js',
-    'web\fe-identity-card.css',
-    'web\pet-product-tour.js',
-    'web\pet-product-tour.css',
-    'web\community-reward-runtime.js',
-    'web\community-reward-runtime.css',
-    'web\pet-particle-orb.js',
-    'web\pet-assistant.css',
-    'web\pet-companion-p2.js',
-    'web\pet-companion-p2.css',
-    'web\creative-community.js',
-    'web\assets\fe-monster-pet-mascot.png',
-    'web\assets\fe-monster-pet-mascot-chroma.png',
-    'scripts\install-fe-monster.ps1',
-    'scripts\ensure-runtime-dependencies.ps1',
-    'scripts\java-runtime.ps1',
-    'data\community-server-url.txt',
-    'data\community-server-tls-pin.txt',
-    'runtime\java\bin\java.exe',
-    'runtime\java\bin\javaw.exe',
-    'runtime\java\bin\FE Monster Backend.exe',
-    'native\windows\build\winforms\FE Monster.exe',
-    'native\windows\build\winforms\FE Monster.dll',
-    'native\windows\build\winforms\FE Monster.deps.json',
-    'native\windows\build\winforms\FE Monster.runtimeconfig.json',
-    'native\windows\build\winforms\WebView2Loader.dll',
-    'native\windows\build\fe-monster-xaudio2.dll',
-    'native\windows\build\fe_monster_upmix.dll',
-    'plugins\music-api\FE-Monster-Netease-API-Plugin-4.32.0.zip',
-    'plugins\music-api\FE-Monster-QQ-API-Plugin-2.4.1.zip',
-    'plugins\music-api\FE-Monster-Kugou-API-Plugin-2.0.7.zip',
-    'plugins\music-api\FE-Monster-Qishui-OpenAPI-Plugin-3.1.1.zip'
+    'runtime/java/bin/java.exe',
+    'runtime/java/bin/javaw.exe',
+    'runtime/java/bin/FE Monster Backend.exe',
+    'native/windows/build/winforms/FE Monster.exe',
+    'native/windows/build/winforms/WebView2Loader.dll',
+    'native/windows/build/fe-monster-xaudio2.dll',
+    'native/windows/build/fe_monster_upmix.dll'
   )) {
-    $relativeFiles.Add($relative) | Out-Null
-  }
-  if ($includeOfflineWebView2) {
-    $relativeFiles.Add('runtime\installers\MicrosoftEdgeWebView2RuntimeInstallerX64.exe') | Out-Null
-  }
-  if (!$NoNodeBundle) {
-    $relativeFiles.Add('runtime\node\node.exe') | Out-Null
+    [void]$nativeAmd64RelativeFiles.Add($relative)
   }
 
   $entries = foreach ($relative in $relativeFiles) {
-    $path = Join-Path $payloadRoot $relative
-    if (!(Test-Path -LiteralPath $path -PathType Leaf)) {
-      throw "Payload integrity source is missing: $relative"
-    }
-    $machine = Get-PeMachine $path
-    # Microsoft's x64 WebView2 standalone package uses an x86 bootstrap stub
-    # while installing only the x64 Runtime selected by its signed package.
-    $isSignedWebView2Installer =
-      $relative -eq 'runtime\installers\MicrosoftEdgeWebView2RuntimeInstallerX64.exe'
-    if ($machine -ne 0 -and $machine -ne $peMachineAmd64 -and !$isSignedWebView2Installer) {
-      throw "Payload contains a non-x64 PE image: $relative (machine=0x$('{0:X4}' -f $machine))"
+    $path = Join-Path $payloadRoot $relative.Replace('/', '\')
+    $machine = $null
+    if ($nativeAmd64RelativeFiles.Contains($relative)) {
+      $machine = Get-PeMachine $path
+      if ($machine -ne $peMachineAmd64) {
+        throw "Payload contains a non-x64 native release executable: $relative (machine=0x$('{0:X4}' -f $machine))"
+      }
     }
     [ordered]@{
-      path = $relative.Replace('\', '/')
+      path = $relative
       length = (Get-Item -LiteralPath $path).Length
       sha256 = Get-FileSha256 $path
-      peMachine = $(if ($machine -eq 0 -or $isSignedWebView2Installer) { $null } else { $machine })
+      peMachine = $machine
     }
   }
 
-  $allFiles = @(Get-ChildItem -LiteralPath $payloadRoot -Recurse -File -Force)
-  $maxRelativePathLength = ($allFiles | ForEach-Object {
-    $_.FullName.Substring($payloadRoot.Length).TrimStart('\').Length
-  } | Measure-Object -Maximum).Maximum
+  $maxRelativePathLength = ($relativeFiles | ForEach-Object { $_.Length } |
+    Measure-Object -Maximum).Maximum
   $requiredInstallBytes = ($allFiles | Measure-Object -Property Length -Sum).Sum
   $manifest = [ordered]@{
     schemaVersion = 1
@@ -581,7 +706,7 @@ function New-PayloadIntegrityManifest {
   }
   $manifest |
     ConvertTo-Json -Depth 5 |
-    Set-Content -LiteralPath (Join-Path $payloadRoot $payloadIntegrityManifestName) -Encoding UTF8
+    Set-Content -LiteralPath $manifestPath -Encoding UTF8
 }
 
 function ConvertTo-NormalizedCommunityTlsPins {
@@ -1107,13 +1232,18 @@ function Stage-Payload {
 
   Copy-File (Join-Path $rootPath 'out\fe-monster-java.jar') (Join-Path $payloadRoot 'out\fe-monster-java.jar')
   $nativeBuildSource = Join-Path $rootPath 'native\windows\build'
+  $nativeAudioSource = Resolve-NativeAudioRuntimeSource
   $nativeBuildDestination = Join-Path $payloadRoot 'native\windows\build'
   Copy-File `
-    (Join-Path $nativeBuildSource 'fe-monster-xaudio2.dll') `
+    (Join-Path $nativeAudioSource 'fe-monster-xaudio2.dll') `
     (Join-Path $nativeBuildDestination 'fe-monster-xaudio2.dll')
   Copy-File `
-    (Join-Path $nativeBuildSource 'fe_monster_upmix.dll') `
+    (Join-Path $nativeAudioSource 'fe_monster_upmix.dll') `
     (Join-Path $nativeBuildDestination 'fe_monster_upmix.dll')
+  Copy-File `
+    (Join-Path $nativeAudioSource 'native-audio-build.json') `
+    (Join-Path $nativeBuildDestination 'native-audio-build.json')
+  $null = Assert-NativeAudioBuildPair -Directory $nativeBuildDestination
   $nativeLicenses = Join-Path $nativeBuildSource 'licenses'
   if (Test-Path -LiteralPath $nativeLicenses -PathType Container) {
     Copy-Dir $nativeLicenses (Join-Path $nativeBuildDestination 'licenses')
@@ -1181,8 +1311,15 @@ function Stage-Payload {
     'out\fe-monster-java.jar',
     'web\index.html',
     'web\cache-fingerprints.json',
+    'web\client-ai-service.js',
+    'web\pet-affect-plan.js',
+    'web\settings-center.js',
+    'web\audio-mixer-ui.js',
+    'web\audio-mixer-visuals.js',
+    'web\runtime-module-loader.js',
     'web\app-command.js',
     'web\playback-intelligence.js',
+    'web\companion-care-actions.js',
     'web\wallpaper-video-continuity.js',
     'web\pet-emotion-runtime.js',
     'web\pet-client-context.js',
@@ -1204,6 +1341,13 @@ function Stage-Payload {
     'web\pet-companion-p2.js',
     'web\pet-companion-p2.css',
     'web\creative-community.js',
+    'web\soundscape-runtime.js',
+    'web\assets\soundscape-workshop\runtime.html',
+    'web\assets\soundscape-workshop\bridge.js',
+    'web\assets\soundscape-workshop\project.json',
+    'web\assets\soundscape-workshop\preview.gif',
+    'web\assets\soundscape-workshop\assets\index-CSU_B_T9.js',
+    'web\assets\soundscape-workshop\assets\index-DgmMz9-g.css',
     'web\assets\fe-monster-pet-mascot.png',
     'web\assets\fe-monster-pet-mascot-chroma.png',
     'scripts\install-fe-monster.ps1',
@@ -1221,6 +1365,7 @@ function Stage-Payload {
     'native\windows\build\winforms\WebView2Loader.dll',
     'native\windows\build\fe-monster-xaudio2.dll',
     'native\windows\build\fe_monster_upmix.dll',
+    'native\windows\build\native-audio-build.json',
     'plugins\music-api\FE-Monster-Netease-API-Plugin-4.32.0.zip',
     'plugins\music-api\FE-Monster-QQ-API-Plugin-2.4.1.zip',
     'plugins\music-api\FE-Monster-Kugou-API-Plugin-2.0.7.zip',
@@ -1506,6 +1651,15 @@ if ($ReusePayloadZip) {
     $payloadRoot
   if ($LASTEXITCODE -ne 0) {
     throw "Staged camera hand-control removal check failed with exit code $LASTEXITCODE"
+  }
+  & powershell.exe `
+    -NoProfile `
+    -ExecutionPolicy Bypass `
+    -File (Join-Path $rootPath 'scripts\check-payload-integrity-tamper.ps1') `
+    -Root $rootPath `
+    -PayloadRoot $payloadRoot
+  if ($LASTEXITCODE -ne 0) {
+    throw "Staged payload ordinary JS/DLL integrity check failed with exit code $LASTEXITCODE"
   }
   if ($StageOnly) {
     & powershell.exe `

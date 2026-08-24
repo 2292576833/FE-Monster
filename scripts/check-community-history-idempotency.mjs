@@ -14,13 +14,18 @@ const communityServiceSource = fs.readFileSync(
 
 assert.match(
   apiRoutesSource,
-  /eventStream\(\s*HttpUtil\.param\(query,\s*"feId",\s*""\),\s*HttpUtil\.param\(query,\s*"after",\s*""\)/s,
-  'the Java SSE route must forward the browser reconnect cursor'
+  /eventStream\(\s*HttpUtil\.param\(query,\s*"feId",\s*""\),\s*HttpUtil\.param\(query,\s*"after",\s*""\),\s*HttpUtil\.param\(query,\s*"streamRole",\s*"browser"\)/s,
+  'the Java SSE route must forward the browser reconnect cursor and bounded stream role'
 );
 assert.match(
   communityServiceSource,
   /if \(after != null && !after\.isBlank\(\)\)\s*\{\s*path\.append\("&after="\)\.append\(encode\(after\)\)/s,
   'the Java community transport must forward the reconnect cursor to the community server'
+);
+assert.match(
+  communityServiceSource,
+  /append\("&streamRole="\)\.append\(encode\(normalizeEventStreamRole\(streamRole\)\)\)/,
+  'the Java community transport must forward a normalized stream role to the community server'
 );
 
 function topLevelFunction(name) {
@@ -39,23 +44,39 @@ function topLevelFunction(name) {
 
 const bubbles = [];
 const relays = [];
+const streamStates = [];
 const broadcasts = [];
 const toasts = [];
+const petEvents = [];
 const storage = new Map();
+const timers = new Map();
+let nextTimerId = 1;
 const eventSourceUrls = [];
+const eventSources = [];
+let clientMode = 'embedded';
+const deterministicMath = Object.create(Math);
+deterministicMath.random = () => 0.5;
 class TestEventSource {
   constructor(url) {
+    this.url = url;
+    this.closed = false;
+    this.listeners = new Map();
     eventSourceUrls.push(url);
+    eventSources.push(this);
   }
 
-  addEventListener() {}
+  addEventListener(name, listener) {
+    this.listeners.set(name, listener);
+  }
 
-  close() {}
+  close() {
+    this.closed = true;
+  }
 }
 const context = vm.createContext({
   Date,
   JSON,
-  Math,
+  Math: deterministicMath,
   Set,
   String,
   COMMUNITY_HISTORY_LEDGER_KEY: 'test-community-history-ledger',
@@ -74,16 +95,19 @@ const context = vm.createContext({
       serverUrl: 'https://community.example',
       eventCursor: '',
       eventSource: null,
-      eventKey: 'https://community.example|10000001',
+      eventKey: 'https://community.example|10000001|embedded',
       eventReconnectTimer: 0,
       eventHeartbeatTimer: 0,
       eventConnected: false,
       eventLastActivityAt: 0,
       eventReconnectDelay: 1200,
+      eventReconnectAttempts: 0,
+      eventNextRetryAt: 0,
+      eventGeneration: 0,
       eventHistoryBefore: 1700000001000,
       eventSeenKeys: new Set(),
       eventSeenKeyOrder: [],
-      eventHistoryIdentity: 'https://community.example|10000001',
+      eventHistoryIdentity: 'https://community.example|10000001|embedded',
       eventHydrationStartedAt: 1700000000000,
       messageBubbleSeenKeys: new Set(),
       messageBubbleSeenOrder: [],
@@ -110,6 +134,11 @@ const context = vm.createContext({
     return Promise.resolve();
   },
   scheduleCommunityRefresh() {},
+  scheduleCommunitySceneDisconnectRestore() {},
+  clearCommunitySceneDisconnectRestore() {},
+  clamp(value, minimum, maximum) {
+    return Math.max(minimum, Math.min(maximum, value));
+  },
   refreshCommunityListenState() {
     return Promise.resolve();
   },
@@ -125,7 +154,14 @@ const context = vm.createContext({
   },
   window: {
     EventSource: TestEventSource,
-    clearTimeout() {},
+    setTimeout(callback, delay) {
+      const id = nextTimerId++;
+      timers.set(id, { callback, delay });
+      return id;
+    },
+    clearTimeout(id) {
+      timers.delete(id);
+    },
     localStorage: {
       getItem(key) {
         return storage.has(key) ? storage.get(key) : null;
@@ -135,7 +171,9 @@ const context = vm.createContext({
       }
     },
     dispatchEvent(event) {
-      relays.push(event);
+      if (event?.type === 'fe-monster-community-relay') relays.push(event);
+      if (event?.type === 'fe-monster-pet-stream-state') streamStates.push(event.detail);
+      if (event?.type === 'fe-monster-pet-event') petEvents.push(event.detail);
     }
   },
   CustomEvent: class CustomEvent {
@@ -144,14 +182,27 @@ const context = vm.createContext({
       this.detail = init && init.detail;
     }
   },
-  document: { hidden: false }
+  document: {
+    hidden: false,
+    documentElement: {
+      getAttribute(name) {
+        return name === 'data-fe-client' ? clientMode : '';
+      }
+    }
+  },
+  navigator: { onLine: true },
+  performance: { now: () => 1000 }
 });
 
 vm.runInContext(
   [
     topLevelFunction('communityEventIdentityKey'),
+    topLevelFunction('communityEventStreamRole'),
     topLevelFunction('communityEventUrl'),
     topLevelFunction('stopCommunityEventStream'),
+    topLevelFunction('scheduleCommunityEventReconnect'),
+    topLevelFunction('emitPetStreamState'),
+    topLevelFunction('restartCommunityEventStreamNow'),
     topLevelFunction('ensureCommunityEventStream'),
     topLevelFunction('communityMessageKey'),
     topLevelFunction('dedupeCommunityMessages'),
@@ -173,13 +224,16 @@ vm.runInContext(
   context
 );
 
-context.restoreCommunityHistoryLedger('https://community.example|10000001');
+context.restoreCommunityHistoryLedger('https://community.example|10000001|embedded');
 context.state.community.eventHistoryBefore = 1700000001000;
 assert.equal(
   context.communityEventUrl(),
-  '/api/community/events?feId=10000001',
+  '/api/community/events?feId=10000001&streamRole=embedded',
   'a first migration with no persisted cursor must start with the server history boundary'
 );
+clientMode = 'desktop-scene';
+assert.equal(context.communityEventUrl(), '', 'the passive desktop scene must not open a duplicate community stream');
+clientMode = 'embedded';
 
 assert.equal(
   context.communityMessageKey({ id: 'server-message-id', text: 'first version' }),
@@ -239,7 +293,7 @@ assert.deepEqual(
 );
 assert.equal(persistedAfterHistory.records[0].cursor, '41', 'the acknowledged history cursor must be persisted');
 
-context.restoreCommunityHistoryLedger('https://community.example|10000001');
+context.restoreCommunityHistoryLedger('https://community.example|10000001|embedded');
 context.handleCommunityServerEvent({
   data: JSON.stringify({
     id: '41',
@@ -293,11 +347,11 @@ context.state.community.messageBubbleSeenKeys = new Set();
 context.state.community.messageBubbleSeenOrder = [];
 context.state.community.messageBubbleSeenReady = true;
 context.state.community.messageBubbles = [{ key: 'stale-account-bubble' }];
-context.restoreCommunityHistoryLedger('https://community.example|10000001');
+context.restoreCommunityHistoryLedger('https://community.example|10000001|embedded');
 assert.equal(context.state.community.eventCursor, '42', 'a cold start must restore the last acknowledged cursor');
 assert.equal(
   context.communityEventUrl(),
-  '/api/community/events?feId=10000001&after=42',
+  '/api/community/events?feId=10000001&streamRole=embedded&after=42',
   'the first cold-start EventSource URL must skip already acknowledged server history'
 );
 assert.equal(context.state.community.messageBubbleSeenReady, false, 'cold-start hydration readiness must reset');
@@ -305,12 +359,12 @@ assert.equal(context.state.community.messageBubbles.length, 0, 'cold-start hydra
 
 context.state.community.messageBubbleSeenReady = true;
 context.state.community.messageBubbles = [{ key: 'account-a-bubble' }];
-context.restoreCommunityHistoryLedger('https://community.example|10000002');
+context.restoreCommunityHistoryLedger('https://community.example|10000002|embedded');
 assert.equal(context.state.community.eventCursor, '', 'an account without a ledger must not inherit another account cursor');
 assert.equal(context.state.community.messageBubbleSeenReady, false, 'A to B account switching must restart history hydration');
 assert.equal(context.state.community.messageBubbles.length, 0, 'A to B account switching must clear account A bubbles');
 
-context.restoreCommunityHistoryLedger('https://community.example|10000001');
+context.restoreCommunityHistoryLedger('https://community.example|10000001|embedded');
 context.state.community.eventHistoryBefore = 1700000001000;
 assert.equal(context.state.community.eventCursor, '42', 'switching back to A must restore only account A cursor');
 context.stopCommunityEventStream(true);
@@ -318,7 +372,7 @@ assert.equal(context.state.community.eventCursor, '42', 'a temporary stream rese
 context.ensureCommunityEventStream();
 assert.equal(
   eventSourceUrls.at(-1),
-  '/api/community/events?feId=10000001&after=42',
+  '/api/community/events?feId=10000001&streamRole=embedded&after=42',
   'same-account recovery after server failure must reconnect after the retained cursor'
 );
 context.stopCommunityEventStream(false);
@@ -344,7 +398,7 @@ context.handleCommunityServerEvent({
 assert.equal(bubbles.length, 1, 'history and realtime copies of one server message ID must dedupe');
 assert.equal(
   context.loadCommunityHistoryLedger()
-    .find((record) => record.identity === 'https://community.example|10000001')
+    .find((record) => record.identity === 'https://community.example|10000001|embedded')
     .cursor,
   '43',
   'a duplicate payload with a newer acknowledged seq must still persist the newer cursor'
@@ -423,6 +477,74 @@ context.handleCommunityServerEvent({
 });
 assert.equal(relays.length, 1, 'a genuinely new relay after hydration must still reach danmaku');
 
+context.handleCommunityServerEvent({
+  data: JSON.stringify({
+    id: '49',
+    seq: 49,
+    type: 'pet.ai.state',
+    createdAt: 1700000005100,
+    payload: { sessionId: 'pet-session-1', requestId: 'pet-request-1', sequence: 1, state: 'thinking' }
+  }),
+  lastEventId: '49'
+});
+context.handleCommunityServerEvent({
+  data: JSON.stringify({
+    id: 'transient-delta-1',
+    seq: 0,
+    transient: true,
+    type: 'pet.ai.delta',
+    createdAt: 1700000005200,
+    payload: { sessionId: 'pet-session-1', requestId: 'pet-request-1', sequence: 2, delta: 'first token' }
+  }),
+  // Native EventSource retains the preceding persisted event ID for an SSE
+  // frame that intentionally omits `id:`. That inherited cursor must not make
+  // this transient model token look like a replay.
+  lastEventId: '49'
+});
+context.handleCommunityServerEvent({
+  data: JSON.stringify({
+    id: 'transient-audio-1',
+    seq: 0,
+    transient: true,
+    type: 'pet.ai.audio',
+    createdAt: 1700000005300,
+    payload: {
+      sessionId: 'pet-session-1',
+      requestId: 'pet-request-1',
+      sequence: 3,
+      audioId: 'pet-audio-1',
+      mime: 'audio/mpeg'
+    }
+  }),
+  lastEventId: '49'
+});
+assert.deepEqual(
+  petEvents.map((event) => event.type),
+  ['pet.ai.state', 'pet.ai.delta', 'pet.ai.audio'],
+  'transient model and audio chunks must be delivered even when MessageEvent.lastEventId inherits the persisted state cursor'
+);
+assert.equal(
+  context.state.community.eventCursor,
+  '49',
+  'transient model and audio chunks must not advance or rewind the persisted reconnect cursor'
+);
+
+context.handleCommunityServerEvent({
+  data: JSON.stringify({
+    id: '47-late',
+    seq: 47,
+    type: 'client.relay',
+    createdAt: 1700000006000,
+    payload: { relay: { type: 'listen.danmaku', payload: { id: 'late-danmaku', text: 'late' } } }
+  }),
+  lastEventId: '47'
+});
+assert.equal(
+  relays.length,
+  1,
+  'an out-of-order event older than the acknowledged cursor must not re-run side effects'
+);
+
 const boundedSeen = new Set();
 const boundedOrder = [];
 for (let index = 0; index <= 512; index += 1) {
@@ -444,11 +566,84 @@ assert.equal(
 assert.equal(toasts.length, 0, 'history hydration must not retrigger toast side effects');
 context.advanceCommunityEventCursor('12');
 context.advanceCommunityEventCursor('not-a-cursor');
-assert.equal(context.state.community.eventCursor, '48', 'the reconnect cursor must advance monotonically');
+assert.equal(context.state.community.eventCursor, '49', 'the reconnect cursor must advance monotonically');
 assert.equal(
   context.communityEventUrl(),
-  '/api/community/events?feId=10000001&after=48',
+  '/api/community/events?feId=10000001&streamRole=embedded&after=49',
   'reconnects must resume after the last monotonic in-session cursor'
+);
+
+context.state.community.eventHistoryIdentity = 'https://community.example|10000001|embedded';
+context.state.community.eventCursor = '49';
+context.state.community.eventGeneration = 0;
+context.ensureCommunityEventStream();
+const halfOpenSource = eventSources.at(-1);
+const streamsBeforeOnline = eventSources.length;
+context.restartCommunityEventStreamNow('online');
+assert.equal(halfOpenSource.closed, true, 'an online transition must retire a possibly half-open EventSource');
+assert.equal(eventSources.length, streamsBeforeOnline + 1, 'an online transition must create exactly one replacement stream');
+assert.equal(
+  eventSourceUrls.at(-1),
+  '/api/community/events?feId=10000001&streamRole=embedded&after=49',
+  'online recovery must reuse the same identity and acknowledged cursor'
+);
+
+const recoveredSource = eventSources.at(-1);
+context.ensureCommunityEventStream();
+context.ensureCommunityEventStream();
+assert.equal(
+  eventSources.at(-1),
+  recoveredSource,
+  'repeated ensure calls in one connection generation must keep exactly one EventSource'
+);
+
+halfOpenSource.listeners.get('error')();
+assert.equal(
+  eventSources.at(-1),
+  recoveredSource,
+  'callbacks from a retired EventSource generation must not replace the current connection'
+);
+assert.equal(timers.size, 0, 'callbacks from a retired EventSource generation must not schedule reconnects');
+
+const firstError = recoveredSource.listeners.get('error');
+for (let attempt = 0; attempt < 20; attempt += 1) firstError();
+assert.equal(timers.size, 1, 'an error burst from one EventSource generation must schedule only one reconnect');
+assert.equal([...timers.values()][0].delay, 1200, 'the first deterministic reconnect delay must use bounded jitter');
+assert.equal(context.state.community.eventReconnectDelay, 1740, 'one failed generation must advance backoff only once');
+assert.deepEqual(
+  JSON.parse(JSON.stringify(streamStates.at(-1))),
+  {
+    state: 'reconnecting',
+    connected: false,
+    activityAt: streamStates.at(-1)?.activityAt,
+    reason: 'transport-error',
+    attempt: 1,
+    retryInMs: 1200,
+    generation: 2
+  },
+  'reconnect state must expose reason, attempt, delay, and connection generation'
+);
+
+for (let generation = 0; generation < 12; generation += 1) {
+  const [timerId, pending] = [...timers.entries()][0];
+  timers.delete(timerId);
+  pending.callback();
+  const failedSource = eventSources.at(-1);
+  failedSource.listeners.get('error')();
+  assert.equal(timers.size, 1, `generation ${generation + 1} must retain a single reconnect timer`);
+}
+assert.equal(context.state.community.eventReconnectDelay, 12000, 'reconnect backoff must stop growing at its cap');
+assert.ok([...timers.values()][0].delay <= 12000, 'jittered reconnect delay must remain within the cap');
+
+const [cappedTimerId, cappedReconnect] = [...timers.entries()][0];
+timers.delete(cappedTimerId);
+cappedReconnect.callback();
+deterministicMath.random = () => 1;
+eventSources.at(-1).listeners.get('error')();
+assert.equal(
+  [...timers.values()][0].delay,
+  12000,
+  'positive jitter at the exponential-backoff ceiling must not exceed the 12 second cap'
 );
 
 console.log('Community history idempotency check passed.');

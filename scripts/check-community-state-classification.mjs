@@ -72,16 +72,26 @@ function fakeClassList() {
 const communityCard = { classList: fakeClassList(), dataset: {} };
 const communityStatus = { textContent: '' };
 const loginCommunityName = { textContent: '' };
+const dispatchedEvents = [];
+class FakeCustomEvent {
+  constructor(type, init = {}) {
+    this.type = type;
+    this.detail = init.detail;
+  }
+}
 const sandbox = {
   JSON,
   Object,
   Array,
   String,
+  CustomEvent: FakeCustomEvent,
   document: {
     activeElement: null,
     createElement: () => ({ textContent: '', classList: fakeClassList() }),
   },
-  window: {},
+  window: {
+    dispatchEvent: (event) => dispatchedEvents.push(event),
+  },
   els: {
     communityCard,
     communityStatus,

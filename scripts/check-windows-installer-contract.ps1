@@ -155,8 +155,11 @@ $setupProgram = Read-Source 'native\windows\setup\Program.cs'
 $setupProject = Read-Source 'native\windows\setup\FeMonsterSetup.csproj'
 $clientProgram = Read-Source 'native\windows\winforms\Program.cs'
 $clientForm = Read-Source 'native\windows\winforms\FeMonsterForm.cs'
+$clientWebViewProfileMigration = Read-Source 'native\windows\winforms\WebView2ProfileMigration.cs'
+$clientLegacyDataMigration = Read-Source 'native\windows\winforms\LegacyDataDirectoryMigration.cs'
 $clientProject = Read-Source 'native\windows\winforms\FeMonsterClient.WinForms.csproj'
 $webClient = Read-Source 'web\app.js'
+$finalIsolatedInstallCheck = Read-Source 'scripts\check-final-installer-isolated-install.ps1'
 $cmake = Read-Source 'native\windows\CMakeLists.txt'
 $cargoConfig = Read-Source 'native\rust-audio-upmix\.cargo\config.toml'
 $nativeBuild = Read-Source 'scripts\build-xaudio2.ps1'
@@ -172,8 +175,8 @@ try {
 } catch {
   $failures.Add('package.json contains invalid JSON') | Out-Null
 }
-if ($releaseVersion -ne '2.0.1') {
-  $failures.Add("Windows installer release version must be 2.0.1, got '$releaseVersion'") | Out-Null
+if ($releaseVersion -ne '2.1.1') {
+  $failures.Add("Windows installer release version must be 2.1.1, got '$releaseVersion'") | Out-Null
 }
 if ($releaseVersion -match '^\d+\.\d+\.\d+$') {
   $releasePattern = [Regex]::Escape($releaseVersion)
@@ -187,6 +190,20 @@ if ($releaseVersion -match '^\d+\.\d+\.\d+$') {
   Assert-SourceMatch 'API version matches package.json' $apiRoutes "body\.put\(`"version`",\s*`"$releasePattern`"\)"
 } else {
   $failures.Add("package.json contains an invalid release version: '$releaseVersion'") | Out-Null
+}
+
+Assert-SourceMatch 'update agent reads the release community TLS pin' $updateAgent 'community-server-tls-pin\.txt'
+Assert-SourceMatch 'update agent uses a per-request certificate callback' $updateAgent 'ServerCertificateValidationCallback'
+Assert-SourceMatch 'update agent routes update checks through the pinned transport' $updateAgent 'Invoke-CommunityUpdateRequest\s+"\$server/api/update/latest'
+Assert-SourceNotMatch 'update agent does not call the HTTPS update endpoint without pinning' $updateAgent 'Invoke-RestMethod\s+-Uri\s+"\$server/api/update/latest'
+$updateAgentTlsCheck = Join-Path $rootPath 'scripts\check-update-agent-tls-pinning.ps1'
+if (!(Test-Path -LiteralPath $updateAgentTlsCheck -PathType Leaf)) {
+  $failures.Add('update agent TLS pinning regression check is missing') | Out-Null
+} else {
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $updateAgentTlsCheck
+  if ($LASTEXITCODE -ne 0) {
+    $failures.Add('update agent TLS pinning regression check failed') | Out-Null
+  }
 }
 
 Assert-SourceMatch 'setup is pinned to win-x64' $setupProject '<RuntimeIdentifier>win-x64</RuntimeIdentifier>'
@@ -209,6 +226,19 @@ Assert-SourceMatch 'setup has a selected-drive session-log fallback' $setupProgr
 Assert-SourceMatch 'setup accepts only explicitly marked retained user state for reinstall' $setupProgram '\.fe-monster-user-data'
 Assert-SourceMatch 'setup installation-space preflight includes preserved user state' $setupProgram 'GetPreservedUserStateBytes'
 Assert-SourceMatch 'setup reuses a registered existing installation directory' $setupProgram 'GetRegisteredInstallDir[\s\S]{0,1800}InstallLocation'
+Assert-SourceMatch `
+  'setup reuses a registered legacy jar plus VBS or run.cmd installation directory' `
+  $setupProgram `
+  'SelectRegisteredInstallDirectory[\s\S]{0,1800}fe-monster-java\.jar[\s\S]{0,900}FE Monster\.vbs[\s\S]{0,180}run\.cmd'
+$registeredUpgradePathCheck = Join-Path $rootPath 'scripts\check-setup-registered-upgrade-path.mjs'
+if (!(Test-Path -LiteralPath $registeredUpgradePathCheck -PathType Leaf)) {
+  $failures.Add('registered modern/legacy upgrade path regression check is missing') | Out-Null
+} else {
+  & node $registeredUpgradePathCheck
+  if ($LASTEXITCODE -ne 0) {
+    $failures.Add('registered modern/legacy upgrade path regression check failed') | Out-Null
+  }
+}
 Assert-SourceMatch 'setup refuses to kill an installation during the upgrade transaction' $setupProgram 'OnFormClosing[\s\S]{0,600}e\.Cancel\s*=\s*true'
 Assert-SourceNotMatch 'setup does not force-kill its transactional installer' $setupProgram 'installProcess\.Kill'
 
@@ -216,7 +246,20 @@ Assert-SourceMatch 'client is pinned to win-x64' $clientProject '<RuntimeIdentif
 Assert-SourceMatch 'client is self-contained' $clientProject '<SelfContained>true</SelfContained>'
 Assert-SourceMatch 'client executable is named FE Monster' $clientProject '<AssemblyName>FE Monster</AssemblyName>'
 Assert-SourceMatch 'client declares a Windows compatibility manifest' $clientProject '<ApplicationManifest>app\.manifest</ApplicationManifest>'
-Assert-SourceMatch 'new host isolates its WebView2 data from legacy clients' $clientForm 'profileFolder[\s\S]{0,180}"DesktopHostV2"[\s\S]{0,500}"WebView2"[\s\S]{0,100}profileFolder'
+Assert-SourceMatch 'new host isolates its WebView2 data from legacy clients' $clientForm 'profileFolder\s*=\s*testStorageKey[\s\S]{0,120}"DesktopHostV2"'
+Assert-SourceMatch 'new host resolves its production WebView2 root before selecting the isolated profile' $clientForm 'profileRoot\s*=\s*testStorageKey[\s\S]{0,160}ResolveWebView2DataRoot\(\)'
+Assert-SourceMatch 'new host migrates the legacy WebView2 profile before opening the current profile' $clientForm 'MigrateLegacyProfile[\s\S]{0,1800}webViewUserDataFolder\s*=\s*Path\.Combine\(profileRoot,\s*profileFolder\)'
+Assert-SourceMatch 'legacy WebView2 migration never overwrites current profile files' $clientWebViewProfileMigration 'if\s*\(File\.Exists\(destinationFile\)\)\s*return\s+0'
+Assert-SourceMatch 'legacy WebView2 migration skips reparse points' $clientWebViewProfileMigration 'AttributesToSkip\s*=\s*FileAttributes\.ReparsePoint'
+$legacyWebViewProfileCheck = Join-Path $rootPath 'scripts\check-webview2-legacy-profile-migration.mjs'
+if (!(Test-Path -LiteralPath $legacyWebViewProfileCheck -PathType Leaf)) {
+  $failures.Add('legacy WebView2 profile migration regression check is missing') | Out-Null
+} else {
+  & node $legacyWebViewProfileCheck
+  if ($LASTEXITCODE -ne 0) {
+    $failures.Add('legacy WebView2 profile migration regression check failed') | Out-Null
+  }
+}
 Assert-SourceMatch 'desktop-pet native tests isolate WebView2 storage under the temporary directory' $clientForm 'testStorageKey[\s\S]{0,500}Path\.GetTempPath\(\)'
 Assert-SourceMatch 'client owns the Java backend child process' $clientProgram '--server'
 Assert-SourceMatch 'client resolves its executable installation before environment or working-directory overrides' $clientProgram 'AddExecutableRootCandidates\(candidates\)[\s\S]{0,500}FE_MONSTER_ROOT[\s\S]{0,300}Environment\.CurrentDirectory'
@@ -224,6 +267,17 @@ Assert-SourceMatch 'client pins backend resource root to the resolved executable
 Assert-SourceMatch 'client pins backend web root to the resolved executable installation' $clientProgram 'startInfo\.Environment\["FE_MONSTER_WEB_ROOT"\]\s*=\s*Path\.Combine\(root,\s*"web"\)'
 Assert-SourceMatch 'client resolves one stable per-user data root across install locations and restarts' $clientProgram 'dataDirectory\s*=\s*ResolveStableDataDirectory\(root\)'
 Assert-SourceMatch 'client passes the stable data root to every backend restart' $clientProgram 'startInfo\.Environment\["FE_MONSTER_DATA_DIR"\]\s*=\s*dataDirectory'
+Assert-SourceMatch 'custom-install migration backs up conflicts before activating legacy user records' $clientLegacyDataMigration 'CopyAtomically\(destinationFile,\s*backupFile[\s\S]{0,260}CopyAtomically\(sourceFile,\s*destinationFile,\s*overwrite:\s*true\)'
+Assert-SourceMatch 'custom-install migration is idempotent after its completion marker' $clientLegacyDataMigration 'File\.Exists\(marker\)\)\s*return\s+default'
+$customInstallDataMigrationCheck = Join-Path $rootPath 'scripts\check-custom-install-data-migration.mjs'
+if (!(Test-Path -LiteralPath $customInstallDataMigrationCheck -PathType Leaf)) {
+  $failures.Add('custom-install data migration regression check is missing') | Out-Null
+} else {
+  & node $customInstallDataMigrationCheck
+  if ($LASTEXITCODE -ne 0) {
+    $failures.Add('custom-install data migration regression check failed') | Out-Null
+  }
+}
 Assert-SourceMatch 'client logs the Java child process id for CPU attribution' $clientProgram 'backend.*ProcessId|ProcessId.*backend'
 Assert-SourceMatch 'client prefers an explainably named backend process' $clientProgram 'FE Monster Backend\.exe'
 Assert-SourceMatch 'hidden single instance has an activation channel' $clientProgram 'UserActivationRequestName|ListenForActivation'
@@ -244,6 +298,14 @@ Assert-SourceNotMatch 'installer must not default to D drive' $installer "Test-P
 Assert-SourceNotMatch 'Java build must not depend on a developer D drive' $javaBuild 'D:\\java'
 Assert-SourceMatch 'Java build delegates to the version-checked PowerShell builder' $javaBuild 'build-java\.ps1'
 Assert-SourceMatch 'Java builder requires a complete JDK 17 or newer' $javaBuilder 'MinimumMajor\s+17'
+Assert-SourceMatch `
+  'installer rebuilds native audio when its sources are newer than the installed DLLs' `
+  $buildInstaller `
+  'nativeSourceIsNewer'
+Assert-SourceMatch `
+  'installer stages a newer verified side-by-side native audio runtime' `
+  $buildInstaller `
+  'native\\windows\\build-next'
 Assert-SourceNotMatch 'production launcher must not force preview native-access flags' $clientProgram '--enable-native-access'
 Assert-SourceNotMatch 'installed backend must not force preview native-access flags' $installer '--enable-native-access'
 Assert-SourceMatch 'installer accepts a payload pre-extracted by the .NET setup host' $installer '\[string\]\$PayloadRoot'
@@ -253,7 +315,42 @@ Assert-SourceMatch 'installer builds the bundled QQ API plugin' $buildInstaller 
 Assert-SourceMatch 'installer stages the bundled QQ API plugin' $buildInstaller 'FE-Monster-QQ-API-Plugin-2\.4\.1\.zip'
 Assert-SourceMatch 'installer writes pre-commit diagnostics outside the install root' $installer "FE Monster Setup"
 Assert-SourceMatch 'installer uses a cross-process mutation lock' $installer 'Enter-InstallMutationLock'
+Assert-SourceMatch `
+  'installer persists an interrupted-upgrade recovery marker before moving the active installation' `
+  $installer `
+  'Write-UpgradeRecoveryMarker\s+[\s\S]{0,300}Move-Item\s+-LiteralPath\s+\$installSafe\s+-Destination\s+\$script:upgradeBackupPath'
+Assert-SourceMatch `
+  'installer recovery marker binds both the exact target and exact backup name' `
+  $installer `
+  'schemaVersion\s*=\s*1[\s\S]{0,180}targetPath\s*=\s*\$targetFull[\s\S]{0,180}backupName\s*=\s*\$backupName'
+Assert-SourceMatch `
+  'installer recovery requires a strict random backup directory name' `
+  $installer `
+  '\^\\\.fm-backup-\[0-9a-f\]\{8\}\$'
+Assert-SourceMatch `
+  'installer recovery validates the backup as an FE Monster installation' `
+  $installer `
+  'function\s+Test-RecoverableFeMonsterBackup[\s\S]{0,2600}Test-ExistingFeMonsterInstall\s+\$backupFull'
+Assert-SourceMatch `
+  'installer fails closed when multiple interrupted-upgrade backups target one installation' `
+  $installer `
+  'recoverableBackups\.Count\s+-gt\s+1[\s\S]{0,200}stopped without moving either backup'
+Assert-SourceMatch `
+  'installer performs restart recovery under the install mutation lock before accepting the target' `
+  $installer `
+  'Enter-InstallMutationLock\s+\$installPath[\s\S]{0,180}Restore-InterruptedUpgradeIfNeeded\s+\$installPath[\s\S]{0,180}Assert-SafeInstallPath\s+\$installPath'
+Assert-SourceMatch `
+  'installer recovery safely removes only the empty placeholder created by native Setup' `
+  $installer `
+  'function\s+Restore-InterruptedUpgradeIfNeeded[\s\S]{0,2600}Get-ChildItem\s+-LiteralPath\s+\$targetFull[\s\S]{0,500}Remove-Item\s+-LiteralPath\s+\$targetFull\s+-Force\s+-ErrorAction\s+Stop[\s\S]{0,180}Move-Item\s+-LiteralPath\s+\$backupPath'
+Assert-SourceMatch `
+  'installer invalidates a committed backup before best-effort recursive cleanup' `
+  $installer `
+  'Remove-UpgradeRecoveryMarker\s+\$backupToDelete[\s\S]{0,180}Remove-Item\s+-LiteralPath\s+\$backupToDelete\s+-Recurse'
 Assert-SourceMatch 'installer verifies the installed payload manifest' $installer 'payload-integrity\.json'
+Assert-SourceMatch 'installer validates every payload manifest entry' $installer 'function\s+Test-PayloadIntegrity[\s\S]{0,900}foreach\s*\(\$entry\s+in\s+@\(\$manifest\.files\)\)'
+Assert-SourceMatch 'installer rejects missing manifest files' $installer 'function\s+Test-PayloadIntegrity[\s\S]{0,1500}is missing required file'
+Assert-SourceMatch 'installer rejects manifest hash mismatches' $installer 'function\s+Test-PayloadIntegrity[\s\S]{0,1900}SHA-256 mismatch'
 Assert-SourceMatch `
   'installer snapshots release-controlled community configuration before preserving user data' `
   $installer `
@@ -264,8 +361,15 @@ Assert-SourceMatch `
   'Restore-ReleaseControlledCommunityConfiguration[\s\S]{0,260}releaseCommunityConfigurationSnapshot'
 foreach ($desktopPetRuntime in @(
   'web\cache-fingerprints.json',
+  'web\client-ai-service.js',
+  'web\pet-affect-plan.js',
+  'web\settings-center.js',
+  'web\audio-mixer-ui.js',
+  'web\audio-mixer-visuals.js',
+  'web\runtime-module-loader.js',
   'web\app-command.js',
   'web\playback-intelligence.js',
+  'web\companion-care-actions.js',
   'web\wallpaper-video-continuity.js',
   'web\pet-emotion-runtime.js',
   'web\pet-client-context.js',
@@ -295,6 +399,62 @@ foreach ($desktopPetRuntime in @(
   $desktopPetPattern = [regex]::Escape($desktopPetRuntime)
   Assert-SourceMatch "build protects required desktop-pet runtime $desktopPetRuntime" $buildInstaller $desktopPetPattern
   Assert-SourceMatch "installer verifies required desktop-pet runtime $desktopPetRuntime" $installer $desktopPetPattern
+}
+
+function Get-TextSha256 {
+  param([Parameter(Mandatory)][string]$Value)
+
+  $sha256 = [Security.Cryptography.SHA256]::Create()
+  try {
+    $bytes = [Text.Encoding]::UTF8.GetBytes($Value)
+    return ([BitConverter]::ToString($sha256.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant()
+  } finally {
+    $sha256.Dispose()
+  }
+}
+$soundscapeRuntimeFiles = @(
+  'web\soundscape-runtime.js',
+  'web\assets\soundscape-workshop\runtime.html',
+  'web\assets\soundscape-workshop\bridge.js',
+  'web\assets\soundscape-workshop\project.json',
+  'web\assets\soundscape-workshop\preview.gif',
+  'web\assets\soundscape-workshop\assets\index-CSU_B_T9.js',
+  'web\assets\soundscape-workshop\assets\index-DgmMz9-g.css'
+)
+foreach ($soundscapeRuntimeFile in $soundscapeRuntimeFiles) {
+  $soundscapeRuntimePattern = [regex]::Escape($soundscapeRuntimeFile)
+  Assert-SourceMatch `
+    "build requires soundscape runtime $soundscapeRuntimeFile" `
+    $buildInstaller `
+    "function\s+Stage-Payload[\s\S]{0,18000}'$soundscapeRuntimePattern'"
+  Assert-SourceMatch `
+    "installer verifies soundscape runtime $soundscapeRuntimeFile" `
+    $installer `
+    "function\s+Assert-RequiredFiles[\s\S]{0,7000}'$soundscapeRuntimePattern'"
+  Assert-SourceMatch `
+    "isolated install verifies soundscape runtime $soundscapeRuntimeFile" `
+    $finalIsolatedInstallCheck `
+    "\`$criticalRelativeFiles\s*=\s*@\([\s\S]{0,5000}'$soundscapeRuntimePattern'"
+}
+$settingsUiRuntimeFiles = @(
+  'web\settings-center.js',
+  'web\audio-mixer-ui.js',
+  'web\audio-mixer-visuals.js'
+)
+foreach ($settingsUiRuntimeFile in $settingsUiRuntimeFiles) {
+  $settingsUiRuntimePattern = [regex]::Escape($settingsUiRuntimeFile)
+  Assert-SourceMatch `
+    "build requires settings runtime $settingsUiRuntimeFile" `
+    $buildInstaller `
+    "function\s+Stage-Payload[\s\S]{0,18000}'$settingsUiRuntimePattern'"
+  Assert-SourceMatch `
+    "installer verifies settings runtime $settingsUiRuntimeFile" `
+    $installer `
+    "function\s+Assert-RequiredFiles[\s\S]{0,7000}'$settingsUiRuntimePattern'"
+  Assert-SourceMatch `
+    "isolated install verifies settings runtime $settingsUiRuntimeFile" `
+    $finalIsolatedInstallCheck `
+    "\`$criticalRelativeFiles\s*=\s*@\([\s\S]{0,5000}'$settingsUiRuntimePattern'"
 }
 foreach ($releaseCriticalFile in @(
   'scripts\install-fe-monster.ps1',
@@ -352,7 +512,8 @@ Assert-SourceMatch 'runtime check validates Microsoft Authenticode before execut
 Assert-SourceMatch 'runtime check retains the official online bootstrapper fallback' $dependencies 'LinkId=2124703'
 Assert-SourceMatch 'runtime bootstrapper download retries transient failures' $dependencies 'attempt\s*=\s*1;[\s\S]{0,100}attempt\s*-le\s*3'
 Assert-SourceMatch 'WebView2 reboot-required result is surfaced and rechecked' $dependencies 'ExitCode\s*-eq\s*3010[\s\S]{0,180}Runtime is already detectable'
-Assert-SourceMatch 'WebView2 network failure recommends the complete offline installer' $dependencies 'FE-Monster-Setup-2\.0\.1-Offline\.exe'
+Assert-SourceMatch 'online WebView2 failure links to Microsoft recovery' $dependencies 'https://developer\.microsoft\.com/[\s\S]{0,160}webview2'
+Assert-SourceNotMatch 'online WebView2 failure must not redirect to another installer flavor' $dependencies 'FE-Monster-Setup-[\s\S]{0,100}-Offline\.exe'
 
 Assert-SourceMatch 'launcher delegates to the named main executable' $launcher "FE Monster\.exe"
 Assert-SourceNotMatch 'launcher does not directly start javaw' $launcher 'Start-Process\s+-FilePath\s+\$javaExe'
@@ -387,7 +548,8 @@ Assert-SourceMatch 'build defaults to the smaller online WebView2 installer mode
 Assert-SourceMatch 'build exposes a complete offline WebView2 installer mode' $buildInstaller "ValidateSet\('Online',\s*'Offline'\)"
 Assert-SourceMatch 'build downloads the WebView2 x64 standalone installer from the official link' $buildInstaller 'LinkId=2124701'
 Assert-SourceMatch 'build validates the WebView2 installer Microsoft signature' $buildInstaller 'Assert-MicrosoftSignedExecutable'
-Assert-SourceMatch 'payload integrity manifest hashes the WebView2 offline installer' $buildInstaller "New-PayloadIntegrityManifest[\s\S]+runtime\\installers\\MicrosoftEdgeWebView2RuntimeInstallerX64\.exe"
+Assert-SourceMatch 'payload integrity manifest enumerates every staged file' $buildInstaller 'function\s+New-PayloadIntegrityManifest[\s\S]{0,900}Get-ChildItem[\s\S]{0,180}-Recurse\s+-File\s+-Force'
+Assert-SourceMatch 'payload integrity manifest excludes itself from its file list' $buildInstaller 'function\s+New-PayloadIntegrityManifest[\s\S]{0,500}\$manifestPath[\s\S]{0,500}StringComparison\]::OrdinalIgnoreCase'
 Assert-SourceMatch 'reused payload zip is checked against the selected WebView2 mode' $buildInstaller 'hasOfflineWebView2[\s\S]{0,500}includeOfflineWebView2'
 Assert-SourceMatch 'build cleanup is isolated from installer smoke/output artifacts' $buildInstaller "out\\installer\\work"
 Assert-SourceMatch 'build validates PE x64 architecture' $buildInstaller 'Get-PeMachine'
@@ -398,7 +560,7 @@ Assert-SourceMatch 'build stages community configuration through an explicit pol
 Assert-SourceMatch 'developer community configuration rejects non-HTTPS release URLs' $buildInstaller 'Developer community server URL must use HTTPS'
 Assert-SourceMatch 'community configuration policy rejects loopback IP addresses' $buildInstaller 'IPAddress\]::IsLoopback'
 Assert-SourceMatch 'build exposes an explicit release community server URL' $buildInstaller '\[string\]\$CommunityServerUrl\s*=\s*\$Env:FE_MONSTER_RELEASE_COMMUNITY_URL'
-Assert-SourceMatch 'explicit release community URL takes priority over developer data' $buildInstaller 'function\s+Stage-CommunityServerConfiguration[\s\S]{0,260}\$CommunityServerUrl[\s\S]{0,1800}return[\s\S]{0,220}community-server-url\.txt'
+Assert-SourceMatch 'explicit release community URL takes priority over developer data' $buildInstaller 'function\s+Stage-CommunityServerConfiguration[\s\S]{0,260}\$CommunityServerUrl[\s\S]{0,900}community-server-url\.txt[\s\S]{0,1200}return[\s\S]{0,500}\$communityUrlFile'
 Assert-SourceMatch 'explicit release community URL requires HTTPS' $buildInstaller 'Assert-PublicCommunityServerUrl[\s\S]{0,700}UriSchemeHttps'
 Assert-SourceMatch 'explicit release community host addresses are resolved' $buildInstaller 'function\s+Resolve-CommunityServerAddresses[\s\S]{0,700}GetHostAddresses'
 Assert-SourceMatch 'explicit release community URL rejects non-public addresses' $buildInstaller 'Test-IsPublicCommunityAddress'
@@ -439,6 +601,30 @@ Assert-SourceMatch 'MSVC native targets use the static CRT' $cmake 'CMAKE_MSVC_R
 Assert-SourceMatch 'Abseil uses the same static CRT as the native targets' $cmake 'ABSL_MSVC_STATIC_RUNTIME\s+ON'
 Assert-SourceMatch 'Rust native DLL uses the static CRT' $cargoConfig 'crt-static'
 Assert-SourceMatch 'Rust build loads the crate-local static-CRT config' $nativeBuild 'Push-Location\s+\(Split-Path\s+-Parent\s+\$rustManifest\)'
+Assert-SourceMatch `
+  'native audio build emits a same-invocation pair manifest' `
+  $nativeBuild `
+  '\$xaudioSha256\s*=\s*\(Get-FileHash[^\r\n]+\$stagedDll[\s\S]{0,500}\$upmixSha256\s*=\s*\(Get-FileHash[^\r\n]+\$stagedRustUpmixDll[\s\S]{0,900}\$nativeAudioBuildManifest\s*=\s*\[ordered\]'
+Assert-SourceMatch `
+  'native audio build copies the pair manifest after both DLLs' `
+  $nativeBuild `
+  'Copy-Item[^\r\n]+\$stagedDll[\s\S]{0,500}Copy-Item[^\r\n]+\$stagedRustUpmixDll[\s\S]{0,500}Copy-Item[^\r\n]+\$stagedBuildManifest'
+Assert-SourceMatch `
+  'installer accepts only hash-verified native audio pairs' `
+  $buildInstaller `
+  'function\s+Assert-NativeAudioBuildPair[\s\S]{0,4500}xaudio2Sha256[\s\S]{0,1200}upmixSha256[\s\S]{0,1200}pairSha256'
+Assert-SourceMatch `
+  'installer validates each runtime candidate pair before selection' `
+  $buildInstaller `
+  'function\s+Resolve-NativeAudioRuntimeSource[\s\S]{0,900}Assert-NativeAudioBuildPair'
+Assert-SourceMatch `
+  'installer stages the native audio pair manifest' `
+  $buildInstaller `
+  "native-audio-build\.json"
+Assert-SourceMatch `
+  'installed runtime requires the native audio pair manifest' `
+  $installer `
+  "native\\windows\\build\\native-audio-build\.json"
 
 if (![string]::IsNullOrWhiteSpace($PayloadRoot)) {
   $payloadPath = (Resolve-Path -LiteralPath $PayloadRoot).Path
@@ -447,7 +633,79 @@ if (![string]::IsNullOrWhiteSpace($PayloadRoot)) {
     $failures.Add('staged payload manifest is missing') | Out-Null
   } else {
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-    foreach ($entry in @($manifest.files)) {
+    $manifestEntries = @($manifest.files)
+    $manifestRelativePaths = @($manifestEntries | ForEach-Object {
+      ([string]$_.path).Replace('\', '/')
+    })
+    $ordinalSortedManifestPaths = [string[]]@($manifestRelativePaths)
+    [Array]::Sort($ordinalSortedManifestPaths, [StringComparer]::Ordinal)
+    for ($index = 0; $index -lt $manifestRelativePaths.Count; $index++) {
+      if (![string]::Equals(
+          $manifestRelativePaths[$index],
+          $ordinalSortedManifestPaths[$index],
+          [StringComparison]::Ordinal)) {
+        $failures.Add('staged payload manifest paths are not in stable ordinal order') | Out-Null
+        break
+      }
+    }
+
+    $manifestPathSet = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($relative in $manifestRelativePaths) {
+      if ([string]::IsNullOrWhiteSpace($relative)) {
+        $failures.Add('staged payload manifest contains an empty path') | Out-Null
+      } elseif (!$manifestPathSet.Add($relative)) {
+        $failures.Add("staged payload manifest contains a duplicate path: $relative") | Out-Null
+      }
+    }
+
+    $actualPayloadRelativePaths = @(Get-ChildItem -LiteralPath $payloadPath -Recurse -File -Force |
+      Where-Object {
+        ![string]::Equals($_.FullName, $manifestPath, [StringComparison]::OrdinalIgnoreCase)
+      } |
+      ForEach-Object {
+        $_.FullName.Substring($payloadPath.Length).TrimStart('\').Replace('\', '/')
+      })
+    if ($actualPayloadRelativePaths.Count -ne $manifestEntries.Count) {
+      $failures.Add(
+        "staged payload manifest covers $($manifestEntries.Count) files, but payload contains $($actualPayloadRelativePaths.Count) files besides the manifest"
+      ) | Out-Null
+    }
+    $actualPayloadPathSet = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($relative in $actualPayloadRelativePaths) {
+      [void]$actualPayloadPathSet.Add($relative)
+    }
+    foreach ($relative in $actualPayloadRelativePaths) {
+      if (!$manifestPathSet.Contains($relative)) {
+        $failures.Add("staged payload file is absent from manifest: $relative") | Out-Null
+      }
+    }
+    foreach ($relative in $manifestRelativePaths) {
+      if (!$actualPayloadPathSet.Contains($relative)) {
+        $failures.Add("staged payload manifest references an absent file: $relative") | Out-Null
+      }
+    }
+
+    $expectedNativeAmd64Paths = [string[]]@(
+      'native/windows/build/fe-monster-xaudio2.dll',
+      'native/windows/build/fe_monster_upmix.dll',
+      'native/windows/build/winforms/FE Monster.exe',
+      'native/windows/build/winforms/WebView2Loader.dll',
+      'runtime/java/bin/FE Monster Backend.exe',
+      'runtime/java/bin/java.exe',
+      'runtime/java/bin/javaw.exe'
+    )
+    [Array]::Sort($expectedNativeAmd64Paths, [StringComparer]::Ordinal)
+    $actualNativeAmd64Paths = [string[]]@($manifestEntries |
+      Where-Object { $null -ne $_.peMachine -and [int]$_.peMachine -ne 0 } |
+      ForEach-Object { ([string]$_.path).Replace('\', '/') })
+    [Array]::Sort($actualNativeAmd64Paths, [StringComparer]::Ordinal)
+    if (($actualNativeAmd64Paths -join '|') -cne ($expectedNativeAmd64Paths -join '|')) {
+      $failures.Add(
+        "staged payload x64 PE contract applies to an unexpected set: $($actualNativeAmd64Paths -join ', ')"
+      ) | Out-Null
+    }
+
+    foreach ($entry in $manifestEntries) {
       $relative = ([string]$entry.path).Replace('/', '\')
       $path = Join-Path $payloadPath $relative
       if (!(Test-Path -LiteralPath $path -PathType Leaf)) {
@@ -461,6 +719,40 @@ if (![string]::IsNullOrWhiteSpace($PayloadRoot)) {
       if ($entry.peMachine -and (Get-PeMachine $path) -ne [int]$entry.peMachine) {
         $failures.Add("staged payload PE architecture mismatch: $relative") | Out-Null
       }
+    }
+
+    $nativePairRoot = Join-Path $payloadPath 'native\windows\build'
+    $nativePairManifestPath = Join-Path $nativePairRoot 'native-audio-build.json'
+    try {
+      if (!(Test-Path -LiteralPath $nativePairManifestPath -PathType Leaf)) {
+        throw 'native audio pair manifest is missing'
+      }
+      $nativePairManifest = Get-Content -LiteralPath $nativePairManifestPath -Raw -Encoding UTF8 |
+        ConvertFrom-Json
+      if ([int]$nativePairManifest.schemaVersion -ne 1) {
+        throw 'native audio pair manifest schema is unsupported'
+      }
+      if ([string]$nativePairManifest.buildId -notmatch '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$') {
+        throw 'native audio pair build ID is invalid'
+      }
+      $nativeXaudioHash = (Get-FileHash `
+        -LiteralPath (Join-Path $nativePairRoot 'fe-monster-xaudio2.dll') `
+        -Algorithm SHA256).Hash.ToLowerInvariant()
+      $nativeUpmixHash = (Get-FileHash `
+        -LiteralPath (Join-Path $nativePairRoot 'fe_monster_upmix.dll') `
+        -Algorithm SHA256).Hash.ToLowerInvariant()
+      if ($nativeXaudioHash -cne [string]$nativePairManifest.xaudio2Sha256) {
+        throw 'staged XAudio2 DLL does not match its native build manifest'
+      }
+      if ($nativeUpmixHash -cne [string]$nativePairManifest.upmixSha256) {
+        throw 'staged Rust upmix DLL does not match its native build manifest'
+      }
+      $nativePairMaterial = "fe-monster-xaudio2.dll=$nativeXaudioHash`nfe_monster_upmix.dll=$nativeUpmixHash"
+      if ((Get-TextSha256 -Value $nativePairMaterial) -cne [string]$nativePairManifest.pairSha256) {
+        throw 'staged native audio pair digest does not match its build manifest'
+      }
+    } catch {
+      $failures.Add("staged native audio build pair is invalid: $($_.Exception.Message)") | Out-Null
     }
     foreach ($sourceMatchedRelative in @(
       'scripts\install-fe-monster.ps1',

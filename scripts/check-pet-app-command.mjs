@@ -9,6 +9,7 @@ const commandSource = read('web/app-command.js');
 const appSource = read('web/app.js');
 const petSource = read('web/pet-assistant.js');
 const html = read('web/index.html');
+const loader = read('web/runtime-module-loader.js');
 
 class FixtureCustomEvent {
   constructor(type, options = {}) {
@@ -88,6 +89,18 @@ await assert.rejects(
 assert.equal(requiredParameterHandlerCalls, 0, 'a command with missing required parameters reached its handler');
 assert.equal((await bus.execute('fixture.toggle.set', { value: false })).enabled, false,
   'an explicit false value must count as a provided required parameter');
+assert.throws(
+  () => bus.inspect('fixture.toggle.set', { value: 'false' }),
+  (error) => error?.code === 'invalid_parameter_type',
+  'inspection accepted a string fallback for a boolean write parameter'
+);
+await assert.rejects(
+  () => bus.execute('fixture.toggle.set', { enabled: 1 }),
+  (error) => error?.code === 'invalid_parameter_type',
+  'execution accepted a numeric fallback for a boolean write parameter'
+);
+assert.equal(requiredParameterHandlerCalls, 1,
+  'an invalid boolean write reached the production command handler');
 
 bus.register({
   command: 'fixture.dynamic.setting',
@@ -138,6 +151,30 @@ assert.equal(capabilities.total, 6);
 assert.equal(capabilities.nextCursor, null);
 assert.equal(bus.capabilities({ query: 'volume', limit: 1 }).commands[0].command, 'fixture.volume.set');
 assert.equal(bus.capabilities({ query: 'missing' }).total, 0);
+
+bus.register({
+  command: 'playback.restart',
+  category: 'playback',
+  reversible: true,
+  handler() {
+    return {
+      restarted: true,
+      undo: { command: 'playback.seek.set', parameters: { seconds: 42 } }
+    };
+  }
+});
+assert.equal((await bus.execute('playback.restart')).restarted, true,
+  'a media playback restart must not be mistaken for a protected system restart');
+for (const command of [
+  'restart', 'system.restart', 'server.restart', 'service.restart', 'app.restart',
+  'client.restart', 'process.restart', 'restart.client'
+]) {
+  assert.throws(
+    () => bus.register({ command, category: 'settings', handler() {} }),
+    (error) => error?.code === 'denied_command',
+    `protected lifecycle command ${command} was accepted`
+  );
+}
 
 bus.register({
   command: 'playlist.item.remove',
@@ -191,8 +228,10 @@ assert.equal(
   'the locally registered read-only command may remain non-mutating'
 );
 
-assert.match(html, /app-command\.js[^>]*>[\s\S]*app\.js[^>]*>[\s\S]*pet-assistant\.js/,
-  'command bus must load before the app and pet adapters');
+assert.match(html, /app-command\.js[^>]*>[\s\S]*app\.js[^>]*>[\s\S]*runtime-module-loader\.js/,
+  'command bus must load before the app and the pet runtime loader');
+assert.ok(loader.indexOf('pet-assistant.js') >= 0,
+  'the pet runtime loader must deliver pet-assistant.js');
 assert.doesNotMatch(appSource, /const\s+PET_ASSISTANT_ACTIONS\s*=\s*new Set/,
   'the old fixed pet action whitelist is still active');
 assert.match(appSource, /registerPetAssistantAppCommands\(\)/);
@@ -220,6 +259,21 @@ assert.match(appSource, /commands\.capabilities\(args\)/,
 assert.match(appSource, /petAssistantPaginate\(petAssistantPresetCatalog\(args\), args\)/,
   'dynamic preset catalogs are not paginated');
 assert.match(appSource, /name === 'control_app' \|\| name === 'execute_app_command'/);
+assert.match(
+  appSource,
+  /function\s+petAssistantCommandContext[\s\S]{0,800}automatic:\s*context\.automatic\s*===\s*true[\s\S]{0,250}proactive:\s*context\.proactive\s*===\s*true[\s\S]{0,350}operationId:/,
+  'the app bridge drops automatic or operation identity before the command bus'
+);
+assert.match(
+  appSource,
+  /FeMonsterAppCommands\.inspect\([\s\S]{0,120}requestedCommand,[\s\S]{0,80}parameters,[\s\S]{0,80}petAssistantCommandContext\(/,
+  'generic control_app inspection bypasses the trusted command context adapter'
+);
+assert.match(
+  appSource,
+  /FeMonsterAppCommands\.execute\([\s\S]{0,120}requestedCommand,[\s\S]{0,80}parameters,[\s\S]{0,80}petAssistantCommandContext\(/,
+  'generic control_app execution bypasses the trusted command context adapter'
+);
 assert.match(appSource, /resolvePetAssistantRoutableCommand\(name\)/,
   'direct registered command names are not routed through the local registry');
 assert.match(appSource, /FeMonsterAppCommands\.resolve\(name\)\.command/,
@@ -231,6 +285,15 @@ assert.match(appSource, /aliases:\s*\[[^\]]*'preset\.switch'/,
 assert.match(petSource, /FeMonsterPetActionBridge\?\.execute/);
 assert.doesNotMatch(petSource, /actions\?\.includes/);
 assert.match(petSource, /requestActionConfirmation\(payload, inspection/);
+assert.match(
+  petSource,
+  /const\s+actionCommandContext\s*=\s*Object\.freeze\([\s\S]{0,500}operationId:\s*actionId[\s\S]{0,300}automatic:\s*payload\.automatic\s*===\s*true\s*\|\|\s*payload\.automaticExecutionRequested\s*===\s*true[\s\S]{0,300}proactive:\s*payload\.proactive\s*===\s*true/,
+  'server tool events do not derive trusted automatic and idempotency context from the outer action payload'
+);
+assert.match(petSource, /\.inspect\?\.\(actionEnvelope,\s*actionCommandContext\)/,
+  'server action inspection does not receive the trusted automatic context');
+assert.match(petSource, /FeMonsterPetActionBridge\.execute\(actionEnvelope,\s*\{[\s\S]{0,200}\.\.\.actionCommandContext/,
+  'server action execution does not receive the same automatic context used during inspection');
 assert.match(petSource, /sourceTrust\s*===\s*['"]untrusted-external-web['"]/);
 assert.match(petSource, /provenance\.taintedByExternalContent[\s\S]*inspection\?\.readOnly\s*!==\s*true/,
   'client provenance handling must use the local inspected readOnly definition');
@@ -241,7 +304,9 @@ assert.match(petSource, /compactActionResult/,
   'client action results are not kept under the server payload budget');
 assert.match(petSource, /cancelAllActionConfirmations\(\)/,
   'hiding the mascot can leave confirmation promises unresolved');
-assert.match(petSource, /\{ sessionId, actionId, cancelled: true \}/);
+assert.match(petSource, /\{ sessionId, actionId, clientRole: petClientRole\(\), cancelled: true \}/);
+assert.match(petSource, /targetStreamRole === petClientRole\(\)/,
+  'same-computer desktop roles must not race the originating role for one action');
 assert.match(petSource, /\.\.\.\(confirmed \? \{ confirmed: true \} : \{\}\)/);
 assert.ok(
   petSource.indexOf('await requestActionConfirmation(payload, inspection') < petSource.indexOf("/api/community/pet/action-claim"),

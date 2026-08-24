@@ -13,7 +13,7 @@ if (!(Test-Path -LiteralPath $outDir)) { New-Item -ItemType Directory -Path $out
 function Test-DownloadSite {
   try {
     $response = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$Port/" -TimeoutSec 3
-    return $response.StatusCode -eq 200 -and $response.Content -match 'FE-Monster-Setup-2\.0\.1\.exe'
+    return $response.StatusCode -eq 200 -and $response.Content -match 'FE-Monster-Setup-2\.1\.1\.exe'
   } catch {
     return $false
   }

@@ -48,9 +48,13 @@ public final class CommunityEventSignatureProbe {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         var executor = Executors.newCachedThreadPool();
         List<String> nonces = new ArrayList<>();
+        List<String> queries = new ArrayList<>();
         server.createContext("/api/community/events", exchange -> {
             synchronized (nonces) {
                 nonces.add(exchange.getRequestHeaders().getFirst(CommunitySignature.NONCE_HEADER));
+            }
+            synchronized (queries) {
+                queries.add(exchange.getRequestURI().getRawQuery());
             }
             byte[] body = "event: community-ready\ndata: {\"ok\":true}\n\n".getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "text/event-stream; charset=utf-8");
@@ -70,7 +74,11 @@ public final class CommunityEventSignatureProbe {
             CommunityModuleBridge bridge = new CommunityModuleBridge(null);
             CommunityService service = new CommunityService(config, null, bridge);
             for (int attempt = 0; attempt < 2; attempt += 1) {
-                HttpResponse<java.io.InputStream> response = service.eventStream("FE-fixture", String.valueOf(attempt));
+                HttpResponse<java.io.InputStream> response = service.eventStream(
+                    "FE-fixture",
+                    String.valueOf(attempt),
+                    "desktop-pet"
+                );
                 require(response.statusCode() == 200, "event stream returned " + response.statusCode());
                 try (var input = response.body()) {
                     input.readAllBytes();
@@ -79,6 +87,10 @@ public final class CommunityEventSignatureProbe {
             require(nonces.size() == 2, "expected two signed event requests, got " + nonces.size());
             require(nonces.get(0) != null && nonces.get(1) != null, "event request was unsigned");
             require(!nonces.get(0).equals(nonces.get(1)), "event reconnect reused its signature nonce");
+            require(
+                queries.size() == 2 && queries.stream().allMatch(query -> query != null && query.contains("streamRole=desktop-pet")),
+                "event stream role was not forwarded consistently: " + queries
+            );
             require(SigningModule.SIGNATURES.get() == 2, "unexpected signature count");
             System.out.println("CommunityEventSignatureProbe passed: nonces=" + nonces);
         } finally {

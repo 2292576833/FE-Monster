@@ -11,6 +11,8 @@ if (Test-Path $javaRuntimeScript) {
   . $javaRuntimeScript
 }
 $preferredJavaMajor = if (Get-Variable -Name PreferredJavaMajor -Scope Script -ErrorAction SilentlyContinue) { [int]$Script:PreferredJavaMajor } else { 17 }
+$webView2InstallerTimeoutMs = 180000
+$wingetInstallerTimeoutMs = 180000
 
 function Find-Exe {
   param(
@@ -71,13 +73,55 @@ function Test-WebView2Runtime {
     "HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients\$runtimeClientId"
   )
   foreach ($path in $registryPaths) {
-    $properties = Get-ItemProperty -LiteralPath $path -Name 'pv' -ErrorAction SilentlyContinue
+    $properties = Get-ItemProperty -LiteralPath $path -Name @('pv', 'location') -ErrorAction SilentlyContinue
     $version = if ($null -eq $properties) { '' } else { [string]$properties.pv }
     if (![string]::IsNullOrWhiteSpace($version)) {
       $parsedVersion = $null
       if ([version]::TryParse($version, [ref]$parsedVersion) -and
           $parsedVersion -gt [version]'0.0.0.0') {
-        return $true
+        $candidateLocations = New-Object System.Collections.Generic.List[string]
+        $location = [string]$properties.location
+        if (![string]::IsNullOrWhiteSpace($location)) {
+          $candidateLocations.Add($location) | Out-Null
+        }
+        foreach ($standardLocation in @(
+          (Join-Path ${Env:ProgramFiles(x86)} 'Microsoft\EdgeWebView\Application'),
+          (Join-Path $Env:ProgramFiles 'Microsoft\EdgeWebView\Application'),
+          (Join-Path $Env:LOCALAPPDATA 'Microsoft\EdgeWebView\Application')
+        )) {
+          if (!$candidateLocations.Contains($standardLocation)) {
+            $candidateLocations.Add($standardLocation) | Out-Null
+          }
+        }
+        foreach ($candidateLocation in $candidateLocations) {
+          $runtimeExecutable = Join-Path `
+            $candidateLocation `
+            (Join-Path $parsedVersion.ToString() 'msedgewebview2.exe')
+          if (Test-Path -LiteralPath $runtimeExecutable -PathType Leaf) {
+            try {
+              $runtimeFile = Get-Item -LiteralPath $runtimeExecutable
+              $fileVersion = $null
+              if ([version]::TryParse(
+                  [string]$runtimeFile.VersionInfo.ProductVersion,
+                  [ref]$fileVersion
+              ) -and $fileVersion -eq $parsedVersion) {
+                $probe = Start-Process `
+                  -FilePath $runtimeExecutable `
+                  -ArgumentList @('--embedded-browser-webview=1', '--version') `
+                  -WindowStyle Hidden `
+                  -PassThru
+                if ($null -ne $probe -and $probe.WaitForExit(5000)) {
+                  if ($probe.ExitCode -eq 0) { return $true }
+                  continue
+                }
+                if ($null -ne $probe) {
+                  try { Stop-Process -Id $probe.Id -Force -ErrorAction SilentlyContinue } catch {}
+                }
+              }
+            } catch {
+            }
+          }
+        }
       }
     }
   }
@@ -101,8 +145,31 @@ function Install-WingetPackage {
   }
 
   Write-Host "Installing $Name ($Id)..."
-  & $winget.Source install --id $Id --exact --silent --accept-package-agreements --accept-source-agreements
-  return $LASTEXITCODE -eq 0
+  try {
+    $process = Start-Process `
+      -FilePath $winget.Source `
+      -ArgumentList @(
+        'install', '--id', $Id, '--exact', '--silent',
+        '--accept-package-agreements', '--accept-source-agreements'
+      ) `
+      -WindowStyle Hidden `
+      -PassThru
+  } catch {
+    Write-Host "winget could not start for ${Name}: $($_.Exception.Message)"
+    return $false
+  }
+  if ($null -eq $process -or !$process.WaitForExit($wingetInstallerTimeoutMs)) {
+    if ($null -ne $process) {
+      try { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue } catch {}
+    }
+    Write-Host ("winget timed out after {0} seconds." -f [Math]::Ceiling($wingetInstallerTimeoutMs / 1000))
+    return $false
+  }
+  if ($process.ExitCode -ne 0) {
+    Write-Host "winget failed for $Name with exit code $($process.ExitCode)."
+    return $false
+  }
+  return $true
 }
 
 function Test-MicrosoftSignedExecutable {
@@ -184,10 +251,16 @@ function Invoke-WebView2RuntimeInstaller {
       -FilePath $InstallerPath `
       -ArgumentList @('/silent', '/install') `
       -WindowStyle Hidden `
-      -Wait `
       -PassThru
   } catch {
     Write-Host "WebView2 installer could not start: $($_.Exception.Message)"
+    return $false
+  }
+  if ($null -eq $process -or !$process.WaitForExit($webView2InstallerTimeoutMs)) {
+    if ($null -ne $process) {
+      try { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue } catch {}
+    }
+    Write-Host 'WebView2 installer timed out after 180 seconds.'
     return $false
   }
   $acceptedExitCode = $process.ExitCode -in @(0, 3010)
@@ -267,13 +340,13 @@ function Ensure-WebView2Runtime {
       return
     }
 
-    if ((Install-WingetPackage $label 'Microsoft.EdgeWebView2Runtime') -and (Test-WebView2Runtime)) {
-      Write-Host "${label}: installed with winget"
+    if (Install-WebView2Bootstrapper) {
+      Write-Host "${label}: installed with the Microsoft bootstrapper"
       return
     }
 
-    if (Install-WebView2Bootstrapper) {
-      Write-Host "${label}: installed with the Microsoft bootstrapper"
+    if ((Install-WingetPackage $label 'Microsoft.EdgeWebView2Runtime') -and (Test-WebView2Runtime)) {
+      Write-Host "${label}: installed with winget"
       return
     }
   }
@@ -281,8 +354,9 @@ function Ensure-WebView2Runtime {
   Write-Host "${label}: missing"
   Write-Host (
     'WebView2 could not be installed from the network. ' +
-    'Connect this computer to the Internet and retry, or download or request ' +
-    'FE-Monster-Setup-2.0.1-Offline.exe, which includes the signed WebView2 Runtime.'
+    'Check the Internet connection and retry this FE Monster online installer. ' +
+    'If Microsoft downloads are blocked, install WebView2 from the official page and retry: ' +
+    'https://developer.microsoft.com/microsoft-edge/webview2/'
   )
   $missing.Add($label) | Out-Null
 }

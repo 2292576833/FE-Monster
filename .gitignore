@@ -78,6 +78,15 @@ videos/
 .tmp-hyperframes/
 *.blend1
 
+# Local browser automation, diagnostics, and test evidence
+.playwright-cli/
+.superpowers/
+.tmp-*/
+test-results/
+tmp-diag*/
+tmp-wv2t/
+javac.*.args
+
 # Rust native audio build output
 native/rust-audio-upmix/target/
 

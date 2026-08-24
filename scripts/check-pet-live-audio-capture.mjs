@@ -84,8 +84,10 @@ assert.match(assistant, /new AudioWorkletNode\([\s\S]{0,180}?'fe-pet-live-captur
   'the pet assistant does not create the live capture AudioWorkletNode');
 assert.match(assistant, /createScriptProcessor\(/,
   'older WebView2 builds lost the ScriptProcessor compatibility fallback');
-assert.ok((installer.match(/web\\pet-live-audio-worklet\.js/g) || []).length >= 2,
-  'the live capture worklet is not required by both installer manifests');
+assert.ok((installer.match(/web\\pet-live-audio-worklet\.js/g) || []).length >= 1,
+  'the live capture worklet is not staged by the installer payload list');
+assert.match(installer, /function\s+New-PayloadIntegrityManifest[\s\S]{0,900}Get-ChildItem[\s\S]{0,180}-Recurse\s+-File\s+-Force/,
+  'the integrity manifest no longer auto-covers the staged live capture worklet');
 assert.match(installScript, /'web\\pet-live-audio-worklet\.js'/,
   'the installed-payload verifier does not require the live capture worklet');
 assert.match(installerContract, /'web\\pet-live-audio-worklet\.js'/,

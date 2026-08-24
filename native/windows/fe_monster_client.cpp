@@ -107,10 +107,8 @@ void apply_window_corner_policy(HWND hwnd, bool maximized) {
 void create_webview() {
     auto environment_options = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
     environment_options->put_AdditionalBrowserArguments(
-        L"--use-gl=angle --use-angle=d3d11 "
-        L"--enable-gpu-rasterization --enable-accelerated-2d-canvas "
-        L"--force_high_performance_gpu --ignore-gpu-blocklist "
-        L"--disable-software-rasterizer"
+        L"--use-gl=angle --use-angle=default "
+        L"--enable-accelerated-2d-canvas"
     );
     CreateCoreWebView2EnvironmentWithOptions(
         nullptr,

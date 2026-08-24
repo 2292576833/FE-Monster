@@ -1,5 +1,7 @@
 package com.femonster.core;
 
+import com.femonster.ai.tts.JavaNetDoubaoV3TransportFactory;
+import com.femonster.ai.tts.TtsSessionManager;
 import com.femonster.community.CommunityClient;
 import com.femonster.music.MusicApiConfigService;
 import com.femonster.music.MusicProviderClient;
@@ -8,6 +10,7 @@ import com.femonster.music.ProviderProtocolClient;
 import com.femonster.netease.NeteaseClient;
 
 import java.io.IOException;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -23,13 +26,18 @@ public final class AppContext implements AutoCloseable {
     public final MusicApiConfigService musicApis;
     public final AchievementStateService achievements;
     public final ClientPreferenceService clientPreferences;
+    public final ClientPreferenceSyncService clientPreferenceSync;
+    public final ClientAiGateway clientAi;
+    public final TtsSessionManager clientTtsSessions;
     public final RuntimeSettingsService runtimeSettings;
     public final NativeAudioEngine audioEngine;
+    public final AudioMixerService audioMixer;
     public final PlayerService player;
     public final VisualBridgeService visualBridge;
     public final WallpaperService wallpapers;
     public final UserCursorService userCursors;
     public final CommunityClient community;
+    public final PetPersonalizationService petPersonalization;
     public final CommunityModuleBridge communityModule;
     public final MachineIdentityService machine;
     public final UpdateService updates;
@@ -41,8 +49,16 @@ public final class AppContext implements AutoCloseable {
         this.musicApis = new MusicApiConfigService(paths);
         this.achievements = new AchievementStateService(paths.dataDir.resolve("achievement-state.json"));
         this.clientPreferences = new ClientPreferenceService(paths.dataDir.resolve("client-preferences.json"));
+        this.clientAi = new ClientAiGateway(paths.dataDir.resolve("client-ai"));
+        this.clientTtsSessions = new TtsSessionManager(
+            clientAi::doubaoTtsConfig,
+            new JavaNetDoubaoV3TransportFactory(),
+            Duration.ofMinutes(2),
+            2L * 1024 * 1024
+        );
         this.runtimeSettings = new RuntimeSettingsService(paths.dataDir.resolve("runtime-settings.json"));
         this.audioEngine = new NativeAudioEngine(paths);
+        this.audioMixer = new AudioMixerService(paths.dataDir.resolve("audio-mixer-state.json"), audioEngine);
         this.netease = createNeteaseClient();
         this.music = new MusicProviderRegistry(provider -> {
             if (interactiveServicesEnabled.get()) {
@@ -54,6 +70,35 @@ public final class AppContext implements AutoCloseable {
         this.machine = new MachineIdentityService(paths, communityModule);
         this.updates = new UpdateService(paths);
         this.community = new CommunityService(paths.dataDir.resolve("community-server-url.txt"), machine, communityModule);
+        this.petPersonalization = new PetPersonalizationService(
+            paths.dataDir.resolve("pet-personalization"),
+            new PetPersonalizationService.AccountSource() {
+                @Override
+                public String scope(String provider, String providerLabel, Map<String, Object> accountPayload) {
+                    return community.petPersonalizationScope(provider, providerLabel, accountPayload);
+                }
+
+                @Override
+                public Map<String, Object> memories(
+                    String provider,
+                    String providerLabel,
+                    Map<String, Object> accountPayload
+                ) {
+                    return community.petMemories(provider, providerLabel, accountPayload);
+                }
+
+                @Override
+                public Map<String, Object> habits(
+                    String provider,
+                    String providerLabel,
+                    Map<String, Object> accountPayload
+                ) {
+                    return community.petHabits(provider, providerLabel, accountPayload);
+                }
+            },
+            Clock.systemUTC()
+        );
+        this.clientPreferenceSync = new ClientPreferenceSyncService(clientPreferences, community, machine.computerId());
         this.player = new PlayerService(paths.dataDir.resolve("player-state.json"), music);
         this.visualBridge = new VisualBridgeService(player, audioEngine);
         this.wallpapers = new WallpaperService(paths.dataDir);
@@ -64,6 +109,8 @@ public final class AppContext implements AutoCloseable {
     @Override
     public void close() {
         if (!closed.compareAndSet(false, true)) return;
+        closeService("clientTtsSessions", this.clientTtsSessions::close);
+        closeService("clientAi", this.clientAi::close);
         closeService("player", this.player::close);
         closeService("audio", this.audioEngine::close);
         closeService("browserLogin", this.browserLogin::close);

@@ -180,6 +180,48 @@ public interface CommunityClient {
         String sessionId
     );
 
+    Map<String, Object> petMemories(
+        String provider,
+        String providerLabel,
+        Map<String, Object> accountPayload
+    );
+
+    Map<String, Object> petHabits(
+        String provider,
+        String providerLabel,
+        Map<String, Object> accountPayload
+    );
+
+    /**
+     * Returns an internal account scope derived from the authenticated provider account.
+     * The value is for local cache partitioning only and must never be returned to browser callers.
+     */
+    String petPersonalizationScope(
+        String provider,
+        String providerLabel,
+        Map<String, Object> accountPayload
+    );
+
+    Map<String, Object> forgetPetMemory(
+        String provider,
+        String providerLabel,
+        Map<String, Object> accountPayload,
+        Map<String, Object> selector
+    );
+
+    Map<String, Object> clientPreferences(
+        String provider,
+        String providerLabel,
+        Map<String, Object> accountPayload
+    );
+
+    Map<String, Object> syncClientPreferences(
+        String provider,
+        String providerLabel,
+        Map<String, Object> accountPayload,
+        Map<String, Object> payload
+    );
+
     Map<String, Object> petMutation(
         String provider,
         String providerLabel,
@@ -216,5 +258,13 @@ public interface CommunityClient {
         InputStream content
     ) throws IOException, InterruptedException;
 
-    HttpResponse<InputStream> eventStream(String feId, String after) throws IOException, InterruptedException;
+    HttpResponse<InputStream> eventStream(
+        String feId,
+        String after,
+        String streamRole
+    ) throws IOException, InterruptedException;
+
+    default HttpResponse<InputStream> eventStream(String feId, String after) throws IOException, InterruptedException {
+        return eventStream(feId, after, "browser");
+    }
 }

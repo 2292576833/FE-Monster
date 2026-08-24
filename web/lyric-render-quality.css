@@ -6,6 +6,8 @@
   --fe-lyric-edge-width: max(0.42px, 0.011em);
   --fe-lyric-edge-dark: rgba(3, 7, 12, 0.62);
   --fe-lyric-edge-light: rgba(255, 255, 255, 0.15);
+  --fe-playback-bar-tilt-x: 1.5deg;
+  --fe-playback-bar-tilt-y: -10deg;
 }
 
 .fe-lyric-crisp-text,
@@ -57,14 +59,39 @@
     0 1px 1.5px rgba(var(--lyric-depth-rgb), 0.5);
 }
 
-/* The playback page stays front-facing. Its physical depth comes from the
- * existing surface/shadow layers, while its lyric glyphs remain native text. */
-#qishuiPlaybackPhone,
-#qishuiPlaybackPhone:hover,
+/* The playback shell leans its left edge back by exactly 10 degrees. Glyphs
+ * stay native text (no post-raster scale) and are re-rasterized by the shared
+ * DPR/zoom quality path instead of stretching a cached bitmap. */
+#qishuiPlaybackPhone {
+  transform:
+    translate3d(0, 0, 0)
+    rotateX(var(--fe-playback-bar-tilt-x))
+    rotateY(var(--fe-playback-bar-tilt-y)) !important;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+#qishuiPlaybackPhone:hover {
+  transform:
+    translate3d(0, -2px, 6px)
+    rotateX(1deg)
+    rotateY(var(--fe-playback-bar-tilt-y)) !important;
+}
+
+/* Opening any playback workspace makes the bar face the user. The default
+ * 10-degree lean returns automatically when the workspace closes. */
 #qishuiPlaybackPhone.is-panel-open,
-#qishuiPlaybackPhone.is-panel-open:hover {
+#qishuiPlaybackPhone.is-panel-open:hover,
+.app-shell.has-rhythm-game #qishuiPlaybackPhone,
+.app-shell.has-rhythm-game #qishuiPlaybackPhone:hover {
+  transform:
+    translate3d(0, 0, 0)
+    rotateX(0deg)
+    rotateY(0deg) !important;
+}
+
+.qishui-playback-card.is-user-hidden #qishuiPlaybackPhone {
   transform: none !important;
-  transform-style: flat;
   will-change: auto;
 }
 

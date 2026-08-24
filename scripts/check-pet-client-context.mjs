@@ -9,7 +9,7 @@ const contextSource = read('web/pet-client-context.js');
 const commandSource = read('web/app-command.js');
 const petSource = read('web/pet-assistant.js');
 const appSource = read('web/app.js');
-const html = read('web/index.html');
+const loaderSource = read('web/runtime-module-loader.js');
 const communitySource = read('src/community-proprietary/java/com/femonster/core/CommunityService.java');
 
 class FixtureTarget {
@@ -259,8 +259,8 @@ assert.match(petSource, /clientContextRelaySupported\s*=\s*false/,
 assert.doesNotMatch(petSource, /payload\.requiresConfirmation\s*===\s*true/,
   'remote metadata can still force a redundant confirmation for registered commands');
 assert.ok(
-  html.indexOf('pet-emotion-runtime.js') < html.indexOf('pet-client-context.js')
-    && html.indexOf('pet-client-context.js') < html.indexOf('pet-assistant.js'),
+  loaderSource.indexOf('pet-emotion-runtime.js') < loaderSource.indexOf('pet-client-context.js')
+    && loaderSource.indexOf('pet-client-context.js') < loaderSource.indexOf('pet-assistant.js'),
   'emotion/context/chat scripts are loaded in the wrong order'
 );
 assert.match(communitySource, /"chat", Set\.of\([^\n]*"clientContext"/,

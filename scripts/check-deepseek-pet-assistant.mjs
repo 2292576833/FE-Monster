@@ -4,11 +4,16 @@ import { join } from 'node:path';
 
 const root = process.cwd();
 const html = readFileSync(join(root, 'web', 'index.html'), 'utf8');
+const loader = readFileSync(join(root, 'web', 'runtime-module-loader.js'), 'utf8');
 const css = readFileSync(join(root, 'web', 'pet-assistant.css'), 'utf8');
 const buttonSkin = readFileSync(join(root, 'web', 'black-gold-buttons.css'), 'utf8');
 const pet = readFileSync(join(root, 'web', 'pet-assistant.js'), 'utf8');
 const app = readFileSync(join(root, 'web', 'app.js'), 'utf8');
 const routes = readFileSync(join(root, 'src', 'main', 'java', 'com', 'femonster', 'api', 'ApiRoutes.java'), 'utf8');
+const localPetGuard = readFileSync(
+  join(root, 'src', 'main', 'java', 'com', 'femonster', 'api', 'LocalPetAssistantGuard.java'),
+  'utf8',
+);
 const community = readFileSync(join(root, 'src', 'community-proprietary', 'java', 'com', 'femonster', 'core', 'CommunityService.java'), 'utf8');
 const http = readFileSync(join(root, 'src', 'main', 'java', 'com', 'femonster', 'http', 'HttpUtil.java'), 'utf8');
 
@@ -25,7 +30,7 @@ assert.ok(existsSync(join(root, 'web', 'assets', 'fe-monster-pet-mascot.png')), 
 assert.match(html, /id="petAssistant"[^>]*data-state="idle"[^>]*hidden/);
 assert.match(html, /id="petAssistantMessages"[^>]*role="log"[^>]*aria-live="polite"/);
 assert.match(html, /pet-assistant\.css/);
-assert.match(html, /pet-assistant\.js/);
+assert.match(loader, /pet-assistant\.js/);
 assert.match(html, /assets\/fe-monster-pet-mascot\.png/);
 assert.match(css, /\.pet-assistant__panel\[hidden\][\s\S]*display:\s*none\s*!important/);
 assert.match(css, /\.pet-assistant \.pet-assistant__character,\s*#petAssistant #petAssistantCharacter\s*\{/);
@@ -149,8 +154,8 @@ for (const path of [
 ]) {
   assert.ok(routes.includes(path), `missing Java proxy route ${path}`);
 }
-assert.match(routes, /path\.startsWith\("\/api\/community\/pet\/"\) \|\| "\/api\/community\/events"\.equals\(path\)[\s\S]*requireLocalPetAssistant\(exchange\)[\s\S]*handleOptions/);
-assert.match(routes, /throw new SecurityException\("pet assistant requires the application origin"\)/);
+assert.match(routes, /path\.startsWith\("\/api\/community\/pet\/"\) \|\| "\/api\/community\/events"\.equals\(path\)[\s\S]*LocalPetAssistantGuard\.require\(exchange\)[\s\S]*handleOptions/);
+assert.match(localPetGuard, /throw new SecurityException\("pet assistant requires the application origin"\)/);
 assert.match(http, /fe\.cors\.same-origin/);
 assert.match(http, /Cross-Origin-Resource-Policy", "same-origin"/);
 assert.match(community, /computerId=.*machine\.computerId\(\)/s);
@@ -159,13 +164,13 @@ assert.match(community, /buildEventStreamRequest\(requestPath\)[\s\S]*catch \(IO
 assert.match(community, /communitySignatureHeaders\("GET", "\/api\/community\/events", ""\)/);
 assert.match(community, /2_796_204/);
 assert.match(community, /PET_ACTION_FIELDS/);
-assert.match(community, /"action-claim", Set\.of\("sessionId", "actionId", "confirmed", "cancelled"\)/,
+assert.match(community, /"action-claim", Set\.of\("sessionId", "actionId", "confirmed", "cancelled", "clientRole"\)/,
   'Java pet proxy strips local confirmation or cancellation claims');
-assert.match(community, /"chat", Set\.of\([^\n]*"replyWithVoice", "voiceReply", "realtimeVoice", "clientContext"\)/,
+assert.match(community, /"chat", Set\.of\([^\n]*"replyWithVoice", "voiceReply", "realtimeVoice", "clientContext", "clientRole"\)/,
   'Java pet proxy strips the request-level TTS mute flags');
-assert.match(community, /"voice\/transcript", Set\.of\([\s\S]*?"replyWithVoice", "voiceReply", "realtimeVoice", "clientContext"[\s\S]*?\),/,
+assert.match(community, /"voice\/transcript", Set\.of\([\s\S]*?"replyWithVoice", "voiceReply", "realtimeVoice", "clientContext", "clientRole"[\s\S]*?\),/,
   'Java transcript proxy strips the request-level TTS mute flags');
-assert.match(community, /"voice\/chunk", Set\.of\([\s\S]*?"replyWithVoice", "voiceReply", "realtimeVoice", "clientContext"[\s\S]*?\),/,
+assert.match(community, /"voice\/chunk", Set\.of\([\s\S]*?"replyWithVoice", "voiceReply", "realtimeVoice", "clientContext", "clientRole"[\s\S]*?\),/,
   'Java audio proxy strips the request-level TTS mute flags');
 console.log(JSON.stringify({
   ok: true,

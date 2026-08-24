@@ -1302,10 +1302,23 @@ internal sealed class SetupOptions
                 @"Software\Microsoft\Windows\CurrentVersion\Uninstall\FE Monster"
             );
             string raw = key?.GetValue("InstallLocation") as string ?? "";
-            if (string.IsNullOrWhiteSpace(raw)) return "";
+            return SelectRegisteredInstallDirectory(raw);
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    internal static string SelectRegisteredInstallDirectory(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "";
+        try
+        {
             string candidate = Path.GetFullPath(Environment.ExpandEnvironmentVariables(raw));
-            bool recognized =
-                File.Exists(Path.Combine(candidate, "out", "fe-monster-java.jar")) &&
+            bool hasJar = File.Exists(Path.Combine(candidate, "out", "fe-monster-java.jar"));
+            bool modernInstall =
+                hasJar &&
                 File.Exists(Path.Combine(candidate, "web", "index.html")) &&
                 File.Exists(Path.Combine(
                     candidate,
@@ -1315,7 +1328,11 @@ internal sealed class SetupOptions
                     "winforms",
                     "FE Monster.exe"
                 ));
-            return recognized ? candidate : "";
+            bool legacyInstall =
+                hasJar &&
+                (File.Exists(Path.Combine(candidate, "FE Monster.vbs")) ||
+                 File.Exists(Path.Combine(candidate, "run.cmd")));
+            return modernInstall || legacyInstall ? candidate : "";
         }
         catch
         {

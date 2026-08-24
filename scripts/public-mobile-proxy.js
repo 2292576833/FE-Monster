@@ -2,6 +2,7 @@
 
 const crypto = require("crypto");
 const http = require("http");
+const net = require("net");
 
 const listenHost = process.env.FE_MONSTER_PUBLIC_PROXY_HOST || "127.0.0.1";
 const listenPort = Number(process.env.FE_MONSTER_PUBLIC_PROXY_PORT || 3099);
@@ -14,7 +15,7 @@ const communityHealthPath = communityPrefix + "/health";
 const publicCommunityGateway = "fe-monster-public-community-gateway";
 const maxCommunityHealthBytes = 64 * 1024;
 const accessKey = String(process.env.FE_MONSTER_PUBLIC_ACCESS_KEY || "").trim();
-const defaultDownloadUrl = "https://fe-monster-download-201.affront-loony-6o.chatgpt.site/";
+const defaultDownloadUrl = "https://2292576833.github.io/FE-Monster/";
 const downloadUrl = String(process.env.FE_MONSTER_PUBLIC_DOWNLOAD_URL || defaultDownloadUrl).trim();
 const cookieName = "fe_public_access";
 
@@ -50,6 +51,31 @@ function sanitizedCookie(header) {
     .map((part) => part.trim())
     .filter((part) => part && !part.startsWith(cookieName + "="))
     .join("; ");
+}
+
+function normalizedIpAddress(value) {
+  let address = String(value || "").trim();
+  if (address.toLowerCase().startsWith("::ffff:")) address = address.slice(7);
+  const zoneSeparator = address.indexOf("%");
+  if (zoneSeparator >= 0) address = address.slice(0, zoneSeparator);
+  return net.isIP(address) ? address : "";
+}
+
+function loopbackAddress(value) {
+  const address = normalizedIpAddress(value);
+  return address === "::1" || address.startsWith("127.");
+}
+
+function directClientAddress(request) {
+  const peerAddress = normalizedIpAddress(request.socket && request.socket.remoteAddress);
+  if (!loopbackAddress(peerAddress)) return peerAddress;
+
+  // SakuraFrp is the only expected loopback peer and appends the address it
+  // observed to X-Forwarded-For. Select only that final hop, never a
+  // caller-controlled prefix, then collapse the chain to one canonical IP.
+  const forwardedChain = String(request.headers["x-forwarded-for"] || "").split(",");
+  const tunnelAddress = normalizedIpAddress(forwardedChain[forwardedChain.length - 1]);
+  return tunnelAddress || peerAddress;
 }
 
 function sendJson(response, statusCode, value) {
@@ -173,9 +199,14 @@ const server = http.createServer((request, response) => {
   if (communityRequest) {
     headers["x-forwarded-host"] = originalHost;
     headers["x-forwarded-proto"] = "https";
-    if (!headers["x-forwarded-for"]) {
-      headers["x-forwarded-for"] = String(request.socket.remoteAddress || "").replace(/^::ffff:/, "");
-    }
+    // This process is the public trust boundary. Never pass caller-controlled
+    // forwarding identity to the community server, where it drives abuse and
+    // device-enrollment limits.
+    delete headers.forwarded;
+    delete headers["x-real-ip"];
+    const clientAddress = directClientAddress(request);
+    if (clientAddress) headers["x-forwarded-for"] = clientAddress;
+    else delete headers["x-forwarded-for"];
   }
   delete headers["x-fe-public-access"];
   const cookie = sanitizedCookie(headers.cookie);

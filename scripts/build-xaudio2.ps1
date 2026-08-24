@@ -12,6 +12,19 @@ $nativeSourceDir = Join-Path $rootPath 'native\windows'
 $runtimeOutputDir = Join-Path $nativeSourceDir 'build'
 $obrRevision = '478dc7c752d5eccae534635139ff0253eee3a14a'
 $obrRepository = 'https://github.com/google/obr.git'
+$nativeAudioBuildManifestName = 'native-audio-build.json'
+
+function Get-TextSha256 {
+  param([Parameter(Mandatory)][string]$Value)
+
+  $sha256 = [Security.Cryptography.SHA256]::Create()
+  try {
+    $bytes = [Text.Encoding]::UTF8.GetBytes($Value)
+    return ([BitConverter]::ToString($sha256.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant()
+  } finally {
+    $sha256.Dispose()
+  }
+}
 
 function Resolve-FirstCommandPath {
   param(
@@ -200,6 +213,33 @@ Copy-Item `
   -Destination (Join-Path $oximediaLicenseDir 'APACHE-2.0.txt') `
   -Force
 
+# This manifest is created only after both artifacts have been produced and
+# staged by the same invocation. The installer verifies both hashes and the
+# pair hash before it accepts build/ or build-next/, preventing a locked or
+# partially copied DLL from being combined with a different native build.
+$xaudioSha256 = (Get-FileHash -LiteralPath $stagedDll -Algorithm SHA256).Hash.ToLowerInvariant()
+$upmixSha256 = (Get-FileHash -LiteralPath $stagedRustUpmixDll -Algorithm SHA256).Hash.ToLowerInvariant()
+$pairMaterial = "fe-monster-xaudio2.dll=$xaudioSha256`nfe_monster_upmix.dll=$upmixSha256"
+$nativeAudioBuildManifest = [ordered]@{
+  schemaVersion = 1
+  buildId = ([Guid]::NewGuid().ToString('D')).ToLowerInvariant()
+  createdAtUtc = [DateTime]::UtcNow.ToString('o', [Globalization.CultureInfo]::InvariantCulture)
+  architecture = 'x64'
+  configuration = $Configuration
+  obrRevision = $obrRevision
+  rustPackage = 'oximedia-audiopost 0.2.0 (locked)'
+  xaudio2Sha256 = $xaudioSha256
+  upmixSha256 = $upmixSha256
+  pairSha256 = Get-TextSha256 -Value $pairMaterial
+}
+$stagedBuildManifest = Join-Path $stagingOutputDir $nativeAudioBuildManifestName
+$manifestJson = $nativeAudioBuildManifest | ConvertTo-Json -Depth 4
+[IO.File]::WriteAllText(
+  $stagedBuildManifest,
+  $manifestJson + [Environment]::NewLine,
+  [Text.UTF8Encoding]::new($false)
+)
+
 if (!$SkipProbe) {
   & $probe
   if ($LASTEXITCODE -ne 0) {
@@ -209,10 +249,12 @@ if (!$SkipProbe) {
 
 $installedDll = Join-Path $runtimeOutputDir 'fe-monster-xaudio2.dll'
 $installedRustUpmixDll = Join-Path $runtimeOutputDir 'fe_monster_upmix.dll'
+$installedBuildManifest = Join-Path $runtimeOutputDir $nativeAudioBuildManifestName
 try {
   Copy-Item -LiteralPath $stagedDll -Destination $installedDll -Force -ErrorAction Stop
   Copy-Item -LiteralPath $stagedRustUpmixDll -Destination $installedRustUpmixDll -Force -ErrorAction Stop
-  $verifiedDlls = @($installedDll, $installedRustUpmixDll)
+  Copy-Item -LiteralPath $stagedBuildManifest -Destination $installedBuildManifest -Force -ErrorAction Stop
+  $verifiedRuntime = @($installedDll, $installedRustUpmixDll, $installedBuildManifest)
 } catch {
   # Windows locks an in-use image file. Keep a complete side-by-side runtime
   # so the next client launch can pick up the verified build without stopping
@@ -223,12 +265,14 @@ try {
   }
   $nextDll = Join-Path $nextRuntimeDir 'fe-monster-xaudio2.dll'
   $nextRustUpmixDll = Join-Path $nextRuntimeDir 'fe_monster_upmix.dll'
+  $nextBuildManifest = Join-Path $nextRuntimeDir $nativeAudioBuildManifestName
   Copy-Item -LiteralPath $stagedDll -Destination $nextDll -Force
   Copy-Item -LiteralPath $stagedRustUpmixDll -Destination $nextRustUpmixDll -Force
-  $verifiedDlls = @($nextDll, $nextRustUpmixDll)
+  Copy-Item -LiteralPath $stagedBuildManifest -Destination $nextBuildManifest -Force
+  $verifiedRuntime = @($nextDll, $nextRustUpmixDll, $nextBuildManifest)
   Write-Warning "The running app is using the installed native audio DLL. The verified replacement is ready for the next launch under $nextRuntimeDir."
 }
 
-Write-Host "Built $($verifiedDlls -join ', ')"
+Write-Host "Built $($verifiedRuntime -join ', ')"
 Write-Host "Rust upmix: oximedia-audiopost 0.2.0 (locked)"
 Write-Host "Verified Google OBR revision $obrRevision through $probe"

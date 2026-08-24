@@ -45,9 +45,10 @@ if ($installLog.StartsWith($installPathPrefix, [StringComparison]::OrdinalIgnore
 $sessionLogDirectory = Split-Path -Parent $installLog
 $dependencyLog = Join-Path $sessionLogDirectory ('dependencies-{0}.log' -f $PID)
 $updateAgentLog = Join-Path $sessionLogDirectory ('update-agent-{0}.log' -f $PID)
-$appVersion = '2.0.1'
+$appVersion = '2.1.1'
 $mainExecutable = Join-Path $installPath 'native\windows\build\winforms\FE Monster.exe'
 $payloadIntegrityManifestName = 'payload-integrity.json'
+$upgradeRecoveryMarkerName = '.fe-monster-upgrade-transaction.json'
 $peMachineAmd64 = 0x8664
 $upgradeBackupPath = ''
 $newInstallActivated = $false
@@ -309,11 +310,205 @@ function Test-ExistingFeMonsterInstall {
       !(Test-Path -LiteralPath $retainedKey -PathType Leaf)) {
     return $false
   }
-  $allowedRetainedEntries = @('data', 'WebView2', 'logs', 'public-access.key', '.fe-monster-user-data')
+  $allowedRetainedEntries = @(
+    'data',
+    'WebView2',
+    'logs',
+    'public-access.key',
+    '.fe-monster-user-data',
+    $upgradeRecoveryMarkerName
+  )
   foreach ($entry in @(Get-ChildItem -LiteralPath $Path -Force -ErrorAction Stop)) {
     if ($allowedRetainedEntries -notcontains $entry.Name) { return $false }
   }
   return $true
+}
+
+function Test-UpgradeBackupName {
+  param([string]$Name)
+
+  return ![string]::IsNullOrWhiteSpace($Name) -and
+    [regex]::IsMatch(
+      $Name,
+      '^\.fm-backup-[0-9a-f]{8}$',
+      [Text.RegularExpressions.RegexOptions]::IgnoreCase -bor
+        [Text.RegularExpressions.RegexOptions]::CultureInvariant
+    )
+}
+
+function Write-UpgradeRecoveryMarker {
+  param(
+    [string]$InstallRoot,
+    [string]$TargetPath,
+    [string]$BackupPath
+  )
+
+  $installRootFull = Resolve-FullPath $InstallRoot
+  $targetFull = Resolve-FullPath $TargetPath
+  $backupFull = Resolve-FullPath $BackupPath
+  $backupName = Split-Path -Leaf $backupFull
+  $targetParent = Resolve-FullPath (Split-Path -Parent $targetFull)
+  $backupParent = Resolve-FullPath (Split-Path -Parent $backupFull)
+  if (
+    ![string]::Equals($installRootFull, $targetFull, [StringComparison]::OrdinalIgnoreCase) -or
+    ![string]::Equals($targetParent, $backupParent, [StringComparison]::OrdinalIgnoreCase) -or
+    !(Test-UpgradeBackupName $backupName)
+  ) {
+    throw 'Refusing to create an upgrade-recovery marker outside the exact installation boundary.'
+  }
+
+  $markerPath = Join-Path $installRootFull $upgradeRecoveryMarkerName
+  $temporaryMarkerPath = Join-Path $installRootFull (
+    $upgradeRecoveryMarkerName + '.tmp-' + [guid]::NewGuid().ToString('N')
+  )
+  $marker = [ordered]@{
+    schemaVersion = 1
+    targetPath = $targetFull
+    backupName = $backupName
+    createdAtUtc = [DateTime]::UtcNow.ToString('o')
+  }
+  try {
+    $markerBytes = [Text.UTF8Encoding]::new($false).GetBytes(
+      ($marker | ConvertTo-Json -Compress)
+    )
+    $markerStream = [IO.FileStream]::new(
+      $temporaryMarkerPath,
+      [IO.FileMode]::CreateNew,
+      [IO.FileAccess]::Write,
+      [IO.FileShare]::None,
+      4096,
+      [IO.FileOptions]::WriteThrough
+    )
+    try {
+      $markerStream.Write($markerBytes, 0, $markerBytes.Length)
+      $markerStream.Flush($true)
+    } finally {
+      $markerStream.Dispose()
+    }
+    if ([IO.File]::Exists($markerPath)) {
+      try {
+        [IO.File]::Replace($temporaryMarkerPath, $markerPath, $null, $true)
+      } catch {
+        # File.Replace is not supported by every custom-install filesystem.
+        # At this point the active installation has not moved, so a safe
+        # remove-and-rename fallback cannot strand user data in a backup.
+        Remove-Item -LiteralPath $markerPath -Force -ErrorAction Stop
+        [IO.File]::Move($temporaryMarkerPath, $markerPath)
+      }
+    } else {
+      [IO.File]::Move($temporaryMarkerPath, $markerPath)
+    }
+  } finally {
+    if (Test-Path -LiteralPath $temporaryMarkerPath -PathType Leaf) {
+      Remove-Item -LiteralPath $temporaryMarkerPath -Force -ErrorAction SilentlyContinue
+    }
+  }
+}
+
+function Remove-UpgradeRecoveryMarker {
+  param([string]$InstallRoot)
+
+  if ([string]::IsNullOrWhiteSpace($InstallRoot)) { return }
+  $markerPath = Join-Path $InstallRoot $upgradeRecoveryMarkerName
+  if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
+    Remove-Item -LiteralPath $markerPath -Force -ErrorAction SilentlyContinue
+  }
+}
+
+function Test-RecoverableFeMonsterBackup {
+  param(
+    [string]$BackupPath,
+    [string]$TargetPath
+  )
+
+  try {
+    if (!(Test-Path -LiteralPath $BackupPath -PathType Container)) { return $false }
+    $backupInfo = Get-Item -LiteralPath $BackupPath -Force -ErrorAction Stop
+    if (($backupInfo.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { return $false }
+    if (!(Test-UpgradeBackupName $backupInfo.Name)) { return $false }
+
+    $targetFull = Resolve-FullPath $TargetPath
+    $targetParent = Resolve-FullPath (Split-Path -Parent $targetFull)
+    $backupFull = Resolve-FullPath $backupInfo.FullName
+    $backupParent = Resolve-FullPath (Split-Path -Parent $backupFull)
+    if (![string]::Equals($targetParent, $backupParent, [StringComparison]::OrdinalIgnoreCase)) {
+      return $false
+    }
+
+    $markerPath = Join-Path $backupFull $upgradeRecoveryMarkerName
+    if (!(Test-Path -LiteralPath $markerPath -PathType Leaf)) { return $false }
+    $markerInfo = Get-Item -LiteralPath $markerPath -Force -ErrorAction Stop
+    if (($markerInfo.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or
+        $markerInfo.Length -le 0 -or $markerInfo.Length -gt 16384) {
+      return $false
+    }
+    $marker = Get-Content -LiteralPath $markerPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+    if ([int]$marker.schemaVersion -ne 1) { return $false }
+    if (![string]::Equals(
+      (Resolve-FullPath ([string]$marker.targetPath)),
+      $targetFull,
+      [StringComparison]::OrdinalIgnoreCase
+    )) {
+      return $false
+    }
+    if (![string]::Equals(
+      [string]$marker.backupName,
+      $backupInfo.Name,
+      [StringComparison]::OrdinalIgnoreCase
+    )) {
+      return $false
+    }
+
+    # A transaction marker is only a binding record. The directory must also
+    # have the modern, legacy, or retained-data shape of an FE Monster install.
+    return Test-ExistingFeMonsterInstall $backupFull
+  } catch {
+    return $false
+  }
+}
+
+function Restore-InterruptedUpgradeIfNeeded {
+  param([string]$TargetPath)
+
+  $targetFull = Assert-SafeInstallBoundary $TargetPath
+  $targetPlaceholderExists = Test-Path -LiteralPath $targetFull -PathType Container
+  if (Test-Path -LiteralPath $targetFull) {
+    if (!$targetPlaceholderExists) { return }
+    $targetInfo = Get-Item -LiteralPath $targetFull -Force -ErrorAction Stop
+    if (($targetInfo.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { return }
+    if ($null -ne (Get-ChildItem -LiteralPath $targetFull -Force -ErrorAction Stop | Select-Object -First 1)) {
+      return
+    }
+  }
+  $targetParent = Split-Path -Parent $targetFull
+  if (!(Test-Path -LiteralPath $targetParent -PathType Container)) { return }
+
+  $recoverableBackups = @(
+    Get-ChildItem -LiteralPath $targetParent -Directory -Force -ErrorAction Stop |
+      Where-Object {
+        (Test-UpgradeBackupName $_.Name) -and
+        (Test-RecoverableFeMonsterBackup -BackupPath $_.FullName -TargetPath $targetFull)
+      }
+  )
+  if ($recoverableBackups.Count -gt 1) {
+    throw "Multiple valid interrupted-upgrade backups target $targetFull. Setup stopped without moving either backup."
+  }
+  if ($recoverableBackups.Count -eq 0) { return }
+
+  $backupPath = $recoverableBackups[0].FullName
+  Write-Log "Recovering the previous FE Monster installation from $backupPath..."
+  if ($targetPlaceholderExists) {
+    # The native Setup host probes writability by creating this directory.
+    # Recheck it without -Recurse so an external writer makes recovery fail
+    # safely instead of deleting anything that appeared after discovery.
+    if ($null -ne (Get-ChildItem -LiteralPath $targetFull -Force -ErrorAction Stop | Select-Object -First 1)) {
+      throw "The installation directory changed while recovering the interrupted upgrade: $targetFull"
+    }
+    Remove-Item -LiteralPath $targetFull -Force -ErrorAction Stop
+  }
+  Move-Item -LiteralPath $backupPath -Destination $targetFull -ErrorAction Stop
+  Remove-UpgradeRecoveryMarker $targetFull
+  Write-Log "Recovered the interrupted upgrade at $targetFull."
 }
 
 function Assert-SafeInstallPath {
@@ -791,7 +986,23 @@ function Copy-Payload {
 
     if (Test-Path -LiteralPath $installSafe) {
       $script:upgradeBackupPath = Join-Path $installParent ('.fm-backup-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
-      Move-Item -LiteralPath $installSafe -Destination $script:upgradeBackupPath -ErrorAction Stop
+      try {
+        Write-UpgradeRecoveryMarker `
+          -InstallRoot $installSafe `
+          -TargetPath $installSafe `
+          -BackupPath $script:upgradeBackupPath
+        Move-Item -LiteralPath $installSafe -Destination $script:upgradeBackupPath -ErrorAction Stop
+      } catch {
+        if ((Test-Path -LiteralPath $script:upgradeBackupPath -PathType Container) -and
+            !(Test-Path -LiteralPath $installSafe)) {
+          Move-Item -LiteralPath $script:upgradeBackupPath -Destination $installSafe -ErrorAction SilentlyContinue
+        }
+        if (Test-Path -LiteralPath $installSafe -PathType Container) {
+          Remove-UpgradeRecoveryMarker $installSafe
+        }
+        $script:upgradeBackupPath = ''
+        throw
+      }
     }
     try {
       Move-Item -LiteralPath $stageRoot -Destination $installSafe -ErrorAction Stop
@@ -801,6 +1012,7 @@ function Copy-Payload {
           (Test-Path -LiteralPath $script:upgradeBackupPath) -and
           !(Test-Path -LiteralPath $installSafe)) {
         Move-Item -LiteralPath $script:upgradeBackupPath -Destination $installSafe -ErrorAction SilentlyContinue
+        Remove-UpgradeRecoveryMarker $installSafe
         $script:upgradeBackupPath = ''
       }
       throw
@@ -831,6 +1043,10 @@ function Complete-UpgradeTransaction {
   $script:newInstallActivated = $false
   try {
     if (Test-Path -LiteralPath $backupToDelete) {
+      # Once post-activation validation succeeds this backup must never be
+      # considered a crash-recovery candidate, even if recursive cleanup is
+      # later blocked by an antivirus scanner or another transient reader.
+      Remove-UpgradeRecoveryMarker $backupToDelete
       Remove-Item -LiteralPath $backupToDelete -Recurse -Force -ErrorAction Stop
     }
   } catch {
@@ -849,6 +1065,7 @@ function Restore-UpgradeTransaction {
       Remove-Item -LiteralPath $installPath -Recurse -Force
     }
     Move-Item -LiteralPath $script:upgradeBackupPath -Destination $installPath -Force
+    Remove-UpgradeRecoveryMarker $installPath
     $script:upgradeBackupPath = ''
     $script:newInstallActivated = $false
   } catch {
@@ -990,11 +1207,18 @@ function Assert-RequiredFiles {
     'out\fe-monster-java.jar',
     'web\index.html',
     'web\cache-fingerprints.json',
+    'web\client-ai-service.js',
+    'web\pet-affect-plan.js',
+    'web\settings-center.js',
+    'web\audio-mixer-ui.js',
+    'web\audio-mixer-visuals.js',
+    'web\runtime-module-loader.js',
     'web\app.js',
     'web\styles.css',
     'web\lyric-render-quality.css',
     'web\app-command.js',
     'web\playback-intelligence.js',
+    'web\companion-care-actions.js',
     'web\wallpaper-video-continuity.js',
     'web\pet-emotion-runtime.js',
     'web\pet-client-context.js',
@@ -1015,6 +1239,13 @@ function Assert-RequiredFiles {
     'web\pet-companion-p2.js',
     'web\pet-companion-p2.css',
     'web\creative-community.js',
+    'web\soundscape-runtime.js',
+    'web\assets\soundscape-workshop\runtime.html',
+    'web\assets\soundscape-workshop\bridge.js',
+    'web\assets\soundscape-workshop\project.json',
+    'web\assets\soundscape-workshop\preview.gif',
+    'web\assets\soundscape-workshop\assets\index-CSU_B_T9.js',
+    'web\assets\soundscape-workshop\assets\index-DgmMz9-g.css',
     'web\assets\fe-monster-pet-mascot.png',
     'web\assets\fe-monster-pet-mascot-chroma.png',
     'scripts\launch-fe-monster.ps1',
@@ -1035,6 +1266,7 @@ function Assert-RequiredFiles {
     'native\windows\build\winforms\WebView2Loader.dll',
     'native\windows\build\fe-monster-xaudio2.dll',
     'native\windows\build\fe_monster_upmix.dll',
+    'native\windows\build\native-audio-build.json',
     'payload-integrity.json'
   )
 
@@ -1169,8 +1401,10 @@ function Test-JavaServer {
 }
 
 try {
-  $installPath = Assert-SafeInstallPath $installPath
+  $installPath = Assert-SafeInstallBoundary $installPath
   $installMutationLock = Enter-InstallMutationLock $installPath
+  Restore-InterruptedUpgradeIfNeeded $installPath
+  $installPath = Assert-SafeInstallPath $installPath
   Write-Log 'FE Monster setup started.'
   Copy-Payload
   Write-InstalledComputerId

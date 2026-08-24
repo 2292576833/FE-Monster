@@ -404,6 +404,29 @@ internal sealed class FeMonsterForm : Form
         string profileRoot = testStorageKey.Length == 0
             ? ResolveWebView2DataRoot()
             : Path.Combine(Path.GetTempPath(), "FE Monster", "WebView2");
+        if (testStorageKey.Length == 0)
+        {
+            try
+            {
+                int migratedFiles = WebView2ProfileMigration.MigrateLegacyProfile(
+                    profileRoot,
+                    profileFolder
+                );
+                if (migratedFiles > 0)
+                {
+                    StartupDiagnostics.WriteMessage(
+                        $"Migrated {migratedFiles} legacy WebView2 profile file(s) into {profileFolder}."
+                    );
+                }
+            }
+            catch (Exception error)
+            {
+                StartupDiagnostics.Write(new InvalidOperationException(
+                    "The legacy WebView2 profile could not be fully migrated; startup will retry on the next launch.",
+                    error
+                ));
+            }
+        }
         webViewUserDataFolder = Path.Combine(profileRoot, profileFolder);
 
         try
