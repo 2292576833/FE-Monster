@@ -293,8 +293,8 @@ pub extern "C" fn fe_rust_upmix_result_unsupported() -> i32 {
     RESULT_UNSUPPORTED
 }
 
-// Mixer ABI v1 is deliberately independent from the legacy upmix ABI above.
-pub const FE_RUST_MIXER_ABI_VERSION: u32 = 1;
+// The mixer ABI is deliberately independent from the legacy upmix ABI above.
+pub const FE_RUST_MIXER_ABI_VERSION: u32 = 2;
 pub const FE_RUST_MIXER_EQ_BANDS: usize = 10;
 pub const FE_RUST_MIXER_OK: i32 = 0;
 pub const FE_RUST_MIXER_INVALID_ARGUMENT: i32 = -1;
@@ -368,6 +368,35 @@ pub struct FeRustMixerParams {
     pub reverb_wet: f32,
     pub reverb_dry: f32,
     pub reserved: [u32; 8],
+    pub chorus_enabled: u32,
+    pub chorus_rate_hz: f32,
+    pub chorus_depth: f32,
+    pub chorus_center_delay_ms: f32,
+    pub chorus_feedback: f32,
+    pub chorus_mix: f32,
+    pub flanger_enabled: u32,
+    pub flanger_rate_hz: f32,
+    pub flanger_depth: f32,
+    pub flanger_center_delay_ms: f32,
+    pub flanger_feedback: f32,
+    pub flanger_mix: f32,
+    pub phaser_enabled: u32,
+    pub phaser_rate_hz: f32,
+    pub phaser_depth: f32,
+    pub phaser_center_frequency_hz: f32,
+    pub phaser_feedback: f32,
+    pub phaser_mix: f32,
+    pub delay_enabled: u32,
+    pub delay_ms: f32,
+    pub delay_feedback: f32,
+    pub delay_ping_pong: f32,
+    pub delay_damping_hz: f32,
+    pub delay_mix: f32,
+    pub early_reflections_enabled: u32,
+    pub early_reflections_room_size: f32,
+    pub early_reflections_diffusion: f32,
+    pub early_reflections_damping: f32,
+    pub early_reflections_mix: f32,
 }
 
 impl Default for FeRustMixerParams {
@@ -433,6 +462,35 @@ fn clean_params() -> FeRustMixerParams {
         reverb_wet: 0.0,
         reverb_dry: 1.0,
         reserved: [0; 8],
+        chorus_enabled: 0,
+        chorus_rate_hz: 0.30,
+        chorus_depth: 0.35,
+        chorus_center_delay_ms: 18.0,
+        chorus_feedback: 0.0,
+        chorus_mix: 0.0,
+        flanger_enabled: 0,
+        flanger_rate_hz: 0.18,
+        flanger_depth: 0.50,
+        flanger_center_delay_ms: 1.5,
+        flanger_feedback: 0.35,
+        flanger_mix: 0.0,
+        phaser_enabled: 0,
+        phaser_rate_hz: 0.20,
+        phaser_depth: 0.50,
+        phaser_center_frequency_hz: 900.0,
+        phaser_feedback: 0.20,
+        phaser_mix: 0.0,
+        delay_enabled: 0,
+        delay_ms: 320.0,
+        delay_feedback: 0.30,
+        delay_ping_pong: 0.75,
+        delay_damping_hz: 8_000.0,
+        delay_mix: 0.0,
+        early_reflections_enabled: 0,
+        early_reflections_room_size: 0.35,
+        early_reflections_diffusion: 0.55,
+        early_reflections_damping: 0.45,
+        early_reflections_mix: 0.0,
     }
 }
 
@@ -537,6 +595,11 @@ fn validate_mixer_params(p: &FeRustMixerParams) -> bool {
         && bool_field(p.compressor_enabled)
         && bool_field(p.limiter_enabled)
         && bool_field(p.reverb_enabled)
+        && bool_field(p.chorus_enabled)
+        && bool_field(p.flanger_enabled)
+        && bool_field(p.phaser_enabled)
+        && bool_field(p.delay_enabled)
+        && bool_field(p.early_reflections_enabled)
         && finite_in_range(p.input_gain_db, -24.0, 24.0)
         && finite_in_range(p.output_gain_db, -24.0, 24.0)
         && finite_in_range(p.balance, -1.0, 1.0)
@@ -560,6 +623,30 @@ fn validate_mixer_params(p: &FeRustMixerParams) -> bool {
         && finite_in_range(p.reverb_wet, 0.0, 1.0)
         && finite_in_range(p.reverb_dry, 0.0, 1.0)
         && p.reserved == [0; 8]
+        && finite_in_range(p.chorus_rate_hz, 0.05, 5.0)
+        && finite_in_range(p.chorus_depth, 0.0, 1.0)
+        && finite_in_range(p.chorus_center_delay_ms, 4.0, 30.0)
+        && finite_in_range(p.chorus_feedback, -0.95, 0.95)
+        && finite_in_range(p.chorus_mix, 0.0, 1.0)
+        && finite_in_range(p.flanger_rate_hz, 0.02, 5.0)
+        && finite_in_range(p.flanger_depth, 0.0, 1.0)
+        && finite_in_range(p.flanger_center_delay_ms, 0.2, 10.0)
+        && finite_in_range(p.flanger_feedback, -0.95, 0.95)
+        && finite_in_range(p.flanger_mix, 0.0, 1.0)
+        && finite_in_range(p.phaser_rate_hz, 0.02, 10.0)
+        && finite_in_range(p.phaser_depth, 0.0, 1.0)
+        && finite_in_range(p.phaser_center_frequency_hz, 100.0, 4_000.0)
+        && finite_in_range(p.phaser_feedback, -0.95, 0.95)
+        && finite_in_range(p.phaser_mix, 0.0, 1.0)
+        && finite_in_range(p.delay_ms, 1.0, 1_000.0)
+        && finite_in_range(p.delay_feedback, 0.0, 0.90)
+        && finite_in_range(p.delay_ping_pong, 0.0, 1.0)
+        && finite_in_range(p.delay_damping_hz, 500.0, 20_000.0)
+        && finite_in_range(p.delay_mix, 0.0, 1.0)
+        && finite_in_range(p.early_reflections_room_size, 0.0, 1.0)
+        && finite_in_range(p.early_reflections_diffusion, 0.0, 1.0)
+        && finite_in_range(p.early_reflections_damping, 0.0, 1.0)
+        && finite_in_range(p.early_reflections_mix, 0.0, 0.5)
 }
 
 #[derive(Clone, Copy, Default)]

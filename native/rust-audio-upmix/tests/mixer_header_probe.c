@@ -1,10 +1,10 @@
 #include <stddef.h>
 #include "fe_rust_mixer.h"
 
-_Static_assert(FE_RUST_MIXER_ABI_VERSION == 1u, "ABI version");
+_Static_assert(FE_RUST_MIXER_ABI_VERSION == 2u, "Mixer ABI v2");
 _Static_assert(sizeof(FeRustMixerConfig) == 32u, "config size");
 _Static_assert(offsetof(FeRustMixerConfig, reserved) == 16u, "config layout");
-_Static_assert(sizeof(FeRustMixerParams) == 180u, "params size");
+_Static_assert(sizeof(FeRustMixerParams) == 296u, "Mixer params size");
 _Static_assert(offsetof(FeRustMixerParams, eq_db) == 36u, "EQ layout");
 _Static_assert(offsetof(FeRustMixerParams, stereo_width) == 76u, "spatial layout");
 _Static_assert(offsetof(FeRustMixerParams, compressor_threshold_db) == 92u,
@@ -13,7 +13,15 @@ _Static_assert(offsetof(FeRustMixerParams, limiter_ceiling_db) == 116u,
                "limiter layout");
 _Static_assert(offsetof(FeRustMixerParams, reverb_room_size) == 124u,
                "reverb layout");
-_Static_assert(offsetof(FeRustMixerParams, reserved) == 148u, "params tail");
+_Static_assert(offsetof(FeRustMixerParams, reserved) == 148u, "v1 prefix moved");
+_Static_assert(offsetof(FeRustMixerParams, chorus_enabled) == 180u, "chorus offset");
+_Static_assert(offsetof(FeRustMixerParams, flanger_enabled) == 204u, "flanger offset");
+_Static_assert(offsetof(FeRustMixerParams, phaser_enabled) == 228u, "phaser offset");
+_Static_assert(offsetof(FeRustMixerParams, delay_enabled) == 252u, "delay offset");
+_Static_assert(offsetof(FeRustMixerParams, early_reflections_enabled) == 276u,
+               "early reflections offset");
+_Static_assert(offsetof(FeRustMixerParams, early_reflections_mix) == 292u,
+               "early reflections mix offset");
 _Static_assert(sizeof(FeRustMixerStatus) == 64u, "status size");
 _Static_assert(offsetof(FeRustMixerStatus, active_revision) == 8u, "status layout");
 _Static_assert(offsetof(FeRustMixerStatus, reserved) == 36u, "status tail");

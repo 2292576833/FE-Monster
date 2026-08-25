@@ -57,12 +57,28 @@ fn sine(frames: usize, channels: usize, frequency: f32, amplitude: f32) -> Vec<f
 }
 
 #[test]
-fn abi_layout_and_legacy_upmix_v1_are_stable() {
-    assert_eq!(fe_rust_mixer_abi_version(), 1);
+fn mixer_v2_layout_and_legacy_upmix_v1_are_stable() {
+    assert_eq!(fe_rust_mixer_abi_version(), 2);
     assert_eq!(FE_RUST_MIXER_BUSY, -5);
     assert_eq!(fe_rust_upmix_abi_version(), 1);
     assert_eq!(size_of::<FeRustMixerConfig>(), 32);
-    assert_eq!(size_of::<FeRustMixerParams>(), 180);
+    assert_eq!(size_of::<FeRustMixerParams>(), 296);
+    assert_eq!(std::mem::offset_of!(FeRustMixerParams, reserved), 148);
+    assert_eq!(std::mem::offset_of!(FeRustMixerParams, chorus_enabled), 180);
+    assert_eq!(
+        std::mem::offset_of!(FeRustMixerParams, flanger_enabled),
+        204
+    );
+    assert_eq!(std::mem::offset_of!(FeRustMixerParams, phaser_enabled), 228);
+    assert_eq!(std::mem::offset_of!(FeRustMixerParams, delay_enabled), 252);
+    assert_eq!(
+        std::mem::offset_of!(FeRustMixerParams, early_reflections_enabled),
+        276
+    );
+    assert_eq!(
+        std::mem::offset_of!(FeRustMixerParams, early_reflections_mix),
+        292
+    );
     assert_eq!(size_of::<FeRustMixerStatus>(), 64);
     let mut config = FeRustMixerConfig::default();
     config.struct_size -= 1;
@@ -193,10 +209,24 @@ fn every_parameter_family_rejects_out_of_range_without_commit() {
             rejects(p);
         }};
     }
+    macro_rules! bad_range_and_non_finite {
+        ($field:ident, $below:expr, $above:expr) => {{
+            bad!($field, $below);
+            bad!($field, $above);
+            bad!($field, f32::NAN);
+            bad!($field, f32::INFINITY);
+            bad!($field, f32::NEG_INFINITY);
+        }};
+    }
     bad!(enabled, 2);
     bad!(compressor_enabled, 2);
     bad!(limiter_enabled, 2);
     bad!(reverb_enabled, 2);
+    bad!(chorus_enabled, 2);
+    bad!(flanger_enabled, 2);
+    bad!(phaser_enabled, 2);
+    bad!(delay_enabled, 2);
+    bad!(early_reflections_enabled, 2);
     bad!(input_gain_db, -24.01);
     bad!(output_gain_db, 24.01);
     bad!(balance, 1.01);
@@ -224,6 +254,30 @@ fn every_parameter_family_rejects_out_of_range_without_commit() {
     bad!(reverb_pre_delay_ms, 200.1);
     bad!(reverb_wet, 1.01);
     bad!(reverb_dry, f32::INFINITY);
+    bad_range_and_non_finite!(chorus_rate_hz, 0.049, 5.001);
+    bad_range_and_non_finite!(chorus_depth, -0.01, 1.01);
+    bad_range_and_non_finite!(chorus_center_delay_ms, 3.99, 30.01);
+    bad_range_and_non_finite!(chorus_feedback, -0.96, 0.96);
+    bad_range_and_non_finite!(chorus_mix, -0.01, 1.01);
+    bad_range_and_non_finite!(flanger_rate_hz, 0.019, 5.001);
+    bad_range_and_non_finite!(flanger_depth, -0.01, 1.01);
+    bad_range_and_non_finite!(flanger_center_delay_ms, 0.19, 10.01);
+    bad_range_and_non_finite!(flanger_feedback, -0.96, 0.96);
+    bad_range_and_non_finite!(flanger_mix, -0.01, 1.01);
+    bad_range_and_non_finite!(phaser_rate_hz, 0.019, 10.01);
+    bad_range_and_non_finite!(phaser_depth, -0.01, 1.01);
+    bad_range_and_non_finite!(phaser_center_frequency_hz, 99.9, 4_000.1);
+    bad_range_and_non_finite!(phaser_feedback, -0.96, 0.96);
+    bad_range_and_non_finite!(phaser_mix, -0.01, 1.01);
+    bad_range_and_non_finite!(delay_ms, 0.99, 1_000.1);
+    bad_range_and_non_finite!(delay_feedback, -0.01, 0.91);
+    bad_range_and_non_finite!(delay_ping_pong, -0.01, 1.01);
+    bad_range_and_non_finite!(delay_damping_hz, 499.9, 20_000.1);
+    bad_range_and_non_finite!(delay_mix, -0.01, 1.01);
+    bad_range_and_non_finite!(early_reflections_room_size, -0.01, 1.01);
+    bad_range_and_non_finite!(early_reflections_diffusion, -0.01, 1.01);
+    bad_range_and_non_finite!(early_reflections_damping, -0.01, 1.01);
+    bad_range_and_non_finite!(early_reflections_mix, -0.01, 0.51);
     let mut p = valid;
     p.struct_size -= 1;
     rejects(p);
@@ -240,6 +294,80 @@ fn every_parameter_family_rejects_out_of_range_without_commit() {
     );
     assert_eq!(status.active_revision, 1);
     assert_eq!(status.staged_revision, 0);
+}
+
+#[test]
+fn v2_effect_defaults_and_parameter_endpoints_are_stable() {
+    let defaults = FeRustMixerParams::default();
+    assert_eq!(defaults.chorus_enabled, 0);
+    assert_eq!(defaults.chorus_rate_hz, 0.30);
+    assert_eq!(defaults.chorus_depth, 0.35);
+    assert_eq!(defaults.chorus_center_delay_ms, 18.0);
+    assert_eq!(defaults.chorus_feedback, 0.0);
+    assert_eq!(defaults.chorus_mix, 0.0);
+    assert_eq!(defaults.flanger_enabled, 0);
+    assert_eq!(defaults.flanger_rate_hz, 0.18);
+    assert_eq!(defaults.flanger_depth, 0.50);
+    assert_eq!(defaults.flanger_center_delay_ms, 1.5);
+    assert_eq!(defaults.flanger_feedback, 0.35);
+    assert_eq!(defaults.flanger_mix, 0.0);
+    assert_eq!(defaults.phaser_enabled, 0);
+    assert_eq!(defaults.phaser_rate_hz, 0.20);
+    assert_eq!(defaults.phaser_depth, 0.50);
+    assert_eq!(defaults.phaser_center_frequency_hz, 900.0);
+    assert_eq!(defaults.phaser_feedback, 0.20);
+    assert_eq!(defaults.phaser_mix, 0.0);
+    assert_eq!(defaults.delay_enabled, 0);
+    assert_eq!(defaults.delay_ms, 320.0);
+    assert_eq!(defaults.delay_feedback, 0.30);
+    assert_eq!(defaults.delay_ping_pong, 0.75);
+    assert_eq!(defaults.delay_damping_hz, 8_000.0);
+    assert_eq!(defaults.delay_mix, 0.0);
+    assert_eq!(defaults.early_reflections_enabled, 0);
+    assert_eq!(defaults.early_reflections_room_size, 0.35);
+    assert_eq!(defaults.early_reflections_diffusion, 0.55);
+    assert_eq!(defaults.early_reflections_damping, 0.45);
+    assert_eq!(defaults.early_reflections_mix, 0.0);
+
+    macro_rules! accepts_endpoints {
+        ($field:ident, $minimum:expr, $maximum:expr) => {{
+            for value in [$minimum, $maximum] {
+                let handle = Handle::new(1);
+                let mut params = defaults;
+                params.$field = value;
+                assert_eq!(
+                    unsafe { fe_rust_mixer_stage_params(handle.0, 1, &params) },
+                    FE_RUST_MIXER_OK,
+                    "{} endpoint {value} should be accepted",
+                    stringify!($field)
+                );
+            }
+        }};
+    }
+    accepts_endpoints!(chorus_rate_hz, 0.05, 5.0);
+    accepts_endpoints!(chorus_depth, 0.0, 1.0);
+    accepts_endpoints!(chorus_center_delay_ms, 4.0, 30.0);
+    accepts_endpoints!(chorus_feedback, -0.95, 0.95);
+    accepts_endpoints!(chorus_mix, 0.0, 1.0);
+    accepts_endpoints!(flanger_rate_hz, 0.02, 5.0);
+    accepts_endpoints!(flanger_depth, 0.0, 1.0);
+    accepts_endpoints!(flanger_center_delay_ms, 0.2, 10.0);
+    accepts_endpoints!(flanger_feedback, -0.95, 0.95);
+    accepts_endpoints!(flanger_mix, 0.0, 1.0);
+    accepts_endpoints!(phaser_rate_hz, 0.02, 10.0);
+    accepts_endpoints!(phaser_depth, 0.0, 1.0);
+    accepts_endpoints!(phaser_center_frequency_hz, 100.0, 4_000.0);
+    accepts_endpoints!(phaser_feedback, -0.95, 0.95);
+    accepts_endpoints!(phaser_mix, 0.0, 1.0);
+    accepts_endpoints!(delay_ms, 1.0, 1_000.0);
+    accepts_endpoints!(delay_feedback, 0.0, 0.90);
+    accepts_endpoints!(delay_ping_pong, 0.0, 1.0);
+    accepts_endpoints!(delay_damping_hz, 500.0, 20_000.0);
+    accepts_endpoints!(delay_mix, 0.0, 1.0);
+    accepts_endpoints!(early_reflections_room_size, 0.0, 1.0);
+    accepts_endpoints!(early_reflections_diffusion, 0.0, 1.0);
+    accepts_endpoints!(early_reflections_damping, 0.0, 1.0);
+    accepts_endpoints!(early_reflections_mix, 0.0, 0.5);
 }
 
 #[test]
@@ -325,7 +453,7 @@ fn all_presets_are_complete_deterministic_valid_snapshots() {
         let first = mixer_preset_params(id).expect("preset");
         assert_eq!(first, mixer_preset_params(id).unwrap());
         assert_eq!(first.struct_size as usize, size_of::<FeRustMixerParams>());
-        assert_eq!(first.abi_version, 1);
+        assert_eq!(first.abi_version, 2);
         assert_eq!(
             unsafe { fe_rust_mixer_stage_params(handle.0, id as u64 + 1, &first) },
             0

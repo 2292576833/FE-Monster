@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-#define FE_RUST_MIXER_ABI_VERSION 1u
+#define FE_RUST_MIXER_ABI_VERSION 2u
 #define FE_RUST_MIXER_EQ_BANDS 10u
 #define FE_RUST_MIXER_OK 0
 #define FE_RUST_MIXER_INVALID_ARGUMENT (-1)
@@ -46,6 +46,13 @@ typedef struct FeRustMixerConfig {
  * ratio 1..20, attack .1..200 ms, release 10..2000 ms, knee 0..24 dB,
  * makeup 0..24 dB; limiter ceiling -12..0 dB and release 10..1000 ms;
  * reverb room/damping/wet/dry 0..1, decay 50..5000 ms, pre-delay 0..200 ms.
+ * Chorus: rate 0.05..5 Hz, depth 0..1, centre delay 4..30 ms,
+ * feedback -0.95..0.95, mix 0..1. Flanger: rate 0.02..5 Hz, depth 0..1,
+ * centre delay 0.2..10 ms, feedback -0.95..0.95, mix 0..1. Phaser: rate
+ * 0.02..10 Hz, depth 0..1, centre frequency 100..4000 Hz, feedback
+ * -0.95..0.95, mix 0..1. Delay: time 1..1000 ms, feedback 0..0.90,
+ * ping-pong 0..1, damping 500..20000 Hz, mix 0..1. Early reflections:
+ * room/diffusion/damping 0..1, mix 0..0.5.
  */
 typedef struct FeRustMixerParams {
     uint32_t struct_size;
@@ -77,6 +84,35 @@ typedef struct FeRustMixerParams {
     float reverb_wet;
     float reverb_dry;
     uint32_t reserved[8];
+    uint32_t chorus_enabled;
+    float chorus_rate_hz;
+    float chorus_depth;
+    float chorus_center_delay_ms;
+    float chorus_feedback;
+    float chorus_mix;
+    uint32_t flanger_enabled;
+    float flanger_rate_hz;
+    float flanger_depth;
+    float flanger_center_delay_ms;
+    float flanger_feedback;
+    float flanger_mix;
+    uint32_t phaser_enabled;
+    float phaser_rate_hz;
+    float phaser_depth;
+    float phaser_center_frequency_hz;
+    float phaser_feedback;
+    float phaser_mix;
+    uint32_t delay_enabled;
+    float delay_ms;
+    float delay_feedback;
+    float delay_ping_pong;
+    float delay_damping_hz;
+    float delay_mix;
+    uint32_t early_reflections_enabled;
+    float early_reflections_room_size;
+    float early_reflections_diffusion;
+    float early_reflections_damping;
+    float early_reflections_mix;
 } FeRustMixerParams;
 
 typedef struct FeRustMixerStatus {
