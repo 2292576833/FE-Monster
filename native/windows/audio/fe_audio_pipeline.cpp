@@ -1829,7 +1829,12 @@ public:
             for (uint32_t channel = 0; channel < obr_applied_position_count_; ++channel) {
                 const float actual = obr_applied_azimuths_[channel];
                 const float target = std::remainder(
-                    expected[channel] * spatial_controls_.obr_spatial_width,
+                    fe::audio::SpatialBedAzimuthForWidth(
+                        obr_applied_position_count_,
+                        channel,
+                        expected[channel],
+                        spatial_controls_.obr_spatial_width
+                    ),
                     360.0f
                 );
                 status->minimum_object_azimuth = std::min(

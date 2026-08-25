@@ -158,6 +158,21 @@ const x3dSpeakerRender = source.slice(
 );
 assert.match(x3dSpeakerRender, /SetFilterParameters\s*\(/,
   'X3DAudio speaker mode must retain its point-source LPF');
+const spatialStatusStart = pipeline.indexOf('status->maximum_object_target_error = 0.0f;');
+const spatialStatusEnd = pipeline.indexOf('void GetMixerStatus(', spatialStatusStart);
+assert.ok(spatialStatusStart >= 0 && spatialStatusEnd > spatialStatusStart,
+  'spatial status diagnostics block missing');
+const spatialStatusDiagnostics = pipeline.slice(spatialStatusStart, spatialStatusEnd);
+assert.match(
+  spatialStatusDiagnostics,
+  /SpatialBedAzimuthForWidth\s*\(\s*obr_applied_position_count_,\s*channel,\s*expected\[channel\],\s*spatial_controls_\.obr_spatial_width\s*\)/,
+  'status target diagnostics must use the bounded role-aware width helper'
+);
+assert.doesNotMatch(
+  spatialStatusDiagnostics,
+  /expected\[channel\]\s*\*\s*spatial_controls_\.obr_spatial_width/,
+  'status target diagnostics must not use obsolete raw width multiplication'
+);
 
 assert.match(probe, /left/i);
 assert.match(probe, /right/i);
