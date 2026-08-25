@@ -597,7 +597,7 @@ try {
         && typeof call.payload.parameters.enabled === 'boolean'
         && typeof call.payload.parameters.upmixEnabled === 'boolean'
         && ['5.1', '7.1'].includes(call.payload.parameters.upmixOutputLayout)
-        && ['passive', 'matrix-decode', 'ambient-extract'].includes(call.payload.parameters.upmixAlgorithm)
+        && ['passive', 'matrix-decode', 'ambient-extract', 'music-detail'].includes(call.payload.parameters.upmixAlgorithm)
         && typeof call.payload.parameters.obrEnabled === 'boolean'
         && ['direct', 'ambient', 'reverberant'].includes(call.payload.parameters.obrFilterProfile)
       )),

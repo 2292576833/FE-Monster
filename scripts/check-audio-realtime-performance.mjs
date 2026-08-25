@@ -9,6 +9,7 @@ const pipeline = read('native', 'windows', 'audio', 'fe_audio_pipeline.cpp');
 const jni = read('native', 'windows', 'fe_monster_xaudio2.cpp');
 const java = read('src', 'main', 'java', 'com', 'femonster', 'core', 'NativeAudioEngine.java');
 const routes = read('src', 'main', 'java', 'com', 'femonster', 'api', 'ApiRoutes.java');
+const app = read('web', 'app.js');
 const worklet = read('web', 'vendor', 'native-spatial', 'native-pcm-worklet.js');
 const rust = read('native', 'rust-audio-upmix', 'src', 'lib.rs');
 
@@ -29,6 +30,8 @@ const functionBlock = (source, name) => {
 const submit = functionBlock(pipeline, 'HRESULT Submit(');
 const queue = functionBlock(pipeline, 'HRESULT QueueRenderedBlock(');
 const stream = functionBlock(routes, 'private void handleNativeSpatialStream(');
+const browserPump = functionBlock(app, 'async function pumpNativeSpatialBlocks(');
+const browserHealth = functionBlock(app, 'function refreshNativeGoogleObrHealth(');
 
 assert.match(
   worklet,
@@ -42,6 +45,25 @@ assert.doesNotMatch(stream, /ByteBuffer\.wrap\s*\(/, 'The PCM stream loop must n
 assert.match(java, /submitSpatialPcm\s*\([^)]*ByteBuffer/, 'Java/native bridge should accept a direct ByteBuffer.');
 assert.match(jni, /GetDirectBufferAddress\s*\(/, 'JNI should use the direct buffer address without array pin/copy.');
 assert.match(jni, /nativeSubmitSpatialPcmDirect/, 'JNI should expose a dedicated direct-buffer submit entry point.');
+assert.match(jni, /#include\s+<shared_mutex>/,
+  'JNI pipeline lifetime must use shared leases so status/control do not wait behind PCM backpressure.');
+for (const entry of ['nativeSubmitSpatialPcm(', 'nativeSubmitSpatialPcmDirect(']) {
+  const body = functionBlock(jni, entry);
+  assert.match(body, /std::shared_lock\s+lock\(g_spatial_pipeline_mutex\)/,
+    `${entry} must hold a shared lifetime lease while submitting PCM.`);
+  assert.doesNotMatch(body, /std::scoped_lock\s+lock\(g_spatial_pipeline_mutex\)/,
+    `${entry} must not exclusively block status and control requests.`);
+}
+assert.doesNotMatch(java, /public\s+synchronized\s+int\s+submitSpatialPcm\s*\(/,
+  'Java PCM submission must not hold the engine monitor during bounded native queue waits.');
+assert.match(browserPump, /GOOGLE_OBR_NATIVE_UPLOAD_RETRY_DELAYS/,
+  'Transient PCM upload retries need bounded backoff instead of an immediate retry burst.');
+assert.match(browserPump, /setTimeout\s*\(/,
+  'Transient PCM upload retries must yield before retrying.');
+assert.match(browserHealth, /nativeUnderrunStreak/,
+  'Native health checks need consecutive-underrun hysteresis.');
+assert.match(browserHealth, /GOOGLE_OBR_NATIVE_UNDERRUN_FAILURE_THRESHOLD/,
+  'A single recovered underrun must not tear down the whole graph.');
 assert.match(jni, /LowFrequencyAnalysisKernel/, 'Low-frequency analysis weights should be cached by sample rate.');
 assert.doesNotMatch(functionBlock(jni, 'void analyze_window('), /std::(?:sin|cos)\s*\(/, 'Steady-state analysis must not recompute trigonometric kernels.');
 assert.match(pipeline, /buffer_pool_/, 'XAudio2 blocks should come from a preallocated pool.');
@@ -60,6 +82,8 @@ console.log(JSON.stringify({
   pass: true,
   transportFrames: 4096,
   javaJni: 'direct-buffer-zero-copy',
+  controlPlane: 'shared lifetime lease outside Java monitor',
+  recovery: 'bounded upload backoff and underrun hysteresis',
   nativeQueue: 'preallocated-pool',
   x3d: 'pose-revision-cache',
   obrBlockFrames: 256

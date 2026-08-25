@@ -1278,6 +1278,33 @@ bool ProbeFiniteInputHeadroom(float* measured_energy) {
         && *measured_energy <= 2.0f;
 }
 
+bool ProbeMusicDetailNativeRoute(FeAudioPipelineStatus* status) {
+    FeAudioPipelineConfig config{};
+    config.struct_size = sizeof(config);
+    config.abi_version = FE_AUDIO_PIPELINE_ABI_VERSION;
+    config.sample_rate = kSampleRate;
+    config.input_channels = 2;
+    config.virtual_layout_channels = 8;
+    config.mode = FE_AUDIO_MODE_OBR_BINAURAL;
+    config.muted = 1;
+    config.max_queued_buffers = 8;
+    config.upmix_algorithm = 4;  // MusicDetail channel-router path.
+    PipelineGuard pipeline{fe_audio_pipeline_create(&config)};
+    if (pipeline.handle == nullptr || !CommitCleanMixer(pipeline.handle, 1)) {
+        return false;
+    }
+    return SubmitBlocks(pipeline.handle, 8, status)
+        && status->rust_upmix_active == 1
+        && status->rust_upmix_last_result == FE_RUST_CHANNEL_ROUTER_OK
+        && status->rust_upmix_process_calls == 8
+        && status->mixer_process_calls == 8
+        && status->obr_process_calls == 8
+        && status->virtual_bed_channels == 8
+        && status->spatial_route == FE_AUDIO_ROUTE_UPMIX_MIXER_X3D_OBR
+        && std::isfinite(status->output_energy)
+        && status->output_energy > 0.001f;
+}
+
 }  // namespace
 
 int main() {
@@ -1305,6 +1332,7 @@ int main() {
     FeAudioMixerPipelineStatus timeline_resumed_mixer{};
     uint64_t timeline_reset_elapsed_ms = 0;
     FeAudioMixerPipelineStatus concurrent_control_render{};
+    FeAudioPipelineStatus music_detail{};
     float partial_failure_energy = 0.0f;
     float partial_control_energy = 0.0f;
     std::array<SpatialRouteProbeResult, 4> spatial_routes{};
@@ -1362,6 +1390,7 @@ int main() {
     const bool concurrent_control_render_ok = ProbeMixerConcurrentControlRender(
         &concurrent_control_render
     );
+    const bool music_detail_ok = ProbeMusicDetailNativeRoute(&music_detail);
     const bool four_state_matrix_ok = ProbeSpatialControlFourStateMatrix(
         &spatial_routes,
         &spatial_toggle_gain_jump_db
@@ -1406,6 +1435,7 @@ int main() {
         && transport_boundary_transition_ok
         && timeline_reset_ok
         && concurrent_control_render_ok
+        && music_detail_ok
         && four_state_matrix_ok
         && wet_dry_phase.pass
         && finite_input_headroom_ok
@@ -1431,6 +1461,7 @@ int main() {
         << (transport_boundary_transition_ok ? "true" : "false")
         << ",\"timelineReset\":" << (timeline_reset_ok ? "true" : "false")
         << ",\"concurrent\":" << (concurrent_control_render_ok ? "true" : "false")
+        << ",\"musicDetail\":" << (music_detail_ok ? "true" : "false")
         << ",\"fourState\":" << (four_state_matrix_ok ? "true" : "false")
         << ",\"wetDryPhase\":" << (wet_dry_phase.pass ? "true" : "false")
         << ",\"finiteInputHeadroom\":"
@@ -1526,6 +1557,12 @@ int main() {
         << "},\n"
         << "    \"concurrent_control_render_stress\": "
         << (concurrent_control_render_ok ? "true" : "false") << ",\n"
+        << "    \"music_detail_native_route\": {\"pass\":"
+        << (music_detail_ok ? "true" : "false")
+        << ",\"upmixCalls\":" << music_detail.rust_upmix_process_calls
+        << ",\"mixerCalls\":" << music_detail.mixer_process_calls
+        << ",\"obrCalls\":" << music_detail.obr_process_calls
+        << ",\"energy\":" << music_detail.output_energy << "},\n"
         << "    \"last_upmix_ordinal\": " << failure_retry.last_upmix_ordinal << ",\n"
         << "    \"last_mixer_ordinal\": " << failure_retry.last_mixer_ordinal << ",\n"
         << "    \"last_obr_ordinal\": " << failure_retry.last_obr_ordinal << "\n"

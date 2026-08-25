@@ -9,6 +9,23 @@
   const KEYBOARD_PATCH_DEBOUNCE_MS = 320;
   const FAMILY_LAYOUT_STORAGE_KEY = 'fe.audioMixer.familyLayout.v1';
   const FAMILY_DENSITIES = Object.freeze(['normal', 'compact', 'wide']);
+  const MIXER_VIEWS = Object.freeze([
+    Object.freeze({
+      id: 'daily',
+      label: '日常调音',
+      description: '常用设置集中在这里：一键效果、最终音量、左右位置、人声、低音与包围感。'
+    }),
+    Object.freeze({
+      id: 'spatial',
+      label: '空间声场',
+      description: '设置上混与 OBR，选择 2.0 / 5.1 / 7.1，并检查每个虚拟声道的位置。'
+    }),
+    Object.freeze({
+      id: 'professional',
+      label: '专业调节',
+      description: '查看全部参数、实时监看、动态处理、自定义矩阵和详细运行状态。'
+    })
+  ]);
   const CHANNEL_LAYOUTS = Object.freeze({
     '5.1': Object.freeze(['FL', 'FR', 'FC', 'LFE', 'SL', 'SR']),
     '7.1': Object.freeze(['FL', 'FR', 'FC', 'LFE', 'BL', 'BR', 'SL', 'SR'])
@@ -18,10 +35,11 @@
     BL: '左后', BR: '右后', SL: '左侧环绕', SR: '右侧环绕'
   });
   const CHANNEL_ALGORITHMS = Object.freeze([
-    Object.freeze({ value: 'front-only', label: 'Pass-through（前置直达）' }),
-    Object.freeze({ value: 'matrix-decode', label: 'Matrix 矩阵解码' }),
-    Object.freeze({ value: 'ambient-extract', label: 'Ambient Extract 环境提取' }),
-    Object.freeze({ value: 'custom-matrix', label: 'Custom Matrix 自定义矩阵' }),
+    Object.freeze({ value: 'front-only', label: '原声直达（仅前方）' }),
+    Object.freeze({ value: 'matrix-decode', label: '保真分离（矩阵解码）' }),
+    Object.freeze({ value: 'ambient-extract', label: '环境包围（环境提取）' }),
+    Object.freeze({ value: 'music-detail', label: '音乐细节（实时分离）' }),
+    Object.freeze({ value: 'custom-matrix', label: '专业自定义矩阵' }),
     Object.freeze({ value: 'passive', label: 'Passive FFT（实验说明，不在此面板切换）', disabled: true }),
     Object.freeze({ value: 'dolby-pro-logic-iix', label: 'Dolby Pro Logic II/IIx（需授权）', disabled: true }),
     Object.freeze({ value: 'dts-neural-x', label: 'DTS Neural:X（需授权）', disabled: true })
@@ -64,13 +82,13 @@
     'obrEnabled'
   ]);
   const NUMERIC_PARAMETERS = Object.freeze({
-    inputGainDb: Object.freeze({ label: '输入增益', min: -24, max: 24, step: 0.1, unit: 'dB' }),
-    outputGainDb: Object.freeze({ label: '输出增益', min: -24, max: 24, step: 0.1, unit: 'dB' }),
-    balance: Object.freeze({ label: '左右平衡', min: -1, max: 1, step: 0.01, unit: '' }),
-    stereoWidth: Object.freeze({ label: '立体声宽度', min: 0, max: 2, step: 0.01, unit: '×' }),
-    centerGain: Object.freeze({ label: '中置增益', min: 0, max: 2, step: 0.01, unit: '×' }),
-    surroundGain: Object.freeze({ label: '环绕增益', min: 0, max: 2, step: 0.01, unit: '×' }),
-    lfeGain: Object.freeze({ label: '低频声道增益', min: 0, max: 2, step: 0.01, unit: '×' }),
+    inputGainDb: Object.freeze({ label: '进入调音台前的音量', min: -24, max: 24, step: 0.1, unit: 'dB' }),
+    outputGainDb: Object.freeze({ label: '最终输出音量', min: -24, max: 24, step: 0.1, unit: 'dB' }),
+    balance: Object.freeze({ label: '左右位置（平衡）', min: -1, max: 1, step: 0.01, unit: '' }),
+    stereoWidth: Object.freeze({ label: '左右展开（立体声宽度）', min: 0, max: 2, step: 0.01, unit: '×' }),
+    centerGain: Object.freeze({ label: '人声位置（中置）', min: 0, max: 2, step: 0.01, unit: '×' }),
+    surroundGain: Object.freeze({ label: '包围感（环绕）', min: 0, max: 2, step: 0.01, unit: '×' }),
+    lfeGain: Object.freeze({ label: '低音力度（LFE）', min: 0, max: 2, step: 0.01, unit: '×' }),
     compressorThresholdDb: Object.freeze({ label: '压缩阈值', min: -60, max: 0, step: 0.1, unit: 'dB' }),
     compressorRatio: Object.freeze({ label: '压缩比', min: 1, max: 20, step: 0.1, unit: ':1' }),
     compressorAttackMs: Object.freeze({ label: '启动时间', min: 0.1, max: 200, step: 0.1, unit: 'ms' }),
@@ -83,37 +101,38 @@
     reverbDecayMs: Object.freeze({ label: '衰减时间', min: 50, max: 5000, step: 10, unit: 'ms' }),
     reverbDamping: Object.freeze({ label: '高频阻尼', min: 0, max: 1, step: 0.01, unit: '' }),
     reverbPreDelayMs: Object.freeze({ label: '预延迟', min: 0, max: 200, step: 1, unit: 'ms' }),
-    reverbWet: Object.freeze({ label: '湿声', min: 0, max: 1, step: 0.01, unit: '' }),
-    reverbDry: Object.freeze({ label: '干声', min: 0, max: 1, step: 0.01, unit: '' }),
-    upmixCenterWidthHz: Object.freeze({ label: '中置提取宽度', min: 20, max: 20000, step: 10, unit: 'Hz' }),
-    upmixLfeCrossoverHz: Object.freeze({ label: 'LFE 分频点', min: 20, max: 500, step: 1, unit: 'Hz' }),
-    upmixCenterGain: Object.freeze({ label: '上混中置增益', min: 0, max: 2, step: 0.01, unit: '×' }),
-    upmixSurroundGain: Object.freeze({ label: '上混环绕增益', min: 0, max: 2, step: 0.01, unit: '×' }),
-    upmixLfeGain: Object.freeze({ label: '上混 LFE 增益', min: 0, max: 2, step: 0.01, unit: '×' }),
-    upmixDecorrelation: Object.freeze({ label: '去相关量', min: 0, max: 1, step: 0.01, unit: '' }),
-    obrWet: Object.freeze({ label: 'OBR 湿声', min: 0, max: 1, step: 0.01, unit: '' }),
-    obrDry: Object.freeze({ label: 'OBR 干声', min: 0, max: 1, step: 0.01, unit: '' }),
-    obrOutputGainDb: Object.freeze({ label: 'OBR 输出增益', min: -12, max: 0, step: 0.1, unit: 'dB' }),
-    obrSpatialWidth: Object.freeze({ label: 'OBR 空间宽度', min: 0, max: 2, step: 0.01, unit: '×' })
+    reverbWet: Object.freeze({ label: '回响比例（湿声）', min: 0, max: 1, step: 0.01, unit: '' }),
+    reverbDry: Object.freeze({ label: '原声比例（干声）', min: 0, max: 1, step: 0.01, unit: '' }),
+    upmixCenterWidthHz: Object.freeze({ label: '人声提取范围（中置宽度）', min: 20, max: 20000, step: 10, unit: 'Hz' }),
+    upmixLfeCrossoverHz: Object.freeze({ label: '低音分频点（LFE）', min: 20, max: 500, step: 1, unit: 'Hz' }),
+    upmixCenterGain: Object.freeze({ label: '上混人声音量（中置）', min: 0, max: 2, step: 0.01, unit: '×' }),
+    upmixSurroundGain: Object.freeze({ label: '上混包围感（环绕）', min: 0, max: 2, step: 0.01, unit: '×' }),
+    upmixLfeGain: Object.freeze({ label: '上混低音力度（LFE）', min: 0, max: 2, step: 0.01, unit: '×' }),
+    upmixDecorrelation: Object.freeze({ label: '前后分离程度（去相关）', min: 0, max: 1, step: 0.01, unit: '' }),
+    obrWet: Object.freeze({ label: '方位声比例（OBR 湿声）', min: 0, max: 1, step: 0.01, unit: '' }),
+    obrDry: Object.freeze({ label: '原声比例（OBR 干声）', min: 0, max: 1, step: 0.01, unit: '' }),
+    obrOutputGainDb: Object.freeze({ label: '方位处理后音量', min: -12, max: 0, step: 0.1, unit: 'dB' }),
+    obrSpatialWidth: Object.freeze({ label: '方位展开范围（OBR 宽度）', min: 0, max: 2, step: 0.01, unit: '×' })
   });
   const ENUM_PARAMETERS = Object.freeze({
     upmixAlgorithm: Object.freeze({
-      label: '上混算法',
+      label: '声音分配方式（上混算法）',
       options: Object.freeze([
         Object.freeze({ value: 'passive', label: 'Passive FFT（实验）' }),
         Object.freeze({ value: 'matrix-decode', label: '矩阵解码（保真）' }),
-        Object.freeze({ value: 'ambient-extract', label: '环境提取' })
+        Object.freeze({ value: 'ambient-extract', label: '环境提取' }),
+        Object.freeze({ value: 'music-detail', label: '音乐细节（实时近似分离）' })
       ])
     }),
     upmixOutputLayout: Object.freeze({
-      label: '虚拟声床布局',
+      label: '播放布局（虚拟声床）',
       options: Object.freeze([
         Object.freeze({ value: '5.1', label: '虚拟 5.1' }),
         Object.freeze({ value: '7.1', label: '虚拟 7.1' })
       ])
     }),
     obrFilterProfile: Object.freeze({
-      label: 'OBR 滤波配置',
+      label: '距离与环境感（OBR 滤波）',
       options: Object.freeze([
         Object.freeze({ value: 'direct', label: '直达声（保真）' }),
         Object.freeze({ value: 'ambient', label: '环境声' }),
@@ -121,11 +140,39 @@
       ])
     })
   });
+  const CONTROL_HELP = Object.freeze({
+    enabled: '控制调音台本身；上混和 OBR 可以独立开关。',
+    inputGainDb: '音乐进入均衡、压缩等处理前的音量。',
+    outputGainDb: '所有效果处理完成后送往播放设备的音量。',
+    balance: '向左或向右移动整首音乐的声音重心。',
+    stereoWidth: '越高越宽；过高可能让中间的人声变薄。',
+    centerGain: '主要影响居中的人声与独奏元素。',
+    surroundGain: '主要影响侧面、后方的环境声与尾音。',
+    lfeGain: '主要影响低频、鼓点和低音炮声道。',
+    upmixEnabled: '把普通双声道展开成虚拟 5.1 或 7.1。',
+    upmixAlgorithm: '决定人声、乐器、低音与环境声如何分到各声道。',
+    upmixOutputLayout: '5.1 更轻量；7.1 增加后方两个虚拟声道。',
+    upmixCenterWidthHz: '控制哪些居中频率更容易进入人声音道。',
+    upmixLfeCrossoverHz: '低于此频率的声音更容易进入低音声道。',
+    upmixCenterGain: '调整上混后居中人声的相对音量。',
+    upmixSurroundGain: '调整上混后侧面和后方声音的相对音量。',
+    upmixLfeGain: '调整上混后鼓点与低频的相对音量。',
+    upmixDecorrelation: '提高可增强前后分离，过高会让声音变散。',
+    obrEnabled: '把虚拟多声道转换成耳机可听的方向与距离。',
+    obrFilterProfile: '选择更直接、更有环境感或混响更明显的距离表现。',
+    obrWet: '经过方位与距离处理的声音比例。',
+    obrDry: '不经过 OBR 方位处理的原声比例。',
+    obrOutputGainDb: '补偿 OBR 处理完成后的整体响度。',
+    obrSpatialWidth: '控制左右、前后方位的展开程度。',
+    compressorEnabled: '自动压低突然过响的部分，让响度更稳定。',
+    limiterEnabled: '拦住危险峰值，减少削波和爆音。',
+    reverbEnabled: '增加空间反射与尾音，不会替代 OBR 方位处理。'
+  });
   const FAMILIES = Object.freeze([
     Object.freeze({
       id: 'master',
-      label: '主控',
-      description: '控制调音链总开关、输入与输出电平。',
+      label: '声音总控',
+      description: '调整进入调音台前和处理完成后的音量，以及整首音乐的左右位置。',
       controls: Object.freeze([
         Object.freeze({ key: 'enabled', label: '启用调音台', type: 'boolean' }),
         Object.freeze({ key: 'inputGainDb', type: 'number' }),
@@ -135,14 +182,14 @@
     }),
     Object.freeze({
       id: 'equalizer',
-      label: '十段均衡器',
-      description: '从 31 Hz 到 16 kHz 调节各频段，范围为 ±12 dB。',
+      label: '音色均衡',
+      description: '从低音到高音分成十段调节；不熟悉时可直接使用上方效果预设。',
       controls: Object.freeze([Object.freeze({ key: 'eqDb', type: 'equalizer' })])
     }),
     Object.freeze({
       id: 'spatial',
-      label: '声场与声道',
-      description: '在上混后调整宽度及中置、环绕、低频声道电平。',
+      label: '常用声场',
+      description: '用通俗参数调整左右展开、人声位置、包围感和低音力度。',
       controls: Object.freeze([
         Object.freeze({ key: 'stereoWidth', type: 'number' }),
         Object.freeze({ key: 'centerGain', type: 'number' }),
@@ -152,8 +199,8 @@
     }),
     Object.freeze({
       id: 'upmix',
-      label: '上混',
-      description: '独立控制立体声到虚拟 5.1/7.1 声床；关闭时仍保留 Mixer 处理。',
+      label: '虚拟多声道（上混）',
+      description: '把立体声分配到虚拟 5.1/7.1；关闭后调音台仍会正常处理声音。',
       controls: Object.freeze([
         Object.freeze({ key: 'upmixEnabled', label: '启用上混', type: 'boolean' }),
         Object.freeze({ key: 'upmixAlgorithm', type: 'enum' }),
@@ -168,8 +215,8 @@
     }),
     Object.freeze({
       id: 'obr',
-      label: 'OBR 双耳渲染',
-      description: '独立控制 OBR 与 FE Monster 干湿声包装；关闭时走非 OBR 干声输出。',
+      label: '耳机方位感（OBR）',
+      description: '把虚拟声道转换为耳机可听的方向与距离；关闭后仍保留调音台输出。',
       controls: Object.freeze([
         Object.freeze({ key: 'obrEnabled', label: '启用 OBR', type: 'boolean' }),
         Object.freeze({ key: 'obrFilterProfile', type: 'enum' }),
@@ -181,8 +228,8 @@
     }),
     Object.freeze({
       id: 'compressor',
-      label: '压缩器',
-      description: '收窄动态范围并平滑响度变化。',
+      label: '响度稳定（压缩器）',
+      description: '自动控制忽大忽小的声音，适合音量变化明显的歌曲。',
       controls: Object.freeze([
         Object.freeze({ key: 'compressorEnabled', label: '启用压缩器', type: 'boolean' }),
         Object.freeze({ key: 'compressorThresholdDb', type: 'number' }),
@@ -195,8 +242,8 @@
     }),
     Object.freeze({
       id: 'limiter',
-      label: '限制器',
-      description: '约束峰值，避免最终输出削波。',
+      label: '防爆音（限制器）',
+      description: '限制危险峰值，降低削波与突然爆音的概率。',
       controls: Object.freeze([
         Object.freeze({ key: 'limiterEnabled', label: '启用限制器', type: 'boolean' }),
         Object.freeze({ key: 'limiterCeilingDb', type: 'number' }),
@@ -205,8 +252,8 @@
     }),
     Object.freeze({
       id: 'reverb',
-      label: '混响',
-      description: '调节空间、衰减、阻尼和干湿声比例。',
+      label: '空间回响（混响）',
+      description: '增加房间、大厅等反射尾音，并分别控制原声和回响比例。',
       controls: Object.freeze([
         Object.freeze({ key: 'reverbEnabled', label: '启用混响', type: 'boolean' }),
         Object.freeze({ key: 'reverbRoomSize', type: 'number' }),
@@ -705,10 +752,12 @@
     let channelOperationTail = Promise.resolve();
     let channelOperationCount = 0;
     let channelReadyState = 'loading';
+    const chainNodes = new Map();
+    const mixerViewButtons = new Map();
 
     const root = node(document, 'div', {
       className: 'audio-mixer-ui',
-      dataset: { mixerReady: 'false', selectedPreset: '' }
+      dataset: { mixerReady: 'false', selectedPreset: '', mixerView: 'daily' }
     });
     root.setAttribute('aria-busy', 'true');
 
@@ -716,14 +765,44 @@
       className: 'audio-mixer-overview',
       attributes: { 'aria-labelledby': `${instanceId}-title` }
     });
-    const title = node(document, 'h2', { text: '调音台', attributes: { id: `${instanceId}-title` } });
+    const overviewHeading = node(document, 'div', { className: 'audio-mixer-overview__heading' });
+    const title = node(document, 'h2', { text: '声音调节', attributes: { id: `${instanceId}-title` } });
     const description = node(document, 'p', {
-      text: '音频按“立体声（可选上混）→ 调音台 → 可选 OBR”处理；关闭任一空间模块不会关闭调音台。'
+      text: '先看当前声音经过哪里，再按需要进入日常、空间或专业设置。关闭上混或 OBR 不会关闭调音台。'
     });
+    overviewHeading.append(title, description);
     const playback = node(document, 'p', {
       className: 'audio-mixer-playback-state',
       text: '正在检测原生音频链…',
       dataset: { mixerPlaybackState: '', playbackState: 'loading' }
+    });
+    const chainSummary = node(document, 'div', {
+      className: 'audio-mixer-chain-summary',
+      attributes: { role: 'group', 'aria-label': '当前声音处理顺序' },
+      dataset: { mixerChainSummary: '' }
+    });
+    [
+      ['upmix', '上混', '把双声道展开成虚拟多声道'],
+      ['mixer', '调音台', '处理音量、音色和动态'],
+      ['obr', 'OBR', '为耳机生成方向与距离'],
+      ['output', '播放设备', '最终送往耳机或双声道设备']
+    ].forEach(([id, label, helper], index) => {
+      if (index > 0) {
+        chainSummary.appendChild(node(document, 'span', {
+          className: 'audio-mixer-chain-arrow', text: '→', attributes: { 'aria-hidden': 'true' }
+        }));
+      }
+      const routeNode = node(document, 'div', {
+        className: 'audio-mixer-chain-node',
+        dataset: { mixerChainNode: id, routeState: 'loading' }
+      });
+      routeNode.append(
+        node(document, 'strong', { text: label }),
+        node(document, 'span', { text: '检测中', dataset: { mixerChainState: id } }),
+        node(document, 'small', { text: helper })
+      );
+      chainNodes.set(id, routeNode);
+      chainSummary.appendChild(routeNode);
     });
     const revision = node(document, 'span', {
       className: 'audio-mixer-revision',
@@ -733,7 +812,7 @@
     const channelLayoutControl = node(document, 'label', {
       className: 'audio-mixer-channel-layout'
     });
-    const channelLayoutLabel = node(document, 'span', { text: '旧版声道切换（兼容）' });
+    const channelLayoutLabel = node(document, 'span', { text: '兼容声道布局（高级）' });
     const channelLayoutSelect = node(document, 'select', {
       attributes: { 'aria-label': '选择原生调音链声道布局' },
       dataset: { mixerChannelLayout: '' }
@@ -759,14 +838,70 @@
       dataset: { mixerRetry: '' }
     });
     retryButton.disabled = true;
-    overview.append(title, description, playback, revision, channelLayoutControl, status, retryButton);
+    const overviewAdvanced = node(document, 'div', {
+      className: 'audio-mixer-overview__advanced',
+      dataset: { mixerAdvancedOnly: '' }
+    });
+    overviewAdvanced.append(revision, channelLayoutControl);
+    overview.append(overviewHeading, playback, chainSummary, status, retryButton, overviewAdvanced);
+
+    const mixerViewNav = node(document, 'nav', {
+      className: 'audio-mixer-view-nav',
+      attributes: { 'aria-label': '调音台设置层级' },
+      dataset: { mixerViewNav: '' }
+    });
+    MIXER_VIEWS.forEach((view) => {
+      const button = node(document, 'button', {
+        text: view.label,
+        attributes: {
+          type: 'button',
+          'aria-label': `${view.label}：${view.description}`,
+          'aria-pressed': String(view.id === 'daily')
+        },
+        dataset: { mixerViewButton: view.id }
+      });
+      button.addEventListener('click', () => selectMixerView(view.id));
+      mixerViewButtons.set(view.id, button);
+      mixerViewNav.appendChild(button);
+    });
+    mixerViewNav.addEventListener('keydown', (event) => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      const activeIndex = MIXER_VIEWS.findIndex((view) => view.id === root.dataset.mixerView);
+      let nextIndex = activeIndex;
+      if (event.key === 'Home') nextIndex = 0;
+      else if (event.key === 'End') nextIndex = MIXER_VIEWS.length - 1;
+      else nextIndex = (activeIndex + (event.key === 'ArrowRight' ? 1 : -1) + MIXER_VIEWS.length) % MIXER_VIEWS.length;
+      event.preventDefault();
+      const nextView = MIXER_VIEWS[nextIndex];
+      selectMixerView(nextView.id);
+      mixerViewButtons.get(nextView.id)?.focus?.();
+    });
+    const mixerViewDescription = node(document, 'p', {
+      className: 'audio-mixer-view-description',
+      text: MIXER_VIEWS[0].description,
+      attributes: { 'aria-live': 'polite' },
+      dataset: { mixerViewDescription: '' }
+    });
+
+    function selectMixerView(viewId) {
+      const nextView = MIXER_VIEWS.find((view) => view.id === viewId) || MIXER_VIEWS[0];
+      root.dataset.mixerView = nextView.id;
+      mixerViewDescription.textContent = nextView.description;
+      mixerViewButtons.forEach((button, id) => {
+        const selected = id === nextView.id;
+        button.setAttribute('aria-pressed', String(selected));
+        button.tabIndex = selected ? 0 : -1;
+      });
+      return nextView.id;
+    }
+    selectMixerView('daily');
 
     const presetsSection = node(document, 'section', {
       className: 'audio-mixer-presets',
       attributes: { 'aria-labelledby': `${instanceId}-presets-title` }
     });
     presetsSection.appendChild(node(document, 'h3', {
-      text: '效果预设',
+      text: '一键效果',
       attributes: { id: `${instanceId}-presets-title` }
     }));
     const presetGrid = node(document, 'div', {
@@ -1044,11 +1179,11 @@
     const channelPanelHeading = node(document, 'div', { className: 'audio-mixer-channel-panel__heading' });
     channelPanelHeading.append(
       node(document, 'h3', {
-        text: '独立逐声道路由',
+        text: '各声道位置与音量',
         attributes: { id: `${instanceId}-channel-panel-title` }
       }),
       node(document, 'p', {
-        text: '逐声道参数作用于虚拟 5.1 / 7.1 声床；OBR 将声床渲染为耳机双声道。'
+        text: '分别调整虚拟 5.1 / 7.1 的音量、延迟和方向；OBR 开启后会把这些位置转换成耳机方位感。'
       })
     );
     const channelPhysicalOutput = node(document, 'p', {
@@ -1072,7 +1207,7 @@
       channelRouterLayout.appendChild(option);
     });
     const channelLayoutLabelControl = node(document, 'label', { className: 'audio-mixer-channel-toolbar__control' });
-    channelLayoutLabelControl.append(node(document, 'span', { text: '声床布局' }), channelRouterLayout);
+    channelLayoutLabelControl.append(node(document, 'span', { text: '播放布局' }), channelRouterLayout);
 
     const channelAlgorithm = node(document, 'select', {
       attributes: { 'aria-label': '选择逐声道上混算法' },
@@ -1086,7 +1221,7 @@
       channelAlgorithm.appendChild(option);
     });
     const channelAlgorithmLabelControl = node(document, 'label', { className: 'audio-mixer-channel-toolbar__control' });
-    channelAlgorithmLabelControl.append(node(document, 'span', { text: '上混算法' }), channelAlgorithm);
+    channelAlgorithmLabelControl.append(node(document, 'span', { text: '声音分配方式' }), channelAlgorithm);
 
     const lfeCrossoverRange = node(document, 'input', {
       attributes: {
@@ -1106,12 +1241,27 @@
     lfeCrossoverNumber.type = 'number';
     const lfeCrossoverControl = node(document, 'label', { className: 'audio-mixer-channel-toolbar__control audio-mixer-channel-toolbar__control--number' });
     lfeCrossoverControl.append(
-      node(document, 'span', { text: 'LFE 分频' }),
+      node(document, 'span', { text: '低音分频点（LFE）' }),
       lfeCrossoverRange,
       lfeCrossoverNumber,
       node(document, 'span', { text: 'Hz', attributes: { 'aria-hidden': 'true' } })
     );
     channelToolbar.append(channelLayoutLabelControl, channelAlgorithmLabelControl, lfeCrossoverControl);
+
+    const musicRoleMap = node(document, 'aside', {
+      className: 'audio-mixer-music-role-map',
+      attributes: { role: 'note', 'aria-label': '音乐细节声道路由说明' },
+      dataset: { mixerMusicRoleMap: '' }
+    });
+    musicRoleMap.append(
+      node(document, 'strong', { text: '“音乐细节”会这样分配声音' }),
+      node(document, 'span', { text: '左前/右前（FL/FR）：乐器与瞬态' }),
+      node(document, 'span', { text: '中置（FC）：居中人声' }),
+      node(document, 'span', { text: '低音声道（LFE）：低频与鼓点' }),
+      node(document, 'span', { text: '侧环绕（SL/SR）：空间与环境' }),
+      node(document, 'span', { text: '后环绕（BL/BR）：尾音与深度（7.1）' }),
+      node(document, 'small', { text: '实时频段与立体声场估计，不虚构为离线 AI 音轨分离。' })
+    );
 
     const channelStrips = node(document, 'div', {
       className: 'audio-mixer-channel-strips',
@@ -1123,8 +1273,8 @@
       attributes: { 'aria-labelledby': `${instanceId}-matrix-title` }
     });
     matrixSection.append(
-      node(document, 'h4', { text: 'Custom Matrix · L/R → 8 声道', attributes: { id: `${instanceId}-matrix-title` } }),
-      node(document, 'p', { text: '16 个系数按输出声道逐行排列；仅 Custom Matrix 算法会消费这些值。' })
+      node(document, 'h4', { text: '专业自定义矩阵 · 左/右输入 → 8 声道', attributes: { id: `${instanceId}-matrix-title` } }),
+      node(document, 'p', { text: '仅选择“专业自定义矩阵”时生效；16 个系数按输出声道逐行排列。' })
     );
     const matrixGrid = node(document, 'div', { className: 'audio-mixer-custom-matrix__grid' });
     const matrixInputs = [];
@@ -1155,7 +1305,7 @@
       attributes: { role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' },
       dataset: { mixerChannelStatus: '', tone: 'neutral' }
     });
-    channelPanel.append(channelPanelHeader, channelToolbar, channelStrips, matrixSection, channelStatus);
+    channelPanel.append(channelPanelHeader, channelToolbar, musicRoleMap, channelStrips, matrixSection, channelStatus);
 
     channelRouterLayout.addEventListener('change', () => {
       changeEffectiveChannelLayout(normalizeEffectiveChannelLayout(channelRouterLayout.value));
@@ -1183,7 +1333,7 @@
       attributes: { 'aria-labelledby': `${instanceId}-diagnostics-title` }
     });
     diagnostics.appendChild(node(document, 'h3', {
-      text: '音频链诊断',
+      text: '详细运行状态（排查问题时查看）',
       attributes: { id: `${instanceId}-diagnostics-title` }
     }));
     const upmixDiagnostic = node(document, 'p', {
@@ -1199,7 +1349,17 @@
       dataset: { mixerDiagnostic: 'mixer' }
     });
     diagnostics.append(upmixDiagnostic, mixerDiagnostic, obrDiagnostic);
-    root.append(overview, visualsHost, presetsSection, familyToolbar, parameters, channelPanel, diagnostics);
+    root.append(
+      overview,
+      mixerViewNav,
+      mixerViewDescription,
+      presetsSection,
+      parameters,
+      channelPanel,
+      visualsHost,
+      familyToolbar,
+      diagnostics
+    );
     container.appendChild(root);
 
     if (global.FeAudioMixerVisuals?.mount) {
@@ -1478,6 +1638,7 @@
       channelPanel.dataset.state = commitState === 'committed' ? 'ready' : commitState;
       channelRouterLayout.value = snapshot.layout;
       channelAlgorithm.value = snapshot.algorithm;
+      musicRoleMap.hidden = snapshot.algorithm !== 'music-detail';
       lfeCrossoverRange.value = String(snapshot.lfeCrossoverHz);
       lfeCrossoverNumber.value = String(snapshot.lfeCrossoverHz);
       matrixInputs.forEach((input, index) => {
@@ -1729,6 +1890,13 @@
       input.disabled = true;
       input.addEventListener('change', () => recordControlValue(key, input.checked));
       label.append(input, node(document, 'span', { text: labelText }));
+      if (CONTROL_HELP[key]) {
+        label.appendChild(node(document, 'small', {
+          className: 'audio-mixer-control-help',
+          text: CONTROL_HELP[key],
+          dataset: { mixerControlHelp: key }
+        }));
+      }
       controls.set(key, input);
       return label;
     }
@@ -1754,6 +1922,13 @@
       });
       select.disabled = true;
       select.addEventListener('change', () => recordControlValue(key, select.value));
+      if (CONTROL_HELP[key]) {
+        label.appendChild(node(document, 'small', {
+          className: 'audio-mixer-control-help',
+          text: CONTROL_HELP[key],
+          dataset: { mixerControlHelp: key }
+        }));
+      }
       label.appendChild(select);
       controls.set(key, select);
       return label;
@@ -1851,7 +2026,15 @@
         event.preventDefault();
         commitNumericValue();
       });
-      label.append(heading, output, numericInput, input);
+      label.append(heading, output, numericInput);
+      if (CONTROL_HELP[definition.key]) {
+        label.appendChild(node(document, 'small', {
+          className: 'audio-mixer-control-help',
+          text: CONTROL_HELP[definition.key],
+          dataset: { mixerControlHelp: definition.key }
+        }));
+      }
+      label.appendChild(input);
       if (definition.eqIndex === undefined) {
         controls.set(definition.key, input);
         numericInputs.set(definition.key, numericInput);
@@ -1913,6 +2096,61 @@
       customState.textContent = selectedPreset === 'custom'
         ? '当前：自定义'
         : `当前：${identity?.label || '自定义'}`;
+    }
+
+    function renderChainNode(id, state, copy) {
+      const routeNode = chainNodes.get(id);
+      if (!routeNode) return;
+      routeNode.dataset.routeState = state;
+      const stateElement = routeNode.children?.[1];
+      if (stateElement) stateElement.textContent = copy;
+      const label = routeNode.children?.[0]?.textContent || id;
+      routeNode.setAttribute('aria-label', `${label}：${copy}`);
+    }
+
+    function renderChainSummary(snapshot) {
+      const upmix = snapshot.upmix;
+      const obr = snapshot.obr;
+      if (upmix.active) {
+        renderChainNode('upmix', 'active', `开启 · 虚拟 ${upmix.outputLayout || snapshot.parameters.upmixOutputLayout}`);
+      } else if (upmix.enabled) {
+        renderChainNode('upmix', 'warning', upmix.available ? '等待生效' : '已请求 · 暂不可用');
+      } else {
+        renderChainNode('upmix', 'bypass', '关闭 · 保持立体声');
+      }
+
+      if (snapshot.mixerActive) {
+        renderChainNode('mixer', 'active', '开启 · 正在处理');
+      } else if (!snapshot.parameters.enabled) {
+        renderChainNode('mixer', 'bypass', '关闭 · 声音直通');
+      } else {
+        renderChainNode('mixer', 'warning', '已开启 · 暂未生效');
+      }
+
+      if (obr.active) {
+        renderChainNode('obr', 'active', '开启 · 生成方向与距离');
+      } else if (obr.enabled) {
+        renderChainNode('obr', 'warning', obr.available ? '等待生效' : '已请求 · 暂不可用');
+      } else {
+        renderChainNode('obr', 'bypass', '关闭 · 普通双声道');
+      }
+
+      if (snapshot.playbackState === 'browser-compatible') {
+        renderChainNode('output', 'warning', '兼容双声道');
+      } else if (obr.active) {
+        renderChainNode('output', 'active', '耳机双声道');
+      } else {
+        renderChainNode('output', 'active', '双声道 / 耳机');
+      }
+      chainSummary.dataset.route = snapshot.spatialRoute;
+    }
+
+    function renderChainUnavailable() {
+      renderChainNode('upmix', 'warning', '状态不可用');
+      renderChainNode('mixer', 'warning', '状态不可用');
+      renderChainNode('obr', 'warning', '状态不可用');
+      renderChainNode('output', 'active', '兼容双声道');
+      chainSummary.dataset.route = 'unavailable';
     }
 
     function renderParameters(nextParameters) {
@@ -2002,6 +2240,7 @@
       );
       playback.dataset.playbackState = snapshot.playbackState;
       playback.textContent = playbackCopy(snapshot.playbackState);
+      renderChainSummary(snapshot);
       renderDiagnostics(snapshot);
       visualsController?.updateParameters(localParameters);
       syncEffectiveChannelLayout();
@@ -2346,6 +2585,7 @@
         setBusy(operationCount > 0);
         playback.dataset.playbackState = 'unavailable';
         playback.textContent = '调音台状态不可用；音频继续使用兼容播放。';
+        renderChainUnavailable();
         setStatus(safeErrorCopy(error, '读取调音台'), 'error');
         return null;
       }

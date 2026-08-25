@@ -1,5 +1,6 @@
 #include "fe_rust_mixer.h"
-#include "fe_rust_upmix.h"
+#include "fe_rust_channel_router.h"
+#include "audio/fe_audio_spatial_layout.h"
 
 #include <windows.h>
 
@@ -175,7 +176,7 @@ class RustChain final {
 public:
     ~RustChain() {
         if (mixer_ != nullptr && mixer_destroy_ != nullptr) mixer_destroy_(mixer_);
-        if (upmix_ != nullptr && upmix_destroy_ != nullptr) upmix_destroy_(upmix_);
+        if (router_ != nullptr && router_destroy_ != nullptr) router_destroy_(router_);
         if (module_ != nullptr) FreeLibrary(module_);
     }
 
@@ -190,34 +191,62 @@ public:
         module_ = LoadLibraryW(path.data());
         if (module_ == nullptr) return false;
 
-        upmix_create_ = Symbol<FeRustUpmixCreateFn>("fe_rust_upmix_create");
-        upmix_process_ = Symbol<FeRustUpmixProcessFn>("fe_rust_upmix_process");
-        upmix_destroy_ = Symbol<FeRustUpmixDestroyFn>("fe_rust_upmix_destroy");
+        router_create_ = Symbol<FeRustChannelRouterCreateFn>(
+            "fe_rust_channel_router_create"
+        );
+        router_stage_ = Symbol<FeRustChannelRouterStageFn>(
+            "fe_rust_channel_router_stage"
+        );
+        router_commit_ = Symbol<FeRustChannelRouterCommitFn>(
+            "fe_rust_channel_router_commit"
+        );
+        router_process_ = Symbol<FeRustChannelRouterProcessFn>(
+            "fe_rust_channel_router_process"
+        );
+        router_destroy_ = Symbol<FeRustChannelRouterDestroyFn>(
+            "fe_rust_channel_router_destroy"
+        );
         mixer_create_ = Symbol<FeRustMixerCreateFn>("fe_rust_mixer_create");
         mixer_stage_ = Symbol<FeRustMixerStageParamsFn>("fe_rust_mixer_stage_params");
         mixer_commit_ = Symbol<FeRustMixerCommitFn>("fe_rust_mixer_commit");
         mixer_process_ = Symbol<FeRustMixerProcessFn>("fe_rust_mixer_process");
         mixer_destroy_ = Symbol<FeRustMixerDestroyFn>("fe_rust_mixer_destroy");
-        if (!upmix_create_ || !upmix_process_ || !upmix_destroy_
+        if (!router_create_ || !router_stage_ || !router_commit_
+            || !router_process_ || !router_destroy_
             || !mixer_create_ || !mixer_stage_ || !mixer_commit_
             || !mixer_process_ || !mixer_destroy_) {
             return false;
         }
 
-        FeRustUpmixConfig upmix_config{};
-        upmix_config.struct_size = sizeof(upmix_config);
-        upmix_config.abi_version = FE_RUST_UPMIX_ABI_VERSION;
-        upmix_config.sample_rate = kSampleRate;
-        upmix_config.output_channels = kVirtualChannels;
-        upmix_config.algorithm = 1;  // Product default: OxiMedia MatrixDecode.
-        upmix_config.center_width_hz = 300.0f;
-        upmix_config.lfe_crossover_hz = 120.0f;
-        upmix_config.lfe_gain = 0.707f;
-        upmix_config.center_gain = 0.707f;
-        upmix_config.surround_gain = 0.5f;
-        upmix_config.decorrelation_amount = 0.7f;
-        upmix_ = upmix_create_(&upmix_config);
-        if (upmix_ == nullptr) return false;
+        FeRustChannelRouterConfig router_config{};
+        router_config.struct_size = sizeof(router_config);
+        router_config.abi_version = FE_RUST_CHANNEL_ROUTER_ABI_VERSION;
+        router_config.sample_rate = kSampleRate;
+        router_config.max_frames_per_call = kFramesPerBlock;
+        router_config.output_channels = kVirtualChannels;
+        router_config.max_delay_ms = 250.0f;
+        router_ = router_create_(&router_config);
+        if (router_ == nullptr) return false;
+
+        FeRustChannelRouterParams router_params{};
+        router_params.struct_size = sizeof(router_params);
+        router_params.abi_version = FE_RUST_CHANNEL_ROUTER_ABI_VERSION;
+        router_params.output_channels = kVirtualChannels;
+        router_params.algorithm = FE_RUST_UPMIX_MATRIX_DECODE;
+        router_params.lfe_crossover_hz = 120.0f;
+        constexpr std::array<float, kVirtualChannels> kAzimuths{
+            30.0f, -30.0f, 0.0f, 0.0f, 135.0f, -135.0f, 90.0f, -90.0f
+        };
+        std::copy(
+            kAzimuths.begin(),
+            kAzimuths.end(),
+            router_params.channel_azimuth_deg
+        );
+        if (router_stage_(router_, 1, &router_params)
+                != FE_RUST_CHANNEL_ROUTER_OK
+            || router_commit_(router_, 1, 0) != FE_RUST_CHANNEL_ROUTER_OK) {
+            return false;
+        }
 
         FeRustMixerConfig mixer_config{};
         mixer_config.struct_size = sizeof(mixer_config);
@@ -255,11 +284,11 @@ public:
 
     bool Process(const std::vector<float>& stereo, std::vector<float>* output) {
         output->assign(static_cast<size_t>(kFramesPerBlock) * kVirtualChannels, 0.0f);
-        const int32_t upmix_result = upmix_process_(
-            upmix_, stereo.data(), kFramesPerBlock, output->data(),
+        const int32_t upmix_result = router_process_(
+            router_, stereo.data(), kFramesPerBlock, output->data(),
             static_cast<uint32_t>(output->size())
         );
-        if (upmix_result != FE_RUST_UPMIX_OK) return false;
+        if (upmix_result != FE_RUST_CHANNEL_ROUTER_OK) return false;
         upmix_process_calls_ += 1;
         if (!ProcessMixer(output, kVirtualChannels)) return false;
         return true;
@@ -290,11 +319,13 @@ private:
     }
 
     HMODULE module_ = nullptr;
-    void* upmix_ = nullptr;
+    void* router_ = nullptr;
     void* mixer_ = nullptr;
-    FeRustUpmixCreateFn upmix_create_ = nullptr;
-    FeRustUpmixProcessFn upmix_process_ = nullptr;
-    FeRustUpmixDestroyFn upmix_destroy_ = nullptr;
+    FeRustChannelRouterCreateFn router_create_ = nullptr;
+    FeRustChannelRouterStageFn router_stage_ = nullptr;
+    FeRustChannelRouterCommitFn router_commit_ = nullptr;
+    FeRustChannelRouterProcessFn router_process_ = nullptr;
+    FeRustChannelRouterDestroyFn router_destroy_ = nullptr;
     FeRustMixerCreateFn mixer_create_ = nullptr;
     FeRustMixerStageParamsFn mixer_stage_ = nullptr;
     FeRustMixerCommitFn mixer_commit_ = nullptr;
@@ -311,23 +342,32 @@ struct ObjectPosition {
 };
 
 std::array<ObjectPosition, 8> CurrentProductPositions() {
-    return {{{30.0f, 0.0f, 1.0f}, {-30.0f, 0.0f, 1.0f},
-        {0.0f, 0.0f, 1.0f}, {0.0f, -30.0f, 1.0f},
-        {90.0f, 0.0f, 1.0f}, {-90.0f, 0.0f, 1.0f},
-        {135.0f, 0.0f, 1.0f}, {-135.0f, 0.0f, 1.0f}}};
+    std::array<ObjectPosition, 8> positions{};
+    for (uint32_t channel = 0; channel < positions.size(); ++channel) {
+        const auto pose = fe::audio::DefaultSpatialBedObjectPose(8, channel);
+        positions[channel] = {pose.azimuth, pose.elevation, pose.distance};
+    }
+    return positions;
 }
 
 std::vector<ObjectPosition> OfficialObrPositions(uint32_t channels) {
     if (channels == 2) {
         return {{30.0f, 0.0f, 1.0f}, {-30.0f, 0.0f, 1.0f}};
     }
-    // Mirrors Google OBR kLayout7_1_0_ch channel order and sign convention:
-    // positive azimuth is left, rear channels are +/-135 degrees.
+    if (channels == 6) {
+        return {
+            {30.0f, 0.0f, 1.0f}, {-30.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f}, {0.0f, -30.0f, 1.0f},
+            {110.0f, 0.0f, 1.0f}, {-110.0f, 0.0f, 1.0f}
+        };
+    }
+    // Adapt Google OBR's target angles to the product's canonical FFmpeg/OBS
+    // order: FL, FR, FC, LFE, BL, BR, SL, SR.
     return {
         {30.0f, 0.0f, 1.0f}, {-30.0f, 0.0f, 1.0f},
         {0.0f, 0.0f, 1.0f}, {0.0f, -30.0f, 1.0f},
-        {90.0f, 0.0f, 1.0f}, {-90.0f, 0.0f, 1.0f},
-        {135.0f, 0.0f, 1.0f}, {-135.0f, 0.0f, 1.0f}
+        {135.0f, 0.0f, 1.0f}, {-135.0f, 0.0f, 1.0f},
+        {90.0f, 0.0f, 1.0f}, {-90.0f, 0.0f, 1.0f}
     };
 }
 
@@ -341,7 +381,7 @@ public:
           input_(positions.size(), kFramesPerBlock),
           output_(2, kFramesPerBlock),
           channels_(static_cast<uint32_t>(positions.size())) {
-        if (channels_ != 1 && channels_ != 2 && channels_ != 8) return;
+        if (channels_ != 1 && channels_ != 2 && channels_ != 6 && channels_ != 8) return;
         for (uint32_t channel = 0; channel < channels_; ++channel) {
             if (!renderer_.AddAudioElement(
                     obr::AudioElementType::kObjectMono,
@@ -520,6 +560,8 @@ RenderResult RenderTone(float amplitude, uint32_t warmup_blocks, uint32_t measur
     timings.reserve(measured_blocks);
     uint64_t absolute_frame = 0;
     LinkedSafetyLimiter safety_limiter;
+    float obr_headroom_gain = 1.0f
+        / std::sqrt(static_cast<float>(kVirtualChannels));
     for (uint32_t block = 0; block < warmup_blocks + measured_blocks; ++block) {
         std::vector<float> stereo(static_cast<size_t>(kFramesPerBlock) * 2, 0.0f);
         for (uint32_t frame = 0; frame < kFramesPerBlock; ++frame) {
@@ -534,8 +576,18 @@ RenderResult RenderTone(float amplitude, uint32_t warmup_blocks, uint32_t measur
             result.output.non_finite_samples = std::numeric_limits<uint64_t>::max();
             return result;
         }
-        const float obr_headroom = 1.0f / std::sqrt(static_cast<float>(kVirtualChannels));
-        for (float& sample : upmixed) sample *= obr_headroom;
+        const float obr_headroom_target = fe::audio::SpatialObrBlockInputHeadroom(
+            upmixed.data(),
+            kFramesPerBlock,
+            kVirtualChannels
+        );
+        obr_headroom_gain = fe::audio::SmoothSpatialObrInputHeadroom(
+            obr_headroom_gain,
+            obr_headroom_target,
+            kFramesPerBlock,
+            kSampleRate
+        );
+        for (float& sample : upmixed) sample *= obr_headroom_gain;
         const auto [rendered, elapsed_ms] = obr.Process(upmixed);
         if (block >= warmup_blocks) {
             timings.push_back(elapsed_ms);
@@ -553,9 +605,13 @@ RenderResult RenderTone(float amplitude, uint32_t warmup_blocks, uint32_t measur
             const auto right = (*rendered)[1];
             for (uint32_t frame = 0; frame < kFramesPerBlock; ++frame) {
                 float output_left = left[frame]
-                    * std::sqrt(static_cast<float>(kVirtualChannels)) * 0.90f;
+                    * std::sqrt(static_cast<float>(kVirtualChannels))
+                    * fe::audio::kSpatialObrUpmixRouteCalibration
+                    * fe::audio::kSpatialObrMatrixDecodeMakeup;
                 float output_right = right[frame]
-                    * std::sqrt(static_cast<float>(kVirtualChannels)) * 0.90f;
+                    * std::sqrt(static_cast<float>(kVirtualChannels))
+                    * fe::audio::kSpatialObrUpmixRouteCalibration
+                    * fe::audio::kSpatialObrMatrixDecodeMakeup;
                 safety_limiter.Process(&output_left, &output_right);
                 output_accumulator.Add(
                     output_left, output_right,
@@ -581,11 +637,12 @@ RenderResult RenderTone(float amplitude, uint32_t warmup_blocks, uint32_t measur
 }
 
 StereoMetrics RenderCoherentObrStress(
+    uint32_t channels,
     float amplitude,
     uint32_t warmup_blocks,
     uint32_t measured_blocks
 ) {
-    FlexibleObrRenderer obr(OfficialObrPositions(kVirtualChannels));
+    FlexibleObrRenderer obr(OfficialObrPositions(channels));
     StereoAccumulator accumulator;
     if (!obr.Ready()) {
         StereoMetrics failed{};
@@ -595,20 +652,33 @@ StereoMetrics RenderCoherentObrStress(
 
     uint64_t absolute_frame = 0;
     LinkedSafetyLimiter safety_limiter;
+    float obr_headroom_gain = 1.0f
+        / std::sqrt(static_cast<float>(channels));
     for (uint32_t block = 0; block < warmup_blocks + measured_blocks; ++block) {
         std::vector<float> input(
-            static_cast<size_t>(kFramesPerBlock) * kVirtualChannels,
+            static_cast<size_t>(kFramesPerBlock) * channels,
             0.0f
         );
         for (uint32_t frame = 0; frame < kFramesPerBlock; ++frame) {
             const double phase = 2.0 * static_cast<double>(kPi) * kToneHz
                 * static_cast<double>(absolute_frame + frame) / kSampleRate;
             const float sample = amplitude * std::sin(phase);
-            for (uint32_t channel = 0; channel < kVirtualChannels; ++channel) {
-                input[static_cast<size_t>(frame) * kVirtualChannels + channel] =
-                    sample / std::sqrt(static_cast<float>(kVirtualChannels));
+            for (uint32_t channel = 0; channel < channels; ++channel) {
+                input[static_cast<size_t>(frame) * channels + channel] = sample;
             }
         }
+        const float obr_headroom_target = fe::audio::SpatialObrBlockInputHeadroom(
+            input.data(),
+            kFramesPerBlock,
+            channels
+        );
+        obr_headroom_gain = fe::audio::SmoothSpatialObrInputHeadroom(
+            obr_headroom_gain,
+            obr_headroom_target,
+            kFramesPerBlock,
+            kSampleRate
+        );
+        for (float& sample : input) sample *= obr_headroom_gain;
         obr::AudioBuffer* rendered = obr.Process(input);
         if (rendered == nullptr) {
             StereoMetrics failed{};
@@ -620,9 +690,9 @@ StereoMetrics RenderCoherentObrStress(
             const auto right = (*rendered)[1];
             for (uint32_t frame = 0; frame < kFramesPerBlock; ++frame) {
                 float output_left = left[frame]
-                    * std::sqrt(static_cast<float>(kVirtualChannels)) * 0.90f;
+                    * std::sqrt(static_cast<float>(channels)) * 0.90f;
                 float output_right = right[frame]
-                    * std::sqrt(static_cast<float>(kVirtualChannels)) * 0.90f;
+                    * std::sqrt(static_cast<float>(channels)) * 0.90f;
                 safety_limiter.Process(&output_left, &output_right);
                 accumulator.Add(
                     output_left,
@@ -679,6 +749,38 @@ double NormalizedCorrelation(const std::vector<float>& a, const std::vector<floa
     return dot / std::max(1.0e-12, std::sqrt(square_a * square_b));
 }
 
+double RenderObjectRms(const ObjectPosition& position) {
+    FlexibleObrRenderer renderer({position});
+    if (!renderer.Ready()) return 0.0;
+    constexpr uint32_t kWarmupBlocks = 12;
+    constexpr uint32_t kMeasuredBlocks = 48;
+    double square_sum = 0.0;
+    uint64_t sample_count = 0;
+    uint64_t absolute_frame = 0;
+    for (uint32_t block = 0; block < kWarmupBlocks + kMeasuredBlocks; ++block) {
+        std::vector<float> input(kFramesPerBlock, 0.0f);
+        for (uint32_t frame = 0; frame < kFramesPerBlock; ++frame) {
+            input[frame] = 0.05f * std::sin(
+                2.0f * kPi * 997.0f * static_cast<float>(absolute_frame + frame)
+                    / static_cast<float>(kSampleRate)
+            );
+        }
+        obr::AudioBuffer* output = renderer.Process(input);
+        if (output == nullptr) return 0.0;
+        if (block >= kWarmupBlocks) {
+            for (uint32_t channel = 0; channel < 2; ++channel) {
+                const auto samples = (*output)[channel];
+                for (float sample : samples) {
+                    square_sum += static_cast<double>(sample) * sample;
+                    sample_count += 1;
+                }
+            }
+        }
+        absolute_frame += kFramesPerBlock;
+    }
+    return std::sqrt(square_sum / std::max<uint64_t>(1, sample_count));
+}
+
 struct FourStateQualityResult {
     StereoMetrics output;
     double maximum_transparency_error = 0.0;
@@ -714,6 +816,8 @@ FourStateQualityResult RenderFourState(
 
     StereoAccumulator accumulator;
     LinkedSafetyLimiter limiter;
+    float obr_headroom_gain = 1.0f
+        / std::sqrt(static_cast<float>(bed_channels));
     uint64_t absolute_frame = 0;
     for (uint32_t block = 0; block < kWarmupBlocks + kMeasuredBlocks; ++block) {
         std::vector<float> stereo(static_cast<size_t>(kFramesPerBlock) * 2u, 0.0f);
@@ -759,8 +863,18 @@ FourStateQualityResult RenderFourState(
 
         std::vector<float> output(static_cast<size_t>(kFramesPerBlock) * 2u, 0.0f);
         if (obr_enabled) {
-            const float headroom = 1.0f / std::sqrt(static_cast<float>(bed_channels));
-            for (float& sample : bed) sample *= headroom;
+            const float headroom_target = fe::audio::SpatialObrBlockInputHeadroom(
+                bed.data(),
+                kFramesPerBlock,
+                bed_channels
+            );
+            obr_headroom_gain = fe::audio::SmoothSpatialObrInputHeadroom(
+                obr_headroom_gain,
+                headroom_target,
+                kFramesPerBlock,
+                kSampleRate
+            );
+            for (float& sample : bed) sample *= obr_headroom_gain;
             obr::AudioBuffer* binaural = renderer->Process(bed);
             if (binaural == nullptr) {
                 result.output.non_finite_samples = std::numeric_limits<uint64_t>::max();
@@ -768,8 +882,13 @@ FourStateQualityResult RenderFourState(
             }
             const auto left = (*binaural)[0];
             const auto right = (*binaural)[1];
-            const float calibration = upmix_enabled ? 0.90f : 0.99f;
-            const float compensation = std::sqrt(static_cast<float>(bed_channels));
+            const float calibration = upmix_enabled
+                ? fe::audio::kSpatialObrUpmixRouteCalibration
+                : fe::audio::kSpatialObrStereoRouteCalibration;
+            const float compensation = std::sqrt(static_cast<float>(bed_channels))
+                * (upmix_enabled
+                    ? fe::audio::kSpatialObrMatrixDecodeMakeup
+                    : 1.0f);
             for (uint32_t frame = 0; frame < kFramesPerBlock; ++frame) {
                 output[static_cast<size_t>(frame) * 2u] =
                     left[frame] * compensation * calibration;
@@ -792,8 +911,10 @@ FourStateQualityResult RenderFourState(
                     + 0.5f * bed[source + 3]
                     + 0.5f * bed[source + 5]
                     + 0.5f * bed[source + 7];
-                output[destination] = left / 1.5f * 1.25f;
-                output[destination + 1] = right / 1.5f * 1.25f;
+                output[destination] = left / 1.5f
+                    * fe::audio::kSpatialMatrixDecodeStereoFoldCalibration;
+                output[destination + 1] = right / 1.5f
+                    * fe::audio::kSpatialMatrixDecodeStereoFoldCalibration;
             }
         }
 
@@ -861,9 +982,19 @@ int main() {
     const auto positions = CurrentProductPositions();
     float minimum_azimuth = positions.front().azimuth;
     float maximum_azimuth = positions.front().azimuth;
+    float minimum_distance = positions.front().distance;
+    float maximum_distance = positions.front().distance;
+    std::vector<float> distance_tiers;
     for (const auto& position : positions) {
         minimum_azimuth = std::min(minimum_azimuth, position.azimuth);
         maximum_azimuth = std::max(maximum_azimuth, position.azimuth);
+        minimum_distance = std::min(minimum_distance, position.distance);
+        maximum_distance = std::max(maximum_distance, position.distance);
+        if (std::none_of(distance_tiers.begin(), distance_tiers.end(), [&](float distance) {
+                return std::abs(distance - position.distance) < 0.01f;
+            })) {
+            distance_tiers.push_back(position.distance);
+        }
     }
     const double angular_span = maximum_azimuth - minimum_azimuth;
     const auto official_positions = OfficialObrPositions(kVirtualChannels);
@@ -885,19 +1016,26 @@ int main() {
     // separate coherent full-scale case below verifies emergency safety.
     const RenderResult low = RenderTone(0.0245f, 32, 160);
     const RenderResult high = RenderTone(0.49f, 32, 160);
+    const RenderResult mastered_programme = RenderTone(0.82f, 32, 160);
     const double expected_level_ratio = 20.0;
     const double measured_level_ratio = high.output.rms / std::max(1.0e-12, low.output.rms);
     const double dry_high_rms = DryStereoRms(0.49f);
     const double obr_to_dry_rms = high.output.rms / std::max(1.0e-12, dry_high_rms);
-    const StereoMetrics coherent_low = RenderCoherentObrStress(0.01f, 32, 160);
-    const StereoMetrics coherent_high = RenderCoherentObrStress(0.20f, 32, 160);
-    const StereoMetrics coherent_full_scale = RenderCoherentObrStress(0.98f, 32, 160);
+    const StereoMetrics coherent_low = RenderCoherentObrStress(8, 0.01f, 32, 160);
+    const StereoMetrics coherent_high = RenderCoherentObrStress(8, 0.20f, 32, 160);
+    const StereoMetrics coherent_mastered = RenderCoherentObrStress(8, 0.82f, 32, 160);
+    const StereoMetrics coherent_full_scale = RenderCoherentObrStress(8, 0.98f, 32, 160);
+    const StereoMetrics coherent_51_mastered = RenderCoherentObrStress(6, 0.82f, 32, 160);
+    const StereoMetrics coherent_51_full_scale = RenderCoherentObrStress(6, 0.98f, 32, 160);
     const double coherent_level_ratio = coherent_high.rms
         / std::max(1.0e-12, coherent_low.rms);
 
     const std::vector<float> front_left = RenderDirectionalSignature(0);
-    const std::vector<float> rear_left = RenderDirectionalSignature(6);
+    const std::vector<float> rear_left = RenderDirectionalSignature(4);
     const double front_rear_signature_correlation = NormalizedCorrelation(front_left, rear_left);
+    const double near_object_rms = RenderObjectRms({30.0f, 0.0f, minimum_distance});
+    const double far_object_rms = RenderObjectRms({30.0f, 0.0f, maximum_distance});
+    const double far_to_near_rms = far_object_rms / std::max(1.0e-12, near_object_rms);
     const ImpulseLatencyMetrics direct_latency = MeasureObrImpulseLatency(
         obr::BinauralFilterProfile::kDirect
     );
@@ -966,21 +1104,40 @@ int main() {
 
     const bool finite_and_dc_ok = low.output.non_finite_samples == 0
         && high.output.non_finite_samples == 0
+        && mastered_programme.output.non_finite_samples == 0
         && low.pre_obr.non_finite_samples == 0
         && high.pre_obr.non_finite_samples == 0
         && std::abs(high.output.dc_left) < 0.001
         && std::abs(high.output.dc_right) < 0.001;
     const bool spatial_geometry_ok = angular_span >= 180.0
-        && maximum_target_azimuth_error <= 2.0;
+        && maximum_target_azimuth_error <= 2.0
+        && distance_tiers.size() >= 4
+        && maximum_distance / std::max(0.01f, minimum_distance) >= 1.7f
+        && far_to_near_rms >= 0.40
+        && far_to_near_rms <= 0.65;
     const bool channel_distinction_ok = std::abs(front_rear_signature_correlation) <= 0.92;
     const bool transfer_linearity_ok = measured_level_ratio >= expected_level_ratio * 0.88;
     const bool distortion_ok = high.output.thd_ratio <= 0.01
         && high.output.hard_clip_samples == 0
         && high.output.near_ceiling_samples == 0
+        && mastered_programme.output.hard_clip_samples == 0
+        && mastered_programme.output.near_ceiling_samples == 0
+        && mastered_programme.output.thd_ratio <= 0.01
         && coherent_high.thd_ratio <= 0.01
         && coherent_high.hard_clip_samples == 0
         && coherent_high.near_ceiling_samples == 0
         && coherent_level_ratio >= expected_level_ratio * 0.88
+        && coherent_mastered.non_finite_samples == 0
+        && coherent_mastered.hard_clip_samples == 0
+        && coherent_mastered.near_ceiling_samples == 0
+        && coherent_mastered.thd_ratio <= 0.001
+        && coherent_51_mastered.non_finite_samples == 0
+        && coherent_51_mastered.hard_clip_samples == 0
+        && coherent_51_mastered.near_ceiling_samples == 0
+        && coherent_51_mastered.thd_ratio <= 0.001
+        && coherent_51_full_scale.non_finite_samples == 0
+        && coherent_51_full_scale.hard_clip_samples == 0
+        && coherent_51_full_scale.thd_ratio <= 0.001
         && coherent_full_scale.non_finite_samples == 0
         && coherent_full_scale.peak <= kObrCeiling * 1.0001
         && coherent_full_scale.thd_ratio <= 0.05;
@@ -1013,7 +1170,11 @@ int main() {
         << ",\"angularSpanDegrees\":" << angular_span
         << ",\"requiredSpanDegrees\":180.0"
         << ",\"maximumOfficialTargetErrorDegrees\":" << maximum_target_azimuth_error
-        << ",\"maximumAllowedTargetErrorDegrees\":2.0},\n"
+        << ",\"maximumAllowedTargetErrorDegrees\":2.0"
+        << ",\"minimumDistanceMeters\":" << minimum_distance
+        << ",\"maximumDistanceMeters\":" << maximum_distance
+        << ",\"distanceTierCount\":" << distance_tiers.size()
+        << ",\"farToNearRms\":" << far_to_near_rms << "},\n"
         << "  \"directionalIdentity\": {\"frontLeftVsRearLeftCorrelation\":"
         << front_rear_signature_correlation << ",\"maximumAllowed\":0.92},\n"
         << "  \"impulseLatency\": {"
@@ -1062,16 +1223,25 @@ int main() {
     PrintStereoMetrics("low", low.output);
     std::cout << ",\n";
     PrintStereoMetrics("high", high.output);
+    std::cout << ",\n";
+    PrintStereoMetrics("masteredProgramme", mastered_programme.output);
     std::cout << "\n  },\n"
         << "  \"coherentEightChannelStress\": {\n";
     PrintStereoMetrics("low", coherent_low);
     std::cout << ",\n";
     PrintStereoMetrics("high", coherent_high);
     std::cout << ",\n";
+    PrintStereoMetrics("masteredProgramme", coherent_mastered);
+    std::cout << ",\n";
     PrintStereoMetrics("fullScaleSafety", coherent_full_scale);
     std::cout << ",\n    \"expectedLevelRatio\":" << expected_level_ratio
         << ",\"measuredLevelRatio\":" << coherent_level_ratio
         << "\n  },\n"
+        << "  \"coherentFiveOneStress\": {\n";
+    PrintStereoMetrics("masteredProgramme", coherent_51_mastered);
+    std::cout << ",\n";
+    PrintStereoMetrics("fullScaleSafety", coherent_51_full_scale);
+    std::cout << "\n  },\n"
         << "  \"performance\": {\"obrProcessP99Ms\":" << high.process_p99_ms
         << ",\"blockBudgetMs\":" << (1000.0 * kFramesPerBlock / kSampleRate)
         << "}\n"

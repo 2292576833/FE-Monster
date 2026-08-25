@@ -122,6 +122,7 @@ try {
     }
     assert.match(service, /matrix-decode/);
     assert.match(service, /ambient-extract/);
+    assert.match(service, /music-detail/);
     assert.match(service, /reverberant/);
     assert.match(service, /legacy|ORIGINAL_PARAMETER_KEYS|migrat/i,
       'pre-spatial v1 files need an explicit compatibility path');
@@ -180,6 +181,23 @@ try {
     assert.match(pipelineSource, /BinauralFilterProfile::kDirect/);
     assert.match(pipelineSource, /BinauralFilterProfile::kAmbient/);
     assert.match(pipelineSource, /BinauralFilterProfile::kReverberant/);
+  });
+
+  contract('queueBackpressureDoesNotBlockMixerControls', () => {
+    const submitStart = pipelineSource.indexOf('HRESULT Submit(const float* interleaved_pcm');
+    const submitEnd = pipelineSource.indexOf('\n    void GetStatus(', submitStart);
+    assert.ok(submitStart >= 0 && submitEnd > submitStart,
+      'native Submit implementation must be inspectable');
+    const submitBody = pipelineSource.slice(submitStart, submitEnd);
+    const queueWait = submitBody.indexOf('buffer_available_cv_.wait_for');
+    const renderLockAfterWait = submitBody.indexOf(
+      'std::lock_guard<std::mutex> spatial_guard(spatial_control_mutex_)',
+      queueWait,
+    );
+    assert.match(submitBody, /submit_guard\(submit_mutex_\)/,
+      'one transport submit must own scratch without serializing the control plane');
+    assert.ok(queueWait >= 0 && renderLockAfterWait > queueWait,
+      'queue backpressure must not hold the spatial/control mutex while waiting for XAudio2');
   });
 
   contract('nativeFourStateFidelityProbe', () => {

@@ -117,7 +117,7 @@ public final class AudioMixerService {
         "upmixEnabled", "obrEnabled"
     );
     private static final Map<String, Set<String>> ENUM_PARAMETERS = Map.of(
-        "upmixAlgorithm", Set.of("passive", "matrix-decode", "ambient-extract"),
+        "upmixAlgorithm", Set.of("passive", "matrix-decode", "ambient-extract", "music-detail"),
         "upmixOutputLayout", Set.of("5.1", "7.1"),
         "obrFilterProfile", Set.of("direct", "ambient", "reverberant")
     );
@@ -463,6 +463,13 @@ public final class AudioMixerService {
             state = next;
             configState = "ready";
             spatialMigrationNeeded = false;
+            if (normalizedPatch.containsKey("upmixAlgorithm")
+                || normalizedPatch.containsKey("upmixOutputLayout")) {
+                synchronizeChannelRoute(
+                    next.parameters(),
+                    normalizedPatch.containsKey("upmixAlgorithm")
+                );
+            }
             // persist(next) is durable before submitDesiredState reaches nativeBridge.submit.
             submitDesiredState();
             return snapshotPayload();
@@ -496,6 +503,7 @@ public final class AudioMixerService {
             state = next;
             configState = "ready";
             spatialMigrationNeeded = false;
+            synchronizeChannelRoute(next.parameters(), true);
             // persist(next) is durable before submitDesiredState reaches nativeBridge.submit.
             submitDesiredState();
             return snapshotPayload();
@@ -610,8 +618,18 @@ public final class AudioMixerService {
 
     private ChannelNativeSubmission desiredChannelSubmission() {
         if (channelState == null) return null;
+        Map<String, Object> parameters = state.parameters();
+        // The router is an optional producer before the invariant Mixer. A
+        // disabled upmixer (including stereo -> Mixer -> OBR) must never gate
+        // Mixer publication on a channel snapshot the native graph cannot
+        // accept. Passive uses the legacy OxiMedia route and likewise has no
+        // explicit per-channel transaction.
+        if (!booleanValue(parameters.get("upmixEnabled"), false)
+            || "passive".equals(stringValue(parameters.get("upmixAlgorithm"), "passive"))) {
+            return null;
+        }
         String activeLayout = stringValue(
-            state.parameters().get("upmixOutputLayout"),
+            parameters.get("upmixOutputLayout"),
             channelState.selectedLayout()
         );
         ChannelLayoutState desired = channelState.layouts().get(activeLayout);
@@ -623,6 +641,56 @@ public final class AudioMixerService {
             channelAlgorithmValue(desired.algorithm()),
             channelNativeValues(desired)
         );
+    }
+
+    private void synchronizeChannelRoute(
+        Map<String, Object> parameters,
+        boolean synchronizeAlgorithm
+    ) throws IOException {
+        String algorithm = stringValue(parameters.get("upmixAlgorithm"), "passive");
+        if ("passive".equals(algorithm)) return;
+        if (synchronizeAlgorithm
+            && !Set.of("matrix-decode", "ambient-extract", "music-detail").contains(algorithm)) {
+            throw new IllegalArgumentException("unsupported synchronized channel router algorithm");
+        }
+        String layout = validateChannelLayout(parameters.get("upmixOutputLayout"));
+        synchronized (channelStateLock) {
+            refreshChannelStateFromDisk();
+            if ("corrupt".equals(channelConfigState) && !channelCorruptEvidencePreserved) {
+                throw new IOException("corrupt audio channel state evidence was not preserved");
+            }
+            ChannelLayoutState current = channelState.layouts().get(layout);
+            if (current == null) {
+                throw new IOException("audio channel layout state is unavailable");
+            }
+            String targetAlgorithm = synchronizeAlgorithm ? algorithm : current.algorithm();
+            if (layout.equals(channelState.selectedLayout())
+                && targetAlgorithm.equals(current.algorithm())) {
+                return;
+            }
+            if (channelState.revision() == Long.MAX_VALUE) {
+                throw new IllegalArgumentException("channel router revision is exhausted");
+            }
+            ChannelLayoutState synchronizedLayout = new ChannelLayoutState(
+                targetAlgorithm,
+                current.lfeCrossoverHz(),
+                current.channelGainDb(),
+                current.channelDelayMs(),
+                current.channelAzimuthDeg(),
+                current.customMatrix()
+            );
+            Map<String, ChannelLayoutState> layouts = new LinkedHashMap<>(channelState.layouts());
+            layouts.put(layout, synchronizedLayout);
+            ChannelRouterState next = new ChannelRouterState(
+                channelState.revision() + 1,
+                layout,
+                Map.copyOf(layouts)
+            );
+            persistChannelState(next);
+            channelState = next;
+            channelConfigState = "ready";
+            channelCorruptEvidencePreserved = true;
+        }
     }
 
     private static Map<String, Object> failedChannelStatus() {
@@ -909,6 +977,10 @@ public final class AudioMixerService {
         catalog.add(channelAlgorithm(
             "ambient-extract", "Ambient extract", "available", true,
             "production-channel-router-v1"
+        ));
+        catalog.add(channelAlgorithm(
+            "music-detail", "Music detail (real-time approximation)", "available", true,
+            "allocation-free-stereo-field-frequency-router-v1"
         ));
         catalog.add(channelAlgorithm(
             "custom-matrix", "Custom matrix", "available", true,
@@ -1225,7 +1297,7 @@ public final class AudioMixerService {
 
     private static String validateChannelAlgorithm(Object value) {
         if (!(value instanceof String string) || !Set.of(
-            "front-only", "matrix-decode", "ambient-extract", "custom-matrix"
+            "front-only", "matrix-decode", "ambient-extract", "music-detail", "custom-matrix"
         ).contains(string)) {
             throw new IllegalArgumentException("unsupported channel router algorithm");
         }
@@ -1279,6 +1351,7 @@ public final class AudioMixerService {
             case "front-only" -> 0;
             case "ambient-extract" -> 2;
             case "custom-matrix" -> 3;
+            case "music-detail" -> 4;
             default -> 1;
         };
     }
@@ -1581,6 +1654,7 @@ public final class AudioMixerService {
         values[31] = switch (stringValue(p.get("upmixAlgorithm"), "matrix-decode")) {
             case "passive" -> 0.0f;
             case "ambient-extract" -> 2.0f;
+            case "music-detail" -> 4.0f;
             default -> 1.0f;
         };
         values[32] = "7.1".equals(p.get("upmixOutputLayout")) ? 8.0f : 6.0f;
@@ -1716,7 +1790,7 @@ public final class AudioMixerService {
         surround.put("inputGainDb", -6.0);
         surround.put("stereoWidth", 1.2);
         surround.put("upmixEnabled", true);
-        surround.put("upmixAlgorithm", "matrix-decode");
+        surround.put("upmixAlgorithm", "music-detail");
         surround.put("upmixOutputLayout", "7.1");
         surround.put("upmixCenterGain", 0.68);
         surround.put("upmixSurroundGain", 0.52);

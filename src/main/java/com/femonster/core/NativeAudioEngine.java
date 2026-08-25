@@ -134,7 +134,7 @@ public final class NativeAudioEngine {
         if (outputChannels != 6 && outputChannels != 8) {
             throw new IllegalArgumentException("channel router output must be 5.1 or 7.1");
         }
-        if (algorithm < 0 || algorithm > 3) {
+        if (algorithm < 0 || algorithm > 4) {
             throw new IllegalArgumentException("unsupported channel router algorithm");
         }
         if (values == null || values.length != NATIVE_CHANNEL_ROUTER_VALUE_COUNT) {
@@ -501,7 +501,7 @@ public final class NativeAudioEngine {
                 sampleRate,
                 inputChannels,
                 virtualLayoutChannels,
-                Math.max(0, Math.min(3, upmixAlgorithm)),
+                Math.max(0, Math.min(4, upmixAlgorithm)),
                 true
             );
         } catch (UnsatisfiedLinkError | SecurityException failure) {
@@ -537,12 +537,16 @@ public final class NativeAudioEngine {
         return body;
     }
 
-    public synchronized int submitSpatialPcm(long session, long generation, float[] pcm) {
-        if (!isActiveSpatialGeneration(session, generation) || pcm == null || pcm.length == 0) {
-            return -1;
+    public int submitSpatialPcm(long session, long generation, float[] pcm) {
+        final int inputChannels;
+        synchronized (this) {
+            if (!isActiveSpatialGeneration(session, generation) || pcm == null || pcm.length == 0) {
+                return -1;
+            }
+            inputChannels = Math.max(1, spatialInputChannels);
         }
-        int frames = pcm.length / Math.max(1, spatialInputChannels);
-        if (frames <= 0 || frames * spatialInputChannels != pcm.length) return -2;
+        int frames = pcm.length / inputChannels;
+        if (frames <= 0 || frames * inputChannels != pcm.length) return -2;
         try {
             return nativeSubmitSpatialPcm(pcm, frames);
         } catch (UnsatisfiedLinkError | SecurityException failure) {
@@ -550,14 +554,15 @@ public final class NativeAudioEngine {
         }
     }
 
-    public synchronized int submitSpatialPcm(long session, long generation, ByteBuffer pcm, int frames) {
-        if (!isActiveSpatialGeneration(session, generation) || pcm == null || frames <= 0) {
-            return -1;
+    public int submitSpatialPcm(long session, long generation, ByteBuffer pcm, int frames) {
+        final int inputChannels;
+        synchronized (this) {
+            if (!isActiveSpatialGeneration(session, generation) || pcm == null || frames <= 0) {
+                return -1;
+            }
+            inputChannels = Math.max(1, spatialInputChannels);
         }
-        int requiredBytes = Math.multiplyExact(
-            Math.multiplyExact(frames, Math.max(1, spatialInputChannels)),
-            Float.BYTES
-        );
+        int requiredBytes = Math.multiplyExact(Math.multiplyExact(frames, inputChannels), Float.BYTES);
         if (!pcm.isDirect() || pcm.position() != 0 || pcm.remaining() < requiredBytes) return -2;
         try {
             return nativeSubmitSpatialPcmDirect(pcm, frames);
@@ -566,22 +571,41 @@ public final class NativeAudioEngine {
         }
     }
 
-    public synchronized int submitSpatialPcm(
+    public int submitSpatialPcm(
         long session,
         long generation,
         long sequence,
         ByteBuffer pcm,
         int frames
     ) {
-        if (sequence < 0) return -2;
-        if (!isActiveSpatialGeneration(session, generation)) return -1;
-        // A lost HTTP response may cause the browser to retry the same finite
-        // PCM body. Treat it as acknowledged without submitting duplicate
-        // audio into XAudio2. The main-thread pump is ordered, so lower values
-        // are obsolete retries as well.
-        if (sequence <= activeSpatialLastSequence) return 0;
-        int result = submitSpatialPcm(session, generation, pcm, frames);
-        if (result >= 0) activeSpatialLastSequence = sequence;
+        final int inputChannels;
+        synchronized (this) {
+            if (sequence < 0) return -2;
+            if (!isActiveSpatialGeneration(session, generation)) return -1;
+            // A lost HTTP response may cause the browser to retry the same finite
+            // PCM body. Treat it as acknowledged without submitting duplicate
+            // audio into XAudio2. The main-thread pump is ordered, so lower values
+            // are obsolete retries as well.
+            if (sequence <= activeSpatialLastSequence) return 0;
+            if (pcm == null || frames <= 0) return -1;
+            inputChannels = Math.max(1, spatialInputChannels);
+        }
+        int requiredBytes = Math.multiplyExact(Math.multiplyExact(frames, inputChannels), Float.BYTES);
+        if (!pcm.isDirect() || pcm.position() != 0 || pcm.remaining() < requiredBytes) return -2;
+        final int result;
+        try {
+            result = nativeSubmitSpatialPcmDirect(pcm, frames);
+        } catch (UnsatisfiedLinkError | SecurityException failure) {
+            return -3;
+        }
+        if (result >= 0) {
+            synchronized (this) {
+                if (isActiveSpatialGeneration(session, generation)
+                    && sequence > activeSpatialLastSequence) {
+                    activeSpatialLastSequence = sequence;
+                }
+            }
+        }
         return result;
     }
 
@@ -1238,6 +1262,7 @@ public final class NativeAudioEngine {
         return switch (value) {
             case 0 -> "passive";
             case 2 -> "ambient-extract";
+            case 4 -> "music-detail";
             default -> "matrix-decode";
         };
     }

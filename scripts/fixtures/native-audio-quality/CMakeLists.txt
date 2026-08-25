@@ -18,6 +18,7 @@ add_executable(fe_audio_quality_probe
   "${CMAKE_CURRENT_SOURCE_DIR}/fe_audio_quality_probe.cpp"
 )
 target_include_directories(fe_audio_quality_probe PRIVATE
+  "${FE_REPO_ROOT}/native/windows"
   "${FE_REPO_ROOT}/native/rust-audio-upmix/include"
 )
 target_compile_definitions(fe_audio_quality_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)

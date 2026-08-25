@@ -97,10 +97,10 @@ try {
   assert.equal(startupReplayFailure.status, 0,
     `atomic startup replay failure was not contained:\n${startupReplayFailureOutput}`);
 
-  // Fixed production contract: one JNI entry point owns the existing native
-  // pipeline mutex for all three stages. Router failure returns before the
-  // mixer call, so no PCM block can observe a target layout with default
-  // router parameters or a partially committed mixer snapshot.
+  // Fixed production contract: one JNI entry point submits all three stages
+  // under a shared lifetime lease. The pipeline revision gate keeps rendering
+  // the old graph until the matching router and Mixer snapshots are ready, so
+  // status/control calls are not serialized behind PCM queue backpressure.
   const nativeSource = readFileSync(
     path.join(root, 'native/windows/fe_monster_xaudio2.cpp'),
     'utf8',
@@ -113,6 +113,10 @@ try {
     path.join(root, 'src/main/java/com/femonster/core/NativeAudioEngine.java'),
     'utf8',
   );
+  const pipelineSource = readFileSync(
+    path.join(root, 'native/windows/audio/fe_audio_pipeline.cpp'),
+    'utf8',
+  );
   assert.match(serviceSource,
     /Map<String, Object>\s+submitCombined\s*\(/,
     'NativeBridge must expose the combined Mixer/router transaction');
@@ -120,7 +124,7 @@ try {
     /default\s+Map<String, Object>\s+submitCombined\s*\(/,
     'NativeBridge adapters must explicitly implement the atomic transaction');
   const startupStart = engineSource.indexOf('public synchronized Map<String, Object> startSpatialStream(');
-  const startupEnd = engineSource.indexOf('public synchronized int submitSpatialPcm(', startupStart);
+  const startupEnd = engineSource.indexOf('public int submitSpatialPcm(', startupStart);
   assert.ok(startupStart >= 0 && startupEnd > startupStart,
     'startSpatialStream implementation is missing');
   const startupBody = engineSource.slice(startupStart, startupEnd);
@@ -141,12 +145,12 @@ try {
   const combinedEnd = nativeSource.indexOf('\n}', combinedStart);
   assert.notEqual(combinedEnd, -1, 'combined JNI function body is incomplete');
   const body = nativeSource.slice(combinedStart, combinedEnd);
-  const lock = body.indexOf('std::scoped_lock lock(g_spatial_pipeline_mutex)');
+  const lock = body.indexOf('std::shared_lock lock(g_spatial_pipeline_mutex)');
   const spatial = body.indexOf('fe_audio_pipeline_set_spatial_controls');
   const router = body.indexOf('fe_audio_pipeline_set_channel_router_params');
   const mixer = body.indexOf('fe_audio_pipeline_set_mixer_params');
   assert.ok(lock >= 0 && lock < spatial && spatial < router && router < mixer,
-    'combined JNI must hold one native mutex and execute spatial -> router -> mixer');
+    'combined JNI must hold one shared lifetime lease and execute spatial -> router -> mixer');
   assert.match(body.slice(router, mixer),
     /router_result[\s\S]*?if\s*\([^)]*router_result[^)]*!=\s*0[^)]*\)\s*return/,
     'router failure must return before mixer parameters are submitted');
@@ -165,17 +169,20 @@ try {
       nextEntry === -1 ? nativeSource.length : nextEntry,
     );
     assert.match(pcmBody,
-      /std::scoped_lock lock\(g_spatial_pipeline_mutex\)/,
-      `${pcmEntry} must share the combined transaction mutex`);
+      /std::shared_lock lock\(g_spatial_pipeline_mutex\)/,
+      `${pcmEntry} must share the pipeline lifetime lease without blocking control/status`);
   }
+  assert.match(pipelineSource,
+    /!MixerRevisionReadyForSpatialTransition\(\)[\s\S]{0,500}FE_AUDIO_SPATIAL_TRANSITION_WAITING_FOR_MIXER/,
+    'rendering must retain the old graph until the exact Mixer revision is ready');
 
   console.log(JSON.stringify({
     pass: true,
     live: 'no interstitial default router',
     boundaryBusy: 'latest combined Mixer/router transaction retried without cancellation',
     startupReplayFailure: 'no session or native graph published after atomic replay failure',
-    transaction: 'spatial -> router -> mixer under g_spatial_pipeline_mutex',
-    pcmSerialization: 'both PCM JNI entries share the transaction mutex',
+    transaction: 'spatial -> router -> mixer under a shared lifetime lease',
+    pcmSerialization: 'PCM and controls synchronize inside the pipeline without global exclusive blocking',
     adapterContract: 'every NativeBridge must implement submitCombined',
   }, null, 2));
 } finally {

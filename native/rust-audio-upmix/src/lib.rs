@@ -164,11 +164,8 @@ fn process_block(
     for frame in 0..frame_count {
         for channel in 0..handle.output_channels {
             let sample = channels[channel][frame];
-            output[frame * handle.output_channels + channel] = if sample.is_finite() {
-                sample
-            } else {
-                0.0
-            };
+            output[frame * handle.output_channels + channel] =
+                if sample.is_finite() { sample } else { 0.0 };
         }
     }
     RESULT_OK
@@ -1094,8 +1091,7 @@ impl MixerDsp {
                         let state_index = channel * REVERB_FDN_LINES + line;
                         let delay_index = state_index * self.reverb_stride + read;
                         self.reverb_damping[state_index] += damping_alpha
-                            * (self.reverb[delay_index]
-                                - self.reverb_damping[state_index]);
+                            * (self.reverb[delay_index] - self.reverb_damping[state_index]);
                         delayed[line] = self.reverb_damping[state_index];
                     }
 
@@ -1107,11 +1103,10 @@ impl MixerDsp {
                     ];
                     for line in 0..REVERB_FDN_LINES {
                         const INPUT_NORMALIZATION: f32 = 0.5;
-                        let write = input * INPUT_NORMALIZATION
-                            + feedback[line] * d.reverb_feedback[line];
+                        let write =
+                            input * INPUT_NORMALIZATION + feedback[line] * d.reverb_feedback[line];
                         let state_index = channel * REVERB_FDN_LINES + line;
-                        let write_index = state_index * self.reverb_stride
-                            + self.reverb_position;
+                        let write_index = state_index * self.reverb_stride + self.reverb_position;
                         self.reverb[write_index] = if write.is_finite() { write } else { 0.0 };
                     }
 
@@ -1652,11 +1647,7 @@ mod tests {
             revision: 1,
             ramp_frames: 0,
             params,
-            derived: DerivedParameters::from_params(
-                &params,
-                config.sample_rate as f32,
-                stride,
-            ),
+            derived: DerivedParameters::from_params(&params, config.sample_rate as f32, stride),
         };
         MixerDsp::new(&config, snapshot)
     }
@@ -1704,7 +1695,10 @@ mod tests {
             }
         }
         let correlation = dot / (left_square * right_square).sqrt().max(1.0e-20);
-        assert!(correlation.abs() < 0.85, "stereo tail correlation={correlation}");
+        assert!(
+            correlation.abs() < 0.85,
+            "stereo tail correlation={correlation}"
+        );
         assert!(
             dense_frames * 5 > tail.len(),
             "tail is too sparse: {dense_frames}/{}",
@@ -1714,8 +1708,7 @@ mod tests {
         let window_energy = |start: usize, end: usize| -> f64 {
             rendered[start..end]
                 .iter()
-                .map(|frame| frame[0] as f64 * frame[0] as f64
-                    + frame[1] as f64 * frame[1] as f64)
+                .map(|frame| frame[0] as f64 * frame[0] as f64 + frame[1] as f64 * frame[1] as f64)
                 .sum::<f64>()
                 / (2 * (end - start)) as f64
         };

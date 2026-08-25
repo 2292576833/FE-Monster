@@ -157,6 +157,7 @@ const els = {
   dockQualityMenu: $('#dockQualityMenu'),
   dockFavoriteButton: $('#dockFavoriteButton'),
   dockPinButton: $('#dockPinButton'),
+  topSearchHoverZone: $('#topSearchHoverZone'),
   searchForm: $('#topSearchForm'),
   searchInput: $('#topSearchInput'),
   topFavoritesButton: $('#topFavoritesButton'),
@@ -1008,6 +1009,8 @@ const GOOGLE_OBR_NATIVE_WORKLET_URL = 'vendor/native-spatial/native-pcm-worklet.
 const GOOGLE_OBR_NATIVE_TRANSPORT_FRAMES = 4096;
 const GOOGLE_OBR_NATIVE_RENDER_FRAMES = 256;
 const GOOGLE_OBR_NATIVE_MAX_PENDING_BLOCKS = 4;
+const GOOGLE_OBR_NATIVE_UPLOAD_RETRY_DELAYS = Object.freeze([20, 50]);
+const GOOGLE_OBR_NATIVE_UNDERRUN_FAILURE_THRESHOLD = 3;
 const GOOGLE_OBR_CHANNEL_LAYOUTS = Object.freeze({
   stereo: Object.freeze({ id: 'stereo', label: '2.0', channels: 2 }),
   '5.1': Object.freeze({ id: '5.1', label: '5.1', channels: 6 }),
@@ -1677,7 +1680,7 @@ function normalizeNativeMixerControl(source = {}) {
     revision: Number.isSafeInteger(revision) && revision >= 0 ? revision : 0,
     enabled: parameters.enabled === true,
     upmixEnabled: parameters.upmixEnabled === true,
-    upmixAlgorithm: ['passive', 'matrix-decode', 'ambient-extract'].includes(parameters.upmixAlgorithm)
+    upmixAlgorithm: ['passive', 'matrix-decode', 'ambient-extract', 'music-detail'].includes(parameters.upmixAlgorithm)
       ? parameters.upmixAlgorithm
       : 'matrix-decode',
     upmixOutputLayout: parameters.upmixOutputLayout === '7.1' ? '7.1' : '5.1',
@@ -7444,6 +7447,10 @@ async function pumpNativeSpatialBlocks(graph) {
             || block.timelineEpoch !== graph.captureTimelineEpoch
             || Number(block.nativeGeneration) !== Number(graph.generation);
           if (obsoleteAttempt) break;
+          const retryDelay = GOOGLE_OBR_NATIVE_UPLOAD_RETRY_DELAYS[attempt];
+          if (Number.isFinite(retryDelay)) {
+            await new Promise((resolve) => window.setTimeout(resolve, retryDelay));
+          }
         }
         const obsolete = graph.disposed
           || graph.timelineTransitionActive
@@ -7512,7 +7519,8 @@ async function createNativeGoogleObrGraph(analysis) {
   const algorithm = {
     passive: 1,
     'matrix-decode': 2,
-    'ambient-extract': 3
+    'ambient-extract': 3,
+    'music-detail': 4
   }[control.upmixAlgorithm] || 2;
   const startParams = new URLSearchParams({
     sampleRate: String(sampleRate),
@@ -7592,6 +7600,7 @@ async function createNativeGoogleObrGraph(analysis) {
       inputRms: 0,
       outputRms: 0,
       nativeQueueUnderruns: 0,
+      nativeUnderrunStreak: 0,
       nativeBuffersQueued: 0,
       nativeOutputLatencySeconds: 0,
       nativeClockOriginMediaTime: Number(els.audio?.currentTime) || 0,
@@ -7806,13 +7815,19 @@ function refreshNativeGoogleObrHealth() {
 
       updateNativeGoogleObrMetrics(graph, status);
       const underruns = Math.max(0, Number(status.queueUnderruns) || 0);
+      const underrunDelta = Math.max(0, underruns - previousUnderruns);
       const unhealthy = Number(status.droppedBuffers) > 0
         || Number(status.bufferPoolExhaustions) > 0
         || Number(status.lastResult) < 0
         || graph.transportDroppedBlocks > 0
         || graph.poolStarvedFrames > 0;
-      if (underruns > previousUnderruns || unhealthy) {
-        const reason = underruns > previousUnderruns
+      graph.nativeUnderrunStreak = underrunDelta > 0
+        ? Math.max(0, Number(graph.nativeUnderrunStreak) || 0) + underrunDelta
+        : 0;
+      const sustainedUnderrun = graph.nativeUnderrunStreak
+        >= GOOGLE_OBR_NATIVE_UNDERRUN_FAILURE_THRESHOLD;
+      if (sustainedUnderrun || unhealthy) {
+        const reason = sustainedUnderrun
           ? `Native XAudio2 queue underrun ${previousUnderruns} -> ${underruns}`
           : graph.poolStarvedFrames > 0
             ? `Native PCM pool starvation dropped ${graph.poolStarvedFrames} frames`
@@ -10065,6 +10080,10 @@ function handleSoundscapeWorkshopGesture(gesture) {
     if (state.windowDragPointerId === event.pointerId) return;
     beginTextPresetGesture(event);
   } else if (gesture.kind === 'pointermove') {
+    // The soundscape iframe owns the full scene surface, so its PointerEvents
+    // do not bubble to the parent window. Reuse its normalized gesture bridge
+    // to drive the same top-search hot zone as ordinary desktop pointer motion.
+    scheduleUiPointerUpdates(event);
     if (state.windowDragPointerId === event.pointerId) {
       moveWindowDragGesture(event);
       return;
@@ -38203,6 +38222,16 @@ function bindEvents() {
     });
   }
   els.searchForm.addEventListener('submit', submitSearch);
+  if (els.topSearchHoverZone) {
+    const revealTopSearch = () => {
+      if (state.playbackPage && playbackTopSearchAvailable()) {
+        setPlaybackChromeVisibility({ searchVisible: true });
+      }
+    };
+    els.topSearchHoverZone.addEventListener('pointerenter', revealTopSearch, { passive: true });
+    els.topSearchHoverZone.addEventListener('mousemove', revealTopSearch, { passive: true });
+    els.topSearchHoverZone.addEventListener('pointerleave', scheduleUiPointerUpdates, { passive: true });
+  }
   if (els.searchInput) {
     els.searchInput.addEventListener('input', scheduleSearchSuggestions);
     els.searchInput.addEventListener('focus', () => {
@@ -39662,6 +39691,10 @@ function bindEvents() {
   document.addEventListener('input', scheduleClientPreferencesSync, { passive: true });
   document.addEventListener('change', scheduleClientPreferencesSync, { passive: true });
   window.addEventListener('pointermove', scheduleUiPointerUpdates, { passive: true });
+  // Some Windows WebView/Electron paths surface real mouse motion without a
+  // corresponding PointerEvent. The rAF scheduler coalesces duplicate mouse +
+  // pointer notifications, so this fallback keeps the top hot-zone reliable.
+  window.addEventListener('mousemove', scheduleUiPointerUpdates, { passive: true });
   window.addEventListener('pointerleave', () => {
     cancelUiPointerUpdates();
     setPlaybackChromeVisibility({

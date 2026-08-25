@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <thread>
 #include <vector>
 
@@ -68,7 +69,7 @@ struct LowFrequencyAnalysisKernel {
     std::array<std::array<float, kAnalysisWindow>, kLowProbeCount> imag_weights{};
 };
 std::unique_ptr<LowFrequencyAnalysisKernel> g_low_frequency_kernel;
-std::mutex g_spatial_pipeline_mutex;
+std::shared_mutex g_spatial_pipeline_mutex;
 FeAudioPipelineHandle g_spatial_pipeline = nullptr;
 uint32_t g_spatial_input_channels = 0;
 
@@ -571,7 +572,7 @@ int32_t read_channel_router_parameters(
         || params == nullptr
         || (output_channels != 6 && output_channels != 8)
         || algorithm < static_cast<jint>(FE_RUST_UPMIX_FRONT_ONLY)
-        || algorithm > static_cast<jint>(FE_RUST_UPMIX_CUSTOM_MATRIX)
+        || algorithm > static_cast<jint>(FE_RUST_UPMIX_MUSIC_DETAIL)
         || values == nullptr
         || env->GetArrayLength(values) != kChannelRouterValueCount) {
         return FE_RUST_CHANNEL_ROUTER_INVALID_ARGUMENT;
@@ -740,7 +741,7 @@ extern "C" JNIEXPORT jboolean JNICALL Java_com_femonster_core_NativeAudioEngine_
     config.muted = muted == JNI_TRUE ? 1u : 0u;
     config.max_queued_buffers = 24;
     config.upmix_algorithm = static_cast<uint32_t>(
-        std::clamp(static_cast<int>(upmix_algorithm), 0, 3)
+        std::clamp(static_cast<int>(upmix_algorithm), 0, 4)
     );
 
     g_spatial_pipeline = fe_audio_pipeline_create(&config);
@@ -759,7 +760,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_femonster_core_NativeAudioEngine_nati
     jint frame_count
 ) {
     if (pcm == nullptr || frame_count <= 0) return static_cast<jint>(E_INVALIDARG);
-    std::scoped_lock lock(g_spatial_pipeline_mutex);
+    std::shared_lock lock(g_spatial_pipeline_mutex);
     if (g_spatial_pipeline == nullptr || g_spatial_input_channels == 0) {
         return static_cast<jint>(E_HANDLE);
     }
@@ -789,7 +790,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_femonster_core_NativeAudioEngine_nati
     jint frame_count
 ) {
     if (pcm == nullptr || frame_count <= 0) return static_cast<jint>(E_INVALIDARG);
-    std::scoped_lock lock(g_spatial_pipeline_mutex);
+    std::shared_lock lock(g_spatial_pipeline_mutex);
     if (g_spatial_pipeline == nullptr || g_spatial_input_channels == 0) {
         return static_cast<jint>(E_HANDLE);
     }
@@ -815,7 +816,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_femonster_core_NativeAudioEngine_nati
     jclass,
     jboolean muted
 ) {
-    std::scoped_lock lock(g_spatial_pipeline_mutex);
+    std::shared_lock lock(g_spatial_pipeline_mutex);
     if (g_spatial_pipeline == nullptr) return static_cast<jint>(E_HANDLE);
     return static_cast<jint>(fe_audio_pipeline_set_muted(
         g_spatial_pipeline,
@@ -827,7 +828,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_femonster_core_NativeAudioEngine_nati
     JNIEnv*,
     jclass
 ) {
-    std::scoped_lock lock(g_spatial_pipeline_mutex);
+    std::shared_lock lock(g_spatial_pipeline_mutex);
     if (g_spatial_pipeline == nullptr) return static_cast<jint>(E_HANDLE);
     return static_cast<jint>(fe_audio_pipeline_reset_timeline(g_spatial_pipeline));
 }
@@ -854,7 +855,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_femonster_core_NativeAudioEngine_nati
     );
     if (parse_result != FE_RUST_MIXER_OK) return static_cast<jint>(parse_result);
 
-    std::scoped_lock lock(g_spatial_pipeline_mutex);
+    std::shared_lock lock(g_spatial_pipeline_mutex);
     if (g_spatial_pipeline == nullptr) return static_cast<jint>(E_HANDLE);
     const uint64_t native_revision = static_cast<uint64_t>(revision) + 1u;
     const int32_t spatial_result = fe_audio_pipeline_set_spatial_controls(
@@ -915,7 +916,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_femonster_core_NativeAudioEngine_nati
         return static_cast<jint>(router_parse_result);
     }
 
-    std::scoped_lock lock(g_spatial_pipeline_mutex);
+    std::shared_lock lock(g_spatial_pipeline_mutex);
     if (g_spatial_pipeline == nullptr) return static_cast<jint>(E_HANDLE);
     const uint64_t native_mixer_revision = static_cast<uint64_t>(mixer_revision) + 1u;
     const uint64_t native_router_revision = static_cast<uint64_t>(channel_revision) + 2u;
@@ -949,7 +950,7 @@ extern "C" JNIEXPORT jdoubleArray JNICALL Java_com_femonster_core_NativeAudioEng
 ) {
     constexpr size_t kMixerStatusValueCount = 29;
     std::array<jdouble, kMixerStatusValueCount> values{};
-    std::scoped_lock lock(g_spatial_pipeline_mutex);
+    std::shared_lock lock(g_spatial_pipeline_mutex);
     if (g_spatial_pipeline != nullptr) {
         FeAudioMixerPipelineStatus status{};
         status.struct_size = sizeof(status);
@@ -1020,7 +1021,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_femonster_core_NativeAudioEngine_nati
     );
     if (parse_result != FE_RUST_CHANNEL_ROUTER_OK) return static_cast<jint>(parse_result);
 
-    std::scoped_lock lock(g_spatial_pipeline_mutex);
+    std::shared_lock lock(g_spatial_pipeline_mutex);
     if (g_spatial_pipeline == nullptr) return static_cast<jint>(E_HANDLE);
     // Native revision 1 is reserved for the router created from the existing
     // spatial-control ABI. Explicit Java snapshots start at native revision 2.
@@ -1038,7 +1039,7 @@ extern "C" JNIEXPORT jdoubleArray JNICALL Java_com_femonster_core_NativeAudioEng
     jclass
 ) {
     std::array<jdouble, kChannelRouterStatusValueCount> values{};
-    std::scoped_lock lock(g_spatial_pipeline_mutex);
+    std::shared_lock lock(g_spatial_pipeline_mutex);
     if (g_spatial_pipeline != nullptr) {
         values[0] = 1.0;
         FeRustChannelRouterStatus status{};
@@ -1101,7 +1102,7 @@ extern "C" JNIEXPORT jint JNICALL Java_com_femonster_core_NativeAudioEngine_nati
         return FE_RUST_CHANNEL_ROUTER_INVALID_ARGUMENT;
     }
 
-    std::scoped_lock lock(g_spatial_pipeline_mutex);
+    std::shared_lock lock(g_spatial_pipeline_mutex);
     if (g_spatial_pipeline == nullptr) return static_cast<jint>(E_HANDLE);
 
     FeAudioPipelineStatus pipeline_status{};
@@ -1164,7 +1165,7 @@ extern "C" JNIEXPORT jdoubleArray JNICALL Java_com_femonster_core_NativeAudioEng
 ) {
     constexpr size_t kStatusValueCount = 32;
     std::array<jdouble, kStatusValueCount> values{};
-    std::scoped_lock lock(g_spatial_pipeline_mutex);
+    std::shared_lock lock(g_spatial_pipeline_mutex);
     if (g_spatial_pipeline != nullptr) {
         FeAudioPipelineStatus status{};
         status.struct_size = sizeof(status);

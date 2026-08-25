@@ -71,6 +71,8 @@ const context = vm.createContext({
   URLSearchParams,
   GOOGLE_OBR_NATIVE_TRANSPORT_FRAMES: 4096,
   GOOGLE_OBR_NATIVE_MAX_PENDING_BLOCKS: 4,
+  GOOGLE_OBR_NATIVE_UPLOAD_RETRY_DELAYS: Object.freeze([20, 50]),
+  window: { setTimeout },
   fetch: (...args) => fetchImplementation(...args),
   safeText: (value, fallback) => String(value || fallback),
   state: { obrSpatialAudio: { requested: true } },

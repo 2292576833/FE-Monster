@@ -478,6 +478,13 @@
       sendGesture('pointermove', event);
       return;
     }
+    if (mode === undefined || mode === 'ignored') {
+      // Hover remains inside this full-screen iframe and therefore cannot
+      // bubble to the parent document. Forward the coalesced position so the
+      // parent can reveal top chrome when the pointer approaches its hot zone.
+      sendGesture('pointermove', event);
+      return;
+    }
     if (mode !== 'player' || !playerHold || playerHold.pointerId !== pointerId) {
       return;
     }

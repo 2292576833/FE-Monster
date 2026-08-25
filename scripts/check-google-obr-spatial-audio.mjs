@@ -328,6 +328,7 @@ try {
       const previousGraph = state.obrSpatialAudio.graph;
       const previousEnabled = state.obrSpatialAudio.enabled;
       const previousRequested = state.obrSpatialAudio.requested;
+      let injectedUnderruns = 0;
       const fakeNativeGraph = {
         nativeStream: true,
         disposed: false,
@@ -355,7 +356,7 @@ try {
             droppedBuffers: 0,
             bufferPoolExhaustions: 0,
             lastResult: 0,
-            queueUnderruns: 1,
+            queueUnderruns: ++injectedUnderruns,
             prerollTargetBuffers: 24
           }
         : {};
@@ -367,7 +368,11 @@ try {
         return false;
       };
       nativeLyricLatency = lyricAudioOutputLatencySeconds();
-      await refreshNativeGoogleObrHealth();
+      for (let checkIndex = 0;
+        checkIndex < GOOGLE_OBR_NATIVE_UNDERRUN_FAILURE_THRESHOLD;
+        checkIndex += 1) {
+        await refreshNativeGoogleObrHealth();
+      }
       apiJson = originalApiJson;
       failGoogleObr = originalFailGoogleObr;
       state.obrSpatialAudio.graph = previousGraph;
@@ -378,7 +383,7 @@ try {
       underrunFailures.length === 1
         && underrunFailures[0].sameGraph
         && /underrun/i.test(underrunFailures[0].message),
-      'A native XAudio2 queue underrun did not trigger controlled OBR fallback.'
+      'Sustained native XAudio2 queue underruns did not trigger controlled OBR fallback.'
     );
     check(
       Math.abs(nativeLyricLatency - 0.1875) < 0.0001,

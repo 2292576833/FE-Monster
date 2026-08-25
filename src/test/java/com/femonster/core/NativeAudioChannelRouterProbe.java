@@ -31,6 +31,12 @@ public final class NativeAudioChannelRouterProbe {
         require(exactList(cached.get("channelAzimuthDeg")).size() == 8,
             "azimuth telemetry seam must remain fixed at eight channels");
 
+        Map<String, Object> musicDetail = engine.setChannelRouterParameters(8L, 8, 4, values);
+        require(((Number) musicDetail.get("algorithm")).intValue() == 4,
+            "the production Java bridge must accept the native music-detail algorithm");
+        require(((Number) musicDetail.get("outputChannels")).intValue() == 8,
+            "music-detail must retain the requested 7.1 layout while cached");
+
         boolean accepted = engine.playChannelTestSignal(6, 4, 0, 250, 997.0f, -18.0f);
         require(!accepted, "an unqueued in-memory test tone must never be reported audible");
         Map<String, Object> test = exactMap(engine.channelRouterPayload().get("testSignal"));

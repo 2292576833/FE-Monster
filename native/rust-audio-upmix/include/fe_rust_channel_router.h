@@ -17,6 +17,8 @@
 #define FE_RUST_UPMIX_MATRIX_DECODE 1u
 #define FE_RUST_UPMIX_AMBIENT_EXTRACT 2u
 #define FE_RUST_UPMIX_CUSTOM_MATRIX 3u
+/* Allocation-free stereo-field/frequency analysis; not an AI stem separator. */
+#define FE_RUST_UPMIX_MUSIC_DETAIL 4u
 #define FE_RUST_UPMIX_DOLBY_PRO_LOGIC_II 100u
 #define FE_RUST_UPMIX_DOLBY_PRO_LOGIC_IIX 101u
 #define FE_RUST_UPMIX_DTS_NEURAL_X 200u

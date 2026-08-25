@@ -581,6 +581,7 @@ assert.deepEqual(
     { value: 'front-only', disabled: false },
     { value: 'matrix-decode', disabled: false },
     { value: 'ambient-extract', disabled: false },
+    { value: 'music-detail', disabled: false },
     { value: 'custom-matrix', disabled: false },
     { value: 'passive', disabled: true },
     { value: 'dolby-pro-logic-iix', disabled: true },
@@ -664,6 +665,7 @@ assert.equal(controller.snapshot().channelRouter.output, 'energy-matched-stereo-
 controller.updateChannelRouter(null);
 
 controller.updateParameters({
+  enabled: true,
   upmixEnabled: true,
   obrEnabled: true,
   upmixAlgorithm: 'matrix-decode',
@@ -674,6 +676,49 @@ controller.updateParameters({
 assert.equal(byDataset(visualRoot, 'spatialLayout')[0].value, '7.1');
 assert.equal(byDataset(visualRoot, 'spatialAlgorithm')[0].value, 'matrix-decode');
 assert.match(byDataset(visualRoot, 'routeSummary')[0].textContent, /7\.1.*上混.*Mixer.*OBR/u);
+
+controller.updateChannelRouter(null);
+controller.updateParameters({
+  enabled: true,
+  upmixEnabled: false,
+  obrEnabled: false,
+  upmixAlgorithm: 'music-detail',
+  upmixOutputLayout: '7.1',
+  obrFilterProfile: 'direct',
+  balance: 0
+});
+assert.equal(byDataset(visualRoot, 'routeNode', 'upmix')[0].dataset.routeState, 'bypass');
+assert.equal(byDataset(visualRoot, 'routeNode', 'obr')[0].dataset.routeState, 'bypass');
+assert.equal(
+  byDataset(visualRoot, 'routeNode', 'mixer')[0].dataset.routeState,
+  'active',
+  'Mixer must remain active when both optional spatial stages are disabled'
+);
+assert.match(byDataset(visualRoot, 'routeSummary')[0].textContent, /Stereo.*Mixer.*独立.*Stereo 2\.0/u);
+assert.equal(byDataset(visualRoot, 'spatialAlgorithm')[0].value, 'music-detail');
+assert.equal(byDataset(visualRoot, 'musicRoleMap')[0].hidden, false);
+
+controller.updateParameters({
+  enabled: false,
+  upmixEnabled: false,
+  obrEnabled: false,
+  upmixAlgorithm: 'music-detail',
+  upmixOutputLayout: '7.1',
+  obrFilterProfile: 'direct',
+  balance: 0
+});
+assert.equal(byDataset(visualRoot, 'routeNode', 'mixer')[0].dataset.routeState, 'bypass');
+assert.match(byDataset(visualRoot, 'routeSummary')[0].textContent, /Mixer 旁路/u);
+
+controller.updateParameters({
+  enabled: true,
+  upmixEnabled: true,
+  obrEnabled: true,
+  upmixAlgorithm: 'matrix-decode',
+  upmixOutputLayout: '7.1',
+  obrFilterProfile: 'direct',
+  balance: 0
+});
 
 const automationEnabled = byDataset(visualRoot, 'automationEnabled')[0];
 const automationCanvas = byDataset(visualRoot, 'automationCanvas')[0];
@@ -790,11 +835,11 @@ assert.equal(byDataset(visualRoot, 'routeNode', 'Rb')[0].dataset.routeState, 'by
 assert.equal(byDataset(visualRoot, 'routeNode', 'Ls')[0].dataset.routeState, 'active');
 assert.equal(byDataset(visualRoot, 'routeNode', 'Rs')[0].dataset.routeState, 'active');
 const algorithmSelect = byDataset(visualRoot, 'spatialAlgorithm')[0];
-algorithmSelect.value = 'ambient-extract';
+algorithmSelect.value = 'music-detail';
 algorithmSelect.dispatchEvent({ type: 'change' });
 assert.deepEqual(channelRouterChanges.slice(-2), [
   { layout: '5.1' },
-  { algorithm: 'ambient-extract' }
+  { algorithm: 'music-detail' }
 ]);
 
 const pan = byDataset(visualRoot, 'spatialPanSurface')[0];

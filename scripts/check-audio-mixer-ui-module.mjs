@@ -357,6 +357,29 @@ assert.equal(findAllByDataset(ui, 'mixerPresetId').length, 8);
 assert.equal(findAllByDataset(ui, 'mixerFamily').length, 8);
 assert.equal(findAllByDataset(ui, 'mixerEqIndex').length, 10);
 assert.equal(findAllByDataset(ui, 'mixerParam').length, 50);
+assert.equal(ui.dataset.mixerView, 'daily', 'the desktop mixer should open in the understandable daily view');
+const mixerViewButtons = findAllByDataset(ui, 'mixerViewButton');
+assert.deepEqual(
+  mixerViewButtons.map((button) => [button.dataset.mixerViewButton, button.textContent]),
+  [['daily', '日常调音'], ['spatial', '空间声场'], ['professional', '专业调节']]
+);
+assert.equal(
+  findAllByDataset(ui, 'mixerChainNode').length,
+  4,
+  'the always-visible route summary must explain upmix, mixer, OBR and physical output'
+);
+assert.match(
+  findByDataset(ui, 'mixerControlHelp', 'centerGain')?.textContent || '',
+  /人声/,
+  'common controls need plain-language explanations'
+);
+findByDataset(ui, 'mixerViewButton', 'spatial').click();
+assert.equal(ui.dataset.mixerView, 'spatial');
+assert.equal(findByDataset(ui, 'mixerViewButton', 'spatial').getAttribute('aria-pressed'), 'true');
+findByDataset(ui, 'mixerViewButton', 'professional').click();
+assert.equal(ui.dataset.mixerView, 'professional');
+findByDataset(ui, 'mixerViewButton', 'daily').click();
+assert.equal(ui.dataset.mixerView, 'daily');
 assert.match(findByDataset(ui, 'mixerPlaybackState').textContent, /旁路|未生效/);
 assert.ok(findByDataset(ui, 'mixerDiagnostic', 'upmix').textContent);
 assert.ok(findByDataset(ui, 'mixerDiagnostic', 'obr').textContent);
@@ -1045,12 +1068,18 @@ assert.deepEqual(
     { value: 'front-only', disabled: false },
     { value: 'matrix-decode', disabled: false },
     { value: 'ambient-extract', disabled: false },
+    { value: 'music-detail', disabled: false },
     { value: 'custom-matrix', disabled: false },
     { value: 'passive', disabled: true },
     { value: 'dolby-pro-logic-iix', disabled: true },
     { value: 'dts-neural-x', disabled: true }
   ],
   'only native, non-proprietary algorithms may be selectable'
+);
+assert.match(
+  findByDataset(channelPanel, 'mixerMusicRoleMap').children.map((child) => child.textContent).join(' '),
+  /FL\/FR.*乐器.*FC.*人声.*LFE.*低频.*SL\/SR.*空间/u,
+  'the music-aware mode must explain its role routing instead of promising perfect AI stems'
 );
 assert.equal(findAllByDataset(channelPanel, 'mixerChannelMatrixCell').length, 16);
 assert.ok(findByDataset(channelPanel, 'mixerChannelLfeCrossover'));
@@ -1150,6 +1179,20 @@ const gainPatch = channelRouterRequests.filter((entry) => (
 assert.equal(gainPatch.body.expectedRevision, 8);
 assert.equal(gainPatch.body.parameters.channelGainDb.length, 8);
 assert.equal(gainPatch.body.parameters.channelGainDb[4], -4.5);
+
+channelAlgorithm.value = 'music-detail';
+channelAlgorithm.dispatchEvent({ type: 'change' });
+await channelRouterController.settled();
+assert.equal(
+  channelRouterRequests.filter((entry) => (
+    entry.url === '/api/audio/mixer/channels'
+    && entry.method === 'PATCH'
+    && entry.body?.parameters?.algorithm === 'music-detail'
+  )).length,
+  1,
+  'music-detail must commit through the real channel-router endpoint'
+);
+assert.equal(findByDataset(channelPanel, 'mixerMusicRoleMap').hidden, false);
 
 channelAlgorithm.value = 'custom-matrix';
 channelAlgorithm.dispatchEvent({ type: 'change' });
@@ -1286,7 +1329,7 @@ assert.equal(stagedSnapshot.layoutPending, true);
 assert.equal(stagedSnapshot.lastResult, -3);
 assert.equal(stagedSnapshot.availability, 'transition-pending');
 assert.equal(stagedSnapshot.output, 'energy-matched-stereo-fold-down');
-assert.equal(channelRouterController.snapshot().channelRouter.revision, 12);
+assert.equal(channelRouterController.snapshot().channelRouter.revision, 13);
 assert.equal(channelRouterController.snapshot().channelRouter.physicalMultichannel, false);
 channelRouterController.destroy();
 

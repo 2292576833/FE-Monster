@@ -932,6 +932,39 @@ try {
     [...BOOLEAN_PARAMETERS],
     EQ_FREQUENCIES
   );
+  const mixerViewHierarchy = await evaluateFunction(() => {
+    const ui = document.querySelector('[data-audio-mixer-ui]');
+    const visible = (element) => !!element && !element.hidden && getComputedStyle(element).display !== 'none';
+    const snapshot = () => ({
+      view: ui?.dataset.mixerView || '',
+      families: [...(ui?.querySelectorAll('[data-mixer-family]') || [])]
+        .filter(visible)
+        .map((family) => family.dataset.mixerFamily),
+      presets: visible(ui?.querySelector('.audio-mixer-presets')),
+      channels: visible(ui?.querySelector('[data-mixer-channel-panel]')),
+      visuals: visible(ui?.querySelector('[data-mixer-visuals-host]')),
+      diagnostics: visible(ui?.querySelector('.audio-mixer-diagnostics')),
+      chainNodes: ui?.querySelectorAll('[data-mixer-chain-node]').length || 0
+    });
+    const buttons = [...(ui?.querySelectorAll('[data-mixer-view-button]') || [])];
+    const daily = snapshot();
+    ui?.querySelector('[data-mixer-view-button="spatial"]')?.click();
+    const spatial = snapshot();
+    ui?.querySelector('[data-mixer-view-button="professional"]')?.click();
+    const professional = snapshot();
+    ui?.querySelector('[data-mixer-view-button="daily"]')?.click();
+    return {
+      buttons: buttons.map((button) => ({
+        id: button.dataset.mixerViewButton,
+        label: button.textContent?.trim() || '',
+        pressed: button.getAttribute('aria-pressed')
+      })),
+      daily,
+      spatial,
+      professional,
+      restoredView: ui?.dataset.mixerView || ''
+    };
+  });
   const initialObrRoute = await evaluateFunction(() => ({
     backend: document.documentElement.dataset.obrSpatialBackend || '',
     enabled: document.documentElement.dataset.obrSpatialEnabled || '',
@@ -1056,6 +1089,7 @@ try {
   async function collectRealEdgeTelemetry() {
     const mixerGetsBeforePlayback = mixerGetCount;
     await evaluateFunction(() => {
+      document.querySelector('[data-mixer-view-button="professional"]')?.click();
       document.querySelector('[data-mixer-visual-module="meters"]')
         ?.scrollIntoView({ block: 'center', inline: 'nearest' });
     });
@@ -1336,7 +1370,7 @@ try {
   });
 
   const viewportResults = [];
-  for (const [width, height] of [[320, 720], [768, 720], [1440, 900]]) {
+  for (const [width, height] of [[768, 720], [1024, 800], [1440, 900]]) {
     await command('Emulation.setDeviceMetricsOverride', {
       width,
       height,
@@ -1461,6 +1495,27 @@ try {
       && initialUi.presetResults.every((item) => (
         item.exists && item.isButton && item.labelMatches && item.accessibleName
       )),
+    desktopMixerInformationHierarchyIsPlainAndProgressive: mixerViewHierarchy.buttons
+      .map((entry) => `${entry.id}:${entry.label}`).join(',')
+      === 'daily:日常调音,spatial:空间声场,professional:专业调节'
+      && mixerViewHierarchy.daily.view === 'daily'
+      && mixerViewHierarchy.daily.families.join(',') === 'master,spatial'
+      && mixerViewHierarchy.daily.presets
+      && !mixerViewHierarchy.daily.channels
+      && !mixerViewHierarchy.daily.visuals
+      && mixerViewHierarchy.daily.chainNodes === 4
+      && mixerViewHierarchy.spatial.view === 'spatial'
+      && mixerViewHierarchy.spatial.families.join(',') === 'spatial,upmix,obr'
+      && !mixerViewHierarchy.spatial.presets
+      && mixerViewHierarchy.spatial.channels
+      && !mixerViewHierarchy.spatial.visuals
+      && mixerViewHierarchy.professional.view === 'professional'
+      && mixerViewHierarchy.professional.families.length === 8
+      && !mixerViewHierarchy.professional.presets
+      && mixerViewHierarchy.professional.channels
+      && mixerViewHierarchy.professional.visuals
+      && mixerViewHierarchy.professional.diagnostics
+      && mixerViewHierarchy.restoredView === 'daily',
     everyParameterFamilyAndControlRendered: initialUi.familyResults.length === 8
       && initialUi.familyResults.every((family) => family.exists && family.labelled)
       && initialUi.controlResults.length === SIMPLE_PARAMETER_KEYS.length
@@ -1514,7 +1569,7 @@ try {
       && initialUi.channelRouter.matrixCellCount === 16
       && initialUi.channelRouter.algorithms.filter((entry) => !entry.disabled)
         .map((entry) => entry.value).join(',')
-        === 'front-only,matrix-decode,ambient-extract,custom-matrix'
+        === 'front-only,matrix-decode,ambient-extract,music-detail,custom-matrix'
       && initialUi.channelRouter.algorithms.filter((entry) => entry.disabled)
         .map((entry) => entry.value).join(',')
         === 'passive,dolby-pro-logic-iix,dts-neural-x'
@@ -1648,6 +1703,7 @@ try {
     },
     opened,
     initialUi,
+    mixerViewHierarchy,
     familyModularity,
     realEdgeTelemetry,
     initialObrRoute,

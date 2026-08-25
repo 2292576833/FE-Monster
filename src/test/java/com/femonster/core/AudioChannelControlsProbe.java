@@ -23,7 +23,7 @@ public final class AudioChannelControlsProbe {
 
         Map<String, Object> schema = service.channelControlSchema();
         List<Object> algorithms = SimpleJson.asList(schema.get("algorithms"));
-        require(algorithms.size() == 7, "algorithm catalog must be complete");
+        require(algorithms.size() == 8, "algorithm catalog must be complete");
         require(Boolean.TRUE.equals(algorithm(algorithms, "front-only").get("selectable"))
                 && "available".equals(
                     algorithm(algorithms, "front-only").get("availability")
@@ -34,6 +34,11 @@ public final class AudioChannelControlsProbe {
                     algorithm(algorithms, "custom-matrix").get("availability")
                 ),
             "custom matrix must be exposed only after JNI/native routing is connected");
+        require(Boolean.TRUE.equals(algorithm(algorithms, "music-detail").get("selectable"))
+                && "available".equals(
+                    algorithm(algorithms, "music-detail").get("availability")
+                ),
+            "music detail must be an honest selectable real-time router path");
         for (String licensed : List.of("dolby-pro-logic-ii", "dolby-pro-logic-iix", "dts-neural-x")) {
             Map<String, Object> item = algorithm(algorithms, licensed);
             require("license-required".equals(item.get("availability"))

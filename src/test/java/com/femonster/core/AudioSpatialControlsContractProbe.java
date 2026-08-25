@@ -152,8 +152,8 @@ public final class AudioSpatialControlsContractProbe {
         )), "preset identities or order changed");
         require(Boolean.TRUE.equals(surround.get("upmixEnabled")),
             "3D surround must use the real upmixer");
-        require("matrix-decode".equals(surround.get("upmixAlgorithm")),
-            "3D surround must stay on the verified OxiMedia MatrixDecode path");
+        require("music-detail".equals(surround.get("upmixAlgorithm")),
+            "3D surround must use the allocation-free music-detail router");
         require("7.1".equals(surround.get("upmixOutputLayout")),
             "3D surround must request a real 7.1 virtual bed");
         require(Boolean.TRUE.equals(surround.get("obrEnabled")),
@@ -320,9 +320,10 @@ public final class AudioSpatialControlsContractProbe {
 
     private static void enumAndNumericBoundariesRejectInvalidInput(Path directory) throws Exception {
         Files.createDirectories(directory);
+        FakeNative bridge = new FakeNative();
         AudioMixerService service = new AudioMixerService(
             directory.resolve("mixer.json"),
-            new FakeNative()
+            bridge
         );
         long revision = 0;
         revision = accepted(service, revision, Map.of("upmixCenterWidthHz", 20.0));
@@ -338,6 +339,18 @@ public final class AudioSpatialControlsContractProbe {
         revision = accepted(service, revision, Map.of("upmixAlgorithm", "passive"));
         revision = accepted(service, revision, Map.of("upmixAlgorithm", "matrix-decode"));
         revision = accepted(service, revision, Map.of("upmixAlgorithm", "ambient-extract"));
+        revision = accepted(service, revision, Map.of("upmixAlgorithm", "music-detail"));
+        require(equalFloat(bridge.lastValues[31], 4.0f),
+            "MusicDetail enum must reach the native channel router");
+        require("music-detail".equals(service.channelSnapshot().get("algorithm")),
+            "main MusicDetail selection must persist in the advanced channel controls");
+        int combinedBeforeEnable = bridge.combinedSubmits;
+        revision = accepted(service, revision, Map.of("upmixEnabled", true));
+        require(bridge.lastChannelAlgorithm == 4,
+            "main MusicDetail selection must synchronize the combined per-channel route");
+        require(bridge.combinedSubmits == combinedBeforeEnable + 1,
+            "enabling MusicDetail must publish one atomic router/Mixer snapshot");
+        revision = accepted(service, revision, Map.of("upmixEnabled", false));
         revision = accepted(service, revision, Map.of("upmixOutputLayout", "7.1"));
         revision = accepted(service, revision, Map.of("upmixOutputLayout", "5.1"));
         revision = accepted(service, revision, Map.of("obrFilterProfile", "direct"));
@@ -366,6 +379,7 @@ public final class AudioSpatialControlsContractProbe {
         Files.createDirectories(directory);
         FakeNative bridge = new FakeNative();
         AudioMixerService service = new AudioMixerService(directory.resolve("mixer.json"), bridge);
+        int initialCombinedSubmits = bridge.combinedSubmits;
 
         Map<String, Object> offOff = service.patch(0L, Map.of(
             "upmixEnabled", false,
@@ -382,6 +396,8 @@ public final class AudioSpatialControlsContractProbe {
             "off/off must be stereo -> mixer -> fidelity output"
         );
         require((bridge.lastFlags & 0x30) == 0, "off/off enable bits were not cleared");
+        require(bridge.combinedSubmits == initialCombinedSubmits,
+            "off/off must submit Mixer directly instead of gating it on an inactive router");
 
         Map<String, Object> onOff = service.patch(1L, Map.of("upmixEnabled", true));
         assertRoute(
@@ -392,6 +408,8 @@ public final class AudioSpatialControlsContractProbe {
             "on/off must be upmix -> mixer -> non-OBR output"
         );
         require((bridge.lastFlags & 0x30) == 0x10, "on/off enable bits are ambiguous");
+        require(bridge.combinedSubmits == initialCombinedSubmits + 1,
+            "on/off must atomically submit the active router and Mixer");
 
         Map<String, Object> offOn = service.patch(2L, Map.of(
             "upmixEnabled", false,
@@ -405,6 +423,8 @@ public final class AudioSpatialControlsContractProbe {
             "off/on must be stereo -> mixer -> OBR"
         );
         require((bridge.lastFlags & 0x30) == 0x20, "off/on enable bits are ambiguous");
+        require(bridge.combinedSubmits == initialCombinedSubmits + 1,
+            "off/on must keep Mixer independent from the disabled upmixer");
 
         Map<String, Object> onOn = service.patch(3L, Map.of("upmixEnabled", true));
         assertRoute(
@@ -415,6 +435,8 @@ public final class AudioSpatialControlsContractProbe {
             "on/on must be upmix -> mixer -> X3D metadata -> OBR"
         );
         require((bridge.lastFlags & 0x30) == 0x30, "on/on enable bits are ambiguous");
+        require(bridge.combinedSubmits == initialCombinedSubmits + 2,
+            "on/on must atomically submit the active router and Mixer");
 
         require(number(onOn.get("revision")) == 4.0,
             "four-state switching must retain the shared mixer revision contract");
@@ -588,6 +610,8 @@ public final class AudioSpatialControlsContractProbe {
         int lastFlags;
         float[] lastValues;
         long lastRevision;
+        int lastChannelAlgorithm = -1;
+        int combinedSubmits;
 
         @Override
         public Map<String, Object> submit(long revision, int flags, float[] values) {
@@ -607,6 +631,8 @@ public final class AudioSpatialControlsContractProbe {
             int algorithm,
             float[] channelValues
         ) {
+            combinedSubmits += 1;
+            lastChannelAlgorithm = algorithm;
             return Map.of(
                 "mixer", submit(mixerRevision, flags, mixerValues),
                 "channels", channelStatus()
@@ -623,7 +649,9 @@ public final class AudioSpatialControlsContractProbe {
             boolean obrEnabled = (lastFlags & 0x20) != 0;
             String algorithm = value(31, 1.0f) == 0.0f
                 ? "passive"
-                : value(31, 1.0f) == 2.0f ? "ambient-extract" : "matrix-decode";
+                : value(31, 1.0f) == 2.0f
+                    ? "ambient-extract"
+                    : value(31, 1.0f) == 4.0f ? "music-detail" : "matrix-decode";
             String layout = value(32, 6.0f) == 8.0f ? "7.1" : "5.1";
             String profile = value(39, 1.0f) == 0.0f
                 ? "direct"

@@ -76,7 +76,7 @@ try {
     path.join(root, 'native/rust-audio-upmix/Cargo.toml'),
     '--test', 'channel_router_contract', '--locked', '--offline',
   ]);
-  assert.match(rustProbe, /13 passed/);
+  assert.match(rustProbe, /15 passed/);
 
   const rust = readFileSync(path.join(root, 'native/rust-audio-upmix/src/channel_router.rs'), 'utf8');
   const header = readFileSync(
@@ -85,6 +85,7 @@ try {
   );
   assert.match(rust, /FFmpeg\/OBS order/);
   assert.match(rust, /ALGORITHM_DOLBY_PRO_LOGIC_II[\s\S]{0,250}ALGORITHM_LICENSE_REQUIRED/);
+  assert.match(rust, /ALGORITHM_MUSIC_DETAIL/);
   assert.match(rust, /delay:\s*Vec<f32>/, 'router must own preallocated delay memory');
   const createBody = rust.slice(rust.indexOf('pub fn new(config:'), rust.indexOf('pub fn stage(&self'));
   assert.match(createBody, /delay:\s*vec!\[0\.0;/,
@@ -99,7 +100,7 @@ try {
     pass: true,
     java: javaProbe,
     integration: integrationProbe,
-    rust: '13 channel-router contract tests passed',
+    rust: '14 channel-router contract tests passed',
     abi: 'additive channel-router v1; legacy upmix/mixer/status contracts unchanged',
     routeConnected: { builtins: true, explicitJni: true },
   }, null, 2));

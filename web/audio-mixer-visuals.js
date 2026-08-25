@@ -27,7 +27,7 @@
     '5.1': Object.freeze(['FL', 'FR', 'FC', 'LFE', 'SL', 'SR']),
     '7.1': Object.freeze(['FL', 'FR', 'FC', 'LFE', 'BL', 'BR', 'SL', 'SR'])
   });
-  const ROUTER_ALGORITHMS = new Set(['front-only', 'matrix-decode', 'ambient-extract', 'custom-matrix', 'passive']);
+  const ROUTER_ALGORITHMS = new Set(['front-only', 'matrix-decode', 'ambient-extract', 'music-detail', 'custom-matrix', 'passive']);
   const ROUTER_OUTPUTS = new Set([
     'binaural-2ch-headphones',
     'energy-matched-stereo-fold-down',
@@ -936,6 +936,7 @@
     let telemetry = unavailableTelemetry();
     let channelRouter = null;
     let parameters = Object.freeze({
+      enabled: true,
       upmixEnabled: false,
       obrEnabled: false,
       upmixAlgorithm: 'matrix-decode',
@@ -1307,11 +1308,24 @@
       { value: 'front-only', label: 'Pass-through（前置直达）' },
       { value: 'matrix-decode', label: 'Matrix Decode（保真）' },
       { value: 'ambient-extract', label: 'Ambient Extract' },
+      { value: 'music-detail', label: '音乐细节（实时近似分离）' },
       { value: 'custom-matrix', label: 'Custom Matrix' },
       { value: 'passive', label: 'Passive FFT（实验说明）', disabled: true, title: 'Passive FFT 是实验上混，不等同前置直达' },
       { value: 'dolby-pro-logic-iix', label: 'Dolby Pro Logic II/IIx（需授权）', disabled: true, title: '专有授权算法，FE Monster 未内置' },
       { value: 'dts-neural-x', label: 'DTS Neural:X（需授权）', disabled: true, title: '专有授权算法，FE Monster 未内置' }
     ], 'upmixAlgorithm', 'algorithm');
+    const musicRoleMap = node(document, 'aside', {
+      className: 'audio-mixer-music-role-map audio-mixer-music-role-map--visual',
+      attributes: { role: 'note', 'aria-label': '音乐细节声道路由说明' },
+      dataset: { musicRoleMap: '' }
+    });
+    musicRoleMap.append(
+      node(document, 'strong', { text: '角色分路' }),
+      node(document, 'span', { text: 'FL/FR 乐器与瞬态' }),
+      node(document, 'span', { text: 'FC 人声 · LFE 低频/鼓点' }),
+      node(document, 'span', { text: '环绕 空间/尾音' })
+    );
+    musicRoleMap.hidden = true;
     const obrProfileSelect = createSpatialSelect('OBR 滤波', 'spatialObrProfile', [
       { value: 'direct', label: 'Direct（保真）' },
       { value: 'ambient', label: 'Ambient' },
@@ -1621,6 +1635,7 @@
     spatialBody.append(
       physicalOutput,
       spatialControls,
+      musicRoleMap,
       routeSummary,
       routeGraph,
       channelRack,
@@ -1920,11 +1935,14 @@
 
     function updateRoute() {
       const layoutValue = channelRouter?.layout || (parameters.upmixOutputLayout === '7.1' ? '7.1' : '5.1');
-      const upmix = channelRouter ? channelRouter.active === true : parameters.upmixEnabled === true;
+      const upmixRequested = parameters.upmixEnabled === true;
+      const upmix = upmixRequested && (channelRouter ? channelRouter.active === true : true);
+      const mixer = parameters.enabled !== false;
       const obr = parameters.obrEnabled === true;
-      routeSummary.textContent = `${upmix ? `${layoutValue} 上混` : 'Stereo'} → Mixer → ${obr ? 'OBR → 双耳 2.0（耳机）' : (upmix ? '能量匹配折叠 2.0' : 'Stereo 2.0')}`;
+      const mixerLabel = mixer ? 'Mixer（独立）' : 'Mixer 旁路';
+      routeSummary.textContent = `${upmix ? `${layoutValue} 上混` : 'Stereo'} → ${mixerLabel} → ${obr ? 'OBR → 双耳 2.0（耳机）' : (upmix ? '能量匹配折叠 2.0' : 'Stereo 2.0')}`;
       routeNodes.get('upmix').dataset.routeState = upmix ? 'active' : 'bypass';
-      routeNodes.get('mixer').dataset.routeState = 'active';
+      routeNodes.get('mixer').dataset.routeState = mixer ? 'active' : 'bypass';
       routeNodes.get('obr').dataset.routeState = obr ? 'active' : 'bypass';
       routeNodes.get('input').dataset.routeState = 'active';
       CHANNELS.forEach((channel) => {
@@ -1947,9 +1965,10 @@
       if (!next || typeof next !== 'object') return false;
       parameters = Object.freeze({
         ...parameters,
+        enabled: typeof next.enabled === 'boolean' ? next.enabled : parameters.enabled,
         upmixEnabled: next.upmixEnabled === true,
         obrEnabled: next.obrEnabled === true,
-        upmixAlgorithm: ['passive', 'matrix-decode', 'ambient-extract'].includes(next.upmixAlgorithm)
+        upmixAlgorithm: ['passive', 'matrix-decode', 'ambient-extract', 'music-detail', 'front-only', 'custom-matrix'].includes(next.upmixAlgorithm)
           ? next.upmixAlgorithm
           : parameters.upmixAlgorithm,
         upmixOutputLayout: next.upmixOutputLayout === '7.1' ? '7.1' : '5.1',
@@ -1969,6 +1988,7 @@
       obrToggle.checked = parameters.obrEnabled;
       layoutSelect.value = channelRouter?.layout || parameters.upmixOutputLayout;
       algorithmSelect.value = channelRouter?.algorithm || parameters.upmixAlgorithm;
+      musicRoleMap.hidden = (channelRouter?.algorithm || parameters.upmixAlgorithm) !== 'music-detail';
       obrProfileSelect.value = parameters.obrFilterProfile;
       updatePan(parameters.balance);
       updateRoute();

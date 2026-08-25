@@ -39,6 +39,9 @@ pub const ALGORITHM_FRONT_ONLY: u32 = 0;
 pub const ALGORITHM_MATRIX_DECODE: u32 = 1;
 pub const ALGORITHM_AMBIENT_EXTRACT: u32 = 2;
 pub const ALGORITHM_CUSTOM_MATRIX: u32 = 3;
+/// Allocation-free, phase-safe real-time music analysis. This is a spectral/
+/// stereo-field approximation for mastered stereo, not an AI stem separator.
+pub const ALGORITHM_MUSIC_DETAIL: u32 = 4;
 pub const ALGORITHM_DOLBY_PRO_LOGIC_II: u32 = 100;
 pub const ALGORITHM_DOLBY_PRO_LOGIC_IIX: u32 = 101;
 pub const ALGORITHM_DTS_NEURAL_X: u32 = 200;
@@ -63,7 +66,8 @@ pub fn algorithm_availability(algorithm: u32) -> u32 {
         ALGORITHM_FRONT_ONLY
         | ALGORITHM_MATRIX_DECODE
         | ALGORITHM_AMBIENT_EXTRACT
-        | ALGORITHM_CUSTOM_MATRIX => ALGORITHM_AVAILABLE,
+        | ALGORITHM_CUSTOM_MATRIX
+        | ALGORITHM_MUSIC_DETAIL => ALGORITHM_AVAILABLE,
         ALGORITHM_DOLBY_PRO_LOGIC_II | ALGORITHM_DOLBY_PRO_LOGIC_IIX | ALGORITHM_DTS_NEURAL_X => {
             ALGORITHM_LICENSE_REQUIRED
         }
@@ -220,6 +224,8 @@ struct DerivedParams {
     allpass_coefficient: [f32; MAX_CHANNELS],
     azimuth: [f32; MAX_CHANNELS],
     lfe_alpha: f32,
+    matrix_decode_mix: f32,
+    music_detail_mix: f32,
     algorithm: u32,
 }
 
@@ -230,6 +236,9 @@ impl DerivedParams {
             ALGORITHM_MATRIX_DECODE => matrix_decode_matrix(config.output_channels),
             ALGORITHM_AMBIENT_EXTRACT => ambient_extract_matrix(config.output_channels),
             ALGORITHM_CUSTOM_MATRIX => params.custom_matrix,
+            // Keep a conservative matrix bed available while the music-aware
+            // path crossfades in or out during a live parameter transition.
+            ALGORITHM_MUSIC_DETAIL => matrix_decode_matrix(config.output_channels),
             _ => [0.0; MAX_MATRIX_COEFFICIENTS],
         };
         let sample_period = 1.0 / config.sample_rate as f32;
@@ -255,6 +264,16 @@ impl DerivedParams {
             }),
             azimuth: params.channel_azimuth_deg,
             lfe_alpha: sample_period / (time_constant + sample_period),
+            matrix_decode_mix: if params.algorithm == ALGORITHM_MATRIX_DECODE {
+                1.0
+            } else {
+                0.0
+            },
+            music_detail_mix: if params.algorithm == ALGORITHM_MUSIC_DETAIL {
+                1.0
+            } else {
+                0.0
+            },
             algorithm: params.algorithm,
         }
     }
@@ -272,6 +291,8 @@ impl DerivedParams {
             self.azimuth[channel] += (target.azimuth[channel] - self.azimuth[channel]) * fraction;
         }
         self.lfe_alpha += (target.lfe_alpha - self.lfe_alpha) * fraction;
+        self.matrix_decode_mix += (target.matrix_decode_mix - self.matrix_decode_mix) * fraction;
+        self.music_detail_mix += (target.music_detail_mix - self.music_detail_mix) * fraction;
     }
 }
 
@@ -288,6 +309,11 @@ fn builtin_decorrelation_delay_ms(algorithm: u32, channels: u32, channel: usize)
         (ALGORITHM_AMBIENT_EXTRACT, 6, 4 | 5) => 7.0,
         (ALGORITHM_AMBIENT_EXTRACT, 8, 4 | 5) => 13.0,
         (ALGORITHM_AMBIENT_EXTRACT, 8, 6 | 7) => 5.0,
+        // Music detail uses different back/side arrival times so a 7.1 bed
+        // retains depth after binaural rendering without left/right precedence.
+        (ALGORITHM_MUSIC_DETAIL, 6, 4 | 5) => 5.0,
+        (ALGORITHM_MUSIC_DETAIL, 8, 4 | 5) => 13.0,
+        (ALGORITHM_MUSIC_DETAIL, 8, 6 | 7) => 5.0,
         _ => 0.0,
     }
 }
@@ -304,7 +330,227 @@ fn builtin_decorrelation_allpass(algorithm: u32, channels: u32, channel: usize) 
         (ALGORITHM_AMBIENT_EXTRACT, 8, 5) => -0.72,
         (ALGORITHM_AMBIENT_EXTRACT, 8, 6) => 0.60,
         (ALGORITHM_AMBIENT_EXTRACT, 8, 7) => -0.60,
+        (ALGORITHM_MUSIC_DETAIL, 6, 4) => 0.56,
+        (ALGORITHM_MUSIC_DETAIL, 6, 5) => -0.56,
+        (ALGORITHM_MUSIC_DETAIL, 8, 4) => 0.70,
+        (ALGORITHM_MUSIC_DETAIL, 8, 5) => -0.70,
+        (ALGORITHM_MUSIC_DETAIL, 8, 6) => 0.52,
+        (ALGORITHM_MUSIC_DETAIL, 8, 7) => -0.52,
         _ => 0.0,
+    }
+}
+
+fn one_pole_alpha(cutoff_hz: f32, sample_rate: u32) -> f32 {
+    let sample_period = 1.0 / sample_rate as f32;
+    let time_constant = 1.0 / (std::f32::consts::TAU * cutoff_hz);
+    sample_period / (time_constant + sample_period)
+}
+
+/// Low-latency steering for the matrix decoder.  The decoder continuously
+/// measures coherent (L+R) and phase-difference (L-R) energy instead of
+/// duplicating both into every speaker.  Its state is fixed-size, so the
+/// real-time path stays allocation- and lock-free.
+struct MatrixDecodeState {
+    mid_energy: f32,
+    side_energy: f32,
+    side_low: f32,
+    bass_stage_one: f32,
+    bass: f32,
+    energy_alpha: f32,
+    side_low_alpha: f32,
+}
+
+impl MatrixDecodeState {
+    fn new(sample_rate: u32) -> Self {
+        Self {
+            mid_energy: 0.0,
+            side_energy: 0.0,
+            side_low: 0.0,
+            bass_stage_one: 0.0,
+            bass: 0.0,
+            // About 18 ms at 48 kHz: fast enough to follow a mix, slow enough
+            // to avoid audible image pumping on individual wave cycles.
+            energy_alpha: one_pole_alpha(9.0, sample_rate),
+            side_low_alpha: one_pole_alpha(720.0, sample_rate),
+        }
+    }
+
+    fn process(
+        &mut self,
+        left: f32,
+        right: f32,
+        lfe_alpha: f32,
+        channels: usize,
+    ) -> [f32; MAX_CHANNELS] {
+        let mid = (left + right) * 0.5;
+        let side = (left - right) * 0.5;
+        self.mid_energy += self.energy_alpha * (mid * mid - self.mid_energy);
+        self.side_energy += self.energy_alpha * (side * side - self.side_energy);
+
+        let total_energy = self.mid_energy + self.side_energy + 1.0e-12;
+        let coherent_ratio = self.mid_energy / total_energy;
+        let difference_ratio = self.side_energy / total_energy;
+        let center_focus = ((coherent_ratio - 0.42) / 0.50).clamp(0.0, 1.0);
+        let surround_focus = ((difference_ratio - 0.42) / 0.50).clamp(0.0, 1.0);
+
+        let center = mid * 0.78 * center_focus;
+        let surround = side * 0.82 * surround_focus;
+        self.side_low += self.side_low_alpha * (surround - self.side_low);
+        let side_high = surround - self.side_low;
+        self.bass_stage_one += lfe_alpha * (mid - self.bass_stage_one);
+        self.bass += lfe_alpha * (self.bass_stage_one - self.bass);
+
+        let mut output = [0.0_f32; MAX_CHANNELS];
+        // Remove only the portion that is deliberately steered away from the
+        // front pair. Panned/non-coherent detail consequently remains anchored
+        // to its original left/right side.
+        output[CHANNEL_FRONT_LEFT as usize] =
+            (left - center * 0.58 - surround * 0.48) * BUILTIN_UPMIX_HEADROOM;
+        output[CHANNEL_FRONT_RIGHT as usize] =
+            (right - center * 0.58 + surround * 0.48) * BUILTIN_UPMIX_HEADROOM;
+        output[CHANNEL_FRONT_CENTER as usize] = center * BUILTIN_UPMIX_HEADROOM;
+        output[CHANNEL_LFE as usize] = self.bass * 0.60 * BUILTIN_UPMIX_HEADROOM;
+
+        if channels == 6 {
+            output[CHANNEL_BACK_LEFT as usize] = surround * 0.95 * BUILTIN_UPMIX_HEADROOM;
+            output[CHANNEL_BACK_RIGHT as usize] = -surround * 0.95 * BUILTIN_UPMIX_HEADROOM;
+        } else {
+            // Low/diffuse side energy is placed deeper behind the listener;
+            // high-frequency differences stay at the sides for localization.
+            let back = self.side_low * 0.85 + side_high * 0.25;
+            let side_bed = side_high * 0.90 + self.side_low * 0.25;
+            output[CHANNEL_BACK_LEFT as usize] = back * BUILTIN_UPMIX_HEADROOM;
+            output[CHANNEL_BACK_RIGHT as usize] = -back * BUILTIN_UPMIX_HEADROOM;
+            output[CHANNEL_SIDE_LEFT as usize] = side_bed * BUILTIN_UPMIX_HEADROOM;
+            output[CHANNEL_SIDE_RIGHT as usize] = -side_bed * BUILTIN_UPMIX_HEADROOM;
+        }
+        output
+    }
+
+    fn reset(&mut self) {
+        self.mid_energy = 0.0;
+        self.side_energy = 0.0;
+        self.side_low = 0.0;
+        self.bass_stage_one = 0.0;
+        self.bass = 0.0;
+    }
+}
+
+/// Streaming state for the bounded music-aware path. Every field is scalar and
+/// allocated with the router; `process` performs no heap allocation or locking.
+struct MusicDetailState {
+    vocal_low: f32,
+    vocal_high: f32,
+    side_low: f32,
+    bass_stage_one: f32,
+    bass: f32,
+    transient_fast: f32,
+    transient_slow: f32,
+    coherence: f32,
+    previous_mid: f32,
+    vocal_low_alpha: f32,
+    vocal_high_alpha: f32,
+    side_low_alpha: f32,
+    coherence_alpha: f32,
+}
+
+impl MusicDetailState {
+    fn new(sample_rate: u32) -> Self {
+        Self {
+            vocal_low: 0.0,
+            vocal_high: 0.0,
+            side_low: 0.0,
+            bass_stage_one: 0.0,
+            bass: 0.0,
+            transient_fast: 0.0,
+            transient_slow: 0.0,
+            coherence: 0.0,
+            previous_mid: 0.0,
+            vocal_low_alpha: one_pole_alpha(160.0, sample_rate),
+            vocal_high_alpha: one_pole_alpha(6_000.0, sample_rate),
+            side_low_alpha: one_pole_alpha(700.0, sample_rate),
+            coherence_alpha: one_pole_alpha(24.0, sample_rate),
+        }
+    }
+
+    fn process(
+        &mut self,
+        left: f32,
+        right: f32,
+        lfe_alpha: f32,
+        channels: usize,
+    ) -> [f32; MAX_CHANNELS] {
+        let mid = (left + right) * 0.5;
+        let side = (left - right) * 0.5;
+
+        // Two cascaded streaming poles provide useful LFE isolation without
+        // an FFT block boundary or per-call allocation.
+        self.bass_stage_one += lfe_alpha * (mid - self.bass_stage_one);
+        self.bass += lfe_alpha * (self.bass_stage_one - self.bass);
+        self.vocal_low += self.vocal_low_alpha * (mid - self.vocal_low);
+        self.vocal_high += self.vocal_high_alpha * (mid - self.vocal_high);
+        self.side_low += self.side_low_alpha * (side - self.side_low);
+
+        // Coherent mid-band content is a useful low-latency vocal/dialogue
+        // estimate. A smoothed side-to-mid ratio prevents hard steering and
+        // keeps off-centre instruments in the front pair.
+        let coherence_target =
+            (1.0 - side.abs() / (mid.abs() + side.abs() + 1.0e-5)).clamp(0.0, 1.0);
+        self.coherence += self.coherence_alpha * (coherence_target - self.coherence);
+
+        // Suppress attacks from the centre estimate so kick/snare transients
+        // retain impact in the fronts/LFE rather than pumping the vocal image.
+        let flux = (mid - self.previous_mid).abs();
+        self.previous_mid = mid;
+        let fast_alpha = if flux > self.transient_fast {
+            0.35
+        } else {
+            0.06
+        };
+        self.transient_fast += fast_alpha * (flux - self.transient_fast);
+        self.transient_slow += 0.0025 * (flux - self.transient_slow);
+        let transient = ((self.transient_fast - self.transient_slow * 1.6)
+            / (self.transient_fast + 1.0e-6))
+            .clamp(0.0, 1.0);
+
+        let vocal_band = self.vocal_high - self.vocal_low;
+        let vocal = vocal_band * (0.30 + self.coherence * 0.70) * (1.0 - transient * 0.72);
+        let bass = self.bass;
+        let side_high = side - self.side_low;
+
+        let mut output = [0.0_f32; MAX_CHANNELS];
+        // Preserve the original stereo detail while reducing only enough of
+        // the extracted centre/bass to avoid a duplicated, boxy downmix.
+        output[CHANNEL_FRONT_LEFT as usize] = (left - vocal * 0.22 - bass * 0.07) * 0.76;
+        output[CHANNEL_FRONT_RIGHT as usize] = (right - vocal * 0.22 - bass * 0.07) * 0.76;
+        output[CHANNEL_FRONT_CENTER as usize] = vocal * 0.72;
+        output[CHANNEL_LFE as usize] = bass * 0.62;
+
+        if channels == 6 {
+            let surround = side_high * 0.70 + self.side_low * 0.30;
+            output[CHANNEL_BACK_LEFT as usize] = surround * 0.58;
+            output[CHANNEL_BACK_RIGHT as usize] = -surround * 0.58;
+        } else {
+            let back = self.side_low * 0.56 + side_high * 0.20;
+            let side_bed = side_high * 0.72 + self.side_low * 0.18;
+            output[CHANNEL_BACK_LEFT as usize] = back * 0.54;
+            output[CHANNEL_BACK_RIGHT as usize] = -back * 0.54;
+            output[CHANNEL_SIDE_LEFT as usize] = side_bed * 0.60;
+            output[CHANNEL_SIDE_RIGHT as usize] = -side_bed * 0.60;
+        }
+        output
+    }
+
+    fn reset(&mut self) {
+        self.vocal_low = 0.0;
+        self.vocal_high = 0.0;
+        self.side_low = 0.0;
+        self.bass_stage_one = 0.0;
+        self.bass = 0.0;
+        self.transient_fast = 0.0;
+        self.transient_slow = 0.0;
+        self.coherence = 0.0;
+        self.previous_mid = 0.0;
     }
 }
 
@@ -534,6 +780,8 @@ pub struct ChannelRouter {
     allpass_input_state: [f32; MAX_CHANNELS],
     allpass_output_state: [f32; MAX_CHANNELS],
     lfe_state: f32,
+    matrix_decode: MatrixDecodeState,
+    music_detail: MusicDetailState,
     telemetry: Telemetry,
 }
 
@@ -571,6 +819,8 @@ impl ChannelRouter {
             allpass_input_state: [0.0; MAX_CHANNELS],
             allpass_output_state: [0.0; MAX_CHANNELS],
             lfe_state: 0.0,
+            matrix_decode: MatrixDecodeState::new(config.sample_rate),
+            music_detail: MusicDetailState::new(config.sample_rate),
             telemetry: Telemetry::new(),
         })
     }
@@ -678,14 +928,35 @@ impl ChannelRouter {
             } else {
                 0.0
             };
+            let music = if self.current.music_detail_mix > f32::EPSILON {
+                self.music_detail
+                    .process(left, right, self.current.lfe_alpha, channels)
+            } else {
+                [0.0; MAX_CHANNELS]
+            };
+            let matrix_decode = if self.current.matrix_decode_mix > f32::EPSILON {
+                self.matrix_decode
+                    .process(left, right, self.current.lfe_alpha, channels)
+            } else {
+                [0.0; MAX_CHANNELS]
+            };
             for channel in 0..channels {
                 let coefficient = channel * 2;
                 let mut sample = left * self.current.matrix[coefficient]
                     + right * self.current.matrix[coefficient + 1];
-                if channel == CHANNEL_LFE as usize && self.current.algorithm != ALGORITHM_FRONT_ONLY
+                if channel == CHANNEL_LFE as usize
+                    && self.current.algorithm != ALGORITHM_FRONT_ONLY
+                    && self.current.matrix_decode_mix < 1.0
+                    && self.current.music_detail_mix < 1.0
                 {
                     self.lfe_state += self.current.lfe_alpha * (sample - self.lfe_state);
                     sample = self.lfe_state;
+                }
+                if self.current.matrix_decode_mix > 0.0 {
+                    sample += (matrix_decode[channel] - sample) * self.current.matrix_decode_mix;
+                }
+                if self.current.music_detail_mix > 0.0 {
+                    sample += (music[channel] - sample) * self.current.music_detail_mix;
                 }
                 sample *= self.current.gain[channel];
                 if !sample.is_finite() {
@@ -743,6 +1014,8 @@ impl ChannelRouter {
         self.allpass_input_state.fill(0.0);
         self.allpass_output_state.fill(0.0);
         self.lfe_state = 0.0;
+        self.matrix_decode.reset();
+        self.music_detail.reset();
         self.telemetry.actual.store(0, Ordering::Release);
         for channel in 0..MAX_CHANNELS {
             self.telemetry.peak[channel].store(0.0_f32.to_bits(), Ordering::Release);

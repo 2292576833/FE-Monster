@@ -3,6 +3,7 @@
 #endif
 
 #include "fe_audio_pipeline.h"
+#include "fe_audio_spatial_layout.h"
 
 #include <windows.h>
 #include <unknwn.h>
@@ -188,7 +189,9 @@ FeAudioSpatialControlParams DefaultSpatialControls(const FeAudioPipelineConfig& 
         : 0u;
     params.upmix_algorithm = config.upmix_algorithm == 1
         ? 0u
-        : (config.upmix_algorithm == 3 ? 2u : 1u);
+        : (config.upmix_algorithm == 3
+            ? 2u
+            : (config.upmix_algorithm == 4 ? FE_RUST_UPMIX_MUSIC_DETAIL : 1u));
     params.upmix_output_channels = config.virtual_layout_channels == 8
         ? 8u
         : (config.virtual_layout_channels == 6 ? 6u : 2u);
@@ -211,7 +214,10 @@ bool IsValidSpatialControls(const FeAudioSpatialControlParams* params) {
     if (params == nullptr || params->struct_size < sizeof(*params)) return false;
     if (params->abi_version != FE_AUDIO_PIPELINE_ABI_VERSION) return false;
     if (params->upmix_enabled > 1 || params->obr_enabled > 1) return false;
-    if (params->upmix_algorithm > 2) return false;
+    if (params->upmix_algorithm > 2
+        && params->upmix_algorithm != FE_RUST_UPMIX_MUSIC_DETAIL) {
+        return false;
+    }
     if (params->upmix_output_channels != 6 && params->upmix_output_channels != 8) {
         return false;
     }
@@ -242,25 +248,41 @@ float LinearGainToDb(float gain) {
 bool SpatialAlgorithmUsesChannelRouter(const FeAudioSpatialControlParams& spatial) {
     // Preserve the established spatial-control ABI: 0 is OxiMedia Passive
     // FFT, not the additive router's FRONT_ONLY id. Matrix (1) and Ambient
-    // (2) intentionally share ids with the new router and can take the new
-    // production path without changing the Java/UI contract.
+    // (2) intentionally share ids with the new router. MusicDetail (4) is an
+    // additive allocation-free router mode; Passive remains on the legacy FFT
+    // implementation for persisted-profile compatibility.
     return spatial.upmix_algorithm == FE_RUST_UPMIX_MATRIX_DECODE
-        || spatial.upmix_algorithm == FE_RUST_UPMIX_AMBIENT_EXTRACT;
+        || spatial.upmix_algorithm == FE_RUST_UPMIX_AMBIENT_EXTRACT
+        || spatial.upmix_algorithm == FE_RUST_UPMIX_MUSIC_DETAIL;
 }
 
 FeRustChannelRouterParams ChannelRouterParamsFromSpatial(
     const FeAudioSpatialControlParams& spatial
 ) {
+    // The public spatial controls retain the established matrix coefficients
+    // (0.707 centre/LFE and 0.5 surround) as their neutral values. The new
+    // channel router already owns the actual decode coefficients, so applying
+    // those values a second time would attenuate the virtual bed by 3-6 dB.
+    // Convert them to relative trim before handing them to the router.
+    constexpr float kNeutralCenterGain = 0.707f;
+    constexpr float kNeutralSurroundGain = 0.5f;
+    constexpr float kNeutralLfeGain = 0.707f;
     FeRustChannelRouterParams params{};
     params.struct_size = sizeof(params);
     params.abi_version = FE_RUST_CHANNEL_ROUTER_ABI_VERSION;
     params.output_channels = spatial.upmix_output_channels;
     params.algorithm = spatial.upmix_algorithm;
     params.lfe_crossover_hz = spatial.upmix_lfe_crossover_hz;
-    params.channel_gain_db[2] = LinearGainToDb(spatial.upmix_center_gain);
-    params.channel_gain_db[3] = LinearGainToDb(spatial.upmix_lfe_gain);
+    params.channel_gain_db[2] = LinearGainToDb(
+        spatial.upmix_center_gain / kNeutralCenterGain
+    );
+    params.channel_gain_db[3] = LinearGainToDb(
+        spatial.upmix_lfe_gain / kNeutralLfeGain
+    );
     for (uint32_t channel = 4; channel < spatial.upmix_output_channels; ++channel) {
-        params.channel_gain_db[channel] = LinearGainToDb(spatial.upmix_surround_gain);
+        params.channel_gain_db[channel] = LinearGainToDb(
+            spatial.upmix_surround_gain / kNeutralSurroundGain
+        );
     }
     if (spatial.upmix_output_channels == 8) {
         const std::array<float, 8> azimuths{
@@ -1654,12 +1676,19 @@ public:
         if (interleaved_pcm == nullptr || frame_count == 0) return E_INVALIDARG;
         if (!running_.load() || source_voice_ == nullptr) return E_HANDLE;
 
-        std::lock_guard<std::mutex> spatial_guard(spatial_control_mutex_);
-
-        const bool submission_rust_upmixed = SpatialUpmixEnabled()
-            && frame_count <= kFramesPerTransportBatch
-            && TryRustUpmixBlock(interleaved_pcm, frame_count);
-        const uint64_t submission_upmix_generation = upmix_generation_;
+        // Serialize transport scratch ownership, but never make the UI/control
+        // plane wait behind XAudio2 queue backpressure. The short spatial lock
+        // below protects only DSP state and is reacquired for each render block.
+        std::lock_guard<std::mutex> submit_guard(submit_mutex_);
+        bool submission_rust_upmixed = false;
+        uint64_t submission_upmix_generation = 0;
+        {
+            std::lock_guard<std::mutex> spatial_guard(spatial_control_mutex_);
+            submission_rust_upmixed = SpatialUpmixEnabled()
+                && frame_count <= kFramesPerTransportBatch
+                && TryRustUpmixBlock(interleaved_pcm, frame_count);
+            submission_upmix_generation = upmix_generation_;
+        }
         uint32_t source_offset = 0;
         while (source_offset < frame_count) {
             const uint32_t frames_this_block = std::min(
@@ -1693,26 +1722,32 @@ public:
             }
             const float* block = interleaved_pcm
                 + static_cast<size_t>(source_offset) * input_channels_;
-            // A transition may rebuild/clear the upmix scratch at the end of
-            // any 256-frame render block. The generation guard preserves the
-            // one-Rust-call-per-transport fast path without carrying stale
-            // scratch ownership into the next effective route.
-            const bool block_rust_upmixed = submission_rust_upmixed
-                && submission_upmix_generation == upmix_generation_
-                && SpatialUpmixEnabled();
             HRESULT result = S_OK;
-            if (mode_ == FE_AUDIO_MODE_OBR_BINAURAL) {
-                result = RenderSpatialBlock(
-                    block,
-                    frames_this_block,
-                    source_offset,
-                    block_rust_upmixed,
-                    &rendered->samples
-                );
-            } else if (mode_ == FE_AUDIO_MODE_X3D_SPEAKER) {
-                result = RenderX3dSpeakerBlock(block, frames_this_block, &rendered->samples);
-            } else {
-                result = RenderDryBlock(block, frames_this_block, &rendered->samples);
+            {
+                std::lock_guard<std::mutex> spatial_guard(spatial_control_mutex_);
+                // A control commit may rebuild/clear the upmix scratch while
+                // Submit is waiting for queue space. The generation guard
+                // prevents stale batch scratch from crossing that boundary.
+                const bool block_rust_upmixed = submission_rust_upmixed
+                    && submission_upmix_generation == upmix_generation_
+                    && SpatialUpmixEnabled();
+                if (mode_ == FE_AUDIO_MODE_OBR_BINAURAL) {
+                    result = RenderSpatialBlock(
+                        block,
+                        frames_this_block,
+                        source_offset,
+                        block_rust_upmixed,
+                        &rendered->samples
+                    );
+                } else if (mode_ == FE_AUDIO_MODE_X3D_SPEAKER) {
+                    result = RenderX3dSpeakerBlock(
+                        block,
+                        frames_this_block,
+                        &rendered->samples
+                    );
+                } else {
+                    result = RenderDryBlock(block, frames_this_block, &rendered->samples);
+                }
             }
             if (FAILED(result)) {
                 ReleaseBuffer(rendered);
@@ -1938,8 +1973,14 @@ private:
         bool legacy_upmix_ready = false;
         bool channel_router_ready = false;
         if (SpatialUpmixEnabled() && (input_channels_ == 1 || input_channels_ == 2)) {
-            const bool should_initialize_channel_router = channel_router_params_present_
-                || SpatialAlgorithmUsesChannelRouter(spatial_controls_);
+            // Algorithm 0 is the legacy passive/OxiMedia upmixer. A retained
+            // advanced-channel snapshot must not silently replace it after a
+            // graph rebuild. Explicit channel controls remain available for
+            // every non-passive router algorithm.
+            const bool should_initialize_channel_router =
+                SpatialAlgorithmUsesChannelRouter(spatial_controls_)
+                || (channel_router_params_present_
+                    && spatial_controls_.upmix_algorithm != 0);
             if (should_initialize_channel_router
                 && rust_channel_router_.Initialize(sample_rate_, virtual_channels_)) {
                 const FeRustChannelRouterParams router_params = channel_router_params_present_
@@ -1994,6 +2035,10 @@ private:
         obr_input_.reset();
         obr_renderer_.reset();
         obr_applied_position_count_ = 0;
+        obr_distance_lpf_state_.fill(0.0f);
+        obr_input_headroom_gain_ = 1.0f / std::sqrt(static_cast<float>(
+            std::max(1u, SpatialBedChannels())
+        ));
         std::fill(obr_dry_delay_line_.begin(), obr_dry_delay_line_.end(), 0.0f);
         obr_dry_delay_cursor_ = 0;
         if (SpatialObrEnabled()) {
@@ -2136,7 +2181,12 @@ private:
             refreshed.reserve(sample_count);
             const auto azimuths = EffectiveLayoutAzimuths(sample_count);
             for (uint32_t channel = 0; channel < sample_count; ++channel) {
-                refreshed.push_back(CalculateSpatialSample(snapshot.pose, azimuths[channel]));
+                refreshed.push_back(CalculateSpatialSample(
+                    snapshot.pose,
+                    sample_count,
+                    channel,
+                    azimuths[channel]
+                ));
             }
             spatial_cache_ = std::move(refreshed);
             spatial_cache_revision_ = snapshot.revision;
@@ -2174,7 +2224,12 @@ private:
         return azimuths;
     }
 
-    SpatialSample CalculateSpatialSample(const FeAudioPose& pose, float layout_azimuth) {
+    SpatialSample CalculateSpatialSample(
+        const FeAudioPose& pose,
+        uint32_t layout_channels,
+        uint32_t channel,
+        float layout_azimuth
+    ) {
         X3DAUDIO_LISTENER listener{};
         listener.Position = {pose.listener_x, pose.listener_y, pose.listener_z};
         listener.Velocity = {
@@ -2197,14 +2252,18 @@ private:
             layout_azimuth * spatial_controls_.obr_spatial_width,
             360.0f
         );
-        const float angle = target_azimuth * kPi / 180.0f;
+        const fe::audio::SpatialBedObjectPose object_pose =
+            fe::audio::DefaultSpatialBedObjectPose(layout_channels, channel);
+        const float azimuth_radians = target_azimuth * kPi / 180.0f;
+        const float elevation_radians = object_pose.elevation * kPi / 180.0f;
+        const float horizontal_distance = object_pose.distance * std::cos(elevation_radians);
         X3DAUDIO_EMITTER emitter{};
         emitter.Position = mode_ == FE_AUDIO_MODE_X3D_SPEAKER
             ? X3DAUDIO_VECTOR{pose.emitter_x, pose.emitter_y, pose.emitter_z}
             : X3DAUDIO_VECTOR{
-                listener.Position.x - std::sin(angle),
-                listener.Position.y,
-                listener.Position.z + std::cos(angle)
+                listener.Position.x - std::sin(azimuth_radians) * horizontal_distance,
+                listener.Position.y + std::sin(elevation_radians) * object_pose.distance,
+                listener.Position.z + std::cos(azimuth_radians) * horizontal_distance
             };
         emitter.Velocity = {
             pose.emitter_velocity_x,
@@ -2214,7 +2273,9 @@ private:
         emitter.OrientFront = {0.0f, 0.0f, 1.0f};
         emitter.OrientTop = {0.0f, 1.0f, 0.0f};
         emitter.ChannelCount = 1;
-        emitter.CurveDistanceScaler = 1.0f;
+        emitter.CurveDistanceScaler = mode_ == FE_AUDIO_MODE_X3D_SPEAKER
+            ? 1.0f
+            : fe::audio::kSpatialDistanceCurveScaleMeters;
         emitter.DopplerScaler = 1.0f;
 
         SpatialSample result{};
@@ -2245,9 +2306,9 @@ private:
                 std::sqrt(dx * dx + dz * dz)
             ) * 180.0f / kPi;
         } else {
-            result.distance = 1.0f;
+            result.distance = object_pose.distance;
             result.azimuth = target_azimuth;
-            result.elevation = 0.0f;
+            result.elevation = object_pose.elevation;
         }
         result.doppler = ClampFinite(settings.DopplerFactor, 0.5f, 2.0f, 1.0f);
         result.lpf_direct = ClampFinite(settings.LPFDirectCoefficient, 0.0f, 1.0f, 1.0f);
@@ -2828,13 +2889,19 @@ private:
                 rendered->data()
             );
             if (SpatialUpmixEnabled()) {
-                // Matrix-decode distributes stereo energy across the virtual
-                // bed; restore its measured energy after the normalized fold.
-                constexpr float kUpmixFoldCalibration = 1.25f;
+                const bool matrix_decode = channel_router_active_
+                    && (channel_router_params_present_
+                        ? channel_router_params_.algorithm
+                            == FE_RUST_UPMIX_MATRIX_DECODE
+                        : spatial_controls_.upmix_algorithm
+                            == FE_RUST_UPMIX_MATRIX_DECODE);
+                const float fold_calibration = matrix_decode
+                    ? fe::audio::kSpatialMatrixDecodeStereoFoldCalibration
+                    : fe::audio::kSpatialUpmixStereoFoldCalibration;
                 for (uint32_t frame = 0; frame < frames; ++frame) {
                     const size_t base = static_cast<size_t>(frame) * 2u;
-                    (*rendered)[base] *= kUpmixFoldCalibration;
-                    (*rendered)[base + 1] *= kUpmixFoldCalibration;
+                    (*rendered)[base] *= fold_calibration;
+                    (*rendered)[base + 1] *= fold_calibration;
                 }
             }
             ApplyOutputSafetyLimiter(rendered, frames);
@@ -2850,7 +2917,18 @@ private:
         }
 
         const bool positions_changed = obr_position_revision_ != spatial_cache_generation_;
-        const float obr_headroom = 1.0f / std::sqrt(static_cast<float>(bed_channels));
+        const float obr_headroom_target = fe::audio::SpatialObrBlockInputHeadroom(
+            bed_source,
+            frames,
+            bed_channels
+        );
+        obr_input_headroom_gain_ = fe::audio::SmoothSpatialObrInputHeadroom(
+            obr_input_headroom_gain_,
+            obr_headroom_target,
+            frames,
+            sample_rate_
+        );
+        const float obr_headroom = obr_input_headroom_gain_;
         for (uint32_t channel = 0; channel < bed_channels; ++channel) {
             const SpatialSample& spatial = spatial_cache_[channel];
             if (channel == 0) {
@@ -2882,10 +2960,15 @@ private:
                 const float sample = bed_source[
                     static_cast<size_t>(frame) * bed_channels + channel
                 ];
+                const float filter_alpha = fe::audio::X3dDirectLpfOnePoleAlpha(
+                    spatial.lpf_direct
+                );
+                float& distance_filter_state = obr_distance_lpf_state_[channel];
+                distance_filter_state += filter_alpha * (sample - distance_filter_state);
                 // Linear pre/post normalization preserves the renderer transfer
                 // while preventing coherent object sums from driving OBR's
                 // internal emergency limiter on ordinary full-scale material.
-                output_channel[frame] = sample * obr_headroom;
+                output_channel[frame] = distance_filter_state * obr_headroom;
             }
         }
         if (positions_changed) obr_position_revision_ = spatial_cache_generation_;
@@ -2917,12 +3000,20 @@ private:
         const std::vector<float>& dry_for_mix = mixed_wet_and_dry
             ? LatencyAlignedObrDry(frames)
             : stereo_dry_scratch_;
-        const float route_calibration = SpatialUpmixEnabled() ? 0.90f : 0.99f;
+        const float route_calibration = SpatialUpmixEnabled()
+            ? fe::audio::kSpatialObrUpmixRouteCalibration
+            : fe::audio::kSpatialObrStereoRouteCalibration;
         const float output_gain = route_calibration * std::pow(
             10.0f,
             spatial_controls_.obr_output_gain_db / 20.0f
         );
-        const float obr_compensation = std::sqrt(static_cast<float>(bed_channels));
+        const bool matrix_decode = SpatialUpmixEnabled()
+            && channel_router_active_
+            && (channel_router_params_present_
+                ? channel_router_params_.algorithm == FE_RUST_UPMIX_MATRIX_DECODE
+                : spatial_controls_.upmix_algorithm == FE_RUST_UPMIX_MATRIX_DECODE);
+        const float obr_compensation = std::sqrt(static_cast<float>(bed_channels))
+            * (matrix_decode ? fe::audio::kSpatialObrMatrixDecodeMakeup : 1.0f);
         for (uint32_t frame = 0; frame < kFramesPerRenderBlock; ++frame) {
             if (frame >= frames) break;
             const size_t base = static_cast<size_t>(frame) * 2u;
@@ -3033,6 +3124,7 @@ private:
         spatial_cache_uses_explicit_router_ = false;
         spatial_cache_generation_ = 0;
         obr_position_revision_ = 0;
+        obr_distance_lpf_state_.fill(0.0f);
         if (mastering_voice_ != nullptr) {
             mastering_voice_->DestroyVoice();
             mastering_voice_ = nullptr;
@@ -3093,6 +3185,7 @@ private:
     std::vector<float> obr_dry_delay_line_;
     uint32_t obr_dry_delay_cursor_ = 0;
     const bool probe_disable_obr_dry_alignment_ = false;
+    std::mutex submit_mutex_;
     std::mutex mixer_control_mutex_;
     FeRustMixerParams mixer_committed_params_{};
     bool mixer_committed_params_present_ = false;
@@ -3112,6 +3205,7 @@ private:
     bool spatial_transition_retry_required_ = false;
     bool spatial_transition_retry_requested_ = false;
     float output_limiter_gain_ = 1.0f;
+    float obr_input_headroom_gain_ = 1.0f;
     mutable std::mutex pose_mutex_;
     FeAudioPose pose_{};
     uint64_t pose_revision_ = 1;
@@ -3121,6 +3215,7 @@ private:
     uint64_t spatial_cache_generation_ = 0;
     uint64_t obr_position_revision_ = 0;
     std::array<float, 8> obr_applied_azimuths_{};
+    std::array<float, 8> obr_distance_lpf_state_{};
     uint32_t obr_applied_position_count_ = 0;
     std::vector<SpatialSample> spatial_cache_;
     std::mutex buffer_mutex_;

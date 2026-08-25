@@ -823,7 +823,7 @@ await new Promise((resolve) => setTimeout(resolve, 5));
 assert.equal(activeIframe.contentWindow.messages.length, messageCountAfterDeactivate, 'inactive scenes must not receive audio frames');
 
 const runtimeHtml = fs.readFileSync(path.join(assetRoot, 'runtime.html'), 'utf8');
-assert.match(runtimeHtml, /<script\s+src="bridge\.js\?v=20260820-webview-gc-loader-2"><\/script>/);
+assert.match(runtimeHtml, /<script\s+src="bridge\.js\?v=20260825-search-hover-bridge-1"><\/script>/);
 assert.doesNotMatch(
   runtimeHtml,
   /<script[^>]+src="assets\/index-CSU_B_T9\.js"/,
@@ -1122,6 +1122,16 @@ assert.deepEqual(
     .map(({ message }) => message.gesture.kind),
   ['pointerdown', 'pointermove', 'pointerup'],
   'a gesture mode chosen on pointerdown must survive crossing into the player until pointerup'
+);
+const hoverGestureStart = parentMessages.length;
+dispatchChildPointer('pointermove', ordinaryTarget, { pointerId: 18, clientX: 500, clientY: 12, buttons: 0 });
+flushChildAnimationFrame(childFrameTimestamp + 16);
+assert.deepEqual(
+  parentMessages.slice(hoverGestureStart)
+    .filter(({ message }) => message.type === 'gesture')
+    .map(({ message }) => message.gesture.kind),
+  ['pointermove'],
+  'hover motion without pointerdown must cross the iframe bridge so parent chrome hot-zones remain usable'
 );
 
 console.log('soundscape Workshop assets, isolated lifecycle, batching, persistence, and performance guards are valid');

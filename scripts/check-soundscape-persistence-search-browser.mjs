@@ -396,7 +396,9 @@ try {
       endWindowDragGesture();
     }
   })()`, true);
-  await command('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 640, y: 34 });
+  await command('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 120, y: 320, pointerType: 'mouse' });
+  await delay(40);
+  await command('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 640, y: 34, pointerType: 'mouse' });
   await delay(180);
   const soundscapeSearch = await evaluate(`({
     active: state.diyPreset,
@@ -462,8 +464,8 @@ try {
     restartRestoresSelectedScene: restoredScene.active === 'chladni'
       && restoredScene.scenePreset === 'chladni'
       && restoredScene.stored === 'chladni',
-    soundscapeSearchVisibleWithoutHover: soundscapeSearchBeforeHover.active === 'soundscape-workshop'
-      && soundscapeSearchBeforeHover.searchVisible === true
+    soundscapeSearchAutoHidesWithoutHover: soundscapeSearchBeforeHover.active === 'soundscape-workshop'
+      && soundscapeSearchBeforeHover.searchVisible === false
       && soundscapeSearchBeforeHover.searchPeek === false,
     soundscapeSearchVisible: soundscapeSearch.active === 'soundscape-workshop'
       && soundscapeSearch.searchVisible === true

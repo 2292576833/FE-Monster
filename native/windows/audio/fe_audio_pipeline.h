@@ -53,7 +53,7 @@ typedef struct FeAudioPipelineConfig {
     uint32_t muted;
     uint32_t max_queued_buffers;
     // 0 = default (OxiMedia MatrixDecode), 1 = Passive,
-    // 2 = MatrixDecode, 3 = AmbientExtract.
+    // 2 = MatrixDecode, 3 = AmbientExtract, 4 = MusicDetail.
     uint32_t upmix_algorithm;
 } FeAudioPipelineConfig;
 
@@ -87,7 +87,7 @@ typedef struct FeAudioSpatialControlParams {
     uint32_t struct_size;
     uint32_t abi_version;
     uint32_t upmix_enabled;
-    /* Existing ABI: 0=Passive FFT, 1=MatrixDecode, 2=AmbientExtract. */
+    /* 0=Passive FFT, 1=MatrixDecode, 2=AmbientExtract, 4=MusicDetail. */
     uint32_t upmix_algorithm;
     uint32_t upmix_output_channels;
     float upmix_center_width_hz;
