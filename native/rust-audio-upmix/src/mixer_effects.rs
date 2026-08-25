@@ -213,6 +213,7 @@ impl EffectsDerivedParameters {
                     center_log2_hz: control
                         .phaser
                         .center_frequency_hz
+                        .max(20.0)
                         .min(sample_rate * 0.45)
                         .log2(),
                     feedback: control.phaser.feedback,
@@ -432,6 +433,242 @@ struct Flanger {
     sample_rate: f32,
 }
 
+#[derive(Clone, Copy, Default)]
+struct AllPassState {
+    x1: f32,
+    y1: f32,
+}
+
+struct PhaserCoefficientTable {
+    values: [f32; SINE_TABLE_SIZE],
+    minimum_log2_hz: f32,
+    maximum_log2_hz: f32,
+}
+
+impl PhaserCoefficientTable {
+    fn new(sample_rate: f32) -> Self {
+        let minimum_log2_hz = 20.0_f32.log2();
+        let maximum_log2_hz = (sample_rate * 0.45).max(20.0).log2();
+        let values = std::array::from_fn(|index| {
+            let position = index as f32 / (SINE_TABLE_SIZE - 1) as f32;
+            let log_frequency = minimum_log2_hz
+                + (maximum_log2_hz - minimum_log2_hz) * position;
+            let frequency = 2.0_f32.powf(log_frequency);
+            let tangent = (PI * frequency / sample_rate).tan();
+            ((1.0 - tangent) / (1.0 + tangent)).clamp(-0.999, 0.999)
+        });
+        Self {
+            values,
+            minimum_log2_hz,
+            maximum_log2_hz,
+        }
+    }
+
+    fn lookup_log2(&self, log_frequency: f32) -> f32 {
+        let position = (log_frequency - self.minimum_log2_hz)
+            / (self.maximum_log2_hz - self.minimum_log2_hz)
+            * (self.values.len() - 1) as f32;
+        let lower = position.floor() as usize;
+        let upper = (lower + 1).min(self.values.len() - 1);
+        let fraction = position - lower as f32;
+        self.values[lower] + (self.values[upper] - self.values[lower]) * fraction
+    }
+}
+
+struct Phaser {
+    stages: [[AllPassState; 6]; MAX_CHANNELS],
+    feedback: [f32; MAX_CHANNELS],
+    phase: f32,
+    active_mix: f32,
+}
+
+impl Phaser {
+    fn new() -> Self {
+        Self {
+            stages: [[AllPassState::default(); 6]; MAX_CHANNELS],
+            feedback: [0.0; MAX_CHANNELS],
+            phase: 0.0,
+            active_mix: 0.0,
+        }
+    }
+
+    fn process(
+        &mut self,
+        frame: &mut [f32],
+        parameters: PhaserFrameParameters,
+        sine_table: &SineTable,
+        coefficients: &PhaserCoefficientTable,
+    ) {
+        let channels = frame.len();
+        self.active_mix = if parameters.enabled {
+            finite_or_zero(parameters.mix).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        if parameters.enabled {
+            let feedback = finite_or_zero(parameters.feedback).clamp(-0.98, 0.98);
+            for channel in 0..channels {
+                if is_lfe(channels, channel) {
+                    continue;
+                }
+                let dry = finite_or_zero(frame[channel]);
+                let lfo = sine_table.lookup(self.phase + pair_phase_offset(channels, channel));
+                let log_frequency = (parameters.center_log2_hz
+                    + lfo * finite_or_zero(parameters.depth) * 2.0)
+                    .clamp(coefficients.minimum_log2_hz, coefficients.maximum_log2_hz);
+                let coefficient = coefficients.lookup_log2(log_frequency);
+                let mut wet = finite_or_zero(dry + self.feedback[channel] * feedback);
+                for state in &mut self.stages[channel] {
+                    let output = -coefficient * wet + state.x1 + coefficient * state.y1;
+                    state.x1 = wet;
+                    state.y1 = finite_or_zero(output);
+                    wet = state.y1;
+                }
+                self.feedback[channel] = wet;
+                frame[channel] = finite_or_zero(dry_wet(dry, wet, self.active_mix));
+            }
+        }
+        self.phase = (self.phase + finite_or_zero(parameters.phase_increment)).rem_euclid(TAU);
+    }
+
+    fn reset(&mut self) {
+        self.stages = [[AllPassState::default(); 6]; MAX_CHANNELS];
+        self.feedback = [0.0; MAX_CHANNELS];
+        self.phase = 0.0;
+        self.active_mix = 0.0;
+    }
+}
+
+struct StereoDelay {
+    delay: FractionalDelayBank,
+    feedback_lowpass: [f32; MAX_CHANNELS],
+    transition_handoff: [f32; MAX_CHANNELS],
+    last_wet: [f32; MAX_CHANNELS],
+    from_delay_samples: f32,
+    to_delay_samples: f32,
+    transition_remaining: usize,
+    transition_total: usize,
+}
+
+impl StereoDelay {
+    fn new(sample_rate: f32) -> Self {
+        Self {
+            delay: FractionalDelayBank::new(MAX_CHANNELS, delay_stride(sample_rate, 1_000.0)),
+            feedback_lowpass: [0.0; MAX_CHANNELS],
+            transition_handoff: [0.0; MAX_CHANNELS],
+            last_wet: [0.0; MAX_CHANNELS],
+            from_delay_samples: 0.0,
+            to_delay_samples: 0.0,
+            transition_remaining: 0,
+            transition_total: (sample_rate * 0.020).round() as usize,
+        }
+    }
+
+    fn current_delay_samples(&self) -> f32 {
+        if self.transition_remaining == 0 {
+            return self.to_delay_samples;
+        }
+        let t = 1.0 - self.transition_remaining as f32 / self.transition_total as f32;
+        let smoothstep = t * t * (3.0 - 2.0 * t);
+        self.from_delay_samples + (self.to_delay_samples - self.from_delay_samples) * smoothstep
+    }
+
+    fn update_target(&mut self, target_delay_samples: f32) {
+        let target = finite_or_zero(target_delay_samples)
+            .clamp(0.0, (self.delay.stride - 2) as f32);
+        if (target - self.to_delay_samples).abs() <= f32::EPSILON {
+            return;
+        }
+        self.from_delay_samples = self.current_delay_samples();
+        self.to_delay_samples = target;
+        self.transition_remaining = self.transition_total;
+        self.transition_handoff = self.last_wet;
+    }
+
+    fn read_smoothed(&self, channel: usize) -> f32 {
+        if self.transition_remaining == 0 {
+            return finite_or_zero(self.delay.read_linear(channel, self.to_delay_samples));
+        }
+        let t = 1.0 - self.transition_remaining as f32 / self.transition_total as f32;
+        let smoothstep = t * t * (3.0 - 2.0 * t);
+        let from = self.delay.read_linear(channel, self.from_delay_samples);
+        let to = self.delay.read_linear(channel, self.to_delay_samples);
+        let taps = finite_or_zero(from + (to - from) * smoothstep);
+        finite_or_zero(
+            self.transition_handoff[channel]
+                + (taps - self.transition_handoff[channel]) * smoothstep,
+        )
+    }
+
+    fn process(&mut self, frame: &mut [f32], parameters: DelayFrameParameters) {
+        self.update_target(parameters.target_delay_samples);
+        let channels = frame.len();
+        if parameters.enabled {
+            let mut dry = [0.0; MAX_CHANNELS];
+            let mut delayed = [0.0; MAX_CHANNELS];
+            let mut feedback_input = [0.0; MAX_CHANNELS];
+            for channel in 0..channels {
+                if is_lfe(channels, channel) {
+                    continue;
+                }
+                dry[channel] = finite_or_zero(frame[channel]);
+                delayed[channel] = self.read_smoothed(channel);
+                self.last_wet[channel] = delayed[channel];
+            }
+
+            let ping_pong = finite_or_zero(parameters.ping_pong).clamp(0.0, 1.0);
+            for channel in 0..channels {
+                if is_lfe(channels, channel) {
+                    continue;
+                }
+                match pair_for_channel(channels, channel) {
+                    Some((left, right)) if channel == left => {
+                        feedback_input[left] = delayed[left] * (1.0 - ping_pong)
+                            + delayed[right] * ping_pong;
+                        feedback_input[right] = delayed[right] * (1.0 - ping_pong)
+                            + delayed[left] * ping_pong;
+                    }
+                    Some(_) => {}
+                    None => feedback_input[channel] = delayed[channel],
+                }
+            }
+
+            let damping_alpha = finite_or_zero(parameters.damping_alpha).clamp(0.0, 1.0);
+            let feedback = finite_or_zero(parameters.feedback).clamp(-0.98, 0.98);
+            for channel in 0..channels {
+                if is_lfe(channels, channel) {
+                    continue;
+                }
+                self.feedback_lowpass[channel] +=
+                    (feedback_input[channel] - self.feedback_lowpass[channel]) * damping_alpha;
+                self.delay.write(
+                    channel,
+                    finite_or_zero(dry[channel] + self.feedback_lowpass[channel] * feedback),
+                );
+                frame[channel] = finite_or_zero(dry_wet(
+                    dry[channel],
+                    delayed[channel],
+                    finite_or_zero(parameters.mix),
+                ));
+            }
+        }
+        if self.transition_remaining > 0 {
+            self.transition_remaining -= 1;
+        }
+        self.delay.advance();
+    }
+
+    fn reset(&mut self) {
+        self.delay.reset();
+        self.feedback_lowpass = [0.0; MAX_CHANNELS];
+        self.transition_handoff = [0.0; MAX_CHANNELS];
+        self.last_wet = [0.0; MAX_CHANNELS];
+        self.from_delay_samples = 0.0;
+        self.to_delay_samples = 0.0;
+        self.transition_remaining = 0;
+    }
+}
+
 fn delay_stride(sample_rate: f32, maximum_delay_ms: f32) -> usize {
     (sample_rate * maximum_delay_ms * 0.001).ceil() as usize + 2
 }
@@ -538,7 +775,10 @@ impl Flanger {
 pub(crate) struct EffectsRack {
     chorus: Chorus,
     flanger: Flanger,
+    phaser: Phaser,
+    delay: StereoDelay,
     sine_table: SineTable,
+    phaser_coefficients: PhaserCoefficientTable,
 }
 
 impl EffectsRack {
@@ -546,7 +786,10 @@ impl EffectsRack {
         Self {
             chorus: Chorus::new(sample_rate),
             flanger: Flanger::new(sample_rate),
+            phaser: Phaser::new(),
+            delay: StereoDelay::new(sample_rate),
             sine_table: SineTable::new(),
+            phaser_coefficients: PhaserCoefficientTable::new(sample_rate),
         }
     }
 
@@ -555,6 +798,8 @@ impl EffectsRack {
     pub(crate) fn reset(&mut self) {
         self.chorus.reset();
         self.flanger.reset();
+        self.phaser.reset();
+        self.delay.reset();
     }
 
     pub(crate) fn process_frame(
@@ -569,7 +814,33 @@ impl EffectsRack {
             .process(frame, parameters.chorus, &self.sine_table);
         self.flanger
             .process(frame, parameters.flanger, &self.sine_table);
+        self.phaser.process(
+            frame,
+            parameters.phaser,
+            &self.sine_table,
+            &self.phaser_coefficients,
+        );
+        self.delay.process(frame, parameters.delay);
         true
+    }
+
+    #[cfg(test)]
+    fn phaser_stage_count(&self) -> usize {
+        self.phaser.stages[0].len()
+    }
+
+    #[cfg(test)]
+    fn delay_transition_remaining(&self) -> usize {
+        self.delay.transition_remaining
+    }
+
+    #[cfg(test)]
+    fn delay_storage_identity(&self) -> (*const f32, usize, usize) {
+        (
+            self.delay.delay.samples.as_ptr(),
+            self.delay.delay.samples.capacity(),
+            self.delay.delay.write_position,
+        )
     }
 }
 
@@ -697,6 +968,130 @@ mod tests {
             assert!(
                 early_peak > late_peak,
                 "tail did not decay at {sample_rate} Hz: {early_peak} <= {late_peak}"
+            );
+        }
+    }
+
+    #[test]
+    fn phaser_has_six_stable_allpass_stages_per_non_lfe_channel() {
+        let mut rack = EffectsRack::new(48_000.0);
+        let input = sine_input(48_000 * 3, 8, 48_000.0);
+        let baseline_lfe = channel_samples(&input, 8, 3);
+        let mut control = EffectControlParameters::default();
+        control.phaser = PhaserControl::new(true, 0.22, 0.55, 900.0, 0.25, 0.34);
+        let rendered = render(&mut rack, input.clone(), 8, prepared(control, 48_000.0));
+        assert_eq!(rack.phaser_stage_count(), 6);
+        assert!(rendered.iter().all(|sample| sample.is_finite()));
+        assert_ne!(channel_samples(&rendered, 8, 0), channel_samples(&input, 8, 0));
+        assert_eq!(channel_samples(&rendered, 8, 3), baseline_lfe);
+    }
+
+    #[test]
+    fn ping_pong_delay_crosses_pairs_but_never_lfe() {
+        for (left, right) in [(0, 1), (4, 5), (6, 7)] {
+            let mut rack = EffectsRack::new(48_000.0);
+            let input = impulse(24_000, 8, left);
+            let baseline_lfe = channel_samples(&input, 8, 3);
+            let mut control = EffectControlParameters::default();
+            control.delay = DelayControl::new(true, 100.0, 0.50, 1.0, 8_000.0, 1.0);
+            let rendered = render(&mut rack, input, 8, prepared(control, 48_000.0));
+            assert!(channel_samples(&rendered, 8, right)[4_800..]
+                .iter()
+                .any(|sample| sample.abs() > 0.1));
+            assert_eq!(channel_samples(&rendered, 8, 3), baseline_lfe);
+        }
+    }
+
+    #[test]
+    fn delay_automation_is_smooth_and_a_stable_target_uses_a_twenty_ms_transition() {
+        let sample_rate = 48_000.0;
+        let mut rack = EffectsRack::new(sample_rate);
+        let mut control = EffectControlParameters::default();
+        control.delay = DelayControl::new(true, 1.0, 0.45, 0.5, 8_000.0, 1.0);
+        let mut parameters = prepared(control, sample_rate);
+        let mut rendered = Vec::with_capacity(48_000 * 2);
+
+        for frame_index in 0..48_000 {
+            if frame_index % 64 == 0 {
+                control.delay.delay_ms = if (frame_index / 64) % 2 == 0 {
+                    1.0
+                } else {
+                    1_000.0
+                };
+                parameters = prepared(control, sample_rate);
+            }
+            let sample = (frame_index as f32 * 997.0 * TAU / sample_rate).sin() * 0.2;
+            let mut frame = [sample, sample];
+            assert!(rack.process_frame(&mut frame, parameters));
+            rendered.push(frame[0]);
+        }
+        let maximum_jump = rendered
+            .windows(2)
+            .map(|samples| (samples[1] - samples[0]).abs())
+            .fold(0.0_f32, f32::max);
+        assert!(maximum_jump < 0.25, "maximum jump was {maximum_jump}");
+
+        control.delay.delay_ms = 250.0;
+        parameters = prepared(control, sample_rate);
+        let transition_frames = (sample_rate * 0.020).round() as usize;
+        for _ in 0..transition_frames {
+            assert!(rack.process_frame(&mut [0.0, 0.0], parameters));
+        }
+        assert_eq!(rack.delay_transition_remaining(), 0);
+    }
+
+    #[test]
+    fn delay_storage_remains_fixed_for_every_supported_layout() {
+        for (sample_rate, channels) in [16_000.0, 48_000.0, 192_000.0]
+            .into_iter()
+            .flat_map(|sample_rate| [2, 6, 8].map(move |channels| (sample_rate, channels)))
+        {
+            let mut rack = EffectsRack::new(sample_rate);
+            let (pointer, capacity, write_position) = rack.delay_storage_identity();
+            let mut control = EffectControlParameters::default();
+            control.delay = DelayControl::new(true, 1_000.0, 0.75, 0.5, 8_000.0, 0.5);
+            let parameters = prepared(control, sample_rate);
+            let mut frame = vec![0.0; channels];
+            for _ in 0..(sample_rate * 10.0) as usize {
+                assert!(rack.process_frame(&mut frame, parameters));
+            }
+            assert_eq!(rack.delay_storage_identity().0, pointer);
+            assert_eq!(rack.delay_storage_identity().1, capacity);
+            assert_ne!(rack.delay_storage_identity().2, write_position);
+        }
+    }
+
+    #[test]
+    fn phaser_and_delay_tails_are_finite_and_decay_for_supported_rates_and_layouts() {
+        for (sample_rate, channels) in [16_000.0, 48_000.0, 192_000.0]
+            .into_iter()
+            .flat_map(|sample_rate| [2, 6, 8].map(move |channels| (sample_rate, channels)))
+        {
+            let frames = (sample_rate * 2.0) as usize;
+            let input = impulse(frames, channels, 0);
+            let baseline_lfe = if channels >= 6 {
+                Some(channel_samples(&input, channels, 3))
+            } else {
+                None
+            };
+            let mut rack = EffectsRack::new(sample_rate);
+            let mut control = EffectControlParameters::default();
+            control.phaser = PhaserControl::new(true, 0.22, 0.55, 900.0, 0.25, 0.34);
+            control.delay = DelayControl::new(true, 100.0, 0.75, 0.5, 8_000.0, 1.0);
+            let rendered = render(&mut rack, input, channels, prepared(control, sample_rate));
+            assert!(rendered.iter().all(|sample| sample.is_finite()));
+            if let Some(baseline_lfe) = baseline_lfe {
+                assert_eq!(channel_samples(&rendered, channels, 3), baseline_lfe);
+            }
+            let early_peak = ((sample_rate * 0.75) as usize..(sample_rate * 1.25) as usize)
+                .map(|frame| frame_peak(&rendered, channels, frame))
+                .fold(0.0_f32, f32::max);
+            let late_peak = ((sample_rate * 1.50) as usize..frames)
+                .map(|frame| frame_peak(&rendered, channels, frame))
+                .fold(0.0_f32, f32::max);
+            assert!(
+                early_peak > late_peak,
+                "tail did not decay at {sample_rate} Hz with {channels} channels: {early_peak} <= {late_peak}"
             );
         }
     }
