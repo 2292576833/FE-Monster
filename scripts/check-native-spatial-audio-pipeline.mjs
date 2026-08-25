@@ -145,6 +145,19 @@ assert.match(spatialRender, /LatencyAlignedObrDry/,
   'partial OBR wet\/dry blends must align the dry path to renderer latency');
 assert.match(spatialRender, /ApplyOutputSafetyLimiter/,
   'all spatial routes need one final linked safety limiter');
+const pipeline = source;
+const obrFillStart = pipeline.indexOf('auto output_channel = (*obr_input_)[channel]');
+const obrFillEnd = pipeline.indexOf('if (positions_changed) obr_position_revision_', obrFillStart);
+assert.ok(obrFillStart >= 0 && obrFillEnd > obrFillStart, 'OBR object-fill block missing');
+const obrFill = pipeline.slice(obrFillStart, obrFillEnd);
+assert.match(obrFill, /sample\s*\*\s*obr_headroom/);
+assert.doesNotMatch(obrFill, /X3dDirectLpfOnePoleAlpha|distance_filter_state/);
+const x3dSpeakerRender = source.slice(
+  source.indexOf('HRESULT RenderX3dSpeakerBlock('),
+  source.indexOf('bool MixerPendingForSpatialRevision()', source.indexOf('HRESULT RenderX3dSpeakerBlock('))
+);
+assert.match(x3dSpeakerRender, /SetFilterParameters\s*\(/,
+  'X3DAudio speaker mode must retain its point-source LPF');
 
 assert.match(probe, /left/i);
 assert.match(probe, /right/i);

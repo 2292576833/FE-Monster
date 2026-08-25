@@ -16,6 +16,7 @@
 #include <limits>
 #include <memory>
 #include <numeric>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -340,6 +341,49 @@ struct ObjectPosition {
     float elevation = 0.0f;
     float distance = 1.0f;
 };
+
+void Require(bool condition, const char* message) {
+    if (!condition) throw std::runtime_error(message);
+}
+
+void RequirePose(
+    uint32_t channels,
+    uint32_t channel,
+    float azimuth,
+    float elevation
+) {
+    const auto pose = fe::audio::DefaultSpatialBedObjectPose(channels, channel);
+    Require(std::abs(pose.azimuth - azimuth) <= 1.0e-6f, "canonical azimuth");
+    Require(std::abs(pose.elevation - elevation) <= 1.0e-6f, "canonical elevation");
+    Require(std::abs(pose.distance - 1.0f) <= 1.0e-6f, "canonical distance");
+}
+
+void VerifyCanonicalSpatialBed() {
+    constexpr float k51Azimuth[6] = {30, -30, 0, 0, 110, -110};
+    constexpr float k51Elevation[6] = {0, 0, 0, -30, 0, 0};
+    constexpr float k71Azimuth[8] = {30, -30, 0, 0, 135, -135, 90, -90};
+    constexpr float k71Elevation[8] = {0, 0, 0, -30, 0, 0, 0, 0};
+    for (uint32_t channel = 0; channel < 6; ++channel) {
+        RequirePose(6, channel, k51Azimuth[channel], k51Elevation[channel]);
+        Require(std::abs(fe::audio::SpatialBedAzimuthForWidth(
+            6, channel, k51Azimuth[channel], 1.0f) - k51Azimuth[channel]) <= 1.0e-6f,
+            "5.1 width 1 exact");
+    }
+    for (uint32_t channel = 0; channel < 8; ++channel) {
+        RequirePose(8, channel, k71Azimuth[channel], k71Elevation[channel]);
+        Require(std::abs(fe::audio::SpatialBedAzimuthForWidth(
+            8, channel, k71Azimuth[channel], 1.0f) - k71Azimuth[channel]) <= 1.0e-6f,
+            "7.1 width 1 exact");
+    }
+    Require(std::abs(fe::audio::SpatialBedAzimuthForWidth(8, 0, 30, 2) - 60) < 1e-6f,
+        "front expansion cap");
+    Require(std::abs(fe::audio::SpatialBedAzimuthForWidth(8, 6, 90, 2) - 120) < 1e-6f,
+        "side expansion cap");
+    Require(std::abs(fe::audio::SpatialBedAzimuthForWidth(8, 4, 135, 2) - 150) < 1e-6f,
+        "rear expansion cap");
+    Require(std::abs(fe::audio::SpatialBedAzimuthForWidth(6, 4, 110, 2) - 120) < 1e-6f,
+        "5.1 surround uses side sector");
+}
 
 std::array<ObjectPosition, 8> CurrentProductPositions() {
     std::array<ObjectPosition, 8> positions{};
@@ -978,23 +1022,18 @@ void PrintStereoMetrics(const char* name, const StereoMetrics& metrics) {
 }  // namespace
 
 int main() {
+    VerifyCanonicalSpatialBed();
     std::cout << std::fixed << std::setprecision(8);
     const auto positions = CurrentProductPositions();
     float minimum_azimuth = positions.front().azimuth;
     float maximum_azimuth = positions.front().azimuth;
     float minimum_distance = positions.front().distance;
     float maximum_distance = positions.front().distance;
-    std::vector<float> distance_tiers;
     for (const auto& position : positions) {
         minimum_azimuth = std::min(minimum_azimuth, position.azimuth);
         maximum_azimuth = std::max(maximum_azimuth, position.azimuth);
         minimum_distance = std::min(minimum_distance, position.distance);
         maximum_distance = std::max(maximum_distance, position.distance);
-        if (std::none_of(distance_tiers.begin(), distance_tiers.end(), [&](float distance) {
-                return std::abs(distance - position.distance) < 0.01f;
-            })) {
-            distance_tiers.push_back(position.distance);
-        }
     }
     const double angular_span = maximum_azimuth - minimum_azimuth;
     const auto official_positions = OfficialObrPositions(kVirtualChannels);
@@ -1033,9 +1072,6 @@ int main() {
     const std::vector<float> front_left = RenderDirectionalSignature(0);
     const std::vector<float> rear_left = RenderDirectionalSignature(4);
     const double front_rear_signature_correlation = NormalizedCorrelation(front_left, rear_left);
-    const double near_object_rms = RenderObjectRms({30.0f, 0.0f, minimum_distance});
-    const double far_object_rms = RenderObjectRms({30.0f, 0.0f, maximum_distance});
-    const double far_to_near_rms = far_object_rms / std::max(1.0e-12, near_object_rms);
     const ImpulseLatencyMetrics direct_latency = MeasureObrImpulseLatency(
         obr::BinauralFilterProfile::kDirect
     );
@@ -1110,11 +1146,9 @@ int main() {
         && std::abs(high.output.dc_left) < 0.001
         && std::abs(high.output.dc_right) < 0.001;
     const bool spatial_geometry_ok = angular_span >= 180.0
-        && maximum_target_azimuth_error <= 2.0
-        && distance_tiers.size() >= 4
-        && maximum_distance / std::max(0.01f, minimum_distance) >= 1.7f
-        && far_to_near_rms >= 0.40
-        && far_to_near_rms <= 0.65;
+        && maximum_target_azimuth_error <= 1.0e-6
+        && std::abs(minimum_distance - 1.0f) <= 1.0e-6f
+        && std::abs(maximum_distance - 1.0f) <= 1.0e-6f;
     const bool channel_distinction_ok = std::abs(front_rear_signature_correlation) <= 0.92;
     const bool transfer_linearity_ok = measured_level_ratio >= expected_level_ratio * 0.88;
     const bool distortion_ok = high.output.thd_ratio <= 0.01
@@ -1170,11 +1204,10 @@ int main() {
         << ",\"angularSpanDegrees\":" << angular_span
         << ",\"requiredSpanDegrees\":180.0"
         << ",\"maximumOfficialTargetErrorDegrees\":" << maximum_target_azimuth_error
-        << ",\"maximumAllowedTargetErrorDegrees\":2.0"
+        << ",\"maximumAllowedTargetErrorDegrees\":0.000001"
         << ",\"minimumDistanceMeters\":" << minimum_distance
         << ",\"maximumDistanceMeters\":" << maximum_distance
-        << ",\"distanceTierCount\":" << distance_tiers.size()
-        << ",\"farToNearRms\":" << far_to_near_rms << "},\n"
+        << ",\"canonicalDistanceMeters\":1.0},\n"
         << "  \"directionalIdentity\": {\"frontLeftVsRearLeftCorrelation\":"
         << front_rear_signature_correlation << ",\"maximumAllowed\":0.92},\n"
         << "  \"impulseLatency\": {"

@@ -2035,7 +2035,6 @@ private:
         obr_input_.reset();
         obr_renderer_.reset();
         obr_applied_position_count_ = 0;
-        obr_distance_lpf_state_.fill(0.0f);
         obr_input_headroom_gain_ = 1.0f / std::sqrt(static_cast<float>(
             std::max(1u, SpatialBedChannels())
         ));
@@ -2249,7 +2248,12 @@ private:
         };
 
         const float target_azimuth = std::remainder(
-            layout_azimuth * spatial_controls_.obr_spatial_width,
+            fe::audio::SpatialBedAzimuthForWidth(
+                layout_channels,
+                channel,
+                layout_azimuth,
+                spatial_controls_.obr_spatial_width
+            ),
             360.0f
         );
         const fe::audio::SpatialBedObjectPose object_pose =
@@ -2960,15 +2964,10 @@ private:
                 const float sample = bed_source[
                     static_cast<size_t>(frame) * bed_channels + channel
                 ];
-                const float filter_alpha = fe::audio::X3dDirectLpfOnePoleAlpha(
-                    spatial.lpf_direct
-                );
-                float& distance_filter_state = obr_distance_lpf_state_[channel];
-                distance_filter_state += filter_alpha * (sample - distance_filter_state);
                 // Linear pre/post normalization preserves the renderer transfer
                 // while preventing coherent object sums from driving OBR's
                 // internal emergency limiter on ordinary full-scale material.
-                output_channel[frame] = distance_filter_state * obr_headroom;
+                output_channel[frame] = std::isfinite(sample) ? sample * obr_headroom : 0.0f;
             }
         }
         if (positions_changed) obr_position_revision_ = spatial_cache_generation_;
@@ -3124,7 +3123,6 @@ private:
         spatial_cache_uses_explicit_router_ = false;
         spatial_cache_generation_ = 0;
         obr_position_revision_ = 0;
-        obr_distance_lpf_state_.fill(0.0f);
         if (mastering_voice_ != nullptr) {
             mastering_voice_->DestroyVoice();
             mastering_voice_ = nullptr;
@@ -3215,7 +3213,6 @@ private:
     uint64_t spatial_cache_generation_ = 0;
     uint64_t obr_position_revision_ = 0;
     std::array<float, 8> obr_applied_azimuths_{};
-    std::array<float, 8> obr_distance_lpf_state_{};
     uint32_t obr_applied_position_count_ = 0;
     std::vector<SpatialSample> spatial_cache_;
     std::mutex buffer_mutex_;

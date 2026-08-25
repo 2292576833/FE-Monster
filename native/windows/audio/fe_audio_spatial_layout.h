@@ -13,35 +13,33 @@ struct SpatialBedObjectPose {
     float distance;
 };
 
-// The bed is intentionally not a flat unit-radius ring. Distinct depth and
-// elevation tiers give OBR/X3DAudio enough geometry to encode front/side/back
-// distance as well as direction. Canonical 7.1 order is
-// FL, FR, FC, LFE, BL, BR, SL, SR; 5.1 is FL, FR, FC, LFE, SL, SR.
+// Canonical 7.1 order is FL, FR, FC, LFE, BL, BR, SL, SR; 5.1 is
+// FL, FR, FC, LFE, SL, SR.
 inline SpatialBedObjectPose DefaultSpatialBedObjectPose(
     uint32_t channels,
     uint32_t channel
 ) noexcept {
     if (channels == 8) {
         constexpr SpatialBedObjectPose kLayout[8] = {
-            {30.0f, 0.0f, 1.00f},
-            {-30.0f, 0.0f, 1.00f},
-            {0.0f, 2.0f, 0.82f},
-            {0.0f, -30.0f, 1.05f},
-            {135.0f, -7.0f, 1.55f},
-            {-135.0f, -7.0f, 1.55f},
-            {90.0f, 5.0f, 1.28f},
-            {-90.0f, 5.0f, 1.28f},
+            {30.0f, 0.0f, 1.0f},
+            {-30.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, -30.0f, 1.0f},
+            {135.0f, 0.0f, 1.0f},
+            {-135.0f, 0.0f, 1.0f},
+            {90.0f, 0.0f, 1.0f},
+            {-90.0f, 0.0f, 1.0f},
         };
         return kLayout[std::min<uint32_t>(channel, 7u)];
     }
     if (channels == 6) {
         constexpr SpatialBedObjectPose kLayout[6] = {
-            {30.0f, 0.0f, 1.00f},
-            {-30.0f, 0.0f, 1.00f},
-            {0.0f, 2.0f, 0.82f},
-            {0.0f, -30.0f, 1.05f},
-            {110.0f, 5.0f, 1.28f},
-            {-110.0f, 5.0f, 1.28f},
+            {30.0f, 0.0f, 1.0f},
+            {-30.0f, 0.0f, 1.0f},
+            {0.0f, 0.0f, 1.0f},
+            {0.0f, -30.0f, 1.0f},
+            {110.0f, 0.0f, 1.0f},
+            {-110.0f, 0.0f, 1.0f},
         };
         return kLayout[std::min<uint32_t>(channel, 5u)];
     }
@@ -50,6 +48,26 @@ inline SpatialBedObjectPose DefaultSpatialBedObjectPose(
         {-30.0f, 0.0f, 1.00f},
     };
     return kStereo[std::min<uint32_t>(channel, 1u)];
+}
+
+inline float SpatialBedAzimuthForWidth(
+    uint32_t channels,
+    uint32_t channel,
+    float base_azimuth,
+    float width
+) noexcept {
+    const float safe_width = std::clamp(width, 0.0f, 2.0f);
+    if (!std::isfinite(base_azimuth)) return 0.0f;
+    if (safe_width <= 1.0f) return base_azimuth * safe_width;
+    float sector_limit = 0.0f;
+    if (channel <= 1) sector_limit = 60.0f;
+    else if (channels == 8 && channel >= 4 && channel <= 5) sector_limit = 150.0f;
+    else if ((channels == 6 && channel >= 4) || (channels == 8 && channel >= 6)) {
+        sector_limit = 120.0f;
+    }
+    if (sector_limit == 0.0f || std::abs(base_azimuth) <= 1.0e-6f) return 0.0f;
+    const float signed_limit = std::copysign(sector_limit, base_azimuth);
+    return base_azimuth + (signed_limit - base_azimuth) * (safe_width - 1.0f);
 }
 
 constexpr float kSpatialDistanceCurveScaleMeters = 2.0f;
@@ -109,18 +127,6 @@ inline float SmoothSpatialObrInputHeadroom(
             / (std::max(1u, sample_rate) * kSpatialObrHeadroomReleaseSeconds)
     );
     return std::min(target, release * current + (1.0f - release) * target);
-}
-
-// XAudio2's documented X3DAudio LPF conversion. The result is suitable as a
-// stable one-pole smoothing coefficient for the OBR object feed.
-inline float X3dDirectLpfOnePoleAlpha(float lpf_direct) noexcept {
-    constexpr float kPi = 3.14159265358979323846f;
-    const float coefficient = std::clamp(lpf_direct, 0.0f, 1.0f);
-    return std::clamp(
-        2.0f * std::sin(kPi / 6.0f * coefficient),
-        0.0f,
-        1.0f
-    );
 }
 
 }  // namespace fe::audio
