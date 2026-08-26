@@ -139,9 +139,9 @@ Corruption handling checkpoints and closes connections, then atomically moves th
 - `GET /api/local-memory/context?provider=...&types=...&limit=...&before=...&q=...`
 - `POST /api/local-memory/forget` — exact event IDs, a conversation ID, a type range, or a complete scope.
 - `POST /api/local-memory/backup`
-- `POST /api/local-memory/restore` — local approved `.fememory` path only; browser cannot supply arbitrary filesystem paths.
+- `POST /api/local-memory/restore` — raw `.fememory` archive body streamed into a fixed vault-owned temporary path, with a 64 MiB hard limit; browser callers never supply filesystem paths.
 
-All routes are loopback/same-origin, return structured error codes, and never include exception messages, SQL, filesystem paths, key state, ciphertext, or rejected values. The browser supplies only a provider hint; Java reads the provider account itself and derives the internal FEID-backed scope through `CommunityClient.petPersonalizationScope`, with a separate device-local anonymous scope when no FEID is authenticated. Browser-provided `scope`, `feId`, or account IDs are rejected. Request bodies use a bounded reader rather than the existing unbounded `readAllBytes` helper.
+All routes are loopback/same-origin, return structured error codes, and never include exception messages, SQL, filesystem paths, key state, ciphertext, or rejected values. The browser supplies only a provider hint; Java reads the provider account itself and derives the internal FEID-backed scope through `CommunityClient.petPersonalizationScope`, with a separate device-local anonymous scope when no FEID is authenticated. Browser-provided `scope`, `feId`, or account IDs are rejected. JSON request bodies use a 1 MiB bounded reader rather than the existing unbounded `readAllBytes` helper; restore is the sole 64 MiB streaming exception and never buffers the complete archive in heap.
 
 ## Event capture
 

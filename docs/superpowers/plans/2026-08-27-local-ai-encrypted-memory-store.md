@@ -16,7 +16,7 @@
 - The vault key is random 32-byte material stored only as a Windows CurrentUser DPAPI blob with application entropy.
 - Production fails closed when DPAPI, the JNI DLL, the key blob, or SQLite is unavailable; no plaintext fallback exists.
 - Browser callers never choose `scope`, `feId`, or account ID; Java derives the internal scope from the authenticated provider account.
-- HTTP bodies are at most 1 MiB, batches at most 100, query results at most 100, and errors reveal no SQL, path, key state, ciphertext, or rejected value.
+- JSON HTTP bodies are at most 1 MiB, restore archives stream to a fixed vault-owned temporary file with a 64 MiB hard limit, batches are at most 100, query results are at most 100, and errors reveal no SQL, path, key state, ciphertext, or rejected value.
 - `eventId` writes are idempotent; a conflicting duplicate changes nothing; batch append is transactional.
 - Credentials, tokens, cookies, authorization values, passwords, sessions, URLs, absolute paths, raw headers, and raw HTTP bodies are rejected recursively.
 - `java -jar out/fe-monster-java.jar` remains a supported launch path.
@@ -169,7 +169,7 @@ git commit -m "feat: add local memory crypto boundary"
 
 **Interfaces:**
 - Consumes: `MemoryCrypto`, `MemorySanitizer`, `MemoryTokenizer`, and an unwrapped vault-key lease.
-- Produces: `AppendResult appendBatch(List<LocalMemoryEvent> events)`, `MemoryPage query(MemoryQuery query)`, `ForgetResult forget(MemorySelector selector)`, `BackupResult backup()`, `RestoreResult restore(byte[] archive)`, `MemoryHealth health()`.
+- Produces: `AppendResult appendBatch(List<LocalMemoryEvent> events)`, `MemoryPage query(MemoryQuery query)`, `ForgetResult forget(MemorySelector selector)`, `BackupResult backup(Path vaultOwnedTarget)`, `RestoreResult restore(Path vaultOwnedArchive)`, `MemoryHealth health()`.
 
 - [ ] **Step 1: Write the failing store probe**
 
@@ -218,7 +218,7 @@ git commit -m "feat: add encrypted sqlite memory store"
 
 - [ ] **Step 1: Write failing service/route probes**
 
-Assert server-derived scope, FEID A/B isolation, anonymous device scope, spoofed scope/FEID rejection, same-origin/loopback guard, method matrix, 1 MiB bounded body, 100-event/100-result limits, idempotency, no-store headers, error status mapping, and post-close database renaming.
+Assert server-derived scope, FEID A/B isolation, anonymous device scope, spoofed scope/FEID rejection, same-origin/loopback guard, method matrix, 1 MiB JSON body limit, 64 MiB streamed restore limit, 100-event/100-result limits, idempotency, no-store headers, error status mapping, and post-close database renaming.
 
 - [ ] **Step 2: Run probes and verify they fail**
 
@@ -339,4 +339,3 @@ Document local-authoritative encrypted memory, temporary conversations, explicit
 git add scripts/build-installer.ps1 scripts/check-windows-installer-contract.ps1 scripts/check-windows-clean-install-runtime.ps1 scripts/check-local-memory-release.ps1 README.md
 git commit -m "build: ship encrypted local memory vault"
 ```
-
