@@ -8,6 +8,14 @@ const sourcePath = path.join(root, 'native', 'windows', 'audio', 'fe_audio_pipel
 const probePath = path.join(root, 'native', 'windows', 'audio', 'fe_audio_probe.cpp');
 const cmakePath = path.join(root, 'native', 'windows', 'CMakeLists.txt');
 const buildScriptPath = path.join(root, 'scripts', 'build-xaudio2.ps1');
+const qualityScriptPath = path.join(root, 'scripts', 'check-native-audio-quality.ps1');
+const qualityProbePath = path.join(
+  root,
+  'scripts',
+  'fixtures',
+  'native-audio-quality',
+  'fe_audio_quality_probe.cpp'
+);
 const rustManifestPath = path.join(root, 'native', 'rust-audio-upmix', 'Cargo.toml');
 const rustLockPath = path.join(root, 'native', 'rust-audio-upmix', 'Cargo.lock');
 const rustSourcePath = path.join(root, 'native', 'rust-audio-upmix', 'src', 'lib.rs');
@@ -24,6 +32,8 @@ for (const file of [
   probePath,
   cmakePath,
   buildScriptPath,
+  qualityScriptPath,
+  qualityProbePath,
   rustManifestPath,
   rustLockPath,
   rustSourcePath,
@@ -42,6 +52,8 @@ const source = readFileSync(sourcePath, 'utf8');
 const probe = readFileSync(probePath, 'utf8');
 const cmake = readFileSync(cmakePath, 'utf8');
 const buildScript = readFileSync(buildScriptPath, 'utf8');
+const qualityScript = readFileSync(qualityScriptPath, 'utf8');
+const qualityProbe = readFileSync(qualityProbePath, 'utf8');
 const rustManifest = readFileSync(rustManifestPath, 'utf8');
 const rustSource = readFileSync(rustSourcePath, 'utf8');
 const mixerHeader = readFileSync(mixerHeaderPath, 'utf8');
@@ -211,6 +223,50 @@ assert.match(buildScript, /cmake/i);
 assert.match(buildScript, /fe_audio_probe/i);
 assert.match(buildScript, /cargo\s+build[\s\S]{0,200}--locked/i);
 assert.match(buildScript, /fe_monster_upmix\.dll/i);
+assert.match(
+  buildScript,
+  /Test-Path[^\r\n]+\$stagedDll[\s\S]{0,500}LastWriteTimeUtc[\s\S]{0,500}Remove-Item\s+-LiteralPath\s+\$stagedDll\s+-Force/,
+  'an equal-or-newer Rust DLL must remove only the generated staged XAudio DLL before the target build'
+);
+assert.match(
+  buildScript,
+  /\$stagedXaudioTimestamp[\s\S]{0,500}-le\s+\$rustTimestamp[\s\S]{0,500}throw/,
+  'the build must fail closed unless staged XAudio is strictly newer than Rust'
+);
+assert.match(
+  buildScript,
+  /\$manifestTimestamp[\s\S]{0,500}-le\s+\$stagedXaudioTimestamp[\s\S]{0,500}throw/,
+  'the build must fail closed unless the manifest is strictly newer than XAudio'
+);
+
+assert.match(qualityScript, /\[string\]\$RuntimeDirectory\s*=\s*''/);
+assert.match(qualityScript, /native\\windows\\build['"]/);
+assert.match(qualityScript, /native\\windows\\build-next['"]/);
+assert.doesNotMatch(
+  qualityScript,
+  /\.cmake-build-xaudio2[^\r\n]+runtime/,
+  'quality runtime selection must never fall back to CMake staging'
+);
+assert.match(qualityScript, /schemaVersion[\s\S]{0,500}architecture[\s\S]{0,500}configuration/);
+assert.match(qualityScript, /obrRevision[\s\S]{0,600}Get-FileHash/);
+assert.match(qualityScript, /xaudio2Sha256[\s\S]{0,900}upmixSha256[\s\S]{0,900}pairSha256/);
+assert.match(
+  qualityScript,
+  /\$rustTimestamp[\s\S]{0,500}-ge\s+\$xaudioTimestamp[\s\S]{0,900}\$xaudioTimestamp[\s\S]{0,500}-ge\s+\$manifestTimestamp/,
+  'quality validation must enforce Rust < XAudio < manifest'
+);
+assert.doesNotMatch(qualityScript, /cargo\s+build/i,
+  'quality verification must use the paired Rust DLL without rebuilding it');
+assert.match(qualityScript, /NativeAudioChannelRouterLiveProbe/);
+assert.match(qualityScript, /FE_MONSTER_XAUDIO2_DLL\s*=\s*\$xaudioDll/);
+assert.match(qualityScript, /FE_MONSTER_RUST_UPMIX_DLL\s*=\s*\$rustDll/);
+assert.match(
+  qualityScript,
+  /finally[\s\S]{0,1200}FE_MONSTER_XAUDIO2_DLL[\s\S]{0,800}FE_MONSTER_RUST_UPMIX_DLL/,
+  'quality verification must restore exact-pair environment overrides in finally'
+);
+assert.match(qualityProbe, /ordinaryProgrammeMinimumLimiterGain[\s\S]{0,120}mastered_programme\.minimum_limiter_gain/);
+assert.match(qualityProbe, /minimumAllowedLimiterGain[\s\S]{0,120}std::pow\(10\.0,\s*-0\.10\s*\/\s*20\.0\)/);
 
 assert.match(rustManifest, /oximedia-audiopost\s*=\s*\{[^}]*=0\.2\.0/);
 assert.match(rustManifest, /crate-type\s*=\s*\[[^\]]*"cdylib"/);

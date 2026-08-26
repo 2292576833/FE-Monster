@@ -177,17 +177,31 @@ if (![string]::IsNullOrWhiteSpace($vsInstall)) {
 & $cmake @configureArguments
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-& $cmake --build $cmakeBuildDir --config $Configuration --target fe_monster_xaudio2 fe_audio_probe --parallel
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
 $stagedDll = Join-Path $stagingOutputDir 'fe-monster-xaudio2.dll'
 $stagedRustUpmixDll = Join-Path $stagingOutputDir 'fe_monster_upmix.dll'
 $probe = Join-Path $stagingOutputDir 'fe_audio_probe.exe'
+$rustTimestamp = (Get-Item -LiteralPath $rustUpmixDll).LastWriteTimeUtc
+if ((Test-Path -LiteralPath $stagedDll -PathType Leaf) -and
+    (Get-Item -LiteralPath $stagedDll).LastWriteTimeUtc -le $rustTimestamp) {
+  # The production DLL dynamically loads Rust, so MSBuild cannot infer this
+  # dependency. Remove only the generated link output to force the target to
+  # relink against the freshly resolved production pair.
+  Remove-Item -LiteralPath $stagedDll -Force
+}
+
+& $cmake --build $cmakeBuildDir --config $Configuration --target fe_monster_xaudio2 fe_audio_probe --parallel
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 if (!(Test-Path -LiteralPath $stagedDll -PathType Leaf)) {
   throw "The native audio DLL was not produced: $stagedDll"
 }
 if (!(Test-Path -LiteralPath $probe -PathType Leaf)) {
   throw "The native audio probe was not produced: $probe"
+}
+$rustTimestamp = (Get-Item -LiteralPath $rustUpmixDll).LastWriteTimeUtc
+$stagedXaudioTimestamp = (Get-Item -LiteralPath $stagedDll).LastWriteTimeUtc
+if ($stagedXaudioTimestamp -le $rustTimestamp) {
+  throw "Native audio pair freshness check failed: XAudio must be newer than Rust ($stagedXaudioTimestamp <= $rustTimestamp)."
 }
 Copy-Item -LiteralPath $rustUpmixDll -Destination $stagedRustUpmixDll -Force
 if (!(Test-Path -LiteralPath $stagedRustUpmixDll -PathType Leaf)) {
@@ -239,6 +253,10 @@ $manifestJson = $nativeAudioBuildManifest | ConvertTo-Json -Depth 4
   $manifestJson + [Environment]::NewLine,
   [Text.UTF8Encoding]::new($false)
 )
+$manifestTimestamp = (Get-Item -LiteralPath $stagedBuildManifest).LastWriteTimeUtc
+if ($manifestTimestamp -le $stagedXaudioTimestamp) {
+  throw "Native audio pair freshness check failed: manifest must be newer than XAudio ($manifestTimestamp <= $stagedXaudioTimestamp)."
+}
 
 if (!$SkipProbe) {
   & $probe

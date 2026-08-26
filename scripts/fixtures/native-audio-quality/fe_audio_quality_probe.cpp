@@ -1499,9 +1499,9 @@ int main() {
     PrintStereoMetrics("high", high.output);
     std::cout << ",\n";
     PrintStereoMetrics("masteredProgramme", mastered_programme.output);
-    std::cout << ",\n    \"masteredProgrammeMinimumLimiterGain\":"
+    std::cout << ",\n    \"ordinaryProgrammeMinimumLimiterGain\":"
         << mastered_programme.minimum_limiter_gain
-        << ",\n    \"ordinaryProgrammeMinimumLimiterGain\":"
+        << ",\n    \"minimumAllowedLimiterGain\":"
         << std::pow(10.0, -0.10 / 20.0)
         << "\n  },\n"
         << "  \"coherentEightChannelStress\": {\n";
