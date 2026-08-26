@@ -42990,9 +42990,11 @@ function petAssistantClientContextCommands(commandCatalog) {
     if (definition?.readOnly === true) current.readOnlyCount += 1;
     categories.set(id, current);
   });
+  const manifest = window.FeMonsterAppCommands?.manifestSummary?.() || null;
   return {
     total: commandCatalog.length,
     defaultPolicy: 'allow-registered',
+    ...(manifest ? { manifest } : {}),
     categories: Array.from(categories.values()).sort((left, right) => left.id.localeCompare(right.id))
   };
 }

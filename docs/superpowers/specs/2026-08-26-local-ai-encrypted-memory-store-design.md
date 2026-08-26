@@ -2,11 +2,11 @@
 
 **Date:** 2026-08-26  
 **Status:** Approved for direct implementation; the user explicitly waived further section-by-section review.  
-**Batch:** 1 of 4 — local durable memory only. FEID server replication, multi-device recovery, model recall injection, and command-manifest parity are separate follow-on batches.
+**Batch:** 1 of 4 — local durable memory. FEID server replication, multi-device recovery, and model recall injection remain follow-on batches. Command-manifest parity is being delivered alongside this batch as an independent transport contract and does not widen memory authority.
 
 ## Goal
 
-Give the Windows desktop client a durable, searchable, local-authoritative memory vault for complete chat messages and timestamps, playback events, playlists/favorites, music-scene presets, and explicit user facts. The vault must never persist credentials, must fail closed when its key cannot be recovered, and must expose a narrow same-origin API instead of exposing storage details to the browser.
+Give the Windows desktop client a durable, searchable, local-authoritative memory vault for complete chat messages and timestamps, separately auditable operation history, playback events, playlists/favorites, music-scene presets, and explicit user facts. The vault must make it possible to reconstruct what was said, what subsequently happened, when each event occurred, and which message/turn caused an operation—without mixing chat rows with operation rows. It must never persist credentials, must fail closed when its key cannot be recovered, and must expose a narrow same-origin API instead of exposing storage details to the browser.
 
 ## Decisions
 
@@ -16,6 +16,8 @@ Give the Windows desktop client a durable, searchable, local-authoritative memor
 - Generate one random 256-bit vault master key. At rest it exists only as a Windows CurrentUser DPAPI blob protected with fixed application entropy. A dedicated `fe-monster-wincrypto.dll` JNI module performs `CryptProtectData` and `CryptUnprotectData`; audio DLLs are not reused.
 - Keep a replaceable `LocalMemoryStore` interface so a properly licensed official SQLCipher JDBC implementation can be added later without changing callers.
 - Use stable UUID event IDs and a per-install immutable `memoryVaultId`. FEID is renameable and must not be key material or authenticated-data identity.
+- Keep chat messages, operation/audit lifecycle events, and derived knowledge/snapshots in physically separate tables and separate query result collections. Shared random `traceId`, `turnId`, `messageId`, and `operationId` fields provide correlation without collapsing the records into one timeline blob.
+- Preserve both `occurredAt` (when the source says it happened) and vault-owned `recordedAt` (when it was durably accepted), plus a bounded per-source sequence. New chat and operation events require a trusted occurrence time; legacy imports with unknown time remain explicitly `timeAccuracy=unknown` and are never assigned a fabricated timestamp.
 - Do not store copyrighted stream bytes. Optional encrypted user-imported attachments belong to a later batch.
 
 Official dependency references:
@@ -53,8 +55,8 @@ Temporary conversations are held only in browser memory. They do not enter local
 
 `com.femonster.memory` owns the subsystem:
 
-- `LocalMemoryEvent`: validated immutable event input (`eventId`, `scope`, `type`, `occurredAt`, payload).
-- `LocalMemoryStore`: `append`, `appendBatch`, `query`, `forget`, `backup`, `restore`, `health`, and `close`.
+- `LocalMemoryEvent`: validated immutable event input (`eventId`, `stream`, `scope`, `type`, `occurredAt`, `sourceSequence`, trace/correlation IDs, payload).
+- `LocalMemoryStore`: separate `appendChats`, `appendOperations`, `appendKnowledge`, `queryChats`, `queryOperations`, and `queryKnowledge` methods plus bounded batch, forget, backup, restore, health, and close operations.
 - `SqliteEncryptedMemoryStore`: transaction and schema implementation; callers never receive JDBC objects.
 - `MemoryCrypto`: HKDF-SHA-256 key derivation, AES-256-GCM envelopes, HMAC tokens, nonce generation, and best-effort byte clearing.
 - `KeyProtector`: small interface with production `WindowsDpapiKeyProtector` and deterministic test implementation.
@@ -84,7 +86,7 @@ HKDF labels derive distinct 32-byte keys for record encryption, blind search, ba
 
 ## Schema
 
-Schema version 1 uses WAL, `foreign_keys=ON`, `busy_timeout=5000`, and `synchronous=FULL` for vault mutations.
+Schema version 1 uses WAL, `foreign_keys=ON`, `busy_timeout=5000`, and `synchronous=FULL` for vault mutations. Chat and operation history are not stored in a shared generic record table.
 
 ```sql
 CREATE TABLE vault_state (
@@ -94,35 +96,91 @@ CREATE TABLE vault_state (
   created_at INTEGER NOT NULL
 );
 
-CREATE TABLE memory_records (
-  event_id TEXT PRIMARY KEY,
+CREATE TABLE chat_records (
+  message_id TEXT PRIMARY KEY,
   scope_hash TEXT NOT NULL,
-  type TEXT NOT NULL,
+  conversation_token BLOB NOT NULL,
+  trace_id TEXT NOT NULL,
+  turn_id TEXT,
   occurred_at INTEGER,
-  imported_at INTEGER NOT NULL,
+  recorded_at INTEGER NOT NULL,
+  source_sequence INTEGER,
   nonce BLOB NOT NULL,
   ciphertext BLOB NOT NULL,
   aad_version INTEGER NOT NULL,
   deleted_at INTEGER
 );
-CREATE INDEX memory_records_scope_time
-  ON memory_records(scope_hash, type, occurred_at DESC, event_id DESC);
+CREATE INDEX chat_records_scope_time
+  ON chat_records(scope_hash, occurred_at DESC, message_id DESC);
+CREATE INDEX chat_records_trace
+  ON chat_records(scope_hash, trace_id, turn_id);
 
-CREATE TABLE memory_search_tokens (
-  event_id TEXT NOT NULL REFERENCES memory_records(event_id) ON DELETE CASCADE,
+CREATE TABLE chat_search_tokens (
+  message_id TEXT NOT NULL REFERENCES chat_records(message_id) ON DELETE CASCADE,
+  token BLOB NOT NULL,
+  PRIMARY KEY(message_id, token)
+);
+CREATE INDEX chat_search_lookup ON chat_search_tokens(token, message_id);
+
+CREATE TABLE operation_records (
+  event_id TEXT PRIMARY KEY,
+  operation_id TEXT NOT NULL,
+  scope_hash TEXT NOT NULL,
+  trace_id TEXT NOT NULL,
+  turn_id TEXT,
+  caused_by_message_id TEXT,
+  type TEXT NOT NULL,
+  phase TEXT NOT NULL,
+  actor TEXT NOT NULL,
+  occurred_at INTEGER NOT NULL,
+  recorded_at INTEGER NOT NULL,
+  source_sequence INTEGER,
+  nonce BLOB NOT NULL,
+  ciphertext BLOB NOT NULL,
+  aad_version INTEGER NOT NULL,
+  deleted_at INTEGER
+);
+CREATE INDEX operation_records_scope_time
+  ON operation_records(scope_hash, occurred_at DESC, event_id DESC);
+CREATE INDEX operation_records_trace
+  ON operation_records(scope_hash, trace_id, operation_id, occurred_at);
+
+CREATE TABLE operation_search_tokens (
+  event_id TEXT NOT NULL REFERENCES operation_records(event_id) ON DELETE CASCADE,
   token BLOB NOT NULL,
   PRIMARY KEY(event_id, token)
 );
-CREATE INDEX memory_search_lookup ON memory_search_tokens(token, event_id);
+CREATE INDEX operation_search_lookup ON operation_search_tokens(token, event_id);
+
+CREATE TABLE knowledge_records (
+  event_id TEXT PRIMARY KEY,
+  scope_hash TEXT NOT NULL,
+  type TEXT NOT NULL,
+  occurred_at INTEGER,
+  recorded_at INTEGER NOT NULL,
+  nonce BLOB NOT NULL,
+  ciphertext BLOB NOT NULL,
+  aad_version INTEGER NOT NULL,
+  deleted_at INTEGER
+);
+CREATE INDEX knowledge_records_scope_time
+  ON knowledge_records(scope_hash, type, occurred_at DESC, event_id DESC);
+
+CREATE TABLE knowledge_search_tokens (
+  event_id TEXT NOT NULL REFERENCES knowledge_records(event_id) ON DELETE CASCADE,
+  token BLOB NOT NULL,
+  PRIMARY KEY(event_id, token)
+);
+CREATE INDEX knowledge_search_lookup ON knowledge_search_tokens(token, event_id);
 ```
 
-Payloads retain domain fields inside the encrypted JSON envelope. Types are namespaced: `chat.message`, `legacy.chat_snapshot`, `playback.started`, `playback.completed`, `playback.skipped`, `playback.replayed`, `library.playlist_snapshot`, `library.favorite_changed`, `scene.preset_saved`, `scene.preset_applied`, and `user.fact`.
+Payloads retain domain fields inside the encrypted JSON envelope. Chat types are `chat.message` and `legacy.chat_snapshot`. Operation types are namespaced lifecycle records such as `command.requested`, `command.confirmed`, `command.started`, `command.succeeded`, `command.failed`, `command.cancelled`, `command.reverted`, `playback.started`, `playback.completed`, `playback.skipped`, `playback.replayed`, `library.favorite_changed`, `scene.preset_saved`, and `scene.preset_applied`. Knowledge types include `library.playlist_snapshot` and `user.fact`.
 
-Chat payloads include conversation ID, role, text, source, and trusted occurrence time. Playback payloads include stable provider/song IDs, semantic metadata, position/duration totals, and action; never media URLs. Scene payloads include stable preset/component IDs and finite bounded position/rotation/scale values; never asset URLs or local paths.
+Chat payloads include the exact sanitized message text, conversation ID, message ID, role, source/model origin, trace ID, turn ID, trusted occurrence time, vault receipt time, source sequence, and explicit time accuracy. Operation payloads include the registered command/event name, actor (`user`, `local-ai`, `server-ai`, `app`, or `system`), phase/status, bounded sanitized arguments, outcome, before/after summary, command receipt, undo reference, and failure code. They carry the same trace/turn IDs and `causedByMessageId` when a chat turn caused the operation. Playback payloads include stable provider/song IDs, semantic metadata, position/duration totals, and action; never media URLs. Scene payloads include stable preset/component IDs and finite bounded position/rotation/scale values; never asset URLs or local paths.
 
 ## Query, deletion, backup, and recovery
 
-Queries require a scope, a type allowlist, a limit from 1 through 100, and an optional before cursor. Text search normalizes and tokenizes on the client, HMACs each token, intersects tokens in SQL, then decrypts at most the requested bounded candidate set. Results are sorted deterministically by occurrence time then event ID. Decryption/authentication failure stops that query and reports a redacted vault integrity error.
+Queries require a scope, one explicit stream (`chat`, `operation`, or `knowledge`), a type allowlist, a limit from 1 through 100, and an optional before cursor. Chat and operation endpoints never return a merged array. A trace lookup may return `{ chats: [...], operations: [...] }`, preserving the separation while showing causality. Text search normalizes and tokenizes on the client, HMACs each token, intersects only that stream's token table in SQL, then decrypts at most the requested bounded candidate set. Results are sorted deterministically by occurrence time, vault receipt time, source sequence, then record ID. Decryption/authentication failure stops that query and reports a redacted vault integrity error.
 
 `eventId` makes append idempotent. A duplicate with identical authenticated content succeeds as `duplicate=true`; a duplicate ID with different content is a conflict and changes nothing. Batch append is all-or-nothing.
 
@@ -136,8 +194,11 @@ Corruption handling checkpoints and closes connections, then atomically moves th
 
 - `GET /api/local-memory/health`
 - `POST /api/local-memory/events` — one event or a batch of at most 100, body at most 1 MiB, idempotent event IDs.
-- `GET /api/local-memory/context?provider=...&types=...&limit=...&before=...&q=...`
-- `POST /api/local-memory/forget` — exact event IDs, a conversation ID, a type range, or a complete scope.
+- `GET /api/local-memory/chats?provider=...&conversation=...&limit=...&before=...&q=...`
+- `GET /api/local-memory/operations?provider=...&traceId=...&operationId=...&types=...&limit=...&before=...&q=...`
+- `GET /api/local-memory/trace?provider=...&traceId=...` — returns separate `chats` and `operations` collections.
+- `GET /api/local-memory/context?provider=...&types=...&limit=...&before=...&q=...` — model-facing bounded projection; it keeps source stream labels and never rewrites operations as chat.
+- `POST /api/local-memory/forget` — an explicit stream plus exact record IDs, a conversation ID, an operation ID/type range, or a complete scope.
 - `POST /api/local-memory/backup`
 - `POST /api/local-memory/restore` — raw `.fememory` archive body streamed into a fixed vault-owned temporary path, with a 64 MiB hard limit; browser callers never supply filesystem paths.
 
@@ -145,7 +206,8 @@ All routes are loopback/same-origin, return structured error codes, and never in
 
 ## Event capture
 
-- `pet-assistant.js` assigns stable conversation/message IDs and timestamps at the unified message insertion point. Successful local and server-model replies use the same sink. Existing last-48 localStorage data is imported once as a sanitized `legacy.chat_snapshot` with unknown occurrence times; it is not rewritten as fake individual history.
+- `pet-assistant.js` assigns stable conversation/message/trace/turn IDs, a trusted wall-clock occurrence time, source sequence, role, and model origin at the unified message insertion point. Successful local and server-model replies use the same chat sink. Existing last-48 localStorage data is imported once as a sanitized `legacy.chat_snapshot` with `timeAccuracy=unknown`; it is not rewritten as fake individual history.
+- The shared command bus emits operation lifecycle events at inspect/request, confirmation, start, terminal result, cancellation, replay, and undo boundaries. Each lifecycle event retains one stable `operationId`, its own event ID and time, the initiating trace/turn/message IDs, actor/model origin, command manifest revision, and the real command receipt. These events use only the operation sink and never become chat messages.
 - `playback-intelligence.js` emits durable events from its narrow `notify(event, payload)` boundary for start, complete, skip, replay, and bounded duration summaries; high-frequency progress ticks are excluded.
 - `app.js` records logged-in playlist snapshots only after a successful provider response, favorite changes at their actual success point, and scene preset saved/applied after the existing API succeeds.
 - Browser sinks batch briefly, retry idempotently, and never block animation, audio, or UI. A failed memory write changes only the memory health indicator.
@@ -163,7 +225,7 @@ The repository vendors the verified artifacts and Apache/MIT notices so producti
 ## Acceptance criteria
 
 - A fresh Windows user can create, restart, query, search, delete, back up, and restore memories from the installed app.
-- Exact chat time and semantic music/playlist/scene data survive restart; temporary conversation content never appears.
+- Exact chat text/time/source and separately queryable operation time/actor/status survive restart. A trace query can prove which message led to which operation without merging the chat and operation records; temporary conversation content never appears.
 - Equal plaintext produces different ciphertext; tampering with nonce, ciphertext, tag, AAD, DPAPI blob, or blind token fails closed.
 - A byte scan of SQLite, WAL, SHM, backups, logs, HTTP responses, and temporary files finds neither the test plaintext nor the search terms.
 - Duplicate IDs are idempotent; conflicting duplicates, invalid scopes/types, oversized bodies, non-finite geometry, secrets, URLs, and absolute paths are rejected.

@@ -2140,6 +2140,7 @@
     'preset',
     'parameters',
     'lyrics',
+    'commands',
     'settings',
     'runtime',
     'emotion',
@@ -3418,6 +3419,45 @@
     syncPetVisibility();
   }
 
+  function serverActionCommandManifestStatus(payload) {
+    const commandBus = window.FeMonsterAppCommands;
+    if (!commandBus || typeof commandBus.verifyManifest !== 'function') {
+      return Object.freeze({
+        ok: false,
+        verified: false,
+        code: 'command_manifest_verifier_unavailable',
+        expected: null,
+        received: null
+      });
+    }
+    return commandBus.verifyManifest(payload?.commandManifest, {
+      // If an older server explicitly rejects clientContext, keep its legacy
+      // command path usable. A server that accepts context must echo the exact
+      // catalog revision that its model saw for this turn.
+      required: clientContextRelaySupported
+    });
+  }
+
+  async function cancelServerActionForCommandManifest(status, sessionId, actionId) {
+    const code = boundedString(status?.code, 80, 'command_catalog_changed');
+    const canResynchronize = !!status?.expected;
+    const response = await requestJson(apiPath('/api/community/pet/action-claim'), {
+      method: 'POST',
+      body: JSON.stringify({
+        sessionId,
+        actionId,
+        clientRole: petClientRole(),
+        cancelled: true,
+        ...(canResynchronize ? {
+          cancellationReason: code,
+          currentCommandManifest: status.expected
+        } : {})
+      })
+    });
+    window.FeMonsterPetClientContext?.refresh?.(`server-action:${code}`);
+    return response;
+  }
+
   async function applyToolEvent(payload) {
     const actionId = boundedString(payload.actionId || payload.requestId, 160);
     const name = boundedString(payload.name, 96).toLowerCase();
@@ -3439,6 +3479,21 @@
     if (pet.handledActions.has(handledActionKey)) return;
     pet.handledActions.add(handledActionKey);
     while (pet.handledActions.size > 128) pet.handledActions.delete(pet.handledActions.values().next().value);
+
+    const manifestStatus = serverActionCommandManifestStatus(payload);
+    if (!manifestStatus.ok) {
+      const message = manifestStatus.code === 'command_catalog_changed'
+        ? '客户端功能命令已更新，本轮服务器操作已取消并重新同步'
+        : '服务器与客户端的功能命令协议不一致，已拒绝执行操作';
+      setPetState('error', message);
+      try {
+        await cancelServerActionForCommandManifest(manifestStatus, sessionId, actionId);
+      } catch (error) {
+        pet.handledActions.delete(handledActionKey);
+        handleNetworkError(error, false);
+      }
+      return;
+    }
 
     const actionEnvelope = {
       name,

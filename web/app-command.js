@@ -29,7 +29,13 @@
   const OPERATION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/;
   const OPERATION_RECEIPT_TTL_MS = 30 * 60 * 1000;
   const OPERATION_RECEIPT_LIMIT = 512;
+  const COMMAND_BUS_VERSION = 3;
+  const COMMAND_MANIFEST_SCHEMA = 'fe-monster.pet-command-manifest/v1';
+  const COMMAND_PROTOCOL_VERSION = 1;
+  const COMMAND_RECEIPT_SCHEMA = 'fe-monster.app-command-receipt/v1';
+  const COMMAND_UNDO_SCHEMA = 'fe-monster.app-command-undo/v1';
   const operationReceipts = new Map();
+  let commandManifestCache = null;
 
   function commandError(message, code = 'invalid_command') {
     const error = new Error(message);
@@ -87,6 +93,112 @@
     return output;
   }
 
+  function utf8Bytes(value) {
+    const bytes = [];
+    const input = String(value ?? '');
+    for (let index = 0; index < input.length; index += 1) {
+      let codePoint = input.charCodeAt(index);
+      if (codePoint >= 0xd800 && codePoint <= 0xdbff && index + 1 < input.length) {
+        const low = input.charCodeAt(index + 1);
+        if (low >= 0xdc00 && low <= 0xdfff) {
+          codePoint = 0x10000 + ((codePoint - 0xd800) << 10) + (low - 0xdc00);
+          index += 1;
+        }
+      }
+      if (codePoint <= 0x7f) bytes.push(codePoint);
+      else if (codePoint <= 0x7ff) {
+        bytes.push(0xc0 | (codePoint >>> 6), 0x80 | (codePoint & 0x3f));
+      } else if (codePoint <= 0xffff) {
+        bytes.push(
+          0xe0 | (codePoint >>> 12),
+          0x80 | ((codePoint >>> 6) & 0x3f),
+          0x80 | (codePoint & 0x3f)
+        );
+      } else {
+        bytes.push(
+          0xf0 | (codePoint >>> 18),
+          0x80 | ((codePoint >>> 12) & 0x3f),
+          0x80 | ((codePoint >>> 6) & 0x3f),
+          0x80 | (codePoint & 0x3f)
+        );
+      }
+    }
+    return bytes;
+  }
+
+  function rotateRight(value, amount) {
+    return (value >>> amount) | (value << (32 - amount));
+  }
+
+  // Synchronous SHA-256 keeps the command manifest available to the client
+  // context snapshot before any model request is sent. It is a drift checksum,
+  // not an authorization primitive; command execution remains client-owned.
+  function sha256Hex(value) {
+    const constants = [
+      0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+      0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+      0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+      0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+      0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+      0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+      0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+      0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+    ];
+    const bytes = utf8Bytes(value);
+    const bitLength = bytes.length * 8;
+    bytes.push(0x80);
+    while (bytes.length % 64 !== 56) bytes.push(0);
+    const high = Math.floor(bitLength / 0x100000000);
+    const low = bitLength >>> 0;
+    for (let shift = 24; shift >= 0; shift -= 8) bytes.push((high >>> shift) & 0xff);
+    for (let shift = 24; shift >= 0; shift -= 8) bytes.push((low >>> shift) & 0xff);
+
+    const hash = [
+      0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+      0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+    ];
+    const words = new Array(64).fill(0);
+    for (let offset = 0; offset < bytes.length; offset += 64) {
+      for (let index = 0; index < 16; index += 1) {
+        const cursor = offset + (index * 4);
+        words[index] = (
+          (bytes[cursor] << 24)
+          | (bytes[cursor + 1] << 16)
+          | (bytes[cursor + 2] << 8)
+          | bytes[cursor + 3]
+        );
+      }
+      for (let index = 16; index < 64; index += 1) {
+        const left = words[index - 15];
+        const right = words[index - 2];
+        const sigma0 = rotateRight(left, 7) ^ rotateRight(left, 18) ^ (left >>> 3);
+        const sigma1 = rotateRight(right, 17) ^ rotateRight(right, 19) ^ (right >>> 10);
+        words[index] = (words[index - 16] + sigma0 + words[index - 7] + sigma1) | 0;
+      }
+      let [a, b, c, d, e, f, g, h] = hash;
+      for (let index = 0; index < 64; index += 1) {
+        const sum1 = rotateRight(e, 6) ^ rotateRight(e, 11) ^ rotateRight(e, 25);
+        const choice = (e & f) ^ ((~e) & g);
+        const temporary1 = (h + sum1 + choice + constants[index] + words[index]) | 0;
+        const sum0 = rotateRight(a, 2) ^ rotateRight(a, 13) ^ rotateRight(a, 22);
+        const majority = (a & b) ^ (a & c) ^ (b & c);
+        const temporary2 = (sum0 + majority) | 0;
+        h = g;
+        g = f;
+        f = e;
+        e = (d + temporary1) | 0;
+        d = c;
+        c = b;
+        b = a;
+        a = (temporary1 + temporary2) | 0;
+      }
+      [a, b, c, d, e, f, g, h].forEach((value, index) => {
+        hash[index] = (hash[index] + value) | 0;
+      });
+    }
+    return hash.map((value) => (value >>> 0).toString(16).padStart(8, '0')).join('');
+  }
+
   function operationSignature(command, parameters) {
     const semanticParameters = Object.create(null);
     Object.entries(parameters && typeof parameters === 'object' ? parameters : {}).forEach(([key, value]) => {
@@ -129,7 +241,11 @@
   }
 
   function commandReceipt(definition, operationId, automatic, replayed) {
+    const commandManifest = manifestSummary();
     return Object.freeze({
+      schema: COMMAND_RECEIPT_SCHEMA,
+      protocolVersion: commandManifest.protocolVersion,
+      catalogRevision: commandManifest.catalogRevision,
       command: definition.command,
       operationId: operationId || null,
       replayed: replayed === true,
@@ -251,7 +367,115 @@
     });
   }
 
-  function register(definition) {
+  function manifestDefinition(definition) {
+    const groups = definition.requiredParameterGroups
+      .map((group) => [...group].sort())
+      .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+    return Object.freeze({
+      command: definition.command,
+      aliases: Object.freeze([...definition.aliases].sort()),
+      category: definition.category,
+      parameters: Object.freeze(stableValue(definition.parameters)),
+      requiredParameterGroups: Object.freeze(groups.map((group) => Object.freeze(group))),
+      readOnly: definition.readOnly === true,
+      reversible: definition.reversible === true,
+      automaticAllowed: definition.automaticAllowed === true,
+      requiresConfirmation: definition.requiresConfirmation === true
+        || typeof definition.requiresConfirmation === 'function'
+    });
+  }
+
+  function buildCommandManifest() {
+    const commands = Array.from(registry.values(), manifestDefinition)
+      .sort((left, right) => left.command.localeCompare(right.command));
+    const semantics = Object.freeze({
+      schema: COMMAND_MANIFEST_SCHEMA,
+      protocolVersion: COMMAND_PROTOCOL_VERSION,
+      catalogVersion: COMMAND_BUS_VERSION,
+      commands: Object.freeze(commands)
+    });
+    const catalogRevision = `sha256:${sha256Hex(JSON.stringify(stableValue(semantics)))}`;
+    const summary = Object.freeze({
+      schema: COMMAND_MANIFEST_SCHEMA,
+      protocolVersion: COMMAND_PROTOCOL_VERSION,
+      catalogVersion: COMMAND_BUS_VERSION,
+      catalogRevision,
+      commandCount: commands.length,
+      discoveryTool: 'query_app_capabilities',
+      controlTool: 'control_app',
+      confirmationAuthority: 'client-registry',
+      receiptSchema: COMMAND_RECEIPT_SCHEMA,
+      undoSchema: COMMAND_UNDO_SCHEMA
+    });
+    return Object.freeze({ summary, commands: semantics.commands });
+  }
+
+  function manifestSummary() {
+    if (!commandManifestCache) commandManifestCache = buildCommandManifest();
+    return commandManifestCache.summary;
+  }
+
+  function manifest() {
+    if (!commandManifestCache) commandManifestCache = buildCommandManifest();
+    return Object.freeze({
+      ...commandManifestCache.summary,
+      commands: commandManifestCache.commands
+    });
+  }
+
+  function receivedManifestSummary(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    return Object.freeze({
+      schema: String(value.schema || '').slice(0, 120),
+      protocolVersion: Math.max(0, Math.floor(Number(value.protocolVersion) || 0)),
+      catalogVersion: Math.max(0, Math.floor(Number(value.catalogVersion) || 0)),
+      catalogRevision: String(value.catalogRevision || '').trim().toLowerCase().slice(0, 80),
+      commandCount: Math.max(0, Math.floor(Number(value.commandCount) || 0))
+    });
+  }
+
+  function verifyManifest(value, options = {}) {
+    const expected = manifestSummary();
+    const received = receivedManifestSummary(value);
+    if (!received) {
+      const required = options.required !== false;
+      return Object.freeze({
+        ok: !required,
+        verified: false,
+        code: required ? 'command_manifest_missing' : 'legacy_command_manifest_unverified',
+        expected,
+        received: null
+      });
+    }
+    let code = '';
+    if (received.schema !== expected.schema || received.protocolVersion !== expected.protocolVersion) {
+      code = 'command_protocol_mismatch';
+    } else if (
+      received.catalogVersion !== expected.catalogVersion
+      || received.catalogRevision !== expected.catalogRevision
+      || received.commandCount !== expected.commandCount
+    ) {
+      code = 'command_catalog_changed';
+    }
+    return Object.freeze({
+      ok: !code,
+      verified: !code,
+      code,
+      expected,
+      received
+    });
+  }
+
+  function notifyCatalogChange() {
+    commandManifestCache = null;
+    try {
+      global.dispatchEvent?.(new CustomEvent('fe-monster-app-command-catalog-change', {
+        detail: manifestSummary()
+      }));
+    } catch (_) {}
+  }
+
+  function registerDefinition(definition) {
     if (!definition || typeof definition !== 'object' || typeof definition.handler !== 'function') {
       throw commandError('命令注册必须包含处理函数');
     }
@@ -304,9 +528,21 @@
     return publicDefinition(record);
   }
 
+  function register(definition) {
+    const registered = registerDefinition(definition);
+    notifyCatalogChange();
+    return registered;
+  }
+
   function registerMany(definitions) {
     if (!Array.isArray(definitions)) throw commandError('命令目录必须是数组');
-    return definitions.map(register);
+    const registered = [];
+    try {
+      definitions.forEach((definition) => registered.push(registerDefinition(definition)));
+    } finally {
+      if (registered.length) notifyCatalogChange();
+    }
+    return registered;
   }
 
   function resolve(value) {
@@ -467,7 +703,8 @@
     const limit = Math.max(1, Math.min(20, Number.isFinite(limitValue) ? Math.floor(limitValue) : 12));
     const page = commands.slice(cursor, cursor + limit);
     return Object.freeze({
-      version: 2,
+      version: COMMAND_BUS_VERSION,
+      manifest: manifestSummary(),
       commands: Object.freeze(page),
       total: commands.length,
       cursor,
@@ -482,7 +719,8 @@
   }
 
   global.FeMonsterAppCommands = Object.freeze({
-    version: 2,
+    version: COMMAND_BUS_VERSION,
+    protocolVersion: COMMAND_PROTOCOL_VERSION,
     register,
     registerMany,
     execute,
@@ -490,6 +728,9 @@
     resolve: (name) => publicDefinition(resolve(name)),
     catalog,
     capabilities,
+    manifest,
+    manifestSummary,
+    verifyManifest,
     normalizeName
   });
 })(window);

@@ -7,6 +7,7 @@
   const LOCAL_PATH_KEY = /(?:^|_)(?:local|file|install|working|workspace|cache|temp|root|home)?(?:path|dir|directory)$/i;
   const LOCAL_PATH_VALUE = /(?:^file:|\b[A-Za-z]:[\\/]|^\\\\|^\/(?:Users|home|var|tmp|opt)\/)/i;
   const CONTEXT_EVENTS = Object.freeze([
+    'fe-monster-app-command-catalog-change',
     'fe-monster-app-command-complete',
     'fe-monster-app-command-error',
     'fe-monster-pet-stream-state',

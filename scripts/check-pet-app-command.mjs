@@ -48,6 +48,7 @@ assert.equal(execution.volume, 42);
 assert.equal(receivedParameters.constructor, undefined, 'prototype-sensitive parameter was not removed');
 assert.equal({}.polluted, undefined, 'command parameters polluted Object.prototype');
 assert.deepEqual(events.map((event) => event.type), [
+  'fe-monster-app-command-catalog-change',
   'fe-monster-app-command-start',
   'fe-monster-app-command-complete'
 ]);
@@ -308,8 +309,12 @@ assert.match(petSource, /\{ sessionId, actionId, clientRole: petClientRole\(\), 
 assert.match(petSource, /targetStreamRole === petClientRole\(\)/,
   'same-computer desktop roles must not race the originating role for one action');
 assert.match(petSource, /\.\.\.\(confirmed \? \{ confirmed: true \} : \{\}\)/);
+const applyToolEventStart = petSource.indexOf('async function applyToolEvent');
+const applyToolEventEnd = petSource.indexOf('\n  function audioIdFromPayload', applyToolEventStart);
+const applyToolEventSource = petSource.slice(applyToolEventStart, applyToolEventEnd);
 assert.ok(
-  petSource.indexOf('await requestActionConfirmation(payload, inspection') < petSource.indexOf("/api/community/pet/action-claim"),
+  applyToolEventSource.indexOf('await requestActionConfirmation(payload, inspection')
+    < applyToolEventSource.indexOf("/api/community/pet/action-claim"),
   'confirmation UI must resolve before acquiring an execution lease'
 );
 

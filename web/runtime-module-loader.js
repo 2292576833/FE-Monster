@@ -3,12 +3,12 @@
 (function loadFeMonsterRuntimeModules() {
   const FE_IDENTITY_CARD_URL = 'fe-identity-card.js?v=20260812-friend-card-2';
   const PET_EMOTION_RUNTIME_URL = 'pet-emotion-runtime.js?v=20260811-conversation-emotion-1';
-  const PET_CLIENT_CONTEXT_URL = 'pet-client-context.js?v=20260811-cache-audit-1';
+  const PET_CLIENT_CONTEXT_URL = 'pet-client-context.js?v=20260827-pet-command-manifest-1';
   const PET_LIVE_TURN_CONTROLLER_URL = 'pet-live-turn-controller.js?v=20260811-cache-audit-1';
   const PET_LIVE_TELEMETRY_URL = 'pet-live-telemetry.js?v=20260811-cache-audit-1';
   const PET_LIVE_PLAYOUT_URL = 'pet-live-playout.js?v=20260811-cache-audit-1';
   const PET_LIVE_STT_CLIENT_URL = 'pet-live-stt-client.js?v=20260811-cache-audit-1';
-  const PET_ASSISTANT_URL = 'pet-assistant.js?v=20260819-command-parity-2';
+  const PET_ASSISTANT_URL = 'pet-assistant.js?v=20260827-pet-command-manifest-2';
   const PET_PRODUCT_TOUR_URL = 'pet-product-tour.js?v=20260811-moving-guide-2';
   const PET_PARTICLE_ORB_URL = 'pet-particle-orb.js?v=20260812-audio-reactive-sphere-2';
   const PET_COMPANION_P2_URL = 'pet-companion-p2.js?v=20260811-cache-audit-1';

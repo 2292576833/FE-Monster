@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the first production batch of FE Monster's local-authoritative, encrypted, searchable AI memory vault and connect new chat, playback, playlist, favorite, and scene-preset events to it.
+**Goal:** Build the first production batch of FE Monster's local-authoritative, encrypted, searchable AI memory vault; preserve exact chat history and a separately auditable operation history with causal trace links; and connect new chat, playback, playlist, favorite, command, and scene-preset events to it.
 
 **Architecture:** Xerial SQLite JDBC stores transaction metadata, AES-256-GCM envelopes, and HMAC-SHA-256 blind search tokens. A dedicated Windows DPAPI JNI DLL protects the vault master key, while a narrow Java service and same-origin HTTP module keep JDBC, key material, and internal FEID scopes out of browser code.
 
@@ -18,6 +18,8 @@
 - Browser callers never choose `scope`, `feId`, or account ID; Java derives the internal scope from the authenticated provider account.
 - JSON HTTP bodies are at most 1 MiB, restore archives stream to a fixed vault-owned temporary file with a 64 MiB hard limit, batches are at most 100, query results are at most 100, and errors reveal no SQL, path, key state, ciphertext, or rejected value.
 - `eventId` writes are idempotent; a conflicting duplicate changes nothing; batch append is transactional.
+- Chat, operation/audit, and knowledge/snapshot records use physically separate tables, sinks, selectors, and result collections. Shared trace/turn/message/operation IDs provide causality without mixing chat text with action history.
+- New chat and operation records require `occurredAt`, vault-owned `recordedAt`, source/model actor, and a bounded per-source sequence. Unknown legacy times stay explicitly unknown and are never fabricated.
 - Credentials, tokens, cookies, authorization values, passwords, sessions, URLs, absolute paths, raw headers, and raw HTTP bodies are rejected recursively.
 - `java -jar out/fe-monster-java.jar` remains a supported launch path.
 - All dependency versions, hashes, licenses, runtime modules, and installer payloads are pinned and verified.
@@ -128,12 +130,12 @@ git commit -m "feat: protect local memory keys with dpapi"
 **Interfaces:**
 - Produces: `MemoryCrypto.Sealed seal(byte[] plaintext, byte[] aad)` and `byte[] open(Sealed sealed, byte[] aad)`.
 - Produces: `byte[] blindToken(String normalizedToken)`, with independent HKDF labels.
-- Produces: `Map<String,Object> MemorySanitizer.sanitize(String type, Map<String,Object> payload)`.
+- Produces: `Map<String,Object> MemorySanitizer.sanitize(Stream stream, String type, Map<String,Object> payload)` with distinct chat, operation, and knowledge allowlists.
 - Produces: `Set<String> MemoryTokenizer.tokens(String text)` using NFKC, lowercasing, word/prefix tokens, and CJK bi/trigrams.
 
 - [ ] **Step 1: Write failing behavior probes**
 
-Cover random nonce/ciphertext for equal plaintext, AAD and tag tamper, independent derived keys, Unicode normalization, Chinese 1/2/3-character search tokens, bounded token count, non-finite geometry, recursive secret keys, URLs, blob URLs, and absolute Windows/Unix paths.
+Cover random nonce/ciphertext for equal plaintext, AAD and tag tamper, independent derived keys, Unicode normalization, Chinese 1/2/3-character search tokens, bounded token count, distinct chat/operation allowlists, exact timestamp/correlation validation, non-finite geometry, recursive secret keys, URLs, blob URLs, and absolute Windows/Unix paths.
 
 - [ ] **Step 2: Run probes and verify they fail**
 
@@ -169,11 +171,11 @@ git commit -m "feat: add local memory crypto boundary"
 
 **Interfaces:**
 - Consumes: `MemoryCrypto`, `MemorySanitizer`, `MemoryTokenizer`, and an unwrapped vault-key lease.
-- Produces: `AppendResult appendBatch(List<LocalMemoryEvent> events)`, `MemoryPage query(MemoryQuery query)`, `ForgetResult forget(MemorySelector selector)`, `BackupResult backup(Path vaultOwnedTarget)`, `RestoreResult restore(Path vaultOwnedArchive)`, `MemoryHealth health()`.
+- Produces separate `appendChats`, `appendOperations`, `appendKnowledge`, `queryChats`, `queryOperations`, and `queryKnowledge` paths plus transactional bounded batch, stream-specific forget, backup, restore, and health methods.
 
 - [ ] **Step 1: Write the failing store probe**
 
-Create a temporary vault with a deterministic test protector. Test migration, append/restart/query, scope isolation, Chinese search, cursor ordering, identical duplicate, conflicting duplicate, batch rollback, deletion/search removal, backup/restore, future-schema refusal, locked DB bounded failure, close/reopen, and DB/WAL/SHM/temp byte scans for plaintext and search markers.
+Create a temporary vault with a deterministic test protector. Test migration, append/restart/query, physical chat/operation separation, trace lookup returning two collections, exact `occurredAt` plus vault-owned `recordedAt`, actor/model origin, operation lifecycle and undo receipt, scope isolation, Chinese search, cursor ordering, identical duplicate, conflicting duplicate, batch rollback, deletion/search removal, backup/restore, future-schema refusal, locked DB bounded failure, close/reopen, and DB/WAL/SHM/temp byte scans for plaintext and search markers.
 
 - [ ] **Step 2: Run the probe and verify it fails**
 
@@ -214,11 +216,11 @@ git commit -m "feat: add encrypted sqlite memory store"
 
 **Interfaces:**
 - Consumes: `provider` only, then resolves account data from `MusicProviderRegistry` and internal FEID scope from `CommunityClient.petPersonalizationScope`.
-- Produces protected `/api/local-memory/health`, `/events`, `/context`, `/forget`, `/backup`, and `/restore` routes with structured no-store responses.
+- Produces protected `/api/local-memory/health`, `/events`, `/chats`, `/operations`, `/trace`, `/context`, `/forget`, `/backup`, and `/restore` routes with structured no-store responses. Chat and operation routes never return one merged timeline array.
 
 - [ ] **Step 1: Write failing service/route probes**
 
-Assert server-derived scope, FEID A/B isolation, anonymous device scope, spoofed scope/FEID rejection, same-origin/loopback guard, method matrix, 1 MiB JSON body limit, 64 MiB streamed restore limit, 100-event/100-result limits, idempotency, no-store headers, error status mapping, and post-close database renaming.
+Assert server-derived scope, FEID A/B isolation, anonymous device scope, spoofed scope/FEID rejection, same-origin/loopback guard, method matrix, explicit stream selection, separate chat/operation result collections, causal trace lookup, 1 MiB JSON body limit, 64 MiB streamed restore limit, 100-event/100-result limits, idempotency, no-store headers, error status mapping, and post-close database renaming.
 
 - [ ] **Step 2: Run probes and verify they fail**
 
@@ -264,7 +266,7 @@ git commit -m "feat: expose protected local memory service"
 
 - [ ] **Step 1: Write the failing browser ingress contract**
 
-Assert stable UUID event IDs, trusted timestamps, conversation IDs, all required event types, temporary-mode suppression, URL/path/credential field exclusion, batching away from render/audio loops, idempotent retry, and no replacement of existing UI/localStorage behavior.
+Assert stable UUID event IDs, exact occurrence timestamps, vault receipt timestamps, source sequence, conversation/message/trace/turn/operation IDs, local-versus-server model actor, all required chat and operation lifecycle types, separate sinks, temporary-mode suppression, URL/path/credential field exclusion, batching away from render/audio loops, idempotent retry, and no replacement of existing UI/localStorage behavior.
 
 - [ ] **Step 2: Run it and verify it fails**
 
@@ -277,7 +279,7 @@ Queue at most 100 sanitized event DTOs, flush on a short timer and visibility/pa
 
 - [ ] **Step 4: Wire the audited event boundaries**
 
-Record `chat.message` at unified insertion plus local/server reply completion; playback start/complete/skip/replay at `playback-intelligence.notify`; playlist snapshots only after logged-in successful refresh; favorite mutations only after success; scene preset save/apply only after success. Never send media/asset URLs or local paths.
+Record `chat.message` only through the chat sink at unified insertion plus local/server reply completion. Record command requested/confirmation/start/success/failure/cancel/replay/undo and playback start/complete/skip/replay only through the operation sink, retaining actor, manifest revision, receipt, result, and causal IDs. Record playlist snapshots through the knowledge sink only after logged-in successful refresh; favorite mutations and scene preset save/apply become operation events only after the real action succeeds. Never send media/asset URLs or local paths.
 
 - [ ] **Step 5: Run browser and regression probes**
 
@@ -339,3 +341,46 @@ Document local-authoritative encrypted memory, temporary conversations, explicit
 git add scripts/build-installer.ps1 scripts/check-windows-installer-contract.ps1 scripts/check-windows-clean-install-runtime.ps1 scripts/check-local-memory-release.ps1 README.md
 git commit -m "build: ship encrypted local memory vault"
 ```
+
+### Task 8: Bind the local user-configured pet and server pet to one client command protocol
+
+**Files:**
+- Modify: `web/app-command.js`
+- Modify: `web/app.js`
+- Modify: `web/pet-client-context.js`
+- Modify: `web/pet-assistant.js`
+- Modify: `web/index.html`
+- Modify: `web/runtime-module-loader.js`
+- Modify: `web/cache-fingerprints.json`
+- Create: `scripts/check-pet-command-manifest-parity.mjs`
+- Modify in sibling server checkout: `../FE moster server/pet-deepseek.js`
+- Modify in sibling server checkout: `../FE moster server/server.js`
+- Create in sibling server checkout: `../FE moster server/test-pet-command-manifest.mjs`
+
+**Interfaces:**
+- Produces one canonical `fe-monster.pet-command-manifest/v1` from the live client registry, with order-independent SHA-256 revision, command count, protocol/catalog versions, confirmation authority, receipt schema, and undo schema.
+- Both the locally configured model and server model receive that same summary through `pet-client-context`; full discovery remains `query_app_capabilities`, and execution remains `control_app` through `FeMonsterPetActionBridge`.
+- Every server-origin `pet.ai.tool` action is bound to the manifest revision seen at turn start. The client validates before confirmation/claim/execution; drift cancels without side effects, reports a structured reason, updates the server with the current manifest, and forces rediscovery.
+
+- [x] **Step 1: Add a failing manifest/parity contract**
+
+Cover registration-order independence, functional schema drift, display-only label changes, real SHA-256, capability/context equality, command receipts, local-model prompt inclusion, and pre-execution server-action guarding.
+
+- [x] **Step 2: Implement the canonical runtime manifest**
+
+Generate the hash only from functional command semantics, cache until registry mutation, emit `fe-monster-app-command-catalog-change`, attach the summary to capabilities and receipts, and keep the client registry authoritative for confirmation/undo policy.
+
+- [x] **Step 3: Relay and bind the manifest through the server**
+
+Strictly sanitize the commands context, persist the turn summary, attach it to pending/reconciled tool actions, and support a bounded `command_catalog_changed` cancellation carrying the new manifest. Server-only memory/web tools stay outside the shared client command catalog.
+
+- [x] **Step 4: Verify both model paths and cache delivery**
+
+Run: `node scripts/check-pet-command-manifest-parity.mjs`
+
+Run: `node scripts/check-client-ai-server-command-parity.mjs`
+
+Run in server checkout: `node test-pet-command-manifest.mjs`
+
+Run: `node scripts/check-web-cache-fingerprints.mjs`
+Expected: all PASS; local privacy-only read denials remain explicit and both model paths still execute ordinary client functions through the same bridge.
