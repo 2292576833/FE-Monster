@@ -77,7 +77,7 @@ constexpr float kSpatialDistanceCurveScaleMeters = 2.0f;
 // stereo fold / OBR normalization; they are not loudness makeup gains.
 constexpr float kSpatialUpmixStereoFoldCalibration = 1.25f;
 constexpr float kSpatialMatrixDecodeStereoFoldCalibration = 1.75f;
-constexpr float kSpatialObrUpmixRouteCalibration = 0.90f;
+constexpr float kSpatialObrUpmixRouteCalibration = 0.904f;
 constexpr float kSpatialObrStereoRouteCalibration = 0.99f;
 constexpr float kSpatialObrMatrixDecodeMakeup = 1.33f;
 constexpr float kSpatialObrAggregateInputCeiling = 0.80f;

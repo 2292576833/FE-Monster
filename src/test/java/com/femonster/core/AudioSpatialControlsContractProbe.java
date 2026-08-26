@@ -67,11 +67,25 @@ public final class AudioSpatialControlsContractProbe {
         "obrSpatialWidth"
     );
 
+    private static final Set<String> EFFECT_PARAMETER_KEYS = Set.of(
+        "chorusEnabled", "chorusRateHz", "chorusDepth", "chorusCenterDelayMs",
+        "chorusFeedback", "chorusMix",
+        "flangerEnabled", "flangerRateHz", "flangerDepth", "flangerCenterDelayMs",
+        "flangerFeedback", "flangerMix",
+        "phaserEnabled", "phaserRateHz", "phaserDepth", "phaserCenterFrequencyHz",
+        "phaserFeedback", "phaserMix",
+        "delayEnabled", "delayMs", "delayFeedback", "delayPingPong",
+        "delayDampingHz", "delayMix",
+        "earlyReflectionsEnabled", "earlyReflectionsRoomSize",
+        "earlyReflectionsDiffusion", "earlyReflectionsDamping", "earlyReflectionsMix"
+    );
+
     private static final Set<String> ALL_PARAMETER_KEYS;
 
     static {
         LinkedHashSet<String> keys = new LinkedHashSet<>(ORIGINAL_PARAMETER_KEYS);
         keys.addAll(SPATIAL_PARAMETER_KEYS);
+        keys.addAll(EFFECT_PARAMETER_KEYS);
         ALL_PARAMETER_KEYS = Set.copyOf(keys);
     }
 
@@ -83,7 +97,7 @@ public final class AudioSpatialControlsContractProbe {
         Path root = Path.of(args[0]).toAbsolutePath().normalize();
         Files.createDirectories(root);
 
-        defaultsAndEightPresetsRemainStable(root.resolve("defaults"));
+        defaultsAndFourteenPresetsRemainStable(root.resolve("defaults"));
         patchMapsEveryControlToTheNativeBoundary(root.resolve("mapping"));
         extendedStatePersistsAndConflictsRemainRevisionSafe(root.resolve("persistence"));
         legacyV1StateMigratesWithoutDataLoss(root.resolve("legacy"));
@@ -93,7 +107,7 @@ public final class AudioSpatialControlsContractProbe {
         System.out.println("AudioSpatialControlsContractProbe passed");
     }
 
-    private static void defaultsAndEightPresetsRemainStable(Path directory) throws Exception {
+    private static void defaultsAndFourteenPresetsRemainStable(Path directory) throws Exception {
         Files.createDirectories(directory);
         FakeNative bridge = new FakeNative();
         AudioMixerService service = new AudioMixerService(directory.resolve("mixer.json"), bridge);
@@ -131,10 +145,11 @@ public final class AudioSpatialControlsContractProbe {
             "OBR output gain must be neutral by default");
         require(equalNumber(clean.get("obrSpatialWidth"), 1.0),
             "OBR position spread must be neutral by default");
+        requireEffectDefaults(clean);
 
         Map<String, Object> presetPayload = service.presets();
         List<Object> presets = SimpleJson.asList(presetPayload.get("presets"));
-        require(presets.size() == 8, "the existing eight effect presets must remain");
+        require(presets.size() == 14, "the fourteen shipped preset identities must remain");
         List<String> ids = new ArrayList<>();
         Map<String, Object> surround = Map.of();
         for (Object value : presets) {
@@ -148,7 +163,9 @@ public final class AudioSpatialControlsContractProbe {
         }
         require(ids.equals(List.of(
             "clean", "bathroom", "hall", "surround-3d",
-            "cinema", "vocal-clear", "bass-boost", "night"
+            "cinema", "vocal-clear", "bass-boost", "night",
+            "wide-chorus", "classic-flanger", "flowing-phaser", "ping-pong-delay",
+            "nearfield-studio", "immersive-live"
         )), "preset identities or order changed");
         require(Boolean.TRUE.equals(surround.get("upmixEnabled")),
             "3D surround must use the real upmixer");
@@ -158,11 +175,10 @@ public final class AudioSpatialControlsContractProbe {
             "3D surround must request a real 7.1 virtual bed");
         require(Boolean.TRUE.equals(surround.get("obrEnabled")),
             "3D surround must use the official binaural renderer");
-        require(number(surround.get("stereoWidth")) >= 1.1
-                && number(surround.get("stereoWidth")) <= 1.3,
-            "3D surround stereo width must preserve center image and headroom");
-        require(equalNumber(surround.get("inputGainDb"), -6.0),
-            "3D surround needs 6 dB input headroom before multichannel summing");
+        require(equalNumber(surround.get("stereoWidth"), 1.0),
+            "3D surround must retain the canonical width-1 geometry");
+        require(equalNumber(surround.get("inputGainDb"), 0.0),
+            "3D surround must not retain an obsolete fixed input cut");
         require(number(surround.get("upmixCenterGain")) >= 0.65
                 && number(surround.get("upmixCenterGain")) <= 0.707,
             "3D surround center gain exceeds the verified fidelity window");
@@ -172,8 +188,9 @@ public final class AudioSpatialControlsContractProbe {
         require(number(surround.get("upmixLfeGain")) >= 0.35
                 && number(surround.get("upmixLfeGain")) <= 0.60,
             "3D surround LFE gain exceeds the verified fidelity window");
-        require(number(surround.get("obrSpatialWidth")) >= 1.25,
-            "3D surround needs a wider object-position spread than the clean preset");
+        require(equalNumber(surround.get("obrSpatialWidth"), 1.0),
+            "3D surround must preserve canonical OBR object positions");
+        assertEffectPresetIdentity(presets);
     }
 
     private static void patchMapsEveryControlToTheNativeBoundary(Path directory) throws Exception {
@@ -198,14 +215,15 @@ public final class AudioSpatialControlsContractProbe {
             1.35
         );
 
+        controls.putAll(effectPatch());
         Map<String, Object> snapshot = service.patch(0L, controls);
         require(number(snapshot.get("revision")) == 1.0, "one atomic patch must advance once");
         require(parameters(snapshot).entrySet().containsAll(controls.entrySet()),
             "the accepted spatial controls were not echoed in the complete snapshot");
-        require(bridge.lastValues != null && bridge.lastValues.length == 44,
-            "the Java/JNI control vector must add 13 values without moving the original 31");
-        require((bridge.lastFlags & 0x30) == 0x30,
-            "upmix and OBR requested-enable bits were not sent to native");
+        require(bridge.lastValues != null && bridge.lastValues.length == 68,
+            "the Java/JNI control vector must retain the ABI-v2 68-value snapshot");
+        require((bridge.lastFlags & 0x7f0) == 0x7f0,
+            "upmix, OBR, and every effect enable bit were not sent atomically");
         require(equalFloat(bridge.lastValues[31], 2.0f), "AmbientExtract enum mapping changed");
         require(equalFloat(bridge.lastValues[32], 8.0f), "7.1 layout mapping changed");
         require(equalFloat(bridge.lastValues[33], 520.0f), "center width mapping changed");
@@ -219,6 +237,17 @@ public final class AudioSpatialControlsContractProbe {
         require(equalFloat(bridge.lastValues[41], 0.24f), "OBR dry mapping changed");
         require(equalFloat(bridge.lastValues[42], -3.5f), "OBR output gain mapping changed");
         require(equalFloat(bridge.lastValues[43], 1.35f), "OBR spatial width mapping changed");
+        float[] expectedEffects = {
+            0.31f, 0.41f, 17.0f, -0.12f, 0.21f,
+            0.17f, 0.61f, 1.7f, 0.32f, 0.22f,
+            0.23f, 0.51f, 910.0f, 0.24f, 0.31f,
+            321.0f, 0.39f, 0.84f, 8_100.0f, 0.27f,
+            0.29f, 0.49f, 0.43f, 0.17f
+        };
+        for (int index = 0; index < expectedEffects.length; index += 1) {
+            require(equalFloat(bridge.lastValues[44 + index], expectedEffects[index]),
+                "ABI-v2 effect mapping changed at value " + (44 + index));
+        }
     }
 
     private static void extendedStatePersistsAndConflictsRemainRevisionSafe(Path directory)
@@ -269,53 +298,53 @@ public final class AudioSpatialControlsContractProbe {
         root.put("presetVersion", 1);
         root.put("revision", 7);
         root.put("selectedPreset", "custom");
-        Map<String, Object> legacy = legacyParameters();
+        Map<String, Object> legacy = v1Parameters();
         legacy.put("inputGainDb", -2.5);
         legacy.put("surroundGain", 1.24);
+        legacy.put("upmixEnabled", true);
+        legacy.put("upmixOutputLayout", "7.1");
+        legacy.put("obrEnabled", true);
+        legacy.put("obrWet", 0.72);
+        legacy.put("obrDry", 0.28);
         root.put("parameters", legacy);
         Files.writeString(stateFile, SimpleJson.stringify(root), StandardCharsets.UTF_8);
 
         AudioMixerService restored = new AudioMixerService(stateFile, new FakeNative());
         Map<String, Object> snapshot = restored.snapshot();
         require("ready".equals(snapshot.get("configState")),
-            "a valid pre-spatial v1 state must not be quarantined as corrupt");
-        require(Boolean.TRUE.equals(snapshot.get("spatialMigrationNeeded")),
-            "a restored 27-key v1 state must expose the one-time migration signal");
+            "a valid v1 state must not be quarantined as corrupt");
+        require(Boolean.FALSE.equals(snapshot.get("spatialMigrationNeeded")),
+            "a validated v1 state must atomically migrate to v2 on first open");
         require(number(snapshot.get("revision")) == 7.0, "legacy revision was reset");
         Map<String, Object> migrated = parameters(snapshot);
         require(migrated.keySet().equals(ALL_PARAMETER_KEYS),
-            "legacy parameters were not completed with additive defaults");
+            "v1 parameters were not completed with additive effect defaults");
         require(equalNumber(migrated.get("inputGainDb"), -2.5),
             "migration changed an existing user mixer preference");
         require(equalNumber(migrated.get("surroundGain"), 1.24),
             "migration changed an existing channel gain");
-        require("matrix-decode".equals(migrated.get("upmixAlgorithm")),
-            "migration did not apply the current real upmix default");
+        require(Boolean.TRUE.equals(migrated.get("upmixEnabled"))
+                && "7.1".equals(migrated.get("upmixOutputLayout")),
+            "migration changed a recognized v1 upmix preference");
         require("direct".equals(migrated.get("obrFilterProfile")),
-            "migration did not apply the fidelity-safe official OBR profile");
-        require(Boolean.FALSE.equals(migrated.get("upmixEnabled"))
-                && Boolean.FALSE.equals(migrated.get("obrEnabled")),
-            "migration force-enabled a spatial chain whose old preference is unknown");
-
-        Map<String, Object> retry = restored.patch(7L, Map.of());
-        require(number(retry.get("revision")) == 7.0
-                && Boolean.TRUE.equals(retry.get("spatialMigrationNeeded")),
-            "an empty native retry must not pretend that legacy state was persisted");
-        Map<String, Object> upgraded = restored.patch(7L, Map.of(
-            "upmixEnabled", false,
-            "obrEnabled", false
-        ));
-        require(number(upgraded.get("revision")) == 8.0,
-            "an explicit same-value migration PATCH must create a durable revision receipt");
-        require(Boolean.FALSE.equals(upgraded.get("spatialMigrationNeeded")),
-            "the first durable additive PATCH did not clear the migration signal");
+            "migration changed the v1 OBR profile");
+        require(Boolean.TRUE.equals(migrated.get("obrEnabled"))
+                && equalNumber(migrated.get("obrWet"), 0.72)
+                && equalNumber(migrated.get("obrDry"), 0.28),
+            "migration changed a recognized v1 OBR preference");
+        requireEffectDefaults(migrated);
         Map<String, Object> persisted = SimpleJson.parseObjectStrict(
             Files.readString(stateFile, StandardCharsets.UTF_8)
         );
         require(parameters(persisted).keySet().equals(ALL_PARAMETER_KEYS),
-            "the first post-migration edit did not durably upgrade the complete state");
-        require(number(persisted.get("revision")) == 8.0,
-            "same-value migration did not persist its new revision");
+            "atomic migration did not durably upgrade the complete state");
+        require(number(persisted.get("revision")) == 7.0,
+            "atomic migration changed the user revision");
+        String firstMigratedDocument = Files.readString(stateFile, StandardCharsets.UTF_8);
+        AudioMixerService reopened = new AudioMixerService(stateFile, new FakeNative());
+        require(reopened.snapshot().equals(snapshot), "reopening changed the migrated v2 state");
+        require(firstMigratedDocument.equals(Files.readString(stateFile, StandardCharsets.UTF_8)),
+            "reopening rewrote an already migrated v2 state");
     }
 
     private static void enumAndNumericBoundariesRejectInvalidInput(Path directory) throws Exception {
@@ -524,6 +553,82 @@ public final class AudioSpatialControlsContractProbe {
         return patch;
     }
 
+    private static Map<String, Object> effectPatch() {
+        Map<String, Object> patch = new LinkedHashMap<>();
+        patch.put("chorusEnabled", true);
+        patch.put("chorusRateHz", 0.31);
+        patch.put("chorusDepth", 0.41);
+        patch.put("chorusCenterDelayMs", 17.0);
+        patch.put("chorusFeedback", -0.12);
+        patch.put("chorusMix", 0.21);
+        patch.put("flangerEnabled", true);
+        patch.put("flangerRateHz", 0.17);
+        patch.put("flangerDepth", 0.61);
+        patch.put("flangerCenterDelayMs", 1.7);
+        patch.put("flangerFeedback", 0.32);
+        patch.put("flangerMix", 0.22);
+        patch.put("phaserEnabled", true);
+        patch.put("phaserRateHz", 0.23);
+        patch.put("phaserDepth", 0.51);
+        patch.put("phaserCenterFrequencyHz", 910.0);
+        patch.put("phaserFeedback", 0.24);
+        patch.put("phaserMix", 0.31);
+        patch.put("delayEnabled", true);
+        patch.put("delayMs", 321.0);
+        patch.put("delayFeedback", 0.39);
+        patch.put("delayPingPong", 0.84);
+        patch.put("delayDampingHz", 8100.0);
+        patch.put("delayMix", 0.27);
+        patch.put("earlyReflectionsEnabled", true);
+        patch.put("earlyReflectionsRoomSize", 0.29);
+        patch.put("earlyReflectionsDiffusion", 0.49);
+        patch.put("earlyReflectionsDamping", 0.43);
+        patch.put("earlyReflectionsMix", 0.17);
+        return patch;
+    }
+
+    private static void requireEffectDefaults(Map<String, Object> parameters) {
+        for (String enabled : List.of(
+            "chorusEnabled", "flangerEnabled", "phaserEnabled", "delayEnabled",
+            "earlyReflectionsEnabled"
+        )) {
+            require(Boolean.FALSE.equals(parameters.get(enabled)), enabled + " must default off");
+        }
+        for (String mix : List.of(
+            "chorusMix", "flangerMix", "phaserMix", "delayMix", "earlyReflectionsMix"
+        )) {
+            require(equalNumber(parameters.get(mix), 0.0), mix + " must default dry");
+        }
+        for (String key : EFFECT_PARAMETER_KEYS) {
+            require(parameters.get(key) != null, "missing additive effect default: " + key);
+        }
+    }
+
+    private static void assertEffectPresetIdentity(List<Object> presets) {
+        Map<String, String> enabledByPreset = Map.of(
+            "wide-chorus", "chorusEnabled",
+            "classic-flanger", "flangerEnabled",
+            "flowing-phaser", "phaserEnabled",
+            "ping-pong-delay", "delayEnabled",
+            "nearfield-studio", "earlyReflectionsEnabled",
+            "immersive-live", "earlyReflectionsEnabled"
+        );
+        for (Object value : presets) {
+            Map<String, Object> preset = SimpleJson.asMap(value);
+            String id = SimpleJson.asString(preset.get("id"), "");
+            String enabled = enabledByPreset.get(id);
+            if (enabled == null) continue;
+            Map<String, Object> parameters = parameters(preset);
+            require(Boolean.TRUE.equals(parameters.get(enabled)),
+                id + " must retain its shipped enabled effect");
+            if ("immersive-live".equals(id)) {
+                require(Boolean.TRUE.equals(parameters.get("upmixEnabled"))
+                        && Boolean.TRUE.equals(parameters.get("obrEnabled")),
+                    "immersive live must remain the holistic spatial preset");
+            }
+        }
+    }
+
     private static Map<String, Object> legacyParameters() {
         Map<String, Object> p = new LinkedHashMap<>();
         p.put("enabled", true);
@@ -553,6 +658,38 @@ public final class AudioSpatialControlsContractProbe {
         p.put("reverbWet", 0.0);
         p.put("reverbDry", 1.0);
         require(p.keySet().equals(ORIGINAL_PARAMETER_KEYS), "legacy fixture drifted");
+        return p;
+    }
+
+    private static Map<String, Object> v1Parameters() {
+        Map<String, Object> p = new LinkedHashMap<>(legacyParameters());
+        p.put("upmixEnabled", false);
+        p.put("upmixAlgorithm", "matrix-decode");
+        p.put("upmixOutputLayout", "5.1");
+        p.put("upmixCenterWidthHz", 300.0);
+        p.put("upmixLfeCrossoverHz", 120.0);
+        p.put("upmixCenterGain", 0.707);
+        p.put("upmixSurroundGain", 0.5);
+        p.put("upmixLfeGain", 0.707);
+        p.put("upmixDecorrelation", 0.7);
+        p.put("obrEnabled", false);
+        p.put("obrFilterProfile", "direct");
+        p.put("obrWet", 1.0);
+        p.put("obrDry", 0.0);
+        p.put("obrOutputGainDb", 0.0);
+        p.put("obrSpatialWidth", 1.0);
+        require(p.keySet().equals(Set.copyOf(List.of(
+            "enabled", "inputGainDb", "outputGainDb", "balance", "eqDb", "stereoWidth",
+            "centerGain", "surroundGain", "lfeGain", "compressorEnabled",
+            "compressorThresholdDb", "compressorRatio", "compressorAttackMs",
+            "compressorReleaseMs", "compressorKneeDb", "compressorMakeupDb", "limiterEnabled",
+            "limiterCeilingDb", "limiterReleaseMs", "reverbEnabled", "reverbRoomSize",
+            "reverbDecayMs", "reverbDamping", "reverbPreDelayMs", "reverbWet", "reverbDry",
+            "upmixEnabled", "upmixAlgorithm", "upmixOutputLayout", "upmixCenterWidthHz",
+            "upmixLfeCrossoverHz", "upmixCenterGain", "upmixSurroundGain", "upmixLfeGain",
+            "upmixDecorrelation", "obrEnabled", "obrFilterProfile", "obrWet", "obrDry",
+            "obrOutputGainDb", "obrSpatialWidth"
+        ))), "v1 fixture drifted");
         return p;
     }
 

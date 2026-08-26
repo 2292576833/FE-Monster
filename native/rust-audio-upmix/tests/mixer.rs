@@ -46,6 +46,10 @@ fn peak(values: &[f32]) -> f32 {
     values.iter().fold(0.0_f32, |m, x| m.max(x.abs()))
 }
 
+fn rms(values: &[f32]) -> f32 {
+    (values.iter().map(|value| value * value).sum::<f32>() / values.len().max(1) as f32).sqrt()
+}
+
 fn sine(frames: usize, channels: usize, frequency: f32, amplitude: f32) -> Vec<f32> {
     let mut result = vec![0.0; frames * channels];
     for frame in 0..frames {
@@ -62,10 +66,27 @@ fn channel_samples(pcm: &[f32], channels: usize, channel: usize) -> Vec<f32> {
         .collect()
 }
 
-fn process_in_blocks(handle: &Handle, pcm: &mut [f32], channels: usize, max_frames: usize) {
+fn process_in_blocks(
+    handle: &Handle,
+    pcm: &mut [f32],
+    channels: usize,
+    max_frames: usize,
+) -> usize {
+    let mut block_count = 0;
     for block in pcm.chunks_mut(max_frames * channels) {
         assert_eq!(handle.process(block, channels as u32), FE_RUST_MIXER_OK);
+        block_count += 1;
     }
+    block_count
+}
+
+fn mixer_status(handle: &Handle) -> FeRustMixerStatus {
+    let mut status = FeRustMixerStatus::default();
+    assert_eq!(
+        unsafe { fe_rust_mixer_get_status(handle.0, &mut status) },
+        FE_RUST_MIXER_OK
+    );
+    status
 }
 
 #[test]
@@ -703,6 +724,302 @@ fn maximum_feedback_effect_tails_decay_through_mixer_ffi() {
             );
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ProgrammeKind {
+    Silence,
+    Impulse,
+    Sine,
+    PinkMultitone,
+}
+
+fn programme(kind: ProgrammeKind, frames: usize, channels: usize) -> Vec<f32> {
+    let mut pcm = vec![0.0; frames * channels];
+    match kind {
+        ProgrammeKind::Silence => {}
+        ProgrammeKind::Impulse => pcm[..channels].fill(0.1),
+        ProgrammeKind::Sine => {
+            for frame in 0..frames {
+                let sample = (frame as f32 * 997.0 * std::f32::consts::TAU / 48_000.0).sin() * 0.1;
+                pcm[frame * channels..(frame + 1) * channels].fill(sample);
+            }
+        }
+        ProgrammeKind::PinkMultitone => {
+            const FREQUENCIES: [f32; 7] = [125.0, 250.0, 500.0, 1_000.0, 2_000.0, 4_000.0, 8_000.0];
+            const WEIGHTS: [f32; 7] = [
+                1.0,
+                0.707_106_77,
+                0.5,
+                0.353_553_38,
+                0.25,
+                0.176_776_69,
+                0.125,
+            ];
+            for frame in 0..frames {
+                for channel in 0..channels {
+                    let mut sample = 0.0;
+                    for (tone, (frequency, weight)) in
+                        FREQUENCIES.into_iter().zip(WEIGHTS).enumerate()
+                    {
+                        let phase = frame as f32 * frequency * std::f32::consts::TAU / 48_000.0
+                            + tone as f32 * 0.17
+                            + channel as f32 * 0.11;
+                        sample += weight * phase.sin();
+                    }
+                    pcm[frame * channels + channel] = sample;
+                }
+            }
+            let scale = 0.1 / peak(&pcm).max(f32::MIN_POSITIVE);
+            for sample in &mut pcm {
+                *sample *= scale;
+            }
+            assert!(peak(&pcm) <= 0.1 + 1.0e-7);
+        }
+    }
+    pcm
+}
+
+fn disable_new_effects(mut params: FeRustMixerParams) -> FeRustMixerParams {
+    params.chorus_enabled = 0;
+    params.chorus_mix = 0.0;
+    params.flanger_enabled = 0;
+    params.flanger_mix = 0.0;
+    params.phaser_enabled = 0;
+    params.phaser_mix = 0.0;
+    params.delay_enabled = 0;
+    params.delay_mix = 0.0;
+    params.early_reflections_enabled = 0;
+    params.early_reflections_mix = 0.0;
+    params
+}
+
+fn restore_new_effect_switches(
+    mut control: FeRustMixerParams,
+    shipped: FeRustMixerParams,
+) -> FeRustMixerParams {
+    control.chorus_enabled = shipped.chorus_enabled;
+    control.chorus_mix = shipped.chorus_mix;
+    control.flanger_enabled = shipped.flanger_enabled;
+    control.flanger_mix = shipped.flanger_mix;
+    control.phaser_enabled = shipped.phaser_enabled;
+    control.phaser_mix = shipped.phaser_mix;
+    control.delay_enabled = shipped.delay_enabled;
+    control.delay_mix = shipped.delay_mix;
+    control.early_reflections_enabled = shipped.early_reflections_enabled;
+    control.early_reflections_mix = shipped.early_reflections_mix;
+    control
+}
+
+fn render_snapshot(
+    params: &FeRustMixerParams,
+    input: &[f32],
+    channels: usize,
+    max_frames: usize,
+) -> (Vec<f32>, FeRustMixerStatus, usize) {
+    let handle = Handle::new(max_frames as u32);
+    handle.apply(1, params, 0);
+    let mut output = input.to_vec();
+    let block_count = process_in_blocks(&handle, &mut output, channels, max_frames);
+    (output, mixer_status(&handle), block_count)
+}
+
+fn assert_effect_preset_identity(id: u32, params: &FeRustMixerParams) {
+    let switches = [
+        (params.chorus_enabled, params.chorus_mix),
+        (params.flanger_enabled, params.flanger_mix),
+        (params.phaser_enabled, params.phaser_mix),
+        (params.delay_enabled, params.delay_mix),
+        (
+            params.early_reflections_enabled,
+            params.early_reflections_mix,
+        ),
+    ];
+    let expected = match id {
+        8 => 0,
+        9 => 1,
+        10 => 2,
+        11 => 3,
+        12 | 13 => 4,
+        _ => panic!("not a shipped effect preset: {id}"),
+    };
+    for (index, (enabled, mix)) in switches.into_iter().enumerate() {
+        assert_eq!(
+            enabled,
+            u32::from(index == expected),
+            "preset {id}, module {index}"
+        );
+        assert_eq!(mix > 0.0, index == expected, "preset {id}, module {index}");
+    }
+    if id == 13 {
+        assert_eq!(params.reverb_enabled, 1);
+        assert!(params.reverb_wet > 0.0);
+    }
+}
+
+#[test]
+fn shipped_effect_presets_are_safe_control_equivalent_and_lfe_transparent() {
+    const SAMPLE_RATE: usize = 48_000;
+    const FRAMES: usize = SAMPLE_RATE * 2;
+    const MAX_FRAMES: usize = 257;
+    const PROGRAMMES: [ProgrammeKind; 4] = [
+        ProgrammeKind::Silence,
+        ProgrammeKind::Impulse,
+        ProgrammeKind::Sine,
+        ProgrammeKind::PinkMultitone,
+    ];
+
+    for id in 8..=13 {
+        let shipped = mixer_preset_params(id).expect("shipped effect preset");
+        let shipped_again = mixer_preset_params(id).expect("repeat shipped effect preset");
+        assert_eq!(shipped, shipped_again, "preset {id} snapshot identity");
+        assert_effect_preset_identity(id, &shipped);
+
+        let control = disable_new_effects(shipped_again);
+        assert_eq!(
+            restore_new_effect_switches(control, shipped),
+            shipped,
+            "preset {id} control changed a legacy/routing field"
+        );
+
+        for channels in [2, 6, 8] {
+            for kind in PROGRAMMES {
+                let input = programme(kind, FRAMES, channels);
+                let (effect_output, effect_status, effect_blocks) =
+                    render_snapshot(&shipped, &input, channels, MAX_FRAMES);
+                let (control_output, control_status, control_blocks) =
+                    render_snapshot(&control, &input, channels, MAX_FRAMES);
+
+                // A fresh limiter-disabled mirror is exact only when the
+                // shipped downstream linked limiter never reduced gain.
+                let mut effect_without_limiter = shipped;
+                effect_without_limiter.limiter_enabled = 0;
+                let mut control_without_limiter = control;
+                control_without_limiter.limiter_enabled = 0;
+                let (effect_unlimited, effect_unlimited_status, effect_unlimited_blocks) =
+                    render_snapshot(&effect_without_limiter, &input, channels, MAX_FRAMES);
+                let (control_unlimited, control_unlimited_status, control_unlimited_blocks) =
+                    render_snapshot(&control_without_limiter, &input, channels, MAX_FRAMES);
+
+                assert_eq!(
+                    effect_output, effect_unlimited,
+                    "preset {id}, {channels}ch, {kind:?}: effect limiter engaged"
+                );
+                assert_eq!(
+                    control_output, control_unlimited,
+                    "preset {id}, {channels}ch, {kind:?}: control limiter engaged"
+                );
+                assert!(
+                    [
+                        effect_blocks,
+                        control_blocks,
+                        effect_unlimited_blocks,
+                        control_unlimited_blocks,
+                    ]
+                    .into_iter()
+                    .all(|blocks| blocks > 1 && blocks == FRAMES.div_ceil(MAX_FRAMES)),
+                    "preset {id}, {channels}ch, {kind:?}: block iteration was vacuous"
+                );
+                for status in [
+                    effect_status,
+                    control_status,
+                    effect_unlimited_status,
+                    control_unlimited_status,
+                ] {
+                    assert_eq!((status.active_revision, status.staged_revision), (1, 0));
+                    assert_eq!(status.process_failures, 0);
+                    assert_eq!(status.enabled, 1);
+                }
+
+                assert!(effect_output.iter().all(|sample| sample.is_finite()));
+                assert!(control_output.iter().all(|sample| sample.is_finite()));
+                assert!(peak(&effect_output) <= 1.0 + 1.0e-6);
+                assert!(peak(&control_output) <= 1.0 + 1.0e-6);
+                if kind == ProgrammeKind::Silence {
+                    assert_eq!(peak(&effect_output), 0.0);
+                    assert_eq!(peak(&control_output), 0.0);
+                } else {
+                    assert!(rms(&effect_output) > 1.0e-7);
+                    assert!(rms(&control_output) > 1.0e-7);
+                    assert!(
+                        effect_output.iter().zip(&control_output).enumerate().any(
+                            |(index, (effect, baseline))| {
+                                (channels < 6 || index % channels != 3)
+                                    && (effect - baseline).abs() > 1.0e-7
+                            }
+                        ),
+                        "preset {id}, {channels}ch, {kind:?}: enabled effect was inaudible"
+                    );
+                }
+
+                if kind == ProgrammeKind::Impulse {
+                    let first_tail =
+                        &effect_output[SAMPLE_RATE / 2 * channels..SAMPLE_RATE * channels];
+                    let last_tail =
+                        &effect_output[SAMPLE_RATE * 3 / 2 * channels..SAMPLE_RATE * 2 * channels];
+                    assert!(
+                        rms(last_tail) <= rms(first_tail) + 1.0e-7,
+                        "preset {id}, {channels}ch impulse tail grew: {} -> {}",
+                        rms(first_tail),
+                        rms(last_tail)
+                    );
+                }
+                if channels >= 6 {
+                    let lfe_baseline = channel_samples(&control_output, channels, 3);
+                    assert_eq!(
+                        channel_samples(&effect_output, channels, 3),
+                        lfe_baseline,
+                        "preset {id}, {channels}ch, {kind:?}: protected LFE changed"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn effect_stage_nan_rejects_revision_and_non_finite_pcm_fails_open() {
+    const MAX_FRAMES: usize = 193;
+    let handle = Handle::new(MAX_FRAMES as u32);
+    let active = mixer_preset_params(8).expect("audible effect preset");
+    handle.apply(1, &active, 0);
+
+    let input = programme(ProgrammeKind::PinkMultitone, 4_096, 2);
+    let mut before = input.clone();
+    assert!(process_in_blocks(&handle, &mut before, 2, MAX_FRAMES) > 1);
+    assert!(rms(&before) > 1.0e-7);
+    assert_eq!(unsafe { fe_rust_mixer_reset(handle.0) }, FE_RUST_MIXER_OK);
+
+    let mut invalid = active;
+    invalid.chorus_rate_hz = f32::NAN;
+    assert_eq!(
+        unsafe { fe_rust_mixer_stage_params(handle.0, 2, &invalid) },
+        FE_RUST_MIXER_INVALID_ARGUMENT
+    );
+    let mut after = input;
+    assert!(process_in_blocks(&handle, &mut after, 2, MAX_FRAMES) > 1);
+    assert_eq!(
+        after, before,
+        "rejected revision replaced the active snapshot"
+    );
+    let status = mixer_status(&handle);
+    assert_eq!((status.active_revision, status.staged_revision), (1, 0));
+    assert_eq!(status.process_failures, 0);
+
+    let mut corrupt_pcm = programme(ProgrammeKind::Sine, 4_096, 2);
+    corrupt_pcm[0] = f32::NAN;
+    corrupt_pcm[17] = f32::INFINITY;
+    corrupt_pcm[511] = f32::NEG_INFINITY;
+    assert!(process_in_blocks(&handle, &mut corrupt_pcm, 2, MAX_FRAMES) > 1);
+    assert!(corrupt_pcm.iter().all(|sample| sample.is_finite()));
+
+    let mut continued = programme(ProgrammeKind::Sine, 4_096, 2);
+    assert!(process_in_blocks(&handle, &mut continued, 2, MAX_FRAMES) > 1);
+    assert!(continued.iter().all(|sample| sample.is_finite()));
+    assert!(rms(&continued) > 1.0e-7);
+    let status = mixer_status(&handle);
+    assert_eq!((status.active_revision, status.staged_revision), (1, 0));
+    assert_eq!(status.process_failures, 0);
 }
 
 #[test]

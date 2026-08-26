@@ -140,14 +140,20 @@ try {
   });
 
   contract('javaJniSnapshotIsOneAtomicControlRevision', () => {
-    assert.match(engine, /NATIVE_MIXER_VALUE_COUNT\s*=\s*44/);
-    assert.match(engine, /\(flags\s*&\s*~0x3f\)\s*!=\s*0/);
+    assert.match(engine, /NATIVE_MIXER_VALUE_COUNT\s*=\s*68/);
+    assert.match(engine, /\(flags\s*&\s*~0x7ff\)\s*!=\s*0/);
     assert.match(engine, /cachedMixerRevision/);
     assert.match(engine, /nativeSetMixerParameters/);
-    assert.match(jniSource, /kMixerValueCount\s*=\s*44/);
-    assert.match(jniSource, /flags\s*&\s*~0x3f/);
+    assert.match(jniSource, /kMixerValueCount\s*=\s*68/);
+    assert.match(jniSource, /flags\s*&\s*~0x7ff/);
     assert.match(jniSource, /raw\[31\]/);
-    assert.match(jniSource, /raw\[43\]/);
+    assert.match(jniSource, /raw\[67\]/);
+    for (const [index, field] of [
+      [44, 'chorus_rate_hz'], [49, 'flanger_rate_hz'], [54, 'phaser_rate_hz'],
+      [59, 'delay_ms'], [64, 'early_reflections_room_size'], [67, 'early_reflections_mix'],
+    ]) {
+      assert.match(jniSource, new RegExp(`${field}\\s*=\\s*raw\\[${index}\\]`));
+    }
     assert.match(jniSource, /fe_audio_pipeline_set_mixer_params/,
       'Mixer receipt must remain part of every four-state commit');
     assert.match(jniSource, /fe_audio_pipeline_set_spatial_controls/,
@@ -240,8 +246,8 @@ try {
     checks,
     failures,
     contract: {
-      presets: 8,
-      nativeVectorValues: 44,
+      presets: 14,
+      nativeVectorValues: 68,
       routes: [
         'stereo-mixer-out',
         'upmix-mixer-non-obr-out',

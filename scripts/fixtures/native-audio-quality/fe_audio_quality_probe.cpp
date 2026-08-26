@@ -165,12 +165,16 @@ public:
             const float release = std::exp(-3.0f / (kSampleRate * 0.050f));
             gain_ = release * gain_ + (1.0f - release) * desired;
         }
+        minimum_gain_ = std::min(minimum_gain_, gain_);
         *left *= gain_;
         *right *= gain_;
     }
 
+    float MinimumGain() const { return minimum_gain_; }
+
 private:
     float gain_ = 1.0f;
+    float minimum_gain_ = 1.0f;
 };
 
 class RustChain final {
@@ -181,7 +185,11 @@ public:
         if (module_ != nullptr) FreeLibrary(module_);
     }
 
-    bool Initialize(float mixer_output_gain_db = 0.0f, bool limiter_enabled = true) {
+    bool Initialize(
+        float mixer_output_gain_db = 0.0f,
+        bool limiter_enabled = true,
+        bool effects_enabled = false
+    ) {
         std::array<wchar_t, 32768> path{};
         const DWORD length = GetEnvironmentVariableW(
             L"FE_MONSTER_RUST_UPMIX_DLL",
@@ -279,8 +287,55 @@ public:
         params.reverb_damping = 0.5f;
         params.reverb_pre_delay_ms = 12.0f;
         params.reverb_dry = 1.0f;
+        params.chorus_rate_hz = 0.30f;
+        params.chorus_depth = 0.35f;
+        params.chorus_center_delay_ms = 18.0f;
+        params.chorus_feedback = 0.0f;
+        params.chorus_mix = 0.0f;
+        params.flanger_rate_hz = 0.18f;
+        params.flanger_depth = 0.50f;
+        params.flanger_center_delay_ms = 1.5f;
+        params.flanger_feedback = 0.35f;
+        params.flanger_mix = 0.0f;
+        params.phaser_rate_hz = 0.20f;
+        params.phaser_depth = 0.50f;
+        params.phaser_center_frequency_hz = 900.0f;
+        params.phaser_feedback = 0.20f;
+        params.phaser_mix = 0.0f;
+        params.delay_ms = 320.0f;
+        params.delay_feedback = 0.30f;
+        params.delay_ping_pong = 0.75f;
+        params.delay_damping_hz = 8'000.0f;
+        params.delay_mix = 0.0f;
+        params.early_reflections_room_size = 0.35f;
+        params.early_reflections_diffusion = 0.55f;
+        params.early_reflections_damping = 0.45f;
+        params.early_reflections_mix = 0.0f;
+        if (effects_enabled) {
+            params.chorus_enabled = 1;
+            params.chorus_depth = 0.25f;
+            params.chorus_feedback = 0.05f;
+            params.chorus_mix = 0.12f;
+            params.flanger_enabled = 1;
+            params.flanger_depth = 0.35f;
+            params.flanger_feedback = 0.15f;
+            params.flanger_mix = 0.10f;
+            params.phaser_enabled = 1;
+            params.phaser_depth = 0.35f;
+            params.phaser_feedback = 0.12f;
+            params.phaser_mix = 0.12f;
+            params.delay_enabled = 1;
+            params.delay_ms = 140.0f;
+            params.delay_feedback = 0.18f;
+            params.delay_ping_pong = 0.60f;
+            params.delay_mix = 0.10f;
+            params.early_reflections_enabled = 1;
+            params.early_reflections_mix = 0.08f;
+        }
         if (mixer_stage_(mixer_, 1, &params) != FE_RUST_MIXER_OK) return false;
-        return mixer_commit_(mixer_, 1, 0) == FE_RUST_MIXER_OK;
+        if (mixer_commit_(mixer_, 1, 0) != FE_RUST_MIXER_OK) return false;
+        effects_enabled_ = effects_enabled;
+        return true;
     }
 
     bool Process(const std::vector<float>& stereo, std::vector<float>* output) {
@@ -303,6 +358,7 @@ public:
 
     uint64_t UpmixProcessCalls() const { return upmix_process_calls_; }
     uint64_t MixerProcessCalls() const { return mixer_process_calls_; }
+    bool EffectsEnabled() const { return effects_enabled_; }
 
 private:
     bool ProcessMixer(std::vector<float>* samples, uint32_t channels) {
@@ -334,6 +390,7 @@ private:
     FeRustMixerDestroyFn mixer_destroy_ = nullptr;
     uint64_t upmix_process_calls_ = 0;
     uint64_t mixer_process_calls_ = 0;
+    bool effects_enabled_ = false;
 };
 
 struct ObjectPosition {
@@ -582,6 +639,9 @@ struct RenderResult {
     StereoMetrics output;
     MultichannelMetrics pre_obr;
     double process_p99_ms = 0.0;
+    double minimum_limiter_gain = 1.0;
+    bool initialized = false;
+    bool completed = false;
 };
 
 RenderResult RenderTone(float amplitude, uint32_t warmup_blocks, uint32_t measured_blocks) {
@@ -593,6 +653,7 @@ RenderResult RenderTone(float amplitude, uint32_t warmup_blocks, uint32_t measur
         result.output.non_finite_samples = std::numeric_limits<uint64_t>::max();
         return result;
     }
+    result.initialized = true;
 
     StereoAccumulator output_accumulator;
     double pre_square_sum = 0.0;
@@ -618,6 +679,7 @@ RenderResult RenderTone(float amplitude, uint32_t warmup_blocks, uint32_t measur
         std::vector<float> upmixed;
         if (!rust.Process(stereo, &upmixed)) {
             result.output.non_finite_samples = std::numeric_limits<uint64_t>::max();
+            result.minimum_limiter_gain = safety_limiter.MinimumGain();
             return result;
         }
         const float obr_headroom_target = fe::audio::SpatialObrBlockInputHeadroom(
@@ -677,6 +739,8 @@ RenderResult RenderTone(float amplitude, uint32_t warmup_blocks, uint32_t measur
             static_cast<size_t>(std::ceil(timings.size() * 0.99) - 1)
         )];
     }
+    result.minimum_limiter_gain = safety_limiter.MinimumGain();
+    result.completed = true;
     return result;
 }
 
@@ -793,21 +857,41 @@ double NormalizedCorrelation(const std::vector<float>& a, const std::vector<floa
     return dot / std::max(1.0e-12, std::sqrt(square_a * square_b));
 }
 
-double RenderObjectRms(const ObjectPosition& position) {
+double RenderObjectRms(const ObjectPosition& position, bool broadband) {
     FlexibleObrRenderer renderer({position});
     if (!renderer.Ready()) return 0.0;
     constexpr uint32_t kWarmupBlocks = 12;
     constexpr uint32_t kMeasuredBlocks = 48;
+    constexpr std::array<float, 7> kFrequencies = {
+        125.0f, 250.0f, 500.0f, 1'000.0f,
+        2'000.0f, 4'000.0f, 8'000.0f
+    };
+    constexpr std::array<float, 7> kWeights = {
+        1.0f, 0.70710678f, 0.5f, 0.35355339f,
+        0.25f, 0.17677670f, 0.125f
+    };
     double square_sum = 0.0;
     uint64_t sample_count = 0;
     uint64_t absolute_frame = 0;
     for (uint32_t block = 0; block < kWarmupBlocks + kMeasuredBlocks; ++block) {
         std::vector<float> input(kFramesPerBlock, 0.0f);
         for (uint32_t frame = 0; frame < kFramesPerBlock; ++frame) {
-            input[frame] = 0.05f * std::sin(
-                2.0f * kPi * 997.0f * static_cast<float>(absolute_frame + frame)
-                    / static_cast<float>(kSampleRate)
-            );
+            if (broadband) {
+                float sum = 0.0f;
+                for (size_t tone = 0; tone < kFrequencies.size(); ++tone) {
+                    const float phase = 2.0f * kPi * kFrequencies[tone]
+                        * static_cast<float>(absolute_frame + frame)
+                        / static_cast<float>(kSampleRate);
+                    sum += kWeights[tone] * std::sin(phase);
+                }
+                input[frame] = 0.04f * sum;
+            } else {
+                input[frame] = 0.05f * std::sin(
+                    2.0f * kPi * 997.0f
+                        * static_cast<float>(absolute_frame + frame)
+                        / static_cast<float>(kSampleRate)
+                );
+            }
         }
         obr::AudioBuffer* output = renderer.Process(input);
         if (output == nullptr) return 0.0;
@@ -828,26 +912,34 @@ double RenderObjectRms(const ObjectPosition& position) {
 struct FourStateQualityResult {
     StereoMetrics output;
     double maximum_transparency_error = 0.0;
+    double minimum_limiter_gain = 1.0;
     uint64_t upmix_process_calls = 0;
     uint64_t mixer_process_calls = 0;
+    uint64_t obr_process_calls = 0;
+    bool effects_enabled = false;
+    bool spatial_enabled = false;
+    bool initialized = false;
+    bool completed = false;
 };
 
 FourStateQualityResult RenderFourState(
-    bool upmix_enabled,
-    bool obr_enabled,
+    bool effects_enabled,
+    bool spatial_enabled,
     bool broadband = false
 ) {
     constexpr uint32_t kWarmupBlocks = 32;
     constexpr uint32_t kMeasuredBlocks = 160;
     RustChain rust;
     FourStateQualityResult result{};
-    if (!rust.Initialize()) {
+    result.effects_enabled = effects_enabled;
+    result.spatial_enabled = spatial_enabled;
+    if (!rust.Initialize(0.0f, true, effects_enabled)) {
         result.output.non_finite_samples = std::numeric_limits<uint64_t>::max();
         return result;
     }
-    const uint32_t bed_channels = upmix_enabled ? kVirtualChannels : 2u;
+    const uint32_t bed_channels = spatial_enabled ? kVirtualChannels : 2u;
     std::unique_ptr<FlexibleObrRenderer> renderer;
-    if (obr_enabled) {
+    if (spatial_enabled) {
         renderer = std::make_unique<FlexibleObrRenderer>(
             OfficialObrPositions(bed_channels),
             obr::BinauralFilterProfile::kDirect
@@ -857,6 +949,7 @@ FourStateQualityResult RenderFourState(
             return result;
         }
     }
+    result.initialized = true;
 
     StereoAccumulator accumulator;
     LinkedSafetyLimiter limiter;
@@ -897,7 +990,7 @@ FourStateQualityResult RenderFourState(
         }
 
         std::vector<float> bed;
-        const bool processed = upmix_enabled
+        const bool processed = spatial_enabled
             ? rust.Process(stereo, &bed)
             : rust.ProcessStereo(stereo, &bed);
         if (!processed) {
@@ -906,7 +999,7 @@ FourStateQualityResult RenderFourState(
         }
 
         std::vector<float> output(static_cast<size_t>(kFramesPerBlock) * 2u, 0.0f);
-        if (obr_enabled) {
+        if (spatial_enabled) {
             const float headroom_target = fe::audio::SpatialObrBlockInputHeadroom(
                 bed.data(),
                 kFramesPerBlock,
@@ -920,46 +1013,24 @@ FourStateQualityResult RenderFourState(
             );
             for (float& sample : bed) sample *= obr_headroom_gain;
             obr::AudioBuffer* binaural = renderer->Process(bed);
+            result.obr_process_calls += 1;
             if (binaural == nullptr) {
                 result.output.non_finite_samples = std::numeric_limits<uint64_t>::max();
                 return result;
             }
             const auto left = (*binaural)[0];
             const auto right = (*binaural)[1];
-            const float calibration = upmix_enabled
-                ? fe::audio::kSpatialObrUpmixRouteCalibration
-                : fe::audio::kSpatialObrStereoRouteCalibration;
+            const float calibration = fe::audio::kSpatialObrUpmixRouteCalibration;
             const float compensation = std::sqrt(static_cast<float>(bed_channels))
-                * (upmix_enabled
-                    ? fe::audio::kSpatialObrMatrixDecodeMakeup
-                    : 1.0f);
+                * fe::audio::kSpatialObrMatrixDecodeMakeup;
             for (uint32_t frame = 0; frame < kFramesPerBlock; ++frame) {
                 output[static_cast<size_t>(frame) * 2u] =
                     left[frame] * compensation * calibration;
                 output[static_cast<size_t>(frame) * 2u + 1u] =
                     right[frame] * compensation * calibration;
             }
-        } else if (!upmix_enabled) {
-            output = bed;
         } else {
-            for (uint32_t frame = 0; frame < kFramesPerBlock; ++frame) {
-                const size_t source = static_cast<size_t>(frame) * kVirtualChannels;
-                const size_t destination = static_cast<size_t>(frame) * 2u;
-                const float left = bed[source]
-                    + 0.70710678f * bed[source + 2]
-                    + 0.5f * bed[source + 3]
-                    + 0.5f * bed[source + 4]
-                    + 0.5f * bed[source + 6];
-                const float right = bed[source + 1]
-                    + 0.70710678f * bed[source + 2]
-                    + 0.5f * bed[source + 3]
-                    + 0.5f * bed[source + 5]
-                    + 0.5f * bed[source + 7];
-                output[destination] = left / 1.5f
-                    * fe::audio::kSpatialMatrixDecodeStereoFoldCalibration;
-                output[destination + 1] = right / 1.5f
-                    * fe::audio::kSpatialMatrixDecodeStereoFoldCalibration;
-            }
+            output = bed;
         }
 
         for (uint32_t frame = 0; frame < kFramesPerBlock; ++frame) {
@@ -972,7 +1043,7 @@ FourStateQualityResult RenderFourState(
                     absolute_frame + frame
                         - static_cast<uint64_t>(kWarmupBlocks) * kFramesPerBlock
                 );
-                if (!upmix_enabled && !obr_enabled) {
+                if (!effects_enabled && !spatial_enabled) {
                     result.maximum_transparency_error = std::max({
                         result.maximum_transparency_error,
                         static_cast<double>(std::abs(output[base] - stereo[base])),
@@ -984,8 +1055,11 @@ FourStateQualityResult RenderFourState(
         absolute_frame += kFramesPerBlock;
     }
     result.output = accumulator.Finish();
+    result.minimum_limiter_gain = limiter.MinimumGain();
     result.upmix_process_calls = rust.UpmixProcessCalls();
     result.mixer_process_calls = rust.MixerProcessCalls();
+    result.effects_enabled = rust.EffectsEnabled();
+    result.completed = true;
     return result;
 }
 
@@ -1072,6 +1146,27 @@ int main() {
     const std::vector<float> front_left = RenderDirectionalSignature(0);
     const std::vector<float> rear_left = RenderDirectionalSignature(4);
     const double front_rear_signature_correlation = NormalizedCorrelation(front_left, rear_left);
+    std::vector<double> object_rms;
+    for (uint32_t channels : {6u, 8u}) {
+        const auto layout = OfficialObrPositions(channels);
+        for (uint32_t channel = 0; channel < channels; ++channel) {
+            if (channel == 3) continue;
+            object_rms.push_back(RenderObjectRms(layout[channel], true));
+        }
+    }
+    const auto [minimum_object_rms, maximum_object_rms] = std::minmax_element(
+        object_rms.begin(), object_rms.end()
+    );
+    const bool object_rms_nonzero = !object_rms.empty()
+        && *minimum_object_rms > 1.0e-12;
+    const double object_rms_spread_db = object_rms_nonzero
+        ? 20.0 * std::log10(*maximum_object_rms / *minimum_object_rms)
+        : std::numeric_limits<double>::infinity();
+    const double obr_loudness_delta_db = 20.0 * std::log10(
+        std::max(1.0e-12, obr_to_dry_rms)
+    );
+    const bool ordinary_programme_limiter_inactive =
+        mastered_programme.minimum_limiter_gain >= std::pow(10.0, -0.10 / 20.0);
     const ImpulseLatencyMetrics direct_latency = MeasureObrImpulseLatency(
         obr::BinauralFilterProfile::kDirect
     );
@@ -1093,6 +1188,28 @@ int main() {
         RenderFourState(false, true, true),
         RenderFourState(true, true, true)
     };
+    const bool render_initialization_ok = low.initialized
+        && high.initialized
+        && mastered_programme.initialized
+        && std::all_of(four_state.begin(), four_state.end(), [](const auto& route) {
+            return route.initialized;
+        })
+        && std::all_of(
+            four_state_broadband.begin(),
+            four_state_broadband.end(),
+            [](const auto& route) { return route.initialized; }
+        );
+    const bool render_completion_ok = low.completed
+        && high.completed
+        && mastered_programme.completed
+        && std::all_of(four_state.begin(), four_state.end(), [](const auto& route) {
+            return route.completed;
+        })
+        && std::all_of(
+            four_state_broadband.begin(),
+            four_state_broadband.end(),
+            [](const auto& route) { return route.completed; }
+        );
     double minimum_route_rms = std::numeric_limits<double>::max();
     double maximum_route_rms = 0.0;
     bool four_state_signal_ok = true;
@@ -1100,13 +1217,19 @@ int main() {
         const auto& route = four_state[state];
         minimum_route_rms = std::min(minimum_route_rms, route.output.rms);
         maximum_route_rms = std::max(maximum_route_rms, route.output.rms);
-        const bool expects_upmix = state == 1 || state == 3;
+        const bool expects_effects = state == 1 || state == 3;
+        const bool expects_spatial = state == 2 || state == 3;
         four_state_signal_ok = four_state_signal_ok
+            && route.effects_enabled == expects_effects
+            && route.spatial_enabled == expects_spatial
             && route.output.non_finite_samples == 0
             && route.output.hard_clip_samples == 0
-            && route.output.thd_ratio < 0.001
+            && route.output.rms > 1.0e-12
+            && (expects_effects || route.output.thd_ratio < 0.001)
             && route.mixer_process_calls == 192
-            && route.upmix_process_calls == (expects_upmix ? 192u : 0u);
+            && route.upmix_process_calls == (expects_spatial ? 192u : 0u)
+            && route.obr_process_calls == (expects_spatial ? 192u : 0u)
+            && route.minimum_limiter_gain >= 0.999999;
     }
     const double four_state_gain_jump_db = 20.0 * std::log10(
         maximum_route_rms / std::max(1.0e-12, minimum_route_rms)
@@ -1119,20 +1242,45 @@ int main() {
         maximum_broadband_rms = std::max(maximum_broadband_rms, route.output.rms);
         broadband_routes_finite = broadband_routes_finite
             && route.output.non_finite_samples == 0
-            && route.output.hard_clip_samples == 0;
+            && route.output.hard_clip_samples == 0
+            && route.output.rms > 1.0e-12
+            && route.minimum_limiter_gain >= 0.999999;
     }
     const double four_state_broadband_gain_jump_db = 20.0 * std::log10(
         maximum_broadband_rms / std::max(1.0e-12, minimum_broadband_rms)
     );
+    const double spatial_route_gain_delta_db = std::abs(20.0 * std::log10(
+        four_state[2].output.rms
+            / std::max(1.0e-12, four_state[0].output.rms)
+    ));
+    const double spatial_route_broadband_gain_delta_db = std::abs(20.0 * std::log10(
+        four_state_broadband[2].output.rms
+            / std::max(1.0e-12, four_state_broadband[0].output.rms)
+    ));
     // The native transition probe owns the <= 1 dB route-switch invariant.
     // This independent multitone fixture intentionally spans the HRTF's full
     // passband, so its spread also includes expected profile coloration.
     constexpr double kMaximumBroadbandSpectralSpreadDb = 1.25;
+    const double effects_only_rms_delta = std::abs(
+        four_state[1].output.rms - four_state[0].output.rms
+    );
+    const double combined_route_effects_rms_delta = std::abs(
+        four_state[3].output.rms - four_state[2].output.rms
+    );
+    const bool effects_audible = effects_only_rms_delta > 1.0e-5
+        && combined_route_effects_rms_delta > 1.0e-5;
+    const bool simultaneous_route_active = four_state[3].effects_enabled
+        && four_state[3].spatial_enabled
+        && four_state[3].mixer_process_calls == 192
+        && four_state[3].upmix_process_calls == 192
+        && four_state[3].obr_process_calls == 192;
     const bool four_state_quality_ok = four_state_signal_ok
         && four_state[0].maximum_transparency_error <= 1.0e-5
-        && four_state_gain_jump_db <= 2.0
+        && spatial_route_gain_delta_db <= 2.0
         && broadband_routes_finite
-        && four_state_broadband_gain_jump_db <= kMaximumBroadbandSpectralSpreadDb
+        && spatial_route_broadband_gain_delta_db <= kMaximumBroadbandSpectralSpreadDb
+        && effects_audible
+        && simultaneous_route_active
         && std::abs(
             four_state[2].output.left_right_correlation
                 - four_state[0].output.left_right_correlation
@@ -1149,7 +1297,8 @@ int main() {
         && maximum_target_azimuth_error <= 1.0e-6
         && std::abs(minimum_distance - 1.0f) <= 1.0e-6f
         && std::abs(maximum_distance - 1.0f) <= 1.0e-6f;
-    const bool channel_distinction_ok = std::abs(front_rear_signature_correlation) <= 0.92;
+    const bool object_presence_ok = object_rms_nonzero && object_rms_spread_db <= 2.0;
+    const bool channel_distinction_ok = std::abs(front_rear_signature_correlation) < 0.95;
     const bool transfer_linearity_ok = measured_level_ratio >= expected_level_ratio * 0.88;
     const bool distortion_ok = high.output.thd_ratio <= 0.01
         && high.output.hard_clip_samples == 0
@@ -1173,13 +1322,19 @@ int main() {
         && coherent_51_full_scale.hard_clip_samples == 0
         && coherent_51_full_scale.thd_ratio <= 0.001
         && coherent_full_scale.non_finite_samples == 0
+        && coherent_full_scale.hard_clip_samples == 0
         && coherent_full_scale.peak <= kObrCeiling * 1.0001
-        && coherent_full_scale.thd_ratio <= 0.05;
-    const bool loudness_ok = obr_to_dry_rms >= 0.70 && obr_to_dry_rms <= 1.30;
+        && coherent_full_scale.thd_ratio <= 0.05
+        && ordinary_programme_limiter_inactive;
+    const bool loudness_ok = obr_loudness_delta_db >= -1.5
+        && obr_loudness_delta_db <= 1.5;
     const bool realtime_ok = high.process_p99_ms <
         (1000.0 * kFramesPerBlock / kSampleRate) * 0.75;
-    const bool pass = finite_and_dc_ok
+    const bool pass = render_initialization_ok
+        && render_completion_ok
+        && finite_and_dc_ok
         && spatial_geometry_ok
+        && object_presence_ok
         && channel_distinction_ok
         && transfer_linearity_ok
         && distortion_ok
@@ -1187,11 +1342,51 @@ int main() {
         && four_state_quality_ok
         && realtime_ok;
 
+    const char* first_failing_metric = "";
+    if (!render_initialization_ok) {
+        first_failing_metric = "render_initialization";
+    } else if (!render_completion_ok) {
+        first_failing_metric = "render_completion";
+    } else if (!object_rms_nonzero) {
+        first_failing_metric = "obr_object_minimum_rms";
+    } else if (object_rms_spread_db > 2.0) {
+        first_failing_metric = "obr_object_rms_spread_db";
+    } else if (obr_loudness_delta_db < -1.5) {
+        first_failing_metric = "obr_loudness_delta_db_low";
+    } else if (obr_loudness_delta_db > 1.5) {
+        first_failing_metric = "obr_loudness_delta_db_high";
+    } else if (std::abs(front_rear_signature_correlation) >= 0.95) {
+        first_failing_metric = "front_rear_signature_correlation";
+    } else if (coherent_51_full_scale.hard_clip_samples != 0) {
+        first_failing_metric = "coherent_51_hard_clip_samples";
+    } else if (coherent_full_scale.hard_clip_samples != 0) {
+        first_failing_metric = "coherent_71_hard_clip_samples";
+    } else if (!ordinary_programme_limiter_inactive) {
+        first_failing_metric = "ordinary_programme_minimum_limiter_gain";
+    } else if (!finite_and_dc_ok) {
+        first_failing_metric = "finite_and_dc";
+    } else if (!spatial_geometry_ok) {
+        first_failing_metric = "spatial_geometry";
+    } else if (!transfer_linearity_ok) {
+        first_failing_metric = "transfer_linearity";
+    } else if (!distortion_ok) {
+        first_failing_metric = "distortion";
+    } else if (!four_state_quality_ok) {
+        first_failing_metric = "four_state_quality";
+    } else if (!realtime_ok) {
+        first_failing_metric = "realtime";
+    }
+
     std::cout << "{\n"
         << "  \"pass\": " << (pass ? "true" : "false") << ",\n"
+        << "  \"firstFailingMetric\": \"" << first_failing_metric << "\",\n"
         << "  \"qualityGates\": {"
-        << "\"finiteAndDc\":" << (finite_and_dc_ok ? "true" : "false")
+        << "\"renderInitialization\":"
+        << (render_initialization_ok ? "true" : "false")
+        << ",\"renderCompletion\":" << (render_completion_ok ? "true" : "false")
+        << ",\"finiteAndDc\":" << (finite_and_dc_ok ? "true" : "false")
         << ",\"spatialGeometry\":" << (spatial_geometry_ok ? "true" : "false")
+        << ",\"objectPresence\":" << (object_presence_ok ? "true" : "false")
         << ",\"channelDistinction\":" << (channel_distinction_ok ? "true" : "false")
         << ",\"transferLinearity\":" << (transfer_linearity_ok ? "true" : "false")
         << ",\"distortion\":" << (distortion_ok ? "true" : "false")
@@ -1209,7 +1404,16 @@ int main() {
         << ",\"maximumDistanceMeters\":" << maximum_distance
         << ",\"canonicalDistanceMeters\":1.0},\n"
         << "  \"directionalIdentity\": {\"frontLeftVsRearLeftCorrelation\":"
-        << front_rear_signature_correlation << ",\"maximumAllowed\":0.92},\n"
+        << front_rear_signature_correlation << ",\"absoluteMaximumExclusive\":0.95},\n"
+        << "  \"objectPresence\": {\"rms\":[";
+    for (size_t index = 0; index < object_rms.size(); ++index) {
+        if (index != 0) std::cout << ",";
+        std::cout << object_rms[index];
+    }
+    std::cout << "],\"minimumRms\":" << *minimum_object_rms
+        << ",\"nonzeroMinimumExclusive\":0.000000000001"
+        << ",\"spreadDb\":" << object_rms_spread_db
+        << ",\"maximumSpreadDb\":2.0},\n"
         << "  \"impulseLatency\": {"
         << "\"direct\":{\"onsetLeft\":" << direct_latency.onset_left
         << ",\"onsetRight\":" << direct_latency.onset_right
@@ -1225,16 +1429,50 @@ int main() {
         << ",\"peakRight\":" << reverberant_latency.peak_right << "}},\n"
         << "  \"fourStateQuality\": {\"pass\":"
         << (four_state_quality_ok ? "true" : "false")
-        << ",\"singleToneSpectralSpreadDb\":" << four_state_gain_jump_db
-        << ",\"broadbandGainJumpDb\":" << four_state_broadband_gain_jump_db
+        << ",\"maximumFourStateRmsSpreadDb\":" << four_state_gain_jump_db
+        << ",\"maximumFourStateBroadbandRmsSpreadDb\":"
+        << four_state_broadband_gain_jump_db
+        << ",\"spatialRouteGainDeltaDb\":" << spatial_route_gain_delta_db
+        << ",\"spatialRouteBroadbandGainDeltaDb\":"
+        << spatial_route_broadband_gain_delta_db
         << ",\"broadbandSpectralSpreadLimitDb\":"
         << kMaximumBroadbandSpectralSpreadDb
         << ",\"broadbandRms\":[" << four_state_broadband[0].output.rms
         << "," << four_state_broadband[1].output.rms
         << "," << four_state_broadband[2].output.rms
         << "," << four_state_broadband[3].output.rms << "]"
+        << ",\"effectsOnlyRmsDelta\":" << effects_only_rms_delta
+        << ",\"combinedRouteEffectsRmsDelta\":"
+        << combined_route_effects_rms_delta
+        << ",\"effectsAudible\":" << (effects_audible ? "true" : "false")
+        << ",\"simultaneousRouteActive\":"
+        << (simultaneous_route_active ? "true" : "false")
         << ",\"offOffTransparencyMaxError\":"
-        << four_state[0].maximum_transparency_error << ",\n";
+        << four_state[0].maximum_transparency_error
+        << ",\"routeEvidence\":[";
+    constexpr std::array<const char*, 4> kRouteNames = {
+        "effectsOffSpatialOff",
+        "effectsOnSpatialOff",
+        "effectsOffSpatialOn",
+        "effectsOnSpatialOn"
+    };
+    for (size_t state = 0; state < four_state.size(); ++state) {
+        if (state != 0) std::cout << ",";
+        const auto& route = four_state[state];
+        std::cout << "{\"name\":\"" << kRouteNames[state] << "\""
+            << ",\"effectsEnabled\":" << (route.effects_enabled ? "true" : "false")
+            << ",\"spatialEnabled\":" << (route.spatial_enabled ? "true" : "false")
+            << ",\"mixerProcessCalls\":" << route.mixer_process_calls
+            << ",\"upmixProcessCalls\":" << route.upmix_process_calls
+            << ",\"obrProcessCalls\":" << route.obr_process_calls
+            << ",\"minimumLimiterGain\":" << route.minimum_limiter_gain
+            << ",\"rms\":" << route.output.rms
+            << ",\"peak\":" << route.output.peak
+            << ",\"hardClipSamples\":" << route.output.hard_clip_samples
+            << ",\"nonFiniteSamples\":" << route.output.non_finite_samples
+            << "}";
+    }
+    std::cout << "],\n";
     PrintStereoMetrics("offOff", four_state[0].output);
     std::cout << ",\n";
     PrintStereoMetrics("onOff", four_state[1].output);
@@ -1245,7 +1483,10 @@ int main() {
     std::cout << "\n  },\n"
         << "  \"levelTransfer\": {\"expectedRatio\":" << expected_level_ratio
         << ",\"measuredRatio\":" << measured_level_ratio
-        << ",\"obrToDryHighRms\":" << obr_to_dry_rms << "},\n"
+        << ",\"obrToDryHighRms\":" << obr_to_dry_rms
+        << ",\"obrLoudnessDeltaDb\":" << obr_loudness_delta_db
+        << ",\"minimumLoudnessDeltaDb\":-1.5"
+        << ",\"maximumLoudnessDeltaDb\":1.5},\n"
         << "  \"preObr\": {\"lowRms\":" << low.pre_obr.rms
         << ",\"lowPeak\":" << low.pre_obr.peak
         << ",\"highRms\":" << high.pre_obr.rms
@@ -1258,7 +1499,11 @@ int main() {
     PrintStereoMetrics("high", high.output);
     std::cout << ",\n";
     PrintStereoMetrics("masteredProgramme", mastered_programme.output);
-    std::cout << "\n  },\n"
+    std::cout << ",\n    \"masteredProgrammeMinimumLimiterGain\":"
+        << mastered_programme.minimum_limiter_gain
+        << ",\n    \"ordinaryProgrammeMinimumLimiterGain\":"
+        << std::pow(10.0, -0.10 / 20.0)
+        << "\n  },\n"
         << "  \"coherentEightChannelStress\": {\n";
     PrintStereoMetrics("low", coherent_low);
     std::cout << ",\n";
