@@ -124,6 +124,16 @@ public final class AudioMixerService {
         "upmixOutputLayout", Set.of("5.1", "7.1"),
         "obrFilterProfile", Set.of("direct", "ambient", "reverberant")
     );
+    private static final Set<String> SPATIAL_PARAMETER_KEYS = Set.of(
+        "upmixEnabled", "upmixAlgorithm", "upmixOutputLayout", "upmixCenterWidthHz",
+        "upmixLfeCrossoverHz", "upmixCenterGain", "upmixSurroundGain", "upmixLfeGain",
+        "upmixDecorrelation", "obrEnabled", "obrFilterProfile", "obrWet", "obrDry",
+        "obrOutputGainDb", "obrSpatialWidth"
+    );
+    private static final Set<String> EFFECT_ONLY_PRESET_IDS = Set.of(
+        "wide-chorus", "classic-flanger", "flowing-phaser",
+        "ping-pong-delay", "nearfield-studio"
+    );
     private static final LinkedHashMap<String, Preset> PRESETS = presetsV1();
     private static final ConcurrentHashMap<Path, Object> STATE_LOCKS = new ConcurrentHashMap<>();
 
@@ -514,8 +524,13 @@ public final class AudioMixerService {
         synchronized (stateLock) {
             refreshFromDiskForMutation();
             requireExpectedRevision(expected);
+            Map<String, Object> effectiveParameters = effectivePresetParameters(
+                normalizedId,
+                preset.parameters(),
+                state.parameters()
+            );
             if (normalizedId.equals(state.selectedPreset())
-                && preset.parameters().equals(state.parameters())) {
+                && effectiveParameters.equals(state.parameters())) {
                 return snapshotPayload();
             }
             if (state.revision() == Long.MAX_VALUE) {
@@ -524,13 +539,15 @@ public final class AudioMixerService {
             MixerState next = new MixerState(
                 state.revision() + 1,
                 normalizedId,
-                preset.parameters()
+                immutableParameters(effectiveParameters)
             );
             persist(next);
             state = next;
             configState = "ready";
             spatialMigrationNeeded = false;
-            synchronizeChannelRoute(next.parameters(), true);
+            if (!EFFECT_ONLY_PRESET_IDS.contains(normalizedId)) {
+                synchronizeChannelRoute(next.parameters(), true);
+            }
             // persist(next) is durable before submitDesiredState reaches nativeBridge.submit.
             submitDesiredState();
             return snapshotPayload();
@@ -1215,7 +1232,11 @@ public final class AudioMixerService {
         };
         String restoredPreset = selectedPreset;
         if (!"custom".equals(restoredPreset)
-            && !PRESETS.get(restoredPreset).parameters().equals(parameters)) {
+            && !presetMatchesParameters(
+                restoredPreset,
+                PRESETS.get(restoredPreset).parameters(),
+                parameters
+            )) {
             restoredPreset = "custom";
         }
         return new MixerState(revision, restoredPreset, immutableParameters(parameters));
@@ -1256,6 +1277,36 @@ public final class AudioMixerService {
             migrated.put(key, validateParameter(key, raw.get(key)));
         }
         return validateCompleteParameters(migrated);
+    }
+
+    private static Map<String, Object> effectivePresetParameters(
+        String presetId,
+        Map<String, Object> presetParameters,
+        Map<String, Object> currentParameters
+    ) {
+        if (!EFFECT_ONLY_PRESET_IDS.contains(presetId)) return presetParameters;
+        Map<String, Object> effective = copyParameters(presetParameters);
+        for (String key : SPATIAL_PARAMETER_KEYS) {
+            effective.put(key, currentParameters.get(key));
+        }
+        return effective;
+    }
+
+    private static boolean presetMatchesParameters(
+        String presetId,
+        Map<String, Object> presetParameters,
+        Map<String, Object> parameters
+    ) {
+        if (!EFFECT_ONLY_PRESET_IDS.contains(presetId)) {
+            return presetParameters.equals(parameters);
+        }
+        for (String key : PARAMETER_KEYS) {
+            if (!SPATIAL_PARAMETER_KEYS.contains(key)
+                && !java.util.Objects.equals(presetParameters.get(key), parameters.get(key))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static Object validateParameter(String key, Object value) {

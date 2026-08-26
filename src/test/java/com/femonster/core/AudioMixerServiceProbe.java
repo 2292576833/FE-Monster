@@ -129,6 +129,7 @@ public final class AudioMixerServiceProbe {
         missingDefaultsAndPresets(root.resolve("missing"));
         migratesCompleteV1SurroundAtomically(root.resolve("v1-migration"));
         effectAndSpatialSnapshotsAreIndependent(root.resolve("independence"));
+        effectPresetsPreserveCustomSpatialState(root.resolve("effect-preset-independence"));
         nativeMixerFlagValidationPrecedesMutation(root.resolve("native-flags"));
         validatesEveryFieldAndRevision(root.resolve("validation"));
         optimisticConflictAcrossWriters(root.resolve("conflict"));
@@ -538,6 +539,124 @@ public final class AudioMixerServiceProbe {
                 && revisionField.getLong(engine) == beforeRevision
                 && java.util.Arrays.equals(beforeValues, (float[]) valuesField.get(engine)),
             "unknown flag mutated NativeAudioEngine cache before rejection");
+    }
+
+    private static void effectPresetsPreserveCustomSpatialState(Path directory) throws Exception {
+        Files.createDirectories(directory);
+        Path stateFile = directory.resolve("audio-mixer-state.json");
+        FakeNative bridge = new FakeNative(true, true, false);
+        AudioMixerService service = new AudioMixerService(stateFile, bridge);
+        Map<String, Object> customSpatial = new LinkedHashMap<>();
+        customSpatial.put("upmixEnabled", true);
+        customSpatial.put("upmixAlgorithm", "music-detail");
+        customSpatial.put("upmixOutputLayout", "7.1");
+        customSpatial.put("upmixCenterWidthHz", 840.0);
+        customSpatial.put("upmixLfeCrossoverHz", 96.0);
+        customSpatial.put("upmixCenterGain", 1.18);
+        customSpatial.put("upmixSurroundGain", 0.82);
+        customSpatial.put("upmixLfeGain", 0.63);
+        customSpatial.put("upmixDecorrelation", 0.44);
+        customSpatial.put("obrEnabled", true);
+        customSpatial.put("obrFilterProfile", "reverberant");
+        customSpatial.put("obrWet", 0.73);
+        customSpatial.put("obrDry", 0.27);
+        customSpatial.put("obrOutputGainDb", -2.25);
+        customSpatial.put("obrSpatialWidth", 1.46);
+        service.patch(0L, customSpatial);
+
+        List<String> spatialFields = List.of(
+            "upmixEnabled", "upmixAlgorithm", "upmixOutputLayout", "upmixCenterWidthHz",
+            "upmixLfeCrossoverHz", "upmixCenterGain", "upmixSurroundGain", "upmixLfeGain",
+            "upmixDecorrelation", "obrEnabled", "obrFilterProfile", "obrWet", "obrDry",
+            "obrOutputGainDb", "obrSpatialWidth"
+        );
+        Map<String, Map<String, Object>> expectedEffects = Map.of(
+            "wide-chorus", Map.of(
+                "chorusEnabled", true, "chorusRateHz", 0.32, "chorusDepth", 0.42,
+                "chorusCenterDelayMs", 18.0, "chorusFeedback", 0.08, "chorusMix", 0.30
+            ),
+            "classic-flanger", Map.of(
+                "flangerEnabled", true, "flangerRateHz", 0.18, "flangerDepth", 0.65,
+                "flangerCenterDelayMs", 1.6, "flangerFeedback", 0.55, "flangerMix", 0.32
+            ),
+            "flowing-phaser", Map.of(
+                "phaserEnabled", true, "phaserRateHz", 0.22, "phaserDepth", 0.55,
+                "phaserCenterFrequencyHz", 900.0, "phaserFeedback", 0.25,
+                "phaserMix", 0.34
+            ),
+            "ping-pong-delay", Map.of(
+                "delayEnabled", true, "delayMs", 320.0, "delayFeedback", 0.38,
+                "delayPingPong", 0.85, "delayDampingHz", 8000.0, "delayMix", 0.28
+            ),
+            "nearfield-studio", Map.of(
+                "earlyReflectionsEnabled", true, "earlyReflectionsRoomSize", 0.28,
+                "earlyReflectionsDiffusion", 0.48, "earlyReflectionsDamping", 0.42,
+                "earlyReflectionsMix", 0.16
+            )
+        );
+        Map<String, Integer> expectedBits = Map.of(
+            "wide-chorus", 0x40,
+            "classic-flanger", 0x80,
+            "flowing-phaser", 0x100,
+            "ping-pong-delay", 0x200,
+            "nearfield-studio", 0x400
+        );
+
+        for (String id : List.of(
+            "wide-chorus", "classic-flanger", "flowing-phaser",
+            "ping-pong-delay", "nearfield-studio"
+        )) {
+            Map<String, Object> before = service.snapshot();
+            Map<String, Object> beforeChannels = service.channelSnapshot();
+            float[] beforeValues = bridge.lastValues.clone();
+            long revision = number(before, "revision").longValue();
+
+            Map<String, Object> applied = service.applyPreset(id, revision);
+            assertFieldsEqual(parameters(before), parameters(applied), spatialFields,
+                id + " changed custom spatial fields");
+            require((bridge.lastFlags & 0x30) == 0x30,
+                id + " cleared native upmix/OBR flags");
+            require((bridge.lastFlags & 0x7c0) == expectedBits.get(id),
+                id + " serialized the wrong effect enable bits");
+            require(java.util.Arrays.equals(
+                java.util.Arrays.copyOfRange(beforeValues, 31, 44),
+                java.util.Arrays.copyOfRange(bridge.lastValues, 31, 44)
+            ), id + " changed native spatial values 31..43");
+            for (Map.Entry<String, Object> expected : expectedEffects.get(id).entrySet()) {
+                require(java.util.Objects.equals(parameters(applied).get(expected.getKey()), expected.getValue()),
+                    id + " did not apply " + expected.getKey());
+            }
+            Map<String, Object> afterChannels = service.channelSnapshot();
+            assertFieldsEqual(beforeChannels, afterChannels, List.of(
+                "revision", "layout", "algorithm"
+            ), id + " rewrote channel-router state");
+            require(id.equals(applied.get("selectedPreset")),
+                id + " did not become selected");
+
+            bridge = new FakeNative(true, true, false);
+            service = new AudioMixerService(stateFile, bridge);
+            Map<String, Object> reloaded = service.snapshot();
+            require(id.equals(reloaded.get("selectedPreset")),
+                id + " identity was lost after reload");
+            assertFieldsEqual(parameters(applied), parameters(reloaded), spatialFields,
+                id + " reload changed custom spatial fields");
+        }
+
+        Map<String, Object> beforeHolistic = service.snapshot();
+        Map<String, Object> immersive = service.applyPreset(
+            "immersive-live",
+            number(beforeHolistic, "revision").longValue()
+        );
+        Map<String, Object> immersiveParameters = parameters(immersive);
+        require("immersive-live".equals(immersive.get("selectedPreset"))
+                && Boolean.TRUE.equals(immersiveParameters.get("upmixEnabled"))
+                && "music-detail".equals(immersiveParameters.get("upmixAlgorithm"))
+                && "7.1".equals(immersiveParameters.get("upmixOutputLayout"))
+                && number(immersiveParameters, "upmixCenterWidthHz").doubleValue() == 300.0
+                && Boolean.TRUE.equals(immersiveParameters.get("obrEnabled"))
+                && "direct".equals(immersiveParameters.get("obrFilterProfile"))
+                && number(immersiveParameters, "obrSpatialWidth").doubleValue() == 1.15,
+            "immersive-live stopped applying its holistic spatial snapshot");
     }
 
     private static void assertFieldsEqual(
