@@ -25350,14 +25350,24 @@ html #runtimeSettingsPanel.runtime-settings-panel.settings-center[hidden] {
   .audio-mixer-family-obr,
   .audio-mixer-family-compressor,
   .audio-mixer-family-limiter,
-  .audio-mixer-family-reverb
+  .audio-mixer-family-reverb,
+  .audio-mixer-family-chorus,
+  .audio-mixer-family-flanger,
+  .audio-mixer-family-phaser,
+  .audio-mixer-family-delay,
+  .audio-mixer-family-early-reflections
 ),
 .audio-mixer-ui[data-mixer-view="spatial"] :is(
   .audio-mixer-family-master,
   .audio-mixer-family-equalizer,
   .audio-mixer-family-compressor,
   .audio-mixer-family-limiter,
-  .audio-mixer-family-reverb
+  .audio-mixer-family-reverb,
+  .audio-mixer-family-chorus,
+  .audio-mixer-family-flanger,
+  .audio-mixer-family-phaser,
+  .audio-mixer-family-delay,
+  .audio-mixer-family-early-reflections
 ) {
   display: none !important;
 }
@@ -25792,6 +25802,18 @@ html #runtimeSettingsPanel.runtime-settings-panel.settings-center[hidden] {
   color: #fff;
   background: rgba(41, 103, 78, 0.46);
   outline: none;
+}
+
+.audio-mixer-family-reset {
+  border-color: rgba(205, 220, 213, 0.24);
+  color: rgba(230, 238, 234, 0.88);
+  background: rgba(22, 43, 35, 0.58);
+}
+
+.audio-mixer-family-reset:focus-visible,
+.audio-mixer-family-collapse:focus-visible {
+  outline: 2px solid rgba(151, 255, 213, 0.72);
+  outline-offset: 2px;
 }
 
 .audio-mixer-family[data-dragging="true"] {

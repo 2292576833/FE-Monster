@@ -34,6 +34,18 @@
     'virtual-bed-to-binaural-2ch'
   ]);
   const TELEMETRY_STAGES = new Set(['media-input', 'post-mixer', 'native-output']);
+  const EFFECT_PARAMETER_DEFAULTS = Object.freeze({
+    chorusEnabled: false, chorusRateHz: 0.30, chorusDepth: 0.35, chorusCenterDelayMs: 18, chorusFeedback: 0, chorusMix: 0,
+    flangerEnabled: false, flangerRateHz: 0.18, flangerDepth: 0.50, flangerCenterDelayMs: 1.5, flangerFeedback: 0.35, flangerMix: 0,
+    phaserEnabled: false, phaserRateHz: 0.20, phaserDepth: 0.50, phaserCenterFrequencyHz: 900, phaserFeedback: 0.20, phaserMix: 0,
+    delayEnabled: false, delayMs: 320, delayFeedback: 0.30, delayPingPong: 0.75, delayDampingHz: 8000, delayMix: 0,
+    earlyReflectionsEnabled: false, earlyReflectionsRoomSize: 0.35, earlyReflectionsDiffusion: 0.55, earlyReflectionsDamping: 0.45, earlyReflectionsMix: 0
+  });
+  const EFFECT_NAMES = Object.freeze([
+    Object.freeze({ key: 'chorusEnabled', label: '合唱' }), Object.freeze({ key: 'flangerEnabled', label: '镶边' }),
+    Object.freeze({ key: 'phaserEnabled', label: '移相' }), Object.freeze({ key: 'delayEnabled', label: '回声' }),
+    Object.freeze({ key: 'earlyReflectionsEnabled', label: '早期反射' })
+  ]);
   const MODULES = Object.freeze([
     Object.freeze({
       id: 'meters',
@@ -936,6 +948,7 @@
     let telemetry = unavailableTelemetry();
     let channelRouter = null;
     let parameters = Object.freeze({
+      ...EFFECT_PARAMETER_DEFAULTS,
       enabled: true,
       upmixEnabled: false,
       obrEnabled: false,
@@ -1940,7 +1953,9 @@
       const mixer = parameters.enabled !== false;
       const obr = parameters.obrEnabled === true;
       const mixerLabel = mixer ? 'Mixer（独立）' : 'Mixer 旁路';
-      routeSummary.textContent = `${upmix ? `${layoutValue} 上混` : 'Stereo'} → ${mixerLabel} → ${obr ? 'OBR → 双耳 2.0（耳机）' : (upmix ? '能量匹配折叠 2.0' : 'Stereo 2.0')}`;
+      const effects = EFFECT_NAMES.filter((effect) => parameters[effect.key] === true).map((effect) => effect.label);
+      const effectSummary = effects.length ? ` · 效果：${effects.join('、')}` : '';
+      routeSummary.textContent = `${upmix ? `${layoutValue} 上混` : 'Stereo'} → ${mixerLabel}${effectSummary} → ${obr ? 'OBR → 双耳 2.0（耳机）' : (upmix ? '能量匹配折叠 2.0' : 'Stereo 2.0')}`;
       routeNodes.get('upmix').dataset.routeState = upmix ? 'active' : 'bypass';
       routeNodes.get('mixer').dataset.routeState = mixer ? 'active' : 'bypass';
       routeNodes.get('obr').dataset.routeState = obr ? 'active' : 'bypass';
@@ -1963,8 +1978,15 @@
 
     function updateParameters(next) {
       if (!next || typeof next !== 'object') return false;
+      const effectValues = {};
+      Object.entries(EFFECT_PARAMETER_DEFAULTS).forEach(([key, fallback]) => {
+        effectValues[key] = typeof fallback === 'boolean'
+          ? (Object.hasOwn(next, key) ? next[key] === true : parameters[key])
+          : (Number.isFinite(Number(next[key])) ? Number(next[key]) : parameters[key]);
+      });
       parameters = Object.freeze({
         ...parameters,
+        ...effectValues,
         enabled: typeof next.enabled === 'boolean' ? next.enabled : parameters.enabled,
         upmixEnabled: next.upmixEnabled === true,
         obrEnabled: next.obrEnabled === true,
@@ -2534,6 +2556,7 @@
         drawCount,
         framePending: frameId !== 0,
         physicalOutputChannels: 2,
+        parameters: Object.freeze({ ...parameters }),
         automation: Object.freeze({
           enabled: automationState.enabled,
           parameter: automationState.selectedParameter,

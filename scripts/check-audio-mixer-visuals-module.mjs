@@ -668,6 +668,12 @@ controller.updateParameters({
   enabled: true,
   upmixEnabled: true,
   obrEnabled: true,
+  chorusEnabled: true,
+  chorusRateHz: 0.44,
+  delayEnabled: true,
+  delayMs: 640,
+  earlyReflectionsEnabled: true,
+  earlyReflectionsMix: 0.22,
   upmixAlgorithm: 'matrix-decode',
   upmixOutputLayout: '7.1',
   obrFilterProfile: 'direct',
@@ -676,6 +682,9 @@ controller.updateParameters({
 assert.equal(byDataset(visualRoot, 'spatialLayout')[0].value, '7.1');
 assert.equal(byDataset(visualRoot, 'spatialAlgorithm')[0].value, 'matrix-decode');
 assert.match(byDataset(visualRoot, 'routeSummary')[0].textContent, /7\.1.*上混.*Mixer.*OBR/u);
+assert.match(byDataset(visualRoot, 'routeSummary')[0].textContent, /合唱.*回声.*早期反射/u);
+assert.equal(Object.isFrozen(controller.snapshot().parameters), true);
+assert.equal(controller.snapshot().parameters.delayMs, 640);
 
 controller.updateChannelRouter(null);
 controller.updateParameters({

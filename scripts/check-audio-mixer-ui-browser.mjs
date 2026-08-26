@@ -63,7 +63,12 @@ const PARAMETER_FAMILIES = {
     'reverbPreDelayMs',
     'reverbWet',
     'reverbDry'
-  ]
+  ],
+  chorus: ['chorusEnabled', 'chorusRateHz', 'chorusDepth', 'chorusCenterDelayMs', 'chorusFeedback', 'chorusMix'],
+  flanger: ['flangerEnabled', 'flangerRateHz', 'flangerDepth', 'flangerCenterDelayMs', 'flangerFeedback', 'flangerMix'],
+  phaser: ['phaserEnabled', 'phaserRateHz', 'phaserDepth', 'phaserCenterFrequencyHz', 'phaserFeedback', 'phaserMix'],
+  delay: ['delayEnabled', 'delayMs', 'delayFeedback', 'delayPingPong', 'delayDampingHz', 'delayMix'],
+  'early-reflections': ['earlyReflectionsEnabled', 'earlyReflectionsRoomSize', 'earlyReflectionsDiffusion', 'earlyReflectionsDamping', 'earlyReflectionsMix']
 };
 const BOOLEAN_PARAMETERS = new Set([
   'enabled',
@@ -71,7 +76,7 @@ const BOOLEAN_PARAMETERS = new Set([
   'limiterEnabled',
   'reverbEnabled',
   'upmixEnabled',
-  'obrEnabled'
+  'obrEnabled', 'chorusEnabled', 'flangerEnabled', 'phaserEnabled', 'delayEnabled', 'earlyReflectionsEnabled'
 ]);
 const SIMPLE_PARAMETER_KEYS = Object.values(PARAMETER_FAMILIES)
   .flat()
@@ -89,7 +94,9 @@ const PRESET_IDENTITIES = [
   ['cinema', '影院'],
   ['vocal-clear', '人声清晰'],
   ['bass-boost', '低频增强'],
-  ['night', '夜间']
+  ['night', '夜间'],
+  ['wide-chorus', '宽阔合唱'], ['classic-flanger', '经典镶边'], ['flowing-phaser', '流动移相'],
+  ['ping-pong-delay', '乒乓回声'], ['nearfield-studio', '近场工作室'], ['immersive-live', '沉浸现场']
 ];
 const FORBIDDEN_MUTATION_DATA = /(?:api[_-]?key|access[_-]?token|secret|password|authorization|dll[_-]?path|native[_-]?path|native[_-]?buffer|dsp[_-]?module|[a-z]:\\|file:\/\/|\.dll\b)/i;
 
@@ -170,7 +177,12 @@ function cleanParameters() {
     obrWet: 1,
     obrDry: 0,
     obrOutputGainDb: 0,
-    obrSpatialWidth: 1
+    obrSpatialWidth: 1,
+    chorusEnabled: false, chorusRateHz: 0.30, chorusDepth: 0.35, chorusCenterDelayMs: 18, chorusFeedback: 0, chorusMix: 0,
+    flangerEnabled: false, flangerRateHz: 0.18, flangerDepth: 0.50, flangerCenterDelayMs: 1.5, flangerFeedback: 0.35, flangerMix: 0,
+    phaserEnabled: false, phaserRateHz: 0.20, phaserDepth: 0.50, phaserCenterFrequencyHz: 900, phaserFeedback: 0.20, phaserMix: 0,
+    delayEnabled: false, delayMs: 320, delayFeedback: 0.30, delayPingPong: 0.75, delayDampingHz: 8000, delayMix: 0,
+    earlyReflectionsEnabled: false, earlyReflectionsRoomSize: 0.35, earlyReflectionsDiffusion: 0.55, earlyReflectionsDamping: 0.45, earlyReflectionsMix: 0
   };
 }
 
@@ -249,6 +261,34 @@ const PRESETS = [
     compressorKneeDb: 10,
     compressorMakeupDb: 3,
     limiterCeilingDb: -3
+  }),
+  completePreset('wide-chorus', '宽阔合唱', {
+    stereoWidth: 1.15, chorusEnabled: true, chorusRateHz: 0.32, chorusDepth: 0.42,
+    chorusCenterDelayMs: 18, chorusFeedback: 0.08, chorusMix: 0.30
+  }),
+  completePreset('classic-flanger', '经典镶边', {
+    flangerEnabled: true, flangerRateHz: 0.18, flangerDepth: 0.65,
+    flangerCenterDelayMs: 1.6, flangerFeedback: 0.55, flangerMix: 0.32
+  }),
+  completePreset('flowing-phaser', '流动移相', {
+    phaserEnabled: true, phaserRateHz: 0.22, phaserDepth: 0.55,
+    phaserCenterFrequencyHz: 900, phaserFeedback: 0.25, phaserMix: 0.34
+  }),
+  completePreset('ping-pong-delay', '乒乓回声', {
+    delayEnabled: true, delayMs: 320, delayFeedback: 0.38, delayPingPong: 0.85,
+    delayDampingHz: 8000, delayMix: 0.28
+  }),
+  completePreset('nearfield-studio', '近场工作室', {
+    earlyReflectionsEnabled: true, earlyReflectionsRoomSize: 0.28,
+    earlyReflectionsDiffusion: 0.48, earlyReflectionsDamping: 0.42, earlyReflectionsMix: 0.16
+  }),
+  completePreset('immersive-live', '沉浸现场', {
+    earlyReflectionsEnabled: true, earlyReflectionsRoomSize: 0.72,
+    earlyReflectionsDiffusion: 0.75, earlyReflectionsDamping: 0.55, earlyReflectionsMix: 0.22,
+    reverbEnabled: true, reverbRoomSize: 0.75, reverbDecayMs: 2200, reverbDamping: 0.60,
+    reverbPreDelayMs: 25, reverbWet: 0.20, reverbDry: 1,
+    upmixEnabled: true, upmixAlgorithm: 'music-detail', upmixOutputLayout: '7.1',
+    obrEnabled: true, obrFilterProfile: 'direct', obrSpatialWidth: 1.15
   })
 ];
 const PRESET_BY_ID = new Map(PRESETS.map((preset) => [preset.id, preset]));
@@ -1370,7 +1410,7 @@ try {
   });
 
   const viewportResults = [];
-  for (const [width, height] of [[768, 720], [1024, 800], [1440, 900]]) {
+  for (const [width, height] of [[768, 720], [1024, 800], [1280, 720], [1440, 900], [1920, 1080]]) {
     await command('Emulation.setDeviceMetricsOverride', {
       width,
       height,
@@ -1491,7 +1531,7 @@ try {
       && initialUi.pageVisible,
     eightVersionedPresetControls: initialUi.uiExists
       && initialUi.ready === 'true'
-      && initialUi.presetResults.length === 8
+      && initialUi.presetResults.length === 14
       && initialUi.presetResults.every((item) => (
         item.exists && item.isButton && item.labelMatches && item.accessibleName
       )),
@@ -1510,13 +1550,13 @@ try {
       && mixerViewHierarchy.spatial.channels
       && !mixerViewHierarchy.spatial.visuals
       && mixerViewHierarchy.professional.view === 'professional'
-      && mixerViewHierarchy.professional.families.length === 8
+      && mixerViewHierarchy.professional.families.length === 13
       && !mixerViewHierarchy.professional.presets
       && mixerViewHierarchy.professional.channels
       && mixerViewHierarchy.professional.visuals
       && mixerViewHierarchy.professional.diagnostics
       && mixerViewHierarchy.restoredView === 'daily',
-    everyParameterFamilyAndControlRendered: initialUi.familyResults.length === 8
+    everyParameterFamilyAndControlRendered: initialUi.familyResults.length === 13
       && initialUi.familyResults.every((family) => family.exists && family.labelled)
       && initialUi.controlResults.length === SIMPLE_PARAMETER_KEYS.length
       && initialUi.controlResults.every((control) => (
@@ -1599,11 +1639,11 @@ try {
       && channelTestRequest?.body?.durationMs === 500
       && channelTestRequest?.body?.frequencyHz === 997
       && channelTestRequest?.body?.gainDb === -18,
-    parameterFamiliesAreModularAndPersistent: familyModularity.chooserCount === 8
-      && familyModularity.dragCount === 8
-      && familyModularity.collapseCount === 8
-      && familyModularity.densityCount === 8
-      && familyModularity.controlsBefore.length === 8
+    parameterFamiliesAreModularAndPersistent: familyModularity.chooserCount === 13
+      && familyModularity.dragCount === 13
+      && familyModularity.collapseCount === 13
+      && familyModularity.densityCount === 13
+      && familyModularity.controlsBefore.length === 13
       && familyModularity.collapsed
       && familyModularity.densityChanged
       && familyModularity.reordered

@@ -210,7 +210,12 @@ const cleanParameters = {
   obrWet: 1,
   obrDry: 0,
   obrOutputGainDb: 0,
-  obrSpatialWidth: 1
+  obrSpatialWidth: 1,
+  chorusEnabled: false, chorusRateHz: 0.30, chorusDepth: 0.35, chorusCenterDelayMs: 18, chorusFeedback: 0, chorusMix: 0,
+  flangerEnabled: false, flangerRateHz: 0.18, flangerDepth: 0.50, flangerCenterDelayMs: 1.5, flangerFeedback: 0.35, flangerMix: 0,
+  phaserEnabled: false, phaserRateHz: 0.20, phaserDepth: 0.50, phaserCenterFrequencyHz: 900, phaserFeedback: 0.20, phaserMix: 0,
+  delayEnabled: false, delayMs: 320, delayFeedback: 0.30, delayPingPong: 0.75, delayDampingHz: 8000, delayMix: 0,
+  earlyReflectionsEnabled: false, earlyReflectionsRoomSize: 0.35, earlyReflectionsDiffusion: 0.55, earlyReflectionsDamping: 0.45, earlyReflectionsMix: 0
 };
 
 const presetIdentity = [
@@ -221,7 +226,9 @@ const presetIdentity = [
   ['cinema', '影院'],
   ['vocal-clear', '人声清晰'],
   ['bass-boost', '低频增强'],
-  ['night', '夜间']
+  ['night', '夜间'],
+  ['wide-chorus', '宽阔合唱'], ['classic-flanger', '经典镶边'], ['flowing-phaser', '流动移相'],
+  ['ping-pong-delay', '乒乓回声'], ['nearfield-studio', '近场工作室'], ['immersive-live', '沉浸现场']
 ];
 
 const presets = presetIdentity.map(([id, label], index) => ({
@@ -353,10 +360,18 @@ const ui = findByDataset(container, 'audioMixerUi');
 assert.ok(ui, 'mount should generate the mixer root');
 assert.equal(ui.dataset.mixerReady, 'true');
 assert.equal(ui.dataset.selectedPreset, 'clean');
-assert.equal(findAllByDataset(ui, 'mixerPresetId').length, 8);
-assert.equal(findAllByDataset(ui, 'mixerFamily').length, 8);
+assert.equal(findAllByDataset(ui, 'mixerPresetId').length, 14);
+assert.equal(findAllByDataset(ui, 'mixerFamily').length, 13);
 assert.equal(findAllByDataset(ui, 'mixerEqIndex').length, 10);
-assert.equal(findAllByDataset(ui, 'mixerParam').length, 50);
+assert.equal(findAllByDataset(ui, 'mixerParam').length, 79);
+for (const id of ['chorus', 'flanger', 'phaser', 'delay', 'early-reflections']) {
+  assert.ok(findByDataset(ui, 'mixerFamily', id), `missing ${id} card`);
+  assert.ok(findByDataset(ui, 'mixerFamilyReset', id), `missing ${id} reset`);
+  assert.ok(findByDataset(ui, 'mixerFamilyCollapse', id), `missing ${id} collapse`);
+}
+assert.equal(findByDataset(ui, 'mixerParam', 'chorusEnabled').type, 'checkbox');
+assert.equal(findByDataset(ui, 'mixerNumericInput', 'delayMs').max, '1000');
+assert.match(findByDataset(ui, 'mixerControlHelp', 'earlyReflectionsMix').textContent, /LFE/);
 assert.equal(ui.dataset.mixerView, 'daily', 'the desktop mixer should open in the understandable daily view');
 const mixerViewButtons = findAllByDataset(ui, 'mixerViewButton');
 assert.deepEqual(
@@ -410,21 +425,121 @@ assert.deepEqual(Object.keys(firstPatch.body.parameters).sort(), ['balance', 'in
 assert.equal(firstPatch.body.parameters.inputGainDb, 2);
 assert.equal(controller.snapshot().revision, 14);
 
+const protectedSpatial = {
+  upmixEnabled: true,
+  upmixAlgorithm: 'music-detail',
+  upmixOutputLayout: '7.1',
+  obrEnabled: true,
+  obrFilterProfile: 'reverberant',
+  obrWet: 0.63,
+  obrDry: 0.21,
+  obrOutputGainDb: -2.4,
+  obrSpatialWidth: 1.37,
+  stereoWidth: 1.43,
+  centerGain: 1.16,
+  surroundGain: 1.29,
+  lfeGain: 1.18
+};
+const parametersBeforeFamilyIndependence = structuredClone(state.parameters);
+Object.assign(state.parameters, protectedSpatial);
+await controller.refresh();
+await controller.settled();
+const chorusDefaults = {
+  chorusEnabled: false, chorusRateHz: 0.30, chorusDepth: 0.35,
+  chorusCenterDelayMs: 18, chorusFeedback: 0, chorusMix: 0
+};
+for (const [key, value] of Object.entries({
+  chorusEnabled: true, chorusRateHz: 0.72, chorusDepth: 0.81,
+  chorusCenterDelayMs: 24, chorusFeedback: 0.44, chorusMix: 0.61
+})) {
+  const control = findByDataset(ui, 'mixerParam', key);
+  if (control.type === 'checkbox') control.checked = value;
+  else control.value = String(value);
+  control.dispatchEvent({ type: control.type === 'checkbox' ? 'change' : 'input' });
+}
+findByDataset(ui, 'mixerFamilyReset', 'chorus').click();
+await controller.settled();
+const chorusPatches = requests.filter((entry) => entry.method === 'PATCH').slice(1);
+assert.equal(chorusPatches.length, 2, 'a reset conflict gets exactly one automatic retry');
+for (const patch of chorusPatches) {
+  assert.deepEqual(patch.body.parameters, chorusDefaults, 'chorus reset must remain one atomic six-key PATCH');
+  assert.equal(Object.keys(patch.body.parameters).some((key) => /^(?:stereoWidth|centerGain|surroundGain|lfeGain|upmix|obr)/u.test(key)), false);
+}
+assert.deepEqual(
+  Object.fromEntries(Object.keys(protectedSpatial).map((key) => [key, state.parameters[key]])),
+  protectedSpatial,
+  'both Chorus reset attempts must preserve authoritative spatial, upmix, and OBR state'
+);
+assert.deepEqual(
+  Object.fromEntries(Object.keys(protectedSpatial).map((key) => {
+    const control = findByDataset(ui, 'mixerParam', key);
+    return [key, control.type === 'checkbox'
+      ? control.checked
+      : (typeof protectedSpatial[key] === 'string' ? control.value : Number(control.value))];
+  })),
+  protectedSpatial,
+  'both Chorus reset attempts must preserve rendered spatial, upmix, and OBR state'
+);
+assert.equal(controller.snapshot().revision, 16);
+
 const outputGain = findByDataset(ui, 'mixerParam', 'outputGainDb');
 outputGain.value = '-1';
 outputGain.dispatchEvent({ type: 'input' });
 await new Promise((resolve) => setTimeout(resolve, 220));
 await controller.settled();
-assert.equal(controller.snapshot().revision, 15);
-assert.equal(Number(outputGain.value), -6);
-assert.match(findByDataset(ui, 'mixerStatus').textContent, /冲突|刷新|更新/);
-assert.equal(findByDataset(ui, 'mixerPlaybackState').dataset.playbackState, 'browser-compatible');
-assert.match(findByDataset(ui, 'mixerPlaybackState').textContent, /兼容播放/);
+assert.equal(controller.snapshot().revision, 17);
+assert.equal(Number(outputGain.value), -1);
 
 findByDataset(ui, 'mixerRetry').click();
 await controller.settled();
 const lastPatch = requests.filter((entry) => entry.method === 'PATCH').at(-1);
-assert.deepEqual(lastPatch.body, { expectedRevision: 15, parameters: {} });
+assert.deepEqual(lastPatch.body, { expectedRevision: 17, parameters: {} });
+
+const familyDefaults = {
+  flanger: { flangerEnabled: false, flangerRateHz: 0.18, flangerDepth: 0.50, flangerCenterDelayMs: 1.5, flangerFeedback: 0.35, flangerMix: 0 },
+  phaser: { phaserEnabled: false, phaserRateHz: 0.20, phaserDepth: 0.50, phaserCenterFrequencyHz: 900, phaserFeedback: 0.20, phaserMix: 0 },
+  delay: { delayEnabled: false, delayMs: 320, delayFeedback: 0.30, delayPingPong: 0.75, delayDampingHz: 8000, delayMix: 0 },
+  'early-reflections': { earlyReflectionsEnabled: false, earlyReflectionsRoomSize: 0.35, earlyReflectionsDiffusion: 0.55, earlyReflectionsDamping: 0.45, earlyReflectionsMix: 0 }
+};
+for (const [family, defaults] of Object.entries(familyDefaults)) {
+  const firstKey = Object.keys(defaults)[0];
+  const firstControl = findByDataset(ui, 'mixerParam', firstKey);
+  if (firstControl.type === 'checkbox') firstControl.checked = true;
+  else firstControl.value = String(Number(firstControl.max));
+  firstControl.dispatchEvent({ type: firstControl.type === 'checkbox' ? 'change' : 'input' });
+  findByDataset(ui, 'mixerFamilyReset', family).click();
+  await controller.settled();
+  const resetPatch = requests.filter((entry) => entry.method === 'PATCH').at(-1);
+  assert.deepEqual(resetPatch.body.parameters, defaults, `${family} reset must be one exact family-only PATCH`);
+  assert.deepEqual(
+    Object.fromEntries(Object.keys(protectedSpatial).map((key) => [key, state.parameters[key]])),
+    protectedSpatial,
+    `${family} reset must not alter authoritative spatial, upmix, or OBR state`
+  );
+  assert.deepEqual(
+    Object.fromEntries(Object.keys(protectedSpatial).map((key) => {
+      const control = findByDataset(ui, 'mixerParam', key);
+      return [key, control.type === 'checkbox'
+        ? control.checked
+        : (typeof protectedSpatial[key] === 'string' ? control.value : Number(control.value))];
+    })),
+    protectedSpatial,
+    `${family} reset must not alter rendered spatial, upmix, or OBR state`
+  );
+}
+const chorusStateBeforeSpatial = Object.fromEntries(Object.keys(chorusDefaults).map((key) => [key, state.parameters[key]]));
+const spatialControl = findByDataset(ui, 'mixerParam', 'stereoWidth');
+spatialControl.value = '1.61';
+spatialControl.dispatchEvent({ type: 'input' });
+await controller.settled();
+assert.deepEqual(
+  Object.fromEntries(Object.keys(chorusDefaults).map((key) => [key, state.parameters[key]])),
+  chorusStateBeforeSpatial,
+  'spatial UI changes must not mutate effect-family state'
+);
+state.parameters = parametersBeforeFamilyIndependence;
+await controller.refresh();
+await controller.settled();
 
 const allowed = new Set([
   'enabled', 'inputGainDb', 'outputGainDb', 'balance', 'eqDb', 'stereoWidth',
@@ -436,8 +551,12 @@ const allowed = new Set([
   'reverbWet', 'reverbDry', 'upmixEnabled', 'upmixAlgorithm',
   'upmixOutputLayout', 'upmixCenterWidthHz', 'upmixLfeCrossoverHz',
   'upmixCenterGain', 'upmixSurroundGain', 'upmixLfeGain', 'upmixDecorrelation',
-  'obrEnabled', 'obrFilterProfile', 'obrWet', 'obrDry', 'obrOutputGainDb',
-  'obrSpatialWidth'
+  'obrEnabled', 'obrFilterProfile', 'obrWet', 'obrDry', 'obrOutputGainDb', 'obrSpatialWidth',
+  'chorusEnabled', 'chorusRateHz', 'chorusDepth', 'chorusCenterDelayMs', 'chorusFeedback', 'chorusMix',
+  'flangerEnabled', 'flangerRateHz', 'flangerDepth', 'flangerCenterDelayMs', 'flangerFeedback', 'flangerMix',
+  'phaserEnabled', 'phaserRateHz', 'phaserDepth', 'phaserCenterFrequencyHz', 'phaserFeedback', 'phaserMix',
+  'delayEnabled', 'delayMs', 'delayFeedback', 'delayPingPong', 'delayDampingHz', 'delayMix',
+  'earlyReflectionsEnabled', 'earlyReflectionsRoomSize', 'earlyReflectionsDiffusion', 'earlyReflectionsDamping', 'earlyReflectionsMix'
 ]);
 for (const request of requests.filter((entry) => ['PATCH', 'POST'].includes(entry.method))) {
   assert.equal(/(?:token|secret|password|authorization|path|buffer|module|\.dll)/i.test(JSON.stringify(request.body)), false);
@@ -1108,7 +1227,7 @@ const effectiveLayoutPatch = channelRouterRequests.find((entry) => (
   && entry.body?.parameters?.upmixOutputLayout === '7.1'
 ));
 assert.deepEqual(effectiveLayoutPatch?.body, {
-  expectedRevision: 15,
+  expectedRevision: 22,
   parameters: { upmixEnabled: true, upmixOutputLayout: '7.1' }
 });
 assert.ok(
@@ -1234,7 +1353,7 @@ const stereoPatch = channelRouterRequests.filter((entry) => (
   && entry.body?.parameters?.upmixEnabled === false
 )).at(-1);
 assert.deepEqual(stereoPatch?.body, {
-  expectedRevision: 17,
+  expectedRevision: 24,
   parameters: { upmixEnabled: false }
 });
 assert.equal(

@@ -70,7 +70,13 @@
     Object.freeze({ id: 'cinema', label: '影院' }),
     Object.freeze({ id: 'vocal-clear', label: '人声清晰' }),
     Object.freeze({ id: 'bass-boost', label: '低频增强' }),
-    Object.freeze({ id: 'night', label: '夜间' })
+    Object.freeze({ id: 'night', label: '夜间' }),
+    Object.freeze({ id: 'wide-chorus', label: '宽阔合唱' }),
+    Object.freeze({ id: 'classic-flanger', label: '经典镶边' }),
+    Object.freeze({ id: 'flowing-phaser', label: '流动移相' }),
+    Object.freeze({ id: 'ping-pong-delay', label: '乒乓回声' }),
+    Object.freeze({ id: 'nearfield-studio', label: '近场工作室' }),
+    Object.freeze({ id: 'immersive-live', label: '沉浸现场' })
   ]);
   const PRESET_IDS = new Set(PRESET_IDENTITIES.map((preset) => preset.id));
   const BOOLEAN_PARAMETERS = new Set([
@@ -79,7 +85,12 @@
     'limiterEnabled',
     'reverbEnabled',
     'upmixEnabled',
-    'obrEnabled'
+    'obrEnabled',
+    'chorusEnabled',
+    'flangerEnabled',
+    'phaserEnabled',
+    'delayEnabled',
+    'earlyReflectionsEnabled'
   ]);
   const NUMERIC_PARAMETERS = Object.freeze({
     inputGainDb: Object.freeze({ label: '进入调音台前的音量', min: -24, max: 24, step: 0.1, unit: 'dB' }),
@@ -112,7 +123,31 @@
     obrWet: Object.freeze({ label: '方位声比例（OBR 湿声）', min: 0, max: 1, step: 0.01, unit: '' }),
     obrDry: Object.freeze({ label: '原声比例（OBR 干声）', min: 0, max: 1, step: 0.01, unit: '' }),
     obrOutputGainDb: Object.freeze({ label: '方位处理后音量', min: -12, max: 0, step: 0.1, unit: 'dB' }),
-    obrSpatialWidth: Object.freeze({ label: '方位展开范围（OBR 宽度）', min: 0, max: 2, step: 0.01, unit: '×' })
+    obrSpatialWidth: Object.freeze({ label: '方位展开范围（OBR 宽度）', min: 0, max: 2, step: 0.01, unit: '×' }),
+    chorusRateHz: Object.freeze({ label: '摆动速度', min: 0.05, max: 5, step: 0.01, unit: 'Hz' }),
+    chorusDepth: Object.freeze({ label: '摆动深度', min: 0, max: 1, step: 0.01, unit: '' }),
+    chorusCenterDelayMs: Object.freeze({ label: '中心延迟', min: 4, max: 30, step: 0.1, unit: 'ms' }),
+    chorusFeedback: Object.freeze({ label: '反馈', min: -0.95, max: 0.95, step: 0.01, unit: '' }),
+    chorusMix: Object.freeze({ label: '效果比例', min: 0, max: 1, step: 0.01, unit: '' }),
+    flangerRateHz: Object.freeze({ label: '扫动速度', min: 0.02, max: 5, step: 0.01, unit: 'Hz' }),
+    flangerDepth: Object.freeze({ label: '扫动深度', min: 0, max: 1, step: 0.01, unit: '' }),
+    flangerCenterDelayMs: Object.freeze({ label: '中心延迟', min: 0.2, max: 10, step: 0.1, unit: 'ms' }),
+    flangerFeedback: Object.freeze({ label: '反馈', min: -0.95, max: 0.95, step: 0.01, unit: '' }),
+    flangerMix: Object.freeze({ label: '效果比例', min: 0, max: 1, step: 0.01, unit: '' }),
+    phaserRateHz: Object.freeze({ label: '流动速度', min: 0.02, max: 10, step: 0.01, unit: 'Hz' }),
+    phaserDepth: Object.freeze({ label: '凹口深度', min: 0, max: 1, step: 0.01, unit: '' }),
+    phaserCenterFrequencyHz: Object.freeze({ label: '中心频率', min: 100, max: 4000, step: 1, unit: 'Hz' }),
+    phaserFeedback: Object.freeze({ label: '反馈', min: -0.95, max: 0.95, step: 0.01, unit: '' }),
+    phaserMix: Object.freeze({ label: '效果比例', min: 0, max: 1, step: 0.01, unit: '' }),
+    delayMs: Object.freeze({ label: '回声间隔', min: 1, max: 1000, step: 1, unit: 'ms' }),
+    delayFeedback: Object.freeze({ label: '回声反馈', min: 0, max: 0.9, step: 0.01, unit: '' }),
+    delayPingPong: Object.freeze({ label: '左右往返', min: 0, max: 1, step: 0.01, unit: '' }),
+    delayDampingHz: Object.freeze({ label: '回声高频阻尼', min: 500, max: 20000, step: 10, unit: 'Hz' }),
+    delayMix: Object.freeze({ label: '效果比例', min: 0, max: 1, step: 0.01, unit: '' }),
+    earlyReflectionsRoomSize: Object.freeze({ label: '房间大小', min: 0, max: 1, step: 0.01, unit: '' }),
+    earlyReflectionsDiffusion: Object.freeze({ label: '反射扩散', min: 0, max: 1, step: 0.01, unit: '' }),
+    earlyReflectionsDamping: Object.freeze({ label: '高频阻尼', min: 0, max: 1, step: 0.01, unit: '' }),
+    earlyReflectionsMix: Object.freeze({ label: '效果比例', min: 0, max: 0.5, step: 0.01, unit: '' })
   });
   const ENUM_PARAMETERS = Object.freeze({
     upmixAlgorithm: Object.freeze({
@@ -166,7 +201,24 @@
     obrSpatialWidth: '控制左右、前后方位的展开程度。',
     compressorEnabled: '自动压低突然过响的部分，让响度更稳定。',
     limiterEnabled: '拦住危险峰值，减少削波和爆音。',
-    reverbEnabled: '增加空间反射与尾音，不会替代 OBR 方位处理。'
+    reverbEnabled: '增加空间反射与尾音，不会替代 OBR 方位处理。',
+    chorusEnabled: '轻微复制并摆动声音，让左右更宽；LFE 保持原声。',
+    chorusRateHz: '控制摆动的快慢。', chorusDepth: '控制音高和延迟的摆动幅度。', chorusCenterDelayMs: '复制声相对原声的基础延迟。', chorusFeedback: '把一部分效果声送回输入；过高会更明显。', chorusMix: '原声与合唱效果的混合比例。',
+    flangerEnabled: '短延迟形成扫动梳状音色；反馈过高会更金属。',
+    flangerRateHz: '控制梳状扫动的快慢。', flangerDepth: '控制扫动的幅度。', flangerCenterDelayMs: '梳状音色的基础短延迟。', flangerFeedback: '反馈越高，金属感越明显。', flangerMix: '原声与镶边效果的混合比例。',
+    phaserEnabled: '六级全通滤波形成流动凹口；LFE 保持原声。',
+    phaserRateHz: '控制凹口移动的快慢。', phaserDepth: '控制凹口移动的幅度。', phaserCenterFrequencyHz: '凹口围绕的中心频率。', phaserFeedback: '提高会增强流动的共鸣。', phaserMix: '原声与移相效果的混合比例。',
+    delayEnabled: '可在左右声道之间往返；中置自反馈，LFE 不进入反馈。',
+    delayMs: '每次回声之间的时间。', delayFeedback: '回声返回输入的比例。', delayPingPong: '让回声在左右声道之间往返。', delayDampingHz: '限制回声中的高频，使重复声更柔和。', delayMix: '原声与回声的混合比例。',
+    earlyReflectionsEnabled: '模拟墙面最先到达的反射，增加距离和房间边界；LFE 保持原声。',
+    earlyReflectionsRoomSize: '改变最早反射到达的间隔。', earlyReflectionsDiffusion: '让反射更集中或更分散。', earlyReflectionsDamping: '降低反射中的高频。', earlyReflectionsMix: '原声与早期反射的混合比例；LFE 保持原声。'
+  });
+  const MODULE_DEFAULTS = Object.freeze({
+    chorus: Object.freeze({ chorusEnabled: false, chorusRateHz: 0.30, chorusDepth: 0.35, chorusCenterDelayMs: 18.0, chorusFeedback: 0.0, chorusMix: 0.0 }),
+    flanger: Object.freeze({ flangerEnabled: false, flangerRateHz: 0.18, flangerDepth: 0.50, flangerCenterDelayMs: 1.5, flangerFeedback: 0.35, flangerMix: 0.0 }),
+    phaser: Object.freeze({ phaserEnabled: false, phaserRateHz: 0.20, phaserDepth: 0.50, phaserCenterFrequencyHz: 900.0, phaserFeedback: 0.20, phaserMix: 0.0 }),
+    delay: Object.freeze({ delayEnabled: false, delayMs: 320.0, delayFeedback: 0.30, delayPingPong: 0.75, delayDampingHz: 8000.0, delayMix: 0.0 }),
+    'early-reflections': Object.freeze({ earlyReflectionsEnabled: false, earlyReflectionsRoomSize: 0.35, earlyReflectionsDiffusion: 0.55, earlyReflectionsDamping: 0.45, earlyReflectionsMix: 0.0 })
   });
   const FAMILIES = Object.freeze([
     Object.freeze({
@@ -262,6 +314,56 @@
         Object.freeze({ key: 'reverbPreDelayMs', type: 'number' }),
         Object.freeze({ key: 'reverbWet', type: 'number' }),
         Object.freeze({ key: 'reverbDry', type: 'number' })
+      ])
+    }),
+    Object.freeze({
+      id: 'chorus',
+      label: '合唱（Chorus）',
+      description: '轻微复制并摆动声音，让左右更宽；LFE 保持原声。',
+      controls: Object.freeze([
+        Object.freeze({ key: 'chorusEnabled', label: '启用合唱', type: 'boolean' }),
+        Object.freeze({ key: 'chorusRateHz', type: 'number' }), Object.freeze({ key: 'chorusDepth', type: 'number' }),
+        Object.freeze({ key: 'chorusCenterDelayMs', type: 'number' }), Object.freeze({ key: 'chorusFeedback', type: 'number' }), Object.freeze({ key: 'chorusMix', type: 'number' })
+      ])
+    }),
+    Object.freeze({
+      id: 'flanger',
+      label: '镶边（Flanger）',
+      description: '短延迟形成扫动梳状音色；反馈过高会更金属。',
+      controls: Object.freeze([
+        Object.freeze({ key: 'flangerEnabled', label: '启用镶边', type: 'boolean' }),
+        Object.freeze({ key: 'flangerRateHz', type: 'number' }), Object.freeze({ key: 'flangerDepth', type: 'number' }),
+        Object.freeze({ key: 'flangerCenterDelayMs', type: 'number' }), Object.freeze({ key: 'flangerFeedback', type: 'number' }), Object.freeze({ key: 'flangerMix', type: 'number' })
+      ])
+    }),
+    Object.freeze({
+      id: 'phaser',
+      label: '移相（Phaser）',
+      description: '六级全通滤波形成流动凹口；LFE 保持原声。',
+      controls: Object.freeze([
+        Object.freeze({ key: 'phaserEnabled', label: '启用移相', type: 'boolean' }),
+        Object.freeze({ key: 'phaserRateHz', type: 'number' }), Object.freeze({ key: 'phaserDepth', type: 'number' }),
+        Object.freeze({ key: 'phaserCenterFrequencyHz', type: 'number' }), Object.freeze({ key: 'phaserFeedback', type: 'number' }), Object.freeze({ key: 'phaserMix', type: 'number' })
+      ])
+    }),
+    Object.freeze({
+      id: 'delay',
+      label: '立体声回声（Delay）',
+      description: '可在左右声道之间往返；中置自反馈，LFE 不进入反馈。',
+      controls: Object.freeze([
+        Object.freeze({ key: 'delayEnabled', label: '启用回声', type: 'boolean' }),
+        Object.freeze({ key: 'delayMs', type: 'number' }), Object.freeze({ key: 'delayFeedback', type: 'number' }),
+        Object.freeze({ key: 'delayPingPong', type: 'number' }), Object.freeze({ key: 'delayDampingHz', type: 'number' }), Object.freeze({ key: 'delayMix', type: 'number' })
+      ])
+    }),
+    Object.freeze({
+      id: 'early-reflections',
+      label: '早期反射',
+      description: '模拟墙面最先到达的反射，增加距离和房间边界；LFE 保持原声。',
+      controls: Object.freeze([
+        Object.freeze({ key: 'earlyReflectionsEnabled', label: '启用早期反射', type: 'boolean' }),
+        Object.freeze({ key: 'earlyReflectionsRoomSize', type: 'number' }), Object.freeze({ key: 'earlyReflectionsDiffusion', type: 'number' }),
+        Object.freeze({ key: 'earlyReflectionsDamping', type: 'number' }), Object.freeze({ key: 'earlyReflectionsMix', type: 'number' })
       ])
     })
   ]);
@@ -729,6 +831,7 @@
     let serverState = null;
     let localParameters = null;
     let pendingPatch = {};
+    let moduleResetPatchId = '';
     let debounceTimer = 0;
     let keyboardPatchDeadline = 0;
     let operationTail = Promise.resolve();
@@ -1029,7 +1132,22 @@
         dataset: { mixerFamilyCollapse: family.id }
       });
       collapseButton.addEventListener('click', () => toggleFamilyCollapsed(family.id));
-      familyTools.append(dragButton, densityButton, collapseButton);
+      if (MODULE_DEFAULTS[family.id]) {
+        const resetButton = node(document, 'button', {
+          className: 'audio-mixer-family-tool audio-mixer-family-reset',
+          text: '恢复默认',
+          attributes: {
+            type: 'button',
+            title: `恢复${family.label}默认参数`,
+            'aria-label': `恢复${family.label}默认参数`
+          },
+          dataset: { mixerFamilyReset: family.id }
+        });
+        resetButton.addEventListener('click', () => resetEffectFamily(family.id));
+        familyTools.append(dragButton, densityButton, resetButton, collapseButton);
+      } else {
+        familyTools.append(dragButton, densityButton, collapseButton);
+      }
       familyHeader.append(familyHeading, familyTools);
       const grid = node(document, 'div', {
         className: 'audio-mixer-control-grid',
@@ -2303,6 +2421,22 @@
       schedulePatch();
     }
 
+    function resetEffectFamily(id) {
+      const defaults = MODULE_DEFAULTS[id];
+      if (!defaults || !serverState || destroyed) return false;
+      Object.assign(localParameters, defaults);
+      Object.assign(pendingPatch, defaults);
+      moduleResetPatchId = id;
+      renderParameters(localParameters);
+      visualsController?.updateParameters(localParameters);
+      renderPresetState('custom');
+      automaticPatchRetryBudget = 1;
+      const family = FAMILIES.find((entry) => entry.id === id);
+      setStatus(`正在恢复${family?.label || '效果'}默认值…`);
+      schedulePatch();
+      return true;
+    }
+
     function recordEqValue(index, value) {
       if (destroyed || !serverState || !Number.isInteger(index) || index < 0 || index >= 10) return;
       localParameters.eqDb[index] = value;
@@ -2320,9 +2454,11 @@
         debounceTimer = 0;
         keyboardPatchDeadline = 0;
         const patch = pendingPatch;
+        const resetFamily = moduleResetPatchId;
         pendingPatch = {};
+        moduleResetPatchId = '';
         if (!Object.keys(patch).length) return;
-        enqueueMutation(() => submitPatch(patch, false));
+        enqueueMutation(() => submitPatch(patch, false, { resetFamily }));
       }, delay);
     }
 
@@ -2474,6 +2610,13 @@
       } catch (error) {
         if (error instanceof MixerHttpError && error.status === 409) {
           await handleConflict(retryOnly ? '重试' : '保存');
+          if (!retryOnly && options.resetFamily && automaticPatchRetryBudget > 0 && !destroyed) {
+            automaticPatchRetryBudget -= 1;
+            pendingPatch = { ...safePatch, ...pendingPatch };
+            moduleResetPatchId = options.resetFamily;
+            setStatus('设置冲突：已刷新最新状态，正在重新恢复效果默认值…', 'warning');
+            schedulePatch();
+          }
           return false;
         }
         if (!retryOnly && retryOnFailure) {
@@ -2630,8 +2773,10 @@
           debounceTimer = 0;
         }
         const patch = pendingPatch;
+        const resetFamily = moduleResetPatchId;
         pendingPatch = {};
-        return enqueueMutation(() => submitPatch(patch, false));
+        moduleResetPatchId = '';
+        return enqueueMutation(() => submitPatch(patch, false, { resetFamily }));
       },
       retry: retryNativeChain,
       async settled() {
