@@ -606,6 +606,105 @@ fn effects_are_finite_distinct_and_keep_lfe_dry_at_every_supported_layout() {
     }
 }
 
+fn maximum_feedback_effect_params(configuration: usize) -> FeRustMixerParams {
+    let mut params = FeRustMixerParams::default();
+    match configuration {
+        0 => {
+            params.chorus_enabled = 1;
+            params.chorus_mix = 0.75;
+            params.chorus_feedback = 0.95;
+        }
+        1 => {
+            params.flanger_enabled = 1;
+            params.flanger_mix = 0.75;
+            params.flanger_feedback = 0.95;
+        }
+        2 => {
+            params.phaser_enabled = 1;
+            params.phaser_mix = 0.75;
+            params.phaser_feedback = 0.95;
+        }
+        3 => {
+            params.delay_enabled = 1;
+            params.delay_ms = 1.0;
+            params.delay_mix = 1.0;
+            params.delay_feedback = 0.90;
+        }
+        4 => {
+            params.early_reflections_enabled = 1;
+            params.early_reflections_mix = 0.5;
+        }
+        5 => {
+            params.chorus_enabled = 1;
+            params.chorus_mix = 0.75;
+            params.chorus_feedback = 0.95;
+            params.flanger_enabled = 1;
+            params.flanger_mix = 0.75;
+            params.flanger_feedback = 0.95;
+            params.phaser_enabled = 1;
+            params.phaser_mix = 0.75;
+            params.phaser_feedback = 0.95;
+            params.delay_enabled = 1;
+            params.delay_ms = 1.0;
+            params.delay_mix = 1.0;
+            params.delay_feedback = 0.90;
+            params.early_reflections_enabled = 1;
+            params.early_reflections_mix = 0.5;
+        }
+        _ => unreachable!("invalid effect configuration"),
+    }
+    params
+}
+
+#[test]
+fn maximum_feedback_effect_tails_decay_through_mixer_ffi() {
+    for channels in [2, 6, 8] {
+        for configuration in 0..6 {
+            let handle = Handle::new(256);
+            handle.apply(1, &maximum_feedback_effect_params(configuration), 0);
+
+            // Let the delay's click-free target transition settle before the
+            // impulse, so each configuration is measured at its ABI value.
+            let mut warmup = vec![0.0_f32; 1_024 * channels];
+            process_in_blocks(&handle, &mut warmup, channels, 256);
+
+            let mut excitation = vec![0.0_f32; 256 * channels];
+            excitation[0] = 0.5;
+            excitation[1] = -0.5;
+            if channels >= 6 {
+                excitation[3] = 0.1875;
+            }
+            let dry_lfe = if channels >= 6 {
+                Some(channel_samples(&excitation, channels, 3))
+            } else {
+                None
+            };
+            process_in_blocks(&handle, &mut excitation, channels, 256);
+            assert!(excitation.iter().all(|sample| sample.is_finite()));
+            if let Some(dry_lfe) = dry_lfe {
+                assert_eq!(channel_samples(&excitation, channels, 3), dry_lfe);
+            }
+
+            let mut tail = vec![0.0_f32; 48_000 * channels];
+            process_in_blocks(&handle, &mut tail, channels, 256);
+            assert!(tail.iter().all(|sample| sample.is_finite()));
+            if channels >= 6 {
+                assert_eq!(channel_samples(&tail, channels, 3), vec![0.0; 48_000]);
+            }
+            let early_peak = peak(&tail[..tail.len() / 2]);
+            let late_peak = peak(&tail[tail.len() / 2..]);
+            assert!(
+                early_peak > 1.0e-5,
+                "channels={channels}, configuration={configuration} has no tail"
+            );
+            assert!(
+                late_peak < early_peak * 0.5,
+                "channels={channels}, configuration={configuration}, early={early_peak}, late={late_peak}"
+            );
+        }
+    }
+}
+
 #[test]
 fn all_presets_are_complete_deterministic_valid_snapshots() {
     let handle = Handle::new(8);
