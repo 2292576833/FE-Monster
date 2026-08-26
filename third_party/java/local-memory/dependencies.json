@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "licenses": [
+    {
+      "file": "LICENSE-SQLITE-JDBC.txt",
+      "source": "https://github.com/xerial/sqlite-jdbc/blob/3.53.2.1/LICENSE",
+      "sha256": "c978e501e690550f7e63203f501e68041f41d450cd7eb56ac7750e4ae2597885"
+    },
+    {
+      "file": "LICENSE-SLF4J.txt",
+      "source": "https://github.com/qos-ch/slf4j/blob/v_1.7.36/LICENSE.txt",
+      "sha256": "c3c2680463d10ba992c002451e94f6018e4096d6d632334731a93cd97cb74aaa"
+    }
+  ],
+  "artifacts": [
+    {
+      "coordinate": "org.xerial:sqlite-jdbc:3.53.2.1:without-natives",
+      "file": "sqlite-jdbc-3.53.2.1-without-natives.jar",
+      "url": "https://github.com/xerial/sqlite-jdbc/releases/download/3.53.2.1/sqlite-jdbc-3.53.2.1-without-natives.jar",
+      "sha256": "4baeeb32cfb8ac3e5922e0fe50b8f78e4fe39d00f68824ce677a9477c686715b"
+    },
+    {
+      "coordinate": "org.xerial:sqlite-jdbc:3.53.2.1:natives-windows",
+      "file": "sqlite-jdbc-3.53.2.1-natives-windows.jar",
+      "url": "https://github.com/xerial/sqlite-jdbc/releases/download/3.53.2.1/sqlite-jdbc-3.53.2.1-natives-windows.jar",
+      "sha256": "05c622ecd7337d96f7ccbd0599fee00cf62af81364fd188a848eb3469f4e17a2"
+    },
+    {
+      "coordinate": "org.slf4j:slf4j-api:1.7.36",
+      "file": "slf4j-api-1.7.36.jar",
+      "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.jar",
+      "sha256": "d3ef575e3e4979678dc01bf1dcce51021493b4d11fb7f1be8ad982877c16a1c0"
+    }
+  ]
+}

@@ -42,16 +42,16 @@
 - Produces app-manifest `Class-Path` entries for the three relative `lib/*.jar` paths.
 - Preserves the existing stable and randomized app jar outputs.
 
-- [ ] **Step 1: Write the failing dependency/build contract**
+- [x] **Step 1: Write the failing dependency/build contract**
 
 Assert exact coordinates, SHA-256 values from the spec, offline vendored files, license files, manifest `Class-Path`, and rejection after a one-byte tamper in a copied fixture.
 
-- [ ] **Step 2: Run the contract and verify it fails**
+- [x] **Step 2: Run the contract and verify it fails**
 
 Run: `node scripts/check-local-memory-build-contract.mjs`  
 Expected: FAIL because the receipt, provisioner, and classpath contract do not exist.
 
-- [ ] **Step 3: Implement verified provisioning and staging**
+- [x] **Step 3: Implement verified provisioning and staging**
 
 The provisioner downloads only when a vendored artifact is absent, writes to a sibling `.download` file, verifies SHA-256, and atomically renames. The checker never downloads and fails on missing, extra, or mismatched artifacts. Build calls the checker, copies jars to `out/lib`, and creates the app jar with this manifest shape:
 
@@ -61,7 +61,7 @@ Main-Class: com.femonster.FeMonsterJavaApp
 Class-Path: lib/sqlite-jdbc-3.53.2.1-without-natives.jar lib/sqlite-jdbc-3.53.2.1-natives-windows.jar lib/slf4j-api-1.7.36.jar
 ```
 
-- [ ] **Step 4: Provision once and run build probes**
+- [x] **Step 4: Provision once and run build probes**
 
 Run: `powershell -NoProfile -File scripts/provision-local-memory-dependencies.ps1`  
 Run: `powershell -NoProfile -File scripts/check-local-memory-dependencies.ps1`  
@@ -69,7 +69,7 @@ Run: `powershell -NoProfile -File scripts/build-java.ps1`
 Run: `node scripts/check-local-memory-build-contract.mjs`  
 Expected: all PASS; `jar --describe-module`/manifest inspection shows the classpath and `Class.forName("org.sqlite.JDBC")` succeeds with the built app layout.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add third_party/java/local-memory scripts/provision-local-memory-dependencies.ps1 scripts/check-local-memory-dependencies.ps1 scripts/check-local-memory-build-contract.mjs scripts/build-java.ps1
