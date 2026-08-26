@@ -76,6 +76,24 @@ function Get-NativeAudioCandidateMetadata {
   }
 }
 
+function Test-NativeAudioRuntimeFilesComplete {
+  param([Parameter(Mandatory)][string]$Directory)
+
+  if (!(Test-Path -LiteralPath $Directory -PathType Container)) {
+    return $false
+  }
+  foreach ($fileName in @(
+    'fe-monster-xaudio2.dll',
+    'fe_monster_upmix.dll',
+    $nativeAudioBuildManifestName
+  )) {
+    if (!(Test-Path -LiteralPath (Join-Path $Directory $fileName) -PathType Leaf)) {
+      return $false
+    }
+  }
+  return $true
+}
+
 function Assert-NativeAudioRuntimePair {
   param([Parameter(Mandatory)][string]$Directory)
 
@@ -150,11 +168,13 @@ function Resolve-NativeAudioRuntimePair {
     (Join-Path $rootPath 'native\windows\build-next')
   )
   $completeCandidates = foreach ($candidatePath in $candidates) {
-    try {
-      Get-NativeAudioCandidateMetadata -Directory $candidatePath
-    } catch {
-      Write-Warning "Ignoring incomplete native audio runtime '$candidatePath': $($_.Exception.Message)"
+    if (!(Test-NativeAudioRuntimeFilesComplete -Directory $candidatePath)) {
+      Write-Warning "Ignoring incomplete native audio runtime '$candidatePath': directory or production pair triad is missing."
+      continue
     }
+    # Once all three files exist, every metadata error is authoritative. A
+    # corrupt newer manifest must fail closed rather than reveal an older pair.
+    Get-NativeAudioCandidateMetadata -Directory $candidatePath
   }
   $selected = $completeCandidates |
     Sort-Object CreatedAtUtc -Descending |

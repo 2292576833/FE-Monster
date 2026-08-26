@@ -244,6 +244,16 @@ assert.match(qualityScript, /native\\windows\\build['"]/);
 assert.match(qualityScript, /native\\windows\\build-next['"]/);
 assert.doesNotMatch(
   qualityScript,
+  /try\s*\{\s*Get-NativeAudioCandidateMetadata\s+-Directory\s+\$candidatePath[\s\S]{0,500}catch\s*\{[\s\S]{0,300}Ignoring/,
+  'metadata errors from a complete newer runtime must fail closed instead of falling back'
+);
+assert.match(
+  qualityScript,
+  /Test-NativeAudioRuntimeFilesComplete[\s\S]{0,900}continue[\s\S]{0,500}Get-NativeAudioCandidateMetadata\s+-Directory\s+\$candidatePath/,
+  'only a missing directory or missing runtime triad may be skipped before metadata parsing'
+);
+assert.doesNotMatch(
+  qualityScript,
   /\.cmake-build-xaudio2[^\r\n]+runtime/,
   'quality runtime selection must never fall back to CMake staging'
 );
