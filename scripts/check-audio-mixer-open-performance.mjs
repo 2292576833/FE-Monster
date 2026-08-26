@@ -67,19 +67,34 @@ function cleanParameters() {
     obrWet: 1,
     obrDry: 0,
     obrOutputGainDb: 0,
-    obrSpatialWidth: 1
+    obrSpatialWidth: 1,
+    chorusEnabled: false, chorusRateHz: 0.30, chorusDepth: 0.35, chorusCenterDelayMs: 18, chorusFeedback: 0, chorusMix: 0,
+    flangerEnabled: false, flangerRateHz: 0.18, flangerDepth: 0.50, flangerCenterDelayMs: 1.5, flangerFeedback: 0.35, flangerMix: 0,
+    phaserEnabled: false, phaserRateHz: 0.20, phaserDepth: 0.50, phaserCenterFrequencyHz: 900, phaserFeedback: 0.20, phaserMix: 0,
+    delayEnabled: false, delayMs: 320, delayFeedback: 0.30, delayPingPong: 0.75, delayDampingHz: 8000, delayMix: 0,
+    earlyReflectionsEnabled: false, earlyReflectionsRoomSize: 0.35, earlyReflectionsDiffusion: 0.55, earlyReflectionsDamping: 0.45, earlyReflectionsMix: 0
   };
 }
 
-const presetIds = [
-  ['clean', '纯净'],
-  ['bathroom', '浴室'],
-  ['hall', '大厅'],
-  ['surround-3d', '3D环绕'],
-  ['cinema', '影院'],
-  ['vocal-clear', '人声清晰'],
-  ['bass-boost', '低频增强'],
-  ['night', '夜间']
+function completePreset(id, label, patch = {}) {
+  return { id, label, parameters: { ...cleanParameters(), ...patch } };
+}
+
+const presets = [
+  completePreset('clean', '纯净'),
+  completePreset('bathroom', '浴室', { reverbEnabled: true, reverbRoomSize: 0.22, reverbDecayMs: 650, reverbDamping: 0.35, reverbPreDelayMs: 8, reverbWet: 0.32, reverbDry: 0.82 }),
+  completePreset('hall', '大厅', { reverbEnabled: true, reverbRoomSize: 0.82, reverbDecayMs: 2800, reverbDamping: 0.62, reverbPreDelayMs: 28, reverbWet: 0.36, reverbDry: 0.88 }),
+  completePreset('surround-3d', '3D环绕', { inputGainDb: -6, stereoWidth: 1.2, upmixEnabled: true, upmixOutputLayout: '7.1', upmixCenterGain: 0.68, upmixSurroundGain: 0.52, upmixLfeGain: 0.48, obrEnabled: true, obrSpatialWidth: 1.3 }),
+  completePreset('cinema', '影院', { inputGainDb: -1.5, centerGain: 1.12, surroundGain: 1.18, lfeGain: 1.22, compressorEnabled: true, compressorThresholdDb: -16, compressorRatio: 2.2, compressorMakeupDb: 1 }),
+  completePreset('vocal-clear', '人声清晰', { centerGain: 1.15, compressorEnabled: true, compressorThresholdDb: -20, compressorRatio: 2, compressorMakeupDb: 1 }),
+  completePreset('bass-boost', '低频增强', { inputGainDb: -1, lfeGain: 1.3, limiterCeilingDb: -0.8 }),
+  completePreset('night', '夜间', { inputGainDb: -3, outputGainDb: -2, compressorEnabled: true, compressorThresholdDb: -28, compressorRatio: 6, compressorAttackMs: 5, compressorReleaseMs: 350, compressorKneeDb: 10, compressorMakeupDb: 3, limiterCeilingDb: -3 }),
+  completePreset('wide-chorus', '宽阔合唱', { stereoWidth: 1.15, chorusEnabled: true, chorusRateHz: 0.32, chorusDepth: 0.42, chorusCenterDelayMs: 18, chorusFeedback: 0.08, chorusMix: 0.30 }),
+  completePreset('classic-flanger', '经典镶边', { flangerEnabled: true, flangerRateHz: 0.18, flangerDepth: 0.65, flangerCenterDelayMs: 1.6, flangerFeedback: 0.55, flangerMix: 0.32 }),
+  completePreset('flowing-phaser', '流动移相', { phaserEnabled: true, phaserRateHz: 0.22, phaserDepth: 0.55, phaserCenterFrequencyHz: 900, phaserFeedback: 0.25, phaserMix: 0.34 }),
+  completePreset('ping-pong-delay', '乒乓回声', { delayEnabled: true, delayMs: 320, delayFeedback: 0.38, delayPingPong: 0.85, delayDampingHz: 8000, delayMix: 0.28 }),
+  completePreset('nearfield-studio', '近场工作室', { earlyReflectionsEnabled: true, earlyReflectionsRoomSize: 0.28, earlyReflectionsDiffusion: 0.48, earlyReflectionsDamping: 0.42, earlyReflectionsMix: 0.16 }),
+  completePreset('immersive-live', '沉浸现场', { earlyReflectionsEnabled: true, earlyReflectionsRoomSize: 0.72, earlyReflectionsDiffusion: 0.75, earlyReflectionsDamping: 0.55, earlyReflectionsMix: 0.22, reverbEnabled: true, reverbRoomSize: 0.75, reverbDecayMs: 2200, reverbDamping: 0.60, reverbPreDelayMs: 25, reverbWet: 0.20, reverbDry: 1, upmixEnabled: true, upmixAlgorithm: 'music-detail', upmixOutputLayout: '7.1', obrEnabled: true, obrFilterProfile: 'direct', obrSpatialWidth: 1.15 })
 ];
 const parameters = cleanParameters();
 
@@ -406,7 +421,7 @@ const server = createServer((request, response) => {
     sendJson(response, {
       ok: true,
       presetVersion: 1,
-      presets: presetIds.map(([id, label]) => ({ id, label, parameters }))
+      presets
     });
     return;
   }
