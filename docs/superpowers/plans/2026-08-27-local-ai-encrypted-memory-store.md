@@ -90,26 +90,26 @@ git commit -m "build: pin local memory sqlite runtime"
 - Produces: `byte[] KeyProtector.protect(byte[] plaintext, byte[] entropy)` and `byte[] unprotect(byte[] protectedBytes, byte[] entropy)`.
 - Produces: `native/windows/build/fe-monster-wincrypto.dll` with JNI methods bound only to `WindowsDpapiKeyProtector`.
 
-- [ ] **Step 1: Write failing Java and source-contract probes**
+- [x] **Step 1: Write failing Java and source-contract probes**
 
 The behavior probe asserts same-user round trip, random protected output, wrong entropy rejection, blob-tamper rejection, empty-input rejection, and absence of plaintext in native/Java error messages. The source probe asserts `CRYPTPROTECT_UI_FORBIDDEN`, `LocalFree`, `SecureZeroMemory`, length checks, and a dedicated DLL name.
 
-- [ ] **Step 2: Run probes and verify they fail**
+- [x] **Step 2: Run probes and verify they fail**
 
 Run: `node scripts/check-local-memory-dpapi.mjs`  
 Expected: FAIL because the bridge and DLL are absent.
 
-- [ ] **Step 3: Implement JNI and Java loading**
+- [x] **Step 3: Implement JNI and Java loading**
 
 Use `CryptProtectData`/`CryptUnprotectData` with CurrentUser default scope, fixed description `FE Monster Local AI Memory v1`, supplied entropy, and `CRYPTPROTECT_UI_FORBIDDEN`. Translate Windows errors to stable codes such as `DPAPI_PROTECT_FAILED`; never include data or filesystem paths. Wipe copied native and Java key buffers in `finally` blocks.
 
-- [ ] **Step 4: Build and run the DPAPI probe**
+- [x] **Step 4: Build and run the DPAPI probe**
 
 Run: `powershell -NoProfile -File scripts/build-wincrypto.ps1`  
 Run: `node scripts/check-local-memory-dpapi.mjs`  
 Expected: PASS on Windows x64; tamper/wrong entropy fail without changing the protected file.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add native/windows/fe_monster_wincrypto.cpp scripts/build-wincrypto.ps1 src/main/java/com/femonster/memory/KeyProtector.java src/main/java/com/femonster/memory/WindowsDpapiKeyProtector.java src/test/java/com/femonster/memory/WindowsDpapiKeyProtectorProbe.java scripts/check-local-memory-dpapi.mjs
