@@ -207,7 +207,16 @@ try {
     'desired state must be atomically persisted before native submission');
 
   assert.match(nativeEngine, /NATIVE_SPATIAL_STATUS_SIZE\s*=\s*32/);
-  assert.match(nativeEngine, /NATIVE_MIXER_VALUE_COUNT\s*=\s*44/);
+  assert.match(nativeEngine, /NATIVE_MIXER_VALUE_COUNT\s*=\s*68/);
+  assert.match(nativeEngine, /\(flags\s*&\s*~0x7ff\)\s*!=\s*0/);
+  assert.match(service, /float\[\]\s+values\s*=\s*new\s+float\[68\]/);
+  for (const [field, bit] of [
+    ['chorusEnabled', '0x40'], ['flangerEnabled', '0x80'],
+    ['phaserEnabled', '0x100'], ['delayEnabled', '0x200'],
+    ['earlyReflectionsEnabled', '0x400'],
+  ]) {
+    assert.match(service, new RegExp(`parameters\\.get\\(\"${field}\"\\)[\\s\\S]{0,80}flags \\|= ${bit}`));
+  }
   assert.match(nativeEngine, /cachedMixerValues/);
   assert.match(nativeEngine, /cachedMixerCommitted/,
     'pending status must track whether the cached snapshot actually committed');
@@ -233,7 +242,7 @@ try {
     nativeBoundaryBusy,
     nativeDelayedPcm,
     presets: javaDump.presets.length,
-    rustParity: 'Mixer-stage field-by-field mixer_preset_params v1',
+    rustParity: 'Mixer-stage field-by-field mixer_preset_params v2',
     routes: [
       'GET /api/audio/mixer',
       'PATCH /api/audio/mixer',

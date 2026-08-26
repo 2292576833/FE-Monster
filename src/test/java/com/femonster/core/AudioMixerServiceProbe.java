@@ -72,7 +72,36 @@ public final class AudioMixerServiceProbe {
         "obrWet",
         "obrDry",
         "obrOutputGainDb",
-        "obrSpatialWidth"
+        "obrSpatialWidth",
+        "chorusEnabled",
+        "chorusRateHz",
+        "chorusDepth",
+        "chorusCenterDelayMs",
+        "chorusFeedback",
+        "chorusMix",
+        "flangerEnabled",
+        "flangerRateHz",
+        "flangerDepth",
+        "flangerCenterDelayMs",
+        "flangerFeedback",
+        "flangerMix",
+        "phaserEnabled",
+        "phaserRateHz",
+        "phaserDepth",
+        "phaserCenterFrequencyHz",
+        "phaserFeedback",
+        "phaserMix",
+        "delayEnabled",
+        "delayMs",
+        "delayFeedback",
+        "delayPingPong",
+        "delayDampingHz",
+        "delayMix",
+        "earlyReflectionsEnabled",
+        "earlyReflectionsRoomSize",
+        "earlyReflectionsDiffusion",
+        "earlyReflectionsDamping",
+        "earlyReflectionsMix"
     );
 
     private AudioMixerServiceProbe() {
@@ -98,6 +127,9 @@ public final class AudioMixerServiceProbe {
         }
 
         missingDefaultsAndPresets(root.resolve("missing"));
+        migratesCompleteV1SurroundAtomically(root.resolve("v1-migration"));
+        effectAndSpatialSnapshotsAreIndependent(root.resolve("independence"));
+        nativeMixerFlagValidationPrecedesMutation(root.resolve("native-flags"));
         validatesEveryFieldAndRevision(root.resolve("validation"));
         optimisticConflictAcrossWriters(root.resolve("conflict"));
         restartPresetCustomAndNoOp(root.resolve("restart"));
@@ -272,13 +304,15 @@ public final class AudioMixerServiceProbe {
         Map<String, Object> presetPayload = service.presets();
         require(number(presetPayload, "presetVersion").longValue() == 1, "preset version mismatch");
         List<Object> presets = SimpleJson.asList(presetPayload.get("presets"));
-        require(presets.size() == 8, "all eight presets must be present");
+        require(presets.size() == 14, "all fourteen presets must be present");
         List<String> ids = new ArrayList<>();
         List<String> labels = new ArrayList<>();
+        Map<String, Map<String, Object>> parametersById = new LinkedHashMap<>();
         for (Object value : presets) {
             Map<String, Object> preset = SimpleJson.asMap(value);
             ids.add(SimpleJson.asString(preset.get("id"), ""));
             labels.add(SimpleJson.asString(preset.get("label"), ""));
+            parametersById.put(SimpleJson.asString(preset.get("id"), ""), parameters(preset));
             require(parameters(preset).keySet().equals(PARAMETER_KEYS),
                 "preset must be a complete snapshot: " + preset.get("id"));
             require(SimpleJson.asList(parameters(preset).get("eqDb")).size() == 10,
@@ -286,11 +320,236 @@ public final class AudioMixerServiceProbe {
         }
         require(ids.equals(List.of(
             "clean", "bathroom", "hall", "surround-3d",
-            "cinema", "vocal-clear", "bass-boost", "night"
+            "cinema", "vocal-clear", "bass-boost", "night",
+            "wide-chorus", "classic-flanger", "flowing-phaser",
+            "ping-pong-delay", "nearfield-studio", "immersive-live"
         )), "preset IDs/order changed");
         require(labels.equals(List.of(
-            "纯净", "浴室", "大厅", "3D环绕", "影院", "人声清晰", "低频增强", "夜间"
+            "纯净", "浴室", "大厅", "3D环绕", "影院", "人声清晰", "低频增强", "夜间",
+            "宽阔合唱", "经典镶边", "流动移相", "乒乓回声", "近场工作室", "沉浸现场"
         )), "preset labels changed");
+        require(Boolean.TRUE.equals(parametersById.get("wide-chorus").get("chorusEnabled"))
+                && number(parametersById.get("wide-chorus"), "chorusMix").doubleValue() == 0.30,
+            "wide chorus snapshot mismatch");
+        require(Boolean.TRUE.equals(parametersById.get("classic-flanger").get("flangerEnabled"))
+                && number(parametersById.get("classic-flanger"), "flangerMix").doubleValue() == 0.32,
+            "classic flanger snapshot mismatch");
+        require(Boolean.TRUE.equals(parametersById.get("flowing-phaser").get("phaserEnabled"))
+                && number(parametersById.get("flowing-phaser"), "phaserMix").doubleValue() == 0.34,
+            "flowing phaser snapshot mismatch");
+        require(Boolean.TRUE.equals(parametersById.get("ping-pong-delay").get("delayEnabled"))
+                && number(parametersById.get("ping-pong-delay"), "delayPingPong").doubleValue() == 0.85,
+            "ping-pong delay snapshot mismatch");
+        require(Boolean.TRUE.equals(parametersById.get("nearfield-studio").get("earlyReflectionsEnabled"))
+                && number(parametersById.get("nearfield-studio"), "earlyReflectionsMix").doubleValue() == 0.16,
+            "nearfield studio snapshot mismatch");
+        Map<String, Object> live = parametersById.get("immersive-live");
+        require(Boolean.TRUE.equals(live.get("earlyReflectionsEnabled"))
+                && Boolean.TRUE.equals(live.get("reverbEnabled"))
+                && Boolean.TRUE.equals(live.get("upmixEnabled"))
+                && Boolean.TRUE.equals(live.get("obrEnabled"))
+                && "7.1".equals(live.get("upmixOutputLayout"))
+                && "music-detail".equals(live.get("upmixAlgorithm"))
+                && number(live, "obrSpatialWidth").doubleValue() == 1.15,
+            "immersive live snapshot mismatch");
+    }
+
+    private static void migratesCompleteV1SurroundAtomically(Path directory) throws Exception {
+        Files.createDirectories(directory);
+        Path stateFile = directory.resolve("audio-mixer-state.json");
+        AudioMixerService template = new AudioMixerService(
+            directory.resolve("template.json"), new FakeNative(true, true, false)
+        );
+        Map<String, Object> oldParameters = new LinkedHashMap<>(parameters(template.snapshot()));
+        for (String key : List.of(
+            "chorusEnabled", "chorusRateHz", "chorusDepth", "chorusCenterDelayMs",
+            "chorusFeedback", "chorusMix", "flangerEnabled", "flangerRateHz",
+            "flangerDepth", "flangerCenterDelayMs", "flangerFeedback", "flangerMix",
+            "phaserEnabled", "phaserRateHz", "phaserDepth", "phaserCenterFrequencyHz",
+            "phaserFeedback", "phaserMix", "delayEnabled", "delayMs", "delayFeedback",
+            "delayPingPong", "delayDampingHz", "delayMix", "earlyReflectionsEnabled",
+            "earlyReflectionsRoomSize", "earlyReflectionsDiffusion",
+            "earlyReflectionsDamping", "earlyReflectionsMix"
+        )) oldParameters.remove(key);
+        oldParameters.put("inputGainDb", -6.0);
+        oldParameters.put("stereoWidth", 1.2);
+        oldParameters.put("upmixEnabled", true);
+        oldParameters.put("upmixAlgorithm", "music-detail");
+        oldParameters.put("upmixOutputLayout", "7.1");
+        oldParameters.put("upmixCenterGain", 0.68);
+        oldParameters.put("upmixSurroundGain", 0.52);
+        oldParameters.put("upmixLfeGain", 0.48);
+        oldParameters.put("obrEnabled", true);
+        oldParameters.put("obrFilterProfile", "direct");
+        oldParameters.put("obrSpatialWidth", 1.3);
+        require(oldParameters.size() == 41, "v1 fixture parameter count");
+        Map<String, Object> oldRoot = new LinkedHashMap<>();
+        oldRoot.put("version", 1);
+        oldRoot.put("presetVersion", 1);
+        oldRoot.put("revision", 7);
+        oldRoot.put("selectedPreset", "surround-3d");
+        oldRoot.put("parameters", oldParameters);
+        byte[] v1Bytes = SimpleJson.stringify(oldRoot).getBytes(StandardCharsets.UTF_8);
+        Files.write(stateFile, v1Bytes);
+
+        AudioMixerService service = new AudioMixerService(
+            stateFile, new FakeNative(true, true, false)
+        );
+        Map<String, Object> migrated = service.snapshot();
+        Map<String, Object> p = parameters(migrated);
+        require(p.size() == 70, "complete v2 parameter count");
+        require(Boolean.FALSE.equals(p.get("chorusEnabled")), "chorus disabled default");
+        require(number(p, "delayMs").doubleValue() == 320.0, "delay default");
+        require(number(p, "earlyReflectionsMix").doubleValue() == 0.0,
+            "early reflections disabled mix");
+        require("custom".equals(migrated.get("selectedPreset")),
+            "retuned built-in snapshot must be preserved as custom");
+        require(Files.readString(stateFile).contains("\"earlyReflectionsMix\""),
+            "validated migration must be atomically rewritten");
+        require(number(p, "inputGainDb").doubleValue() == -6.0
+                && number(p, "obrSpatialWidth").doubleValue() == 1.3,
+            "v1 migration changed recognized user values");
+
+        Path failureFile = directory.resolve("replacement-failure.json");
+        Files.write(failureFile, v1Bytes);
+        expectIOException(() -> new AudioMixerService(
+            failureFile,
+            new FakeNative(true, true, false),
+            (source, evidence) -> {
+                throw new AssertionError("valid migration invoked corrupt evidence move");
+            },
+            (temporary, destination) -> {
+                throw new IOException("injected atomic replacement failure");
+            }
+        ), "migration replacement failure was swallowed");
+        require(java.util.Arrays.equals(v1Bytes, Files.readAllBytes(failureFile)),
+            "migration replacement failure changed the original v1 document");
+    }
+
+    private static void effectAndSpatialSnapshotsAreIndependent(Path directory) throws Exception {
+        Files.createDirectories(directory);
+        FakeNative bridge = new FakeNative(true, true, false);
+        AudioMixerService service = new AudioMixerService(
+            directory.resolve("audio-mixer-state.json"), bridge
+        );
+        Map<String, Object> both = new LinkedHashMap<>();
+        both.put("upmixEnabled", true);
+        both.put("upmixAlgorithm", "music-detail");
+        both.put("upmixOutputLayout", "7.1");
+        both.put("obrEnabled", true);
+        both.put("obrFilterProfile", "reverberant");
+        both.put("obrWet", 0.72);
+        both.put("obrDry", 0.28);
+        both.put("obrSpatialWidth", 1.37);
+        both.put("chorusEnabled", true);
+        both.put("chorusRateHz", 0.44);
+        both.put("delayEnabled", true);
+        both.put("delayMix", 0.31);
+        service.patch(0L, both);
+        Map<String, Object> beforeEffects = service.snapshot();
+        float[] bothValues = bridge.lastValues.clone();
+        int bothFlags = bridge.lastFlags;
+        require(bothValues.length == 68 && (bothFlags & 0x670) == 0x270,
+            "both snapshot flags/vector mismatch");
+        require(bothValues[31] == 4.0f && bothValues[32] == 8.0f
+                && bothValues[39] == 2.0f && bothValues[40] == 0.72f
+                && bothValues[41] == 0.28f && bothValues[43] == 1.37f,
+            "spatial fields 31..43 were serialized at the wrong indices");
+        require(bothValues[44] == 0.44f && bothValues[45] == 0.35f
+                && bothValues[59] == 320.0f && bothValues[63] == 0.31f
+                && bothValues[67] == 0.0f,
+            "effect fields 44..67 were serialized at the wrong indices");
+
+        Map<String, Object> effectOnlyChange = new LinkedHashMap<>();
+        effectOnlyChange.put("chorusEnabled", false);
+        effectOnlyChange.put("chorusDepth", 0.77);
+        effectOnlyChange.put("delayEnabled", false);
+        effectOnlyChange.put("delayMs", 640.0);
+        service.patch(number(beforeEffects, "revision").longValue(), effectOnlyChange);
+        Map<String, Object> afterEffects = service.snapshot();
+        assertFieldsEqual(parameters(beforeEffects), parameters(afterEffects), List.of(
+            "upmixEnabled", "upmixAlgorithm", "upmixOutputLayout", "upmixCenterWidthHz",
+            "upmixLfeCrossoverHz", "upmixCenterGain", "upmixSurroundGain", "upmixLfeGain",
+            "upmixDecorrelation", "obrEnabled", "obrFilterProfile", "obrWet", "obrDry",
+            "obrOutputGainDb", "obrSpatialWidth"
+        ), "effect change mutated spatial fields");
+        require(java.util.Arrays.equals(
+            java.util.Arrays.copyOfRange(bothValues, 31, 44),
+            java.util.Arrays.copyOfRange(bridge.lastValues, 31, 44)
+        ), "effect change mutated native indices 31..43");
+
+        Map<String, Object> beforeSpatial = service.snapshot();
+        float[] beforeSpatialValues = bridge.lastValues.clone();
+        service.patch(number(beforeSpatial, "revision").longValue(), Map.of(
+            "obrSpatialWidth", 0.83,
+            "upmixCenterGain", 1.21
+        ));
+        Map<String, Object> afterSpatial = service.snapshot();
+        assertFieldsEqual(parameters(beforeSpatial), parameters(afterSpatial), List.of(
+            "chorusEnabled", "chorusRateHz", "chorusDepth", "chorusCenterDelayMs",
+            "chorusFeedback", "chorusMix", "flangerEnabled", "flangerRateHz",
+            "flangerDepth", "flangerCenterDelayMs", "flangerFeedback", "flangerMix",
+            "phaserEnabled", "phaserRateHz", "phaserDepth", "phaserCenterFrequencyHz",
+            "phaserFeedback", "phaserMix", "delayEnabled", "delayMs", "delayFeedback",
+            "delayPingPong", "delayDampingHz", "delayMix", "earlyReflectionsEnabled",
+            "earlyReflectionsRoomSize", "earlyReflectionsDiffusion",
+            "earlyReflectionsDamping", "earlyReflectionsMix"
+        ), "spatial change mutated effect fields");
+        require(java.util.Arrays.equals(
+            java.util.Arrays.copyOfRange(beforeSpatialValues, 44, 68),
+            java.util.Arrays.copyOfRange(bridge.lastValues, 44, 68)
+        ), "spatial change mutated native indices 44..67");
+        require((bridge.lastFlags & 0x7f0) == 0x30,
+            "spatial-only snapshot carried effect flags");
+
+        long revision = number(afterSpatial, "revision").longValue();
+        Map<String, Object> effectsOnly = new LinkedHashMap<>();
+        effectsOnly.put("upmixEnabled", false);
+        effectsOnly.put("obrEnabled", false);
+        effectsOnly.put("flangerEnabled", true);
+        service.patch(revision, effectsOnly);
+        require((bridge.lastFlags & 0x7f0) == 0x80,
+            "effects-only snapshot carried spatial flags");
+        revision = number(service.snapshot(), "revision").longValue();
+        service.patch(revision, Map.of("flangerEnabled", false));
+        require((bridge.lastFlags & 0x30) == 0 && (bridge.lastFlags & 0x7c0) == 0,
+            "both-off snapshot carried effect or spatial flags");
+    }
+
+    private static void nativeMixerFlagValidationPrecedesMutation(Path directory) throws Exception {
+        Files.createDirectories(directory);
+        NativeAudioEngine engine = new NativeAudioEngine(ProjectPaths.detect());
+        float[] values = new float[68];
+        for (int bit : List.of(0x40, 0x80, 0x100, 0x200, 0x400)) {
+            engine.setMixerParameters(bit, bit, values.clone());
+        }
+        var flagsField = NativeAudioEngine.class.getDeclaredField("cachedMixerFlags");
+        var revisionField = NativeAudioEngine.class.getDeclaredField("cachedMixerRevision");
+        var valuesField = NativeAudioEngine.class.getDeclaredField("cachedMixerValues");
+        flagsField.setAccessible(true);
+        revisionField.setAccessible(true);
+        valuesField.setAccessible(true);
+        int before = flagsField.getInt(engine);
+        long beforeRevision = revisionField.getLong(engine);
+        float[] beforeValues = ((float[]) valuesField.get(engine)).clone();
+        expectIllegal(() -> engine.setMixerParameters(999L, 0x800, values.clone()),
+            "unknown mixer flag was accepted");
+        require(flagsField.getInt(engine) == before
+                && revisionField.getLong(engine) == beforeRevision
+                && java.util.Arrays.equals(beforeValues, (float[]) valuesField.get(engine)),
+            "unknown flag mutated NativeAudioEngine cache before rejection");
+    }
+
+    private static void assertFieldsEqual(
+        Map<String, Object> before,
+        Map<String, Object> after,
+        List<String> fields,
+        String message
+    ) {
+        for (String field : fields) {
+            require(java.util.Objects.equals(before.get(field), after.get(field)),
+                message + ": " + field);
+        }
     }
 
     private static void validatesEveryFieldAndRevision(Path directory) throws Exception {
@@ -322,7 +581,31 @@ public final class AudioMixerServiceProbe {
             new Bounds("reverbDamping", 0.0, 1.0),
             new Bounds("reverbPreDelayMs", 0.0, 200.0),
             new Bounds("reverbWet", 0.0, 1.0),
-            new Bounds("reverbDry", 0.0, 1.0)
+            new Bounds("reverbDry", 0.0, 1.0),
+            new Bounds("chorusRateHz", 0.05, 5.0),
+            new Bounds("chorusDepth", 0.0, 1.0),
+            new Bounds("chorusCenterDelayMs", 4.0, 30.0),
+            new Bounds("chorusFeedback", -0.95, 0.95),
+            new Bounds("chorusMix", 0.0, 1.0),
+            new Bounds("flangerRateHz", 0.02, 5.0),
+            new Bounds("flangerDepth", 0.0, 1.0),
+            new Bounds("flangerCenterDelayMs", 0.2, 10.0),
+            new Bounds("flangerFeedback", -0.95, 0.95),
+            new Bounds("flangerMix", 0.0, 1.0),
+            new Bounds("phaserRateHz", 0.02, 10.0),
+            new Bounds("phaserDepth", 0.0, 1.0),
+            new Bounds("phaserCenterFrequencyHz", 100.0, 4000.0),
+            new Bounds("phaserFeedback", -0.95, 0.95),
+            new Bounds("phaserMix", 0.0, 1.0),
+            new Bounds("delayMs", 1.0, 1000.0),
+            new Bounds("delayFeedback", 0.0, 0.90),
+            new Bounds("delayPingPong", 0.0, 1.0),
+            new Bounds("delayDampingHz", 500.0, 20_000.0),
+            new Bounds("delayMix", 0.0, 1.0),
+            new Bounds("earlyReflectionsRoomSize", 0.0, 1.0),
+            new Bounds("earlyReflectionsDiffusion", 0.0, 1.0),
+            new Bounds("earlyReflectionsDamping", 0.0, 1.0),
+            new Bounds("earlyReflectionsMix", 0.0, 0.5)
         )) {
             revision = accepted(service, revision, map(bounds.field(), bounds.minimum()));
             revision = accepted(service, revision, map(bounds.field(), bounds.maximum()));
@@ -351,7 +634,9 @@ public final class AudioMixerServiceProbe {
         rejectedNoMutation(service, revision, map("eqDb", longEq));
 
         for (String field : List.of(
-            "enabled", "compressorEnabled", "limiterEnabled", "reverbEnabled"
+            "enabled", "compressorEnabled", "limiterEnabled", "reverbEnabled",
+            "chorusEnabled", "flangerEnabled", "phaserEnabled", "delayEnabled",
+            "earlyReflectionsEnabled"
         )) {
             revision = accepted(service, revision, map(field, false));
             revision = accepted(service, revision, map(field, true));

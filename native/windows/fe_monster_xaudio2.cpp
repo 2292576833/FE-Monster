@@ -41,7 +41,7 @@ constexpr size_t kAnalysisWindow = 2048;
 constexpr size_t kAnalysisHop = 1024;
 constexpr ULONGLONG kCaptureIdleTimeoutMs = 900;
 constexpr DWORD kCaptureWaitTimeoutMs = 180;
-constexpr jsize kMixerValueCount = 44;
+constexpr jsize kMixerValueCount = 68;
 constexpr jsize kChannelRouterValueCount = 41;
 constexpr size_t kChannelRouterStatusValueCount = 34;
 
@@ -497,7 +497,7 @@ int32_t read_mixer_and_spatial_parameters(
         || values == nullptr
         || env->GetArrayLength(values) != kMixerValueCount
         || flags < 0
-        || (flags & ~0x3f) != 0) {
+        || (flags & ~0x7ff) != 0) {
         return FE_RUST_MIXER_INVALID_ARGUMENT;
     }
 
@@ -539,6 +539,36 @@ int32_t read_mixer_and_spatial_parameters(
     mixer->reverb_pre_delay_ms = raw[28];
     mixer->reverb_wet = raw[29];
     mixer->reverb_dry = raw[30];
+
+    mixer->chorus_enabled = (flags & 0x40) != 0 ? 1u : 0u;
+    mixer->chorus_rate_hz = raw[44];
+    mixer->chorus_depth = raw[45];
+    mixer->chorus_center_delay_ms = raw[46];
+    mixer->chorus_feedback = raw[47];
+    mixer->chorus_mix = raw[48];
+    mixer->flanger_enabled = (flags & 0x80) != 0 ? 1u : 0u;
+    mixer->flanger_rate_hz = raw[49];
+    mixer->flanger_depth = raw[50];
+    mixer->flanger_center_delay_ms = raw[51];
+    mixer->flanger_feedback = raw[52];
+    mixer->flanger_mix = raw[53];
+    mixer->phaser_enabled = (flags & 0x100) != 0 ? 1u : 0u;
+    mixer->phaser_rate_hz = raw[54];
+    mixer->phaser_depth = raw[55];
+    mixer->phaser_center_frequency_hz = raw[56];
+    mixer->phaser_feedback = raw[57];
+    mixer->phaser_mix = raw[58];
+    mixer->delay_enabled = (flags & 0x200) != 0 ? 1u : 0u;
+    mixer->delay_ms = raw[59];
+    mixer->delay_feedback = raw[60];
+    mixer->delay_ping_pong = raw[61];
+    mixer->delay_damping_hz = raw[62];
+    mixer->delay_mix = raw[63];
+    mixer->early_reflections_enabled = (flags & 0x400) != 0 ? 1u : 0u;
+    mixer->early_reflections_room_size = raw[64];
+    mixer->early_reflections_diffusion = raw[65];
+    mixer->early_reflections_damping = raw[66];
+    mixer->early_reflections_mix = raw[67];
 
     *spatial = {};
     spatial->struct_size = sizeof(*spatial);

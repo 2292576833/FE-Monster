@@ -66,7 +66,7 @@ public final class AudioMixerService {
         "reverbWet",
         "reverbDry"
     );
-    private static final List<String> PARAMETER_KEYS = List.of(
+    private static final List<String> V1_PARAMETER_KEYS = List.of(
         "enabled",
         "inputGainDb",
         "outputGainDb",
@@ -109,12 +109,15 @@ public final class AudioMixerService {
         "obrOutputGainDb",
         "obrSpatialWidth"
     );
+    private static final List<String> PARAMETER_KEYS = parameterKeysV2();
     private static final Set<String> LEGACY_PARAMETER_KEY_SET = Set.copyOf(LEGACY_PARAMETER_KEYS);
+    private static final Set<String> V1_PARAMETER_KEY_SET = Set.copyOf(V1_PARAMETER_KEYS);
     private static final Set<String> PARAMETER_KEY_SET = Set.copyOf(PARAMETER_KEYS);
     private static final Map<String, Bounds> NUMERIC_BOUNDS = numericBounds();
     private static final Set<String> BOOLEAN_PARAMETERS = Set.of(
         "enabled", "compressorEnabled", "limiterEnabled", "reverbEnabled",
-        "upmixEnabled", "obrEnabled"
+        "upmixEnabled", "obrEnabled", "chorusEnabled", "flangerEnabled",
+        "phaserEnabled", "delayEnabled", "earlyReflectionsEnabled"
     );
     private static final Map<String, Set<String>> ENUM_PARAMETERS = Map.of(
         "upmixAlgorithm", Set.of("passive", "matrix-decode", "ambient-extract", "music-detail"),
@@ -175,11 +178,17 @@ public final class AudioMixerService {
         void move(Path source, Path evidence) throws IOException;
     }
 
+    @FunctionalInterface
+    interface StateReplacement {
+        void replace(Path temporary, Path destination) throws IOException;
+    }
+
     private final Path stateFile;
     private final Path channelStateFile;
     private final Path dataDirectory;
     private final NativeBridge nativeBridge;
     private final CorruptEvidenceMove corruptEvidenceMove;
+    private final StateReplacement stateReplacement;
     private final Object stateLock;
     private final Object channelStateLock;
     private MixerState state;
@@ -267,7 +276,12 @@ public final class AudioMixerService {
     }
 
     AudioMixerService(Path stateFile, NativeBridge nativeBridge) throws IOException {
-        this(stateFile, nativeBridge, AudioMixerService::atomicMoveCorruptEvidence);
+        this(
+            stateFile,
+            nativeBridge,
+            AudioMixerService::atomicMoveCorruptEvidence,
+            AudioMixerService::atomicReplaceState
+        );
     }
 
     AudioMixerService(
@@ -275,10 +289,22 @@ public final class AudioMixerService {
         NativeBridge nativeBridge,
         CorruptEvidenceMove corruptEvidenceMove
     ) throws IOException {
+        this(stateFile, nativeBridge, corruptEvidenceMove, AudioMixerService::atomicReplaceState);
+    }
+
+    AudioMixerService(
+        Path stateFile,
+        NativeBridge nativeBridge,
+        CorruptEvidenceMove corruptEvidenceMove,
+        StateReplacement stateReplacement
+    ) throws IOException {
         if (stateFile == null) throw new IllegalArgumentException("audio mixer state file is required");
         if (nativeBridge == null) throw new IllegalArgumentException("audio mixer native bridge is required");
         if (corruptEvidenceMove == null) {
             throw new IllegalArgumentException("audio mixer corrupt evidence move is required");
+        }
+        if (stateReplacement == null) {
+            throw new IllegalArgumentException("audio mixer state replacement is required");
         }
         this.stateFile = stateFile.toAbsolutePath().normalize();
         this.dataDirectory = this.stateFile.getParent();
@@ -286,6 +312,7 @@ public final class AudioMixerService {
         this.channelStateFile = dataDirectory.resolve("audio-channel-router-state.json");
         this.nativeBridge = nativeBridge;
         this.corruptEvidenceMove = corruptEvidenceMove;
+        this.stateReplacement = stateReplacement;
         this.stateLock = STATE_LOCKS.computeIfAbsent(this.stateFile, ignored -> new Object());
         this.channelStateLock = STATE_LOCKS.computeIfAbsent(this.channelStateFile, ignored -> new Object());
         loadInitialState();
@@ -524,11 +551,17 @@ public final class AudioMixerService {
                 Map<String, Object> root = SimpleJson.parseObjectStrict(
                     new String(bytes, StandardCharsets.UTF_8)
                 );
-                state = stateFromRoot(root);
+                ParameterShape shape = parameterShape(root);
+                MixerState loaded = stateFromRoot(root);
+                state = loaded;
                 configState = "ready";
                 corruptEvidencePreserved = true;
-                spatialMigrationNeeded = hasLegacyParameterShape(root);
+                spatialMigrationNeeded = shape != ParameterShape.V2;
+                if (spatialMigrationNeeded) persistMigration(state);
+                spatialMigrationNeeded = false;
                 restrictOwnerOnly(stateFile);
+            } catch (MigrationReplacementException replacementFailure) {
+                throw replacementFailure;
             } catch (Exception invalid) {
                 corruptEvidencePreserved = preserveCorruptEvidence();
                 state = cleanState();
@@ -760,7 +793,7 @@ public final class AudioMixerService {
         return lastChannelStatus;
     }
 
-    private void refreshFromDiskForMutation() {
+    private void refreshFromDiskForMutation() throws IOException {
         if ("corrupt".equals(configState)) return;
         if (!Files.isRegularFile(stateFile)) {
             if (state.revision() != 0 || "ready".equals(configState)) {
@@ -775,11 +808,15 @@ public final class AudioMixerService {
             Map<String, Object> root = SimpleJson.parseObjectStrict(
                 new String(readBoundedState(), StandardCharsets.UTF_8)
             );
+            ParameterShape shape = parameterShape(root);
             MixerState disk = stateFromRoot(root);
+            if (shape != ParameterShape.V2) persistMigration(disk);
             if (!disk.equals(state)) state = disk;
             configState = "ready";
             corruptEvidencePreserved = true;
-            spatialMigrationNeeded = hasLegacyParameterShape(root);
+            spatialMigrationNeeded = false;
+        } catch (MigrationReplacementException replacementFailure) {
+            throw replacementFailure;
         } catch (Exception invalid) {
             corruptEvidencePreserved = preserveCorruptEvidence();
             state = cleanState();
@@ -1142,10 +1179,17 @@ public final class AudioMixerService {
         return lastNativeStatus;
     }
 
-    private static boolean hasLegacyParameterShape(Map<String, Object> root) {
-        Object parameterValue = root.get("parameters");
-        return parameterValue instanceof Map<?, ?> map
-            && map.keySet().equals(LEGACY_PARAMETER_KEY_SET);
+    private enum ParameterShape { LEGACY, V1, V2 }
+
+    private static ParameterShape parameterShape(Map<String, Object> root) {
+        Object value = root.get("parameters");
+        if (!(value instanceof Map<?, ?> raw)) {
+            throw new IllegalArgumentException("parameters must be an object");
+        }
+        if (raw.keySet().equals(PARAMETER_KEY_SET)) return ParameterShape.V2;
+        if (raw.keySet().equals(V1_PARAMETER_KEY_SET)) return ParameterShape.V1;
+        if (raw.keySet().equals(LEGACY_PARAMETER_KEY_SET)) return ParameterShape.LEGACY;
+        throw new IllegalArgumentException("unsupported audio mixer parameter shape");
     }
 
     private MixerState stateFromRoot(Map<String, Object> root) {
@@ -1162,24 +1206,16 @@ public final class AudioMixerService {
         if (!"custom".equals(selectedPreset) && !PRESETS.containsKey(selectedPreset)) {
             throw new IllegalArgumentException("unknown selectedPreset");
         }
-        Object parameterValue = root.get("parameters");
-        if (!(parameterValue instanceof Map<?, ?>)) {
-            throw new IllegalArgumentException("parameters must be an object");
-        }
-        Map<String, Object> rawParameters = SimpleJson.asMap(parameterValue);
-        boolean legacy = rawParameters.keySet().equals(LEGACY_PARAMETER_KEY_SET);
-        Map<String, Object> parameters = legacy
-            ? migrateLegacyParameters(rawParameters)
-            : validateCompleteParameters(rawParameters);
+        ParameterShape shape = parameterShape(root);
+        Map<String, Object> rawParameters = SimpleJson.asMap(root.get("parameters"));
+        Map<String, Object> parameters = switch (shape) {
+            case V2 -> validateCompleteParameters(rawParameters);
+            case V1 -> migrateCompleteParameters(rawParameters, V1_PARAMETER_KEYS);
+            case LEGACY -> migrateCompleteParameters(rawParameters, LEGACY_PARAMETER_KEYS);
+        };
         String restoredPreset = selectedPreset;
         if (!"custom".equals(restoredPreset)
             && !PRESETS.get(restoredPreset).parameters().equals(parameters)) {
-            if (!legacy) {
-                throw new IllegalArgumentException("selected preset parameters do not match");
-            }
-            // Additive migration never rewrites old user values merely because a
-            // built-in preset was tuned in a newer build. Preserve those values
-            // and truthfully relabel the restored state as custom.
             restoredPreset = "custom";
         }
         return new MixerState(revision, restoredPreset, immutableParameters(parameters));
@@ -1208,13 +1244,16 @@ public final class AudioMixerService {
         return normalized;
     }
 
-    private static Map<String, Object> migrateLegacyParameters(Map<String, Object> legacy) {
-        if (!legacy.keySet().equals(LEGACY_PARAMETER_KEY_SET)) {
+    private static Map<String, Object> migrateCompleteParameters(
+        Map<String, Object> raw,
+        List<String> orderedKeys
+    ) {
+        if (!raw.keySet().equals(Set.copyOf(orderedKeys))) {
             throw new IllegalArgumentException("legacy audio mixer parameters must be complete");
         }
         Map<String, Object> migrated = cleanParameters();
-        for (String key : LEGACY_PARAMETER_KEYS) {
-            migrated.put(key, validateParameter(key, legacy.get(key)));
+        for (String key : orderedKeys) {
+            migrated.put(key, validateParameter(key, raw.get(key)));
         }
         return validateCompleteParameters(migrated);
     }
@@ -1415,19 +1454,18 @@ public final class AudioMixerService {
                 while (buffer.hasRemaining()) channel.write(buffer);
                 channel.force(true);
             }
-            try {
-                Files.move(
-                    temporary,
-                    stateFile,
-                    StandardCopyOption.ATOMIC_MOVE,
-                    StandardCopyOption.REPLACE_EXISTING
-                );
-            } catch (AtomicMoveNotSupportedException unavailable) {
-                throw new IOException("atomic audio mixer state replacement is unavailable", unavailable);
-            }
+            stateReplacement.replace(temporary, stateFile);
             restrictOwnerOnly(stateFile);
         } finally {
             Files.deleteIfExists(temporary);
+        }
+    }
+
+    private void persistMigration(MixerState migrated) throws MigrationReplacementException {
+        try {
+            persist(migrated);
+        } catch (IOException failure) {
+            throw new MigrationReplacementException(failure);
         }
     }
 
@@ -1501,6 +1539,19 @@ public final class AudioMixerService {
 
     private static void atomicMoveCorruptEvidence(Path source, Path evidence) throws IOException {
         Files.move(source, evidence, StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    private static void atomicReplaceState(Path temporary, Path destination) throws IOException {
+        try {
+            Files.move(
+                temporary,
+                destination,
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING
+            );
+        } catch (AtomicMoveNotSupportedException unavailable) {
+            throw new IOException("atomic audio mixer state replacement is unavailable", unavailable);
+        }
     }
 
     private static Map<String, Object> stateMap(MixerState state) {
@@ -1621,11 +1672,16 @@ public final class AudioMixerService {
         if (booleanValue(parameters.get("reverbEnabled"), false)) flags |= 8;
         if (booleanValue(parameters.get("upmixEnabled"), false)) flags |= 0x10;
         if (booleanValue(parameters.get("obrEnabled"), false)) flags |= 0x20;
+        if (booleanValue(parameters.get("chorusEnabled"), false)) flags |= 0x40;
+        if (booleanValue(parameters.get("flangerEnabled"), false)) flags |= 0x80;
+        if (booleanValue(parameters.get("phaserEnabled"), false)) flags |= 0x100;
+        if (booleanValue(parameters.get("delayEnabled"), false)) flags |= 0x200;
+        if (booleanValue(parameters.get("earlyReflectionsEnabled"), false)) flags |= 0x400;
         return flags;
     }
 
     private static float[] nativeValues(Map<String, Object> p) {
-        float[] values = new float[44];
+        float[] values = new float[68];
         values[0] = floatValue(p.get("inputGainDb"));
         values[1] = floatValue(p.get("outputGainDb"));
         values[2] = floatValue(p.get("balance"));
@@ -1673,6 +1729,30 @@ public final class AudioMixerService {
         values[41] = floatValue(p.get("obrDry"));
         values[42] = floatValue(p.get("obrOutputGainDb"));
         values[43] = floatValue(p.get("obrSpatialWidth"));
+        values[44] = floatValue(p.get("chorusRateHz"));
+        values[45] = floatValue(p.get("chorusDepth"));
+        values[46] = floatValue(p.get("chorusCenterDelayMs"));
+        values[47] = floatValue(p.get("chorusFeedback"));
+        values[48] = floatValue(p.get("chorusMix"));
+        values[49] = floatValue(p.get("flangerRateHz"));
+        values[50] = floatValue(p.get("flangerDepth"));
+        values[51] = floatValue(p.get("flangerCenterDelayMs"));
+        values[52] = floatValue(p.get("flangerFeedback"));
+        values[53] = floatValue(p.get("flangerMix"));
+        values[54] = floatValue(p.get("phaserRateHz"));
+        values[55] = floatValue(p.get("phaserDepth"));
+        values[56] = floatValue(p.get("phaserCenterFrequencyHz"));
+        values[57] = floatValue(p.get("phaserFeedback"));
+        values[58] = floatValue(p.get("phaserMix"));
+        values[59] = floatValue(p.get("delayMs"));
+        values[60] = floatValue(p.get("delayFeedback"));
+        values[61] = floatValue(p.get("delayPingPong"));
+        values[62] = floatValue(p.get("delayDampingHz"));
+        values[63] = floatValue(p.get("delayMix"));
+        values[64] = floatValue(p.get("earlyReflectionsRoomSize"));
+        values[65] = floatValue(p.get("earlyReflectionsDiffusion"));
+        values[66] = floatValue(p.get("earlyReflectionsDamping"));
+        values[67] = floatValue(p.get("earlyReflectionsMix"));
         return values;
     }
 
@@ -1724,6 +1804,23 @@ public final class AudioMixerService {
         return value instanceof String string && !string.isBlank() ? string : fallback;
     }
 
+    private static List<String> parameterKeysV2() {
+        List<String> keys = new ArrayList<>(V1_PARAMETER_KEYS);
+        keys.addAll(List.of(
+            "chorusEnabled", "chorusRateHz", "chorusDepth", "chorusCenterDelayMs",
+            "chorusFeedback", "chorusMix",
+            "flangerEnabled", "flangerRateHz", "flangerDepth", "flangerCenterDelayMs",
+            "flangerFeedback", "flangerMix",
+            "phaserEnabled", "phaserRateHz", "phaserDepth", "phaserCenterFrequencyHz",
+            "phaserFeedback", "phaserMix",
+            "delayEnabled", "delayMs", "delayFeedback", "delayPingPong",
+            "delayDampingHz", "delayMix",
+            "earlyReflectionsEnabled", "earlyReflectionsRoomSize",
+            "earlyReflectionsDiffusion", "earlyReflectionsDamping", "earlyReflectionsMix"
+        ));
+        return List.copyOf(keys);
+    }
+
     private static Map<String, Bounds> numericBounds() {
         Map<String, Bounds> bounds = new LinkedHashMap<>();
         bounds.put("inputGainDb", new Bounds(-24.0, 24.0));
@@ -1757,6 +1854,30 @@ public final class AudioMixerService {
         bounds.put("obrDry", new Bounds(0.0, 1.0));
         bounds.put("obrOutputGainDb", new Bounds(-12.0, 0.0));
         bounds.put("obrSpatialWidth", new Bounds(0.0, 2.0));
+        bounds.put("chorusRateHz", new Bounds(0.05, 5.0));
+        bounds.put("chorusDepth", new Bounds(0.0, 1.0));
+        bounds.put("chorusCenterDelayMs", new Bounds(4.0, 30.0));
+        bounds.put("chorusFeedback", new Bounds(-0.95, 0.95));
+        bounds.put("chorusMix", new Bounds(0.0, 1.0));
+        bounds.put("flangerRateHz", new Bounds(0.02, 5.0));
+        bounds.put("flangerDepth", new Bounds(0.0, 1.0));
+        bounds.put("flangerCenterDelayMs", new Bounds(0.2, 10.0));
+        bounds.put("flangerFeedback", new Bounds(-0.95, 0.95));
+        bounds.put("flangerMix", new Bounds(0.0, 1.0));
+        bounds.put("phaserRateHz", new Bounds(0.02, 10.0));
+        bounds.put("phaserDepth", new Bounds(0.0, 1.0));
+        bounds.put("phaserCenterFrequencyHz", new Bounds(100.0, 4000.0));
+        bounds.put("phaserFeedback", new Bounds(-0.95, 0.95));
+        bounds.put("phaserMix", new Bounds(0.0, 1.0));
+        bounds.put("delayMs", new Bounds(1.0, 1000.0));
+        bounds.put("delayFeedback", new Bounds(0.0, 0.90));
+        bounds.put("delayPingPong", new Bounds(0.0, 1.0));
+        bounds.put("delayDampingHz", new Bounds(500.0, 20_000.0));
+        bounds.put("delayMix", new Bounds(0.0, 1.0));
+        bounds.put("earlyReflectionsRoomSize", new Bounds(0.0, 1.0));
+        bounds.put("earlyReflectionsDiffusion", new Bounds(0.0, 1.0));
+        bounds.put("earlyReflectionsDamping", new Bounds(0.0, 1.0));
+        bounds.put("earlyReflectionsMix", new Bounds(0.0, 0.5));
         return Map.copyOf(bounds);
     }
 
@@ -1787,8 +1908,8 @@ public final class AudioMixerService {
         putPreset(presets, "hall", "大厅", hall);
 
         Map<String, Object> surround = copyParameters(clean);
-        surround.put("inputGainDb", -6.0);
-        surround.put("stereoWidth", 1.2);
+        surround.put("inputGainDb", 0.0);
+        surround.put("stereoWidth", 1.0);
         surround.put("upmixEnabled", true);
         surround.put("upmixAlgorithm", "music-detail");
         surround.put("upmixOutputLayout", "7.1");
@@ -1797,7 +1918,7 @@ public final class AudioMixerService {
         surround.put("upmixLfeGain", 0.48);
         surround.put("obrEnabled", true);
         surround.put("obrFilterProfile", "direct");
-        surround.put("obrSpatialWidth", 1.3);
+        surround.put("obrSpatialWidth", 1.0);
         putPreset(presets, "surround-3d", "3D环绕", surround);
 
         Map<String, Object> cinema = copyParameters(clean);
@@ -1848,6 +1969,72 @@ public final class AudioMixerService {
         night.put("compressorMakeupDb", 3.0);
         night.put("limiterCeilingDb", -3.0);
         putPreset(presets, "night", "夜间", night);
+
+        Map<String, Object> chorus = copyParameters(clean);
+        chorus.put("stereoWidth", 1.15);
+        chorus.put("chorusEnabled", true);
+        chorus.put("chorusRateHz", 0.32);
+        chorus.put("chorusDepth", 0.42);
+        chorus.put("chorusCenterDelayMs", 18.0);
+        chorus.put("chorusFeedback", 0.08);
+        chorus.put("chorusMix", 0.30);
+        putPreset(presets, "wide-chorus", "宽阔合唱", chorus);
+
+        Map<String, Object> flanger = copyParameters(clean);
+        flanger.put("flangerEnabled", true);
+        flanger.put("flangerRateHz", 0.18);
+        flanger.put("flangerDepth", 0.65);
+        flanger.put("flangerCenterDelayMs", 1.6);
+        flanger.put("flangerFeedback", 0.55);
+        flanger.put("flangerMix", 0.32);
+        putPreset(presets, "classic-flanger", "经典镶边", flanger);
+
+        Map<String, Object> phaser = copyParameters(clean);
+        phaser.put("phaserEnabled", true);
+        phaser.put("phaserRateHz", 0.22);
+        phaser.put("phaserDepth", 0.55);
+        phaser.put("phaserCenterFrequencyHz", 900.0);
+        phaser.put("phaserFeedback", 0.25);
+        phaser.put("phaserMix", 0.34);
+        putPreset(presets, "flowing-phaser", "流动移相", phaser);
+
+        Map<String, Object> delay = copyParameters(clean);
+        delay.put("delayEnabled", true);
+        delay.put("delayMs", 320.0);
+        delay.put("delayFeedback", 0.38);
+        delay.put("delayPingPong", 0.85);
+        delay.put("delayDampingHz", 8000.0);
+        delay.put("delayMix", 0.28);
+        putPreset(presets, "ping-pong-delay", "乒乓回声", delay);
+
+        Map<String, Object> nearfield = copyParameters(clean);
+        nearfield.put("earlyReflectionsEnabled", true);
+        nearfield.put("earlyReflectionsRoomSize", 0.28);
+        nearfield.put("earlyReflectionsDiffusion", 0.48);
+        nearfield.put("earlyReflectionsDamping", 0.42);
+        nearfield.put("earlyReflectionsMix", 0.16);
+        putPreset(presets, "nearfield-studio", "近场工作室", nearfield);
+
+        Map<String, Object> live = copyParameters(clean);
+        live.put("earlyReflectionsEnabled", true);
+        live.put("earlyReflectionsRoomSize", 0.72);
+        live.put("earlyReflectionsDiffusion", 0.75);
+        live.put("earlyReflectionsDamping", 0.55);
+        live.put("earlyReflectionsMix", 0.22);
+        live.put("reverbEnabled", true);
+        live.put("reverbRoomSize", 0.75);
+        live.put("reverbDecayMs", 2200.0);
+        live.put("reverbDamping", 0.60);
+        live.put("reverbPreDelayMs", 25.0);
+        live.put("reverbWet", 0.20);
+        live.put("reverbDry", 1.0);
+        live.put("upmixEnabled", true);
+        live.put("upmixAlgorithm", "music-detail");
+        live.put("upmixOutputLayout", "7.1");
+        live.put("obrEnabled", true);
+        live.put("obrFilterProfile", "direct");
+        live.put("obrSpatialWidth", 1.15);
+        putPreset(presets, "immersive-live", "沉浸现场", live);
         return presets;
     }
 
@@ -1894,6 +2081,35 @@ public final class AudioMixerService {
         p.put("obrDry", 0.0);
         p.put("obrOutputGainDb", 0.0);
         p.put("obrSpatialWidth", 1.0);
+        p.put("chorusEnabled", false);
+        p.put("chorusRateHz", 0.30);
+        p.put("chorusDepth", 0.35);
+        p.put("chorusCenterDelayMs", 18.0);
+        p.put("chorusFeedback", 0.0);
+        p.put("chorusMix", 0.0);
+        p.put("flangerEnabled", false);
+        p.put("flangerRateHz", 0.18);
+        p.put("flangerDepth", 0.50);
+        p.put("flangerCenterDelayMs", 1.5);
+        p.put("flangerFeedback", 0.35);
+        p.put("flangerMix", 0.0);
+        p.put("phaserEnabled", false);
+        p.put("phaserRateHz", 0.20);
+        p.put("phaserDepth", 0.50);
+        p.put("phaserCenterFrequencyHz", 900.0);
+        p.put("phaserFeedback", 0.20);
+        p.put("phaserMix", 0.0);
+        p.put("delayEnabled", false);
+        p.put("delayMs", 320.0);
+        p.put("delayFeedback", 0.30);
+        p.put("delayPingPong", 0.75);
+        p.put("delayDampingHz", 8000.0);
+        p.put("delayMix", 0.0);
+        p.put("earlyReflectionsEnabled", false);
+        p.put("earlyReflectionsRoomSize", 0.35);
+        p.put("earlyReflectionsDiffusion", 0.55);
+        p.put("earlyReflectionsDamping", 0.45);
+        p.put("earlyReflectionsMix", 0.0);
         return p;
     }
 
@@ -1944,6 +2160,12 @@ public final class AudioMixerService {
 
         public long currentRevision() {
             return currentRevision;
+        }
+    }
+
+    private static final class MigrationReplacementException extends IOException {
+        private MigrationReplacementException(IOException cause) {
+            super("atomic audio mixer migration replacement failed", cause);
         }
     }
 

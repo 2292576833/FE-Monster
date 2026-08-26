@@ -709,7 +709,7 @@ fn maximum_feedback_effect_tails_decay_through_mixer_ffi() {
 fn all_presets_are_complete_deterministic_valid_snapshots() {
     let handle = Handle::new(8);
     let mut snapshots = Vec::new();
-    for id in 0..8 {
+    for id in 0..=13 {
         let first = mixer_preset_params(id).expect("preset");
         assert_eq!(first, mixer_preset_params(id).unwrap());
         assert_eq!(first.struct_size as usize, size_of::<FeRustMixerParams>());
@@ -726,8 +726,10 @@ fn all_presets_are_complete_deterministic_valid_snapshots() {
     }
     snapshots.sort();
     snapshots.dedup();
-    assert_eq!(snapshots.len(), 8);
-    assert!(mixer_preset_params(8).is_none());
+    // surround-3d differs from clean only in Java-owned spatial fields; its
+    // Mixer-stage Rust snapshot is intentionally the same unity control state.
+    assert_eq!(snapshots.len(), 13);
+    assert!(mixer_preset_params(14).is_none());
 }
 
 #[test]

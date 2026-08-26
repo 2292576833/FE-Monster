@@ -500,7 +500,9 @@ fn clean_params() -> FeRustMixerParams {
 }
 
 /// Returns a complete deterministic snapshot for a stable preset id:
-/// clean, bathroom, hall, surround-3d, cinema, vocal-clear, bass-boost, night.
+/// clean, bathroom, hall, surround-3d, cinema, vocal-clear, bass-boost, night,
+/// wide-chorus, classic-flanger, flowing-phaser, ping-pong-delay,
+/// nearfield-studio, immersive-live.
 pub fn mixer_preset_params(id: u32) -> Option<FeRustMixerParams> {
     let mut p = clean_params();
     match id {
@@ -525,11 +527,10 @@ pub fn mixer_preset_params(id: u32) -> Option<FeRustMixerParams> {
             p.reverb_dry = 0.88;
         }
         3 => {
-            // Conservative headroom for MatrixDecode -> Mixer -> OBR. Spatial
-            // extent now comes from real 5.1/7.1 object geometry, not boosted
-            // channel gain or an over-wide stereo stage.
-            p.input_gain_db = -6.0;
-            p.stereo_width = 1.2;
+            // The native spatial chain owns adaptive headroom; the Mixer-stage
+            // snapshot remains unity so it does not double-attenuate the bed.
+            p.input_gain_db = 0.0;
+            p.stereo_width = 1.0;
         }
         4 => {
             p.input_gain_db = -1.5;
@@ -575,6 +576,60 @@ pub fn mixer_preset_params(id: u32) -> Option<FeRustMixerParams> {
             p.compressor_knee_db = 10.0;
             p.compressor_makeup_db = 3.0;
             p.limiter_ceiling_db = -3.0;
+        }
+        8 => {
+            p.stereo_width = 1.15;
+            p.chorus_enabled = 1;
+            p.chorus_rate_hz = 0.32;
+            p.chorus_depth = 0.42;
+            p.chorus_center_delay_ms = 18.0;
+            p.chorus_feedback = 0.08;
+            p.chorus_mix = 0.30;
+        }
+        9 => {
+            p.flanger_enabled = 1;
+            p.flanger_rate_hz = 0.18;
+            p.flanger_depth = 0.65;
+            p.flanger_center_delay_ms = 1.6;
+            p.flanger_feedback = 0.55;
+            p.flanger_mix = 0.32;
+        }
+        10 => {
+            p.phaser_enabled = 1;
+            p.phaser_rate_hz = 0.22;
+            p.phaser_depth = 0.55;
+            p.phaser_center_frequency_hz = 900.0;
+            p.phaser_feedback = 0.25;
+            p.phaser_mix = 0.34;
+        }
+        11 => {
+            p.delay_enabled = 1;
+            p.delay_ms = 320.0;
+            p.delay_feedback = 0.38;
+            p.delay_ping_pong = 0.85;
+            p.delay_damping_hz = 8_000.0;
+            p.delay_mix = 0.28;
+        }
+        12 => {
+            p.early_reflections_enabled = 1;
+            p.early_reflections_room_size = 0.28;
+            p.early_reflections_diffusion = 0.48;
+            p.early_reflections_damping = 0.42;
+            p.early_reflections_mix = 0.16;
+        }
+        13 => {
+            p.early_reflections_enabled = 1;
+            p.early_reflections_room_size = 0.72;
+            p.early_reflections_diffusion = 0.75;
+            p.early_reflections_damping = 0.55;
+            p.early_reflections_mix = 0.22;
+            p.reverb_enabled = 1;
+            p.reverb_room_size = 0.75;
+            p.reverb_decay_ms = 2_200.0;
+            p.reverb_damping = 0.60;
+            p.reverb_pre_delay_ms = 25.0;
+            p.reverb_wet = 0.20;
+            p.reverb_dry = 1.0;
         }
         _ => return None,
     }
@@ -1963,8 +2018,8 @@ mod tests {
     #[test]
     fn surround_preset_does_not_double_attenuate_upmix_stage() {
         let params = mixer_preset_params(3).expect("surround preset");
-        assert_eq!(params.input_gain_db, -6.0);
-        assert_eq!(params.stereo_width, 1.2);
+        assert_eq!(params.input_gain_db, 0.0);
+        assert_eq!(params.stereo_width, 1.0);
         assert_eq!(params.center_gain, 1.0);
         assert_eq!(params.surround_gain, 1.0);
         assert_eq!(params.lfe_gain, 1.0);

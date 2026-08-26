@@ -18,7 +18,7 @@ public final class NativeAudioEngine {
     private static final int NATIVE_SAMPLE_HEADER_SIZE = 5;
     private static final int NATIVE_SPATIAL_STATUS_SIZE = 32;
     private static final int NATIVE_MIXER_STATUS_SIZE = 29;
-    private static final int NATIVE_MIXER_VALUE_COUNT = 44;
+    private static final int NATIVE_MIXER_VALUE_COUNT = 68;
     private static final int NATIVE_CHANNEL_ROUTER_STATUS_SIZE = 34;
     private static final int NATIVE_CHANNEL_ROUTER_VALUE_COUNT = 41;
     private static final int NATIVE_CHANNEL_ROUTER_CHANNEL_COUNT = 8;
@@ -109,11 +109,11 @@ public final class NativeAudioEngine {
 
     private static void validateMixerParameters(long revision, int flags, float[] values) {
         if (revision < 0) throw new IllegalArgumentException("mixer revision must be nonnegative");
-        if (flags < 0 || (flags & ~0x3f) != 0) {
+        if (flags < 0 || (flags & ~0x7ff) != 0) {
             throw new IllegalArgumentException("invalid mixer flags");
         }
         if (values == null || values.length != NATIVE_MIXER_VALUE_COUNT) {
-            throw new IllegalArgumentException("mixer values must contain exactly 44 floats");
+            throw new IllegalArgumentException("mixer values must contain exactly 68 floats");
         }
         for (float value : values) {
             if (!Float.isFinite(value)) {

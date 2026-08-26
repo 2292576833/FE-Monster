@@ -144,7 +144,12 @@ bool IsValidMixerParams(const FeRustMixerParams* params) {
     if (params->enabled > 1
         || params->compressor_enabled > 1
         || params->limiter_enabled > 1
-        || params->reverb_enabled > 1) {
+        || params->reverb_enabled > 1
+        || params->chorus_enabled > 1
+        || params->flanger_enabled > 1
+        || params->phaser_enabled > 1
+        || params->delay_enabled > 1
+        || params->early_reflections_enabled > 1) {
         return false;
     }
     if (!MixerValueInRange(params->input_gain_db, -24.0f, 24.0f)
@@ -167,7 +172,31 @@ bool IsValidMixerParams(const FeRustMixerParams* params) {
         || !MixerValueInRange(params->reverb_damping, 0.0f, 1.0f)
         || !MixerValueInRange(params->reverb_pre_delay_ms, 0.0f, 200.0f)
         || !MixerValueInRange(params->reverb_wet, 0.0f, 1.0f)
-        || !MixerValueInRange(params->reverb_dry, 0.0f, 1.0f)) {
+        || !MixerValueInRange(params->reverb_dry, 0.0f, 1.0f)
+        || !MixerValueInRange(params->chorus_rate_hz, 0.05f, 5.0f)
+        || !MixerValueInRange(params->chorus_depth, 0.0f, 1.0f)
+        || !MixerValueInRange(params->chorus_center_delay_ms, 4.0f, 30.0f)
+        || !MixerValueInRange(params->chorus_feedback, -0.95f, 0.95f)
+        || !MixerValueInRange(params->chorus_mix, 0.0f, 1.0f)
+        || !MixerValueInRange(params->flanger_rate_hz, 0.02f, 5.0f)
+        || !MixerValueInRange(params->flanger_depth, 0.0f, 1.0f)
+        || !MixerValueInRange(params->flanger_center_delay_ms, 0.2f, 10.0f)
+        || !MixerValueInRange(params->flanger_feedback, -0.95f, 0.95f)
+        || !MixerValueInRange(params->flanger_mix, 0.0f, 1.0f)
+        || !MixerValueInRange(params->phaser_rate_hz, 0.02f, 10.0f)
+        || !MixerValueInRange(params->phaser_depth, 0.0f, 1.0f)
+        || !MixerValueInRange(params->phaser_center_frequency_hz, 100.0f, 4000.0f)
+        || !MixerValueInRange(params->phaser_feedback, -0.95f, 0.95f)
+        || !MixerValueInRange(params->phaser_mix, 0.0f, 1.0f)
+        || !MixerValueInRange(params->delay_ms, 1.0f, 1000.0f)
+        || !MixerValueInRange(params->delay_feedback, 0.0f, 0.90f)
+        || !MixerValueInRange(params->delay_ping_pong, 0.0f, 1.0f)
+        || !MixerValueInRange(params->delay_damping_hz, 500.0f, 20000.0f)
+        || !MixerValueInRange(params->delay_mix, 0.0f, 1.0f)
+        || !MixerValueInRange(params->early_reflections_room_size, 0.0f, 1.0f)
+        || !MixerValueInRange(params->early_reflections_diffusion, 0.0f, 1.0f)
+        || !MixerValueInRange(params->early_reflections_damping, 0.0f, 1.0f)
+        || !MixerValueInRange(params->early_reflections_mix, 0.0f, 0.5f)) {
         return false;
     }
     for (float value : params->eq_db) {

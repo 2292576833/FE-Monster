@@ -109,6 +109,30 @@ FeRustMixerParams CleanMixerParams() {
     params.reverb_damping = 0.5f;
     params.reverb_pre_delay_ms = 12.0f;
     params.reverb_dry = 1.0f;
+    params.chorus_rate_hz = 0.30f;
+    params.chorus_depth = 0.35f;
+    params.chorus_center_delay_ms = 18.0f;
+    params.chorus_feedback = 0.0f;
+    params.chorus_mix = 0.0f;
+    params.flanger_rate_hz = 0.18f;
+    params.flanger_depth = 0.50f;
+    params.flanger_center_delay_ms = 1.5f;
+    params.flanger_feedback = 0.35f;
+    params.flanger_mix = 0.0f;
+    params.phaser_rate_hz = 0.20f;
+    params.phaser_depth = 0.50f;
+    params.phaser_center_frequency_hz = 900.0f;
+    params.phaser_feedback = 0.20f;
+    params.phaser_mix = 0.0f;
+    params.delay_ms = 320.0f;
+    params.delay_feedback = 0.30f;
+    params.delay_ping_pong = 0.75f;
+    params.delay_damping_hz = 8000.0f;
+    params.delay_mix = 0.0f;
+    params.early_reflections_room_size = 0.35f;
+    params.early_reflections_diffusion = 0.55f;
+    params.early_reflections_damping = 0.45f;
+    params.early_reflections_mix = 0.0f;
     return params;
 }
 

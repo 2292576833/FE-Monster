@@ -218,7 +218,7 @@ assert.match(rustSource, /SurroundUpmixer/);
 assert.match(rustSource, /upmix_stereo_to_51/);
 assert.match(rustSource, /upmix_51_to_71/);
 assert.match(rustSource, /fe_rust_upmix_process/);
-assert.match(mixerHeader, /FE_RUST_MIXER_ABI_VERSION\s+1u/);
+assert.match(mixerHeader, /FE_RUST_MIXER_ABI_VERSION\s+2u/);
 assert.equal(
   (mixerHeader.match(/typedef .*FeRustMixer[A-Za-z]+Fn/g) || []).length,
   8,
@@ -242,7 +242,7 @@ assert.match(jniBridge, /status\.spatial_active_revision\s*>\s*0[\s\S]{0,180}:\s
 assert.match(javaBridge, /startSpatialStream/);
 assert.match(javaBridge, /submitSpatialPcm/);
 assert.match(javaBridge, /mixerPayload/);
-assert.match(javaBridge, /NATIVE_MIXER_VALUE_COUNT\s*=\s*44/);
+assert.match(javaBridge, /NATIVE_MIXER_VALUE_COUNT\s*=\s*68/);
 assert.match(javaBridge, /NATIVE_MIXER_STATUS_SIZE\s*=\s*29/);
 assert.match(javaBridge, /nativeSetMixerParameters\s*\([\s\S]{0,240}int rampFrames/);
 assert.match(javaBridge, /nativeMixerStatus\s*\(\)/);
@@ -284,7 +284,7 @@ console.log(JSON.stringify({
   modes: ['dry', 'x3d-speaker', 'obr-binaural'],
   pipeline: [
     'OxiMedia Rust SurroundUpmixer',
-    'Rust Mixer ABI v1',
+    'Rust Mixer ABI v2',
     'X3DAudioCalculate',
     'Google OBR Process',
     'XAudio2 SourceVoice',

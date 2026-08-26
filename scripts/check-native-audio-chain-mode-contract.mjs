@@ -14,6 +14,49 @@ const mixerService = readFileSync(
   path.join(root, 'src/main/java/com/femonster/core/AudioMixerService.java'),
   'utf8'
 );
+const bridge = readFileSync(
+  path.join(root, 'native/windows/fe_monster_xaudio2.cpp'),
+  'utf8'
+);
+
+// The JNI mixer snapshot is append-only: the spatial block stays at 31..43
+// while ABI v2 effect controls occupy 44..67 and use their own flag bits.
+assert.match(bridge, /constexpr\s+jsize\s+kMixerValueCount\s*=\s*68/);
+assert.match(bridge, /\(flags\s*&\s*~0x7ff\)\s*!=\s*0/);
+for (const [field, bit] of [
+  ['chorus_enabled', '0x40'],
+  ['flanger_enabled', '0x80'],
+  ['phaser_enabled', '0x100'],
+  ['delay_enabled', '0x200'],
+  ['early_reflections_enabled', '0x400'],
+]) {
+  assert.match(bridge, new RegExp(`mixer->${field}\\s*=\\s*\\(flags\\s*&\\s*${bit}\\)`));
+}
+for (const [index, field] of [
+  [31, 'upmix_algorithm'], [32, 'upmix_output_channels'],
+  [33, 'upmix_center_width_hz'], [34, 'upmix_lfe_crossover_hz'],
+  [35, 'upmix_lfe_gain'], [36, 'upmix_center_gain'],
+  [37, 'upmix_surround_gain'], [38, 'upmix_decorrelation_amount'],
+  [39, 'obr_filter_profile'], [40, 'obr_wet'], [41, 'obr_dry'],
+  [42, 'obr_output_gain_db'], [43, 'obr_spatial_width'],
+]) {
+  assert.match(bridge, new RegExp(`spatial->${field}\\s*=.*raw\\[${index}\\]`),
+    `legacy spatial assignment raw[${index}] -> ${field} changed`);
+}
+for (const [index, field] of [
+  [44, 'chorus_rate_hz'], [45, 'chorus_depth'], [46, 'chorus_center_delay_ms'],
+  [47, 'chorus_feedback'], [48, 'chorus_mix'], [49, 'flanger_rate_hz'],
+  [50, 'flanger_depth'], [51, 'flanger_center_delay_ms'], [52, 'flanger_feedback'],
+  [53, 'flanger_mix'], [54, 'phaser_rate_hz'], [55, 'phaser_depth'],
+  [56, 'phaser_center_frequency_hz'], [57, 'phaser_feedback'], [58, 'phaser_mix'],
+  [59, 'delay_ms'], [60, 'delay_feedback'], [61, 'delay_ping_pong'],
+  [62, 'delay_damping_hz'], [63, 'delay_mix'], [64, 'early_reflections_room_size'],
+  [65, 'early_reflections_diffusion'], [66, 'early_reflections_damping'],
+  [67, 'early_reflections_mix'],
+]) {
+  assert.match(bridge, new RegExp(`mixer->${field}\\s*=\\s*raw\\[${index}\\]`),
+    `ABI v2 effect assignment raw[${index}] -> ${field} changed`);
+}
 
 // Upmix and OBR are independent stages, not aliases for the old monolithic
 // pipeline mode. The exact ABI representation may be fields or feature flags,
