@@ -277,7 +277,10 @@ impl EffectsDerivedParameters {
         approach(&mut self.frame.phaser.mix, target.frame.phaser.mix);
 
         self.frame.delay.enabled = target.frame.delay.enabled;
-        self.frame.delay.target_delay_samples = target.frame.delay.target_delay_samples;
+        approach(
+            &mut self.frame.delay.target_delay_samples,
+            target.frame.delay.target_delay_samples,
+        );
         approach(&mut self.frame.delay.feedback, target.frame.delay.feedback);
         approach(
             &mut self.frame.delay.ping_pong,

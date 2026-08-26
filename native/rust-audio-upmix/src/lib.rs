@@ -1,5 +1,9 @@
 use oximedia_audiopost::surround_upmix::{SurroundUpmixer, UpmixAlgorithm, UpmixConfig};
 mod mixer_effects;
+use mixer_effects::{
+    DelayControl, EarlyReflectionsControl, EffectControlParameters, EffectsDerivedParameters,
+    EffectsRack, ModulationControl, PhaserControl,
+};
 use std::cell::UnsafeCell;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Mutex;
@@ -728,6 +732,7 @@ struct DerivedParameters {
     limiter_release: f32,
     reverb_feedback: [f32; REVERB_FDN_LINES],
     reverb_delays: [usize; REVERB_FDN_LINES],
+    effects: EffectsDerivedParameters,
 }
 
 fn is_prime(value: usize) -> bool {
@@ -791,6 +796,50 @@ impl DerivedParameters {
             };
             compressor_gain_for_db_unchecked(p, detector_db)
         });
+        let effects = EffectsDerivedParameters::prepare(
+            EffectControlParameters {
+                chorus: ModulationControl::new(
+                    p.chorus_enabled != 0,
+                    p.chorus_rate_hz,
+                    p.chorus_depth,
+                    p.chorus_center_delay_ms,
+                    p.chorus_feedback,
+                    p.chorus_mix,
+                ),
+                flanger: ModulationControl::new(
+                    p.flanger_enabled != 0,
+                    p.flanger_rate_hz,
+                    p.flanger_depth,
+                    p.flanger_center_delay_ms,
+                    p.flanger_feedback,
+                    p.flanger_mix,
+                ),
+                phaser: PhaserControl::new(
+                    p.phaser_enabled != 0,
+                    p.phaser_rate_hz,
+                    p.phaser_depth,
+                    p.phaser_center_frequency_hz,
+                    p.phaser_feedback,
+                    p.phaser_mix,
+                ),
+                delay: DelayControl::new(
+                    p.delay_enabled != 0,
+                    p.delay_ms,
+                    p.delay_feedback,
+                    p.delay_ping_pong,
+                    p.delay_damping_hz,
+                    p.delay_mix,
+                ),
+                early_reflections: EarlyReflectionsControl::new(
+                    p.early_reflections_enabled != 0,
+                    p.early_reflections_room_size,
+                    p.early_reflections_diffusion,
+                    p.early_reflections_damping,
+                    p.early_reflections_mix,
+                ),
+            },
+            sample_rate,
+        );
         Self {
             input_gain: db_gain(p.input_gain_db),
             output_gain: db_gain(p.output_gain_db),
@@ -806,6 +855,7 @@ impl DerivedParameters {
                 10.0_f32.powf(-3.0 * reverb_delays[line] as f32 / decay_samples)
             }),
             reverb_delays,
+            effects,
         }
     }
 
@@ -838,6 +888,7 @@ impl DerivedParameters {
             coefficient!(a2);
         }
         self.reverb_delays = target.reverb_delays;
+        self.effects.approach(target.effects, fraction);
     }
 }
 
@@ -954,6 +1005,7 @@ struct MixerDsp {
     reverb_stride: usize,
     reverb_position: usize,
     reverb_damping: [f32; MIXER_MAX_CHANNELS * REVERB_FDN_LINES],
+    effects: EffectsRack,
 }
 
 impl MixerDsp {
@@ -975,6 +1027,7 @@ impl MixerDsp {
             reverb_stride: stride,
             reverb_position: 0,
             reverb_damping: [0.0; MIXER_MAX_CHANNELS * REVERB_FDN_LINES],
+            effects: EffectsRack::new(config.sample_rate as f32),
         }
     }
 
@@ -985,6 +1038,7 @@ impl MixerDsp {
         self.reverb.fill(0.0);
         self.reverb_position = 0;
         self.reverb_damping = [0.0; MIXER_MAX_CHANNELS * REVERB_FDN_LINES];
+        self.effects.reset();
     }
 
     fn reset_to_snapshot(&mut self, snapshot: PreparedSnapshot) {
@@ -1053,12 +1107,41 @@ impl MixerDsp {
         approach!(reverb_pre_delay_ms);
         approach!(reverb_wet);
         approach!(reverb_dry);
+        approach!(chorus_rate_hz);
+        approach!(chorus_depth);
+        approach!(chorus_center_delay_ms);
+        approach!(chorus_feedback);
+        approach!(chorus_mix);
+        approach!(flanger_rate_hz);
+        approach!(flanger_depth);
+        approach!(flanger_center_delay_ms);
+        approach!(flanger_feedback);
+        approach!(flanger_mix);
+        approach!(phaser_rate_hz);
+        approach!(phaser_depth);
+        approach!(phaser_center_frequency_hz);
+        approach!(phaser_feedback);
+        approach!(phaser_mix);
+        approach!(delay_ms);
+        approach!(delay_feedback);
+        approach!(delay_ping_pong);
+        approach!(delay_damping_hz);
+        approach!(delay_mix);
+        approach!(early_reflections_room_size);
+        approach!(early_reflections_diffusion);
+        approach!(early_reflections_damping);
+        approach!(early_reflections_mix);
         self.derived.approach(self.derived_target, fraction);
         self.compressor_lut_mix += (1.0 - self.compressor_lut_mix) * fraction;
         self.current.enabled = self.target.enabled;
         self.current.compressor_enabled = self.target.compressor_enabled;
         self.current.limiter_enabled = self.target.limiter_enabled;
         self.current.reverb_enabled = self.target.reverb_enabled;
+        self.current.chorus_enabled = self.target.chorus_enabled;
+        self.current.flanger_enabled = self.target.flanger_enabled;
+        self.current.phaser_enabled = self.target.phaser_enabled;
+        self.current.delay_enabled = self.target.delay_enabled;
+        self.current.early_reflections_enabled = self.target.early_reflections_enabled;
         self.ramp_remaining -= 1;
     }
 
@@ -1078,6 +1161,7 @@ impl MixerDsp {
     }
 
     fn process(&mut self, pcm: &mut [f32], frames: usize, channels: usize) {
+        self.effects.begin_block();
         for frame in 0..frames {
             self.ramp_one();
             let p = self.current;
@@ -1152,7 +1236,19 @@ impl MixerDsp {
                 }
             }
 
-            // 5. Four-line feedback delay network. All delay and damping
+            // 5. The preallocated effects rack is deliberately upstream of
+            // the legacy FDN and output stage. A failed effect restores its
+            // own dry frame, so this host block still succeeds.
+            let effects_ok = self.effects.process_frame(
+                &mut pcm[base..base + channels],
+                d.effects.frame_parameters(),
+            );
+            if !effects_ok {
+                // The rack already restored the affected module's dry input
+                // and reset only that module's temporal state.
+            }
+
+            // 6. Four-line feedback delay network. All delay and damping
             // memory is allocated by create; the normalized Hadamard matrix
             // is energy-preserving and the per-line T60 gains remain < 1.
             if p.reverb_enabled != 0 {
@@ -1210,7 +1306,7 @@ impl MixerDsp {
                 self.reverb_position = (self.reverb_position + 1) % self.reverb_stride;
             }
 
-            // 6. Output gain and linked peak limiter.
+            // 7. Output gain and linked peak limiter.
             for channel in 0..channels {
                 pcm[base + channel] *= d.output_gain;
             }
@@ -1234,7 +1330,7 @@ impl MixerDsp {
                 self.limiter_gain = 1.0;
             }
 
-            // 7. Final finite sanitation. The linked limiter above (when
+            // 8. Final finite sanitation. The linked limiter above (when
             // enabled) and the native pipeline's final safety limiter own
             // output protection; an extra hard clamp here would add avoidable
             // flat-top distortion and break disabled-mode transparency.

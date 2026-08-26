@@ -56,6 +56,18 @@ fn sine(frames: usize, channels: usize, frequency: f32, amplitude: f32) -> Vec<f
     result
 }
 
+fn channel_samples(pcm: &[f32], channels: usize, channel: usize) -> Vec<f32> {
+    pcm.chunks_exact(channels)
+        .map(|frame| frame[channel])
+        .collect()
+}
+
+fn process_in_blocks(handle: &Handle, pcm: &mut [f32], channels: usize, max_frames: usize) {
+    for block in pcm.chunks_mut(max_frames * channels) {
+        assert_eq!(handle.process(block, channels as u32), FE_RUST_MIXER_OK);
+    }
+}
+
 #[test]
 fn mixer_v2_layout_and_legacy_upmix_v1_are_stable() {
     assert_eq!(fe_rust_mixer_abi_version(), 2);
@@ -443,6 +455,155 @@ fn eq_compressor_limiter_and_reverb_are_observable() {
     impulse[1] = 0.5;
     assert_eq!(reverb.process(&mut impulse, 2), 0);
     assert!(impulse[2000..].iter().any(|x| x.abs() > 1.0e-5));
+}
+
+#[test]
+fn disabled_effect_rack_matches_clean_mixer_and_enabled_modules_are_real() {
+    let clean = Handle::new(512);
+    let effected = Handle::new(512);
+    let input = sine(48_000, 8, 997.0, 0.15);
+    let mut baseline = input.clone();
+    let mut disabled = input.clone();
+    process_in_blocks(&clean, &mut baseline, 8, 512);
+    process_in_blocks(&effected, &mut disabled, 8, 512);
+    assert_eq!(disabled, baseline);
+
+    let mut chorus = FeRustMixerParams::default();
+    chorus.chorus_enabled = 1;
+    chorus.chorus_mix = 0.35;
+    effected.apply(1, &chorus, 240);
+    let mut wet = input.clone();
+    process_in_blocks(&effected, &mut wet, 8, 512);
+    assert_ne!(wet, baseline);
+    assert_eq!(
+        channel_samples(&wet, 8, 3),
+        channel_samples(&baseline, 8, 3)
+    );
+}
+
+#[test]
+fn effect_tails_reset_and_rapid_automation_remains_continuous() {
+    let handle = Handle::new(64);
+    let mut params = FeRustMixerParams::default();
+    params.delay_enabled = 1;
+    params.delay_feedback = 0.38;
+    params.delay_ping_pong = 0.85;
+    params.delay_damping_hz = 8_000.0;
+    params.delay_mix = 0.28;
+    handle.apply(1, &params, 240);
+    let mut previous = 0.0_f32;
+    let mut maximum_jump = 0.0_f32;
+    let mut absolute_frame = 0_usize;
+    for revision in 2_u64..514 {
+        params.delay_ms = if revision % 2 == 0 { 1.0 } else { 1_000.0 };
+        handle.apply(revision, &params, 64);
+        let mut input = vec![0.0_f32; 64 * 2];
+        for frame in 0..64 {
+            let sample =
+                ((absolute_frame + frame) as f32 * 440.0 * std::f32::consts::TAU / 48_000.0).sin()
+                    * 0.2;
+            input[frame * 2] = sample;
+            input[frame * 2 + 1] = sample;
+        }
+        absolute_frame += 64;
+        assert_eq!(handle.process(&mut input, 2), FE_RUST_MIXER_OK);
+        for sample in &input {
+            maximum_jump = maximum_jump.max((*sample - previous).abs());
+            previous = *sample;
+        }
+    }
+    assert!(maximum_jump < 0.25, "automation jump={maximum_jump}");
+    assert_eq!(unsafe { fe_rust_mixer_reset(handle.0) }, FE_RUST_MIXER_OK);
+    let mut silence = vec![0.0; 8_192];
+    process_in_blocks(&handle, &mut silence, 2, 64);
+    assert_eq!(silence, vec![0.0; 8_192]);
+}
+
+#[test]
+fn effects_are_finite_distinct_and_keep_lfe_dry_at_every_supported_layout() {
+    for channels in [2, 6, 8] {
+        let input = sine(32_768, channels, 613.0, 0.18);
+        let mut checksums = Vec::new();
+        for module in 0..6 {
+            let handle = Handle::new(256);
+            let mut params = FeRustMixerParams::default();
+            match module {
+                0 => {
+                    params.chorus_enabled = 1;
+                    params.chorus_mix = 0.42;
+                    params.chorus_feedback = 0.5;
+                }
+                1 => {
+                    params.flanger_enabled = 1;
+                    params.flanger_mix = 0.42;
+                    params.flanger_feedback = 0.5;
+                }
+                2 => {
+                    params.phaser_enabled = 1;
+                    params.phaser_mix = 0.42;
+                    params.phaser_feedback = 0.5;
+                }
+                3 => {
+                    params.delay_enabled = 1;
+                    params.delay_mix = 0.42;
+                    params.delay_feedback = 0.9;
+                }
+                4 => {
+                    params.early_reflections_enabled = 1;
+                    params.early_reflections_mix = 0.5;
+                }
+                _ => {
+                    params.chorus_enabled = 1;
+                    params.chorus_mix = 0.42;
+                    params.flanger_enabled = 1;
+                    params.flanger_mix = 0.42;
+                    params.phaser_enabled = 1;
+                    params.phaser_mix = 0.42;
+                    params.delay_enabled = 1;
+                    params.delay_mix = 0.42;
+                    params.delay_feedback = 0.9;
+                    params.early_reflections_enabled = 1;
+                    params.early_reflections_mix = 0.5;
+                }
+            }
+            handle.apply(1, &params, 0);
+            let mut output = input.clone();
+            process_in_blocks(&handle, &mut output, channels, 256);
+            assert!(output.iter().all(|sample| sample.is_finite()));
+            if channels >= 6 {
+                assert_eq!(
+                    channel_samples(&output, channels, 3),
+                    channel_samples(&input, channels, 3)
+                );
+            }
+            checksums.push(output.iter().map(|sample| *sample as f64).sum::<f64>());
+        }
+        for (index, left) in checksums.iter().enumerate() {
+            for right in &checksums[index + 1..] {
+                assert!(
+                    (left - right).abs() > 1.0e-4,
+                    "channels={channels}, checksum collision"
+                );
+            }
+        }
+
+        let handle = Handle::new(256);
+        let mut params = FeRustMixerParams::default();
+        params.delay_enabled = 1;
+        params.delay_ms = 1.0;
+        params.delay_feedback = 0.9;
+        params.delay_mix = 1.0;
+        handle.apply(1, &params, 0);
+        let mut impulse = vec![0.0; 256 * channels];
+        impulse[0] = 0.5;
+        impulse[1] = 0.5;
+        process_in_blocks(&handle, &mut impulse, channels, 256);
+        let mut tail = vec![0.0; 48_000 * channels];
+        process_in_blocks(&handle, &mut tail, channels, 256);
+        let early_peak = peak(&tail[..tail.len() / 2]);
+        let late_peak = peak(&tail[tail.len() / 2..]);
+        assert!(late_peak < early_peak.max(1.0e-6));
+    }
 }
 
 #[test]
