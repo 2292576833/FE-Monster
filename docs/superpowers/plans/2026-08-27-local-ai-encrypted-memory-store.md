@@ -120,6 +120,7 @@ git commit -m "feat: protect local memory keys with dpapi"
 
 **Files:**
 - Create: `src/main/java/com/femonster/memory/MemoryCrypto.java`
+- Create: `src/main/java/com/femonster/memory/MemoryFileSecurity.java`
 - Create: `src/main/java/com/femonster/memory/MemorySanitizer.java`
 - Create: `src/main/java/com/femonster/memory/MemoryTokenizer.java`
 - Create: `src/main/java/com/femonster/memory/MemoryVaultKeyManager.java`
@@ -133,26 +134,26 @@ git commit -m "feat: protect local memory keys with dpapi"
 - Produces: `Map<String,Object> MemorySanitizer.sanitize(Stream stream, String type, Map<String,Object> payload)` with distinct chat, operation, and knowledge allowlists.
 - Produces: `Set<String> MemoryTokenizer.tokens(String text)` using NFKC, lowercasing, word/prefix tokens, and CJK bi/trigrams.
 
-- [ ] **Step 1: Write failing behavior probes**
+- [x] **Step 1: Write failing behavior probes**
 
 Cover random nonce/ciphertext for equal plaintext, AAD and tag tamper, independent derived keys, Unicode normalization, Chinese 1/2/3-character search tokens, bounded token count, distinct chat/operation allowlists, exact timestamp/correlation validation, non-finite geometry, recursive secret keys, URLs, blob URLs, and absolute Windows/Unix paths.
 
-- [ ] **Step 2: Run probes and verify they fail**
+- [x] **Step 2: Run probes and verify they fail**
 
 Run: `node scripts/check-local-memory-crypto.mjs`  
 Expected: FAIL because the memory crypto package is absent.
 
-- [ ] **Step 3: Implement the minimal pure-Java core**
+- [x] **Step 3: Implement the minimal pure-Java core**
 
 Use `AES/GCM/NoPadding`, 12-byte nonces, 128-bit tags, `HmacSHA256`, constant-time byte comparison, `Normalizer.Form.NFKC`, and explicit per-event allowlists. Cap text at 32 KiB, JSON nesting at 12, collection size at 1,000, token length at 64 code points, and generated token count at 2,048.
 
-- [ ] **Step 4: Run probes**
+- [x] **Step 4: Run probes**
 
 Run: `powershell -NoProfile -File scripts/build-java.ps1`  
 Run: `node scripts/check-local-memory-crypto.mjs`  
 Expected: PASS, including a raw-output scan proving no test key or plaintext appears in errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/java/com/femonster/memory src/test/java/com/femonster/memory scripts/check-local-memory-crypto.mjs
