@@ -165,8 +165,10 @@ git commit -m "feat: add local memory crypto boundary"
 **Files:**
 - Create: `src/main/java/com/femonster/memory/LocalMemoryEvent.java`
 - Create: `src/main/java/com/femonster/memory/LocalMemoryStore.java`
+- Create: `src/main/java/com/femonster/memory/CanonicalMemoryJson.java`
 - Create: `src/main/java/com/femonster/memory/SqliteEncryptedMemoryStore.java`
 - Create: `src/main/java/com/femonster/memory/LocalMemoryException.java`
+- Modify: `src/main/java/com/femonster/memory/MemorySanitizer.java`
 - Create: `src/test/java/com/femonster/memory/SqliteEncryptedMemoryStoreProbe.java`
 - Create: `scripts/check-local-encrypted-memory-store.mjs`
 
@@ -174,30 +176,30 @@ git commit -m "feat: add local memory crypto boundary"
 - Consumes: `MemoryCrypto`, `MemorySanitizer`, `MemoryTokenizer`, and an unwrapped vault-key lease.
 - Produces separate `appendChats`, `appendOperations`, `appendKnowledge`, `queryChats`, `queryOperations`, and `queryKnowledge` paths plus transactional bounded batch, stream-specific forget, backup, restore, and health methods.
 
-- [ ] **Step 1: Write the failing store probe**
+- [x] **Step 1: Write the failing store probe**
 
-Create a temporary vault with a deterministic test protector. Test migration, append/restart/query, physical chat/operation separation, trace lookup returning two collections, exact `occurredAt` plus vault-owned `recordedAt`, actor/model origin, operation lifecycle and undo receipt, scope isolation, Chinese search, cursor ordering, identical duplicate, conflicting duplicate, batch rollback, deletion/search removal, backup/restore, future-schema refusal, locked DB bounded failure, close/reopen, and DB/WAL/SHM/temp byte scans for plaintext and search markers.
+Create a temporary vault with a deterministic stateless test protector. Test migration, append/restart/query, physical chat/operation/knowledge separation, chat `eventId == messageId`, trace lookup returning two collections, exact `occurredAt` plus vault-owned `recordedAt`, actor/model origin, operation lifecycle and undo receipt, scope isolation, Chinese search, cursor ordering, identical duplicate, conflicting duplicate and cross-stream ID conflict, mixed-stream batch rollback, deletion/search removal, backup/restore, envelope/token/manifest tamper, future-schema refusal, locked DB bounded failure, owner-only ACLs, close/reopen, and DB/WAL/SHM/temp byte scans for plaintext and search markers.
 
-- [ ] **Step 2: Run the probe and verify it fails**
+- [x] **Step 2: Run the probe and verify it fails**
 
 Run: `node scripts/check-local-encrypted-memory-store.mjs`  
 Expected: FAIL because the store does not exist.
 
-- [ ] **Step 3: Implement schema and serial transaction boundary**
+- [x] **Step 3: Implement schema and serial transaction boundary**
 
-Load `org.sqlite.JDBC`, use one serialized write executor, configure WAL/foreign keys/FULL sync/busy timeout, and create the exact v1 tables from the spec. Store canonical encrypted JSON, nonce, AAD version, and HMAC tokens. Recompute token sets after decrypt to detect index tamper. Roll back every failed batch and map SQLite result codes to stable redacted error codes.
+Load `org.sqlite.JDBC`, use one serialized store executor, configure WAL/foreign keys/FULL sync/busy timeout/in-memory temp storage, and create the exact corrected v1 tables from the spec (`chat_records.type` and `knowledge_records.source_sequence` are required). Store canonical encrypted JSON, nonce, AAD version, and HMAC tokens. Bind the public type column into AAD, use `KeyLease.createdAt` for `vault_state`, and recompute token sets after decrypt to detect index tamper. Roll back every failed batch and map SQLite result codes to stable redacted error codes.
 
-- [ ] **Step 4: Implement backup, restore, and quarantine**
+- [x] **Step 4: Implement backup, restore, and quarantine**
 
-Checkpoint before backup; authenticate the manifest and every encrypted envelope. Restore into a sibling temporary DB, fully verify, close, and atomically swap. For verified corruption, close and atomically move the DB/WAL/SHM set into one quarantine directory; if that fails, lock the store without overwriting evidence.
+Audit SQLite integrity, foreign keys, every encrypted envelope, public projection, token set, and global ID before backup; authenticate a bounded canonical manifest containing the streamed DB length and SHA-256 instead of MACing the whole DB in memory. Restore into a sibling temporary DB, fully verify, retain a durable old-DB recovery copy, atomically publish a signed fsynced restore intent containing old/new physical hashes and deterministic logical roots, then atomically replace the existing DB without a missing-file window. Reconcile pre-publish, post-publish, WAL-transition, half-written-marker, missing-live, and row-removal crash states before schema initialization; never let a valid marker conceal a missing encrypted row or blind token. For verified corruption, write a durable signed quarantine lock/manifest before recoverable staged moves of the DB/WAL/SHM evidence set; if any stage fails, keep the vault locked without overwriting evidence.
 
-- [ ] **Step 5: Run store and regression probes**
+- [x] **Step 5: Run store and regression probes**
 
 Run: `powershell -NoProfile -File scripts/build-java.ps1`  
 Run: `node scripts/check-local-encrypted-memory-store.mjs`  
 Expected: PASS with zero plaintext markers and deterministic failure codes.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/main/java/com/femonster/memory src/test/java/com/femonster/memory scripts/check-local-encrypted-memory-store.mjs
@@ -216,12 +218,12 @@ git commit -m "feat: add encrypted sqlite memory store"
 - Modify: `src/main/java/com/femonster/api/LocalPetAssistantGuard.java`
 
 **Interfaces:**
-- Consumes: `provider` only, then resolves account data from `MusicProviderRegistry` and internal FEID scope from `CommunityClient.petPersonalizationScope`.
+- Consumes: `provider` only, then resolves account data from `MusicProviderRegistry` and an immutable server account-subject scope from `CommunityClient`; renameable FEID is retained only as an alias/backup lookup attribute.
 - Produces protected `/api/local-memory/health`, `/events`, `/chats`, `/operations`, `/trace`, `/context`, `/forget`, `/backup`, and `/restore` routes with structured no-store responses. Chat and operation routes never return one merged timeline array.
 
 - [ ] **Step 1: Write failing service/route probes**
 
-Assert server-derived scope, FEID A/B isolation, anonymous device scope, spoofed scope/FEID rejection, same-origin/loopback guard, method matrix, explicit stream selection, separate chat/operation result collections, causal trace lookup, 1 MiB JSON body limit, 64 MiB streamed restore limit, 100-event/100-result limits, idempotency, no-store headers, error status mapping, and post-close database renaming.
+Assert server-derived immutable subject scope, FEID rename continuity, account A/B isolation, anonymous device scope, spoofed scope/FEID/account rejection, same-origin/loopback guard, method matrix, explicit stream selection, separate chat/operation result collections, causal trace lookup, 1 MiB JSON body limit, 64 MiB streamed restore limit, 100-event/100-result limits, idempotency, no-store headers, error status mapping, and post-close database renaming.
 
 - [ ] **Step 2: Run probes and verify they fail**
 

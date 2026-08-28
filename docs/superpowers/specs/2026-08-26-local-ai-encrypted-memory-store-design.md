@@ -77,6 +77,8 @@ data/local-ai-memory/
   memory.db                   # SQLite metadata + encrypted payloads + blind tokens
   memory.db-wal / -shm        # treated as one recovery unit with memory.db
   backups/*.fememory          # already encrypted record envelopes + authenticated manifest
+  .memory-restore-intent.json # signed crash-recovery state; absent outside an active restore
+  .memory-quarantine-lock.json # durable fail-closed marker after verified corruption
   quarantine/<timestamp>/     # complete corrupt db/wal/shm evidence set
 ```
 
@@ -100,18 +102,21 @@ CREATE TABLE chat_records (
   message_id TEXT PRIMARY KEY,
   scope_hash TEXT NOT NULL,
   conversation_token BLOB NOT NULL,
+  type TEXT NOT NULL,
   trace_id TEXT NOT NULL,
   turn_id TEXT,
   occurred_at INTEGER,
   recorded_at INTEGER NOT NULL,
-  source_sequence INTEGER,
+  source_sequence INTEGER NOT NULL,
   nonce BLOB NOT NULL,
   ciphertext BLOB NOT NULL,
   aad_version INTEGER NOT NULL,
   deleted_at INTEGER
 );
 CREATE INDEX chat_records_scope_time
-  ON chat_records(scope_hash, occurred_at DESC, message_id DESC);
+  ON chat_records(scope_hash, occurred_at DESC, recorded_at DESC, source_sequence DESC, message_id DESC);
+CREATE INDEX chat_records_scope_type
+  ON chat_records(scope_hash, type, occurred_at DESC, message_id DESC);
 CREATE INDEX chat_records_trace
   ON chat_records(scope_hash, trace_id, turn_id);
 
@@ -134,16 +139,18 @@ CREATE TABLE operation_records (
   actor TEXT NOT NULL,
   occurred_at INTEGER NOT NULL,
   recorded_at INTEGER NOT NULL,
-  source_sequence INTEGER,
+  source_sequence INTEGER NOT NULL,
   nonce BLOB NOT NULL,
   ciphertext BLOB NOT NULL,
   aad_version INTEGER NOT NULL,
   deleted_at INTEGER
 );
 CREATE INDEX operation_records_scope_time
-  ON operation_records(scope_hash, occurred_at DESC, event_id DESC);
+  ON operation_records(scope_hash, occurred_at DESC, recorded_at DESC, source_sequence DESC, event_id DESC);
 CREATE INDEX operation_records_trace
   ON operation_records(scope_hash, trace_id, operation_id, occurred_at);
+CREATE INDEX operation_records_operation
+  ON operation_records(scope_hash, operation_id, occurred_at DESC, event_id DESC);
 
 CREATE TABLE operation_search_tokens (
   event_id TEXT NOT NULL REFERENCES operation_records(event_id) ON DELETE CASCADE,
@@ -158,13 +165,14 @@ CREATE TABLE knowledge_records (
   type TEXT NOT NULL,
   occurred_at INTEGER,
   recorded_at INTEGER NOT NULL,
+  source_sequence INTEGER NOT NULL,
   nonce BLOB NOT NULL,
   ciphertext BLOB NOT NULL,
   aad_version INTEGER NOT NULL,
   deleted_at INTEGER
 );
 CREATE INDEX knowledge_records_scope_time
-  ON knowledge_records(scope_hash, type, occurred_at DESC, event_id DESC);
+  ON knowledge_records(scope_hash, type, occurred_at DESC, recorded_at DESC, source_sequence DESC, event_id DESC);
 
 CREATE TABLE knowledge_search_tokens (
   event_id TEXT NOT NULL REFERENCES knowledge_records(event_id) ON DELETE CASCADE,
@@ -174,19 +182,25 @@ CREATE TABLE knowledge_search_tokens (
 CREATE INDEX knowledge_search_lookup ON knowledge_search_tokens(token, event_id);
 ```
 
-Payloads retain domain fields inside the encrypted JSON envelope. Chat types are `chat.message` and `legacy.chat_snapshot`. Operation types are namespaced lifecycle records such as `command.requested`, `command.confirmed`, `command.started`, `command.succeeded`, `command.failed`, `command.cancelled`, `command.reverted`, `playback.started`, `playback.completed`, `playback.skipped`, `playback.replayed`, `library.favorite_changed`, `scene.preset_saved`, and `scene.preset_applied`. Knowledge types include `library.playlist_snapshot` and `user.fact`.
+Payloads retain domain fields inside the encrypted JSON envelope. Chat `eventId` is exactly its immutable `messageId`/`chat_records.message_id`; it is not a second identifier. Chat types are `chat.message` and `legacy.chat_snapshot`. Operation types are namespaced lifecycle records such as `command.requested`, `command.confirmed`, `command.started`, `command.succeeded`, `command.failed`, `command.cancelled`, `command.reverted`, `playback.started`, `playback.completed`, `playback.skipped`, `playback.replayed`, `library.favorite_changed`, `scene.preset_saved`, and `scene.preset_applied`. Knowledge types are `library.playlist_snapshot` and `user.fact`.
+
+Canonical event JSON recursively sorts object keys and normalizes numeric representations before encryption and duplicate comparison. Ingress accepts only JSON-round-trippable Java numeric wrappers (`Byte`/`Short`/`Integer`/`Long`/`Float`/`Double`); Java-only arbitrary-precision `Number` instances are rejected instead of being committed into a form the strict JSON reader cannot reconstruct exactly. The authenticated-data tuple binds `schemaVersion`, immutable vault ID, stream, scope hash, record ID, type, and the exact SQL occurrence-time value; therefore every one of those fields needed before decryption is also present in the matching physical table. `vault_state.created_at` is derived from the same `MemoryVaultKeyManager.KeyLease.createdAt` value as `vault-meta.json`, represented as epoch milliseconds, and is checked on every open.
 
 Chat payloads include the exact sanitized message text, conversation ID, message ID, role, source/model origin, trace ID, turn ID, trusted occurrence time, vault receipt time, source sequence, and explicit time accuracy. Operation payloads include the registered command/event name, actor (`user`, `local-ai`, `server-ai`, `app`, or `system`), phase/status, bounded sanitized arguments, outcome, before/after summary, command receipt, undo reference, and failure code. They carry the same trace/turn IDs and `causedByMessageId` when a chat turn caused the operation. Playback payloads include stable provider/song IDs, semantic metadata, position/duration totals, and action; never media URLs. Scene payloads include stable preset/component IDs and finite bounded position/rotation/scale values; never asset URLs or local paths.
 
 ## Query, deletion, backup, and recovery
 
-Queries require a scope, one explicit stream (`chat`, `operation`, or `knowledge`), a type allowlist, a limit from 1 through 100, and an optional before cursor. Chat and operation endpoints never return a merged array. A trace lookup may return `{ chats: [...], operations: [...] }`, preserving the separation while showing causality. Text search normalizes and tokenizes on the client, HMACs each token, intersects only that stream's token table in SQL, then decrypts at most the requested bounded candidate set. Results are sorted deterministically by occurrence time, vault receipt time, source sequence, then record ID. Decryption/authentication failure stops that query and reports a redacted vault integrity error.
+Every open performs SQLite integrity/foreign-key checks plus a complete authenticated audit of all envelopes, public projections, tombstones, blind-token sets, and cross-stream event-ID uniqueness before any filtered read is served. This prevents a tampered public filter or removed blind token from making a record silently disappear. Queries require a scope, one explicit stream (`chat`, `operation`, or `knowledge`), a type allowlist, a limit from 1 through 100, and an optional before cursor. Chat and operation endpoints never return a merged array. A trace lookup may return `{ chats: [...], operations: [...] }`, preserving the separation while showing causality. Text search normalizes and tokenizes on the client, HMACs each token, intersects only that stream's token table in SQL, then decrypts at most the requested bounded candidate set. Results are sorted deterministically by occurrence time, vault receipt time, source sequence, then record ID. Decryption/authentication failure stops that query and reports a redacted vault integrity error.
 
 `eventId` makes append idempotent. A duplicate with identical authenticated content succeeds as `duplicate=true`; a duplicate ID with different content is a conflict and changes nothing. Batch append is all-or-nothing.
 
 Local deletion writes a tombstone timestamp and removes search tokens in one transaction. Physical SQLite erasure is not claimed. Scope deletion additionally rotates a scope data key in later sync work; batch 1 runs checkpoint plus secure-delete vacuum only from an explicit maintenance operation. Permanent cross-device tombstones are added in batch 2.
 
-Backup closes/checkpoints a consistent read transaction and exports encrypted record envelopes plus a manifest authenticated by the backup key. Restore validates manifest, vault ID, schema version, every envelope tag, and event uniqueness into a sibling temporary database, then atomically swaps the complete database set. A foreign machine cannot unwrap `vault-key.dpapi`; cross-device recovery requires batch 3's authorized recovery key flow.
+Backup first repeats the complete authenticated database audit and checkpoint, then streams the encrypted SQLite body behind a bounded canonical manifest containing vault ID, schema version, DB length, and DB SHA-256. The backup-key HMAC authenticates the small format header and manifest, while the authenticated digest covers the complete body without the 1 MiB MAC-input ceiling or whole-archive heap buffering. Backup and restore paths are confined to the pinned, owner-only vault tree.
+
+Restore streams into a sibling temporary database and validates the manifest, body digest, vault ID, schema version, exact schema SQL, SQLite integrity/foreign keys, every envelope tag, public projection, token set, and event uniqueness. Before publication it checkpoints the live DB, creates a durable old-DB recovery copy, and atomically publishes a signed fsynced restore intent from a same-directory staging file. The intent authenticates both old/new physical SHA-256 values and deterministic logical roots over `vault_state`, every column of every chat/operation/knowledge row, and every blind-token row in stable order. Publication uses one atomic same-volume replace of the existing `memory.db`, so the live filename is never deliberately absent. A likewise atomically published signed marker lets startup reconcile crash points before schema initialization, including the physical hash transition when SQLite switches the restored database from DELETE journaling back to WAL; the selected live database must still match the signed logical root after its complete audit, so deleting an entire row plus its cascading tokens cannot disappear from verification. Startup retains the old DB before publication, retains the verified new DB after publication, or republishes the recovery copy if the live name is unexpectedly missing. Half-written marker staging files are inert and safely discarded. Recovery artifacts and intent are removed only after the selected DB has reopened, passed the full audit and logical-root check, and had its ACLs hardened.
+
+Verified corruption writes a signed durable quarantine manifest and root lock before recoverable staged moves of the `db/-wal/-shm` evidence set; any incomplete replacement or quarantine state stays locked and never creates a new database. A foreign machine cannot unwrap `vault-key.dpapi`; cross-device recovery requires batch 3's authorized recovery key flow.
 
 Corruption handling checkpoints and closes connections, then atomically moves the complete `db/-wal/-shm` set into one quarantine directory. If quarantine cannot be completed, the service stays locked and does not create or overwrite a database. Disk-full, read-only, busy, and migration failures propagate as redacted structured errors and leave the previous committed state readable.
 
@@ -202,7 +216,7 @@ Corruption handling checkpoints and closes connections, then atomically moves th
 - `POST /api/local-memory/backup`
 - `POST /api/local-memory/restore` — raw `.fememory` archive body streamed into a fixed vault-owned temporary path, with a 64 MiB hard limit; browser callers never supply filesystem paths.
 
-All routes are loopback/same-origin, return structured error codes, and never include exception messages, SQL, filesystem paths, key state, ciphertext, or rejected values. The browser supplies only a provider hint; Java reads the provider account itself and derives the internal FEID-backed scope through `CommunityClient.petPersonalizationScope`, with a separate device-local anonymous scope when no FEID is authenticated. Browser-provided `scope`, `feId`, or account IDs are rejected. JSON request bodies use a 1 MiB bounded reader rather than the existing unbounded `readAllBytes` helper; restore is the sole 64 MiB streaming exception and never buffers the complete archive in heap.
+All routes are loopback/same-origin, return structured error codes, and never include exception messages, SQL, filesystem paths, key state, ciphertext, or rejected values. The browser supplies only a provider hint; Java reads the provider account itself and derives the authenticated scope from an immutable server account-subject ID. Renameable FEID remains a user-facing alias and server-backup lookup attribute, never AAD/key identity; Task 5 must add an explicit alias migration if the server cannot yet expose an immutable subject. A separate device-local anonymous scope is used when no account is authenticated. Browser-provided `scope`, `feId`, or account IDs are rejected. JSON request bodies use a 1 MiB bounded reader rather than the existing unbounded `readAllBytes` helper; restore is the sole 64 MiB streaming exception and never buffers the complete archive in heap.
 
 ## Event capture
 

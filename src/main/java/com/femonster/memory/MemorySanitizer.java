@@ -426,6 +426,17 @@ public final class MemorySanitizer {
         if (depth > MAX_DEPTH) throw failure("MEMORY_NESTING_TOO_DEEP");
         if (value == null || value instanceof Boolean) return value;
         if (value instanceof Number number) {
+            if (!(number instanceof Byte)
+                && !(number instanceof Short)
+                && !(number instanceof Integer)
+                && !(number instanceof Long)
+                && !(number instanceof Float)
+                && !(number instanceof Double)) {
+                // The strict JSON reader reconstructs integers as Long and
+                // decimals as Double. Reject wider Java-only number classes so
+                // accepted canonical payloads are guaranteed to round-trip.
+                throw failure("MEMORY_FIELD_INVALID");
+            }
             double numeric = number.doubleValue();
             if (!Double.isFinite(numeric)) throw failure("MEMORY_NON_FINITE_NUMBER");
             return number;
