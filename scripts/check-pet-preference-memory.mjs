@@ -6,8 +6,15 @@ import vm from 'node:vm';
 const root = path.resolve(import.meta.dirname, '..');
 const policySource = readFileSync(path.join(root, 'web', 'pet-preference-policy.js'), 'utf8');
 const source = readFileSync(path.join(root, 'web', 'pet-preference-memory.js'), 'utf8');
+const htmlSource = readFileSync(path.join(root, 'web', 'index.html'), 'utf8');
 const recordsByProvider = new Map();
 let appendCount = 0;
+
+const policyScript = 'pet-preference-policy.js?v=20260831-preference-ledger-v2-1';
+const runtimeScript = 'pet-preference-memory.js?v=20260831-cross-session-preferences-2';
+assert.ok(htmlSource.includes(policyScript), 'the v2 preference policy is not loaded by the page');
+assert.ok(htmlSource.indexOf(policyScript) < htmlSource.indexOf(runtimeScript),
+  'the preference policy must load before the preference runtime');
 
 function records(provider) {
   if (!recordsByProvider.has(provider)) recordsByProvider.set(provider, []);
