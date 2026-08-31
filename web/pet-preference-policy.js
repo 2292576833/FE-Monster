@@ -9,7 +9,7 @@
   const MAX_PREFERENCES = 100;
   const PERMANENT = /(?:记住|以后|今后|一直|长期)/u;
   const ONE_TURN = /(?:这次|本次|今天|暂时|现在先|先别|待会)/u;
-  const UNSAFE = /(?:https?:\/\/|www\.|```|<script|api[\s_-]*key|password|token|secret|authorization|系统提示|忽略.{0,12}(?:提示|规则)|执行.{0,8}(?:命令|代码|脚本)|[\w.+-]+@[\w-]+\.[\w.-]+|\b\d{7,}\b|(?:[A-Za-z]:[\\/]|(?:^|\s)[\\/])[^\s]+)/iu;
+  const UNSAFE = /(?:https?:\/\/|www\.|```|<script|api[\s_-]*key|password|token|secret|authorization|cookie|(?:session|session[_ -]?id|set-cookie)[\s:=_-]*[A-Za-z0-9._~+\/-]+|(?:bearer|jwt|access[_ -]?token|refresh[_ -]?token|credential)[\s:=_-]*[A-Za-z0-9._~+\/-]+|系统提示|忽略.{0,12}(?:提示|规则)|执行.{0,8}(?:命令|代码|脚本)|[\w.+-]+@[\w-]+\.[\w.-]+|\b\d{7,}\b|(?:[A-Za-z]:[\\/]|(?:^|\s)[\\/])[^\s]+)/iu;
   const QUESTION = /[?？]|(?:什么|哪些|哪种|是否|有没有|怎么|吗|么)$/u;
   const PUNCTUATION = /[，。！？；,!?;\n]/u;
 
@@ -59,7 +59,7 @@
   }
 
   function isoTime(value, fallback) {
-    const parsed = new Date(String(value ?? '')).getTime();
+    const parsed = new Date(typeof value === 'number' ? value : String(value ?? '')).getTime();
     if (Number.isFinite(parsed)) return new Date(parsed).toISOString();
     return fallback || '';
   }
@@ -67,8 +67,8 @@
   function clockNow(input) {
     const clock = input && typeof input.clock === 'function' ? input.clock : null;
     const value = clock ? clock() : input?.now;
-    const parsed = new Date(String(value ?? '')).getTime();
-    return Number.isFinite(parsed) ? parsed : Date.now();
+    const parsed = new Date(typeof value === 'number' ? value : String(value ?? '')).getTime();
+    return Number.isFinite(parsed) ? parsed : NaN;
   }
 
   function canonicalCategory(category) {
@@ -133,8 +133,8 @@
 
   function signal(category, subject, polarity, statement, origin, occurredAt, options = {}) {
     const cleanSubject = safeSubject(subject);
-    const updatedAt = isoTime(occurredAt) || new Date().toISOString();
-    if (!cleanSubject || UNSAFE.test(statement) || options.oneTurn) return null;
+    const updatedAt = isoTime(occurredAt);
+    if (!cleanSubject || !updatedAt || UNSAFE.test(statement) || options.oneTurn) return null;
     return preferenceValue({
       category,
       subject: cleanSubject,
@@ -161,8 +161,8 @@
   function extractChatSignals(input = {}) {
     const text = boundedText(input.text, MAX_TEXT);
     if (!text || UNSAFE.test(text) || QUESTION.test(text)) return Object.freeze({ signals: Object.freeze([]) });
-    const occurredAt = input.occurredAt || input.updatedAt || input.now
-      || (typeof input.clock === 'function' ? input.clock() : undefined);
+    const occurredAt = isoTime(input.occurredAt || input.updatedAt || input.now)
+      || isoTime(clockNow(input));
     const output = [];
 
     // Retractions and corrections intentionally run first so a sentence cannot be
@@ -207,8 +207,8 @@
 
   function behaviorSignals(input = {}) {
     const summary = input?.summary && typeof input.summary === 'object' ? input.summary : input;
-    const occurredAt = input.occurredAt || input.updatedAt || summary?.occurredAt || summary?.now
-      || (typeof input.clock === 'function' ? input.clock() : undefined);
+    const occurredAt = isoTime(input.occurredAt || input.updatedAt || summary?.occurredAt || summary?.now)
+      || isoTime(clockNow(input));
     const output = [];
     const tracks = Array.isArray(summary?.topSongs) ? summary.topSongs : Array.isArray(summary?.topTracks) ? summary.topTracks : [];
     const artists = Array.isArray(summary?.topArtists) ? summary.topArtists : [];
@@ -286,9 +286,7 @@
   }
 
   function nowMs(options) {
-    const value = typeof options?.clock === 'function' ? options.clock() : options?.now;
-    const parsed = new Date(String(value ?? '')).getTime();
-    return Number.isFinite(parsed) ? parsed : Date.now();
+    return clockNow(options);
   }
 
   function decayed(value, currentMs) {
@@ -315,6 +313,7 @@
       if (!previous || isExplicit(value.origin) || !isExplicit(previous.origin)) selected.set(value.entityId, value);
     }
     const currentMs = nowMs(options);
+    if (!Number.isFinite(currentMs)) return Object.freeze([]);
     return Object.freeze(Array.from(selected.values())
       .map((value) => Object.freeze({ ...value, confidence: decayed(value, currentMs) }))
       .filter((value) => value.status === 'active' && value.confidence > 0)
