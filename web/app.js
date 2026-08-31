@@ -17476,6 +17476,102 @@ function loadFavoriteDirectories() {
   return directories;
 }
 
+function appLocalMemoryClient() {
+  const client = window.FeLocalMemory;
+  return client && typeof client.append === 'function' ? client : null;
+}
+
+function appLocalMemoryId() {
+  try { return String(appLocalMemoryClient()?.createId?.() || window.crypto?.randomUUID?.() || ''); }
+  catch (error) { return ''; }
+}
+
+function appLocalMemoryCorrelationId(value, fallback = 'unknown') {
+  const source = String(value ?? '').trim();
+  if (!source) return fallback;
+  let output = '';
+  for (const character of source) {
+    if (/[A-Za-z0-9._:-]/.test(character)) output += character;
+    else {
+      const encoded = Array.from(new TextEncoder().encode(character), (item) => item.toString(16).padStart(2, '0')).join('');
+      output += `_${encoded}`;
+    }
+    if (output.length >= 112) break;
+  }
+  return (output || fallback).slice(0, 112);
+}
+
+function recordAppLocalMemoryOperation(type, details = {}) {
+  const client = appLocalMemoryClient();
+  const operationId = appLocalMemoryId();
+  const traceId = appLocalMemoryId();
+  if (!client || !operationId || !traceId) return null;
+  const occurredAt = new Date().toISOString();
+  return client.append({
+    provider: safeText(details.provider, state.activeProvider).toLowerCase(),
+    stream: 'operation',
+    type,
+    occurredAt,
+    payload: {
+      operationId,
+      traceId,
+      actor: ['user', 'local-ai', 'server-ai', 'app', 'system'].includes(details.actor)
+        ? details.actor
+        : 'app',
+      phase: safeText(details.phase, 'complete'),
+      status: safeText(details.status, 'succeeded'),
+      ...(details.providerId ? { providerId: appLocalMemoryCorrelationId(details.providerId, 'unknown-provider') } : {}),
+      ...(details.songId ? { songId: appLocalMemoryCorrelationId(details.songId, 'unknown-song') } : {}),
+      ...(details.playlistId ? { playlistId: appLocalMemoryCorrelationId(details.playlistId, 'unknown-playlist') } : {}),
+      ...(details.presetId ? { presetId: appLocalMemoryCorrelationId(details.presetId, 'unknown-preset') } : {}),
+      ...(details.componentId ? { componentId: appLocalMemoryCorrelationId(details.componentId, 'unknown-component') } : {}),
+      ...(details.title ? { title: safeText(details.title, '').slice(0, 320) } : {}),
+      ...(details.artist ? { artist: safeText(details.artist, '').slice(0, 320) } : {}),
+      action: safeText(details.action, 'complete'),
+      ...(details.position ? { position: details.position } : {}),
+      ...(details.rotation ? { rotation: details.rotation } : {}),
+      ...(details.scale ? { scale: details.scale } : {}),
+      ...(details.before !== undefined ? { before: details.before } : {}),
+      ...(details.after !== undefined ? { after: details.after } : {})
+    }
+  });
+}
+
+function recordScenePresetMemory(type, preset, options = {}) {
+  if (!preset) return null;
+  const firstItem = Array.isArray(preset.sceneItems) ? preset.sceneItems[0] : null;
+  const vector = (value, fallback) => ['x', 'y', 'z'].map((axis, index) => {
+    const numeric = Number(value?.[axis]);
+    return Number.isFinite(numeric) ? numeric : fallback[index];
+  });
+  const handle = recordAppLocalMemoryOperation(type, {
+    actor: options.actor || 'app',
+    provider: options.provider || state.activeProvider,
+    presetId: preset.id || preset.playbackPreset || preset.name,
+    componentId: firstItem?.component?.id,
+    title: preset.name || preset.playbackPreset || preset.id,
+    action: type === 'scene.preset_saved' ? 'save' : 'apply',
+    ...(firstItem ? {
+      position: vector(firstItem.position, [0, 0, 0]),
+      rotation: vector(firstItem.rotation, [0, 0, 0]),
+      scale: vector(firstItem.scale, [1, 1, 1])
+    } : {})
+  });
+  if (type === 'scene.preset_applied' && handle?.accepted === true) {
+    Promise.resolve(handle.receipt).then((receipt) => {
+      if (receipt?.accepted === false || receipt?.suppressed === true || !receipt?.recordedAt) return;
+      notifyPlaybackIntelligence('scene-apply', {
+        scene: {
+          id: safeText(preset.id || preset.playbackPreset || preset.name, '').slice(0, 160),
+          name: safeText(preset.name || preset.playbackPreset || preset.id, '').slice(0, 160)
+        },
+        provider: safeText(options.provider || state.activeProvider, '').slice(0, 80)
+      });
+    }).catch(() => {});
+  }
+  return handle;
+}
+
 function saveFavoriteDirectories() {
   try {
     window.localStorage.setItem(FAVORITE_SONGS_KEY, JSON.stringify(state.favoriteDirectories));
@@ -27567,7 +27663,7 @@ function enterPlaybackPage() {
   requestOrbFrame();
 }
 
-function enterPresetPlaybackPage(preset) {
+function enterPresetPlaybackPage(preset, options = {}) {
   state.sandbox.playbackPresetId = '';
   state.sandbox.playbackKeepBackground = false;
   state.sandbox.playbackPreviewUrl = '';
@@ -27580,6 +27676,15 @@ function enterPresetPlaybackPage(preset) {
   setDiyPreset(preset);
   enterPlaybackPage();
   if (normalizeDiyPreset(preset) !== 'lyric') unlockAppAchievement('visual-first');
+  if (options.recordMemory === true) {
+    recordScenePresetMemory('scene.preset_applied', {
+      id: normalizeDiyPreset(preset),
+      name: normalizeDiyPreset(preset),
+      presetType: 'playback',
+      playbackPreset: normalizeDiyPreset(preset),
+      sceneItems: []
+    }, options);
+  }
 }
 
 function returnHomePage() {
@@ -33132,13 +33237,13 @@ function renderDiySandboxPresets() {
   renderDiySelectedPresetConfig();
 }
 
-async function enterDiyScenePresetPlayback(id) {
+async function enterDiyScenePresetPlayback(id, options = {}) {
   const preset = state.sandbox.presets.find((item) => item.id === id);
   if (!preset) return;
   const selectionToken = ++presetSceneSelectionToken;
   state.sandbox.selectedPresetId = preset.id;
   if (preset.presetType === 'playback' && preset.playbackPreset) {
-    enterPresetPlaybackPage(preset.playbackPreset);
+    enterPresetPlaybackPage(preset.playbackPreset, options);
     return;
   }
   if (state.sandbox.open) setSandboxOpen(false);
@@ -33179,6 +33284,7 @@ async function enterDiyScenePresetPlayback(id) {
   setDiyPreset('sandbox-scene');
   enterPlaybackPage();
   if (stormOcean) resetPlaybackView();
+  if (options.recordMemory === true) recordScenePresetMemory('scene.preset_applied', preset, options);
 }
 
 function setDiyPreset(preset, options = {}) {
@@ -35512,6 +35618,7 @@ async function saveSandboxPreset() {
     renderSandboxPresets();
     if (els.sandboxSaveStatus) els.sandboxSaveStatus.textContent = `已写入预设文件夹：${name}`;
     if (preset.sceneItems.length > 0) unlockAppAchievement('scene-smith');
+    recordScenePresetMemory('scene.preset_saved', preset, { actor: 'user' });
     toast('场景已保存到客户端预设文件夹');
   } catch (error) {
     setSandboxStageStatus(`保存失败：${error.message || '预设服务不可用'}`);
@@ -35540,16 +35647,18 @@ function applySandboxScenePreset(preset, options = {}) {
   return true;
 }
 
-function loadSandboxPreset(id) {
+function loadSandboxPreset(id, options = {}) {
   const preset = state.sandbox.presets.find((item) => item.id === id);
   if (!preset) return;
   if (preset.presetType === 'playback' && preset.playbackPreset) {
     setSandboxOpen(false);
-    enterPresetPlaybackPage(preset.playbackPreset);
+    enterPresetPlaybackPage(preset.playbackPreset, options);
     return;
   }
   state.sandbox.playbackPresetId = '';
-  applySandboxScenePreset(preset);
+  if (applySandboxScenePreset(preset) && options.recordMemory === true) {
+    recordScenePresetMemory('scene.preset_applied', preset, options);
+  }
 }
 
 async function deleteSandboxPreset(id) {
@@ -35887,7 +35996,8 @@ function applySavedCodexPreset(response) {
   renderSandboxPresets();
   state.sandbox.codexDraft = null;
   setSandboxCodexDecisionsVisible(false);
-  loadSandboxPreset(preset.id);
+  recordScenePresetMemory('scene.preset_saved', preset, { actor: 'user' });
+  loadSandboxPreset(preset.id, { recordMemory: true, actor: 'user' });
   setSandboxStageStatus(`${preset.name} 已由 Codex 写入客户端预设文件夹`);
   toast('Codex 成品已保存，可在预设与组件库中继续使用');
   return true;
@@ -36239,7 +36349,7 @@ function bindSandboxEvents() {
         return;
       }
       const load = event.target.closest('[data-sandbox-preset-id]');
-      if (load) loadSandboxPreset(load.dataset.sandboxPresetId);
+      if (load) loadSandboxPreset(load.dataset.sandboxPresetId, { recordMemory: true, actor: 'user' });
     });
   }
   if (els.sandboxCategory) {

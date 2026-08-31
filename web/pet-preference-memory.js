@@ -8,6 +8,10 @@
   const CATEGORY_PATTERN = /^[a-z][a-z0-9_]{0,47}$/;
   const MAX_QUERY = 100;
   const MAX_RECALL = 24;
+  const MIN_BEHAVIOR_OBSERVATIONS = 3;
+  const MIN_BEHAVIOR_CONFIDENCE = 0.6;
+  const FIBONACCI_EVIDENCE = Object.freeze([1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1_597, 2_584, 4_181, 6_765, 10_946, 17_711, 28_657, 46_368, 75_025]);
+  const UNSAFE_BEHAVIOR_TEXT = /(?:https?:\/\/|www\.|[\\/]|api[\s_-]*key|password|token|secret|authorization|cookie|session(?:[_ -]?id)?)/iu;
 
   function boundedText(value, maximum) {
     return String(value ?? '').normalize('NFKC')
@@ -52,6 +56,97 @@
     });
   }
 
+  function behaviorText(value, maximum = 72) {
+    const text = boundedText(value, maximum);
+    return text && !UNSAFE_BEHAVIOR_TEXT.test(text) ? text : '';
+  }
+
+  function observationCount(value) {
+    return Math.max(0, Math.min(100_000, Math.floor(Number(value) || 0)));
+  }
+
+  function confidenceTenth(value) {
+    return Math.max(0, Math.min(10, Math.round(Math.max(0, Math.min(1, Number(value) || 0)) * 10)));
+  }
+
+  function fibonacciBucket(value) {
+    const evidence = observationCount(value);
+    let bucket = 0;
+    for (const candidate of FIBONACCI_EVIDENCE) {
+      if (candidate > evidence) break;
+      bucket = candidate;
+    }
+    return bucket;
+  }
+
+  function behaviorUnchanged(previous, preference) {
+    if (!previous) return false;
+    return previous.category === preference.category
+      && previous.subject === preference.subject
+      && previous.polarity === preference.polarity
+      && previous.statement === preference.statement
+      && previous.origin === preference.origin
+      && previous.status === preference.status
+      && fibonacciBucket(previous.evidence) === fibonacciBucket(preference.evidence)
+      && confidenceTenth(previous.confidence) === confidenceTenth(preference.confidence);
+  }
+
+  function contextualBehaviorSignals(input, currentSignals, policy) {
+    const summary = input?.summary && typeof input.summary === 'object' ? input.summary : input;
+    const occurredAt = exactTime(input?.occurredAt || input?.updatedAt, input?.clock);
+    const signals = Array.isArray(currentSignals) ? currentSignals.slice(0, 4) : [];
+    const add = (category, subject, statement, evidence, confidence) => {
+      const cleanSubject = behaviorText(subject);
+      const count = observationCount(evidence);
+      const score = Math.max(0, Math.min(1, Number(confidence) || 0));
+      if (!cleanSubject || count < MIN_BEHAVIOR_OBSERVATIONS || score < MIN_BEHAVIOR_CONFIDENCE || signals.length >= 8) return;
+      const entityId = typeof policy.entityId === 'function' ? policy.entityId(category, cleanSubject) : '';
+      if (!entityId || signals.some((item) => item?.entityId === entityId)) return;
+      signals.push(Object.freeze({
+        schemaVersion: 2,
+        kind: 'preference',
+        entityId,
+        category,
+        subject: cleanSubject,
+        polarity: 'like',
+        statement: boundedText(statement, 220),
+        origin: 'behavior',
+        confidence: Math.round(score * 1000) / 1000,
+        evidence: count,
+        status: 'active',
+        updatedAt: occurredAt
+      }));
+    };
+    const candidates = Array.isArray(summary?.topGenres) ? summary.topGenres : [];
+    candidates.slice(0, 6).forEach((item) => add(
+      'music_affinity', item?.name,
+      `根据跨会话播放行为，用户经常听音乐类型：${behaviorText(item?.name)}`,
+      item?.evidence, item?.confidence
+    ));
+    const scenes = Array.isArray(summary?.topScenes) ? summary.topScenes : [];
+    scenes.slice(0, 6).forEach((item) => add(
+      'scene_affinity', item?.name,
+      `根据跨会话场景行为，用户经常使用场景：${behaviorText(item?.name)}`,
+      item?.evidence, item?.confidence
+    ));
+    const bucketSignals = (values, labels, category, statement) => {
+      if (!values || typeof values !== 'object' || Array.isArray(values)) return;
+      Object.entries(values).slice(0, 8).forEach(([bucket, value]) => {
+        const subject = labels[bucket] || '';
+        const evidence = observationCount(value);
+        const confidence = Math.min(1, (Math.min(evidence, 6) / 6) * 0.7 + 0.3);
+        add(category, subject, statement(subject), evidence, confidence);
+      });
+    };
+    bucketSignals(summary?.timeBuckets, {
+      morning: '早晨', afternoon: '下午', evening: '傍晚', 'late-night': '深夜'
+    }, 'listening_routine', (subject) => `根据跨会话播放行为，用户通常在${subject}听歌`);
+    bucketSignals(summary?.volumeBuckets, {
+      quiet: '安静', balanced: '适中', loud: '较大'
+    }, 'listening_volume', (subject) => `根据跨会话播放行为，用户通常使用${subject}音量`);
+    return Object.freeze(signals);
+  }
+
   function create(options = {}) {
     const memoryClient = options.memoryClient || global.FeLocalMemory;
     const policy = options.policy || global.FeMonsterPetPreferencePolicy;
@@ -59,7 +154,8 @@
     const states = new Map();
 
     if (!policy || policy.version !== 2 || typeof policy.reduce !== 'function'
-      || typeof policy.normalizeRecord !== 'function' || typeof policy.serialize !== 'function') {
+      || typeof policy.normalizeRecord !== 'function' || typeof policy.serialize !== 'function'
+      || typeof policy.behaviorSignals !== 'function' || typeof policy.entityId !== 'function') {
       throw new Error('FeMonsterPetPreferencePolicy v2 is required before creating preference memory.');
     }
 
@@ -131,6 +227,13 @@
       const value = policy.serialize(preference);
       if (!value) throw durableError('PREFERENCE_REJECTED');
       const previous = state.active.find((item) => item.entityId === preference.entityId);
+      const previousBehavior = preference.origin === 'behavior'
+        ? state.records.map((record) => policy.normalizeRecord(record))
+          .find((item) => item?.entityId === preference.entityId && item.origin === 'behavior')
+        : null;
+      if (preference.origin === 'behavior' && behaviorUnchanged(previousBehavior, preference)) {
+        return Object.freeze({ changed: false, deduplicated: true });
+      }
       if (previous && policy.serialize(previous) === value) {
         return Object.freeze({ changed: false, deduplicated: true });
       }
@@ -198,7 +301,10 @@
     function observePlaybackSummary(input = {}) {
       const provider = providerId(input.provider);
       const extracted = policy.behaviorSignals({ ...input, occurredAt: exactTime(input.occurredAt, clock) });
-      const signals = Array.isArray(extracted?.signals) ? extracted.signals : [];
+      const signals = contextualBehaviorSignals(
+        { ...input, occurredAt: exactTime(input.occurredAt, clock) },
+        Array.isArray(extracted?.signals) ? extracted.signals : [], policy
+      );
       if (!signals.length) return Promise.resolve(Object.freeze({ written: 0, deduplicated: 0, suppressed: 0, facts: 0 }));
       return enqueue(provider, () => persistSignals(provider, signals));
     }

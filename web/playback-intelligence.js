@@ -45,6 +45,9 @@
   const AUTOMATION_ACTION_ALIASES = Object.freeze({
     'music.playlist.play': 'playlist.play'
   });
+  const HABIT_EVENTS = new Set([
+    'track-start', 'track-complete', 'track-skip', 'track-replay', 'volume-change', 'scene-apply'
+  ]);
 
   function create(options = {}) {
     const player = options.player || {};
@@ -56,8 +59,85 @@
     const runtimeProgress = new Map();
     const progressWatches = new Map();
     const runningRuleIds = new Set();
+    const durablePlaybackTraces = new Map();
     let generatedId = 0;
     let generatedWatchId = 0;
+
+    function durableMemoryClient() {
+      const client = global.FeLocalMemory;
+      return client && typeof client.append === 'function' ? client : null;
+    }
+
+    function durableIdentifier(value, fallback = 'unknown') {
+      const source = String(value ?? '').trim();
+      if (!source) return fallback;
+      let output = '';
+      for (const character of source) {
+        if (/[A-Za-z0-9._:-]/.test(character)) output += character;
+        else {
+          const encoded = Array.from(new TextEncoder().encode(character), (item) => item.toString(16).padStart(2, '0')).join('');
+          output += `_${encoded}`;
+        }
+        if (output.length >= 112) break;
+      }
+      return (output || fallback).slice(0, 112);
+    }
+
+    function durableUuid() {
+      try { return String(durableMemoryClient()?.createId?.() || global.crypto?.randomUUID?.() || ''); }
+      catch (_) { return ''; }
+    }
+
+    function durablePlaybackPayload(name, payload = {}) {
+      const type = {
+        'track-start': 'playback.started',
+        'track-complete': 'playback.completed',
+        'track-skip': 'playback.skipped',
+        'track-replay': 'playback.replayed'
+      }[name];
+      const client = durableMemoryClient();
+      if (!client || !type) return null;
+      const song = payload.song && typeof payload.song === 'object' ? payload.song : {};
+      const live = snapshot();
+      const providerId = durableIdentifier(song.provider || payload.provider || live.song?.provider, 'unknown-provider');
+      const songId = durableIdentifier(song.id || payload.songId || live.song?.id || song.name || song.title, 'unknown-song');
+      const traceKey = `${providerId}:${songId}`;
+      let traceId = durablePlaybackTraces.get(traceKey);
+      if (!traceId || name === 'track-start') {
+        traceId = durableUuid();
+        if (!traceId) return null;
+        durablePlaybackTraces.set(traceKey, traceId);
+      }
+      const operationId = durableUuid();
+      if (!operationId) return null;
+      const positionSeconds = Math.max(0, finiteNumber(payload.positionSeconds, live.positionSeconds));
+      const durationSeconds = Math.max(0, finiteNumber(payload.durationSeconds, live.durationSeconds));
+      const occurredAt = new Date().toISOString();
+      const action = name.replace('track-', '');
+      const terminal = name === 'track-complete' || name === 'track-skip';
+      const handle = client.append({
+        provider: String(song.provider || payload.provider || live.song?.provider || 'netease').trim().toLowerCase(),
+        stream: 'operation',
+        type,
+        occurredAt,
+        payload: {
+          operationId,
+          traceId,
+          actor: 'app',
+          phase: terminal ? 'complete' : 'start',
+          status: name === 'track-complete' ? 'succeeded' : name === 'track-skip' ? 'skipped' : name === 'track-replay' ? 'replayed' : 'running',
+          providerId,
+          songId,
+          title: String(song.title || song.name || live.song?.title || live.song?.name || '').trim().slice(0, 320),
+          artist: String(song.artist || song.artists || live.song?.artist || '').trim().slice(0, 320),
+          action,
+          positionMs: Math.min(604_800_000, Math.round(positionSeconds * 1_000)),
+          durationMs: Math.min(604_800_000, Math.round(durationSeconds * 1_000))
+        }
+      });
+      if (terminal) durablePlaybackTraces.delete(traceKey);
+      return handle;
+    }
 
     function operationError(message, code = 'invalid_operation') {
       const error = new Error(message);
@@ -88,12 +168,14 @@
         version: 1,
         rules: [],
         habits: {
-          version: 1,
+          version: 2,
           events: 0,
           songs: {},
           artists: {},
           playlists: {},
           providers: {},
+          genres: {},
+          scenes: {},
           timeBuckets: {},
           volumeBuckets: {}
         }
@@ -115,12 +197,14 @@
       const empty = emptyPersistentState().habits;
       const habits = value && typeof value === 'object' ? value : empty;
       return {
-        version: 1,
+        version: 2,
         events: Math.max(0, Math.floor(finiteNumber(habits.events))),
         songs: safeDictionary(habits.songs),
         artists: safeDictionary(habits.artists),
         playlists: safeDictionary(habits.playlists),
         providers: safeDictionary(habits.providers),
+        genres: safeDictionary(habits.genres),
+        scenes: safeDictionary(habits.scenes),
         timeBuckets: safeDictionary(habits.timeBuckets),
         volumeBuckets: safeDictionary(habits.volumeBuckets)
       };
@@ -203,9 +287,10 @@
         completes: Math.max(0, Math.floor(finiteNumber(current.completes))),
         skips: Math.max(0, Math.floor(finiteNumber(current.skips))),
         replays: Math.max(0, Math.floor(finiteNumber(current.replays))),
+        applies: Math.max(0, Math.floor(finiteNumber(current.applies))),
         lastAt: Date.now()
       };
-      next[field] = Math.min(1_000_000, next[field] + 1);
+      next[field] = Math.min(1_000_000, Math.max(0, Math.floor(finiteNumber(next[field]))) + 1);
       dictionary[key] = next;
     }
 
@@ -215,8 +300,10 @@
       entries.sort((left, right) => {
         const leftValue = left[1] || {};
         const rightValue = right[1] || {};
-        const leftScore = finiteNumber(leftValue.starts) + finiteNumber(leftValue.completes) + finiteNumber(leftValue.replays);
-        const rightScore = finiteNumber(rightValue.starts) + finiteNumber(rightValue.completes) + finiteNumber(rightValue.replays);
+        const leftScore = finiteNumber(leftValue.starts) + finiteNumber(leftValue.completes)
+          + finiteNumber(leftValue.replays) + finiteNumber(leftValue.skips) + finiteNumber(leftValue.applies);
+        const rightScore = finiteNumber(rightValue.starts) + finiteNumber(rightValue.completes)
+          + finiteNumber(rightValue.replays) + finiteNumber(rightValue.skips) + finiteNumber(rightValue.applies);
         return rightScore - leftScore || finiteNumber(rightValue.lastAt) - finiteNumber(leftValue.lastAt);
       });
       return Object.fromEntries(entries.slice(0, maximum));
@@ -230,7 +317,34 @@
       return 'late-night';
     }
 
+    function temporaryConversation() {
+      try { return global.FeLocalMemory?.isTemporaryConversation?.() === true; }
+      catch (_) { return false; }
+    }
+
+    function boundedHabitText(value, maximum = 160) {
+      const text = String(value ?? '').normalize('NFKC')
+        .replace(/[\u0000-\u001f\u007f]/g, ' ')
+        .replace(/\s+/g, ' ').trim().slice(0, maximum);
+      if (!text || /(?:https?:\/\/|www\.|[\\/]|api[\s_-]*key|password|token|secret|authorization|cookie|sessionid)/iu.test(text)) return '';
+      return text;
+    }
+
+    function resolvedProvider(payload = {}) {
+      const song = payload.song && typeof payload.song === 'object' ? payload.song : {};
+      const live = snapshot();
+      return boundedHabitText(song.provider || payload.provider || live.song?.provider || 'netease', 80).toLowerCase() || 'netease';
+    }
+
+    function songGenres(song) {
+      const values = [song?.genre];
+      if (Array.isArray(song?.genres)) values.push(...song.genres);
+      else values.push(song?.genres);
+      return Array.from(new Set(values.map((value) => boundedHabitText(value, 120)).filter(Boolean))).slice(0, 6);
+    }
+
     function recordHabitEvent(name, payload = {}) {
+      if (temporaryConversation()) return Object.freeze({ recorded: false, suppressed: true });
       const persistent = readPersistentState();
       const habits = persistent.habits;
       const song = payload.song && typeof payload.song === 'object' ? payload.song : {};
@@ -241,18 +355,24 @@
             : name === 'track-replay' ? 'replays'
               : null;
       if (field) {
-        const provider = String(song.provider || payload.provider || '').trim().slice(0, 80);
-        const songName = String(song.name || song.title || '').trim().slice(0, 160);
-        const artistName = String(song.artist || song.artists || '').trim().slice(0, 160);
-        bumpEntity(habits.songs, entityKey('song', `${provider}:${song.id || ''}`, `${provider}:${songName}:${artistName}`), {
-          id: String(song.id || '').slice(0, 240), name: songName, artist: artistName, provider
+        const provider = resolvedProvider(payload);
+        const songId = boundedHabitText(song.id, 160);
+        const songName = boundedHabitText(song.name || song.title, 160);
+        const artistName = boundedHabitText(song.artist || song.artists, 160);
+        bumpEntity(habits.songs, entityKey('song', `${provider}:${songId}`, `${provider}:${songName}:${artistName}`), {
+          id: songId, name: songName, artist: artistName, provider
         }, field);
         bumpEntity(habits.artists, entityKey('artist', '', artistName), { name: artistName }, field);
         bumpEntity(habits.providers, entityKey('provider', '', provider), { name: provider }, field);
-        if (playlist.id || playlist.name) {
-          bumpEntity(habits.playlists, entityKey('playlist', playlist.id, playlist.name), {
-            id: String(playlist.id || '').slice(0, 240),
-            name: String(playlist.name || '').trim().slice(0, 160),
+        songGenres(song).forEach((genre) => {
+          bumpEntity(habits.genres, entityKey('genre', '', genre), { name: genre }, field);
+        });
+        const playlistId = boundedHabitText(playlist.id, 160);
+        const playlistName = boundedHabitText(playlist.name, 160);
+        if (playlistId || playlistName) {
+          bumpEntity(habits.playlists, entityKey('playlist', playlistId, playlistName), {
+            id: playlistId,
+            name: playlistName,
             provider
           }, field);
         }
@@ -264,13 +384,22 @@
         const volume = clamp(finiteNumber(payload.volume), 0, 100);
         const bucket = volume < 30 ? 'quiet' : volume < 70 ? 'balanced' : 'loud';
         habits.volumeBuckets[bucket] = Math.min(1_000_000, Math.max(0, Math.floor(finiteNumber(habits.volumeBuckets[bucket]))) + 1);
+      } else if (name === 'scene-apply') {
+        const scene = payload.scene && typeof payload.scene === 'object' ? payload.scene : {};
+        const id = boundedHabitText(scene.id, 160);
+        const sceneName = boundedHabitText(scene.name || scene.title, 160);
+        const provider = resolvedProvider(payload);
+        bumpEntity(habits.scenes, entityKey('scene', id, sceneName), { id, name: sceneName, provider }, 'applies');
       }
       habits.events = Math.min(1_000_000, habits.events + 1);
       habits.songs = pruneDictionary(habits.songs);
       habits.artists = pruneDictionary(habits.artists);
       habits.playlists = pruneDictionary(habits.playlists);
       habits.providers = pruneDictionary(habits.providers, 16);
+      habits.genres = pruneDictionary(habits.genres, 40);
+      habits.scenes = pruneDictionary(habits.scenes, 40);
       writePersistentState(persistent);
+      return Object.freeze({ recorded: true, suppressed: false });
     }
 
     function rankedHabitValues(dictionary, minimumEvidence = 3, maximum = 8) {
@@ -280,13 +409,16 @@
           const completes = Math.max(0, Math.floor(finiteNumber(value.completes)));
           const skips = Math.max(0, Math.floor(finiteNumber(value.skips)));
           const replays = Math.max(0, Math.floor(finiteNumber(value.replays)));
-          const evidence = starts + completes + skips + replays;
-          const completionRatio = starts > 0 ? clamp(completes / starts, 0, 1) : 0;
-          const confidence = clamp((Math.min(evidence, 8) / 8) * 0.7 + completionRatio * 0.3, 0, 1);
-          return { ...value, starts, completes, skips, replays, evidence, confidence };
+          const applies = Math.max(0, Math.floor(finiteNumber(value.applies)));
+          const observations = starts + applies;
+          const evidence = starts + completes + skips + replays + applies;
+          const resolved = completes + skips + replays + applies;
+          const completionRatio = observations > 0 ? clamp(resolved / observations, 0, 1) : 0;
+          const confidence = clamp((Math.min(evidence, 6) / 6) * 0.7 + completionRatio * 0.3, 0, 1);
+          return { ...value, starts, completes, skips, replays, applies, evidence, confidence };
         })
-        .filter((value) => value.evidence >= minimumEvidence && value.starts >= 3)
-        .sort((left, right) => (right.completes + right.replays * 2 - right.skips) - (left.completes + left.replays * 2 - left.skips)
+        .filter((value) => value.evidence >= minimumEvidence && (value.starts >= 3 || value.applies >= 3))
+        .sort((left, right) => (right.completes + right.replays * 2 + right.applies - right.skips) - (left.completes + left.replays * 2 + left.applies - left.skips)
           || right.evidence - left.evidence)
         .slice(0, maximum);
     }
@@ -299,6 +431,8 @@
         topArtists: Object.freeze(rankedHabitValues(habits.artists)),
         topPlaylists: Object.freeze(rankedHabitValues(habits.playlists)),
         topProviders: Object.freeze(rankedHabitValues(habits.providers)),
+        topGenres: Object.freeze(rankedHabitValues(habits.genres)),
+        topScenes: Object.freeze(rankedHabitValues(habits.scenes)),
         timeBuckets: Object.freeze({ ...habits.timeBuckets }),
         volumeBuckets: Object.freeze({ ...habits.volumeBuckets }),
         inferenceThreshold: 3
@@ -605,10 +739,24 @@
     async function notify(event, payload = {}) {
       const name = normalizedText(event);
       publishPlaybackState(name);
-      if (['track-start', 'track-complete', 'track-skip', 'track-replay', 'volume-change'].includes(name)) {
-        recordHabitEvent(name, payload);
-        const fired = name === 'volume-change' ? 0 : await notifyAutomationEvent(name, payload);
-        return Object.freeze({ processed: true, recorded: true, fired });
+      if (HABIT_EVENTS.has(name)) {
+        if (temporaryConversation()) {
+          return Object.freeze({ processed: true, recorded: false, suppressed: true, fired: 0 });
+        }
+        const recorded = recordHabitEvent(name, payload);
+        if (['track-start', 'track-complete', 'track-skip', 'track-replay'].includes(name)) {
+          durablePlaybackPayload(name, payload);
+        }
+        try {
+          await Promise.resolve(global.FeMonsterPetPreferenceMemory?.observePlaybackSummary?.({
+            provider: resolvedProvider(payload),
+            occurredAt: new Date().toISOString(),
+            event: name,
+            summary: habitSummary()
+          }));
+        } catch (_) {}
+        const fired = ['volume-change', 'scene-apply'].includes(name) ? 0 : await notifyAutomationEvent(name, payload);
+        return Object.freeze({ processed: true, recorded: recorded.recorded, fired });
       }
       if (name !== 'progress') {
         const fired = await notifyAutomationEvent(name, payload);
