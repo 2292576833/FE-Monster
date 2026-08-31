@@ -17539,6 +17539,16 @@ function recordAppLocalMemoryOperation(type, details = {}) {
 
 function recordScenePresetMemory(type, preset, options = {}) {
   if (!preset) return null;
+  const sceneText = (value, maximum) => {
+    const text = safeText(value, '').normalize('NFKC')
+      .replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, maximum);
+    return /(?:https?:\/\/|www\.|[\\/]|api[\s_-]*key|password|token|secret|authorization|cookie|sessionid)/iu.test(text) ? '' : text;
+  };
+  const provider = sceneText(options.provider || state.activeProvider, 80).toLowerCase() || 'netease';
+  const scene = Object.freeze({
+    id: sceneText(preset.id || preset.playbackPreset || preset.name, 160),
+    name: sceneText(preset.name || preset.playbackPreset || preset.id, 160)
+  });
   const firstItem = Array.isArray(preset.sceneItems) ? preset.sceneItems[0] : null;
   const vector = (value, fallback) => ['x', 'y', 'z'].map((axis, index) => {
     const numeric = Number(value?.[axis]);
@@ -17546,10 +17556,10 @@ function recordScenePresetMemory(type, preset, options = {}) {
   });
   const handle = recordAppLocalMemoryOperation(type, {
     actor: options.actor || 'app',
-    provider: options.provider || state.activeProvider,
-    presetId: preset.id || preset.playbackPreset || preset.name,
+    provider,
+    presetId: scene.id,
     componentId: firstItem?.component?.id,
-    title: preset.name || preset.playbackPreset || preset.id,
+    title: scene.name,
     action: type === 'scene.preset_saved' ? 'save' : 'apply',
     ...(firstItem ? {
       position: vector(firstItem.position, [0, 0, 0]),
@@ -17561,11 +17571,8 @@ function recordScenePresetMemory(type, preset, options = {}) {
     Promise.resolve(handle.receipt).then((receipt) => {
       if (receipt?.accepted === false || receipt?.suppressed === true || !receipt?.recordedAt) return;
       notifyPlaybackIntelligence('scene-apply', {
-        scene: {
-          id: safeText(preset.id || preset.playbackPreset || preset.name, '').slice(0, 160),
-          name: safeText(preset.name || preset.playbackPreset || preset.id, '').slice(0, 160)
-        },
-        provider: safeText(options.provider || state.activeProvider, '').slice(0, 80)
+        scene,
+        provider
       });
     }).catch(() => {});
   }
@@ -22968,7 +22975,7 @@ async function downloadMarketPreset(id) {
     renderPresetMarket();
     setCommunityProfileOpen(false);
     setSandboxOpen(true);
-    loadSandboxPreset(preset.id);
+    loadSandboxPreset(preset.id, { recordMemory: true, actor: 'user', provider: state.activeProvider });
     toast(`${preset.name} 已下载并应用`);
   } catch (error) {
     toast(error.message || '下载预设失败');
@@ -35996,8 +36003,8 @@ function applySavedCodexPreset(response) {
   renderSandboxPresets();
   state.sandbox.codexDraft = null;
   setSandboxCodexDecisionsVisible(false);
-  recordScenePresetMemory('scene.preset_saved', preset, { actor: 'user' });
-  loadSandboxPreset(preset.id, { recordMemory: true, actor: 'user' });
+  recordScenePresetMemory('scene.preset_saved', preset, { actor: 'user', provider: state.activeProvider });
+  loadSandboxPreset(preset.id, { recordMemory: true, actor: 'user', provider: state.activeProvider });
   setSandboxStageStatus(`${preset.name} 已由 Codex 写入客户端预设文件夹`);
   toast('Codex 成品已保存，可在预设与组件库中继续使用');
   return true;
@@ -36349,7 +36356,7 @@ function bindSandboxEvents() {
         return;
       }
       const load = event.target.closest('[data-sandbox-preset-id]');
-      if (load) loadSandboxPreset(load.dataset.sandboxPresetId, { recordMemory: true, actor: 'user' });
+      if (load) loadSandboxPreset(load.dataset.sandboxPresetId, { recordMemory: true, actor: 'user', provider: state.activeProvider });
     });
   }
   if (els.sandboxCategory) {
@@ -38933,7 +38940,7 @@ function bindEvents() {
     els.diySidebar.addEventListener('click', (event) => {
       const sandboxPreset = event.target && event.target.closest ? event.target.closest('[data-diy-sandbox-preset]') : null;
       if (sandboxPreset && els.diySidebar.contains(sandboxPreset) && !sandboxPreset.disabled) {
-        enterDiyScenePresetPlayback(sandboxPreset.dataset.diySandboxPreset);
+        enterDiyScenePresetPlayback(sandboxPreset.dataset.diySandboxPreset, { recordMemory: true, actor: 'user', provider: state.activeProvider });
         return;
       }
       const sandboxPresetCard = event.target && event.target.closest ? event.target.closest('[data-diy-preset-card]') : null;
@@ -39039,7 +39046,7 @@ function bindEvents() {
   window.addEventListener('pointerup', endDiyCardRotation);
   window.addEventListener('pointercancel', endDiyCardRotation);
   updateDiyCardRotation();
-  if (els.diyBookLyricPreset) els.diyBookLyricPreset.addEventListener('click', () => enterPresetPlaybackPage('book'));
+  if (els.diyBookLyricPreset) els.diyBookLyricPreset.addEventListener('click', () => enterPresetPlaybackPage('book', { recordMemory: true, actor: 'user', provider: state.activeProvider }));
   if (els.bookLyricList) {
     els.bookLyricList.addEventListener('pointerdown', (event) => event.stopPropagation());
     els.bookLyricList.addEventListener('click', (event) => {
@@ -39074,15 +39081,15 @@ function bindEvents() {
       event.stopPropagation();
     }, true);
   }
-  if (els.diySceneNonePreset) els.diySceneNonePreset.addEventListener('click', () => enterPresetPlaybackPage('lyric'));
-  if (els.diyCubePreset) els.diyCubePreset.addEventListener('click', () => enterPresetPlaybackPage('cube'));
-  if (els.diyFreeCubePreset) els.diyFreeCubePreset.addEventListener('click', () => enterPresetPlaybackPage('free-cubes'));
-  if (els.diyVoidPrismPreset) els.diyVoidPrismPreset.addEventListener('click', () => enterPresetPlaybackPage('void-prism'));
-  if (els.diyTopographyPreset) els.diyTopographyPreset.addEventListener('click', () => enterPresetPlaybackPage('topography'));
-  if (els.diySoundscapeWorkshopPreset) els.diySoundscapeWorkshopPreset.addEventListener('click', () => enterPresetPlaybackPage('soundscape-workshop'));
-  if (els.diyChladniPreset) els.diyChladniPreset.addEventListener('click', () => enterPresetPlaybackPage('chladni'));
-  if (els.diyRainGlassPreset) els.diyRainGlassPreset.addEventListener('click', () => enterPresetPlaybackPage('rain-glass'));
-  if (els.diyCoverParticlesPreset) els.diyCoverParticlesPreset.addEventListener('click', () => enterPresetPlaybackPage('cover-particles'));
+  if (els.diySceneNonePreset) els.diySceneNonePreset.addEventListener('click', () => enterPresetPlaybackPage('lyric', { recordMemory: true, actor: 'user', provider: state.activeProvider }));
+  if (els.diyCubePreset) els.diyCubePreset.addEventListener('click', () => enterPresetPlaybackPage('cube', { recordMemory: true, actor: 'user', provider: state.activeProvider }));
+  if (els.diyFreeCubePreset) els.diyFreeCubePreset.addEventListener('click', () => enterPresetPlaybackPage('free-cubes', { recordMemory: true, actor: 'user', provider: state.activeProvider }));
+  if (els.diyVoidPrismPreset) els.diyVoidPrismPreset.addEventListener('click', () => enterPresetPlaybackPage('void-prism', { recordMemory: true, actor: 'user', provider: state.activeProvider }));
+  if (els.diyTopographyPreset) els.diyTopographyPreset.addEventListener('click', () => enterPresetPlaybackPage('topography', { recordMemory: true, actor: 'user', provider: state.activeProvider }));
+  if (els.diySoundscapeWorkshopPreset) els.diySoundscapeWorkshopPreset.addEventListener('click', () => enterPresetPlaybackPage('soundscape-workshop', { recordMemory: true, actor: 'user', provider: state.activeProvider }));
+  if (els.diyChladniPreset) els.diyChladniPreset.addEventListener('click', () => enterPresetPlaybackPage('chladni', { recordMemory: true, actor: 'user', provider: state.activeProvider }));
+  if (els.diyRainGlassPreset) els.diyRainGlassPreset.addEventListener('click', () => enterPresetPlaybackPage('rain-glass', { recordMemory: true, actor: 'user', provider: state.activeProvider }));
+  if (els.diyCoverParticlesPreset) els.diyCoverParticlesPreset.addEventListener('click', () => enterPresetPlaybackPage('cover-particles', { recordMemory: true, actor: 'user', provider: state.activeProvider }));
   if (els.wallpaperImportedModeButton) els.wallpaperImportedModeButton.addEventListener('click', () => setWallpaperSource('imported'));
   if (els.wallpaperLiveModeButton) els.wallpaperLiveModeButton.addEventListener('click', () => setWallpaperSource('live'));
   document.querySelectorAll('[data-wallpaper-fit]').forEach((button) => {
@@ -42711,13 +42718,24 @@ function notifyPlaybackIntelligence(event, payload = {}) {
 
 let playbackIntelligenceTrackSignature = '';
 function playbackIntelligenceSongPayload() {
-  return state.currentSong ? {
-    id: safeText(state.currentSong.id, ''),
-    name: safeText(state.currentSong.title || state.currentSong.name, ''),
-    title: safeText(state.currentSong.title || state.currentSong.name, ''),
-    artist: safeText(state.currentSong.artist, ''),
-    provider: safeText(state.currentSong.provider, state.activeProvider)
-  } : null;
+  if (!state.currentSong) return null;
+  const song = state.currentSong;
+  const rawGenres = Array.isArray(song.genres) ? song.genres.slice() : [song.genres];
+  rawGenres.push(song.genre);
+  const genres = Array.from(new Set(rawGenres
+    .filter((value) => typeof value === 'string')
+    .map((value) => safeText(value, '').normalize('NFKC')
+      .replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120))
+    .filter((value) => value && !/(?:https?:\/\/|www\.|[\\/]|api[\s_-]*key|password|token|secret|authorization|cookie|sessionid)/iu.test(value))))
+    .slice(0, 6);
+  return {
+    id: safeText(song.id, ''),
+    name: safeText(song.title || song.name, ''),
+    title: safeText(song.title || song.name, ''),
+    artist: safeText(song.artist, ''),
+    provider: safeText(song.provider, state.activeProvider),
+    genres
+  };
 }
 
 function notePlaybackIntelligenceTrackStart() {
@@ -43351,8 +43369,8 @@ async function petAssistantSwitchPreset(argumentsValue = {}, context = {}) {
       selectedPreset: { id: preset.id, name: preset.name, source: preset.source }
     };
   }
-  if (preset.source === 'builtin') enterPresetPlaybackPage(preset.id);
-  else await enterDiyScenePresetPlayback(preset.id);
+  if (preset.source === 'builtin') enterPresetPlaybackPage(preset.id, { recordMemory: true, actor: 'pet', provider: state.activeProvider });
+  else await enterDiyScenePresetPlayback(preset.id, { recordMemory: true, actor: 'pet', provider: state.activeProvider });
   return {
     ...petAssistantPlaybackSnapshot(),
     status: 'changed',

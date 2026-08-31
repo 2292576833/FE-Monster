@@ -7,6 +7,9 @@
   const PROVIDER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,39}$/;
   const CATEGORY_PATTERN = /^[a-z][a-z0-9_]{0,47}$/;
   const MAX_QUERY = 100;
+  const MAX_HYDRATE_RECORDS = 100;
+  const MAX_CACHED_RECORDS = 96;
+  const MAX_PROVIDER_STATES = 8;
   const MAX_RECALL = 24;
   const MIN_BEHAVIOR_OBSERVATIONS = 3;
   const MIN_BEHAVIOR_CONFIDENCE = 0.6;
@@ -91,59 +94,119 @@
       && confidenceTenth(previous.confidence) === confidenceTenth(preference.confidence);
   }
 
-  function contextualBehaviorSignals(input, currentSignals, policy) {
+  function compactPreferenceRecords(records, policy) {
+    const ordered = (Array.isArray(records) ? records : [])
+      .map((record, index) => {
+        const value = policy.normalizeRecord(record);
+        const recordedAt = Date.parse(record?.recordedAt || record?.occurredAt || value?.updatedAt || '');
+        const sourceSequence = Number(record?.sourceSequence ?? record?.payload?.sourceSequence);
+        return { record, value, index, recordedAt: Number.isFinite(recordedAt) ? recordedAt : 0, sourceSequence: Number.isFinite(sourceSequence) ? sourceSequence : 0 };
+      })
+      .filter((item) => item.value)
+      .sort((left, right) => right.recordedAt - left.recordedAt || right.sourceSequence - left.sourceSequence || right.index - left.index);
+    const authorities = new Map();
+    const behaviors = new Map();
+    ordered.forEach((item) => {
+      if (item.value.origin === 'explicit-chat') {
+        if (!authorities.has(item.value.entityId)) authorities.set(item.value.entityId, item);
+      } else if (!behaviors.has(item.value.entityId)) {
+        behaviors.set(item.value.entityId, item);
+      }
+    });
+    const sortRecent = (left, right) => right.recordedAt - left.recordedAt || right.sourceSequence - left.sourceSequence || right.index - left.index;
+    const protectedAuthorities = Array.from(authorities.values()).sort(sortRecent);
+    const selected = [
+      ...protectedAuthorities,
+      ...Array.from(behaviors.entries())
+        .filter(([entityId]) => !authorities.has(entityId))
+        .map(([, item]) => item)
+        .sort(sortRecent)
+    ]
+      .slice(0, MAX_CACHED_RECORDS)
+      .map((item) => Object.freeze(item.record));
+    return selected;
+  }
+
+  function contextualBehaviorSignals(input, currentSignals, policy, rotation = 0) {
     const summary = input?.summary && typeof input.summary === 'object' ? input.summary : input;
     const occurredAt = exactTime(input?.occurredAt || input?.updatedAt, input?.clock);
-    const signals = Array.isArray(currentSignals) ? currentSignals.slice(0, 4) : [];
-    const add = (category, subject, statement, evidence, confidence) => {
-      const cleanSubject = behaviorText(subject);
-      const count = observationCount(evidence);
-      const score = Math.max(0, Math.min(1, Number(confidence) || 0));
-      if (!cleanSubject || count < MIN_BEHAVIOR_OBSERVATIONS || score < MIN_BEHAVIOR_CONFIDENCE || signals.length >= 8) return;
-      const entityId = typeof policy.entityId === 'function' ? policy.entityId(category, cleanSubject) : '';
-      if (!entityId || signals.some((item) => item?.entityId === entityId)) return;
+    const signals = [];
+    (Array.isArray(currentSignals) ? currentSignals : []).slice(0, 4).forEach((signal) => {
+      if (signal?.entityId && !signals.some((item) => item.entityId === signal.entityId)) signals.push(signal);
+    });
+    const add = (candidate) => {
+      const cleanSubject = behaviorText(candidate?.subject);
+      const count = observationCount(candidate?.evidence);
+      const score = Math.max(0, Math.min(1, Number(candidate?.confidence) || 0));
+      if (!cleanSubject || count < MIN_BEHAVIOR_OBSERVATIONS || score < MIN_BEHAVIOR_CONFIDENCE || signals.length >= 8) return false;
+      const entityId = typeof policy.entityId === 'function' ? policy.entityId(candidate.category, cleanSubject) : '';
+      if (!entityId || signals.some((item) => item?.entityId === entityId)) return false;
       signals.push(Object.freeze({
         schemaVersion: 2,
         kind: 'preference',
         entityId,
-        category,
+        category: candidate.category,
         subject: cleanSubject,
         polarity: 'like',
-        statement: boundedText(statement, 220),
+        statement: boundedText(candidate.statement, 220),
         origin: 'behavior',
         confidence: Math.round(score * 1000) / 1000,
         evidence: count,
         status: 'active',
         updatedAt: occurredAt
       }));
+      return true;
     };
-    const candidates = Array.isArray(summary?.topGenres) ? summary.topGenres : [];
-    candidates.slice(0, 6).forEach((item) => add(
-      'music_affinity', item?.name,
-      `根据跨会话播放行为，用户经常听音乐类型：${behaviorText(item?.name)}`,
-      item?.evidence, item?.confidence
-    ));
-    const scenes = Array.isArray(summary?.topScenes) ? summary.topScenes : [];
-    scenes.slice(0, 6).forEach((item) => add(
-      'scene_affinity', item?.name,
-      `根据跨会话场景行为，用户经常使用场景：${behaviorText(item?.name)}`,
-      item?.evidence, item?.confidence
-    ));
-    const bucketSignals = (values, labels, category, statement) => {
-      if (!values || typeof values !== 'object' || Array.isArray(values)) return;
-      Object.entries(values).slice(0, 8).forEach(([bucket, value]) => {
+    const bucketCandidates = (values, labels, category, statement) => {
+      if (!values || typeof values !== 'object' || Array.isArray(values)) return [];
+      return Object.entries(values).slice(0, 8).map(([bucket, value]) => {
         const subject = labels[bucket] || '';
         const evidence = observationCount(value);
-        const confidence = Math.min(1, (Math.min(evidence, 6) / 6) * 0.7 + 0.3);
-        add(category, subject, statement(subject), evidence, confidence);
+        return {
+          category,
+          subject,
+          statement: statement(subject),
+          evidence,
+          confidence: Math.min(1, (Math.min(evidence, 6) / 6) * 0.7 + 0.3)
+        };
       });
     };
-    bucketSignals(summary?.timeBuckets, {
-      morning: '早晨', afternoon: '下午', evening: '傍晚', 'late-night': '深夜'
-    }, 'listening_routine', (subject) => `根据跨会话播放行为，用户通常在${subject}听歌`);
-    bucketSignals(summary?.volumeBuckets, {
-      quiet: '安静', balanced: '适中', loud: '较大'
-    }, 'listening_volume', (subject) => `根据跨会话播放行为，用户通常使用${subject}音量`);
+    const groups = [
+      (Array.isArray(summary?.topGenres) ? summary.topGenres : []).slice(0, 6).map((item) => ({
+        category: 'music_affinity', subject: item?.name,
+        statement: `根据跨会话播放行为，用户经常听音乐类型：${behaviorText(item?.name)}`,
+        evidence: item?.evidence, confidence: item?.confidence
+      })),
+      (Array.isArray(summary?.topScenes) ? summary.topScenes : []).slice(0, 6).map((item) => ({
+        category: 'scene_affinity', subject: item?.name,
+        statement: `根据跨会话场景行为，用户经常使用场景：${behaviorText(item?.name)}`,
+        evidence: item?.evidence, confidence: item?.confidence
+      })),
+      bucketCandidates(summary?.timeBuckets, {
+        morning: '早晨', afternoon: '下午', evening: '傍晚', 'late-night': '深夜'
+      }, 'listening_routine', (subject) => `根据跨会话播放行为，用户通常在${subject}听歌`),
+      bucketCandidates(summary?.volumeBuckets, {
+        quiet: '安静', balanced: '适中', loud: '较大'
+      }, 'listening_volume', (subject) => `根据跨会话播放行为，用户通常使用${subject}音量`)
+    ];
+    const start = ((Math.floor(Number(rotation) || 0) % groups.length) + groups.length) % groups.length;
+    const order = groups.map((_, index) => (start + index) % groups.length);
+    const cursors = groups.map(() => 0);
+    let added = true;
+    while (signals.length < 8 && added) {
+      added = false;
+      order.forEach((index) => {
+        if (signals.length >= 8) return;
+        const group = groups[index];
+        while (cursors[index] < group.length) {
+          const candidate = group[cursors[index]++];
+          if (add(candidate)) {
+            added = true;
+            break;
+          }
+        }
+      });
+    }
     return Object.freeze(signals);
   }
 
@@ -168,10 +231,27 @@
           loading: null,
           queue: Promise.resolve(),
           available: Boolean(memoryClient && typeof memoryClient.context === 'function'),
-          nextSequence: 1
+          nextSequence: 1,
+          nextContextualGroup: 0,
+          pending: 0,
+          lastAccessAt: Date.now()
         });
       }
-      return states.get(provider);
+      const state = states.get(provider);
+      state.lastAccessAt = Date.now();
+      pruneProviderStates(provider);
+      return state;
+    }
+
+    function pruneProviderStates(retainedProvider = '') {
+      if (states.size <= MAX_PROVIDER_STATES) return;
+      const candidates = Array.from(states.entries())
+        .filter(([provider, state]) => provider !== retainedProvider && !state.loading && state.pending === 0)
+        .sort((left, right) => left[1].lastAccessAt - right[1].lastAccessAt);
+      while (states.size > MAX_PROVIDER_STATES && candidates.length) {
+        const [provider] = candidates.shift();
+        states.delete(provider);
+      }
     }
 
     function rebuild(state, now) {
@@ -189,15 +269,15 @@
         return state;
       }
       state.loading = (async () => {
-        const recalled = await memoryClient.context({ provider, limit: MAX_QUERY, types: ['user.fact'] });
+        const recalled = await memoryClient.context({ provider, limit: MAX_HYDRATE_RECORDS, types: ['user.fact'] });
         state.available = recalled?.available !== false;
         const newest = (Array.isArray(recalled?.knowledge) ? recalled.knowledge : [])
           .filter((record) => record?.type === 'user.fact')
           .slice()
           .sort((left, right) => Date.parse(right?.recordedAt || right?.occurredAt || 0)
             - Date.parse(left?.recordedAt || left?.occurredAt || 0))
-          .slice(0, MAX_QUERY);
-        state.records = newest.map((record) => Object.freeze(record));
+          .slice(0, MAX_HYDRATE_RECORDS);
+        state.records = compactPreferenceRecords(newest, policy);
         state.nextSequence = newest.reduce((maximum, record) => (
           Math.max(maximum, Number.isFinite(Number(record?.sourceSequence)) ? Number(record.sourceSequence) + 1 : maximum)
         ), 1);
@@ -214,9 +294,15 @@
 
     function enqueue(provider, operation) {
       const state = stateFor(provider);
+      state.pending += 1;
       const next = state.queue.then(operation, operation);
-      state.queue = next.catch(() => {});
-      return next;
+      const settled = next.finally(() => {
+        state.pending = Math.max(0, state.pending - 1);
+        state.lastAccessAt = Date.now();
+        pruneProviderStates();
+      });
+      state.queue = settled.catch(() => {});
+      return settled;
     }
 
     async function persist(provider, preference) {
@@ -227,10 +313,17 @@
       const value = policy.serialize(preference);
       if (!value) throw durableError('PREFERENCE_REJECTED');
       const previous = state.active.find((item) => item.entityId === preference.entityId);
+      const explicitAuthority = preference.origin === 'behavior'
+        ? state.records.map((record) => policy.normalizeRecord(record))
+          .find((item) => item?.entityId === preference.entityId && item.origin === 'explicit-chat')
+        : null;
       const previousBehavior = preference.origin === 'behavior'
         ? state.records.map((record) => policy.normalizeRecord(record))
           .find((item) => item?.entityId === preference.entityId && item.origin === 'behavior')
         : null;
+      if (explicitAuthority) {
+        return Object.freeze({ changed: false, deduplicated: true, authoritative: true });
+      }
       if (preference.origin === 'behavior' && behaviorUnchanged(previousBehavior, preference)) {
         return Object.freeze({ changed: false, deduplicated: true });
       }
@@ -272,6 +365,7 @@
           value
         })
       }));
+      state.records = compactPreferenceRecords(state.records, policy);
       rebuild(state, preference.updatedAt);
       return Object.freeze({ changed: true, eventId: boundedText(handle.eventId, 120), recordedAt: exactTime(receipt.recordedAt, clock) });
     }
@@ -300,11 +394,13 @@
 
     function observePlaybackSummary(input = {}) {
       const provider = providerId(input.provider);
+      const state = stateFor(provider);
       const extracted = policy.behaviorSignals({ ...input, occurredAt: exactTime(input.occurredAt, clock) });
       const signals = contextualBehaviorSignals(
         { ...input, occurredAt: exactTime(input.occurredAt, clock) },
-        Array.isArray(extracted?.signals) ? extracted.signals : [], policy
+        Array.isArray(extracted?.signals) ? extracted.signals : [], policy, state.nextContextualGroup
       );
+      state.nextContextualGroup = (state.nextContextualGroup + 1) % 4;
       if (!signals.length) return Promise.resolve(Object.freeze({ written: 0, deduplicated: 0, suppressed: 0, facts: 0 }));
       return enqueue(provider, () => persistSignals(provider, signals));
     }

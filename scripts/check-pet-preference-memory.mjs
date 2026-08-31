@@ -138,7 +138,8 @@ const inferred = await firstSession.observePlaybackSummary({
   provider: 'netease', occurredAt: '2026-08-31T12:01:00.000Z',
   summary: { topArtists: [{ name: '爵士', starts: 6, completes: 5, skips: 0, replays: 1, confidence: 0.9 }] }
 });
-assert.equal(inferred.written, 1);
+assert.equal(inferred.written, 0,
+  'behavioral evidence persisted beside an explicit preference');
 const explicitWins = await firstSession.query({ provider: 'netease' });
 assert.equal(explicitWins.preferences.find((item) => item.subject === '爵士').origin, 'explicit-chat',
   'a behavioral signal replaced an explicit preference');

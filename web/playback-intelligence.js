@@ -48,6 +48,8 @@
   const HABIT_EVENTS = new Set([
     'track-start', 'track-complete', 'track-skip', 'track-replay', 'volume-change', 'scene-apply'
   ]);
+  const MAX_DURABLE_PLAYBACK_TRACES = 64;
+  const DURABLE_PLAYBACK_TRACE_TTL_MS = 30 * 60 * 1_000;
 
   function create(options = {}) {
     const player = options.player || {};
@@ -88,6 +90,18 @@
       catch (_) { return ''; }
     }
 
+    function pruneDurablePlaybackTraces(now = Date.now()) {
+      durablePlaybackTraces.forEach((trace, key) => {
+        const lastUsedAt = Number(trace?.lastUsedAt);
+        if (!trace?.traceId || !Number.isFinite(lastUsedAt) || lastUsedAt < now - DURABLE_PLAYBACK_TRACE_TTL_MS) {
+          durablePlaybackTraces.delete(key);
+        }
+      });
+      while (durablePlaybackTraces.size > MAX_DURABLE_PLAYBACK_TRACES) {
+        durablePlaybackTraces.delete(durablePlaybackTraces.keys().next().value);
+      }
+    }
+
     function durablePlaybackPayload(name, payload = {}) {
       const type = {
         'track-start': 'playback.started',
@@ -102,12 +116,20 @@
       const providerId = durableIdentifier(song.provider || payload.provider || live.song?.provider, 'unknown-provider');
       const songId = durableIdentifier(song.id || payload.songId || live.song?.id || song.name || song.title, 'unknown-song');
       const traceKey = `${providerId}:${songId}`;
-      let traceId = durablePlaybackTraces.get(traceKey);
-      if (!traceId || name === 'track-start') {
-        traceId = durableUuid();
+      const traceNow = Date.now();
+      pruneDurablePlaybackTraces(traceNow);
+      let trace = durablePlaybackTraces.get(traceKey);
+      if (!trace?.traceId || name === 'track-start') {
+        const traceId = durableUuid();
         if (!traceId) return null;
-        durablePlaybackTraces.set(traceKey, traceId);
+        trace = { traceId, lastUsedAt: traceNow };
+      } else {
+        trace = { traceId: trace.traceId, lastUsedAt: traceNow };
       }
+      durablePlaybackTraces.delete(traceKey);
+      durablePlaybackTraces.set(traceKey, trace);
+      pruneDurablePlaybackTraces(traceNow);
+      const traceId = trace.traceId;
       const operationId = durableUuid();
       if (!operationId) return null;
       const positionSeconds = Math.max(0, finiteNumber(payload.positionSeconds, live.positionSeconds));

@@ -305,12 +305,20 @@
     const selected = new Map();
     for (const item of normalized) {
       const value = item.value;
+      const previous = selected.get(value.entityId);
+      if (isExplicit(value.origin)) {
+        // A retracted explicit preference is a durable tombstone.  It must
+        // remain authoritative over later inferred observations, while a
+        // newer explicit correction or retraction may replace it.
+        selected.set(value.entityId, value);
+        continue;
+      }
+      if (isExplicit(previous?.origin)) continue;
       if (value.status === 'retracted') {
         selected.delete(value.entityId);
         continue;
       }
-      const previous = selected.get(value.entityId);
-      if (!previous || isExplicit(value.origin) || !isExplicit(previous.origin)) selected.set(value.entityId, value);
+      selected.set(value.entityId, value);
     }
     const currentMs = nowMs(options);
     if (!Number.isFinite(currentMs)) return Object.freeze([]);
