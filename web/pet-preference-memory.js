@@ -9,6 +9,7 @@
   const MAX_QUERY = 100;
   const MAX_HYDRATE_RECORDS = 100;
   const MAX_CACHED_RECORDS = 96;
+  const MAX_AUTHORITY_CACHE = MAX_CACHED_RECORDS;
   const MAX_PROVIDER_STATES = 8;
   const MAX_RECALL = 24;
   const MIN_BEHAVIOR_OBSERVATIONS = 3;
@@ -127,6 +128,39 @@
     return selected;
   }
 
+  function recordRecency(record, index = 0) {
+    const normalized = record && typeof record === 'object' ? record : {};
+    const recordedAt = Date.parse(normalized.recordedAt || normalized.occurredAt || '');
+    const sourceSequence = Number(normalized.sourceSequence ?? normalized.payload?.sourceSequence);
+    return {
+      recordedAt: Number.isFinite(recordedAt) ? recordedAt : 0,
+      sourceSequence: Number.isFinite(sourceSequence) ? sourceSequence : 0,
+      index
+    };
+  }
+
+  function newerRecord(left, right) {
+    if (!right) return true;
+    const leftOrder = recordRecency(left.record, left.index);
+    const rightOrder = recordRecency(right.record, right.index);
+    return leftOrder.recordedAt > rightOrder.recordedAt
+      || (leftOrder.recordedAt === rightOrder.recordedAt && leftOrder.sourceSequence > rightOrder.sourceSequence)
+      || (leftOrder.recordedAt === rightOrder.recordedAt
+        && leftOrder.sourceSequence === rightOrder.sourceSequence
+        && leftOrder.index > rightOrder.index);
+  }
+
+  function explicitAuthorityRecord(records, entityId, policy) {
+    let selected = null;
+    (Array.isArray(records) ? records : []).forEach((record, index) => {
+      const value = policy.normalizeRecord(record);
+      if (value?.entityId !== entityId || value.origin !== 'explicit-chat') return;
+      const candidate = { record, index };
+      if (newerRecord(candidate, selected)) selected = candidate;
+    });
+    return selected?.record || null;
+  }
+
   function contextualBehaviorSignals(input, currentSignals, policy, rotation = 0) {
     const summary = input?.summary && typeof input.summary === 'object' ? input.summary : input;
     const occurredAt = exactTime(input?.occurredAt || input?.updatedAt, input?.clock);
@@ -226,6 +260,7 @@
       if (!states.has(provider)) {
         states.set(provider, {
           records: [],
+          authorities: new Map(),
           active: Object.freeze([]),
           loaded: false,
           loading: null,
@@ -255,8 +290,26 @@
     }
 
     function rebuild(state, now) {
-      state.active = policy.reduce(state.records, { now: exactTime(now, clock) });
+      const behaviorEntities = new Set(state.records.map((record) => policy.normalizeRecord(record))
+        .filter((value) => value?.origin === 'behavior')
+        .map((value) => value.entityId));
+      state.authorities.forEach((record, entityId) => {
+        if (!behaviorEntities.has(entityId)) state.authorities.delete(entityId);
+      });
+      const authorityRecords = Array.from(state.authorities.values());
+      state.active = policy.reduce([...state.records, ...authorityRecords], { now: exactTime(now, clock) });
       return state.active;
+    }
+
+    async function durableExplicitAuthority(provider, entityId) {
+      const recalled = await memoryClient.context({
+        provider,
+        q: entityId,
+        limit: MAX_HYDRATE_RECORDS,
+        types: ['user.fact']
+      });
+      if (recalled?.available === false) throw durableError('LOCAL_MEMORY_AUTHORITY_UNAVAILABLE');
+      return explicitAuthorityRecord(recalled?.knowledge, entityId, policy);
     }
 
     async function hydrate(provider) {
@@ -281,6 +334,16 @@
         state.nextSequence = newest.reduce((maximum, record) => (
           Math.max(maximum, Number.isFinite(Number(record?.sourceSequence)) ? Number(record.sourceSequence) + 1 : maximum)
         ), 1);
+        const behaviorEntityIds = Array.from(new Set(state.records.map((record) => policy.normalizeRecord(record))
+          .filter((value) => value?.origin === 'behavior')
+          .map((value) => value.entityId))).slice(0, MAX_AUTHORITY_CACHE);
+        const authorities = await Promise.all(behaviorEntityIds.map(async (entityId) => ({
+          entityId,
+          record: await durableExplicitAuthority(provider, entityId)
+        })));
+        authorities.forEach(({ entityId, record }) => {
+          if (record) state.authorities.set(entityId, Object.freeze(record));
+        });
         rebuild(state, clock());
         state.loaded = true;
         return state;
@@ -313,10 +376,15 @@
       const value = policy.serialize(preference);
       if (!value) throw durableError('PREFERENCE_REJECTED');
       const previous = state.active.find((item) => item.entityId === preference.entityId);
-      const explicitAuthority = preference.origin === 'behavior'
-        ? state.records.map((record) => policy.normalizeRecord(record))
-          .find((item) => item?.entityId === preference.entityId && item.origin === 'explicit-chat')
-        : null;
+      let explicitAuthority = null;
+      if (preference.origin === 'behavior') {
+        explicitAuthority = state.authorities.get(preference.entityId)
+          || await durableExplicitAuthority(provider, preference.entityId);
+        if (explicitAuthority) {
+          state.authorities.set(preference.entityId, Object.freeze(explicitAuthority));
+          rebuild(state, preference.updatedAt);
+        }
+      }
       const previousBehavior = preference.origin === 'behavior'
         ? state.records.map((record) => policy.normalizeRecord(record))
           .find((item) => item?.entityId === preference.entityId && item.origin === 'behavior')

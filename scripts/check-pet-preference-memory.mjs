@@ -45,9 +45,16 @@ const memoryClient = {
   failNextReceipt: false,
   suppressNext: false,
   async context(options = {}) {
+    const provider = String(options.provider || 'netease');
+    const limit = Math.max(1, Math.min(100, Math.floor(Number(options.limit) || 24)));
+    const query = String(options.q || '');
+    const requestedTypes = Array.isArray(options.types) ? new Set(options.types) : null;
     return {
       available: true,
-      knowledge: records(String(options.provider || 'netease')).slice().reverse()
+      knowledge: records(provider).slice().reverse()
+        .filter((record) => !requestedTypes || requestedTypes.has(record.type))
+        .filter((record) => !query || record?.payload?.entityId === query)
+        .slice(0, limit)
     };
   },
   append(input) {
@@ -163,6 +170,58 @@ assert.ok(!restarted.preferences.some((item) => item.subject === '后摇'),
 const isolated = await secondSession.query({ provider: 'qq' });
 assert.equal(isolated.preferences.length, 0, 'preferences leaked across providers');
 
+const overflowProvider = 'overflow';
+const overflowSession = loadRuntime();
+await overflowSession.correct({
+  provider: overflowProvider, category: 'music_affinity', subject: 'protected-zero', polarity: 'like',
+  statement: '用户明确表示喜欢 protected-zero', occurredAt: '2026-09-01T00:00:00.000Z'
+});
+const protectedZeroId = (await overflowSession.query({ provider: overflowProvider })).preferences[0].entityId;
+await overflowSession.forget({
+  provider: overflowProvider, entityIds: [protectedZeroId], occurredAt: '2026-09-01T00:00:01.000Z'
+});
+for (let index = 1; index <= 96; index += 1) {
+  await overflowSession.correct({
+    provider: overflowProvider, category: 'music_affinity', subject: `overflow-explicit-${index}`, polarity: 'like',
+    statement: `用户明确表示喜欢 overflow-explicit-${index}`,
+    occurredAt: `2026-09-01T00:01:${String(index % 60).padStart(2, '0')}.000Z`
+  });
+}
+for (let index = 0; index < 10; index += 1) {
+  const occurredAt = `2026-09-01T00:03:${String(index).padStart(2, '0')}.000Z`;
+  appendCount += 1;
+  records(overflowProvider).push({
+    eventId: `00000000-0000-4000-8000-${String(appendCount).padStart(12, '0')}`,
+    stream: 'knowledge', type: 'user.fact', occurredAt, recordedAt: occurredAt, sourceSequence: appendCount,
+    payload: {
+      source: 'pet-preference-learning', entityId: protectedZeroId, title: '用户偏好·music_affinity',
+      value: JSON.stringify({
+        schemaVersion: 2, kind: 'preference', entityId: protectedZeroId,
+        category: 'music_affinity', subject: 'protected-zero', polarity: 'like',
+        statement: '根据跨会话播放行为，用户经常听歌曲：protected-zero',
+        origin: 'behavior', confidence: 0.8, evidence: 3 + index, status: 'active', updatedAt: occurredAt
+      }),
+      occurredAt, sourceSequence: appendCount
+    }
+  });
+}
+assert.equal(records(overflowProvider).length, 108,
+  'overflow fixture must exceed the real 100-record hydration window');
+const overflowRestarted = loadRuntime();
+const overflowBehavior = await overflowRestarted.observePlaybackSummary({
+  provider: overflowProvider, occurredAt: '2026-09-01T00:04:00.000Z',
+  summary: {
+    topSongs: [{
+      name: 'protected-zero', starts: 8, completes: 7, replays: 1, skips: 0, evidence: 21, confidence: 0.9
+    }]
+  }
+});
+assert.equal(overflowBehavior.written, 0,
+  'a tombstone outside the hydration window allowed a behavioral reactivation write');
+assert.ok(!(await overflowRestarted.query({ provider: overflowProvider })).preferences
+  .some((item) => item.entityId === protectedZeroId),
+  'a tombstone outside the hydration window leaked as an active behavioral preference');
+
 console.log(JSON.stringify({
   ok: true,
   v1Migration: true,
@@ -172,5 +231,6 @@ console.log(JSON.stringify({
   suppressedWriteIsolation: true,
   explicitOverridesBehavior: true,
   restartRecall: true,
+  hydratedAuthorityOverflow: true,
   providerIsolation: true
 }, null, 2));

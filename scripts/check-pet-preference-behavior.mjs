@@ -436,6 +436,65 @@ assert.deepEqual(JSON.parse(JSON.stringify(builtinEntryCalls[0])), {
 builtinEntryContext.enterPresetPlaybackPage('cube');
 assert.equal(builtinEntryCalls.length, 1, 'startup/recovery preset application unexpectedly recorded a memory event');
 
+const builtinClickCalls = [];
+let builtinClickHandler = null;
+const builtinClickContext = {
+  state: { activeProvider: 'qq' },
+  els: {
+    diyCubePreset: {
+      addEventListener(event, handler) {
+        assert.equal(event, 'click');
+        builtinClickHandler = handler;
+      }
+    }
+  },
+  enterPresetPlaybackPage(id, options) { builtinClickCalls.push({ id, options }); }
+};
+const builtinClickRegistration = appSource.match(
+  /if \(els\.diyCubePreset\) els\.diyCubePreset\.addEventListener\('click', \(\) => enterPresetPlaybackPage\('cube', \{ recordMemory: true, actor: 'user', provider: state\.activeProvider \}\)\);/u
+);
+assert.ok(builtinClickRegistration, 'missing the production built-in cube click registration');
+vm.runInNewContext(builtinClickRegistration[0], builtinClickContext, { filename: 'app-builtin-click.js' });
+builtinClickHandler();
+assert.deepEqual(JSON.parse(JSON.stringify(builtinClickCalls)), [{
+  id: 'cube', options: { recordMemory: true, actor: 'user', provider: 'qq' }
+}], 'the production built-in click handler lost its memory attribution');
+
+function appArrowHandlerSource(marker) {
+  const markerStart = appSource.indexOf(marker);
+  const start = markerStart + marker.length;
+  assert.ok(markerStart >= 0 && appSource[start] === '{', `missing production click handler ${marker}`);
+  let depth = 0;
+  for (let index = start; index < appSource.length; index += 1) {
+    if (appSource[index] === '{') depth += 1;
+    if (appSource[index] === '}' && --depth === 0) return appSource.slice(start, index + 1);
+  }
+  assert.fail(`unterminated production click handler ${marker}`);
+}
+
+const diyClickCalls = [];
+const diyClickContext = {
+  state: { activeProvider: 'netease' },
+  els: { diySidebar: { contains() { return true; } } },
+  enterDiyScenePresetPlayback(id, options) { diyClickCalls.push({ id, options }); }
+};
+const diyHandlerSource = appArrowHandlerSource("els.diySidebar.addEventListener('click', (event) => ");
+vm.runInNewContext(`this.__diyClickHandler = (event) => ${diyHandlerSource};`, diyClickContext, {
+  filename: 'app-diy-click.js'
+});
+diyClickContext.__diyClickHandler({
+  target: {
+    closest(selector) {
+      return selector === '[data-diy-sandbox-preset]'
+        ? { disabled: false, dataset: { diySandboxPreset: 'clicked-diy-scene' } }
+        : null;
+    }
+  }
+});
+assert.deepEqual(JSON.parse(JSON.stringify(diyClickCalls)), [{
+  id: 'clicked-diy-scene', options: { recordMemory: true, actor: 'user', provider: 'netease' }
+}], 'the production DIY sidebar click handler lost its memory attribution');
+
 const diyEntryCalls = [];
 const diyEntryContext = {
   state: { sandbox: { presets: [{ id: 'diy-playback', presetType: 'playback', playbackPreset: 'cube' }] } },
