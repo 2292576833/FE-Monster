@@ -261,6 +261,7 @@
         states.set(provider, {
           records: [],
           authorities: new Map(),
+          authorityUnknown: new Set(),
           active: Object.freeze([]),
           loaded: false,
           loading: null,
@@ -296,8 +297,15 @@
       state.authorities.forEach((record, entityId) => {
         if (!behaviorEntities.has(entityId)) state.authorities.delete(entityId);
       });
+      state.authorityUnknown.forEach((entityId) => {
+        if (!behaviorEntities.has(entityId)) state.authorityUnknown.delete(entityId);
+      });
       const authorityRecords = Array.from(state.authorities.values());
-      state.active = policy.reduce([...state.records, ...authorityRecords], { now: exactTime(now, clock) });
+      const projectionRecords = state.records.filter((record) => {
+        const value = policy.normalizeRecord(record);
+        return value?.origin !== 'behavior' || !state.authorityUnknown.has(value.entityId);
+      });
+      state.active = policy.reduce([...projectionRecords, ...authorityRecords], { now: exactTime(now, clock) });
       return state.active;
     }
 
@@ -309,7 +317,13 @@
         types: ['user.fact']
       });
       if (recalled?.available === false) throw durableError('LOCAL_MEMORY_AUTHORITY_UNAVAILABLE');
-      return explicitAuthorityRecord(recalled?.knowledge, entityId, policy);
+      const records = Array.isArray(recalled?.knowledge) ? recalled.knowledge : [];
+      return Object.freeze({
+        authority: explicitAuthorityRecord(records, entityId, policy),
+        // Context has no pagination cursor. At the maximum, absence is not a
+        // proof: a legacy explicit authority may sit beyond this bounded page.
+        complete: records.length < MAX_HYDRATE_RECORDS
+      });
     }
 
     async function hydrate(provider) {
@@ -339,10 +353,11 @@
           .map((value) => value.entityId))).slice(0, MAX_AUTHORITY_CACHE);
         const authorities = await Promise.all(behaviorEntityIds.map(async (entityId) => ({
           entityId,
-          record: await durableExplicitAuthority(provider, entityId)
+          result: await durableExplicitAuthority(provider, entityId)
         })));
-        authorities.forEach(({ entityId, record }) => {
-          if (record) state.authorities.set(entityId, Object.freeze(record));
+        authorities.forEach(({ entityId, result }) => {
+          if (result.authority) state.authorities.set(entityId, Object.freeze(result.authority));
+          else if (!result.complete) state.authorityUnknown.add(entityId);
         });
         rebuild(state, clock());
         state.loaded = true;
@@ -378,11 +393,17 @@
       const previous = state.active.find((item) => item.entityId === preference.entityId);
       let explicitAuthority = null;
       if (preference.origin === 'behavior') {
-        explicitAuthority = state.authorities.get(preference.entityId)
-          || await durableExplicitAuthority(provider, preference.entityId);
+        const authorityResult = state.authorities.has(preference.entityId)
+          ? Object.freeze({ authority: state.authorities.get(preference.entityId), complete: true })
+          : await durableExplicitAuthority(provider, preference.entityId);
+        explicitAuthority = authorityResult.authority;
         if (explicitAuthority) {
           state.authorities.set(preference.entityId, Object.freeze(explicitAuthority));
           rebuild(state, preference.updatedAt);
+        } else if (!authorityResult.complete) {
+          state.authorityUnknown.add(preference.entityId);
+          rebuild(state, preference.updatedAt);
+          return Object.freeze({ changed: false, deduplicated: true, authoritative: true, unknown: true });
         }
       }
       const previousBehavior = preference.origin === 'behavior'
