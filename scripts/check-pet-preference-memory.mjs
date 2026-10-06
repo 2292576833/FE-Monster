@@ -11,7 +11,7 @@ const recordsByProvider = new Map();
 let appendCount = 0;
 
 const policyScript = 'pet-preference-policy.js?v=20260831-preference-ledger-v2-1';
-const runtimeScript = 'pet-preference-memory.js?v=20260831-cross-session-preferences-2';
+const runtimeScript = 'pet-preference-memory.js?v=20260901-cross-session-preferences-3';
 assert.ok(htmlSource.includes(policyScript), 'the v2 preference policy is not loaded by the page');
 assert.ok(htmlSource.indexOf(policyScript) < htmlSource.indexOf(runtimeScript),
   'the preference policy must load before the preference runtime');

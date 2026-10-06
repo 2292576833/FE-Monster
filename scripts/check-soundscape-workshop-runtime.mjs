@@ -211,6 +211,7 @@ function loadRuntimeWithPersistedSettings(settingsStore) {
 
 function createManualRuntimeHarness(settingsStore = new Map()) {
   const listeners = new Map();
+  const documentListeners = new Map();
   const timers = new Map();
   const iframes = [];
   let clock = 1000;
@@ -266,6 +267,11 @@ function createManualRuntimeHarness(settingsStore = new Map()) {
       baseURI: 'http://127.0.0.1:3081/',
       currentScript: { src: 'http://127.0.0.1:3081/soundscape-runtime.js' },
       visibilityState: 'visible',
+      addEventListener(type, listener) {
+        if (!documentListeners.has(type)) documentListeners.set(type, new Set());
+        documentListeners.get(type).add(listener);
+      },
+      removeEventListener(type, listener) { documentListeners.get(type)?.delete(listener); },
       createElement(tagName) {
         if (String(tagName).toLowerCase() !== 'iframe') throw new Error(`unexpected element ${tagName}`);
         return makeIframe();
@@ -282,6 +288,10 @@ function createManualRuntimeHarness(settingsStore = new Map()) {
     settingsStore,
     iframes,
     advance,
+    setVisibility(visibilityState) {
+      context.document.visibilityState = visibilityState;
+      for (const listener of documentListeners.get('visibilitychange') || []) listener();
+    },
     dispatch(source, data) {
       for (const listener of listeners.get('message') || []) listener({ source, data, origin: 'null' });
     }
@@ -711,6 +721,72 @@ healthyHarness.dispatch(healthyFrame.contentWindow, healthyMessage('player-inten
 }));
 assert.equal(receivedPlayerIntents.length, 1, 'invalid ranges and URL-bearing intents must be ignored');
 assert.equal(terminalSnapshots.length, 0);
+
+const visibilityHarness = createManualRuntimeHarness();
+const visibilityHost = createFakeHost();
+const visibilityTerminal = [];
+const visibilityInstance = visibilityHarness.api.create(visibilityHost, {
+  onTerminalError: (snapshot) => visibilityTerminal.push(snapshot)
+});
+visibilityHarness.api.activate(visibilityInstance);
+const visibilityFrame = visibilityHost.children[0];
+const visibilityNonce = new URL(visibilityFrame.src).searchParams.get('nonce');
+const visibilityMessage = (type, payload = {}) => ({
+  channel: 'fe-soundscape:v1', nonce: visibilityNonce, type, ...payload
+});
+visibilityHarness.dispatch(visibilityFrame.contentWindow, visibilityMessage('runtime-ready'));
+visibilityHarness.dispatch(visibilityFrame.contentWindow, visibilityMessage('frame-heartbeat', {
+  timestamp: visibilityHarness.context.performance.now(),
+  frameTimeMs: 16,
+  width: 1280,
+  height: 800,
+  nonBlack: true
+}));
+assert.equal(visibilityHarness.api.get(visibilityInstance).ready, true);
+visibilityHarness.setVisibility('hidden');
+visibilityHarness.advance(20_000);
+assert.equal(
+  visibilityHost.children[0],
+  visibilityFrame,
+  'minimizing the desktop window must not replace a healthy soundscape iframe while rendering is suspended'
+);
+assert.equal(visibilityTerminal.length, 0, 'a minimized window must not consume retries or report terminal failure');
+visibilityHarness.setVisibility('visible');
+visibilityHarness.dispatch(visibilityFrame.contentWindow, visibilityMessage('frame-heartbeat', {
+  timestamp: visibilityHarness.context.performance.now(),
+  frameTimeMs: 16,
+  width: 1280,
+  height: 800,
+  nonBlack: true
+}));
+assert.equal(visibilityHarness.api.get(visibilityInstance).ready, true, 'the same runtime must recover on restore');
+
+const hiddenStartupHarness = createManualRuntimeHarness();
+const hiddenStartupHost = createFakeHost();
+const hiddenStartupTerminal = [];
+hiddenStartupHarness.setVisibility('hidden');
+const hiddenStartupInstance = hiddenStartupHarness.api.create(hiddenStartupHost, {
+  onTerminalError: (snapshot) => hiddenStartupTerminal.push(snapshot)
+});
+hiddenStartupHarness.api.activate(hiddenStartupInstance);
+const hiddenStartupFrame = hiddenStartupHost.children[0];
+hiddenStartupHarness.advance(20_000);
+assert.equal(hiddenStartupHost.children[0], hiddenStartupFrame, 'hidden startup must pause its ready watchdog');
+assert.equal(hiddenStartupTerminal.length, 0, 'hidden startup must not consume its retry budget');
+hiddenStartupHarness.setVisibility('visible');
+const hiddenStartupNonce = new URL(hiddenStartupFrame.src).searchParams.get('nonce');
+const hiddenStartupMessage = (type, payload = {}) => ({
+  channel: 'fe-soundscape:v1', nonce: hiddenStartupNonce, type, ...payload
+});
+hiddenStartupHarness.dispatch(hiddenStartupFrame.contentWindow, hiddenStartupMessage('runtime-ready'));
+hiddenStartupHarness.dispatch(hiddenStartupFrame.contentWindow, hiddenStartupMessage('frame-heartbeat', {
+  timestamp: hiddenStartupHarness.context.performance.now(),
+  frameTimeMs: 16,
+  width: 1280,
+  height: 800,
+  nonBlack: true
+}));
+assert.equal(hiddenStartupHarness.api.get(hiddenStartupInstance).ready, true, 'hidden startup must finish after restore');
 
 const rollbackStore = new Map([[
   versionTwoStorageKey,

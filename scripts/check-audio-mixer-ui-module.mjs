@@ -228,7 +228,7 @@ const presetIdentity = [
   ['bass-boost', '低频增强'],
   ['night', '夜间'],
   ['wide-chorus', '宽阔合唱'], ['classic-flanger', '经典镶边'], ['flowing-phaser', '流动移相'],
-  ['ping-pong-delay', '乒乓回声'], ['nearfield-studio', '近场工作室'], ['immersive-live', '沉浸现场']
+  ['ping-pong-delay', '乒乓回声'], ['nearfield-studio', '近场工作室'], ['immersive-live', '沉浸现场'], ['clear-spatial', '清晰空间']
 ];
 
 const presets = presetIdentity.map(([id, label], index) => ({
@@ -360,7 +360,8 @@ const ui = findByDataset(container, 'audioMixerUi');
 assert.ok(ui, 'mount should generate the mixer root');
 assert.equal(ui.dataset.mixerReady, 'true');
 assert.equal(ui.dataset.selectedPreset, 'clean');
-assert.equal(findAllByDataset(ui, 'mixerPresetId').length, 14);
+assert.equal(findAllByDataset(ui, 'mixerPresetId').length, 15);
+assert.equal(findByDataset(ui, 'mixerPresetId', 'clear-spatial').textContent, '清晰空间');
 assert.equal(findAllByDataset(ui, 'mixerFamily').length, 13);
 assert.equal(findAllByDataset(ui, 'mixerEqIndex').length, 10);
 assert.equal(findAllByDataset(ui, 'mixerParam').length, 79);
@@ -370,6 +371,9 @@ for (const id of ['chorus', 'flanger', 'phaser', 'delay', 'early-reflections']) 
   assert.ok(findByDataset(ui, 'mixerFamilyCollapse', id), `missing ${id} collapse`);
 }
 assert.equal(findByDataset(ui, 'mixerParam', 'chorusEnabled').type, 'checkbox');
+assert.equal(findByDataset(ui, 'mixerParam', 'inputGainDb').dataset.petParameterKey, 'audio.mixer.input-gain-db');
+assert.equal(findByDataset(ui, 'mixerEqIndex', '0').dataset.petParameterKey, 'audio.mixer.eq.31hz');
+assert.equal(findByDataset(ui, 'mixerNumericInput', 'inputGainDb').dataset.petParameterIgnoreReason, 'mirrored-number-input');
 assert.equal(findByDataset(ui, 'mixerNumericInput', 'delayMs').max, '1000');
 assert.match(findByDataset(ui, 'mixerControlHelp', 'earlyReflectionsMix').textContent, /LFE/);
 assert.equal(ui.dataset.mixerView, 'daily', 'the desktop mixer should open in the understandable daily view');
@@ -591,6 +595,115 @@ assert.equal(
 );
 await errorController.settled();
 errorController.destroy();
+
+// A cached/new frontend must negotiate the backend's preset catalog, not require
+// every additive preset before exposing an otherwise valid mixer snapshot.
+const legacyPresets = presets.filter(({ id }) => id !== 'clear-spatial');
+const incompatibleSnapshot = { ...state, parameters: structuredClone(cleanParameters) };
+delete incompatibleSnapshot.parameters.chorusEnabled;
+const malformedPreset = structuredClone(presets[0]);
+delete malformedPreset.parameters.chorusEnabled;
+const catalogCases = [
+  { name: 'previous backend with 14 presets', catalog: legacyPresets, ready: true },
+  { name: 'current backend with 15 presets', catalog: presets, ready: true },
+  { name: 'known subset with future preset', catalog: [presets[0], { id: 'future-preset' }], ready: true },
+  { name: 'empty catalog', catalog: [], ready: false },
+  { name: 'no supported presets', catalog: [{ id: 'future-preset' }], ready: false },
+  { name: 'invalid known preset parameters', catalog: [malformedPreset], ready: false },
+  { name: 'unsupported catalog version', catalog: legacyPresets, version: 2, ready: false },
+  { name: 'incomplete snapshot', catalog: legacyPresets, snapshot: incompatibleSnapshot, ready: false },
+  { name: 'unsupported snapshot version', catalog: legacyPresets, snapshot: { ...state, version: 2 }, ready: false }
+];
+for (const testCase of catalogCases) {
+  let catalogState = testCase.snapshot || {
+    ...state, selectedPreset: 'clean', parameters: structuredClone(cleanParameters),
+    playbackState: 'native-mixer'
+  };
+  const catalogMutations = [];
+  window.fetch = async (url, options = {}) => {
+    const method = options.method || 'GET';
+    if (method !== 'GET') {
+      catalogMutations.push({ url, method });
+      if (method === 'PATCH') {
+        const patch = JSON.parse(options.body);
+        assert.equal(patch.expectedRevision, catalogState.revision);
+        catalogState = {
+          ...catalogState, revision: catalogState.revision + 1,
+          parameters: { ...catalogState.parameters, ...patch.parameters }
+        };
+      }
+      return response(200, catalogState);
+    }
+    if (url === '/api/audio/mixer') return response(200, catalogState);
+    if (url === '/api/audio/mixer/presets') {
+      return response(200, { ok: true, presetVersion: testCase.version || 1, presets: testCase.catalog });
+    }
+    return response(404, { ok: false });
+  };
+  const catalogContainer = document.createElement('section');
+  document.body.append(catalogContainer);
+  const catalogController = window.FeAudioMixerUi.mount(catalogContainer);
+  await catalogController.ready;
+  const catalogUi = findByDataset(catalogContainer, 'audioMixerUi');
+  assert.equal(catalogController.snapshot().ready, testCase.ready ? 'ready' : 'error', testCase.name);
+  const gain = findByDataset(catalogUi, 'mixerParam', 'inputGainDb');
+  assert.equal(gain.disabled, !testCase.ready, testCase.name);
+  assert.equal(catalogMutations.length, 0, 'catalog discovery must not change audio settings');
+  if (testCase.ready) {
+    const advertisedIds = new Set(testCase.catalog.map(({ id }) => id));
+    for (const button of findAllByDataset(catalogUi, 'mixerPresetId')) {
+      assert.equal(button.disabled, !advertisedIds.has(button.dataset.mixerPresetId), testCase.name);
+      if (button.disabled) button.click(); // The handler must reject unavailable presets too.
+    }
+    await catalogController.settled();
+    assert.equal(catalogMutations.length, 0, 'unavailable preset must never be posted to an older backend');
+    gain.value = '-2';
+    gain.dispatchEvent({ type: 'input' });
+    await catalogController.flush();
+    await catalogController.settled();
+    assert.equal(catalogState.parameters.inputGainDb, -2, 'supported parameters remain editable');
+    assert.equal(catalogMutations.length, 1);
+    assert.equal(catalogMutations[0].method, 'PATCH');
+    findByDataset(catalogUi, 'mixerPresetId', 'clean').click();
+    await catalogController.settled();
+    assert.equal(catalogMutations.at(-1).url, '/api/audio/mixer/presets/clean/apply');
+  }
+  catalogController.destroy();
+}
+
+let changingCatalog = legacyPresets;
+let changingCatalogPosts = 0;
+window.fetch = async (url, options = {}) => {
+  if ((options.method || 'GET') !== 'GET') changingCatalogPosts += 1;
+  if (url === '/api/audio/mixer') return response(200, { ...state, parameters: structuredClone(cleanParameters) });
+  if (url === '/api/audio/mixer/presets') return response(200, { ok: true, presetVersion: 1, presets: changingCatalog });
+  return response(404, { ok: false });
+};
+const changingContainer = document.createElement('section');
+document.body.append(changingContainer);
+const changingController = window.FeAudioMixerUi.mount(changingContainer);
+await changingController.ready;
+const changingUi = findByDataset(changingContainer, 'audioMixerUi');
+const changingPreset = findByDataset(changingUi, 'mixerPresetId', 'clear-spatial');
+assert.equal(changingPreset.disabled, true);
+changingCatalog = presets;
+await changingController.refresh();
+assert.equal(changingPreset.disabled, false, 'reopening the mixer must discover an upgraded preset catalog');
+changingCatalog = legacyPresets;
+await changingController.refresh();
+assert.equal(changingPreset.disabled, true, 'reopening must also revoke presets removed by the backend');
+changingPreset.click();
+await changingController.settled();
+assert.equal(changingCatalogPosts, 0, 'revoked presets must not submit');
+changingCatalog = [malformedPreset];
+await changingController.refresh();
+assert.ok(findAllByDataset(changingUi, 'mixerPresetId').every((button) => button.disabled), 'invalid refreshed catalogs revoke stale preset availability');
+assert.equal(findByDataset(changingUi, 'mixerParam', 'inputGainDb').disabled, false, 'a catalog refresh failure must not block valid parameters');
+changingCatalog = presets;
+await changingController.refresh();
+assert.equal(changingPreset.disabled, false, 'catalog discovery can recover without remounting');
+assert.doesNotMatch(changingController.snapshot().status, /刷新预设目录失败/, 'recovered catalogs must not leave a stale failure message');
+changingController.destroy();
 
 let recoveryStateGets = 0;
 let recoveryPresetGets = 0;
@@ -1181,6 +1294,13 @@ for (const strip of findAllByDataset(channelPanel, 'mixerChannelStrip')) {
 }
 
 const channelAlgorithm = findByDataset(channelPanel, 'mixerChannelAlgorithm');
+assert.equal(channelAlgorithm.dataset.petParameterKey, 'audio.channel.algorithm');
+assert.equal(findByDataset(channelPanel, 'mixerChannelRouterLayout').dataset.petParameterKey, 'audio.channel.layout');
+assert.equal(findByDataset(channelPanel, 'mixerChannelLfeCrossoverRange').dataset.petParameterKey, 'audio.channel.lfe-crossover-hz');
+assert.equal(findByDataset(channelPanel, 'mixerChannelMatrixCell', '0').dataset.petParameterKey, 'audio.channel.matrix.1-l');
+const frontLeftStrip = findByDataset(channelPanel, 'mixerChannelStrip', 'FL');
+assert.equal(findByDataset(frontLeftStrip, 'mixerChannelRange', 'gainDb').dataset.petParameterKey, 'audio.channel.fl.gain-db');
+assert.equal(findByDataset(frontLeftStrip, 'mixerChannelNumber', 'gainDb').dataset.petParameterIgnoreReason, 'mirrored-number-input');
 assert.deepEqual(
   channelAlgorithm.children.map((option) => ({ value: option.value, disabled: option.disabled })),
   [

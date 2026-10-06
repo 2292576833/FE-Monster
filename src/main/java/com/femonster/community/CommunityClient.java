@@ -202,6 +202,21 @@ public interface CommunityClient {
         Map<String, Object> accountPayload
     );
 
+    /**
+     * Immutable account subject for local encrypted-memory partitioning.  This
+     * must not be a renameable FEID. Implementations may use a persisted,
+     * cryptographically random device-local account subject until the server
+     * subject is available; FEID-based aliases are never acceptable encrypted-
+     * memory identities.
+     */
+    default String localMemorySubject(
+        String provider,
+        String providerLabel,
+        Map<String, Object> accountPayload
+    ) {
+        return "";
+    }
+
     Map<String, Object> forgetPetMemory(
         String provider,
         String providerLabel,

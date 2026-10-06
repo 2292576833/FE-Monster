@@ -11,6 +11,7 @@ const requiredRoutes = [
   '"/api/netease/lyric"',
   '"/api/qq/lyric"',
   '"/api/kugou/lyric"',
+  '"/api/qishui/lyric"',
 ];
 
 for (const route of requiredRoutes) {
@@ -22,8 +23,11 @@ if (!routes.includes('context.music.lyricPayload(') || !routes.includes('provide
 if (!/function lyricSignatureForSong[\s\S]{0,260}playbackQualityProvider\(song\)/.test(app)) {
   throw new Error('Frontend lyric signature does not include the song provider');
 }
-if (!/apiJson\(`\/api\/lyric\?\$\{query\(\{\s*provider,\s*id,\s*title:[\s\S]{0,180}artist:[\s\S]{0,180}duration:/m.test(app)) {
+if (!/function requestLyricPayload\(provider, song[\s\S]{0,420}apiJson\(`\/api\/lyric\?\$\{query\(\{\s*provider,\s*id:\s*safeText\(song[\s\S]{0,180}title:[\s\S]{0,180}artist:[\s\S]{0,180}duration:/m.test(app)) {
   throw new Error('Frontend lyrics do not send provider, title, artist, and duration metadata');
+}
+if (!/const provider\s*=\s*playbackQualityProvider\(song\)[\s\S]{0,180}playbackLyricTimelineResolver\(\)\.resolve\(song, provider\)/m.test(app)) {
+  throw new Error('Frontend timeline resolution does not retain the playback provider identity');
 }
 for (const metadataParam of ['title', 'artist', 'duration']) {
   if (!routes.includes(`HttpUtil.param(query, "${metadataParam}"`)

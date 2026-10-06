@@ -8,19 +8,22 @@ final class BackendServer {
         case javaMissing
         case launchFailed(String)
         case readinessTimeout(String)
+        case invalidDevelopmentDataDirectory
 
         var errorDescription: String? {
             switch self {
             case .projectRootMissing:
-                return "找不到 FE Monster 资源目录。请设置 FE_MONSTER_ROOT。"
+                return "找不到完整的 FE Monster 资源目录。请重新安装应用，或在开发模式使用 --root 指定项目目录。"
             case .jarMissing:
-                return "找不到 fe-monster-java.jar。请设置 FE_MONSTER_JAR。"
+                return "找不到 fe-monster-java.jar。请重新安装完整应用，或使用 --jar 指定 Java 服务文件。"
             case .javaMissing:
-                return "找不到 Java 运行时。请设置 FE_MONSTER_JAVA。"
+                return "找不到 Java 运行时。请重新安装完整应用，或使用 --java 指定 Java 可执行文件。"
             case .launchFailed(let detail):
                 return "FE Monster Java 服务启动失败：\(detail)"
             case .readinessTimeout(let detail):
                 return "FE Monster Java 服务未在限定时间内就绪。\(detail)"
+            case .invalidDevelopmentDataDirectory:
+                return "开发数据目录必须是资源目录之外的绝对路径。请为 FE_MONSTER_DATA_DIR 设置单独的可写测试目录。"
             }
         }
     }
@@ -35,10 +38,22 @@ final class BackendServer {
     private var process: Process?
     private var outputPipe: Pipe?
     private var outputText = ""
+    private var pendingOutput = Data()
     private var runtimeBaseURL: URL
+    private var didDiscoverServerURL = false
     private var completion: ((Result<URL, Error>) -> Void)?
     private var completed = false
+    private var ready = false
     private var stopping = false
+    private var startupDeadline = Date.distantPast
+    var onUnexpectedExit: ((String) -> Void)?
+    private let localSession: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.connectionProxyDictionary = [:]
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.httpCookieStorage = nil
+        return URLSession(configuration: configuration)
+    }()
 
     init(options: ClientOptions) {
         self.options = options
@@ -55,13 +70,10 @@ final class BackendServer {
                 return
             }
 
-            self.probeHealth(at: self.runtimeBaseURL) { healthy in
-                if healthy {
-                    self.finish(.success(self.applicationURL(for: self.runtimeBaseURL)))
-                } else {
-                    self.launchJavaServer()
-                }
-            }
+            // Each client owns its Java process and an OS-assigned port. Reusing an
+            // arbitrary service on port 3000 can connect to an old installation or
+            // another user session, then accidentally stop it when this app closes.
+            self.launchJavaServer()
         }
     }
 
@@ -69,7 +81,7 @@ final class BackendServer {
     func stopSynchronously() {
         let snapshot: (URL, Process?, Bool) = queue.sync {
             stopping = true
-            return (runtimeBaseURL, process, options.startServer && options.isLoopbackServer)
+            return (runtimeBaseURL, process, process?.isRunning == true && didDiscoverServerURL)
         }
 
         if snapshot.2 {
@@ -120,6 +132,13 @@ final class BackendServer {
             finish(.failure(StartupError.javaMissing))
             return
         }
+        let dataDirectory: URL
+        do {
+            dataDirectory = try applicationSupportDirectory(in: root)
+        } catch {
+            finish(.failure(error))
+            return
+        }
 
         let process = Process()
         let pipe = Pipe()
@@ -136,12 +155,24 @@ final class BackendServer {
 
         var environment = ProcessInfo.processInfo.environment
         environment["FE_MONSTER_BIND"] = "127.0.0.1"
-        environment["FE_MONSTER_PORT"] = String(runtimeBaseURL.port ?? 3000)
+        environment["FE_MONSTER_PORT"] = "0"
         environment["FE_MONSTER_ROOT"] = root.path
-        environment["FE_MONSTER_WEB_ROOT"] =
-            environment["FE_MONSTER_WEB_ROOT"] ?? root.appendingPathComponent("web").path
-        environment["FE_MONSTER_DATA_DIR"] =
-            environment["FE_MONSTER_DATA_DIR"] ?? applicationSupportDirectory().path
+        environment["FE_MONSTER_WEB_ROOT"] = root.appendingPathComponent("web").path
+        environment["FE_MONSTER_DATA_DIR"] = dataDirectory.path
+        environment["FE_MONSTER_MAIN_PID"] = String(ProcessInfo.processInfo.processIdentifier)
+        if Bundle.main.bundleURL.pathExtension.lowercased() == "app" {
+            environment.removeValue(forKey: "FE_MONSTER_DEV")
+            environment.removeValue(forKey: "FE_MONSTER_COREAUDIO_LIBRARY")
+            environment["FE_MONSTER_BUNDLE_PATH"] = Bundle.main.bundleURL.resolvingSymlinksInPath().path
+        } else {
+            environment.removeValue(forKey: "FE_MONSTER_BUNDLE_PATH")
+        }
+        let bundledNode = root.appendingPathComponent("runtime/node/node")
+        if FileManager.default.isExecutableFile(atPath: bundledNode.path) {
+            environment["FE_MONSTER_NODE"] = bundledNode.path
+        } else if Bundle.main.bundleURL.pathExtension.lowercased() == "app" {
+            environment.removeValue(forKey: "FE_MONSTER_NODE")
+        }
         process.environment = environment
 
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
@@ -153,21 +184,28 @@ final class BackendServer {
         }
         process.terminationHandler = { [weak self] terminatedProcess in
             self?.queue.async {
-                guard let self, !self.stopping, !self.completed else { return }
-                self.finish(.failure(StartupError.launchFailed(
+                guard let self, !self.stopping else { return }
+                let error = StartupError.launchFailed(
                     "进程退出码 \(terminatedProcess.terminationStatus)。\(self.outputTail())"
-                )))
+                )
+                if !self.completed {
+                    self.finish(.failure(error))
+                } else if self.ready {
+                    let callback = self.onUnexpectedExit
+                    DispatchQueue.main.async { callback?(error.localizedDescription) }
+                }
             }
         }
 
         do {
             try FileManager.default.createDirectory(
-                at: applicationSupportDirectory(),
+                at: dataDirectory,
                 withIntermediateDirectories: true
             )
             try process.run()
             self.process = process
             outputPipe = pipe
+            startupDeadline = Date().addingTimeInterval(45)
             pollUntilReady(attempt: 0)
         } catch {
             pipe.fileHandleForReading.readabilityHandler = nil
@@ -177,15 +215,23 @@ final class BackendServer {
 
     private func pollUntilReady(attempt: Int) {
         guard !completed, !stopping else { return }
+        guard Date() < startupDeadline else {
+            finish(.failure(StartupError.readinessTimeout(outputTail())))
+            return
+        }
+        // Wait for the address printed by our child; never probe the default port
+        // before it is known, even if another FE Monster instance responds there.
+        guard didDiscoverServerURL else {
+            queue.asyncAfter(deadline: .now() + 0.15) {
+                self.pollUntilReady(attempt: attempt + 1)
+            }
+            return
+        }
         let baseURL = runtimeBaseURL
         probeHealth(at: baseURL) { healthy in
             guard !self.completed, !self.stopping else { return }
             if healthy {
                 self.finish(.success(self.applicationURL(for: baseURL)))
-                return
-            }
-            guard attempt < 79 else {
-                self.finish(.failure(StartupError.readinessTimeout(self.outputTail())))
                 return
             }
             self.queue.asyncAfter(deadline: .now() + 0.15) {
@@ -198,43 +244,80 @@ final class BackendServer {
         let healthURL = URL(string: "api/app/version", relativeTo: baseURL)!.absoluteURL
         var request = URLRequest(url: healthURL)
         request.timeoutInterval = 0.9
-        URLSession.shared.dataTask(with: request) { data, response, _ in
+        localSession.dataTask(with: request) { data, response, _ in
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-            var healthy = (200..<300).contains(status)
-            if healthy, let data,
-               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let ok = object["ok"] as? Bool {
-                healthy = ok
+            let object = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+            let healthy = (200..<300).contains(status)
+                && (object?["ok"] as? Bool) == true
+                && (object?["name"] as? String) == "FE Monster Java"
+                && !(object?["version"] as? String ?? "").isEmpty
+            guard healthy else {
+                self.queue.async { completion(false) }
+                return
             }
-            self.queue.async {
-                completion(healthy)
+            self.probeAppShell(at: baseURL) { ready in
+                self.queue.async { completion(ready) }
             }
         }.resume()
     }
 
+    private func probeAppShell(at baseURL: URL, completion: @escaping (Bool) -> Void) {
+        var request = URLRequest(url: baseURL)
+        request.timeoutInterval = 0.9
+        localSession.dataTask(with: request) { data, response, _ in
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let html = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+            completion((200..<300).contains(status) && html.contains("FE Monster") && html.contains("bootScreen"))
+        }.resume()
+    }
+
     private func consumeProcessOutput(_ data: Data) {
-        guard let text = String(data: data, encoding: .utf8) else { return }
-        outputText += text
+        pendingOutput.append(data)
+        // Read complete UTF-8 lines: a Pipe callback may split a multibyte Chinese
+        // character or the URL itself across chunks.
+        while let newline = pendingOutput.firstIndex(of: 0x0A) {
+            let line = String(decoding: pendingOutput.prefix(through: newline), as: UTF8.self)
+            pendingOutput.removeSubrange(...newline)
+            outputText += line
+            discoverServerURL(in: line)
+        }
+        if pendingOutput.count > 64_000 {
+            outputText += String(decoding: pendingOutput, as: UTF8.self)
+            pendingOutput.removeAll(keepingCapacity: true)
+        }
         if outputText.count > 32_000 {
             outputText = String(outputText.suffix(32_000))
         }
+    }
 
-        let pattern = #"URL:\s+(http://(?:127\.0\.0\.1|localhost|\[::1\]):\d+/)"#
+    private func discoverServerURL(in text: String) {
+        guard !didDiscoverServerURL else { return }
+        let pattern = #"^URL:\s+(http://(?:127\.0\.0\.1|localhost|\[::1\]):\d+/)\s*$"#
         guard let expression = try? NSRegularExpression(pattern: pattern),
               let match = expression.firstMatch(
-                in: outputText,
-                range: NSRange(outputText.startIndex..., in: outputText)
+                in: text,
+                range: NSRange(text.startIndex..., in: text)
               ),
-              let range = Range(match.range(at: 1), in: outputText),
-              let discoveredURL = URL(string: String(outputText[range])) else {
+              let range = Range(match.range(at: 1), in: text),
+              let discoveredURL = URL(string: String(text[range])),
+              let port = discoveredURL.port, (1...65535).contains(port) else {
             return
         }
         runtimeBaseURL = discoveredURL
+        didDiscoverServerURL = true
     }
 
     private func finish(_ result: Result<URL, Error>) {
-        guard !completed else { return }
+        guard !completed, !stopping else { return }
         completed = true
+        if case .success = result { ready = true }
+        if case .failure = result, let process, process.isRunning {
+            process.terminate()
+            // Keep cleanup tied to this exact child rather than a broad process name.
+            self.queue.asyncAfter(deadline: .now() + 1.5) {
+                if process.isRunning { Darwin.kill(process.processIdentifier, SIGKILL) }
+            }
+        }
         let callback = completion
         completion = nil
         DispatchQueue.main.async {
@@ -252,16 +335,18 @@ final class BackendServer {
 
     private func resolveProjectRoot() -> URL? {
         let fileManager = FileManager.default
-        let candidates: [URL?] = [
+        var candidates: [URL?] = [
             options.rootOverride,
-            Bundle.main.resourceURL?.appendingPathComponent("App", isDirectory: true),
-            URL(fileURLWithPath: fileManager.currentDirectoryPath, isDirectory: true)
+            Bundle.main.resourceURL?.appendingPathComponent("App", isDirectory: true)
         ]
+        if Bundle.main.bundleURL.pathExtension.lowercased() != "app" {
+            candidates.append(URL(fileURLWithPath: fileManager.currentDirectoryPath, isDirectory: true))
+        }
         for candidate in candidates.compactMap({ $0?.standardizedFileURL }) {
             let hasWeb = fileManager.fileExists(
-                atPath: candidate.appendingPathComponent("web", isDirectory: true).path
+                atPath: candidate.appendingPathComponent("web/index.html").path
             )
-            if hasWeb || resolveJar(in: candidate) != nil {
+            if hasWeb && resolveJar(in: candidate) != nil {
                 return candidate
             }
         }
@@ -320,7 +405,24 @@ final class BackendServer {
         return nil
     }
 
-    private func applicationSupportDirectory() -> URL {
+    private func applicationSupportDirectory(in root: URL) throws -> URL {
+        let environment = ProcessInfo.processInfo.environment
+        if Bundle.main.bundleURL.pathExtension.lowercased() != "app",
+           environment["FE_MONSTER_DEV"] == "1",
+           let requested = environment["FE_MONSTER_DATA_DIR"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !requested.isEmpty {
+            guard NSString(string: requested).isAbsolutePath else {
+                throw StartupError.invalidDevelopmentDataDirectory
+            }
+            let candidate = URL(fileURLWithPath: requested, isDirectory: true)
+                .standardizedFileURL.resolvingSymlinksInPath()
+            let resourceRoots = [root, Bundle.main.resourceURL].compactMap { $0 }
+                .map { $0.standardizedFileURL.resolvingSymlinksInPath().path }
+            guard !resourceRoots.contains(where: { candidate.path == $0 || candidate.path.hasPrefix($0 + "/") }) else {
+                throw StartupError.invalidDevelopmentDataDirectory
+            }
+            return candidate
+        }
         let base = FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask
@@ -335,7 +437,7 @@ final class BackendServer {
         var request = URLRequest(url: url)
         request.timeoutInterval = 1.0
         let semaphore = DispatchSemaphore(value: 0)
-        URLSession.shared.dataTask(with: request) { _, _, _ in
+        localSession.dataTask(with: request) { _, _, _ in
             semaphore.signal()
         }.resume()
         _ = semaphore.wait(timeout: .now() + 1.1)

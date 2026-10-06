@@ -133,21 +133,23 @@ const focusEchoEnd = css.indexOf('.playback-lyric-scene.is-rain-glass-text', foc
 const focusEchoRules = focusEchoStart >= 0 && focusEchoEnd > focusEchoStart
   ? css.slice(focusEchoStart, focusEchoEnd)
   : '';
-const focusEchoKeyframeStart = css.indexOf('@keyframes focusEchoConverge');
-const focusEchoKeyframeEnd = css.indexOf('.playback-lyric-scene.is-word-glow-text', focusEchoKeyframeStart);
-const focusEchoKeyframes = focusEchoKeyframeStart >= 0 && focusEchoKeyframeEnd > focusEchoKeyframeStart
-  ? css.slice(focusEchoKeyframeStart, focusEchoKeyframeEnd)
+const focusEchoRuntimeStart = app.indexOf('function startFocusEchoTransition');
+const focusEchoRuntimeEnd = app.indexOf('function syncFocusEchoTransition', focusEchoRuntimeStart);
+const focusEchoRuntime = focusEchoRuntimeStart >= 0 && focusEchoRuntimeEnd > focusEchoRuntimeStart
+  ? app.slice(focusEchoRuntimeStart, focusEchoRuntimeEnd)
   : '';
 
 check(
   'focus echo keeps the settled main phrase sharp while only the background echoes stay soft',
   !!focusEchoRules
-    && !!focusEchoKeyframes
+    && !!focusEchoRuntime
     && /is-focus-echo-text\s+\.lyric-depth-0\s*\{[\s\S]{0,680}filter\s*:\s*none[\s\S]{0,680}scale\(1\)/.test(focusEchoRules)
     && /playback-lyric-layer\.is-text-composer-layer-visible\s*\{[\s\S]{0,520}blur\(var\(--focus-echo-blur\)\)/.test(focusEchoRules)
-    && /0%\s*\{[\s\S]{0,260}blur\(15px\)[\s\S]{0,260}scale\(1\.62\)/.test(focusEchoKeyframes)
-    && /100%\s*\{[\s\S]{0,300}blur\(0(?:px)?\)[\s\S]{0,300}scale\(1\)/.test(focusEchoKeyframes),
-  'The stable main layer must be clear at 1x; blur/scale belong only to the entry and the dark background echoes.'
+    && !css.includes('@keyframes focusEchoConverge')
+    && /\.animate\(\[[\s\S]{0,2200}transform\s*:[\s\S]{0,2200}opacity\s*:/.test(focusEchoRuntime)
+    && /\.pause\(\)/.test(focusEchoRuntime)
+    && !/\bfilter\s*:|letterSpacing\s*:/.test(focusEchoRuntime),
+  'The stable main layer must stay clear at 1x; media-clock keyframes may animate only transform/opacity while static blur belongs to the dark background echoes.'
 );
 
 const failures = checks.filter((item) => !item.ok);

@@ -41,8 +41,8 @@ function run(command, args, options = {}) {
 
 const providers = [
   { id: 'netease', version: '4.32.0', file: 'FE-Monster-Netease-API-Plugin-4.32.0.zip', port: 41100 },
-  { id: 'qq', version: '2.4.1', file: 'FE-Monster-QQ-API-Plugin-2.4.1.zip', port: 41101 },
-  { id: 'kugou', version: '2.0.7', file: 'FE-Monster-Kugou-API-Plugin-2.0.7.zip', port: 41102 },
+  { id: 'qq', version: '2.4.2', file: 'FE-Monster-QQ-API-Plugin-2.4.2.zip', port: 41101 },
+  { id: 'kugou', version: '2.0.8', file: 'FE-Monster-Kugou-API-Plugin-2.0.8.zip', port: 41102 },
   { id: 'qishui', version: '3.1.1', file: 'FE-Monster-Qishui-OpenAPI-Plugin-3.1.1.zip', port: 41103 }
 ];
 

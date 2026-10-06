@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, join, resolve } from 'node:path';
+import { basename, delimiter, join, resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 const powershell = process.env.SystemRoot
@@ -113,6 +113,26 @@ const manifest = execFileSync(jar, ['--describe-module', '--file', join(root, 'o
   encoding: 'utf8',
 });
 assert.match(manifest, /com\.femonster/, 'built application jar must remain inspectable');
+const accountScopeProbeRoot = mkdtempSync(join(tmpdir(), 'fe-monster-account-scope-'));
+try {
+  const probeClasses = join(accountScopeProbeRoot, 'classes');
+  mkdirSync(probeClasses, { recursive: true });
+  const applicationJar = join(root, 'out', 'fe-monster-java.jar');
+  execFileSync(javac, [
+    '-encoding', 'UTF-8', '--release', '17',
+    '-cp', applicationJar,
+    '-d', probeClasses,
+    join(root, 'src', 'test', 'java', 'com', 'femonster', 'core', 'CommunityAccountProfileStoreProbe.java'),
+  ], { cwd: root, encoding: 'utf8' });
+  const probeOutput = execFileSync(java, [
+    '-cp', `${probeClasses}${delimiter}${applicationJar}`,
+    'com.femonster.core.CommunityAccountProfileStoreProbe',
+  ], { cwd: root, encoding: 'utf8' });
+  assert.match(probeOutput, /CommunityAccountProfileStoreProbe passed/,
+    'offline account memory subjects are not stable and isolated');
+} finally {
+  rmSync(accountScopeProbeRoot, { recursive: true, force: true });
+}
 for (const artifact of artifacts) {
   const staged = join(root, 'out', 'lib', artifact.file);
   assert.ok(existsSync(staged), `missing staged artifact ${artifact.file}`);

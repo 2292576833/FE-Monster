@@ -7,6 +7,12 @@
 
 #define FE_AUDIO_PIPELINE_ABI_VERSION 4u
 
+// DSP tuning contract.  OBR keeps the native 256-frame render quantum for
+// XAudio2 scheduling; its analysis target and the Rust passive-upmix STFT are
+// declared separately so changing UI parameters never changes the queue
+// cadence.
+#define FE_AUDIO_OBR_SAMPLE_POINTS 8192u
+
 #if defined(_WIN32)
 #define FE_AUDIO_PIPELINE_API __declspec(dllexport)
 #else
@@ -228,9 +234,42 @@ FE_AUDIO_PIPELINE_API int32_t fe_audio_pipeline_submit(
     uint32_t frame_count
 );
 
+// Additive timeline contract: no existing ABI structure or export changes.
+// Initialize exactly once before publication. UINT64_MAX means unsequenced
+// for submit; numbered retries return their previous result without requeueing.
+FE_AUDIO_PIPELINE_API int32_t fe_audio_pipeline_initialize_generation(
+    FeAudioPipelineHandle handle,
+    uint64_t generation
+);
+
+FE_AUDIO_PIPELINE_API int32_t fe_audio_pipeline_submit_generation(
+    FeAudioPipelineHandle handle,
+    const float* interleaved_pcm,
+    uint32_t frame_count,
+    uint64_t generation,
+    uint64_t sequence
+);
+
+FE_AUDIO_PIPELINE_API int32_t fe_audio_pipeline_reset_timeline_generation(
+    FeAudioPipelineHandle handle,
+    uint64_t expected_generation,
+    uint64_t next_generation
+);
+
 FE_AUDIO_PIPELINE_API int32_t fe_audio_pipeline_set_muted(
     FeAudioPipelineHandle handle,
     uint32_t muted
+);
+
+// Ordered, expiring output ownership used by the browser/native handoff.
+FE_AUDIO_PIPELINE_API int32_t fe_audio_pipeline_set_output_gain(
+    FeAudioPipelineHandle handle, uint64_t generation, uint64_t sequence,
+    float gain, int64_t expires_at_unix_ms
+);
+
+FE_AUDIO_PIPELINE_API int32_t fe_audio_pipeline_renew_output_gain_lease(
+    FeAudioPipelineHandle handle, uint64_t generation, uint64_t sequence,
+    int64_t expires_at_unix_ms
 );
 
 // Starts a new media timeline without rebuilding the Mixer/spatial graph.

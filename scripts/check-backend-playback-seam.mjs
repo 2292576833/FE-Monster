@@ -126,7 +126,7 @@ try {
           && !stateMethod.includes('music.songUrl(')
           && !stateMethod.includes('load('),
       browserStatePollDoesNotReload:
-        refreshPlayerState.includes("apiJson('/api/player/state')")
+        /apiJson\(['"]\/api\/player\/state['"]\s*(?:,|\))/.test(refreshPlayerState)
           && !refreshPlayerState.includes('/api/player/load')
           && !refreshPlayerState.includes('loadSong('),
       urlRenewalBelongsToFrontendRecovery:

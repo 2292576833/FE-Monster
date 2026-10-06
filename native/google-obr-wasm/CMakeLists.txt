@@ -49,10 +49,33 @@ add_library(pffft STATIC "${pffft_source_SOURCE_DIR}/pffft.c")
 target_include_directories(pffft PUBLIC "${pffft_source_SOURCE_DIR}")
 target_compile_options(pffft PRIVATE -O3 -msimd128)
 
+# Keep the WebAssembly/native OBR builds on the same 8192-point analysis FFT
+# while retaining the host's small realtime render quantum.  This generated
+# copy is deliberately outside the pinned checkout.
+set(FE_OBR_FFT_MANAGER_SOURCE
+  "${CMAKE_CURRENT_BINARY_DIR}/fe_obr_fft_manager_8192.cc"
+)
+file(READ
+  "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/fft_manager.cc"
+  FE_OBR_FFT_MANAGER_TEXT
+)
+string(REPLACE
+  "NextPowTwo(frames_per_buffer) * 2"
+  "8192"
+  FE_OBR_FFT_MANAGER_TEXT
+  "${FE_OBR_FFT_MANAGER_TEXT}"
+)
+set(FE_OBR_FFT_NEEDLE "NextPowTwo(frames_per_buffer) * 2")
+string(FIND "${FE_OBR_FFT_MANAGER_TEXT}" "${FE_OBR_FFT_NEEDLE}" FE_OBR_FFT_NEEDLE_POSITION)
+if(FE_OBR_FFT_NEEDLE_POSITION GREATER_EQUAL 0)
+  message(FATAL_ERROR "Unable to apply the 8192-point OBR FFT tuning")
+endif()
+file(WRITE "${FE_OBR_FFT_MANAGER_SOURCE}" "${FE_OBR_FFT_MANAGER_TEXT}")
+
 set(OBR_CORE_SOURCES
   "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/ambisonic_binaural_decoder.cc"
   "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/dsp_utils.cc"
-  "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/fft_manager.cc"
+  "${FE_OBR_FFT_MANAGER_SOURCE}"
   "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/partitioned_fft_filter.cc"
   "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/planar_interleaved_conversion.cc"
   "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/resampler.cc"

@@ -47,6 +47,20 @@ const checks = {
     && /const sheetTime = cover\.waveTime;/.test(coverRegion)
     && /const particleFloatTime = cover\.waveTime \* coverParticleFloatSpeedScale\(\);/.test(coverRegion)
     && /const particleFloat = Math\.sin\(particleFloatTime \* particle\.floatRate \+ particle\.floatPhase\);/.test(coverRegion),
+  imageMotionModesGpuCpuParity: /uniform float uImageMotionMode;/.test(coverRegion)
+    && /dissolveSignal = sin\(/.test(coverRegion)
+    && /source\.xy \+= dissolveOffset \* uImageMotionMode;/.test(coverRegion)
+    && /source\.z \+= dissolveDepth \* uImageMotionMode;/.test(coverRegion)
+    && /varying float vDissolve;/.test(coverRegion)
+    && /float dissolveMask = mix\(1\.0, smoothstep\(/.test(coverRegion)
+    && /const dissolveMode = cover\.imageMotionMode === 'dissolve';/.test(coverRegion)
+    && /const dissolveSignal = Math\.sin\(/.test(coverRegion)
+    && /const motionSourceX = sourceX \+ \(dissolveMode \? dissolveOffsetX : 0\);/.test(coverRegion)
+    && /if \(dissolveMode\) alpha \*= smoothstep\(/.test(coverRegion),
+  imageMotionControl: /id="coverImageMotionMode" data-cover-setting="imageMotionMode"/.test(html)
+    && /option value="parallax"/.test(html)
+    && /option value="dissolve"/.test(html)
+    && /input\.tagName === 'SELECT'/.test(app),
   floatSpeedDoesNotDriveWholeSheet: !/sheetTime\s*=\s*(?:uTime|cover\.waveTime)\s*\*\s*(?:uFloatSpeed|coverParticleFloatSpeedScale\(\))/.test(coverRegion),
   lowFrequencyWholeCoverJump: /uniform float uWholeJump;/.test(coverRegion)
     && /const lowFrequencyTarget = audioActive/.test(coverRegion)
@@ -65,8 +79,8 @@ const checks = {
     && /uniform float uBassJitter;/.test(coverRegion)
     && /uniforms\.uBassJitter\.value = cover\.bassJitter;/.test(coverRegion)
     && /source\.xy \+= bassJitterOffset;/.test(coverRegion)
-    && /const jitteredSourceX = sourceX \+ bassJitterX;/.test(coverRegion)
-    && /const jitteredSourceY = flowedSourceY \+ bassJitterY;/.test(coverRegion),
+    && /const jitteredSourceX = motionSourceX \+ bassJitterX;/.test(coverRegion)
+    && /const jitteredSourceY = motionSourceY \+ bassJitterY;/.test(coverRegion),
   independentJitterPhaseDirectionAndRate: /jitterDirectionX:\s*driftX,/.test(coverRegion)
     && /jitterDirectionY:\s*driftY,/.test(coverRegion)
     && /jitterRate:\s*COVER_PARTICLE_BASS_JITTER_BASE_RATE/.test(coverRegion)
@@ -90,6 +104,12 @@ const checks = {
   smoothAttackAndRelease: /gateTarget > cover\.motionGate \? 260 : 420/.test(coverRegion)
     && /cover\.motionGate \+= \(gateTarget - cover\.motionGate\) \* gateRate;/.test(coverRegion),
   phasePausesWithoutMusic: /if \(audioActive\) cover\.waveTime \+= envelopeStepMs \/ 1000 \* 0\.72;/.test(coverRegion),
+  idleCoverKeepsMoving: /function coverParticleIdleMotionGate\(\)/.test(app)
+    && /coverParticleIdleMotionGate\(\) > 0/.test(coverRegion)
+    && /Math\.max\(cover\.motionGate, coverParticleIdleMotionGate\(\)\)/.test(coverRegion)
+    && /COVER_PARTICLE_IDLE_MOTION_GATE/.test(coverRegion)
+    && /coverParticleIdleMotionGate\(\) > 0/.test(app.slice(app.indexOf("function coverParticleNeedsContinuousFrame")))
+    && /if \(!activeMotion && coverParticleIdleMotionGate\(\) > 0\)[\s\S]*?1000 \/ 30/.test(app),
   noShockwaveState: !/shockAge|shockStrength|shockCooldown|shockArmed|lastShockDrive|lastBassInput/.test(coverRegion),
   stableCpuFallbackHotPath: /renderFrame:\s*\{\s*canvas:\s*null,/.test(app)
     && /const frame = state\.coverParticle\.renderFrame;/.test(coverRegion)

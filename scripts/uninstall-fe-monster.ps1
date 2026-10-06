@@ -28,27 +28,58 @@ function Enter-InstallMutationLock {
   } finally {
     $sha.Dispose()
   }
-  $lockDirectory = Join-Path $Env:LOCALAPPDATA 'FE Monster Setup\Locks'
-  New-Item -ItemType Directory -Path $lockDirectory -Force | Out-Null
-  $lockPath = Join-Path $lockDirectory ($hash.Substring(0, 32) + '.lock')
-  try {
-    $stream = [System.IO.File]::Open(
-      $lockPath,
-      [System.IO.FileMode]::OpenOrCreate,
-      [System.IO.FileAccess]::ReadWrite,
-      [System.IO.FileShare]::None
-    )
-  } catch {
-    throw "Another FE Monster install, update, or uninstall is already changing $Path"
+  $lockName = $hash.Substring(0, 32) + '.lock'
+  $installParent = Split-Path -Parent (Resolve-FullPath $Path)
+  $anchorDirectory = Join-Path $installParent '.fe-monster-setup-locks'
+  $lockDirectories = @(
+    $anchorDirectory,
+    (Join-Path $Env:LOCALAPPDATA 'FE Monster Setup\Locks')
+  ) | Select-Object -Unique
+  $heldLocks = [Collections.Generic.List[object]]::new()
+  foreach ($lockDirectory in $lockDirectories) {
+    $stream = $null
+    $lockPath = Join-Path $lockDirectory $lockName
+    try {
+      New-Item -ItemType Directory -Path $lockDirectory -Force | Out-Null
+      $stream = [System.IO.File]::Open(
+        $lockPath,
+        [System.IO.FileMode]::OpenOrCreate,
+        [System.IO.FileAccess]::ReadWrite,
+        [System.IO.FileShare]::None
+      )
+      $stream.SetLength(0)
+      $probe = [System.Text.Encoding]::ASCII.GetBytes("FE Monster setup lock`n")
+      $stream.Write($probe, 0, $probe.Length)
+      $stream.Flush($true)
+      $heldLocks.Add([pscustomobject]@{ Stream = $stream; Path = $lockPath })
+    } catch {
+      $lastError = $_.Exception
+      if ($null -ne $stream) { try { $stream.Dispose() } catch {} }
+      # Always share the target-parent anchor with setup. Keep the old per-user
+      # lock for older installers when that directory is available.
+      $nativeError = $lastError.GetBaseException().HResult -band 0xFFFF
+      if ($lockDirectory -eq $anchorDirectory -or $nativeError -in @(32, 33)) {
+        foreach ($heldLock in $heldLocks) { try { $heldLock.Stream.Dispose() } catch {} }
+        throw "Another FE Monster install, update, or uninstall is already changing $Path, or its setup lock is unavailable. $($lastError.Message)"
+      }
+    }
   }
-  return [pscustomobject]@{ Stream = $stream; Path = $lockPath }
+  return [pscustomobject]@{ Path = $heldLocks[0].Path; Locks = $heldLocks.ToArray() }
 }
 
 function Exit-InstallMutationLock {
   param([object]$Lock)
   if ($null -eq $Lock) { return }
-  try { $Lock.Stream.Dispose() } catch {}
-  try { Remove-Item -LiteralPath $Lock.Path -Force -ErrorAction SilentlyContinue } catch {}
+  foreach ($heldLock in @($Lock.Locks)) {
+    try { $heldLock.Stream.Dispose() } catch {}
+    try { Remove-Item -LiteralPath $heldLock.Path -Force -ErrorAction SilentlyContinue } catch {}
+  }
+  try {
+    $parent = Split-Path -Parent $Lock.Path
+    if ((Split-Path -Leaf $parent) -eq '.fe-monster-setup-locks') {
+      [IO.Directory]::Delete($parent, $false)
+    }
+  } catch {}
 }
 
 function Test-PathSameOrAncestor {

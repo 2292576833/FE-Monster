@@ -25,6 +25,15 @@ public interface LocalMemoryStore extends AutoCloseable {
 
     List<AppendResult> appendKnowledge(List<LocalMemoryEvent> events);
 
+    /** Internal-only trusted personalization path; browser event ingress cannot select it. */
+    boolean appendTrustedPersonalization(String scope, java.util.Map<String, Object> projection);
+
+    /** Returns only a producer-authenticated internal personalization snapshot. */
+    java.util.Map<String, Object> trustedPersonalization(String scope);
+
+    /** Internal-only tombstone for the fixed trusted personalization record. */
+    boolean forgetTrustedPersonalization(String scope);
+
     Page queryChats(Query query);
 
     Page queryOperations(Query query);
@@ -85,8 +94,14 @@ public interface LocalMemoryStore extends AutoCloseable {
         Set<String> types,
         int limit,
         Cursor before,
-        String text
+        String text,
+        String conversationId,
+        String traceId,
+        String operationId
     ) {
+        public Query(String scope, Set<String> types, int limit, Cursor before, String text) {
+            this(scope, types, limit, before, text, null, null, null);
+        }
         public Query {
             scope = Bounds.scope(scope);
             types = Bounds.types(types, true);
@@ -95,10 +110,16 @@ public interface LocalMemoryStore extends AutoCloseable {
                 Bounds.text(text, 32_768, false);
                 if (text.isBlank()) text = null;
             }
+            conversationId = conversationId == null ? null : Bounds.identifier(conversationId);
+            traceId = traceId == null ? null : Bounds.identifier(traceId);
+            operationId = operationId == null ? null : Bounds.identifier(operationId);
         }
 
         public void requireStream(MemorySanitizer.Stream stream) {
             Bounds.requireTypesForStream(types, stream);
+            if (conversationId != null && stream != MemorySanitizer.Stream.CHAT) throw Bounds.invalid();
+            if ((operationId != null) && stream != MemorySanitizer.Stream.OPERATION) throw Bounds.invalid();
+            if (traceId != null && stream == MemorySanitizer.Stream.KNOWLEDGE) throw Bounds.invalid();
         }
     }
 

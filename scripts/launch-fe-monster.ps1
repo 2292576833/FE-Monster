@@ -13,7 +13,6 @@ $outDir = Join-Path $rootPath 'out'
 $logFile = Join-Path $outDir 'launch.log'
 $buildLogFile = Join-Path $outDir 'launch-build.log'
 $mainExecutable = Join-Path $rootPath 'native\windows\build\winforms\FE Monster.exe'
-$javaJar = Join-Path $rootPath 'out\fe-monster-java.jar'
 
 function Write-Log {
   param([string]$Message)
@@ -39,6 +38,9 @@ function Show-VisibleError {
 
 try {
   . (Join-Path $rootPath 'scripts\windows-no-console-process.ps1')
+  . (Join-Path $rootPath 'scripts\java-build-artifacts.ps1')
+  $javaJar = Resolve-JavaRunJar -Root $rootPath
+  if ([string]::IsNullOrWhiteSpace($javaJar)) { $javaJar = Join-Path $rootPath 'out\fe-monster-java.jar' }
   Write-Log 'Legacy launcher delegated to the named FE Monster host.'
 
   if (!(Test-Path -LiteralPath $javaJar -PathType Leaf)) {
@@ -60,6 +62,8 @@ try {
       -Wait `
       -CaptureOutput `
       -LogPath $buildLogFile
+    $javaJar = Resolve-JavaRunJar -Root $rootPath
+    if ([string]::IsNullOrWhiteSpace($javaJar)) { $javaJar = Join-Path $rootPath 'out\fe-monster-java.jar' }
     if ($javaBuild.ExitCode -ne 0 -or !(Test-Path -LiteralPath $javaJar -PathType Leaf)) {
       throw "FE Monster Java backend build failed with exit code $($javaBuild.ExitCode). See $buildLogFile"
     }

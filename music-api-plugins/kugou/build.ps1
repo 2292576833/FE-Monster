@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$pluginVersion = "2.0.7"
+$pluginVersion = "2.0.8"
 $upstreamVersion = "1.5.1"
 $upstreamCommit = "283f1e97b110726b208a64b486a657c0fc0a6126"
 
@@ -36,15 +36,30 @@ try {
 
   $entryPath = Join-Path $pluginRoot "src\server-entry.cjs"
   $bundlePath = Join-Path $packageRoot "server.cjs"
-  & npx.cmd --yes --package esbuild@0.28.1 esbuild $entryPath `
-    --bundle `
-    --platform=node `
-    --format=cjs `
-    --target=node18 `
-    --legal-comments=eof `
-    "--outfile=$bundlePath"
-  if ($LASTEXITCODE -ne 0) {
-    throw "esbuild failed to bundle the Kugou API plugin."
+  $nodeCommand = Get-Command node.exe -ErrorAction Stop
+  $npxCommand = Get-Command npx.cmd -ErrorAction Stop
+  $originalPath = $Env:Path
+  try {
+    # cmd.exe drops an overlong PATH instead of searching it. npx launches
+    # package shims through cmd.exe, so use a bounded build-tool PATH here;
+    # otherwise machines with a large developer PATH fail before esbuild runs.
+    $nodeDirectory = Split-Path -Parent $nodeCommand.Source
+    $systemDirectory = [Environment]::GetFolderPath([Environment+SpecialFolder]::System)
+    $Env:Path = (@($nodeDirectory, $systemDirectory) `
+      | Where-Object { ![string]::IsNullOrWhiteSpace($_) } `
+      | Select-Object -Unique) -join ';'
+    & $npxCommand.Source --yes --package esbuild@0.28.1 esbuild $entryPath `
+      --bundle `
+      --platform=node `
+      --format=cjs `
+      --target=node18 `
+      --legal-comments=eof `
+      "--outfile=$bundlePath"
+    if ($LASTEXITCODE -ne 0) {
+      throw "esbuild failed to bundle the Kugou API plugin."
+    }
+  } finally {
+    $Env:Path = $originalPath
   }
 
   foreach ($name in @("music-api-package.json", "LICENSE", "THIRD-PARTY-NOTICES.md", "README.md")) {

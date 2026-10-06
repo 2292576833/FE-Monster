@@ -1,0 +1,70 @@
+import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { delimiter, join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
+
+const root = process.cwd();
+const read = (file) => readFileSync(join(root, file), 'utf8');
+const service = read('src/main/java/com/femonster/memory/LocalAiMemoryService.java');
+const module = read('src/main/java/com/femonster/api/LocalMemoryHttpModule.java');
+const routes = read('src/main/java/com/femonster/api/ApiRoutes.java');
+const guard = read('src/main/java/com/femonster/api/LocalPetAssistantGuard.java');
+const app = read('src/main/java/com/femonster/core/AppContext.java');
+const community = read('src/community-proprietary/java/com/femonster/core/CommunityService.java');
+
+for (const route of ['health', 'events', 'chats', 'operations', 'trace', 'context', 'forget', 'backup', 'restore']) {
+  assert.match(module, new RegExp(`/api/local-memory/${route}`), `missing local-memory ${route} route`);
+}
+assert.match(routes, /localMemoryHttpModule\.tryHandle\(exchange\)/);
+assert.match(routes, /localMemoryHttpModule\.tryHandle\(exchange\)/);
+assert.match(module, /LocalPetAssistantGuard\.requireLocalMemory\(exchange\)/);
+assert.match(guard, /isLoopbackAddress\(\)/);
+assert.match(guard, /same-origin/);
+assert.match(module, /MAX_JSON_BYTES = 1024 \* 1024/);
+assert.match(module, /MAX_RESTORE_BYTES = 64L \* 1024 \* 1024/);
+assert.match(module, /readNBytes\(maximum \+ 1\)/);
+assert.match(module, /count > maximum/);
+assert.match(module, /Cache-Control", "no-store/);
+assert.match(module, /case CONFLICT -> 409; case LOCKED -> 423; case FULL, TOO_LARGE -> 507; case BUSY, UNAVAILABLE -> 503; case INTEGRITY, RESTORE_INVALID -> 422/);
+assert.match(module, /body\.put\("chats"[\s\S]*body\.put\("operations"/);
+assert.doesNotMatch(module, /"timeline"/);
+assert.match(service, /ANONYMOUS_SCOPE/);
+assert.match(service, /community\.localMemorySubject\(/);
+assert.doesNotMatch(service, /feId|accountId|scopeFromBrowser/i);
+assert.match(community, /memoryBinding\(serverMemorySubject\)/);
+assert.match(community, /membind_v1_/);
+assert.doesNotMatch(community, /return providerId \+ "\\n" \+ platformUserId/);
+assert.match(service, /storeDirectory\(scope\)/);
+assert.match(service, /local-ai-memory:account:v1:/);
+assert.match(service, /MessageDigest\.getInstance\("SHA-256"\)/);
+assert.match(app, /localAiMemory/, 'AppContext does not own the encrypted-memory lifecycle');
+assert.match(app, /closeService\("localAiMemory"/, 'memory store must close before dependent services');
+assert.match(module, /requireOnly\(root, Set\.of\("provider", "event", "events"\)\)/);
+assert.match(module, /requireOnly\(root, Set\.of\("provider", "stream", "eventIds"/);
+const powershell = process.env.SystemRoot ? join(process.env.SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe') : 'powershell.exe';
+const build = spawnSync(powershell, ['-NoProfile', '-File', join(root, 'scripts', 'build-java.ps1')], { cwd: root, encoding: 'utf8', timeout: 180000 });
+assert.equal(build.status, 0, `build failed:\n${build.stdout}\n${build.stderr}`);
+const jdk = String(build.stdout).match(/Using JDK:\s*(.+)\r?$/m)?.[1]?.trim();
+assert.ok(jdk, 'build did not report JDK');
+const classes = mkdtempSync(join(tmpdir(), 'fe-memory-service-probe-'));
+try {
+  const jar = join(root, 'out', 'fe-monster-java.jar');
+  const libs = readdirSync(join(root, 'out', 'lib')).filter((name) => name.endsWith('.jar')).map((name) => join(root, 'out', 'lib', name));
+  const cp = [jar, ...libs].join(delimiter);
+  const probe = join(root, 'src', 'test', 'java', 'com', 'femonster', 'memory', 'LocalAiMemoryServiceProbe.java');
+  const httpProbe = join(root, 'src', 'test', 'java', 'com', 'femonster', 'api', 'LocalMemoryHttpModuleProbe.java');
+  const migrationProbe = join(root, 'src', 'test', 'java', 'com', 'femonster', 'core', 'PersonalizationMigrationProbe.java');
+  const compile = spawnSync(join(jdk, 'bin', 'javac.exe'), ['-encoding', 'UTF-8', '--release', '17', '-cp', cp, '-d', classes, probe, httpProbe, migrationProbe], { cwd: root, encoding: 'utf8', timeout: 120000 });
+  assert.equal(compile.status, 0, `service probe compile failed:\n${compile.stdout}\n${compile.stderr}`);
+  const run = spawnSync(join(jdk, 'bin', 'java.exe'), ['-cp', [classes, jar, ...libs].join(delimiter), 'com.femonster.memory.LocalAiMemoryServiceProbe'], { cwd: root, encoding: 'utf8', timeout: 120000 });
+  assert.equal(run.status, 0, `service probe failed:\n${run.stdout}\n${run.stderr}`);
+  assert.match(`${run.stdout}${run.stderr}`, /LocalAiMemoryServiceProbe passed/);
+  const httpRun = spawnSync(join(jdk, 'bin', 'java.exe'), ['-cp', [classes, jar, ...libs].join(delimiter), 'com.femonster.api.LocalMemoryHttpModuleProbe'], { cwd: root, encoding: 'utf8', timeout: 120000 });
+  assert.equal(httpRun.status, 0, `HTTP probe failed:\n${httpRun.stdout}\n${httpRun.stderr}`);
+  assert.match(`${httpRun.stdout}${httpRun.stderr}`, /LocalMemoryHttpModuleProbe passed/);
+  const migrationRun = spawnSync(join(jdk, 'bin', 'java.exe'), ['-cp', [classes, jar, ...libs].join(delimiter), 'com.femonster.core.PersonalizationMigrationProbe'], { cwd: root, encoding: 'utf8', timeout: 120000 });
+  assert.equal(migrationRun.status, 0, `migration probe failed:\n${migrationRun.stdout}\n${migrationRun.stderr}`);
+  assert.match(`${migrationRun.stdout}${migrationRun.stderr}`, /PersonalizationMigrationProbe passed/);
+} finally { rmSync(classes, { recursive: true, force: true }); }
+console.log(JSON.stringify({ ok: true, routes: 9, bodyLimit: '1 MiB', restoreLimit: '64 MiB', migration: 'encrypted commit before plaintext deletion' }, null, 2));

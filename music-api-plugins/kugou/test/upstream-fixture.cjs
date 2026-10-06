@@ -465,7 +465,9 @@ function lyricFixture(params) {
     cookie: [],
     body: {
       status: 200,
-      decodeContent: "[00:00.00]fixture lyric\n[00:01.00]fixture line"
+      decodeContent: params?.fmt === "krc"
+        ? "[0,1000]<0,500,0>fixture <500,500,0>lyric\n[1000,1000]<0,1000,0>fixture line"
+        : "[00:00.00]fixture lyric\n[00:01.00]fixture line"
     }
   });
 }

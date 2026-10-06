@@ -1,9 +1,12 @@
 package com.femonster.core;
 
+import com.femonster.json.SimpleJson;
+
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +16,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
+import java.security.MessageDigest;
 
 public final class NativeAudioEngine {
     private static final int NATIVE_SAMPLE_HEADER_SIZE = 5;
@@ -30,6 +34,7 @@ public final class NativeAudioEngine {
 
     private final Path dllPath;
     private final boolean windows;
+    private final boolean macos;
     private boolean nativeLibraryLoaded;
     private boolean available;
     private String status = "not-loaded";
@@ -38,6 +43,9 @@ public final class NativeAudioEngine {
     private long activeSpatialSession = 0;
     private long spatialGenerationCounter = 0;
     private long activeSpatialGeneration = 0;
+    private long spatialGainSequence = 0;
+    private double spatialOutputGain = 0;
+    private long spatialGainLeaseExpiresAt = 0;
     private int spatialInputChannels = 0;
     private int spatialSampleRate = 0;
     private long activeSpatialLastSequence = -1;
@@ -74,7 +82,9 @@ public final class NativeAudioEngine {
     );
 
     public NativeAudioEngine(ProjectPaths paths) {
-        this.windows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        this.windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("windows");
+        String operatingSystem = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        this.macos = operatingSystem.contains("mac") || operatingSystem.contains("darwin");
         this.dllPath = resolveDll(paths);
         load();
     }
@@ -86,18 +96,19 @@ public final class NativeAudioEngine {
         NativeSample sample = sample(false);
         body.put("requested", true);
         body.put("active", available);
-        body.put("backend", available ? "xaudio2" : "html-audio-fallback");
-        body.put("spatialBackend", windows ? "x3daudio" : "web-audio-panner");
+        body.put("backend", available ? (macos ? "coreaudio" : "xaudio2") : "html-audio-fallback");
+        body.put("spatialBackend", macos ? "google-obr" : (windows ? "x3daudio" : "web-audio-panner"));
         body.put("decoder", windows ? "media-foundation" : "webkit-media");
-        body.put("sampleSource", sample.active ? "xaudio2-native-loopback" : "inactive");
+        body.put("sampleSource", sample.active ? nativeSampleSource() : "inactive");
         body.put("captureRunning", sample.captureRunning);
         body.put("sampleRate", sample.sampleRate);
         body.put("lowFrequencyAmplitude", sample.lowFrequencyAmplitude);
         body.put("lowFrequencyBands", sample.lowFrequencyBands);
-        body.put("dll", windows ? dllPath.toString() : "");
+        body.put("dll", windows || macos ? dllPath.toString() : "");
         body.put("status", status);
         body.put("error", error);
         body.put("windows", windows);
+        body.put("macos", macos);
         body.put("spatialStreaming", available);
         body.put("spatialPipeline", spatialPayload());
         return body;
@@ -105,6 +116,26 @@ public final class NativeAudioEngine {
 
     public synchronized boolean available() {
         return available;
+    }
+
+    // ScreenCaptureKit runs in the Swift host process. This bounded PCM bridge
+    // feeds native visual analysis only; captured system output is never queued
+    // for playback, which would create an audible feedback loop.
+    public synchronized int submitExternalCapturePcm(ByteBuffer pcm, int frames, int channels, int sampleRate) {
+        if (!macos || !available) return -3;
+        if (pcm == null || !pcm.isDirect() || pcm.position() != 0
+            || frames < 1 || frames > 4096 || channels < 1 || channels > 2
+            || sampleRate < 8000 || sampleRate > 192000
+            || pcm.remaining() != frames * channels * Float.BYTES) return -1;
+        try {
+            return nativeSubmitCapturePcm(pcm, frames, channels, sampleRate);
+        } catch (UnsatisfiedLinkError | SecurityException failure) {
+            return -3;
+        }
+    }
+
+    private String nativeSampleSource() {
+        return macos ? "coreaudio-pcm-screencapturekit" : "xaudio2-native-loopback";
     }
 
     private static void validateMixerParameters(long revision, int flags, float[] values) {
@@ -487,7 +518,7 @@ public final class NativeAudioEngine {
         int virtualLayoutChannels,
         int upmixAlgorithm
     ) {
-        if (!available) return spatialError("native XAudio2 bridge is unavailable");
+        if (!available) return spatialError("native audio bridge is unavailable");
         if (sampleRate < 16000 || sampleRate > 192000) return spatialError("invalid PCM sample rate");
         if (inputChannels != 1 && inputChannels != 2) return spatialError("native spatial input must be mono or stereo");
         if (virtualLayoutChannels != 6 && virtualLayoutChannels != 8) {
@@ -507,7 +538,7 @@ public final class NativeAudioEngine {
         } catch (UnsatisfiedLinkError | SecurityException failure) {
             return spatialError(failure.getMessage());
         }
-        if (!configured) return spatialError("unable to initialize Rust/X3DAudio/OBR pipeline");
+        if (!configured) return spatialError("unable to initialize native Rust/OBR pipeline");
 
         spatialSampleRate = sampleRate;
         // Desired mixer state is service-owned and cached even while no
@@ -525,10 +556,30 @@ public final class NativeAudioEngine {
             );
         }
 
+        long nextGeneration = ++spatialGenerationCounter;
+        try {
+            if (nativeInitializeSpatialGeneration(nextGeneration) < 0) {
+                stopSpatialStreamInternal();
+                return spatialError("unable to initialize native PCM generation");
+            }
+        } catch (UnsatisfiedLinkError | SecurityException failure) {
+            // Older DLLs lack the atomic generation seam. Keep the browser's
+            // direct fallback instead of publishing an unsafe native session.
+            stopSpatialStreamInternal();
+            return spatialError("native PCM generation support unavailable: " + failure.getMessage());
+        }
         activeSpatialSession = ++spatialSessionCounter;
-        activeSpatialGeneration = ++spatialGenerationCounter;
+        activeSpatialGeneration = nextGeneration;
         spatialInputChannels = inputChannels;
         activeSpatialLastSequence = -1;
+        // Verify the expiring gain seam before publishing a usable stream.
+        Map<String, Object> gainProbe = setSpatialOutputGain(
+            activeSpatialSession, nextGeneration, 1, 0, System.currentTimeMillis() + 1_000
+        );
+        if (!Boolean.TRUE.equals(gainProbe.get("ok"))) {
+            stopSpatialStreamInternal();
+            return spatialError("native output handoff support is unavailable");
+        }
         Map<String, Object> body = spatialPayload();
         body.put("ok", true);
         body.put("session", activeSpatialSession);
@@ -548,7 +599,7 @@ public final class NativeAudioEngine {
         int frames = pcm.length / inputChannels;
         if (frames <= 0 || frames * inputChannels != pcm.length) return -2;
         try {
-            return nativeSubmitSpatialPcm(pcm, frames);
+            return nativeSubmitSpatialPcmGeneration(pcm, frames, generation);
         } catch (UnsatisfiedLinkError | SecurityException failure) {
             return -3;
         }
@@ -565,7 +616,7 @@ public final class NativeAudioEngine {
         int requiredBytes = Math.multiplyExact(Math.multiplyExact(frames, inputChannels), Float.BYTES);
         if (!pcm.isDirect() || pcm.position() != 0 || pcm.remaining() < requiredBytes) return -2;
         try {
-            return nativeSubmitSpatialPcmDirect(pcm, frames);
+            return nativeSubmitSpatialPcmDirectGeneration(pcm, frames, generation, -1L);
         } catch (UnsatisfiedLinkError | SecurityException failure) {
             return -3;
         }
@@ -594,7 +645,7 @@ public final class NativeAudioEngine {
         if (!pcm.isDirect() || pcm.position() != 0 || pcm.remaining() < requiredBytes) return -2;
         final int result;
         try {
-            result = nativeSubmitSpatialPcmDirect(pcm, frames);
+            result = nativeSubmitSpatialPcmDirectGeneration(pcm, frames, generation, sequence);
         } catch (UnsatisfiedLinkError | SecurityException failure) {
             return -3;
         }
@@ -627,6 +678,68 @@ public final class NativeAudioEngine {
         return body;
     }
 
+    public synchronized Map<String, Object> setSpatialOutputGain(
+        long session, long generation, long sequence, double gain, long expiresAt
+    ) {
+        long now = System.currentTimeMillis();
+        if (!Double.isFinite(gain) || gain < 0 || gain > 1 || sequence <= 0
+            || expiresAt <= now || expiresAt - now > 2_000) {
+            return spatialError("invalid or expired native output handoff");
+        }
+        if (!isActiveSpatialGeneration(session, generation) || sequence < spatialGainSequence) {
+            Map<String, Object> body = spatialPayload();
+            body.put("ok", true);
+            body.put("ignored", true);
+            body.put("stale", true);
+            return body;
+        }
+        if (sequence == spatialGainSequence && gain != spatialOutputGain) {
+            return spatialError("native output handoff sequence conflicts");
+        }
+        int result;
+        try {
+            result = nativeSetSpatialOutputGain(generation, sequence, (float) gain, expiresAt);
+        } catch (UnsatisfiedLinkError | SecurityException failure) {
+            return spatialError("native output handoff unavailable: " + failure.getMessage());
+        }
+        // Fence the command even on uncertain/device failures. A later command
+        // must use a new sequence rather than replaying an old gain increase.
+        spatialGainSequence = sequence;
+        if (result >= 0) {
+            spatialOutputGain = gain;
+            spatialGainLeaseExpiresAt = Math.max(spatialGainLeaseExpiresAt, expiresAt);
+        }
+        Map<String, Object> body = spatialPayload();
+        body.put("ok", result >= 0);
+        body.put("result", result);
+        if (result < 0) body.put("error", "native output handoff failed: " + result);
+        return body;
+    }
+
+    public synchronized int renewSpatialOutputGainLease(
+        long session, long generation, long sequence, long expiresAt
+    ) {
+        long now = System.currentTimeMillis();
+        if (!isActiveSpatialGeneration(session, generation) || sequence != spatialGainSequence
+            || sequence <= 0 || spatialGainLeaseExpiresAt == 0
+            || expiresAt <= now || expiresAt - now > 2_000) return -1;
+        try {
+            int result = nativeRenewSpatialOutputGainLease(generation, sequence, expiresAt);
+            if (result >= 0) spatialGainLeaseExpiresAt = Math.max(spatialGainLeaseExpiresAt, expiresAt);
+            else {
+                // The native monotonic lease may expire while the wall clock
+                // moves backward. Never advertise the old cached owner then.
+                spatialGainLeaseExpiresAt = 0;
+                spatialOutputGain = 0;
+            }
+            return result;
+        } catch (UnsatisfiedLinkError | SecurityException failure) {
+            spatialGainLeaseExpiresAt = 0;
+            spatialOutputGain = 0;
+            return -3;
+        }
+    }
+
     public synchronized Map<String, Object> resetSpatialTimeline(long session, long generation) {
         if (!isActiveSpatialGeneration(session, generation)) {
             Map<String, Object> body = spatialPayload();
@@ -638,8 +751,9 @@ public final class NativeAudioEngine {
         }
         int result;
         long resetStartedAt = System.nanoTime();
+        long nextGeneration = ++spatialGenerationCounter;
         try {
-            result = nativeResetSpatialTimeline();
+            result = nativeResetSpatialTimelineGeneration(generation, nextGeneration);
         } catch (UnsatisfiedLinkError | SecurityException failure) {
             return spatialError(failure.getMessage());
         }
@@ -655,8 +769,10 @@ public final class NativeAudioEngine {
             return body;
         }
         long previousGeneration = activeSpatialGeneration;
-        activeSpatialGeneration = ++spatialGenerationCounter;
+        activeSpatialGeneration = nextGeneration;
         activeSpatialLastSequence = -1;
+        spatialOutputGain = 0;
+        spatialGainLeaseExpiresAt = 0;
         Map<String, Object> body = spatialPayload();
         body.put("ok", true);
         body.put("session", activeSpatialSession);
@@ -717,6 +833,10 @@ public final class NativeAudioEngine {
         body.put("active", active);
         body.put("session", active ? activeSpatialSession : 0);
         body.put("generation", active ? activeSpatialGeneration : 0);
+        body.put("gainSequence", spatialGainSequence);
+        body.put("outputGain", active && spatialGainLeaseExpiresAt > System.currentTimeMillis() ? spatialOutputGain : 0);
+        body.put("gainLeaseExpiresAt", spatialGainLeaseExpiresAt);
+        body.put("gainHandoffProtocol", 1);
         body.put("running", active && values[1] > 0.5);
         body.put("rendererReady", active && values[2] > 0.5);
         body.put("sampleRate", active ? Math.round(values[3]) : 0);
@@ -729,7 +849,8 @@ public final class NativeAudioEngine {
         body.put("framesProcessed", active ? Math.round(values[10]) : 0);
         body.put("droppedBuffers", active ? Math.round(values[11]) : 0);
         body.put("obrProcessCalls", active ? Math.round(values[12]) : 0);
-        body.put("x3dCalculateCalls", active ? Math.round(values[13]) : 0);
+        body.put("x3dCalculateCalls", active && !macos ? Math.round(values[13]) : 0);
+        body.put("objectPositionUpdates", active && macos ? Math.round(values[13]) : 0);
         body.put("rustUpmixProcessCalls", active ? Math.round(values[14]) : 0);
         body.put("rustUpmixFallbackBlocks", active ? Math.round(values[15]) : 0);
         body.put("rustUpmixActive", active && values[16] > 0.5);
@@ -780,6 +901,7 @@ public final class NativeAudioEngine {
             case "stereo-mixer-obr" -> "PCM stereo → Rust Mixer → Google OBR → XAudio2 stereo";
             default -> "PCM stereo → Rust Mixer → XAudio2 stereo";
         } : "inactive");
+        if (macos && active) body.put("chain", body.get("chain").toString().replace("XAudio2", "CoreAudio"));
         return body;
     }
 
@@ -802,8 +924,8 @@ public final class NativeAudioEngine {
         NativeSample sample = sample(true);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("active", available && sample.active);
-        body.put("backend", available ? "xaudio2" : "html-audio-fallback");
-        body.put("source", sample.active ? "xaudio2-native-loopback" : (windows ? "inactive" : "web-audio"));
+        body.put("backend", available ? (macos ? "coreaudio" : "xaudio2") : "html-audio-fallback");
+        body.put("source", sample.active ? nativeSampleSource() : (windows || macos ? "inactive" : "web-audio"));
         body.put("captureRunning", sample.captureRunning);
         body.put("lowFrequencyAmplitude", sample.lowFrequencyAmplitude);
         body.put("lowFrequencyBands", sample.lowFrequencyBands);
@@ -817,14 +939,15 @@ public final class NativeAudioEngine {
     }
 
     private void load() {
-        if (!windows) {
+        if (!windows && !macos) {
             status = "unsupported-os";
-            error = "XAudio2/X3DAudio is only available on Windows";
+            error = "Native audio requires Windows or macOS";
             return;
         }
         if (!Files.isRegularFile(dllPath)) {
             status = "dll-missing";
-            error = "Build native/windows/fe-monster-xaudio2.dll to enable XAudio2";
+            error = macos ? "Build native/macos/libfe-monster-coreaudio.dylib to enable CoreAudio"
+                : "Build native/windows/fe-monster-xaudio2.dll to enable XAudio2";
             return;
         }
         try {
@@ -859,6 +982,9 @@ public final class NativeAudioEngine {
         spatialInputChannels = 0;
         spatialSampleRate = 0;
         activeSpatialLastSequence = -1;
+        spatialGainSequence = 0;
+        spatialOutputGain = 0;
+        spatialGainLeaseExpiresAt = 0;
     }
 
     private int reapplyCachedMixer(int rampFrames) {
@@ -1298,8 +1424,16 @@ public final class NativeAudioEngine {
     }
 
     private static Path resolveDll(ProjectPaths paths) {
+        String operatingSystem = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        if (operatingSystem.contains("mac") || operatingSystem.contains("darwin")) {
+            String override = System.getenv("FE_MONSTER_COREAUDIO_LIBRARY");
+            return override != null && !override.isBlank() ? Path.of(override)
+                : paths.root.resolve("native").resolve("macos").resolve("libfe-monster-coreaudio.dylib");
+        }
         String override = System.getenv("FE_MONSTER_XAUDIO2_DLL");
         if (override != null && !override.isBlank()) return Path.of(override);
+        Path published = resolvePublishedDll(paths);
+        if (published != null) return published;
         Path installed = paths.root.resolve("native").resolve("windows")
             .resolve("build").resolve("fe-monster-xaudio2.dll");
         Path nextLaunch = paths.root.resolve("native").resolve("windows")
@@ -1313,6 +1447,55 @@ public final class NativeAudioEngine {
         } catch (Exception ignored) {
             return installed;
         }
+    }
+
+    private static Path resolvePublishedDll(ProjectPaths paths) {
+        try {
+            Path nativeRoot = paths.root.resolve("native").resolve("windows");
+            Path marker = nativeRoot.resolve("run-audio.txt");
+            if (!Files.isRegularFile(marker) || Files.size(marker) > 8192) return null;
+            String value = Files.readString(marker).strip();
+            if (value.isEmpty() || value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0) return null;
+            Path candidate = Path.of(value);
+            if (!candidate.isAbsolute()) candidate = paths.root.resolve(candidate);
+            Path builds = nativeRoot.resolve("builds").toRealPath();
+            Path realRoot = paths.root.toRealPath();
+            if (!builds.startsWith(realRoot)) return null;
+            candidate = candidate.toRealPath();
+            Path directory = candidate.getParent();
+            if (!candidate.getFileName().toString().equals("fe-monster-xaudio2.dll")
+                || directory == null || !builds.equals(directory.getParent())) return null;
+            Path rust = directory.resolve("fe_monster_upmix.dll").toRealPath();
+            Path manifestPath = directory.resolve("native-audio-build.json").toRealPath();
+            if (!directory.equals(rust.getParent()) || !directory.equals(manifestPath.getParent())
+                || !Files.isRegularFile(candidate) || !Files.isRegularFile(rust)
+                || Files.size(manifestPath) > 65536) return null;
+            Map<String, Object> manifest = SimpleJson.parseObjectStrict(Files.readString(manifestPath));
+            if (!(manifest.get("schemaVersion") instanceof Number version) || version.intValue() != 1
+                || !"x64".equals(manifest.get("architecture"))) return null;
+            String xaudioHash = artifactSha256(candidate);
+            String rustHash = artifactSha256(rust);
+            String material = "fe-monster-xaudio2.dll=" + xaudioHash + "\nfe_monster_upmix.dll=" + rustHash;
+            String pairHash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                .digest(material.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            if (!xaudioHash.equals(manifest.get("xaudio2Sha256"))
+                || !rustHash.equals(manifest.get("upmixSha256"))
+                || !pairHash.equals(manifest.get("pairSha256"))) return null;
+            return candidate;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static String artifactSha256(Path file) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        try (var input = Files.newInputStream(file)) {
+            byte[] buffer = new byte[65536];
+            for (int count; (count = input.read(buffer)) >= 0;) {
+                if (count > 0) digest.update(buffer, 0, count);
+            }
+        }
+        return HexFormat.of().formatHex(digest.digest());
     }
 
     private NativeSample sample(boolean requestCapture) {
@@ -1453,6 +1636,8 @@ public final class NativeAudioEngine {
 
     private static native boolean nativeInit();
 
+    private static native int nativeSubmitCapturePcm(ByteBuffer pcm, int frames, int channels, int sampleRate);
+
     private static native float[] nativeSampleState(boolean requestCapture);
 
     private static native void nativeShutdown();
@@ -1481,7 +1666,21 @@ public final class NativeAudioEngine {
 
     private static native int nativeSetSpatialMuted(boolean muted);
 
+    private static native int nativeSetSpatialOutputGain(long generation, long sequence, float gain, long expiresAt);
+
+    private static native int nativeRenewSpatialOutputGainLease(long generation, long sequence, long expiresAt);
+
     private static native int nativeResetSpatialTimeline();
+
+    private static native int nativeInitializeSpatialGeneration(long generation);
+
+    private static native int nativeSubmitSpatialPcmGeneration(float[] pcm, int frameCount, long generation);
+
+    private static native int nativeSubmitSpatialPcmDirectGeneration(
+        ByteBuffer pcm, int frameCount, long generation, long sequence
+    );
+
+    private static native int nativeResetSpatialTimelineGeneration(long generation, long nextGeneration);
 
     private static native int nativeSetMixerParameters(
         long revision,

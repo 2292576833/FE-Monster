@@ -344,6 +344,7 @@
       pendingParameters: {}, parameterRevision: 0,
       active: false, mounted: false, ready: false, runtimeReady: false, firstFrame: false,
       disposed: false, iframe: null, nonce: '', messageListener: null,
+      visibilityListener: null, visibilitySuspended: false, recoveryWasSuspended: false,
       lifecycleState: 'idle', retryCount: 0, attemptGeneration: 0, attemptFailureScheduled: false,
       readyTimer: null, heartbeatTimer: null,
       recoveryTimer: null, recoveryPlan: [], recoveryCandidate: null, recoveryHeartbeatBaseline: -Infinity,
@@ -565,7 +566,10 @@
       && instance.overBudgetFrames < OVER_BUDGET_LIMIT;
   }
   function scheduleRecoveryObservation(instance, candidate = null) {
-    if (!instance.active || !instance.ready || instance.disposed) return;
+    if (
+      !instance.active || !instance.ready || instance.disposed
+      || instance.visibilitySuspended || global.document?.visibilityState === 'hidden'
+    ) return;
     if (instance.recoveryTimer !== null) global.clearTimeout(instance.recoveryTimer);
     instance.recoveryCandidate = candidate;
     instance.recoveryHeartbeatBaseline = instance.lastHeartbeatAt;
@@ -599,6 +603,10 @@
   }
   function beginStartupRecovery(instance) {
     clearRecoveryTimer(instance);
+    if (instance.visibilitySuspended || global.document?.visibilityState === 'hidden') {
+      instance.recoveryWasSuspended = true;
+      return;
+    }
     const requested = instance.requestedParameters.gridSize;
     if (!HIGH_IMPACT_GRID_VALUES.has(requested)) {
       setEffectiveGrid(instance, requested);
@@ -619,6 +627,7 @@
   }
   function armHeartbeatWatchdog(instance) {
     clearHeartbeatTimer(instance);
+    if (instance.visibilitySuspended || global.document?.visibilityState === 'hidden') return;
     const attemptGeneration = instance.attemptGeneration;
     instance.heartbeatTimer = global.setTimeout(() => {
       instance.heartbeatTimer = null;
@@ -629,6 +638,42 @@
       rollbackGrid(instance, 'heartbeat-timeout');
       scheduleAttemptFailure(instance, 'heartbeat-timeout', attemptGeneration);
     }, HEARTBEAT_STALE_MS);
+  }
+  function armReadyWatchdog(instance) {
+    clearReadyTimer(instance);
+    if (
+      !instance.active || instance.ready || instance.disposed || !instance.mounted
+      || instance.visibilitySuspended || global.document?.visibilityState === 'hidden'
+    ) return;
+    const attemptGeneration = instance.attemptGeneration;
+    instance.readyTimer = global.setTimeout(() => {
+      instance.readyTimer = null;
+      if (!instance.ready) {
+        scheduleAttemptFailure(instance, 'trusted-ready-and-first-frame-timeout', attemptGeneration);
+      }
+    }, READY_TIMEOUT_MS);
+  }
+  function handleVisibilityChange(instance) {
+    if (!instance.active || instance.disposed) return;
+    const hidden = global.document?.visibilityState === 'hidden';
+    if (hidden) {
+      instance.visibilitySuspended = true;
+      instance.recoveryWasSuspended = instance.recoveryWasSuspended || instance.recoveryTimer !== null;
+      clearReadyTimer(instance);
+      clearHeartbeatTimer(instance);
+      clearRecoveryTimer(instance);
+      instance.lifecycleState = instance.ready ? 'suspended' : instance.lifecycleState;
+      return;
+    }
+    if (!instance.visibilitySuspended) return;
+    instance.visibilitySuspended = false;
+    if (instance.ready) {
+      instance.lifecycleState = 'ready';
+      instance.lastHeartbeatAt = now();
+      armHeartbeatWatchdog(instance);
+    } else {
+      armReadyWatchdog(instance);
+    }
   }
   function markInstanceReady(instance) {
     if (!instance.active || instance.disposed || instance.ready || !instance.runtimeReady || !instance.firstFrame) return;
@@ -645,6 +690,7 @@
     beginStartupRecovery(instance);
   }
   function handleHeartbeat(instance, heartbeat) {
+    if (instance.visibilitySuspended || global.document?.visibilityState === 'hidden') return;
     instance.lastHeartbeatAt = now();
     instance.diagnosticsState.lastHeartbeat = clone(heartbeat);
     instance.overBudgetFrames = heartbeat.frameTimeMs > OVER_BUDGET_FRAME_MS
@@ -663,6 +709,10 @@
         scheduleRecoveryObservation(instance, null);
       }
       return;
+    }
+    if (instance.recoveryWasSuspended && instance.ready) {
+      instance.recoveryWasSuspended = false;
+      beginStartupRecovery(instance);
     }
     if (!instance.firstFrame) instance.firstFrame = true;
     markInstanceReady(instance);
@@ -694,6 +744,8 @@
     persistInstance(instance);
     if (instance.messageListener) global.removeEventListener('message', instance.messageListener);
     instance.messageListener = null;
+    if (instance.visibilityListener) global.document?.removeEventListener?.('visibilitychange', instance.visibilityListener);
+    instance.visibilityListener = null;
     instance.options.onTerminalError?.(diagnostics(instance));
   }
   function mountAttempt(instance) {
@@ -703,7 +755,6 @@
     clearGestureFrame(instance);
     instance.attemptGeneration += 1;
     instance.attemptFailureScheduled = false;
-    const attemptGeneration = instance.attemptGeneration;
     instance.iframe?.remove();
     instance.ready = false;
     instance.runtimeReady = false;
@@ -735,24 +786,25 @@
     instance.iframe = iframe;
     instance.mounted = true;
     instance.host.appendChild(iframe);
-    instance.readyTimer = global.setTimeout(() => {
-      instance.readyTimer = null;
-      if (!instance.ready) {
-        scheduleAttemptFailure(instance, 'trusted-ready-and-first-frame-timeout', attemptGeneration);
-      }
-    }, READY_TIMEOUT_MS);
+    armReadyWatchdog(instance);
   }
   function scheduleAttemptFailure(instance, reason, attemptGeneration = instance.attemptGeneration) {
     if (
       !instance.active || instance.disposed
       || attemptGeneration !== instance.attemptGeneration
       || instance.attemptFailureScheduled
+      || instance.visibilitySuspended || global.document?.visibilityState === 'hidden'
     ) return false;
     instance.attemptFailureScheduled = true;
     global.setTimeout(() => handleAttemptFailure(instance, reason, attemptGeneration), 0);
     return true;
   }
   function handleAttemptFailure(instance, reason, attemptGeneration = instance.attemptGeneration) {
+    if (instance.visibilitySuspended || global.document?.visibilityState === 'hidden') {
+      instance.attemptFailureScheduled = false;
+      handleVisibilityChange(instance);
+      return;
+    }
     if (
       !instance.active || instance.disposed
       || attemptGeneration !== instance.attemptGeneration
@@ -830,7 +882,10 @@
       }
     };
     global.addEventListener('message', instance.messageListener);
+    instance.visibilityListener = () => handleVisibilityChange(instance);
+    global.document?.addEventListener?.('visibilitychange', instance.visibilityListener);
     mountAttempt(instance);
+    handleVisibilityChange(instance);
     return instance;
   }
   function cancelPending(instance) {
@@ -847,9 +902,12 @@
     clearGestureFrame(runtime);
     if (runtime.messageListener) global.removeEventListener('message', runtime.messageListener);
     runtime.messageListener = null;
+    if (runtime.visibilityListener) global.document?.removeEventListener?.('visibilitychange', runtime.visibilityListener);
+    runtime.visibilityListener = null;
     runtime.iframe?.remove();
     runtime.iframe = null; runtime.nonce = ''; runtime.active = false; runtime.mounted = false; runtime.ready = false;
     runtime.runtimeReady = false; runtime.firstFrame = false; runtime.lifecycleState = 'inactive';
+    runtime.visibilitySuspended = false; runtime.recoveryWasSuspended = false;
     runtime.attemptGeneration += 1; runtime.attemptFailureScheduled = false;
     return runtime;
   }

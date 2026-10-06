@@ -38,14 +38,14 @@ const enqueueSource = extractFunction('enqueueNativeSpatialBlock');
 const recycleSource = extractFunction('recycleNativeSpatialBlock');
 const discardSource = extractFunction('discardNativeSpatialBlocks');
 const pumpSource = extractFunction('pumpNativeSpatialBlocks');
-const disposeSource = extractFunction('disposeOfficialGoogleObrGraph');
+const disposeSource = extractFunction('disposeNativeSpatialGraph');
 const prerollSource = extractFunction('waitForNativeGoogleObrPreroll');
 const healthSource = extractFunction('refreshNativeGoogleObrHealth');
 
 assert.match(
   disposeSource,
   /discardNativeSpatialBlocks\(graph\)/,
-  'Native graph disposal must synchronously discard queued ownership before closing the port.'
+  'Native graph disposal must discard queued ownership before closing the port.'
 );
 for (const [label, functionSource] of [
   ['preroll', prerollSource],
@@ -53,13 +53,13 @@ for (const [label, functionSource] of [
 ]) {
   assert.match(
     functionSource,
-    /graph\.transportDroppedBlocks\s*>\s*0/,
-    `${label} must fail the graph after a main-thread upload overflow.`
+    /graph\.transportDroppedBlocks[^;]*timelineDroppedBlocksBaseline/,
+    `${label} must distinguish recovered overflow from new loss in the current timeline.`
   );
   assert.match(
     functionSource,
-    /graph\.poolStarvedFrames\s*>\s*0/,
-    `${label} must fail the graph after AudioWorklet pool starvation.`
+    /graph\.poolStarvedFrames[^;]*timelineStarvedFramesBaseline/,
+    `${label} must distinguish recovered starvation from new loss in the current timeline.`
   );
 }
 
@@ -67,15 +67,22 @@ let fetchImplementation = null;
 const failures = [];
 const context = vm.createContext({
   AbortController,
+  DOMException,
   Float32Array,
   URLSearchParams,
   GOOGLE_OBR_NATIVE_TRANSPORT_FRAMES: 4096,
   GOOGLE_OBR_NATIVE_MAX_PENDING_BLOCKS: 4,
   GOOGLE_OBR_NATIVE_UPLOAD_RETRY_DELAYS: Object.freeze([20, 50]),
-  window: { setTimeout },
+  GOOGLE_OBR_NATIVE_UPLOAD_TIMEOUT_MS: 750,
+  window: { setTimeout, clearTimeout },
   fetch: (...args) => fetchImplementation(...args),
   safeText: (value, fallback) => String(value || fallback),
   state: { obrSpatialAudio: { requested: true } },
+  beginNativeSpatialTimelineTransition: async () => {
+    const graph = context.state.obrSpatialAudio.graph;
+    graph.timelineTransitionActive = true;
+    context.nativeSpatialBufferApi.discardNativeSpatialBlocks(graph, { recycle: true });
+  },
   failGoogleObr: (error) => failures.push(error)
 });
 vm.runInContext(`
@@ -102,7 +109,7 @@ const sequenceFromUrl = (url) => Number(new URL(String(url), 'http://localhost')
 
 function makeGraph() {
   const recycleMessages = [];
-  return {
+  const graph = {
     disposed: false,
     session: 41,
     generation: 9,
@@ -113,6 +120,7 @@ function makeGraph() {
     nextBlockSequence: 0,
     uploadedBlocks: 0,
     transportDroppedBlocks: 0,
+    transportRecoveryCount: 0,
     node: {
       port: {
         postMessage(message, transfer = []) {
@@ -125,6 +133,8 @@ function makeGraph() {
     },
     recycleMessages
   };
+  context.state.obrSpatialAudio.graph = graph;
+  return graph;
 }
 
 const makePcm = (seed) => {
@@ -169,8 +179,8 @@ async function waitUntil(predicate, label) {
   assert.equal(graph.recycleMessages[0].transferCount, 1);
 }
 
-// Queue overflow may return the oldest queued block immediately, but never the
-// block still owned by the pending upload.
+// Overflow resets the timeline and returns queued/incoming ownership, but never
+// reuses the storage still owned by the pending upload.
 {
   const graph = makeGraph();
   const blocks = Array.from({ length: 6 }, (_, index) => makePcm(index + 10));
@@ -185,12 +195,12 @@ async function waitUntil(predicate, label) {
     return Promise.resolve(response(sequence));
   };
   blocks.forEach((pcm, index) => {
-    assert.equal(api.enqueueNativeSpatialBlock(graph, pcm, ownership(index)), true);
+    assert.equal(api.enqueueNativeSpatialBlock(graph, pcm, ownership(index)), index < 5);
   });
   assert.deepEqual(
     graph.recycleMessages.map(({ message }) => message.bufferId),
-    [1],
-    'Only the oldest queued block should be returned when the four-block queue overflows.'
+    [5, 1, 2, 3, 4],
+    'Overflow must return the incoming and queued blocks before resetting the timeline.'
   );
   assert.ok(
     !graph.recycleMessages.some(({ message }) => message.bufferId === 0),
@@ -203,7 +213,9 @@ async function waitUntil(predicate, label) {
     [0, 1, 2, 3, 4, 5],
     'Every accepted or dropped transferable should be returned exactly once while the graph remains live.'
   );
-  assert.equal(graph.transportDroppedBlocks, 1);
+  assert.equal(graph.transportDroppedBlocks, 5);
+  assert.equal(graph.transportRecoveryCount, 1);
+  assert.equal(fetchCalls, 1, 'No subsequent block may splice onto the obsolete generation.');
 }
 
 // Once disposal begins, queued and active storage belongs to the obsolete pool
@@ -231,6 +243,6 @@ assert.equal(failures.length, 0, 'Focused successful/abort paths must not fail t
 console.log(JSON.stringify({
   pass: true,
   activeOwnership: 'until-response-complete',
-  overflow: 'oldest-queued-returned',
+  overflow: 'timeline-reset-queued-ownership-returned',
   disposal: 'obsolete-epoch-discarded'
 }, null, 2));

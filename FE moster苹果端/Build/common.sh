@@ -22,6 +22,13 @@ require_command() {
   command -v "$1" >/dev/null 2>&1 || fail "缺少命令：$1"
 }
 
+require_supported_macos() {
+  [[ "$(uname -s)" == Darwin ]] || fail "This client must be built and run on macOS."
+  local major minor remainder
+  IFS=. read -r major minor remainder <<< "$(sw_vers -productVersion)"
+  (( major > 13 || (major == 13 && ${minor:-0} >= 5) )) || fail "macOS 13.5+ is required by the bundled Node.js 24 runtime."
+}
+
 assert_generated_path() {
   local candidate="$1"
   case "${candidate}" in

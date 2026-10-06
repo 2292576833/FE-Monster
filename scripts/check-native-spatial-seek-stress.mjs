@@ -58,6 +58,7 @@ const timelineRequests = [];
 const uploads = [];
 const workletMessages = [];
 const mediaWrites = [];
+const handoffs = [];
 let stressGraph = null;
 const media = {
   src: 'http://127.0.0.1/audio/test.flac',
@@ -76,6 +77,7 @@ const dryGain = new FakeAudioParam(0);
 
 const context = vm.createContext({
   AbortController,
+  DOMException,
   Float32Array,
   Math,
   Number,
@@ -84,25 +86,27 @@ const context = vm.createContext({
   URLSearchParams,
   encodeURIComponent,
   performance: { now: () => logicalTimeMs },
-  window: {
-    setTimeout(callback, delay = 0) {
-      logicalTimeMs += Math.max(0, Number(delay) || 0);
-      queueMicrotask(callback);
-      return 1;
-    },
-    clearTimeout() {}
-  },
+  window: { setTimeout, clearTimeout },
   GOOGLE_OBR_NATIVE_TRANSPORT_FRAMES: 4096,
   GOOGLE_OBR_NATIVE_MAX_PENDING_BLOCKS: 4,
   GOOGLE_OBR_NATIVE_UPLOAD_RETRY_DELAYS: Object.freeze([20, 50]),
+  GOOGLE_OBR_NATIVE_UPLOAD_TIMEOUT_MS: 750,
   els: { audio: media },
   state: {
     obrSpatialAudio: { requested: true, graph: null },
-    audioPositionSync: { nativeSeekPromise: null }
+    audioPositionSync: { nativeSeekPromise: null },
+    qishuiPlaybackCard: {}
   },
   safeText: (value, fallback) => String(value || fallback),
   setAudioParamSmoothly(parameter, value) {
     if (parameter) parameter.value = value;
+  },
+  // The separate handoff waveform regression executes the complete production
+  // gain protocol. This stress harness isolates epoch/coalescing ownership.
+  async handoffNativeSpatialOutput(graph, target, options) {
+    handoffs.push({ target, epoch: options?.epoch, generation: graph.generation });
+    graph.dryGain.gain.value = target === 'browser' ? 1 : 0;
+    return true;
   },
   nativeSpatialRequest(url) {
     if (!String(url).startsWith('/api/audio/spatial/timeline')) {
@@ -209,16 +213,10 @@ for (let index = 0; index < 100; index += 1) {
 const expectedFinalPosition = 237.25 - 99 * 0.25;
 assert.equal(mediaWrites.length, 100, 'all 100 media seeks must be applied synchronously');
 assert.equal(media.currentTime, expectedFinalPosition, 'the final scrub position must win');
+for (let attempt = 0; attempt < 20 && timelineRequests.length === 0; attempt += 1) await Promise.resolve();
 assert.equal(timelineRequests.length, 1, 'rapid seeks should coalesce while reset is in flight');
-assert.equal(dryGain.value, 1, 'browser dry audio must become audible before reset acknowledgement');
-assert.ok(dryGain.curves.length >= 1, 'dry continuity must use AudioParam automation');
-const dryCurve = dryGain.curves[0].values;
-const equalPowerError = Math.max(...dryCurve.map((dry, index) => {
-  const progress = index / (dryCurve.length - 1);
-  const native = Math.cos(progress * Math.PI * 0.5);
-  return Math.abs(dry * dry + native * native - 1);
-}));
-assert.ok(equalPowerError < 0.000001, 'dry/native seek hand-off must remain equal-power');
+assert.equal(dryGain.value, 1, 'native output must complete its browser handoff before reset acknowledgement');
+assert.equal(handoffs[0].target, 'browser', 'reset must first relinquish native output safely');
 assert.equal(stressGraph.captureTimelineEpoch, 101);
 assert.equal(uploads.length, 0, 'old and unacknowledged epochs must not upload');
 
@@ -303,8 +301,8 @@ console.log(JSON.stringify({
   periodicCpuDelayEvents: cpuDelayEvents,
   oldEpochUploads: uploads.filter((entry) => entry.timelineEpoch !== 101).length,
   oldGenerationUploads: uploads.filter((entry) => entry.generation !== 9).length,
-  dryAudibleBeforeResetAcknowledgement: dryGain.curves.length > 0 && dryGain.value === 1,
-  equalPowerMaximumError: equalPowerError,
+  dryAudibleBeforeResetAcknowledgement: handoffs.length > 0 && dryGain.value === 1,
+  handoffProtocolWaveformRegression: 'check-native-spatial-handoff.mjs',
   counters: {
     dropped: stressGraph.transportDroppedBlocks,
     underruns: stressGraph.nativeQueueUnderruns,

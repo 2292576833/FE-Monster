@@ -612,6 +612,7 @@ html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__quick-actions {
   justify-items: start;
   gap: 4px;
   margin: 0 0 13px;
+  animation: pet-message-enter .2s cubic-bezier(.2, .75, .25, 1) both;
 }
 
 .pet-assistant__message.is-user {
@@ -619,9 +620,24 @@ html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__quick-actions {
 }
 
 .pet-assistant__message > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   padding: 0 4px;
   color: rgba(210, 229, 237, .56);
   font-size: 10px;
+}
+
+.pet-assistant__message > span b {
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+}
+
+.pet-assistant__message > span time {
+  color: rgba(210, 229, 237, .42);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .02em;
 }
 
 .pet-assistant__message p {
@@ -1037,6 +1053,11 @@ html[data-fe-client="desktop-pet"] #petAssistant .pet-assistant__quick-actions {
 @keyframes pet-panel-in {
   from { opacity: 0; transform: translate3d(-10px, 12px, 0) scale(.94); }
   to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes pet-message-enter {
+  from { opacity: 0; transform: translate3d(0, 5px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 @keyframes pet-breathe {
@@ -1842,6 +1863,10 @@ html[data-fe-client="desktop-pet"] #petAssistant #petAssistantPanel[data-pet-tex
 #petAssistantPanel[data-pet-text-bubble] .pet-assistant__message {
   gap: 3px;
   margin: 0;
+}
+
+#petAssistantPanel[data-pet-text-bubble] .pet-assistant__message + .pet-assistant__message {
+  margin-top: 12px;
 }
 
 #petAssistantPanel[data-pet-text-bubble] .pet-assistant__message > span {

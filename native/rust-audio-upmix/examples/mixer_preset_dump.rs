@@ -112,6 +112,7 @@ fn main() {
         "ping-pong-delay",
         "nearfield-studio",
         "immersive-live",
+        "clear-spatial",
     ];
     print!("{{\"presetVersion\":1,\"presets\":[");
     for (index, id) in ids.iter().enumerate() {

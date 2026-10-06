@@ -45,7 +45,7 @@ if ($installLog.StartsWith($installPathPrefix, [StringComparison]::OrdinalIgnore
 $sessionLogDirectory = Split-Path -Parent $installLog
 $dependencyLog = Join-Path $sessionLogDirectory ('dependencies-{0}.log' -f $PID)
 $updateAgentLog = Join-Path $sessionLogDirectory ('update-agent-{0}.log' -f $PID)
-$appVersion = '2.1.1'
+$appVersion = '2.2.3'
 $mainExecutable = Join-Path $installPath 'native\windows\build\winforms\FE Monster.exe'
 $payloadIntegrityManifestName = 'payload-integrity.json'
 $upgradeRecoveryMarkerName = '.fe-monster-upgrade-transaction.json'
@@ -175,11 +175,12 @@ function Enter-InstallMutationLock {
   }
   $lockName = $hash.Substring(0, 32) + '.lock'
   $installParent = Split-Path -Parent (Resolve-FullPath $Path)
+  $anchorDirectory = Join-Path $installParent '.fe-monster-setup-locks'
   $lockDirectories = @(
-    (Join-Path $Env:LOCALAPPDATA 'FE Monster Setup\Locks'),
-    (Join-Path $installParent '.fe-monster-setup-locks')
+    $anchorDirectory,
+    (Join-Path $Env:LOCALAPPDATA 'FE Monster Setup\Locks')
   ) | Select-Object -Unique
-  $lastError = $null
+  $heldLocks = [Collections.Generic.List[object]]::new()
   foreach ($lockDirectory in $lockDirectories) {
     $stream = $null
     $lockPath = Join-Path $lockDirectory $lockName
@@ -197,24 +198,34 @@ function Enter-InstallMutationLock {
       $probe = [System.Text.Encoding]::ASCII.GetBytes("FE Monster setup lock`n")
       $stream.Write($probe, 0, $probe.Length)
       $stream.Flush($true)
-      return [pscustomobject]@{ Stream = $stream; Path = $lockPath }
+      $heldLocks.Add([pscustomobject]@{ Stream = $stream; Path = $lockPath })
     } catch {
       $lastError = $_.Exception
       if ($null -ne $stream) { try { $stream.Dispose() } catch {} }
+      # The target-parent anchor is mandatory and independent of LOCALAPPDATA
+      # availability. The old per-user lock additionally coordinates with older
+      # uninstallers; only an unavailable compatibility directory may be skipped.
+      $nativeError = $lastError.GetBaseException().HResult -band 0xFFFF
+      if ($lockDirectory -eq $anchorDirectory -or $nativeError -in @(32, 33)) {
+        foreach ($heldLock in $heldLocks) { try { $heldLock.Stream.Dispose() } catch {} }
+        throw "Another FE Monster install, update, or uninstall is already changing $Path, or its setup lock is unavailable. $($lastError.Message)"
+      }
     }
   }
-  throw "Another FE Monster install, update, or uninstall is already changing $Path, or no writable setup lock directory is available. $($lastError.Message)"
+  return [pscustomobject]@{ Path = $heldLocks[0].Path; Locks = $heldLocks.ToArray() }
 }
 
 function Exit-InstallMutationLock {
   param([object]$Lock)
   if ($null -eq $Lock) { return }
-  try { $Lock.Stream.Dispose() } catch {}
-  try { Remove-Item -LiteralPath $Lock.Path -Force -ErrorAction SilentlyContinue } catch {}
+  foreach ($heldLock in @($Lock.Locks)) {
+    try { $heldLock.Stream.Dispose() } catch {}
+    try { Remove-Item -LiteralPath $heldLock.Path -Force -ErrorAction SilentlyContinue } catch {}
+  }
   try {
     $parent = Split-Path -Parent $Lock.Path
     if ((Split-Path -Leaf $parent) -eq '.fe-monster-setup-locks') {
-      Remove-Item -LiteralPath $parent -Force -ErrorAction SilentlyContinue
+      [IO.Directory]::Delete($parent, $false)
     }
   } catch {}
 }
@@ -1205,6 +1216,12 @@ function Assert-RequiredFiles {
   $required = @(
     'FE Monster.vbs',
     'out\fe-monster-java.jar',
+    'out\lib\sqlite-jdbc-3.53.2.1-without-natives.jar',
+    'out\lib\sqlite-jdbc-3.53.2.1-natives-windows.jar',
+    'out\lib\slf4j-api-1.7.36.jar',
+    'third_party\java\local-memory\dependencies.json',
+    'third_party\java\local-memory\LICENSE-SQLITE-JDBC.txt',
+    'third_party\java\local-memory\LICENSE-SLF4J.txt',
     'web\index.html',
     'web\cache-fingerprints.json',
     'web\client-ai-service.js',
@@ -1212,6 +1229,12 @@ function Assert-RequiredFiles {
     'web\settings-center.js',
     'web\audio-mixer-ui.js',
     'web\audio-mixer-visuals.js',
+    'web\local-memory-client.js',
+    'web\pet-memory-recall.js',
+    'web\pet-preference-policy.js',
+    'web\pet-preference-memory.js',
+    'web\app-parameter-registry.js',
+    'web\lyric-highlight-particles.js',
     'web\runtime-module-loader.js',
     'web\app.js',
     'web\styles.css',
@@ -1266,7 +1289,12 @@ function Assert-RequiredFiles {
     'native\windows\build\winforms\WebView2Loader.dll',
     'native\windows\build\fe-monster-xaudio2.dll',
     'native\windows\build\fe_monster_upmix.dll',
+    'native\windows\build\fe-monster-wincrypto.dll',
     'native\windows\build\native-audio-build.json',
+    'plugins\music-api\FE-Monster-Netease-API-Plugin-4.32.0.zip',
+    'plugins\music-api\FE-Monster-QQ-API-Plugin-2.4.2.zip',
+    'plugins\music-api\FE-Monster-Kugou-API-Plugin-2.0.8.zip',
+    'plugins\music-api\FE-Monster-Qishui-OpenAPI-Plugin-3.1.1.zip',
     'payload-integrity.json'
   )
 

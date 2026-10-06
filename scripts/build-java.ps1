@@ -6,9 +6,7 @@ $ErrorActionPreference = 'Stop'
 $rootPath = (Resolve-Path -LiteralPath $Root).Path
 $outDir = Join-Path $rootPath 'out'
 $classesDir = Join-Path $outDir 'classes'
-$stableJar = Join-Path $outDir 'fe-monster-java.jar'
 $runJar = Join-Path $outDir ('fe-monster-java-{0}-{1}.jar' -f (Get-Random), (Get-Random))
-$runJarFile = Join-Path $outDir 'run-jar.txt'
 $sourcesFile = Join-Path $rootPath 'build\sources.txt'
 $dependencyRoot = Join-Path $rootPath 'third_party\java\local-memory\lib'
 $dependencyChecker = Join-Path $rootPath 'scripts\check-local-memory-dependencies.ps1'
@@ -20,27 +18,54 @@ $dependencyFiles = @(
 $outLibDir = Join-Path $outDir 'lib'
 $manifestFile = Join-Path $outDir 'fe-monster-java-manifest.mf'
 
-. (Join-Path $rootPath 'scripts\windows-no-console-process.ps1')
-. (Join-Path $rootPath 'scripts\java-runtime.ps1')
-$jdkHome = Find-JavaDevelopmentKit -Root $rootPath -MinimumMajor 17
-if ([string]::IsNullOrWhiteSpace($jdkHome)) {
-  throw 'A complete Windows x64 JDK 17+ (javac, jar, jdeps and jlink) is required.'
+function Get-BuildDependencyHash([string]$Path) {
+  $stream = [IO.File]::OpenRead($Path)
+  $hash = [Security.Cryptography.SHA256]::Create()
+  try { return [BitConverter]::ToString($hash.ComputeHash($stream)) }
+  finally { $stream.Dispose(); $hash.Dispose() }
 }
-$javac = Join-Path $jdkHome 'bin\javac.exe'
-$jarTool = Join-Path $jdkHome 'bin\jar.exe'
+
+$buildMutex = [Threading.Mutex]::new($false, 'Local\FE-Monster-Java-Build')
+$buildLockTaken = $false
+try {
+  try {
+    $buildLockTaken = $buildMutex.WaitOne(600000)
+  } catch [Threading.AbandonedMutexException] {
+    $buildLockTaken = $true
+  }
+  if (!$buildLockTaken) { throw 'Timed out waiting for another FE Monster Java build to finish.' }
+
+  # classes, dependency copies, the source list and stable jar are shared
+  # outputs. Serialize builds so parallel release checks cannot delete one
+  # another's intermediate files.
+  . (Join-Path $rootPath 'scripts\windows-no-console-process.ps1')
+  . (Join-Path $rootPath 'scripts\java-runtime.ps1')
+  . (Join-Path $rootPath 'scripts\java-build-artifacts.ps1')
+  $jdkHome = Find-JavaDevelopmentKit -Root $rootPath -MinimumMajor 17
+  if ([string]::IsNullOrWhiteSpace($jdkHome)) {
+    throw 'A complete Windows x64 JDK 17+ (javac, jar, jdeps and jlink) is required.'
+  }
+  $javac = Join-Path $jdkHome 'bin\javac.exe'
+  $jarTool = Join-Path $jdkHome 'bin\jar.exe'
 
 & $dependencyChecker -Root $rootPath
 
+$expectedClasses = [IO.Path]::GetFullPath((Join-Path $rootPath 'out\classes'))
+if ([IO.Path]::GetFullPath($classesDir) -ne $expectedClasses) { throw 'Unexpected build classes directory.' }
 if (Test-Path -LiteralPath $classesDir) {
   Remove-Item -LiteralPath $classesDir -Recurse -Force
 }
 New-Item -ItemType Directory -Path $classesDir -Force | Out-Null
-if (Test-Path -LiteralPath $outLibDir) {
-  Remove-Item -LiteralPath $outLibDir -Recurse -Force
-}
 New-Item -ItemType Directory -Path $outLibDir -Force | Out-Null
 foreach ($dependencyFile in $dependencyFiles) {
-  Copy-Item -LiteralPath (Join-Path $dependencyRoot $dependencyFile) -Destination (Join-Path $outLibDir $dependencyFile)
+  $dependencySource = Join-Path $dependencyRoot $dependencyFile
+  $dependencyTarget = Join-Path $outLibDir $dependencyFile
+  # A running JVM holds these files open. Identical, pinned dependencies need
+  # no rewrite; deleting the entire directory can leave that JVM half intact.
+  if ((Test-Path -LiteralPath $dependencyTarget) -and
+      (Get-BuildDependencyHash $dependencySource) -eq
+      (Get-BuildDependencyHash $dependencyTarget)) { continue }
+  Copy-Item -LiteralPath $dependencySource -Destination $dependencyTarget -Force
 }
 New-Item -ItemType Directory -Path (Split-Path -Parent $sourcesFile) -Force | Out-Null
 
@@ -119,10 +144,11 @@ if ($jarResult.ExitCode -ne 0) {
   throw "jar failed with exit code $($jarResult.ExitCode)"
 }
 
-Copy-Item -LiteralPath $runJar -Destination $stableJar -Force
-[System.IO.File]::WriteAllText(
-  $runJarFile,
-  $runJar + [Environment]::NewLine,
-  [System.Text.UTF8Encoding]::new($false)
-)
-Write-Host "Built $runJar"
+Publish-JavaBuildArtifact -Root $rootPath -RunJar $runJar | Out-Null
+  Write-Host "Built $runJar"
+} finally {
+  if ($buildLockTaken) {
+    try { $buildMutex.ReleaseMutex() } catch {}
+  }
+  $buildMutex.Dispose()
+}

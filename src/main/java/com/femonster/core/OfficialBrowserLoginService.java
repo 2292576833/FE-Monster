@@ -5,6 +5,9 @@ import com.femonster.music.MusicProviderRegistry;
 
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.net.Proxy;
+import java.net.ProxySelector;
+import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.net.http.HttpClient;
@@ -262,6 +265,26 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
                 handleBrowserProbeFailure(session);
                 return;
             }
+        } else if (session.syncAttempts > 0 && session.process != null && session.process.isAlive()) {
+            // A retry must keep the captured credentials usable if the user
+            // closes the official window. While it remains open, observe a
+            // replacement scan instead of freezing the first cookie snapshot.
+            try {
+                Map<String, String> detected = readProviderCookies(session);
+                if (hasAuthenticatedSession(session.provider, detected)) {
+                    cookies = Map.copyOf(detected);
+                    synchronized (session) {
+                        if (session.done()) return;
+                        session.authenticatedCookies = cookies;
+                    }
+                }
+            } catch (IOException | RuntimeException ignored) {
+                // The API can still verify the already imported session even
+                // when the browser's debug endpoint disappears temporarily.
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return;
+            }
         }
 
         synchronizeAuthenticatedSession(session, cookies);
@@ -269,6 +292,7 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
 
     private void monitorManagedProviderLogin(LoginSession session) {
         long now = System.nanoTime();
+        boolean synchronizeExisting;
         synchronized (session) {
             if (session.done()) {
                 stopMonitor(session);
@@ -281,8 +305,19 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
                 closeProcess(session.process);
                 return;
             }
-            if (now - session.lastProviderPollNanos < TimeUnit.MILLISECONDS.toNanos(350L)) return;
-            session.lastProviderPollNanos = now;
+            synchronizeExisting = !session.authenticatedCookies.isEmpty();
+            if (!synchronizeExisting) {
+                if (now - session.lastProviderPollNanos < TimeUnit.MILLISECONDS.toNanos(350L)) return;
+                session.lastProviderPollNanos = now;
+            }
+        }
+
+        // After the QR has been accepted, synchronization relies on the
+        // provider's persisted session. Its one-use QR key may already have
+        // expired and must not turn a valid account back into a failed login.
+        if (synchronizeExisting) {
+            synchronizeAuthenticatedSession(session, Map.of());
+            return;
         }
 
         try {
@@ -362,6 +397,7 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
                 if (session.done()) return;
                 session.accountReady = SimpleJson.asBoolean(sync.get("loggedIn"), false);
                 session.playlistsReady = SimpleJson.asBoolean(sync.get("playlistsReady"), false);
+                if (session.accountReady) session.accountPayload = verifiedAccountPayload(session, sync);
                 if (!SimpleJson.asBoolean(sync.get("ready"), false)) {
                     completed = false;
                 } else {
@@ -372,8 +408,7 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
                     activeByProvider.remove(session.provider, session.id);
                     stopMonitor(session);
                 } else {
-                    boolean terminal = retryOrFailProviderSync(session);
-                    if (!terminal) session.authenticatedCookies = Map.of();
+                    retryOrFailProviderSync(session);
                 }
             }
             if (completed || session.done()) closeProcess(session.process);
@@ -383,7 +418,6 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
             synchronized (session) {
                 if (session.done()) return;
                 terminal = retryOrFailProviderSync(session);
-                if (!terminal) session.authenticatedCookies = Map.of();
             }
             if (terminal) closeProcess(session.process);
         } catch (InterruptedException interrupted) {
@@ -413,7 +447,6 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
                 session.importPrepared = false;
                 if (session.done()) return false;
                 terminal = retryOrFailProviderSync(session);
-                if (!terminal) session.authenticatedCookies = Map.of();
             }
             if (terminal) closeProcess(session.process);
             return false;
@@ -423,7 +456,10 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
     private void handleBrowserProbeFailure(LoginSession session) {
         synchronized (session) {
             if (session.done()) return;
-            if (session.process == null || !session.process.isAlive()) {
+            if (session.syncStartedNanos != 0L && remainingSyncNanos(session) <= 0L) {
+                failProviderSync(session);
+                closeProcess(session.process);
+            } else if (session.process == null || !session.process.isAlive()) {
                 finishSession(session, "failed", "官方浏览器窗口已关闭，尚未检测到登录会话");
                 activeByProvider.remove(session.provider, session.id);
                 stopMonitor(session);
@@ -582,11 +618,18 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
         if (socketUrl.isBlank()) throw new IOException("browser debug socket is unavailable");
 
         CdpListener listener = new CdpListener(1);
-        WebSocket socket;
+        WebSocket socket = null;
         try {
+            URI socketUri = URI.create(socketUrl);
+            if (!"ws".equalsIgnoreCase(socketUri.getScheme())
+                || !"127.0.0.1".equals(socketUri.getHost())
+                || socketUri.getPort() != session.port
+                || socketUri.getUserInfo() != null) {
+                throw new IOException("browser debug socket is outside the loopback session");
+            }
             socket = http.newWebSocketBuilder()
                 .connectTimeout(Duration.ofSeconds(3))
-                .buildAsync(URI.create(socketUrl), listener)
+                .buildAsync(socketUri, listener)
                 .get(4, TimeUnit.SECONDS);
             Map<String, Object> command = new LinkedHashMap<>();
             command.put("id", 1);
@@ -599,6 +642,8 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
             throw error;
         } catch (Exception error) {
             throw new IOException("unable to read official browser session", error);
+        } finally {
+            if (socket != null) socket.abort();
         }
     }
 
@@ -607,14 +652,25 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
         Map<String, Object> result = SimpleJson.asMap(root.get("result"));
         List<Object> items = SimpleJson.asList(result.get("cookies"));
         Map<String, String> found = new LinkedHashMap<>();
+        Map<String, Integer> priorities = new LinkedHashMap<>();
+        String loginHost = URI.create(spec.loginUrl()).getHost();
+        long nowSeconds = System.currentTimeMillis() / 1_000L;
         for (Object item : items) {
             Map<String, Object> cookie = SimpleJson.asMap(item);
             String domain = SimpleJson.asString(cookie.get("domain"), "").toLowerCase(Locale.ROOT);
             if (!spec.matchesDomain(domain)) continue;
             String name = SimpleJson.asString(cookie.get("name"), "").trim();
             String value = SimpleJson.asString(cookie.get("value"), "").trim();
-            if (name.isBlank() || value.isBlank() || found.size() >= 128) continue;
+            if (name.isBlank() || value.isBlank() || (!found.containsKey(name) && found.size() >= 128)) continue;
+            double expires = cookie.get("expires") instanceof Number number ? number.doubleValue() : -1.0;
+            if (expires > 0.0 && expires <= nowSeconds) continue;
+            String normalizedDomain = domain.startsWith(".") ? domain.substring(1) : domain;
+            boolean appliesToOfficialPage = loginHost.equals(normalizedDomain) || loginHost.endsWith("." + normalizedDomain);
+            String path = SimpleJson.asString(cookie.get("path"), "/");
+            int priority = (appliesToOfficialPage ? 10_000 : 0) + normalizedDomain.length() * 10 - Math.min(1_000, path.length());
+            if (priorities.getOrDefault(name, Integer.MIN_VALUE) > priority) continue;
             found.put(name, value);
+            priorities.put(name, priority);
         }
         return found.entrySet().stream()
             .sorted(Map.Entry.comparingByKey(String.CASE_INSENSITIVE_ORDER))
@@ -623,7 +679,9 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
 
     private static boolean hasAuthenticatedSession(String provider, Map<String, String> cookies) {
         return switch (provider) {
-            case "netease" -> hasCookie(cookies, "MUSIC_U", "MUSIC_A");
+            // MUSIC_A is an anonymous visitor token. Starting the sync timer
+            // for it can expire a login before the user has scanned the QR.
+            case "netease" -> hasCookie(cookies, "MUSIC_U", "MUSIC_R_U");
             case "qq" -> hasCookie(cookies, "uin", "p_uin", "wxuin")
                 && hasCookie(cookies, "qm_keyst", "qqmusic_key");
             case "kugou" -> hasKugouAuthenticatedSession(cookies);
@@ -756,6 +814,26 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
         body.put("terminal", session.done());
         body.put("message", session.message);
         body.put("browser", session.browserName);
+        if ("success".equals(session.phase)) body.put("accountPayload", session.accountPayload);
+        return body;
+    }
+
+    private static Map<String, Object> verifiedAccountPayload(LoginSession session, Map<String, Object> sync) {
+        Map<String, Object> verified = SimpleJson.asMap(sync.get("account"));
+        Map<String, Object> source = SimpleJson.asMap(verified.get("account"));
+        Map<String, Object> account = new LinkedHashMap<>();
+        // Return display metadata only. Provider profile responses may also
+        // contain VIP tokens or other credentials that the UI does not need.
+        for (String key : List.of("userId", "nickname", "avatarUrl", "vipType", "vipStatus", "vipLevel", "isVip", "feId", "platformUserId")) {
+            Object value = source.get(key);
+            if (value instanceof String || value instanceof Number || value instanceof Boolean) account.put(key, value);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("ok", true);
+        body.put("loggedIn", true);
+        body.put("provider", session.provider);
+        body.put("label", SimpleJson.asString(verified.get("label"), session.spec.label()));
+        body.put("account", account);
         return body;
     }
 
@@ -771,14 +849,14 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
 
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         List<Path> candidates = new ArrayList<>();
-        if (os.contains("win")) {
+        if (os.startsWith("windows")) {
             addWindowsBrowser(candidates, System.getenv("ProgramFiles(x86)"), "Microsoft/Edge/Application/msedge.exe");
             addWindowsBrowser(candidates, System.getenv("ProgramFiles"), "Microsoft/Edge/Application/msedge.exe");
             addWindowsBrowser(candidates, System.getenv("LOCALAPPDATA"), "Microsoft/Edge/Application/msedge.exe");
             addWindowsBrowser(candidates, System.getenv("ProgramFiles"), "Google/Chrome/Application/chrome.exe");
             addWindowsBrowser(candidates, System.getenv("ProgramFiles(x86)"), "Google/Chrome/Application/chrome.exe");
             addWindowsBrowser(candidates, System.getenv("LOCALAPPDATA"), "Google/Chrome/Application/chrome.exe");
-        } else if (os.contains("mac")) {
+        } else if (os.contains("mac") || os.contains("darwin")) {
             candidates.add(Path.of("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"));
             candidates.add(Path.of("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"));
             String home = System.getProperty("user.home", "");
@@ -799,7 +877,7 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
     }
 
     private static int freeLoopbackPort() throws IOException {
-        try (ServerSocket socket = new ServerSocket(0, 1, java.net.InetAddress.getLoopbackAddress())) {
+        try (ServerSocket socket = new ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1"))) {
             return socket.getLocalPort();
         }
     }
@@ -897,6 +975,10 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
     private static final class HttpClientHolder {
         private static final HttpClient INSTANCE = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(2))
+            .proxy(new ProxySelector() {
+                @Override public List<Proxy> select(URI uri) { return List.of(Proxy.NO_PROXY); }
+                @Override public void connectFailed(URI uri, SocketAddress address, IOException error) { }
+            })
             .build();
     }
 
@@ -919,6 +1001,7 @@ public final class OfficialBrowserLoginService implements AutoCloseable {
         private String providerLoginKey = "";
         private boolean accountReady;
         private boolean playlistsReady;
+        private Map<String, Object> accountPayload = Map.of();
         private int syncAttempts;
         private long revision;
         private String phase = "opening";

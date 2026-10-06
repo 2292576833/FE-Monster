@@ -16,6 +16,9 @@ assert_generated_path "${OUTPUT_JAR}"
 JAVA_HOME_RESOLVED="$(require_java_17)"
 JAVAC="${JAVA_HOME_RESOLVED}/bin/javac"
 JAR_TOOL="${JAVA_HOME_RESOLVED}/bin/jar"
+bash "${SCRIPT_DIR}/prepare-java-dependencies.sh"
+JAVA_LIB="${JAVA_OUTPUT_ROOT}/lib"
+CLASSPATH="${JAVA_LIB}/sqlite-jdbc-3.53.2.1-without-natives.jar:${JAVA_LIB}/sqlite-jdbc-3.53.2.1-natives-mac.jar:${JAVA_LIB}/slf4j-api-1.7.36.jar"
 
 SOURCE_ROOTS=("${SOURCE_PROJECT_ROOT}/src/main/java")
 if [[ -d "${SOURCE_PROJECT_ROOT}/src/community-proprietary/java" ]]; then
@@ -36,15 +39,19 @@ note "使用 ${JAVAC} 编译 ${#JAVA_SOURCES[@]} 个 Java 文件。"
 "${JAVAC}" \
   -encoding UTF-8 \
   --release 17 \
+  -classpath "${CLASSPATH}" \
   -d "${CLASSES_DIR}" \
   "${JAVA_SOURCES[@]}"
 
-rm -f "${OUTPUT_JAR}"
+MANIFEST="${JAVA_OUTPUT_ROOT}/manifest.mf"
+printf 'Manifest-Version: 1.0\nMain-Class: com.femonster.FeMonsterJavaApp\nClass-Path: lib/sqlite-jdbc-3.53.2.1-without-natives.jar lib/sqlite-jdbc-3.53.2.1-natives-mac.jar lib/slf4j-api-1.7.36.jar\n\n' > "${MANIFEST}"
+# jar folds manifest lines at the specification's byte limit.
 "${JAR_TOOL}" \
   --create \
-  --file "${OUTPUT_JAR}" \
-  --main-class com.femonster.FeMonsterJavaApp \
+  --file "${OUTPUT_JAR}.next" \
+  --manifest "${MANIFEST}" \
   -C "${CLASSES_DIR}" .
+mv "${OUTPUT_JAR}.next" "${OUTPUT_JAR}"
 
 note "Java 后端已生成：${OUTPUT_JAR}"
 printf '%s\n' "${OUTPUT_JAR}"

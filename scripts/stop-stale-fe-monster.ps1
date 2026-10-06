@@ -13,14 +13,21 @@ if ([string]::IsNullOrWhiteSpace($rootPath) -or
     [string]::Equals($rootPath, [System.IO.Path]::GetPathRoot($rootPath).TrimEnd('\', '/'), [StringComparison]::OrdinalIgnoreCase)) {
   throw "Unsafe FE Monster root: $Root"
 }
-$rootNeedle = $rootPath.ToLowerInvariant()
 
 function Test-FeMonsterPath {
   param([string]$Text)
 
   if ([string]::IsNullOrWhiteSpace($Text)) { return $false }
-  $normalized = $Text.Replace('/', '\').ToLowerInvariant()
-  return $normalized.Contains('\fe monster\') -or $normalized.Contains('\fe moster\')
+  try {
+    $candidate = $Text.Replace('/', '\')
+    # A drive-relative path belongs to the inspected process's working
+    # directory, which cannot be inferred from the cleanup process.
+    if ($candidate -notmatch '^(?:[A-Za-z]:\\|\\\\[^\\]+\\[^\\]+(?:\\|$))') { return $false }
+    $normalized = [IO.Path]::GetFullPath($candidate).TrimEnd('\')
+    return $normalized.StartsWith($rootPath + '\', [StringComparison]::OrdinalIgnoreCase)
+  } catch {
+    return $false
+  }
 }
 
 function Get-CommandLineTokens {
@@ -28,13 +35,8 @@ function Get-CommandLineTokens {
 
   if ([string]::IsNullOrWhiteSpace($CommandLine)) { return @() }
   $tokens = New-Object System.Collections.Generic.List[string]
-  foreach ($match in [regex]::Matches($CommandLine, '"(?<quoted>[^"]*)"|(?<bare>\S+)')) {
-    $value = if ($match.Groups['quoted'].Success) {
-      $match.Groups['quoted'].Value
-    } else {
-      $match.Groups['bare'].Value
-    }
-    $tokens.Add($value) | Out-Null
+  foreach ($match in [regex]::Matches($CommandLine, '(?:[^\s"]+|"[^"]*")+')) {
+    $tokens.Add($match.Value.Replace('"', '')) | Out-Null
   }
   return @($tokens)
 }
@@ -83,22 +85,32 @@ function Test-FeMonsterProcess {
   $name = ([string]$Process.Name).ToLowerInvariant()
   $command = ([string]$Process.CommandLine).ToLowerInvariant()
   $executable = ([string]$Process.ExecutablePath).ToLowerInvariant()
-  $isTargetInstall = $command.Contains($rootNeedle) -or $executable.StartsWith($rootNeedle)
-  $isKnownLegacyInstall = (Test-FeMonsterPath $command) -or (Test-FeMonsterPath $executable)
-  if (!$isTargetInstall -and !$isKnownLegacyInstall) { return $false }
+  $tokens = @(Get-CommandLineTokens ([string]$Process.CommandLine))
+  $targetExecutable = Test-FeMonsterPath $executable
+  if ([string]::IsNullOrWhiteSpace($executable) -and $tokens.Count -gt 0) {
+    $targetExecutable = Test-FeMonsterPath ([string]$tokens[0])
+  }
 
   if (
     !$SkipJava -and
-    $name -in @('java.exe', 'javaw.exe', 'fe monster backend.exe') -and
-    $command.Contains('fe-monster-java')
+    $name -in @('java.exe', 'javaw.exe', 'fe monster backend.exe')
   ) {
-    return $true
+    for ($index = 1; $index -lt ($tokens.Count - 1); $index += 1) {
+      if ($tokens[$index] -eq '-jar') {
+        $jar = [string]$tokens[$index + 1]
+        if (!(Test-FeMonsterPath $jar)) { return $false }
+        $jar = [IO.Path]::GetFullPath($jar)
+        return [string]::Equals([IO.Path]::GetDirectoryName($jar), (Join-Path $rootPath 'out'), [StringComparison]::OrdinalIgnoreCase) -and
+          ([IO.Path]::GetFileName($jar) -match '^fe-monster-java(?:-.+)?\.jar$')
+      }
+    }
+    return $false
   }
 
   if (
     !$SkipClient -and
     $name -in @('fe monster.exe', 'fe-monster-client.exe') -and
-    ($command.Contains('fe monster.exe') -or $command.Contains('fe-monster-client.exe'))
+    $targetExecutable
   ) {
     return $true
   }
@@ -109,7 +121,12 @@ function Test-FeMonsterProcess {
     $command.Contains('--user-data-dir=') -and
     $command.Contains('\webview2\')
   ) {
-    return $true
+    foreach ($token in $tokens) {
+      if ([string]$token -like '--user-data-dir=*') {
+        return Test-FeMonsterPath ([string]$token).Substring('--user-data-dir='.Length)
+      }
+    }
+    return $false
   }
 
   # Upgrade cleanup for releases that bundled a private Python runtime.
@@ -118,7 +135,7 @@ function Test-FeMonsterProcess {
   if (
     !$SkipClient -and
     $name -in @('python.exe', 'pythonw.exe') -and
-    $executable.StartsWith($rootNeedle) -and
+    $targetExecutable -and
     $executable.Contains('\runtime\python\')
   ) {
     return $true
@@ -138,14 +155,21 @@ function Test-FeMonsterProcess {
   if (
     !$SkipClient -and
     $name -like 'fe-monster-setup-*.exe' -and
-    $executable.StartsWith($rootNeedle) -and
+    $targetExecutable -and
     $executable.Contains('\data\updates\')
   ) {
     return $true
   }
 
   if (!$SkipNode -and $name -eq 'node.exe') {
-    return (
+    $targetScript = $false
+    for ($index = 1; $index -lt $tokens.Count; $index += 1) {
+      $token = [string]$tokens[$index]
+      if ($token.StartsWith('-')) { continue }
+      $targetScript = Test-FeMonsterPath $token
+      break
+    }
+    return (($targetScript -or $targetExecutable) -and (
       $command.Contains('netease-api-server.cjs') -or
       $command.Contains('kugou-api-server.cjs') -or
       $command.Contains('@sansenjian\qq-music-api') -or
@@ -154,7 +178,7 @@ function Test-FeMonsterProcess {
       $command.Contains('qq-music-api/dist/cli.js') -or
       $command.Contains('\data\music-api\packages\') -or
       $command.Contains('/data/music-api/packages/')
-    )
+    ))
   }
 
   return $false

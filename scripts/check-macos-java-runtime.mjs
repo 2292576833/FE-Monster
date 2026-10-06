@@ -78,7 +78,11 @@ try {
     ok: runtime.renderBackend === "wkwebview-metal-webgl"
       && runtime.audioSpatialBackend === "web-audio-panner"
       && runtime.audioDecoder === "webkit-media"
-      && runtime.nativeAudio?.status === "unsupported-os",
+      && runtime.nativeAudio?.active === false
+      && runtime.nativeAudio?.macos === true
+      && runtime.nativeAudio?.windows === false
+      && runtime.nativeAudio?.status === "dll-missing"
+      && runtime.nativeAudio?.dll?.replaceAll('\\', '/').endsWith('/native/macos/libfe-monster-coreaudio.dylib'),
     renderPreset: runtime.renderPreset,
     renderBackend: runtime.renderBackend,
     audioSpatialBackend: runtime.audioSpatialBackend,

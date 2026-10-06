@@ -73,6 +73,8 @@ public final class ApiRoutes {
     );
     private final AppContext context;
     private final ClientAiHttpModule clientAiHttpModule;
+    private final LocalMemoryHttpModule localMemoryHttpModule;
+    private final AudioSourceHttpModule audioSourceHttpModule;
     private final AudioStreamProxy audioStreamProxy = new AudioStreamProxy();
     private final AtomicBoolean quitRequested = new AtomicBoolean(false);
 
@@ -88,9 +90,12 @@ public final class ApiRoutes {
     private ApiRoutes(AppContext context) {
         this.context = context;
         this.clientAiHttpModule = new ClientAiHttpModule(context.clientAi, context.clientTtsSessions);
+        this.localMemoryHttpModule = new LocalMemoryHttpModule(context.localAiMemory);
+        this.audioSourceHttpModule = new AudioSourceHttpModule(context.audioSources, context.music);
     }
 
     public static void register(HttpServer server, AppContext context) {
+        context.audioSources.setLocalPort(server.getAddress().getPort());
         ApiRoutes routes = new ApiRoutes(context);
         server.createContext("/api/", routes::handle);
     }
@@ -110,6 +115,8 @@ public final class ApiRoutes {
             if (path.startsWith("/api/audio/mixer")) {
                 LocalPetAssistantGuard.require(exchange);
             }
+            if (localMemoryHttpModule.tryHandle(exchange)) return;
+            if (audioSourceHttpModule.tryHandle(exchange)) return;
             if (HttpUtil.handleOptions(exchange)) return;
             Map<String, String> query = HttpUtil.query(exchange);
             if (clientAiHttpModule.tryHandle(exchange)) return;
@@ -309,7 +316,7 @@ public final class ApiRoutes {
                 songCommentId(query),
                 HttpUtil.intParam(query, "limit", 20, 1, 80)
             ));
-            case "/api/lyric", "/api/netease/lyric", "/api/qq/lyric", "/api/kugou/lyric" -> HttpUtil.sendJson(
+            case "/api/lyric", "/api/netease/lyric", "/api/qq/lyric", "/api/kugou/lyric", "/api/qishui/lyric" -> HttpUtil.sendJson(
                 exchange,
                 context.music.lyricPayload(
                     providerFrom(path, query),
@@ -515,6 +522,17 @@ public final class ApiRoutes {
             ));
             return;
         }
+        if ("/api/audio/spatial/gain".equals(path)) {
+            requireLocalNativeAudio(exchange);
+            double gain;
+            try { gain = Double.parseDouble(HttpUtil.param(query, "gain", "NaN")); }
+            catch (NumberFormatException failure) { gain = Double.NaN; }
+            HttpUtil.sendJson(exchange, context.audioEngine.setSpatialOutputGain(
+                longParam(query, "session", 0), longParam(query, "generation", 0),
+                longParam(query, "sequence", 0), gain, longParam(query, "expiresAt", 0)
+            ));
+            return;
+        }
         if ("/api/audio/spatial/timeline".equals(path)) {
             requireLocalNativeAudio(exchange);
             HttpUtil.sendJson(exchange, context.audioEngine.resetSpatialTimeline(
@@ -547,6 +565,11 @@ public final class ApiRoutes {
         if ("/api/audio/spatial/block".equals(path)) {
             requireLocalNativeAudio(exchange);
             handleNativeSpatialBlock(exchange, query);
+            return;
+        }
+        if ("/api/audio/native/capture".equals(path)) {
+            requireLocalNativeAudio(exchange);
+            handleNativeCapturePcm(exchange, query);
             return;
         }
         if (path.equals("/api/netease/login/browser/start") || path.equals("/api/qq/login/browser/start")
@@ -710,6 +733,19 @@ public final class ApiRoutes {
             case "/api/player/queue/merge" -> HttpUtil.sendJson(exchange, context.player.mergeQueue(
                 songsFromPayload(root),
                 SimpleJson.asString(root.get("mode"), "append")
+            ));
+            case "/api/player/queue/remove" -> HttpUtil.sendJson(exchange, context.player.removeFromQueue(
+                SimpleJson.asInt(root.get("index"), -1),
+                SimpleJson.asString(root.get("songId"), ""),
+                SimpleJson.asString(root.get("provider"), ""),
+                SimpleJson.asLong(root.get("expectedRevision"), -1L)
+            ));
+            case "/api/player/queue/move" -> HttpUtil.sendJson(exchange, context.player.moveInQueue(
+                SimpleJson.asInt(root.get("fromIndex"), -1),
+                SimpleJson.asInt(root.get("toIndex"), -1),
+                SimpleJson.asString(root.get("songId"), ""),
+                SimpleJson.asString(root.get("provider"), ""),
+                SimpleJson.asLong(root.get("expectedRevision"), -1L)
             ));
             default -> HttpUtil.notFound(exchange);
         }
@@ -976,6 +1012,36 @@ public final class ApiRoutes {
         }
     }
 
+    private void handleNativeCapturePcm(HttpExchange exchange, Map<String, String> query) throws IOException {
+        String origin = exchange.getRequestHeaders().getFirst("Origin");
+        if (origin != null && !origin.isBlank()) {
+            try {
+                URI uri = URI.create(origin);
+                String host = uri.getHost() == null ? "" : uri.getHost();
+                if (!"http".equalsIgnoreCase(uri.getScheme()) || uri.getRawUserInfo() != null
+                    || !("127.0.0.1".equals(host) || "localhost".equalsIgnoreCase(host) || "[::1]".equals(host) || "::1".equals(host))
+                    || uri.getPort() != exchange.getLocalAddress().getPort()) {
+                    throw new IllegalArgumentException();
+                }
+            } catch (IllegalArgumentException error) {
+                throw new IllegalArgumentException("native capture requires a local application origin");
+            }
+        }
+        ByteBuffer pcm = NativeCapturePcm.read(
+            exchange.getRequestBody(), query,
+            exchange.getRequestHeaders().getFirst("Content-Type"), parseContentLength(exchange)
+        );
+        int frames = NativeCapturePcm.requiredInteger(query, "frames", 1, 4096);
+        int channels = NativeCapturePcm.requiredInteger(query, "channels", 1, 2);
+        int sampleRate = NativeCapturePcm.requiredInteger(query, "sampleRate", 8000, 192000);
+        int result = context.audioEngine.submitExternalCapturePcm(pcm, frames, channels, sampleRate);
+        Map<String, Object> body = HttpUtil.ok();
+        body.put("ok", result == 0);
+        body.put("result", result);
+        if (result != 0) body.put("error", "native capture analysis is unavailable");
+        HttpUtil.sendJson(exchange, body);
+    }
+
     private void handleNativeSpatialStream(
         HttpExchange exchange,
         Map<String, String> query
@@ -1058,6 +1124,16 @@ public final class ApiRoutes {
             throw new IllegalArgumentException("native spatial PCM block ended early");
         }
         encodedBlock.flip();
+        long gainSequence = longParam(query, "gainSequence", 0);
+        int gainLeaseResult = -1;
+        if (gainSequence > 0) {
+            // Renewal cannot resurrect a timed-out owner or an older command.
+            // PCM still traverses its generation gate; expired ownership is
+            // kept silent by the native audio callback.
+            gainLeaseResult = context.audioEngine.renewSpatialOutputGainLease(
+                session, generation, gainSequence, longParam(query, "expiresAt", 0)
+            );
+        }
         int result = context.audioEngine.submitSpatialPcm(
             session,
             generation,
@@ -1073,6 +1149,7 @@ public final class ApiRoutes {
         body.put("blocks", 1);
         body.put("sequence", sequence);
         body.put("lastResult", result);
+        body.put("gainLeaseExpired", gainLeaseResult < -1);
         HttpUtil.sendJson(exchange, body);
     }
 
@@ -2027,7 +2104,7 @@ public final class ApiRoutes {
     private static Map<String, Object> appVersion() {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("name", "FE Monster Java");
-        body.put("version", "2.1.1");
+        body.put("version", "2.2.3");
         body.put("runtime", System.getProperty("java.version"));
         body.put("ok", true);
         return body;
@@ -2068,7 +2145,12 @@ public final class ApiRoutes {
     ) throws IOException {
         String provider = providerFrom(path, query);
         Map<String, Object> accountPayload = context.music.accountPayload(provider);
-        AchievementAccount account = achievementAccount(provider, accountPayload);
+        AchievementAccount account = achievementAccount(
+            provider,
+            accountPayload,
+            context.achievements.rememberedScope(provider)
+        );
+        if (account.confirmed()) context.achievements.rememberScope(account.provider(), account.scope());
         Map<String, Object> state = context.achievements.snapshot(account.scope());
         boolean serverSynced = !account.remoteRequired();
         if (account.remoteRequired()) {
@@ -2096,7 +2178,12 @@ public final class ApiRoutes {
     ) throws IOException {
         String provider = providerFrom(path, query);
         Map<String, Object> accountPayload = context.music.accountPayload(provider);
-        AchievementAccount account = achievementAccount(provider, accountPayload);
+        AchievementAccount account = achievementAccount(
+            provider,
+            accountPayload,
+            context.achievements.rememberedScope(provider)
+        );
+        if (account.confirmed()) context.achievements.rememberScope(account.provider(), account.scope());
         Map<String, Object> state = context.achievements.update(account.scope(), incoming);
         boolean serverSynced = !account.remoteRequired();
         if (account.remoteRequired()) {
@@ -2119,19 +2206,39 @@ public final class ApiRoutes {
 
     private static AchievementAccount achievementAccount(
         String provider,
-        Map<String, Object> accountPayload
+        Map<String, Object> accountPayload,
+        String rememberedScope
     ) {
         Map<String, Object> account = SimpleJson.asMap(accountPayload.get("account"));
         String accountId = SimpleJson.asString(account.get("userId"), "").trim();
         boolean loggedIn = SimpleJson.asBoolean(accountPayload.get("loggedIn"), false)
             && !accountId.isBlank();
         String normalizedProvider = MusicProviderRegistry.normalize(provider);
-        return new AchievementAccount(
-            loggedIn ? normalizedProvider + ":" + accountId : "anonymous",
-            normalizedProvider,
-            loggedIn ? accountId : "",
-            loggedIn
-        );
+        if (loggedIn) {
+            return new AchievementAccount(
+                normalizedProvider + ":" + accountId,
+                normalizedProvider,
+                accountId,
+                true,
+                true
+            );
+        }
+        // Without a live account the achievements must keep following the last
+        // confirmed music-platform account instead of the empty anonymous
+        // partition. The music-API plugin is often still starting when the
+        // client asks for its state right after launch.
+        String remembered = rememberedScope == null ? "" : rememberedScope.trim();
+        if (remembered.startsWith(normalizedProvider + ":")
+            && !remembered.substring(normalizedProvider.length() + 1).isBlank()) {
+            return new AchievementAccount(
+                remembered,
+                normalizedProvider,
+                remembered.substring(normalizedProvider.length() + 1),
+                false,
+                false
+            );
+        }
+        return new AchievementAccount("anonymous", normalizedProvider, "", false, true);
     }
 
     private static Map<String, Object> achievementResponse(
@@ -2144,6 +2251,8 @@ public final class ApiRoutes {
         sync.put("scope", account.scope());
         sync.put("provider", account.provider());
         sync.put("accountId", account.accountId());
+        sync.put("confirmed", account.confirmed());
+        sync.put("remembered", !account.confirmed() && !"anonymous".equals(account.scope()));
         sync.put("remoteRequired", account.remoteRequired());
         sync.put("serverSynced", serverSynced);
         response.put("_sync", sync);
@@ -2167,7 +2276,8 @@ public final class ApiRoutes {
         String scope,
         String provider,
         String accountId,
-        boolean remoteRequired
+        boolean remoteRequired,
+        boolean confirmed
     ) {
     }
 
@@ -2242,7 +2352,7 @@ public final class ApiRoutes {
 
     private static Map<String, Object> updatePayload() {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("version", "2.1.1");
+        body.put("version", "2.2.3");
         body.put("downloadUrl", "");
         body.put("releaseNotes", "New translucent playback page, clearer lyrics, independent lyric colors, rhythm mode, and adaptive preset performance.");
         body.put("fileSize", 0);

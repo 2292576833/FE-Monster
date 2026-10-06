@@ -18,15 +18,20 @@
         document.documentElement.dataset.interactiveServices = 'deferred';
       }
     </script>
-    <link rel="stylesheet" href="/components/GlassSurface.css?v=20260811-cache-audit-1" />
+    <link rel="stylesheet" href="/components/GlassSurface.css?v=20260926-playback-glass-brightness-1" />
     <link rel="stylesheet" href="/components/BorderGlow.css?v=20260811-cache-audit-1" />
     <link rel="stylesheet" href="border-glow-buttons.css?v=20260811-cache-audit-1" />
   <link rel="stylesheet" href="text-fonts.css?v=20260811-cache-audit-1" />
-    <link rel="stylesheet" href="styles.css?v=20260825-desktop-mixer-layout-1" />
+    <link rel="stylesheet" href="styles.css?v=20261007-wheel-transition-2" />
+    <link rel="stylesheet" href="search-window.css?v=20260926-search-bare-buttons-1" />
+    <link rel="stylesheet" href="playback-card.css?v=20260924-card-border-volume-1" />
+    <link rel="stylesheet" href="playback-bar-enhancements.css?v=20260926-queue-wheel-selection-1" />
+    <link rel="stylesheet" href="particle-lyrics.css?v=20260918-particle-idle-custom-2" />
     <link rel="stylesheet" href="rhythm-game.css?v=20260811-cache-audit-1" />
     <link rel="stylesheet" href="black-gold-buttons.css?v=20260811-cache-audit-1" />
     <link rel="stylesheet" href="pixel-adventure.css?v=20260813-achievement-rewards-1" />
-    <link rel="stylesheet" href="pet-assistant.css?v=20260816-pet-chain-fix-1" />
+    <link rel="stylesheet" href="audio-source-manager.css?v=20260919-audio-source-library-switch-1" />
+    <link rel="stylesheet" href="pet-assistant.css?v=20260830-permanent-chat-history-1" />
     <link rel="stylesheet" href="pet-companion-p2.css?v=20260811-cache-audit-1" />
     <link rel="stylesheet" href="pet-product-tour.css?v=20260811-moving-guide-1" />
     <link rel="stylesheet" href="community-reward-runtime.css?v=20260812-reward-stages-2" />
@@ -178,7 +183,7 @@
           <div class="runtime-settings-group-content" id="petAssistantVoiceDisclosureOptions">
             <label class="pet-assistant__voice-picker" for="petAssistantVoiceSelect">
               <span>回复音色</span>
-              <select id="petAssistantVoiceSelect" aria-describedby="petAssistantVoiceHint" disabled>
+              <select id="petAssistantVoiceSelect" aria-describedby="petAssistantVoiceHint" data-pet-parameter-ignore-reason="command:pet.voice.select" disabled>
                 <option value="">正在同步音色…</option>
               </select>
               <span class="pet-assistant__voice-hint" id="petAssistantVoiceHint">音色由你的 FE Monster 服务器提供</span>
@@ -227,21 +232,25 @@
               </label>
               <label class="runtime-ai-field" for="aiServiceModelBaseUrl">
                 <span>Base URL</span>
-                <input id="aiServiceModelBaseUrl" type="url" inputmode="url" autocomplete="off" spellcheck="false" />
+                <input id="aiServiceModelBaseUrl" type="url" inputmode="url" autocomplete="off" spellcheck="false" data-pet-parameter-ignore-reason="manual-external-endpoint" />
               </label>
               <label class="runtime-ai-field" for="aiServiceModelApiKey">
                 <span>API Key</span>
                 <span class="runtime-ai-secret-row">
-                  <input id="aiServiceModelApiKey" class="runtime-ai-secret-input" type="password" autocomplete="new-password" placeholder="留空保持不变" />
+                  <input id="aiServiceModelApiKey" class="runtime-ai-secret-input" type="password" autocomplete="new-password" placeholder="留空保持不变" data-pet-parameter-ignore-reason="manual-credential" />
                   <button id="aiServiceModelKeyClearButton" type="button">清除</button>
                 </span>
               </label>
               <label class="runtime-ai-field" for="aiServiceModelName">
                 <span>模型名</span>
-                <input id="aiServiceModelName" type="text" list="aiServiceModelNameList" autocomplete="off" spellcheck="false" />
+                <input id="aiServiceModelName" type="text" list="aiServiceModelNameList" autocomplete="off" spellcheck="false" data-pet-parameter-ignore-reason="command:ai.model.select" />
                 <datalist id="aiServiceModelNameList"></datalist>
               </label>
               <button class="runtime-ai-test-button" id="aiServiceModelTestButton" type="button">测试模型连接</button>
+              <label class="runtime-ai-field runtime-ai-memory-consent" for="aiServiceMemorySharing">
+                <span><input id="aiServiceMemorySharing" type="checkbox" data-pet-parameter-ignore-reason="manual-memory-sharing-consent" /> 允许当前模型使用跨会话记忆</span>
+                <small>启用后会向当前模型服务发送相关聊天片段和偏好摘要；更换服务商或地址后需重新授权。完整记忆库仍保存在本机。</small>
+              </label>
             </div>
             <label class="runtime-ai-field" for="aiServiceTtsModeSelect">
               <span>TTS 来源（跟随模型）</span>
@@ -265,6 +274,8 @@
               <button
                 class="runtime-ai-tts-toggle"
                 id="aiServiceTtsEnabledToggle"
+                data-pet-parameter-key="ai.tts.enabled"
+                data-pet-parameter-scope="ai"
                 type="button"
                 role="switch"
                 aria-label="客户端 TTS"
@@ -298,32 +309,32 @@
                 </label>
                 <label class="runtime-ai-field" for="aiServiceTtsAppId" data-doubao-auth="legacy-app-access" hidden>
                   <span>App ID</span>
-                  <input id="aiServiceTtsAppId" class="runtime-ai-secret-input" type="password" autocomplete="new-password" placeholder="留空保持不变" />
+                  <input id="aiServiceTtsAppId" class="runtime-ai-secret-input" type="password" autocomplete="new-password" placeholder="留空保持不变" data-pet-parameter-ignore-reason="manual-credential" />
                 </label>
                 <label class="runtime-ai-field" for="aiServiceTtsAccessKey" data-doubao-auth="legacy-app-access" hidden>
                   <span>Access Key</span>
-                  <input id="aiServiceTtsAccessKey" class="runtime-ai-secret-input" type="password" autocomplete="new-password" placeholder="留空保持不变" />
+                  <input id="aiServiceTtsAccessKey" class="runtime-ai-secret-input" type="password" autocomplete="new-password" placeholder="留空保持不变" data-pet-parameter-ignore-reason="manual-credential" />
                 </label>
               </div>
               <label class="runtime-ai-field" for="aiServiceTtsBaseUrl">
                 <span>Base URL</span>
-                <input id="aiServiceTtsBaseUrl" type="url" inputmode="url" autocomplete="off" spellcheck="false" />
+                <input id="aiServiceTtsBaseUrl" type="url" inputmode="url" autocomplete="off" spellcheck="false" data-pet-parameter-ignore-reason="manual-external-endpoint" />
               </label>
               <label class="runtime-ai-field" for="aiServiceTtsApiKey">
                 <span>TTS Key</span>
                 <span class="runtime-ai-secret-row">
-                  <input id="aiServiceTtsApiKey" class="runtime-ai-secret-input" type="password" autocomplete="new-password" placeholder="留空保持不变" />
+                  <input id="aiServiceTtsApiKey" class="runtime-ai-secret-input" type="password" autocomplete="new-password" placeholder="留空保持不变" data-pet-parameter-ignore-reason="manual-credential" />
                   <button id="aiServiceTtsKeyClearButton" type="button">清除</button>
                 </span>
               </label>
               <label class="runtime-ai-field" for="aiServiceTtsModel">
                 <span>TTS 模型</span>
-                <input id="aiServiceTtsModel" type="text" list="aiServiceTtsModelList" autocomplete="off" spellcheck="false" />
+                <input id="aiServiceTtsModel" type="text" list="aiServiceTtsModelList" autocomplete="off" spellcheck="false" data-pet-parameter-ignore-reason="command:ai.tts.provider.select" />
                 <datalist id="aiServiceTtsModelList"></datalist>
               </label>
               <label class="runtime-ai-field" for="aiServiceTtsVoice">
                 <span>音色</span>
-                <input id="aiServiceTtsVoice" type="text" autocomplete="off" spellcheck="false" />
+                <input id="aiServiceTtsVoice" type="text" autocomplete="off" spellcheck="false" data-pet-parameter-ignore-reason="command:ai.tts.voice.select" />
               </label>
               <div class="runtime-ai-doubao-fields runtime-ai-doubao-output" id="aiServiceDoubaoOutputFields" hidden>
                 <label class="runtime-ai-field" for="aiServiceTtsFormat">
@@ -344,7 +355,7 @@
                 </label>
                 <label class="runtime-ai-field" for="aiServiceTtsEmotion">
                   <span>语音情绪</span>
-                  <input id="aiServiceTtsEmotion" type="text" maxlength="64" autocomplete="off" placeholder="留空自动；需音色支持" />
+                  <input id="aiServiceTtsEmotion" type="text" maxlength="64" autocomplete="off" placeholder="留空自动；需音色支持" data-pet-parameter-ignore-reason="command:ai.tts.prosody.set" />
                 </label>
                 <label class="runtime-ai-field" for="aiServiceTtsEmotionScale">
                   <span>情绪强度</span>
@@ -372,6 +383,47 @@
           </span>
           <button id="petProductTourReplay" type="button">重新演示</button>
         </div>
+        <details class="runtime-settings-group runtime-volume-slider-settings" id="runtimeVolumeSliderSettingsGroup">
+          <summary>
+            <span>音量滑块</span>
+            <small>贴边细线、音乐律动与滚轮</small>
+          </summary>
+          <div class="runtime-settings-group-content">
+            <p class="volume-slider-settings-hint">鼠标移到播放栏右侧细线即可调节音量。向上滚动增大，向下滚动减小；拖动和方向键仍可使用。</p>
+            <label class="runtime-toggle" for="volumeSliderGradientToggle">
+              <input class="ui-switch" id="volumeSliderGradientToggle" type="checkbox" role="switch" checked />
+              <span>悬停自动渐变</span>
+            </label>
+            <label class="runtime-toggle" for="volumeSliderMusicReactiveToggle">
+              <input class="ui-switch" id="volumeSliderMusicReactiveToggle" type="checkbox" role="switch" checked />
+              <span>随音乐律动</span>
+            </label>
+            <label class="volume-slider-setting" for="volumeSliderMusicStrength">
+              <span>律动强度 <output id="volumeSliderMusicStrengthValue" for="volumeSliderMusicStrength">65%</output></span>
+              <input id="volumeSliderMusicStrength" type="range" min="0" max="100" step="1" value="65" />
+              <small>低频带动光亮脉冲，中高频推动渐变；只改变外观，不改变音量。设为 0 可停止律动。</small>
+            </label>
+            <div class="volume-slider-colors">
+              <label for="volumeSliderColorStart"><span>起始颜色</span><input id="volumeSliderColorStart" type="color" value="#72e6ff" /></label>
+              <label for="volumeSliderColorEnd"><span>结束颜色</span><input id="volumeSliderColorEnd" type="color" value="#b69cff" /></label>
+            </div>
+            <label class="volume-slider-setting" for="volumeSliderGradientDuration">
+              <span>变色周期 <output id="volumeSliderGradientDurationValue" for="volumeSliderGradientDuration">6 秒 / 周期</output></span>
+              <input id="volumeSliderGradientDuration" type="range" min="2" max="20" step="1" value="6" />
+              <small>周期越短，变色越快；关闭渐变时使用起始颜色。</small>
+            </label>
+            <label class="volume-slider-setting" for="volumeSliderHoverStrength">
+              <span>悬停高亮强度 <output id="volumeSliderHoverStrengthValue" for="volumeSliderHoverStrength">70%</output></span>
+              <input id="volumeSliderHoverStrength" type="range" min="0" max="100" step="1" value="70" />
+            </label>
+            <label class="volume-slider-setting" for="volumeSliderWheelStep">
+              <span>滚轮步长 <output id="volumeSliderWheelStepValue" for="volumeSliderWheelStep">2% / 格</output></span>
+              <input id="volumeSliderWheelStep" type="range" min="1" max="10" step="1" value="2" />
+            </label>
+            <button class="runtime-action-button" id="volumeSliderAppearanceReset" type="button">恢复音量滑块默认设置</button>
+            <small class="volume-slider-settings-hint">修改即时生效并自动保存。暂停或采样中断时律动平滑停止；系统开启“减少动态效果”时保留高亮，停止颜色动画与律动。</small>
+          </div>
+        </details>
         <details class="runtime-settings-group runtime-cursor-settings" id="runtimeCursorSettingsGroup">
           <summary>
             <span>鼠标光标</span>
@@ -418,6 +470,7 @@
                 id="cursorImportInput"
                 type="file"
                 accept="image/png,image/jpeg,image/webp,image/gif"
+                data-pet-parameter-ignore-reason="manual-file-picker"
                 hidden
               />
               <small>支持 PNG、JPG/JPEG、WebP、GIF；GIF 会使用静态首帧。最大 4 MB、2048 × 2048。</small>
@@ -485,6 +538,21 @@
       </form>
 
       <section class="search-suggestions" id="searchSuggestions" role="listbox" aria-label="相关歌曲" hidden></section>
+      <section class="search-results-window" id="searchResultsWindow" role="dialog" aria-modal="false" aria-labelledby="searchResultsWindowTitle" hidden>
+        <header class="search-results-window-head">
+          <div class="search-results-window-heading">
+            <small>当前平台</small>
+            <strong id="searchResultsWindowTitle">搜索结果</strong>
+            <span id="searchResultsWindowMeta">输入关键词开始搜索</span>
+          </div>
+          <button class="search-results-window-close glass-button-native" id="searchResultsWindowClose" type="button" aria-label="关闭搜索结果" title="关闭">×</button>
+        </header>
+        <div class="search-results-window-list" id="searchResultsWindowList" role="listbox" aria-label="全部歌曲"></div>
+        <footer class="search-results-window-foot">
+          <span id="searchResultsWindowStatus">可选择歌曲播放</span>
+          <button class="search-results-window-refresh glass-button-native" id="searchResultsWindowRefresh" type="button">重新搜索</button>
+        </footer>
+      </section>
       <section class="favorite-library" id="favoriteLibrary" aria-label="收藏目录" hidden>
         <div class="favorite-library-head">
           <strong>收藏目录</strong>
@@ -570,6 +638,9 @@
         </button>
         <button class="diy-page-tab glass-surface" id="diyRhythmGameButton" type="button" aria-pressed="false" aria-controls="rhythmGameScene" style="--diy-menu-index: 3">
           <span class="glass-surface__content">音游</span>
+        </button>
+        <button class="diy-page-tab glass-surface" id="diyPlaylistButton" type="button" aria-pressed="false" aria-controls="orbPlaylists playlistShelf" style="--diy-menu-index: 4">
+          <span class="glass-surface__content">歌单</span>
         </button>
       </nav>
 
@@ -1480,11 +1551,19 @@
         <section class="chladni-scene" id="chladniScene" aria-label="克拉尼 3D 粒子图形" hidden>
           <div class="chladni-core" id="chladniCore" aria-hidden="true"></div>
         </section>
+        <section class="particle-lyrics-scene" id="particleLyricsScene" aria-label="粒子歌词" hidden>
+          <div class="particle-lyrics-core" id="particleLyricsCore"></div>
+          <span class="particle-lyrics-accessible" id="particleLyricsAccessible" role="status" aria-live="polite"></span>
+        </section>
+        <section class="harmonic-state-scene" id="harmonicStateScene" aria-label="谐波之境 · HARMONIC STATE" hidden>
+          <div class="harmonic-state-core" id="harmonicStateCore" aria-hidden="true"></div>
+        </section>
         <section class="cover-particle-scene" id="coverParticleScene" aria-label="&#31890;&#23376;&#23553;&#38754;" hidden>
           <div class="cover-particle-rig" id="coverParticleRig" aria-hidden="true">
             <canvas class="cover-particle-wallpaper-canvas" id="coverParticleWallpaperCanvas"></canvas>
             <div class="cover-particle-engine" id="coverParticleEngine"></div>
             <canvas class="cover-particle-canvas" id="coverParticleCanvas"></canvas>
+            <canvas class="cover-sketch-canvas" id="coverSketchCanvas" hidden></canvas>
           </div>
         </section>
         <section class="sandbox-playback-scene" id="sandboxPlaybackScene" aria-label="&#33258;&#23450;&#20041; 3D &#22330;&#26223;&#39044;&#35774;" hidden>
@@ -1500,13 +1579,15 @@
         </section>
         <section class="playback-lyric-scene" id="playbackLyricScene" aria-label="3D playback lyric" hidden>
           <div class="book-lyric-stage" id="bookLyricStage" aria-hidden="true">
-            <figure class="book-lyric-cover" id="bookLyricCover">
-              <img id="bookLyricCoverImage" alt="" />
-              <figcaption>FE</figcaption>
-            </figure>
-            <div class="book-lyric-page" id="bookLyricPage" aria-label="书页歌词">
-              <div class="book-lyric-list" id="bookLyricList"></div>
+            <div class="book-lyric-cover-column">
+              <figure class="book-lyric-cover" id="bookLyricCover">
+                <img id="bookLyricCoverImage" alt="" />
+                <figcaption>FE</figcaption>
+              </figure>
               <div class="book-lyric-artist" id="bookLyricArtist"></div>
+            </div>
+            <div class="book-lyric-page" id="bookLyricPage" aria-label="书页歌词">
+              <div class="book-lyric-list" id="bookLyricList" data-lyric-offset="transform"></div>
             </div>
           </div>
           <div class="multi-row-lyric-stage" id="multiRowLyricStage" aria-hidden="true">
@@ -1525,6 +1606,11 @@
               <span class="word-glow-lyric-previous" id="wordGlowLyricPrevious" aria-hidden="true" hidden></span>
               <span class="word-glow-lyric-keyword word-glow-echo" id="wordGlowLyricKeyword" aria-hidden="true"></span>
               <div class="playback-lyric-subtitle" id="playbackLyricSubtitle"></div>
+              <canvas
+                class="lyric-highlight-particles lyric-highlight-particles--front"
+                id="lyricHighlightParticlesFront"
+                aria-hidden="true"
+              ></canvas>
             </div>
           </div>
         </section>
@@ -1545,16 +1631,6 @@
               aria-hidden="true"
               data-glass-surface
               data-glass-radius="16"
-              data-glass-brightness="50"
-              data-glass-opacity="0.9"
-              data-glass-blur="7"
-              data-glass-displace="0.16"
-              data-glass-background-opacity="0.035"
-              data-glass-saturation="1.14"
-              data-glass-distortion-scale="-96"
-              data-glass-red-offset="-2"
-              data-glass-green-offset="4"
-              data-glass-blue-offset="10"
             >
               <img id="qishuiPlaybackBackdrop" alt="" />
             </div>
@@ -1575,6 +1651,14 @@
                   aria-label="放大播放页"
                   aria-pressed="false"
                   title="放大播放页"
+                ><span aria-hidden="true"></span></button>
+                <button
+                  class="qishui-playback-view-button qishui-playback-mode-toggle"
+                  id="compactPlaybackModeToggle"
+                  type="button"
+                  aria-label="切换播放卡片"
+                  aria-pressed="false"
+                  title="切换播放卡片"
                 ><span aria-hidden="true"></span></button>
                 <button
                   class="qishui-playback-view-button qishui-playback-desktop-toggle"
@@ -1649,6 +1733,9 @@
                 <img id="qishuiPlaybackCover" alt="" />
                 <span id="qishuiPlaybackCoverFallback" aria-hidden="true">FE</span>
               </figure>
+              <label class="qishui-playback-volume" id="qishuiPlaybackVolume">
+                <input id="qishuiPlaybackVolumeRange" type="range" min="0" max="100" step="1" value="80" aria-label="音量" aria-orientation="vertical" aria-valuetext="80%" />
+              </label>
 
               <div class="qishui-playback-lyrics" id="qishuiPlaybackLyrics">
                 <div
@@ -1792,6 +1879,51 @@
             </div>
           </article>
           <p class="qishui-playback-wheel-hint" id="qishuiPlaybackWheelHint">滚轮向上上一首 · 向下下一首</p>
+          <button class="qishui-playback-queue-button" id="qishuiPlaybackQueueButton" type="button" aria-label="打开播放队列" title="打开播放队列" aria-expanded="false" aria-controls="qishuiPlaybackQueuePanel">
+            <span class="qishui-playback-queue-button__icon" aria-hidden="true">≡</span><span class="qishui-playback-queue-button__label">歌曲队列</span><b id="qishuiPlaybackQueueCount">0</b>
+          </button>
+          <aside class="qishui-playback-queue-panel" id="qishuiPlaybackQueuePanel" aria-label="歌曲队列" aria-hidden="true" hidden>
+            <header class="qishui-playback-queue-panel__header">
+              <div><strong>歌曲队列</strong><small id="qishuiPlaybackQueuePanelMeta">暂无排队歌曲</small></div>
+              <button class="qishui-playback-queue-close" id="qishuiPlaybackQueueClose" type="button" aria-label="关闭歌曲队列">×</button>
+            </header>
+            <ol class="qishui-playback-queue-list" id="qishuiPlaybackQueueList" role="listbox" aria-label="正在排队的歌曲"></ol>
+          </aside>
+        </section>
+        <section class="compact-playback-card" id="compactPlaybackCard" aria-label="播放卡片" hidden>
+          <canvas class="compact-playback-canvas" id="compactPlaybackCanvas" aria-hidden="true"></canvas>
+          <div class="compact-playback-sheen" aria-hidden="true"></div>
+          <div class="compact-playback-content">
+            <div class="compact-playback-heading">
+              <strong id="compactPlaybackTitle">等待播放</strong>
+              <span id="compactPlaybackArtist">音乐播放</span>
+            </div>
+            <div class="compact-playback-progress">
+              <input id="compactPlaybackProgress" type="range" min="0" max="1000" step="1" value="0" aria-label="歌曲播放进度" disabled />
+              <span class="compact-playback-time"><time id="compactPlaybackCurrentTime">00:00</time><span>/</span><time id="compactPlaybackTotalTime">00:00</time></span>
+            </div>
+            <div class="compact-playback-actions" aria-label="播放控制">
+              <button id="compactPlaybackPreviousButton" type="button" aria-label="上一首" title="上一首">‹</button>
+              <button id="compactPlaybackPlayButton" type="button" aria-label="播放" title="播放">▶</button>
+              <button id="compactPlaybackNextButton" type="button" aria-label="下一首" title="下一首">›</button>
+              <button id="compactPlaybackReturnButton" class="compact-playback-return" type="button" aria-label="切换回新播放栏" title="切换回新播放栏">↗</button>
+            </div>
+          </div>
+          <div class="compact-playback-volume" id="compactPlaybackVolume" role="slider" tabindex="0" aria-label="音量" aria-valuemin="0" aria-valuemax="100" aria-valuenow="80" aria-valuetext="80%">
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="compactPlaybackVolumeGradient" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#72e6ff" />
+                  <stop offset="0.5" stop-color="#b69cff" />
+                  <stop offset="1" stop-color="#72e6ff" />
+                </linearGradient>
+              </defs>
+              <path class="compact-playback-volume-track" id="compactPlaybackVolumeTrack" d="M 17 1 H 83 A 16 16 0 0 1 99 17 V 83 A 16 16 0 0 1 83 99 H 17 A 16 16 0 0 1 1 83 V 17 A 16 16 0 0 1 17 1 Z" pathLength="1" />
+              <path class="compact-playback-volume-fill" id="compactPlaybackVolumeFill" d="M 17 1 H 83 A 16 16 0 0 1 99 17 V 83 A 16 16 0 0 1 83 99 H 17 A 16 16 0 0 1 1 83 V 17 A 16 16 0 0 1 17 1 Z" pathLength="1" />
+              <path class="compact-playback-volume-hit" id="compactPlaybackVolumeHit" d="M 17 1 H 83 A 16 16 0 0 1 99 17 V 83 A 16 16 0 0 1 83 99 H 17 A 16 16 0 0 1 1 83 V 17 A 16 16 0 0 1 17 1 Z" pathLength="1" />
+            </svg>
+          </div>
+          <span class="compact-playback-drag-hint" aria-hidden="true">长按拖动</span>
         </section>
         <canvas class="rain-glass-overlay-canvas" id="rainGlassCanvas" aria-hidden="true"></canvas>
         <section class="orb-playlists playlist-album-orbit" id="orbPlaylists" aria-label="User playlist albums" hidden>
@@ -1942,6 +2074,10 @@
                 <strong>克拉尼</strong>
                 <small>平面 · 3D六面</small>
               </button>
+              <button class="diy-preset-card" id="diyHarmonicStatePreset" type="button" data-preset="harmonic-state">
+                <strong>谐波之境</strong>
+                <small>旋转环轨 · 涟漪方块 · 粒子雨</small>
+              </button>
               <button class="diy-preset-card" id="diyRainGlassPreset" type="button" data-preset="rain-glass">
                 <strong>&#38632;&#22825;&#29627;&#29827;</strong>
                 <small>&#27700;&#28404;&#28369;&#33853;</small>
@@ -1975,7 +2111,52 @@
               </span>
             </summary>
             <div class="scene-preset-settings__content" id="scenePresetSettingsContent">
+          <section class="diy-text-composer" id="bookLyricLineCountControl" data-diy-preset-control="book" data-scene-feature-preset="book" aria-label="书页歌词参数" hidden>
+            <div class="diy-text-composer-field">
+              <label for="bookLyricLineCount">书页歌词显示行数</label>
+              <output id="bookLyricLineCountValue" for="bookLyricLineCount">7 行</output>
+              <input id="bookLyricLineCount" data-text-composer-setting="bookLyricLineCount" type="range" min="1" max="15" step="1" value="7" />
+            </div>
+          </section>
           <section id="diyCoverParticleControl" data-diy-preset-control="cover-particles" hidden>
+            <details class="scene-feature-group" id="coverRenderModeFeatureGroup" data-scene-feature-preset="cover-particles" open>
+              <summary><strong>封面样式</strong><small>粒子与流动素描</small></summary>
+              <div class="scene-feature-group__content">
+                <div class="cover-render-mode-switch" role="group" aria-label="封面样式">
+                  <button type="button" data-cover-render-mode="particles" aria-pressed="true">粒子封面</button>
+                  <button type="button" data-cover-render-mode="sketch" aria-pressed="false">素描封面</button>
+                  <button id="coverDepthMapToggle" type="button" aria-pressed="false" aria-describedby="coverDepthMapDescription">深度图：关闭</button>
+                </div>
+                <p id="coverDepthMapDescription" class="cover-depth-status">黑白强对比、深色阴影与亮部高光。再次点击恢复原色。</p>
+              </div>
+            </details>
+            <details class="scene-feature-group" id="coverSketchFeatureGroup" data-scene-feature-preset="cover-particles" data-cover-mode-controls="sketch" open hidden>
+              <summary><strong>素描线条</strong><small>多层交织 · 待机流动</small></summary>
+              <div class="scene-feature-group__content">
+                <div class="sonic-range-control"><label for="cover-sketchLayers">线条层数 <output id="cover-sketchLayersValue" for="cover-sketchLayers">8 层</output></label><input id="cover-sketchLayers" data-cover-setting="sketchLayers" type="range" min="2" max="16" step="1" value="8" aria-valuetext="8 层" /></div>
+                <div class="sonic-range-control"><label for="cover-sketchDensity">单层疏密 <output id="cover-sketchDensityValue" for="cover-sketchDensity">100%</output></label><input id="cover-sketchDensity" data-cover-setting="sketchDensity" type="range" min="40" max="160" step="5" value="100" aria-valuetext="100%" /></div>
+                <div class="sonic-range-control"><label for="cover-sketchLineWidth">线条粗细 <output id="cover-sketchLineWidthValue" for="cover-sketchLineWidth">80%</output></label><input id="cover-sketchLineWidth" data-cover-setting="sketchLineWidth" type="range" min="40" max="200" step="5" value="80" aria-valuetext="80%" /></div>
+                <div class="sonic-range-control"><label for="cover-sketchFlowSpeed">流动速度 <output id="cover-sketchFlowSpeedValue" for="cover-sketchFlowSpeed">65%</output></label><input id="cover-sketchFlowSpeed" data-cover-setting="sketchFlowSpeed" type="range" min="0" max="200" step="5" value="65" aria-valuetext="65%" /></div>
+                <div class="sonic-range-control"><label for="cover-sketchFlowAmplitude">流动幅度 <output id="cover-sketchFlowAmplitudeValue" for="cover-sketchFlowAmplitude">65%</output></label><input id="cover-sketchFlowAmplitude" data-cover-setting="sketchFlowAmplitude" type="range" min="0" max="200" step="5" value="65" aria-valuetext="65%" /></div>
+              </div>
+            </details>
+            <details class="scene-feature-group" id="coverDepthFeatureGroup" data-scene-feature-preset="cover-particles" open>
+              <summary><strong>立体深度与光照</strong><small>根据当前封面自动生成 · 换封面自动更新</small></summary>
+              <div class="scene-feature-group__content">
+                <p id="coverDepthStatus" class="cover-depth-status" role="status" aria-live="polite">深度已启用，随当前封面自动更新。</p>
+                <button id="coverDepthReset" class="cover-depth-reset" type="button">恢复深度默认值</button>
+                <label class="diy-toggle" for="cover-depthEnabled"><span>深度效果</span><input class="ui-switch" id="cover-depthEnabled" data-cover-setting="depthEnabled" type="checkbox" role="switch" checked /></label>
+                <div class="sonic-range-control"><label for="cover-depthStrength">深度强度 <output id="cover-depthStrengthValue" for="cover-depthStrength">100%</output></label><input id="cover-depthStrength" data-cover-setting="depthStrength" type="range" min="0" max="300" step="5" value="100" aria-valuetext="100%" /></div>
+                <div class="sonic-range-control"><label for="cover-depthContrast">深度对比 <output id="cover-depthContrastValue" for="cover-depthContrast">100%</output></label><input id="cover-depthContrast" data-cover-setting="depthContrast" type="range" min="25" max="300" step="5" value="100" aria-valuetext="100%" /></div>
+                <label class="diy-toggle" for="cover-depthInvert"><span>反向深度</span><input class="ui-switch" id="cover-depthInvert" data-cover-setting="depthInvert" type="checkbox" role="switch" /></label>
+                <label class="diy-toggle" for="cover-depthLightingEnabled"><span>深度光照</span><input class="ui-switch" id="cover-depthLightingEnabled" data-cover-setting="depthLightingEnabled" type="checkbox" role="switch" checked /></label>
+                <div class="sonic-range-control"><label for="cover-depthLightStrength">光照强度 <output id="cover-depthLightStrengthValue" for="cover-depthLightStrength">80%</output></label><input id="cover-depthLightStrength" data-cover-setting="depthLightStrength" type="range" min="0" max="200" step="5" value="80" aria-valuetext="80%" /></div>
+                <div class="sonic-range-control"><label for="cover-depthAmbient">暗部亮度 <output id="cover-depthAmbientValue" for="cover-depthAmbient">65%</output></label><input id="cover-depthAmbient" data-cover-setting="depthAmbient" type="range" min="5" max="100" step="5" value="65" aria-valuetext="65%" /></div>
+                <div class="sonic-range-control"><label for="cover-depthLightAngle">光源方向 <output id="cover-depthLightAngleValue" for="cover-depthLightAngle">315°</output></label><input id="cover-depthLightAngle" data-cover-setting="depthLightAngle" type="range" min="0" max="360" step="1" value="315" aria-valuetext="315°" /></div>
+                <div class="sonic-range-control"><label for="cover-depthLightSpeed">扫光速度 <output id="cover-depthLightSpeedValue" for="cover-depthLightSpeed">25%</output></label><input id="cover-depthLightSpeed" data-cover-setting="depthLightSpeed" type="range" min="0" max="200" step="5" value="25" aria-valuetext="25%" /></div>
+                <div class="sonic-range-control"><label for="cover-depthHighlight">高光强度 <output id="cover-depthHighlightValue" for="cover-depthHighlight">35%</output></label><input id="cover-depthHighlight" data-cover-setting="depthHighlight" type="range" min="0" max="200" step="5" value="35" aria-valuetext="35%" /></div>
+              </div>
+            </details>
             <details class="scene-feature-group" id="coverParticleBackgroundFeatureGroup" data-scene-feature-preset="cover-particles" open>
               <summary><strong>背景</strong><small>柔光背景显示</small></summary>
               <div class="scene-feature-group__content diy-control diy-control--cover-particle-background">
@@ -1986,9 +2167,14 @@
                 <span id="diyCoverParticleBackgroundValue">ON</span>
               </div>
             </details>
-            <details class="scene-feature-group" id="coverParticleMotionFeatureGroup" data-scene-feature-preset="cover-particles" open>
+            <details class="scene-feature-group" id="coverParticleMotionFeatureGroup" data-scene-feature-preset="cover-particles" data-cover-mode-controls="particles" open>
               <summary><strong>粒子浮动</strong><small>纵深律动与速度</small></summary>
               <div class="scene-feature-group__content diy-control diy-control--cover-particle-background">
+                <label for="coverImageMotionMode">图片动态化</label>
+                <select id="coverImageMotionMode" data-cover-setting="imageMotionMode" aria-label="图片动态化模式">
+                  <option value="parallax">深度视差 + 流动噪声</option>
+                  <option value="dissolve">粒子溶解重组</option>
+                </select>
                 <label for="diyCoverParticleMotionRange">&#31890;&#23376;&#24459;&#21160;</label>
                 <span id="diyCoverParticleMotionValue">80%</span>
                 <input id="diyCoverParticleMotionRange" type="range" min="0" max="200" step="1" value="80" aria-label="&#31890;&#23376;&#24459;&#21160;&#24133;&#24230;" aria-valuetext="80%" />
@@ -2188,8 +2374,13 @@
                 <strong>焦点回声</strong>
                 <small>纯净回声 · 无故障模糊</small>
               </button>
+              <button class="diy-preset-card" id="diyParticleLyricsPreset" type="button" data-text-preset="particle-lyrics" aria-pressed="false">
+                <strong>粒子歌词</strong>
+                <small>星尘凝字 · 随声流动</small>
+              </button>
             </div>
           </div>
+          <section class="particle-lyrics-settings" id="particleLyricsSettings" aria-label="粒子歌词参数" hidden></section>
           <fieldset class="diy-text-composer" id="textComposerControl" aria-labelledby="textComposerTitle">
             <legend id="textComposerTitle">文字效果参数</legend>
             <header class="diy-text-composer-head">
@@ -2323,6 +2514,84 @@
                     <input id="lyricBrightnessRange" type="range" min="60" max="180" value="112" />
                   </div>
                 </div>
+                <section class="diy-text-particle-control" aria-labelledby="lyricParticleControlTitle">
+                  <header class="diy-text-particle-head">
+                    <span>
+                      <strong id="lyricParticleControlTitle">高亮粒子</strong>
+                      <small>低频越强，歌词周围流出的细粒子越密</small>
+                    </span>
+                    <label class="diy-text-particle-toggle" for="textHighlightParticlesToggle">
+                      <output id="textHighlightParticlesValue" for="textHighlightParticlesToggle">ON</output>
+                      <input
+                        class="ui-switch"
+                        id="textHighlightParticlesToggle"
+                        data-text-composer-setting="highlightParticlesEnabled"
+                        type="checkbox"
+                        role="switch"
+                        checked
+                      />
+                    </label>
+                  </header>
+                  <div class="diy-text-composer-grid">
+                    <div class="diy-text-composer-field">
+                      <label for="textHighlightParticleSize">粒子尺寸</label>
+                      <output id="textHighlightParticleSizeValue" for="textHighlightParticleSize">0.75px</output>
+                      <input id="textHighlightParticleSize" data-text-composer-setting="highlightParticleSize" type="range" min="0.35" max="2.4" step="0.05" value="0.75" />
+                    </div>
+                    <div class="diy-text-composer-field">
+                      <label for="textHighlightParticleDensity">粒子密度</label>
+                      <output id="textHighlightParticleDensityValue" for="textHighlightParticleDensity">78%</output>
+                      <input id="textHighlightParticleDensity" data-text-composer-setting="highlightParticleDensity" type="range" min="0" max="100" step="1" value="78" />
+                    </div>
+                    <div class="diy-text-composer-field">
+                      <label for="textHighlightParticleSensitivity">低频灵敏度</label>
+                      <output id="textHighlightParticleSensitivityValue" for="textHighlightParticleSensitivity">68%</output>
+                      <input id="textHighlightParticleSensitivity" data-text-composer-setting="highlightParticleSensitivity" type="range" min="20" max="100" step="1" value="68" />
+                    </div>
+                    <div class="diy-text-composer-field">
+                      <label for="textHighlightParticleSpread">流出范围</label>
+                      <output id="textHighlightParticleSpreadValue" for="textHighlightParticleSpread">56%</output>
+                      <input id="textHighlightParticleSpread" data-text-composer-setting="highlightParticleSpread" type="range" min="0" max="100" step="1" value="56" />
+                    </div>
+                  </div>
+                </section>
+                <section
+                  class="diy-text-palette diy-text-palette--particles"
+                  id="lyricParticlePaletteControl"
+                  aria-labelledby="lyricParticlePaletteTitle"
+                >
+                  <header class="diy-text-palette-head">
+                    <strong id="lyricParticlePaletteTitle">粒子颜色</strong>
+                    <output id="lyricParticlePaletteStatus">跟随歌词</output>
+                  </header>
+                  <button
+                    class="diy-text-palette-auto is-active"
+                    id="lyricParticlePaletteAutoButton"
+                    type="button"
+                    data-lyric-particle-color-mode="auto"
+                    aria-pressed="true"
+                  >
+                    <i aria-hidden="true"></i>
+                    <span>跟随歌词高亮色</span>
+                  </button>
+                  <div class="diy-text-palette-actions">
+                    <div class="diy-text-palette-swatches" role="group" aria-label="高亮粒子常用颜色">
+                      <button type="button" data-lyric-particle-palette-color="#eafbff" style="--text-swatch: #eafbff" aria-label="冰白"></button>
+                      <button type="button" data-lyric-particle-palette-color="#a8dde8" style="--text-swatch: #a8dde8" aria-label="雾蓝"></button>
+                      <button type="button" data-lyric-particle-palette-color="#56d9f2" style="--text-swatch: #56d9f2" aria-label="光青"></button>
+                      <button type="button" data-lyric-particle-palette-color="#64e7c3" style="--text-swatch: #64e7c3" aria-label="薄荷"></button>
+                      <button type="button" data-lyric-particle-palette-color="#bfadff" style="--text-swatch: #bfadff" aria-label="雾紫"></button>
+                      <button type="button" data-lyric-particle-palette-color="#ffadc9" style="--text-swatch: #ffadc9" aria-label="柔粉"></button>
+                      <button type="button" data-lyric-particle-palette-color="#ffbc72" style="--text-swatch: #ffbc72" aria-label="暖橙"></button>
+                      <button type="button" data-lyric-particle-palette-color="#ffe16b" style="--text-swatch: #ffe16b" aria-label="月黄"></button>
+                    </div>
+                    <label class="diy-text-palette-custom" for="lyricParticleCustomColor">
+                      <input id="lyricParticleCustomColor" type="color" value="#eafbff" aria-label="自定义高亮粒子颜色" />
+                      <span>自定义</span>
+                    </label>
+                    <button class="diy-text-palette-reset" id="lyricParticlePaletteResetButton" type="button">跟随歌词</button>
+                  </div>
+                </section>
                 <section class="diy-text-palette" id="textPaletteControl" aria-labelledby="textPaletteTitle">
                   <header class="diy-text-palette-head">
                     <strong id="textPaletteTitle">文字调色</strong>
@@ -2641,7 +2910,10 @@
               <strong id="neteaseLoginTitle">音乐账号登录</strong>
               <span id="loginProviderSubtitle">选择平台后在官方音乐网站完成登录</span>
             </div>
-            <button class="login-close-button" id="neteaseLoginClose" type="button" aria-label="关闭登录弹窗"></button>
+            <div class="audio-source-login-actions">
+              <button class="audio-source-launch" id="audioSourceManagerButton" type="button" aria-haspopup="dialog" aria-controls="audioSourceDialog">音源管理</button>
+              <button class="login-close-button" id="neteaseLoginClose" type="button" aria-label="关闭登录弹窗"></button>
+            </div>
           </header>
 
           <section class="pixel-login-scene" id="pixelLoginScene" aria-label="像素冒险登录场景">
@@ -2862,6 +3134,145 @@
       </section>
     </div>
 
+    <div class="audio-source-dialog" id="audioSourceDialog" role="dialog" aria-modal="true" aria-labelledby="audioSourceTitle" aria-describedby="audioSourceDescription" aria-hidden="true" hidden>
+      <div class="audio-source-backdrop" data-audio-source-close></div>
+      <section class="audio-source-panel" id="audioSourcePanel" tabindex="-1">
+        <header class="audio-source-head">
+          <span>
+            <small>SOURCE ROUTER · LOCAL ONLY</small>
+            <strong id="audioSourceTitle">音源管理</strong>
+          </span>
+          <div class="audio-source-header-actions">
+            <button class="audio-source-launch" id="audioSourceBrowse" type="button">浏览歌单与歌曲</button>
+            <button class="audio-source-launch" id="audioSourceReconnect" type="button">重新连接</button>
+            <button class="audio-source-close" id="audioSourceClose" type="button" aria-label="关闭音源管理">×</button>
+          </div>
+        </header>
+
+        <div class="audio-source-body">
+          <p class="sr-only" id="audioSourceDescription">选择内置解析、导入受限运行的 LX 音源脚本，或导入洛雪歌单。不会导入平台账号或修改音效。</p>
+          <p class="audio-source-runtime" id="audioSourceRuntimeState" data-ready="false">正在读取音源配置…</p>
+
+          <section class="audio-source-library" aria-labelledby="audioSourceLibraryLabel">
+            <label id="audioSourceLibraryLabel" for="audioSourceLibraryProvider">当前音源的歌单平台</label>
+            <select id="audioSourceLibraryProvider" aria-describedby="audioSourceLibraryStatus" disabled>
+              <option value="">尚未读取音源</option>
+            </select>
+            <p id="audioSourceLibraryStatus" role="status">连接音源服务后可选择歌单平台。</p>
+          </section>
+
+          <div class="audio-source-grid">
+            <div class="audio-source-column">
+              <section class="audio-source-section" aria-labelledby="audioSourceBuiltinTitle">
+                <header>
+                  <span>
+                    <strong id="audioSourceBuiltinTitle">内置音源</strong>
+                    <small>网易云、QQ、酷狗与汽水的现有服务</small>
+                  </span>
+                </header>
+                <div class="audio-source-builtin-card" id="audioSourceBuiltinCard" data-selected="false">
+                  <header>
+                    <span>
+                      <strong>FE Monster 内置解析</strong>
+                      <small>服务状态与单曲可播性分开报告</small>
+                    </span>
+                    <em id="audioSourceBuiltinSelected">未选择</em>
+                  </header>
+                  <ul class="audio-source-builtin-list" id="audioSourceBuiltinList"></ul>
+                  <div class="audio-source-builtin-actions">
+                    <button id="audioSourceSelectBuiltin" type="button" data-audio-source-operation>使用内置音源</button>
+                    <button id="audioSourceTestBuiltin" type="button" data-audio-source-operation data-test-action="true">检测当前歌曲</button>
+                  </div>
+                </div>
+              </section>
+
+              <section class="audio-source-section" aria-labelledby="audioSourceImportTitle">
+                <header>
+                  <span>
+                    <strong id="audioSourceImportTitle">导入 LX 音源脚本</strong>
+                    <small>UTF-8 .js · 单个最多 512 KiB</small>
+                  </span>
+                </header>
+                <p class="audio-source-compatibility">
+                  支持网易云、QQ 与带有效 hash 的酷狗歌曲的 <code>musicUrl</code> 播放解析；并非所有 LX 脚本都兼容，已支持 AES（CBC/ECB），RSA、解压工具暂不支持。汽水继续使用内置解析。
+                </p>
+                <form class="audio-source-import-form" id="audioSourceImportForm">
+                  <label for="audioSourceUrl">脚本链接（HTTPS .js）</label>
+                  <div class="audio-source-url-row">
+                    <input id="audioSourceUrl" type="url" placeholder="https://example.org/source.js" autocomplete="off" spellcheck="false" maxlength="8192" />
+                    <button id="audioSourceUrlRead" type="button">读取链接</button>
+                  </div>
+                  <p class="audio-source-import-copy">仅下载公网 HTTPS .js，最多 512 KiB；预览在隔离环境中禁用联网，不会保存或启用。</p>
+                  <section id="audioSourcePreview" class="audio-source-preview" hidden aria-live="polite"></section>
+                  <div class="audio-source-file-row">
+                    <button id="audioSourceScriptChoose" type="button">选择 .js 文件</button>
+                    <output id="audioSourceFileState">尚未选择脚本</output>
+                    <input id="audioSourceScriptInput" type="file" accept=".js,text/javascript,application/javascript" hidden />
+                  </div>
+                  <label class="audio-source-field" for="audioSourceHosts">
+                    <span>允许联网的精确域名</span>
+                    <textarea id="audioSourceHosts" rows="4" spellcheck="false" autocomplete="off" placeholder="music.example.org&#10;api.example.org" aria-describedby="audioSourceHostsHelp"></textarea>
+                    <small id="audioSourceHostsHelp">填写音源解析服务与音频 CDN 域名，每行一个，最多 32 个；只访问 HTTPS，不支持通配符、IP 或内网地址。</small>
+                  </label>
+                  <label class="audio-source-consent" for="audioSourceConsent">
+                    <input id="audioSourceConsent" type="checkbox" />
+                    <span>我信任此脚本，并同意它通过隔离环境访问上面列出的网络域名。</span>
+                    <small>脚本不会获得 Node、文件、进程、页面、FE 账号或记忆接口。</small>
+                  </label>
+                  <label class="audio-source-consent" for="audioSourceApply">
+                    <input id="audioSourceApply" type="checkbox" checked />
+                    <span>导入后立即应用到支持的平台</span>
+                  </label>
+                  <div class="audio-source-import-actions">
+                    <button class="is-primary" id="audioSourceImportSubmit" type="submit">导入脚本</button>
+                    <button id="audioSourceCancelPreview" type="button" hidden>取消预览</button>
+                    <button id="audioSourcePlatformImport" type="button" hidden>导入平台配置</button>
+                    <input id="audioSourcePlatformInput" type="file" accept=".json,.feapi,.zip,application/json,application/zip" hidden />
+                  </div>
+                </form>
+              </section>
+            </div>
+
+            <section class="audio-source-section" aria-labelledby="lxPlaylistTitle">
+              <header>
+                <span><strong id="lxPlaylistTitle">洛雪歌单</strong><small>保留现有播放器，使用当前音源解析</small></span>
+                <output id="lxPlaylistCount">0 / 100</output>
+              </header>
+              <p>导入洛雪导出的 .lxmc / .json 歌单。只读取歌曲信息，不执行脚本、不导入账号或设置；混合歌单按网易云、QQ、酷狗拆分，未接入的平台会提示并跳过。</p>
+              <p>歌单副本保存在本机浏览器，清理站点数据会移除副本。重新导入同标识歌单会更新副本，不修改洛雪原文件或平台歌单。</p>
+              <div class="audio-source-file-row">
+                <button id="lxPlaylistChoose" type="button">选择洛雪歌单</button>
+                <input id="lxPlaylistFile" type="file" accept=".lxmc,.json,application/json" hidden />
+              </div>
+              <div class="audio-source-preview" id="lxPlaylistPreview" hidden aria-live="polite"></div>
+              <div class="audio-source-import-actions">
+                <button id="lxPlaylistImport" type="button" disabled>确认导入歌单</button>
+                <button id="lxPlaylistCancel" type="button" hidden>取消预览</button>
+              </div>
+              <p id="lxPlaylistStatus" role="status" aria-live="polite">选择文件后先预览，确认才保存；导入不会自动播放。</p>
+              <div class="audio-source-custom-list" id="lxPlaylistSaved"></div>
+            </section>
+
+            <section class="audio-source-section" aria-labelledby="audioSourceCustomTitle">
+              <header>
+                <span>
+                  <strong id="audioSourceCustomTitle">已导入脚本</strong>
+                  <small>选择后仅替换播放地址解析</small>
+                </span>
+                <output id="audioSourceCustomCount">— / 20</output>
+              </header>
+              <div class="audio-source-custom-list" id="audioSourceCustomList"></div>
+            </section>
+          </div>
+        </div>
+
+        <footer class="audio-source-footer">
+          <p class="audio-source-live-status" id="audioSourceLiveStatus" role="status" aria-live="polite" aria-atomic="true">打开后将读取本机音源配置。</p>
+          <span class="audio-source-busy" id="audioSourceBusy" aria-hidden="true" hidden></span>
+        </footer>
+      </section>
+    </div>
+
     <section class="pet-assistant" id="petAssistant" data-state="idle" aria-label="FE Monster 智能桌宠" hidden>
       <section
         class="pet-assistant__panel pet-assistant__text-bubble"
@@ -2870,7 +3281,7 @@
         aria-label="小 Fe 文字聊天"
         hidden
       >
-        <div class="pet-assistant__messages pet-assistant__current-reply" id="petAssistantMessages" role="log" aria-label="当前文字回复" aria-live="polite" aria-relevant="additions text"></div>
+        <div class="pet-assistant__messages pet-assistant__conversation-history" id="petAssistantMessages" role="log" aria-label="永久对话记录" aria-live="polite" aria-relevant="additions text"></div>
         <p class="pet-assistant__interim" id="petAssistantInterim" aria-live="polite" hidden></p>
         <section class="pet-assistant__confirmation" id="petAssistantConfirmation" role="alertdialog" aria-labelledby="petAssistantConfirmationTitle" aria-describedby="petAssistantConfirmationText" hidden>
           <span>
@@ -3086,19 +3497,39 @@
     <script type="module" src="client-runtime-loader.js?v=20260811-cache-audit-1"></script>
     <script src="render-quality.js?v=20260811-cache-audit-1"></script>
     <script src="wallpaper-video-continuity.js?v=20260811-cache-audit-1"></script>
+    <script src="local-memory-client.js?v=20260917-account-health-8"></script>
+    <script src="pet-memory-recall.js?v=20260831-relevant-cross-session-memory-1"></script>
     <script src="pet-preference-policy.js?v=20260831-preference-ledger-v2-1"></script>
-    <script src="app-command.js?v=20260827-pet-command-manifest-1"></script>
-    <script src="playback-intelligence.js?v=20260811-cache-audit-1"></script>
+    <script src="pet-preference-memory.js?v=20260901-cross-session-preferences-3"></script>
+    <script src="app-command.js?v=20260926-pet-self-register-1"></script>
+    <script src="app-parameter-registry.js?v=20260831-complete-parameter-registry-1"></script>
+    <script src="playback-intelligence.js?v=20260901-cross-session-preferences-2"></script>
     <script src="companion-care-actions.js?v=20260817-care-autonomy-1"></script>
     <script src="music-api-package-client.js?v=20260811-cache-audit-1"></script>
     <script src="community-reward-runtime.js?v=20260812-reward-stages-2"></script>
-    <script src="soundscape-runtime.js?v=20260824-durable-state-1"></script>
-    <script src="client-ai-service.js?v=20260819-soundscape-parity-1"></script>
+    <script src="soundscape-runtime.js?v=20260901-minimize-resume-1"></script>
+    <script src="client-ai-service.js?v=20260917-tool-consent-2"></script>
     <script src="settings-center.js?v=20260824-dialog-perf-5"></script>
+    <script src="playback-card-runtime.js?v=20260924-three-card-5"></script>
+    <script src="playback-card-transition.js?v=20260924-particle-morph-11"></script>
+    <script src="playback-card-settings.js?v=20260924-card-settings-6"></script>
     <script src="audio-mixer-visuals.js?v=20260827-soundscape-state-pair-1"></script>
-    <script src="audio-mixer-ui.js?v=20260825-desktop-layout-1"></script>
-    <script src="app.js?v=20260827-pet-command-context-1"></script>
+    <script src="audio-mixer-ui.js?v=20260918-mixer-catalog-compat-2"></script>
+    <script src="lyric-timeline-resolver.js?v=20260911-native-provider-1"></script>
+    <script src="lyric-highlight-particles.js?v=20260918-lyric-particles-performance-1"></script>
+    <script src="audio-source-manager.js?v=20260926-release-2.2.3-1"></script>
+    <script src="lx-playlists.js?v=20260927-lx-playlist-import-1"></script>
+    <script src="particle-lyrics-shape-editor.js?v=20260918-particle-idle-custom-2"></script>
+    <script src="particle-lyrics-settings.js?v=20260926-particle-idle-suppression-1"></script>
+    <script src="harmonic-state-settings.js?v=20260926-harmonic-bass-rise-2"></script>
+    <script src="cover-depth-light.js?v=20260918-cover-depth-map-display-3"></script>
+    <script src="cover-sketch-runtime.js?v=20260924-cover-dynamic-1"></script>
+    <script src="mac-capture.js?v=20261007-macos-native-1"></script>
+    <script src="app.js?v=20261007-playback-macos-sync-3"></script>
+    <script src="search-window.js?v=20260926-search-bare-buttons-1"></script>
+    <script src="playback-queue.js?v=20260926-queue-wheel-selection-1"></script>
+    <script src="playback-card-app.js?v=20261007-card-wheel-28"></script>
     <script src="pet-affect-plan.js?v=20260818-seven-affect-3"></script>
-    <script src="runtime-module-loader.js?v=20260827-pet-command-manifest-2"></script>
+    <script src="runtime-module-loader.js?v=20260926-pet-self-register-1"></script>
   </body>
 </html>

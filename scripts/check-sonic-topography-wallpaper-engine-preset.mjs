@@ -72,7 +72,7 @@ function fixtureApi(pathname, response) {
     '/api/sandbox/presets': { ok: true, presets: [], folder: 'browser-fixture' },
     '/api/sandbox/components': { ok: true, components: [] },
     '/api/app/interactive/activate': { ok: true },
-    '/api/app/version': { ok: true, version: '2.1.1' },
+    '/api/app/version': { ok: true, version: '2.1.2' },
     '/api/update/latest': { ok: true, available: false },
     '/api/community/status': { ok: true, authenticated: false },
     '/api/community/pet/status': { ok: true, pet: { state: 'idle', voices: [] }, sessions: [] },
@@ -285,7 +285,11 @@ async function waitFor(expression, label, timeoutMs = 8_000) {
     if (await evaluate(expression)) return;
     await wait(50);
   }
-  throw new Error(`Timed out waiting for ${label}`);
+  const diagnostics = [
+    ...pageErrors.slice(-4),
+    ...consoleMessages.filter((entry) => entry.type === 'error').slice(-4).map((entry) => entry.text)
+  ].filter(Boolean);
+  throw new Error(`Timed out waiting for ${label}${diagnostics.length ? `: ${diagnostics.join(' | ')}` : ''}`);
 }
 
 try {
@@ -464,6 +468,7 @@ try {
 
     const parameterCatalog = { ok: Boolean(preset), pages: [], error: null };
     const parameters = [];
+    const parameterCoverage = await commandResult('app.parameters.coverage.query');
     if (preset) {
       let cursor = 0;
       for (let pageIndex = 0; pageIndex < 8; pageIndex += 1) {
@@ -638,6 +643,13 @@ try {
         && hasCamera
         && hasRipple
         && hasMeteor,
+      parameterCoverageComplete:
+        parameterCoverage.ok === true
+        && Array.isArray(parameterCoverage.value?.missing)
+        && parameterCoverage.value.missing.length === 0
+        && parameterCoverage.value.operable?.some((item) => item.key === 'ai.tts.enabled')
+        && parameterCoverage.value.manual?.some((item) => item.reason === 'manual-credential')
+        && parameterCoverage.value.delegated?.some((item) => item.command === 'ai.model.select'),
       gridOptionsAndRisk:
         JSON.stringify(gridOptions) === JSON.stringify([120, 160, 320, 640, 1080, 4096])
         && JSON.stringify(gridHighImpactValues) === JSON.stringify([640, 1080, 4096])
@@ -675,6 +687,7 @@ try {
       current,
       iframe: matchingFrame ? { sandboxTokens, src: matchingFrame.src } : null,
       parameterCount: parameters.length,
+      parameterCoverage,
       expectedSourceProperties,
       discoveredSourceProperties: Array.from(sourceParameters.keys()),
       parameterKeys: parameters.map((item) => item.key),

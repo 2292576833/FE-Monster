@@ -8,11 +8,11 @@
   const PET_LIVE_TELEMETRY_URL = 'pet-live-telemetry.js?v=20260811-cache-audit-1';
   const PET_LIVE_PLAYOUT_URL = 'pet-live-playout.js?v=20260811-cache-audit-1';
   const PET_LIVE_STT_CLIENT_URL = 'pet-live-stt-client.js?v=20260811-cache-audit-1';
-  const PET_ASSISTANT_URL = 'pet-assistant.js?v=20260827-pet-command-manifest-2';
+  const PET_ASSISTANT_URL = 'pet-assistant.js?v=20260926-pet-self-register-1';
   const PET_PRODUCT_TOUR_URL = 'pet-product-tour.js?v=20260811-moving-guide-2';
   const PET_PARTICLE_ORB_URL = 'pet-particle-orb.js?v=20260812-audio-reactive-sphere-2';
   const PET_COMPANION_P2_URL = 'pet-companion-p2.js?v=20260811-cache-audit-1';
-  const PIXEL_ACHIEVEMENTS_URL = 'pixel-achievements.js?v=20260813-achievement-rewards-1';
+  const PIXEL_ACHIEVEMENTS_URL = 'pixel-achievements.js?v=20260926-achievement-notification-dedupe-3';
   const PIXEL_LOGIN_ADVENTURE_URL = 'pixel-login-adventure.js?v=20260811-cache-audit-1';
   const CURSOR_TRAILS_URL = 'cursor-trails.js?v=20260811-cache-audit-1';
   const CREATIVE_COMMUNITY_URL = 'creative-community.js?v=20260812-friend-card-1';

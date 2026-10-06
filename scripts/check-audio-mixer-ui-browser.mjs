@@ -1228,7 +1228,13 @@ try {
       disabledParameterCount: visuals?.closest('[data-audio-mixer-ui]')
         ?.querySelectorAll('[data-mixer-param]:disabled').length || 0,
       disabledPresetCount: visuals?.closest('[data-audio-mixer-ui]')
-        ?.querySelectorAll('[data-mixer-preset-id]:disabled').length || 0
+        ?.querySelectorAll('[data-mixer-preset-id]:disabled').length || 0,
+      disabledPresetIds: [...(visuals?.closest('[data-audio-mixer-ui]')
+        ?.querySelectorAll('[data-mixer-preset-id]:disabled') || [])]
+        .map((button) => button.dataset.mixerPresetId),
+      enabledPresetIds: [...(visuals?.closest('[data-audio-mixer-ui]')
+        ?.querySelectorAll('[data-mixer-preset-id]:enabled') || [])]
+        .map((button) => button.dataset.mixerPresetId)
     };
     };
 
@@ -1681,7 +1687,10 @@ try {
         && realEdgeTelemetry.nativeChannelsAreReal
         && realEdgeTelemetry.gainReductionText === 'GR —'
         && realEdgeTelemetry.disabledParameterCount === 0
-        && realEdgeTelemetry.disabledPresetCount === 0
+        && realEdgeTelemetry.disabledPresetIds.length === 1
+        && realEdgeTelemetry.disabledPresetIds[0] === 'clear-spatial'
+        && realEdgeTelemetry.enabledPresetIds.length === PRESET_IDENTITIES.length
+        && PRESET_IDENTITIES.every(([id]) => realEdgeTelemetry.enabledPresetIds.includes(id))
         && realEdgeTelemetry.refreshGetCount <= 6,
     presetApplyUsesCurrentRevision: !!presetApplyRequest
       && presetApplyRequest.body?.expectedRevision === 13

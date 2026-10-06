@@ -797,8 +797,8 @@ check('wrapped current lyrics split time by visual-row grapheme weight', () => {
   );
   assert.match(
     cssSource,
-    /\.qishui-playback-lyric-line\.is-arriving[\s\S]*?:is\(\.book-lyric-copy--hot,\s*\.book-lyric-translation-copy--hot\)\s*\{[^}]*opacity:\s*0\.42;[^}]*transition:\s*opacity 120ms ease-out;/,
-    'the incoming sentence should reveal its live highlight without an abrupt visibility jump'
+    /\.qishui-playback-lyric-line\.is-arriving[\s\S]*?:is\(\.book-lyric-copy--hot,\s*\.book-lyric-translation-copy--hot\)\s*\{[^}]*opacity:\s*0\.42;[^}]*transition:\s*none;/,
+    'the incoming sentence must expose its clocked highlight without a CSS timing delay'
   );
 
   const runtime = multiRowRuntime();

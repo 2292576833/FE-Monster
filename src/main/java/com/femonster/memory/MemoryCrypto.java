@@ -135,6 +135,17 @@ public final class MemoryCrypto implements AutoCloseable {
         }
     }
 
+    /**
+     * Computes a keyed digest for internal identifiers whose input is not a
+     * user-search token.  Unlike blindToken this has no token-length limit;
+     * production account subjects may legitimately be longer than 64 code
+     * points.  The result is never written as plaintext.
+     */
+    public synchronized byte[] internalMac(byte[] value) {
+        ensureOpen();
+        return macValue(backupAuthenticationKey, value);
+    }
+
     public synchronized byte[] backupMac(byte[] value) {
         ensureOpen();
         return macValue(backupAuthenticationKey, value);

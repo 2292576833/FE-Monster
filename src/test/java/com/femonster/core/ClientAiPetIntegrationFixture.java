@@ -261,6 +261,12 @@ public final class ClientAiPetIntegrationFixture {
                     ));
                     return;
                 }
+                if (prompt.contains("无工具虚假执行测试")) {
+                    sendSse(exchange,
+                        "data: {\"choices\":[{\"delta\":{\"content\":\"命令已执行。\"}}]}\n\n" +
+                        "data: [DONE]\n\n");
+                    return;
+                }
                 if (hasRole(body, "tool")) {
                     sendSse(exchange,
                         "data: {\"choices\":[{\"delta\":{\"content\":\"工具续轮成功\"}}]}\n\n" +

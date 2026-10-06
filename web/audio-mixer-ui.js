@@ -76,7 +76,8 @@
     Object.freeze({ id: 'flowing-phaser', label: '流动移相' }),
     Object.freeze({ id: 'ping-pong-delay', label: '乒乓回声' }),
     Object.freeze({ id: 'nearfield-studio', label: '近场工作室' }),
-    Object.freeze({ id: 'immersive-live', label: '沉浸现场' })
+    Object.freeze({ id: 'immersive-live', label: '沉浸现场' }),
+    Object.freeze({ id: 'clear-spatial', label: '清晰空间' })
   ]);
   const PRESET_IDS = new Set(PRESET_IDENTITIES.map((preset) => preset.id));
   const BOOLEAN_PARAMETERS = new Set([
@@ -374,6 +375,14 @@
   const ALLOWED_PARAMETER_KEYS = new Set([...SIMPLE_PARAMETER_KEYS, 'eqDb']);
   const mounted = new WeakMap();
   let mountSequence = 0;
+
+  function parameterSlug(value) {
+    return String(value || '')
+      .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+      .replace(/[^A-Za-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .toLowerCase();
+  }
 
   function normalizeChannelLayout(value) {
     return value === '7.1' ? '7.1' : '5.1';
@@ -804,6 +813,7 @@
     const numericInputs = new Map();
     const presetButtons = new Map();
     const availablePresets = new Set();
+    let presetCatalogFailed = false;
     const familySections = new Map();
     const familyBodies = new Map();
     const familyVisibilityControls = new Map();
@@ -918,7 +928,11 @@
     const channelLayoutLabel = node(document, 'span', { text: '兼容声道布局（高级）' });
     const channelLayoutSelect = node(document, 'select', {
       attributes: { 'aria-label': '选择原生调音链声道布局' },
-      dataset: { mixerChannelLayout: '' }
+      dataset: {
+        mixerChannelLayout: '',
+        petParameterKey: 'audio.channel.native-layout',
+        petParameterScope: 'audio'
+      }
     });
     ['5.1', '7.1'].forEach((layout) => {
       const option = node(document, 'option', { text: layout });
@@ -1317,7 +1331,11 @@
     });
     const channelRouterLayout = node(document, 'select', {
       attributes: { 'aria-label': '选择虚拟声床布局' },
-      dataset: { mixerChannelRouterLayout: '' }
+      dataset: {
+        mixerChannelRouterLayout: '',
+        petParameterKey: 'audio.channel.layout',
+        petParameterScope: 'audio'
+      }
     });
     ['stereo', '5.1', '7.1'].forEach((layout) => {
       const option = node(document, 'option', { text: layout === 'stereo' ? 'Stereo 2.0（关闭上混）' : `虚拟 ${layout}` });
@@ -1329,7 +1347,11 @@
 
     const channelAlgorithm = node(document, 'select', {
       attributes: { 'aria-label': '选择逐声道上混算法' },
-      dataset: { mixerChannelAlgorithm: '' }
+      dataset: {
+        mixerChannelAlgorithm: '',
+        petParameterKey: 'audio.channel.algorithm',
+        petParameterScope: 'audio'
+      }
     });
     CHANNEL_ALGORITHMS.forEach((definition) => {
       const option = node(document, 'option', { text: definition.label });
@@ -1346,7 +1368,11 @@
         type: 'range', min: '20', max: '500', step: '1',
         'aria-label': 'LFE 低通分频点滑杆', title: 'LFE 低通分频点，20 到 500 Hz'
       },
-      dataset: { mixerChannelLfeCrossoverRange: '' }
+      dataset: {
+        mixerChannelLfeCrossoverRange: '',
+        petParameterKey: 'audio.channel.lfe-crossover-hz',
+        petParameterScope: 'audio'
+      }
     });
     lfeCrossoverRange.type = 'range';
     const lfeCrossoverNumber = node(document, 'input', {
@@ -1354,7 +1380,10 @@
         type: 'number', min: '20', max: '500', step: '1',
         'aria-label': '手动输入 LFE 低通分频点'
       },
-      dataset: { mixerChannelLfeCrossover: '' }
+      dataset: {
+        mixerChannelLfeCrossover: '',
+        petParameterIgnoreReason: 'mirrored-number-input'
+      }
     });
     lfeCrossoverNumber.type = 'number';
     const lfeCrossoverControl = node(document, 'label', { className: 'audio-mixer-channel-toolbar__control audio-mixer-channel-toolbar__control--number' });
@@ -1406,7 +1435,11 @@
           'aria-label': `矩阵第 ${row + 1} 行 ${column} 输入系数`,
           title: '自定义矩阵系数，范围 -2 到 2'
         },
-        dataset: { mixerChannelMatrixCell: String(index) }
+        dataset: {
+          mixerChannelMatrixCell: String(index),
+          petParameterKey: `audio.channel.matrix.${row + 1}-${column.toLowerCase()}`,
+          petParameterScope: 'audio'
+        }
       });
       input.type = 'number';
       input.disabled = true;
@@ -1616,6 +1649,7 @@
     }
 
     function channelControlInput(definition, channelId, index, value, kind) {
+      const parameterKey = `audio.channel.${String(channelId).toLowerCase()}.${parameterSlug(definition.key)}`;
       const input = node(document, 'input', {
         attributes: {
           type: kind,
@@ -1626,8 +1660,17 @@
           title: `${CHANNEL_LABELS[channelId] || channelId}${definition.label}，范围 ${definition.min} 到 ${definition.max} ${definition.unit}`
         },
         dataset: kind === 'range'
-          ? { mixerChannelRange: definition.key, mixerChannelIndex: String(index) }
-          : { mixerChannelNumber: definition.key, mixerChannelIndex: String(index) }
+          ? {
+              mixerChannelRange: definition.key,
+              mixerChannelIndex: String(index),
+              petParameterKey: parameterKey,
+              petParameterScope: 'audio'
+            }
+          : {
+              mixerChannelNumber: definition.key,
+              mixerChannelIndex: String(index),
+              petParameterIgnoreReason: 'mirrored-number-input'
+            }
       });
       input.type = kind;
       input.min = String(definition.min);
@@ -2002,7 +2045,11 @@
       });
       const input = node(document, 'input', {
         attributes: { id, type: 'checkbox' },
-        dataset: { mixerParam: key }
+        dataset: {
+          mixerParam: key,
+          petParameterKey: `audio.mixer.${parameterSlug(key)}`,
+          petParameterScope: 'audio'
+        }
       });
       input.type = 'checkbox';
       input.disabled = true;
@@ -2031,7 +2078,11 @@
       }));
       const select = node(document, 'select', {
         attributes: { id, 'aria-label': definition.label },
-        dataset: { mixerParam: key }
+        dataset: {
+          mixerParam: key,
+          petParameterKey: `audio.mixer.${parameterSlug(key)}`,
+          petParameterScope: 'audio'
+        }
       });
       definition.options.forEach((entry) => {
         const option = node(document, 'option', { text: entry.label });
@@ -2071,7 +2122,13 @@
         text: '—',
         attributes: { for: id, 'aria-hidden': 'true' }
       });
-      const dataset = { mixerParam: definition.key };
+      const dataset = {
+        mixerParam: definition.key,
+        petParameterKey: definition.eqIndex === undefined
+          ? `audio.mixer.${parameterSlug(definition.key)}`
+          : `audio.mixer.eq.${definition.frequency}hz`,
+        petParameterScope: 'audio'
+      };
       if (definition.eqIndex !== undefined) {
         dataset.mixerEqIndex = definition.eqIndex;
         dataset.mixerEqFrequency = definition.frequency;
@@ -2097,7 +2154,10 @@
         if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) return;
         keyboardPatchDeadline = Date.now() + KEYBOARD_PATCH_DEBOUNCE_MS;
       });
-      const numericDataset = { mixerNumericInput: definition.key };
+      const numericDataset = {
+        mixerNumericInput: definition.key,
+        petParameterIgnoreReason: 'mirrored-number-input'
+      };
       if (definition.eqIndex !== undefined) numericDataset.mixerNumericEqIndex = definition.eqIndex;
       const numericInput = node(document, 'input', {
         className: 'audio-mixer-control-number',
@@ -2514,7 +2574,8 @@
           }
           const refreshes = await Promise.allSettled([
             refreshFromServer(),
-            refreshChannelRouter()
+            refreshChannelRouter(),
+            refreshPresetCatalog()
           ]);
           refreshed = refreshes.some((result) => result.status === 'fulfilled') || refreshed;
           completedFetches += 1;
@@ -2665,6 +2726,48 @@
       return true;
     }
 
+    async function requestPresetCatalog() {
+      const payload = await requestJson(PRESETS_ENDPOINT);
+      if (payload.ok !== true || payload.presetVersion !== 1 || !Array.isArray(payload.presets)) {
+        throw new TypeError('Invalid audio mixer presets response');
+      }
+      const received = new Set();
+      payload.presets.forEach((preset) => {
+        if (!isRecord(preset) || !PRESET_IDS.has(preset.id) || received.has(preset.id)) return;
+        normalizeParameters(preset.parameters);
+        received.add(preset.id);
+      });
+      // Presets are additive within v1. An older backend can still expose all
+      // mixer controls; only presets it does not advertise stay disabled.
+      if (received.size === 0) throw new TypeError('No supported audio mixer presets');
+      return received;
+    }
+
+    function replacePresetCatalog(received) {
+      availablePresets.clear();
+      received.forEach((id) => availablePresets.add(id));
+      setBusy(operationCount > 0);
+    }
+
+    async function refreshPresetCatalog() {
+      try {
+        const received = await requestPresetCatalog();
+        if (destroyed) return false;
+        replacePresetCatalog(received);
+        if (presetCatalogFailed) setStatus('预设目录已恢复。', 'success');
+        presetCatalogFailed = false;
+        return true;
+      } catch (error) {
+        if (destroyed) return false;
+        // Do not post a preset against a catalog that is no longer trustworthy.
+        // The separately validated mixer parameters remain usable.
+        presetCatalogFailed = true;
+        replacePresetCatalog(new Set());
+        setStatus(`${safeErrorCopy(error, '刷新预设目录')}；调音参数仍可使用。`, 'warning');
+        throw error;
+      }
+    }
+
     async function loadInitial() {
       readyState = 'loading';
       root.dataset.mixerReady = 'false';
@@ -2674,29 +2777,13 @@
       setStatus('正在读取调音台设置…');
       setBusy(true);
       try {
-        const [snapshotPayload, presetPayload] = await Promise.all([
+        const [snapshotPayload, received] = await Promise.all([
           requestJson(MIXER_ENDPOINT),
-          requestJson(PRESETS_ENDPOINT)
+          requestPresetCatalog()
         ]);
-        if (
-          !isRecord(presetPayload)
-          || presetPayload.ok !== true
-          || presetPayload.presetVersion !== 1
-          || !Array.isArray(presetPayload.presets)
-        ) {
-          throw new TypeError('Invalid audio mixer presets response');
-        }
-        const received = new Map();
-        presetPayload.presets.forEach((preset) => {
-          if (!isRecord(preset) || !PRESET_IDS.has(preset.id) || received.has(preset.id)) return;
-          normalizeParameters(preset.parameters);
-          received.set(preset.id, true);
-        });
-        if (received.size !== PRESET_IDENTITIES.length) {
-          throw new TypeError('Audio mixer presets are incomplete');
-        }
-        received.forEach((_, id) => availablePresets.add(id));
         const snapshot = normalizeSnapshot(snapshotPayload);
+        replacePresetCatalog(received);
+        presetCatalogFailed = false;
         renderSnapshot(snapshot);
         readyState = 'ready';
         root.dataset.audioMixerUi = '';

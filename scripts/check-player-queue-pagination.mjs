@@ -52,6 +52,15 @@ try {
     /case\s+"\/api\/player\/queue"\s*->\s*HttpUtil\.sendJson\(exchange,\s*context\.player\.queuePage\(/s,
     'GET /api/player/queue must expose the bounded page instead of the full player state'
   );
+  assert.match(routes, /case\s+"\/api\/player\/queue\/remove"\s*->\s*HttpUtil\.sendJson\(exchange,\s*context\.player\.removeFromQueue\(/s,
+    'POST queue removal must use the atomic player service operation');
+  assert.match(routes, /case\s+"\/api\/player\/queue\/move"\s*->\s*HttpUtil\.sendJson\(exchange,\s*context\.player\.moveInQueue\(/s,
+    'POST queue reorder must use the atomic player service operation');
 } finally {
+  const relative = path.relative(path.resolve(tmpdir()), path.resolve(temporary));
+  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)
+    || !path.basename(temporary).startsWith('fe-player-queue-probe-')) {
+    throw new Error('Refusing to remove an unexpected test directory');
+  }
   rmSync(temporary, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 }

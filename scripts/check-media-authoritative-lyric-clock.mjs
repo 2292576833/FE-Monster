@@ -57,6 +57,9 @@ const sandbox = vm.createContext({
   LYRIC_TIMESTAMP_COMPENSATION_SECONDS: numericConstant('LYRIC_TIMESTAMP_COMPENSATION_SECONDS'),
   MULTI_ROW_LYRIC_VISUAL_LEAD_SECONDS: numericConstant('LYRIC_TIMESTAMP_COMPENSATION_SECONDS'),
   BOOK_LYRIC_VISUAL_LEAD_SECONDS: numericConstant('BOOK_LYRIC_VISUAL_LEAD_SECONDS'),
+  DESKTOP_SCENE_LYRIC_EXTRAPOLATION_MAX_SECONDS: numericConstant(
+    'DESKTOP_SCENE_LYRIC_EXTRAPOLATION_MAX_SECONDS',
+  ),
   QISHUI_SEEK_HANDOFF_TOLERANCE_SECONDS: numericConstant('QISHUI_SEEK_HANDOFF_TOLERANCE_SECONDS'),
   QISHUI_SEEK_HANDOFF_MAX_MS: numericConstant('QISHUI_SEEK_HANDOFF_MAX_MS'),
   clamp: (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, Number(value) || 0)),
@@ -81,6 +84,9 @@ vm.runInContext(`
   ${extractFunction('findLyricIndexAtDisplayTime')}
   ${extractFunction('findLyricIndexAtTime')}
   ${extractFunction('playbackLyricVisualLeadSeconds')}
+  ${extractFunction('clamp')}
+  ${extractFunction('bookGlyphEase')}
+  ${extractFunction('lyricProgressForLineAtTime')}
   ${extractFunction('computeMultiLyricHighlightProgress')}
   ${extractFunction('multiRowLyricHighlightProgress')}
   globalThis.clockContract = {
@@ -104,6 +110,16 @@ const normalPlaybackMeasurement = {
   mediaTime: media.currentTime,
   renderedTime: rendered.time,
 };
+assert.match(
+  extractFunction('lyricTimelineTime'),
+  /-\s*lyricAudioOutputLatencySeconds\(\)/,
+  'the lyric timeline must account for a measured downstream native queue',
+);
+assert.doesNotMatch(
+  extractFunction('lyricTimelineTime'),
+  /getOutputTimestamp|baseLatency|performance\.now|estimated/i,
+  'the lyric timeline must not use guessed browser or wall-clock latency',
+);
 assert.equal(
   snapshotScheduleCount,
   1,
@@ -199,7 +215,7 @@ assert.equal(
 );
 assert.equal(sampleMediaClock(75.012, 75), 75.012, 'post-seek lyrics must follow the settled media position');
 
-const mirroredMediaClock = { time: 18.4, updatedAt: 1_000, playing: true };
+const mirroredMediaClock = { time: 18.4, updatedAt: 1_000, playing: true, playbackRate: 1 };
 const mirroredAtDelivery = sandbox.clockContract.desktopSceneEffectiveLyricTimeAt(
   mirroredMediaClock,
   1_000,
@@ -211,12 +227,16 @@ const mirroredAfterThrottle = sandbox.clockContract.desktopSceneEffectiveLyricTi
   0.22,
 );
 assert.ok(
-  Math.abs(mirroredAtDelivery - 18.62) <= 1e-9,
-  'a mirrored media sample may apply only the requested visual lead',
+  Math.abs(mirroredAtDelivery - 18.4) <= 1e-9,
+  'a mirrored media sample must not add a synthetic visual lead',
 );
 assert.ok(
-  Math.abs(mirroredAfterThrottle - mirroredAtDelivery) <= 1e-9,
-  'a mirrored lyric clock must not invent elapsed playback time from performance.now()',
+  Math.abs(
+    mirroredAfterThrottle
+      - mirroredAtDelivery
+      - numericConstant('DESKTOP_SCENE_LYRIC_EXTRAPOLATION_MAX_SECONDS')
+  ) <= 1e-9,
+  'a mirrored lyric clock may interpolate only within its explicit drift bound',
 );
 
 state.multiRowLyricsEnabled = true;
@@ -253,7 +273,7 @@ const firstVisualLineProgress = sandbox.clockContract.multiRowLyricHighlightProg
 );
 assert.ok(
   Math.abs(firstVisualLineProgress - 0.25) <= 1e-9,
-  'multi-row progressive highlight must reuse the frame sample instead of reading a second clock',
+  'plain LRC rolling highlight must reuse the sampled real media clock',
 );
 media.currentTime = 13.75;
 const secondVisualLineProgress = sandbox.clockContract.multiRowLyricHighlightProgress(
@@ -263,7 +283,7 @@ const secondVisualLineProgress = sandbox.clockContract.multiRowLyricHighlightPro
 );
 assert.ok(
   Math.abs(secondVisualLineProgress - 0.25) <= 1e-9,
-  'the next lyric row must begin its own progressive highlight from the same sampled timeline',
+  'the next plain LRC row must roll from the same sampled provider timeline',
 );
 assert.equal(
   sandbox.clockContract.findLyricIndexAtTime(wrappedSentenceModel.lines, 12.5, offsetLead),
@@ -272,7 +292,7 @@ assert.equal(
 );
 assert.match(
   appSource,
-  /function renderMultiRowLyrics\(force = false, currentTime = Number\.NaN\)[\s\S]*?multiRowLyricHighlightProgress\(displayModel, active, currentTime\)[\s\S]*?setSequentialLyricHighlight\(main, main, progress\)/,
+  /function renderMultiRowLyrics\(force = false, currentTime = Number\.NaN\)[\s\S]*?multiRowLyricHighlightProgress\(displayModel, active, currentTime, main\)[\s\S]*?setSequentialLyricHighlight\(main, main, progress\)/,
   'a wrapped sentence must feed the sampled progress into sequential visual-line highlighting',
 );
 

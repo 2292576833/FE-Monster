@@ -7,7 +7,9 @@ import com.femonster.music.MusicApiConfigService;
 import com.femonster.music.MusicProviderClient;
 import com.femonster.music.MusicProviderRegistry;
 import com.femonster.music.ProviderProtocolClient;
+import com.femonster.music.sources.AudioSourceService;
 import com.femonster.netease.NeteaseClient;
+import com.femonster.memory.LocalAiMemoryService;
 
 import java.io.IOException;
 import java.time.Clock;
@@ -24,6 +26,7 @@ public final class AppContext implements AutoCloseable {
     public final MusicProviderRegistry music;
     public final OfficialBrowserLoginService browserLogin;
     public final MusicApiConfigService musicApis;
+    public final AudioSourceService audioSources;
     public final AchievementStateService achievements;
     public final ClientPreferenceService clientPreferences;
     public final ClientPreferenceSyncService clientPreferenceSync;
@@ -37,6 +40,7 @@ public final class AppContext implements AutoCloseable {
     public final WallpaperService wallpapers;
     public final UserCursorService userCursors;
     public final CommunityClient community;
+    public final LocalAiMemoryService localAiMemory;
     public final PetPersonalizationService petPersonalization;
     public final CommunityModuleBridge communityModule;
     public final MachineIdentityService machine;
@@ -65,11 +69,19 @@ public final class AppContext implements AutoCloseable {
                 musicApis.awaitReady(provider, Duration.ofSeconds(7));
             }
         }, providerClients(netease));
+        this.audioSources = new AudioSourceService(paths, musicApis);
+        this.music.setPlaybackResolver(audioSources::resolve);
         this.browserLogin = new OfficialBrowserLoginService(paths.dataDir, music);
         this.communityModule = new CommunityModuleBridge(paths.root.resolve("plugins").resolve("community"));
         this.machine = new MachineIdentityService(paths, communityModule);
         this.updates = new UpdateService(paths);
         this.community = new CommunityService(paths.dataDir.resolve("community-server-url.txt"), machine, communityModule);
+        this.localAiMemory = new LocalAiMemoryService(
+            paths.dataDir.resolve("local-ai-memory"),
+            music,
+            community,
+            platformMemoryLibrary(paths)
+        );
         this.petPersonalization = new PetPersonalizationService(
             paths.dataDir.resolve("pet-personalization"),
             new PetPersonalizationService.AccountSource() {
@@ -96,7 +108,9 @@ public final class AppContext implements AutoCloseable {
                     return community.petHabits(provider, providerLabel, accountPayload);
                 }
             },
-            Clock.systemUTC()
+            Clock.systemUTC(),
+            false,
+            localAiMemory
         );
         this.clientPreferenceSync = new ClientPreferenceSyncService(clientPreferences, community, machine.computerId());
         this.player = new PlayerService(paths.dataDir.resolve("player-state.json"), music);
@@ -109,12 +123,22 @@ public final class AppContext implements AutoCloseable {
     @Override
     public void close() {
         if (!closed.compareAndSet(false, true)) return;
+        closeService("localAiMemory", this.localAiMemory::close);
         closeService("clientTtsSessions", this.clientTtsSessions::close);
         closeService("clientAi", this.clientAi::close);
         closeService("player", this.player::close);
+        closeService("audioSources", this.audioSources::close);
         closeService("audio", this.audioEngine::close);
         closeService("browserLogin", this.browserLogin::close);
         closeService("musicApis", this.musicApis::close);
+    }
+
+    private static java.nio.file.Path platformMemoryLibrary(ProjectPaths paths) {
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        if (os.contains("mac") || os.contains("darwin")) {
+            return paths.root.resolve("native/macos/libfe-monster-keychain.dylib");
+        }
+        return paths.root.resolve("native/windows/build/fe-monster-wincrypto.dll");
     }
 
     private static void closeService(String name, Runnable closeAction) {

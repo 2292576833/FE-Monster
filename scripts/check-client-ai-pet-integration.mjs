@@ -97,9 +97,11 @@ try {
   let personalizationReads = 0;
   let localMemoryReads = 0;
   let preferenceRecallReads = 0;
+  let preferenceRecallShouldFail = false;
   let temporaryConversation = false;
   const localMemoryContextOptions = [];
   const localCommandState = { playbackMode: 'classic' };
+  const musicCommandState = { searches: [], plays: [], similar: [] };
   const largeBatchState = { calls: 0, arguments: null };
   const newCommandRegressions = [];
   const localContextFixture = {
@@ -216,8 +218,59 @@ try {
       },
       FeMonsterPetActionBridge: {
         clientContextSnapshot: () => structuredClone(localContextFixture),
-        inspect: () => ({ requiresConfirmation: false }),
+        inspect: (envelope) => ({
+          requiresConfirmation: false,
+          readOnly: envelope?.arguments?.command === 'music.search',
+          command: envelope?.arguments?.command || envelope?.name,
+        }),
         execute: async (envelope) => {
+          if (envelope?.name === 'control_app'
+            && envelope?.arguments?.command === 'music.search') {
+            const query = String(envelope.arguments.arguments?.query || '');
+            musicCommandState.searches.push(query);
+            return {
+              ok: true,
+              query,
+              found: 2,
+              songs: [
+                { id: 'song-1', title: '青花瓷', artist: '周杰伦' },
+                { id: 'song-2', title: '七里香', artist: '周杰伦' },
+              ],
+            };
+          }
+          if (envelope?.name === 'control_app'
+            && envelope?.arguments?.command === 'music.search.play') {
+            const query = String(envelope.arguments.arguments?.query || '');
+            musicCommandState.plays.push(query);
+            return {
+              ok: true,
+              changed: true,
+              played: true,
+              matched: { id: 'song-1', title: '青花瓷', artist: '周杰伦' },
+              commandReceipt: {
+                command: 'music.search.play',
+                operationId: 'music-play-fixture',
+                replayed: false,
+              },
+            };
+          }
+          if (envelope?.name === 'control_app'
+            && envelope?.arguments?.command === 'music.play.similar') {
+            const query = String(envelope.arguments.arguments?.query || '');
+            musicCommandState.similar.push(query);
+            return {
+              ok: true,
+              changed: true,
+              played: true,
+              seed: { title: '稻香', artist: '周杰伦' },
+              matched: { title: '晴天', artist: '周杰伦' },
+              commandReceipt: {
+                command: 'music.play.similar',
+                operationId: 'music-similar-fixture',
+                replayed: false,
+              },
+            };
+          }
           if (envelope?.name === 'control_app'
             && envelope?.arguments?.command === 'playback.mode.set') {
             localCommandState.playbackMode = String(envelope.arguments.arguments?.mode || '');
@@ -351,6 +404,9 @@ try {
       assert.equal(options.provider, 'netease');
       assert.equal(options.message, '你记得我的音乐偏好吗');
       assert.equal(options.limit, 24);
+      if (preferenceRecallShouldFail) throw Object.assign(new Error('fixture preference projection unavailable'), {
+        code: 'PREFERENCE_RECALL_UNAVAILABLE',
+      });
       return Object.freeze({
         available: true,
         provider: 'netease',
@@ -467,6 +523,19 @@ try {
   assert.equal(localMemoryContextOptions.some((options) => (
     Array.isArray(options.types) && options.types.includes('user.fact')
   )), false, 'raw preference versions were queried for generic prompt ranking');
+  preferenceRecallShouldFail = true;
+  const localMemoryWithoutPreferenceProjection = await sandbox.requestClientAiLocalMemory(
+    sandbox.window.FeMonsterClientAiService,
+    '你记得我的音乐偏好吗',
+  );
+  preferenceRecallShouldFail = false;
+  assert.equal(localMemoryWithoutPreferenceProjection.available, true,
+    'a preference-projection failure incorrectly disabled otherwise healthy encrypted memory');
+  assert.ok(localMemoryWithoutPreferenceProjection.chats.some((entry) => (
+    entry.text.includes('LOCAL-ENCRYPTED-MEMORY-MARKER')
+  )), 'a preference-projection failure discarded healthy cross-session chat recall');
+  assert.equal(localMemoryWithoutPreferenceProjection.preferences.length, 0,
+    'failed preference recall did not degrade to an empty projection');
   assert.equal(sandbox.petLocalMemoryCapabilityQuestion('你有没有记忆存储？'), true,
     'a direct local-memory capability question would still be delegated to a guessing model');
   assert.equal(sandbox.petLocalMemoryCapabilityQuestion('你还记得我喜欢的歌吗？'), false,
@@ -548,12 +617,73 @@ try {
     modelMode: 'custom',
     model: { baseUrl: 'https://api.openai.com/v1' },
   }), false, 'remote cloud custom model received personalization without explicit opt-in');
+  assert.equal(sandbox.clientAiPersonalizationAllowed({
+    modelMode: 'custom', model: { baseUrl: 'https://api.deepseek.com/v1', memorySharingEnabled: true }
+  }), true, 'explicitly approved cloud model could not recall local memories');
+  const directMusicCases = [
+    ['帮我播放周杰伦的青花瓷', 'music.search.play'],
+    ['我想听七里香', 'music.search.play'],
+    ['来一首晴天', 'music.search.play'],
+    ['搜一下林俊杰的修炼爱情', 'music.search'],
+    ['找找陈奕迅的歌', 'music.search'],
+    ['search for Adele Hello', 'music.search'],
+    ['play Bohemian Rhapsody', 'music.search.play'],
+    ['放一首类似稻香的歌', 'music.play.similar'],
+    ['暂停一下', 'playback.pause'],
+    ['下一首', 'playback.next'],
+    ['音量调到50%', 'playback.volume.set'],
+  ];
+  directMusicCases.forEach(([input, expected]) => {
+    assert.equal(sandbox.clientAiDirectCommandRequest(input)?.command, expected,
+      `deterministic local command routing missed ${input}`);
+  });
+  assert.equal(sandbox.clientAiDirectCommandRequest('不要播放青花瓷'), null,
+    'a negated playback request was executed');
+  assert.equal(sandbox.clientAiDirectCommandRequest('我想听你讲个笑话'), null,
+    'ordinary conversation was mistaken for music playback');
+
+  pet.messages = [{ role: 'user', text: '帮我播放周杰伦的青花瓷' }];
+  const directPlayState = { controlAttempted: false, controlCompleted: false };
+  const directPlayReply = await sandbox.requestCustomAiReply(
+    '帮我播放周杰伦的青花瓷',
+    'pet-direct-music-play',
+    { commandExecutionState: directPlayState },
+  );
+  assert.equal(musicCommandState.plays.at(-1), '周杰伦的青花瓷',
+    'local pet did not synchronously execute the parsed music command');
+  assert.equal(directPlayState.controlAttempted, true);
+  assert.equal(directPlayState.controlCompleted, true);
+  assert.match(directPlayReply, /青花瓷/u,
+    'local pet did not report the song confirmed by the real command receipt');
+
+  pet.messages = [{ role: 'user', text: '搜一下周杰伦的歌' }];
+  const directSearchReply = await sandbox.requestCustomAiReply('搜一下周杰伦的歌', 'pet-direct-music-search');
+  assert.equal(musicCommandState.searches.at(-1), '周杰伦',
+    'local pet did not execute a search-only request through the command bridge');
+  assert.match(directSearchReply, /找到\s*2\s*首/u,
+    'local pet did not summarize verified search results');
+
+  pet.messages = [{ role: 'user', text: '无工具虚假执行测试：把场景切换到歌词场景' }];
+  const falseExecutionState = { controlAttempted: false, controlCompleted: false };
+  const guardedExecutionReply = await sandbox.requestCustomAiReply(
+    '无工具虚假执行测试：把场景切换到歌词场景',
+    'pet-false-command-claim',
+    { commandExecutionState: falseExecutionState },
+  );
+  assert.equal(falseExecutionState.controlAttempted, false,
+    'fixture unexpectedly entered the command bridge');
+  assert.doesNotMatch(guardedExecutionReply, /命令已执行|已经执行|执行完成/u,
+    'local pet still claimed success without entering the command bridge');
+  assert.match(guardedExecutionReply, /没有收到.*执行回执|未执行/u,
+    'local pet did not expose the missing execution receipt');
 
   pet.messages = [{ role: 'user', text: '瞬时重试测试' }];
   rendered.length = 0;
   const transientReply = await sandbox.requestCustomAiReply('瞬时重试测试', 'pet-transient');
   assert.equal(transientReply, '瞬时重试成功',
     'pre-token transient model failure still becomes 自定义模型调用失败');
+  assert.ok(localMemoryReads >= 2,
+    'ordinary local-model turns do not recall encrypted memory before inference');
 
   for (const status of [408, 425, 429]) {
     const prompt = `状态${status}测试`;

@@ -77,6 +77,27 @@ assert.equal(normalized.releaseNotes, '性能优化\n修复更新提示');
 assert.equal(normalized.fileSize, 1234);
 assert.equal(normalized.sha256, 'a'.repeat(64));
 
+const macRelease = helpers.normalizeGitHubRelease({
+  tag_name: 'v2.2.4',
+  assets: [
+    { name: 'FE-Monster-Setup-2.2.4.exe', browser_download_url: 'https://github.com/2292576833/FE-Monster/releases/download/v2.2.4/windows.exe' },
+    { name: 'FE-Monster-2.2.4-arm64.dmg', browser_download_url: 'https://github.com/2292576833/FE-Monster/releases/download/v2.2.4/mac.dmg' }
+  ]
+}, true, 'arm64');
+assert.match(macRelease.downloadUrl, /mac\.dmg$/);
+assert.equal(helpers.normalizeGitHubRelease({ tag_name: 'v2.2.4', assets: [{
+  name: 'FE-Monster-Setup-2.2.4.exe', browser_download_url: 'https://github.com/2292576833/FE-Monster/releases/download/v2.2.4/windows.exe'
+}] }, true).downloadUrl, '', 'Mac must never select a Windows executable');
+const macArchitectureRelease = { tag_name: 'v2.2.4', assets: ['arm64', 'x86_64'].map(arch => ({
+  name: `FE-Monster-2.2.4-${arch}.dmg`,
+  browser_download_url: `https://github.com/2292576833/FE-Monster/releases/download/v2.2.4/FE-Monster-2.2.4-${arch}.dmg`,
+  digest: `sha256:${'a'.repeat(64)}`
+})) };
+for (const arch of ['arm64', 'x86_64']) assert.ok(helpers.normalizeGitHubRelease(macArchitectureRelease, true, arch).downloadUrl.endsWith(`-${arch}.dmg`));
+assert.equal(helpers.normalizeGitHubRelease(macArchitectureRelease, true).downloadUrl, '', 'unknown architecture cannot pick an arbitrary Mac installer');
+const installFunction = app.slice(app.indexOf('async function startClientUpdate('), app.indexOf('async function pollClientUpdateProgress('));
+assert.doesNotMatch(installFunction, /window\.open/, 'Mac updates use the verified native updater');
+
 assert.match(updateService, /isOfficialGitHubReleaseAsset\(downloadUrl\)/,
   'automatic install must reject non-official download URLs');
 assert.match(updateService, /sha256\.isBlank\(\)[\s\S]{0,100}?return error\("update sha256 is required"\)/,

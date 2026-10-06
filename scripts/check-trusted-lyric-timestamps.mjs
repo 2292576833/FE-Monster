@@ -141,6 +141,7 @@ const parserSource = [
   extractFunction('isLyricCreditLine'),
   extractFunction('glyphTimingsFromWordTimings'),
   extractFunction('normalizeGlyphTimeline'),
+  extractFunction('normalizeKaraokeSegments'),
   extractFunction('parseInlineLrcLyric'),
   extractFunction('normalizeParsedLyricLines'),
   extractFunction('completeLineWordTimings'),

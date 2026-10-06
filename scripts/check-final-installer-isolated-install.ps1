@@ -1,5 +1,6 @@
 param(
   [string]$Root = '',
+  [string]$WinFormsSourceDir = '',
   [Parameter(Mandatory = $true)]
   [string]$SetupExe,
   [Parameter(Mandatory = $true)]
@@ -21,7 +22,17 @@ if ([string]::IsNullOrWhiteSpace($Root)) {
   $Root = Join-Path $scriptRoot '..'
 }
 $rootPath = (Resolve-Path -LiteralPath $Root).Path
-$expectedAppVersion = [string](Get-Content -Raw -LiteralPath (Join-Path $rootPath 'package.json') | ConvertFrom-Json).version
+. (Join-Path $rootPath 'scripts\release-version.ps1')
+$expectedAppVersion = (Get-FeMonsterReleaseVersion (Get-Content -Raw -LiteralPath (Join-Path $rootPath 'package.json') | ConvertFrom-Json)).DisplayVersion
+$winFormsReferenceRoot = if ([string]::IsNullOrWhiteSpace($WinFormsSourceDir)) {
+  Join-Path $rootPath 'native\windows\build\winforms'
+} else {
+  (Resolve-Path -LiteralPath $WinFormsSourceDir).Path
+}
+$referenceClient = Get-Item -LiteralPath (Join-Path $winFormsReferenceRoot 'FE Monster.exe')
+if ([string]$referenceClient.VersionInfo.ProductVersion -cne $expectedAppVersion) {
+  throw 'Reference client version does not match the release. Supply the exact -WinFormsSourceDir used for packaging.'
+}
 $setupPath = (Resolve-Path -LiteralPath $SetupExe).Path
 $testPath = [IO.Path]::GetFullPath($TestRoot)
 $installPath = Join-Path $testPath 'app'
@@ -123,6 +134,15 @@ $criticalRelativeFiles = @(
   'web\settings-center.js',
   'web\audio-mixer-ui.js',
   'web\audio-mixer-visuals.js',
+  'web\local-memory-client.js',
+  'web\pet-memory-recall.js',
+  'web\pet-preference-policy.js',
+  'web\pet-preference-memory.js',
+  'web\app-parameter-registry.js',
+  'web\lyric-highlight-particles.js',
+  'web\runtime-module-loader.js',
+  'web\app-command.js',
+  'web\playback-intelligence.js',
   'web\companion-care-actions.js',
   'web\pet-assistant.js',
   'web\pet-assistant.css',
@@ -139,13 +159,44 @@ $criticalRelativeFiles = @(
   'web\assets\soundscape-workshop\assets\index-DgmMz9-g.css',
   'native\windows\build\winforms\FE Monster.exe',
   'out\fe-monster-java.jar',
+  'out\lib\sqlite-jdbc-3.53.2.1-without-natives.jar',
+  'out\lib\sqlite-jdbc-3.53.2.1-natives-windows.jar',
+  'out\lib\slf4j-api-1.7.36.jar',
+  'native\windows\build\fe-monster-xaudio2.dll',
+  'native\windows\build\fe_monster_upmix.dll',
+  'native\windows\build\native-audio-build.json',
+  'native\windows\build\fe-monster-wincrypto.dll',
+  'plugins\music-api\FE-Monster-Netease-API-Plugin-4.32.0.zip',
+  'plugins\music-api\FE-Monster-QQ-API-Plugin-2.4.2.zip',
+  'plugins\music-api\FE-Monster-Kugou-API-Plugin-2.0.8.zip',
+  'plugins\music-api\FE-Monster-Qishui-OpenAPI-Plugin-3.1.1.zip',
+  'data\community-server-url.txt',
+  'data\community-server-tls-pin.txt',
   'scripts\install-fe-monster.ps1',
   'scripts\ensure-runtime-dependencies.ps1',
   'scripts\java-runtime.ps1'
 )
 $criticalHashes = [ordered]@{}
+$stagedPayloadRoot = Join-Path $rootPath 'out\installer\work\payload\FE Monster'
 foreach ($relative in $criticalRelativeFiles) {
   $sourceFile = Join-Path $rootPath $relative
+  if ($relative -ceq 'native\windows\build\winforms\FE Monster.exe') {
+    $sourceFile = Join-Path $winFormsReferenceRoot 'FE Monster.exe'
+  } elseif ($relative.StartsWith('plugins\music-api\', [StringComparison]::OrdinalIgnoreCase)) {
+    $sourceFile = Join-Path (Join-Path $rootPath 'dist\plugins') (Split-Path -Leaf $relative)
+  } elseif ($relative -in @(
+      'native\windows\build\fe-monster-xaudio2.dll',
+      'native\windows\build\fe_monster_upmix.dll',
+      'native\windows\build\native-audio-build.json',
+      'data\community-server-url.txt',
+      'data\community-server-tls-pin.txt'
+    )) {
+    # The release selects the newest hash-verified native pair from build or
+    # build-next. Compare against the exact staged selection, not always the
+    # older canonical build directory. Release community configuration is
+    # canonicalized while staging, so compare those exact normalized bytes too.
+    $sourceFile = Join-Path $stagedPayloadRoot $relative
+  }
   $installedFile = Join-Path $installPath $relative
   if (!(Test-Path -LiteralPath $sourceFile -PathType Leaf) -or
       !(Test-Path -LiteralPath $installedFile -PathType Leaf)) {
@@ -204,6 +255,7 @@ $setupSignature = Get-AuthenticodeSignature -LiteralPath $setupPath
   appVersion = $expectedAppVersion
   setupProductVersion = $setupProductVersion
   installedClientVersion = $installedClientVersion
+  winFormsSourceDir = $winFormsReferenceRoot
   cacheToken = $ExpectedCacheToken
   communityUrl = $communityUrl
   tlsPin = $tlsPin

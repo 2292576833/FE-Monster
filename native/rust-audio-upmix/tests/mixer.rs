@@ -1026,7 +1026,7 @@ fn effect_stage_nan_rejects_revision_and_non_finite_pcm_fails_open() {
 fn all_presets_are_complete_deterministic_valid_snapshots() {
     let handle = Handle::new(8);
     let mut snapshots = Vec::new();
-    for id in 0..=13 {
+    for id in 0..=14 {
         let first = mixer_preset_params(id).expect("preset");
         assert_eq!(first, mixer_preset_params(id).unwrap());
         assert_eq!(first.struct_size as usize, size_of::<FeRustMixerParams>());
@@ -1043,10 +1043,11 @@ fn all_presets_are_complete_deterministic_valid_snapshots() {
     }
     snapshots.sort();
     snapshots.dedup();
-    // surround-3d differs from clean only in Java-owned spatial fields; its
+    // surround-3d and clear-spatial differ from clean only in Java-owned spatial fields; their
     // Mixer-stage Rust snapshot is intentionally the same unity control state.
     assert_eq!(snapshots.len(), 13);
-    assert!(mixer_preset_params(14).is_none());
+    assert_eq!(mixer_preset_params(14), mixer_preset_params(0));
+    assert!(mixer_preset_params(15).is_none());
 }
 
 #[test]
@@ -1451,6 +1452,7 @@ fn cdylib_exports_mixer_and_legacy_upmix_symbols() {
     for name in [
         "fe_rust_upmix_abi_version",
         "fe_rust_upmix_create",
+        "fe_rust_upmix_update",
         "fe_rust_upmix_process",
         "fe_rust_upmix_reset",
         "fe_rust_upmix_destroy",

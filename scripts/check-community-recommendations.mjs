@@ -40,12 +40,11 @@ const checks = {
   recommendedPlaylistCardIsIdentifiable:
     /is-recommended-playlist/.test(app)
     && /今日推荐/.test(app),
-  selectedPlaylistBecomesPlaybackQueue:
+  selectedPlaylistDoesNotReplaceManualQueue:
     /const tracks = Array\.isArray\(songs\)[\s\S]{0,180}?slice\(0, 2000\)/.test(app)
     && /state\.activePlaylistSongs = tracks/.test(app)
-    && /let playbackQueue = tracks/.test(app)
-    && /currentIndex:\s*playbackQueueIndex/.test(app)
-    && /state\.queue\s*=\s*playbackQueue/.test(app),
+    && /playback queue[\s\S]{0,80}explicit user-managed list/.test(app)
+    && !/async function playPlaylistTracks\([\s\S]*?state\.queue\s*=\s*tracks/.test(app),
   playbackWheelUsesCurrentQueue:
     /function handleQishuiPlaybackWheel/.test(app)
     && /function switchQishuiPlaybackTrack[\s\S]*?playQueueIndex/.test(app),

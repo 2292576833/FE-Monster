@@ -25,7 +25,7 @@ const manualProgress = functionBlock(
   'skipUnavailableCommunitySong'
 );
 
-const hiddenLyricsBranch = /if \(!textLyricsEnabled\(\)\) \{([^]*?)\n  \}/m
+const hiddenLyricsBranch = /if \(!textLyricsEnabled\(\) \|\| state\.textPreset === 'particle-lyrics'\) \{([^]*?)\n  \}/m
   .exec(centralLyrics)?.[1] || '';
 
 const checks = {

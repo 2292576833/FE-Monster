@@ -7,6 +7,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $rootPath = (Resolve-Path -LiteralPath $Root).Path
+$contractTempRoot = Join-Path $rootPath 'tmp\windows-installer-contract'
+New-Item -ItemType Directory -Path $contractTempRoot -Force | Out-Null
+$Env:TEMP = $contractTempRoot
+$Env:TMP = $contractTempRoot
 $failures = New-Object System.Collections.Generic.List[string]
 
 function Read-Source {
@@ -169,27 +173,29 @@ $machineIdentity = Read-Source 'src\main\java\com\femonster\core\MachineIdentity
 $apiRoutes = Read-Source 'src\main\java\com\femonster\api\ApiRoutes.java'
 $updateAgent = Read-Source 'scripts\fe-monster-update-agent.ps1'
 
-$releaseVersion = ''
+$releaseVersion = $null
 try {
-  $releaseVersion = [string](ConvertFrom-Json $packageJson).version
+  . (Join-Path $rootPath 'scripts\release-version.ps1')
+  $releaseVersion = Get-FeMonsterReleaseVersion (ConvertFrom-Json $packageJson)
 } catch {
-  $failures.Add('package.json contains invalid JSON') | Out-Null
+  $failures.Add("Invalid application release metadata: $($_.Exception.Message)") | Out-Null
 }
-if ($releaseVersion -ne '2.1.1') {
-  $failures.Add("Windows installer release version must be 2.1.1, got '$releaseVersion'") | Out-Null
-}
-if ($releaseVersion -match '^\d+\.\d+\.\d+$') {
-  $releasePattern = [Regex]::Escape($releaseVersion)
-  Assert-SourceMatch 'setup project version matches package.json' $setupProject "<Version>$releasePattern</Version>"
-  Assert-SourceMatch 'client project version matches package.json' $clientProject "<Version>$releasePattern</Version>"
-  Assert-SourceMatch 'setup manifest version matches package.json' $setupManifest "assemblyIdentity version=`"$releasePattern\.0`""
-  Assert-SourceMatch 'client manifest version matches package.json' $clientManifest "assemblyIdentity version=`"$releasePattern\.0`""
+if ($null -ne $releaseVersion) {
+  $packagePattern = [Regex]::Escape($releaseVersion.PackageVersion)
+  $releasePattern = [Regex]::Escape($releaseVersion.DisplayVersion)
+  $windowsPattern = [Regex]::Escape($releaseVersion.WindowsVersion)
+  foreach ($project in @($setupProject, $clientProject)) {
+    Assert-SourceMatch 'Windows project package version matches package.json' $project "<Version>$packagePattern</Version>"
+    Assert-SourceMatch 'Windows product version matches displayVersion' $project "<InformationalVersion>$releasePattern</InformationalVersion>"
+    Assert-SourceMatch 'Windows assembly version is numeric' $project "<AssemblyVersion>$windowsPattern</AssemblyVersion>"
+    Assert-SourceMatch 'Windows file version is numeric' $project "<FileVersion>$windowsPattern</FileVersion>"
+  }
+  Assert-SourceMatch 'setup manifest version matches package.json' $setupManifest "assemblyIdentity version=`"$windowsPattern`""
+  Assert-SourceMatch 'client manifest version matches package.json' $clientManifest "assemblyIdentity version=`"$windowsPattern`""
   Assert-SourceMatch 'installed script version matches package.json' $installer "appVersion\s*=\s*'$releasePattern'"
   Assert-SourceMatch 'update agent version matches package.json' $updateAgent "return\s+'$releasePattern'"
   Assert-SourceMatch 'machine identity version matches package.json' $machineIdentity "return\s+`"$releasePattern`""
   Assert-SourceMatch 'API version matches package.json' $apiRoutes "body\.put\(`"version`",\s*`"$releasePattern`"\)"
-} else {
-  $failures.Add("package.json contains an invalid release version: '$releaseVersion'") | Out-Null
 }
 
 Assert-SourceMatch 'update agent reads the release community TLS pin' $updateAgent 'community-server-tls-pin\.txt'
@@ -237,6 +243,15 @@ if (!(Test-Path -LiteralPath $registeredUpgradePathCheck -PathType Leaf)) {
   & node $registeredUpgradePathCheck
   if ($LASTEXITCODE -ne 0) {
     $failures.Add('registered modern/legacy upgrade path regression check failed') | Out-Null
+  }
+}
+$setupTempPathCheck = Join-Path $rootPath 'scripts\check-setup-temp-path.mjs'
+if (!(Test-Path -LiteralPath $setupTempPathCheck -PathType Leaf)) {
+  $failures.Add('setup temporary payload path regression check is missing') | Out-Null
+} else {
+  & node $setupTempPathCheck
+  if ($LASTEXITCODE -ne 0) {
+    $failures.Add('setup temporary payload path regression check failed') | Out-Null
   }
 }
 Assert-SourceMatch 'setup refuses to kill an installation during the upgrade transaction' $setupProgram 'OnFormClosing[\s\S]{0,600}e\.Cancel\s*=\s*true'
@@ -312,9 +327,23 @@ Assert-SourceMatch 'installer accepts a payload pre-extracted by the .NET setup 
 Assert-SourceMatch 'installer builds the bundled Netease API plugin' $buildInstaller "music-api-plugins\\netease\\build\.ps1"
 Assert-SourceMatch 'installer stages the bundled Netease API plugin' $buildInstaller 'FE-Monster-Netease-API-Plugin-4\.32\.0\.zip'
 Assert-SourceMatch 'installer builds the bundled QQ API plugin' $buildInstaller "music-api-plugins\\qq\\build\.ps1"
-Assert-SourceMatch 'installer stages the bundled QQ API plugin' $buildInstaller 'FE-Monster-QQ-API-Plugin-2\.4\.1\.zip'
+Assert-SourceMatch 'installer stages the bundled QQ API plugin' $buildInstaller 'FE-Monster-QQ-API-Plugin-2\.4\.2\.zip'
 Assert-SourceMatch 'installer writes pre-commit diagnostics outside the install root' $installer "FE Monster Setup"
 Assert-SourceMatch 'installer uses a cross-process mutation lock' $installer 'Enter-InstallMutationLock'
+foreach ($isolationCheckName in @(
+  'check-installer-mutation-lock.ps1',
+  'check-stop-stale-target-isolation.ps1'
+)) {
+  $isolationCheck = Join-Path $rootPath (Join-Path 'scripts' $isolationCheckName)
+  if (!(Test-Path -LiteralPath $isolationCheck -PathType Leaf)) {
+    $failures.Add("installer isolation regression check is missing: $isolationCheckName") | Out-Null
+    continue
+  }
+  & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $isolationCheck -Root $rootPath
+  if ($LASTEXITCODE -ne 0) {
+    $failures.Add("installer isolation regression check failed: $isolationCheckName") | Out-Null
+  }
+}
 Assert-SourceMatch `
   'installer persists an interrupted-upgrade recovery marker before moving the active installation' `
   $installer `
@@ -366,6 +395,12 @@ foreach ($desktopPetRuntime in @(
   'web\settings-center.js',
   'web\audio-mixer-ui.js',
   'web\audio-mixer-visuals.js',
+  'web\local-memory-client.js',
+  'web\pet-memory-recall.js',
+  'web\pet-preference-policy.js',
+  'web\pet-preference-memory.js',
+  'web\app-parameter-registry.js',
+  'web\lyric-highlight-particles.js',
   'web\runtime-module-loader.js',
   'web\app-command.js',
   'web\playback-intelligence.js',
@@ -531,6 +566,14 @@ Assert-SourceMatch 'stale-process cleanup accepts a not-yet-created clean instal
 Assert-SourceNotMatch 'stale-process cleanup does not require a clean install target to exist' $stopper 'Resolve-Path\s+\$Root'
 
 Assert-SourceMatch 'build stages a bundled Java runtime' $buildInstaller 'Stage-JavaRuntime'
+Assert-SourceMatch `
+  'build produces the dedicated encrypted-memory WinCrypto bridge before staging' `
+  $buildInstaller `
+  'Build-App[\s\S]*build-wincrypto\.ps1'
+Assert-SourceMatch `
+  'bundled Java runtime explicitly includes java.sql for SQLite JDBC' `
+  $buildInstaller `
+  "Stage-JavaRuntime[\s\S]{0,1800}'java\.sql'"
 Assert-SourceNotMatch 'published payload does not expose the console-only run.cmd entry' $buildInstaller "'run\.cmd'"
 Assert-SourceNotMatch 'installed runtime does not require the console-only run.cmd entry' $installer 'function\s+Assert-RequiredFiles[\s\S]{0,260}''run\.cmd'''
 Assert-SourceMatch 'build rejects the unsupported no-Node payload mode' $buildInstaller "NoNodeBundle[\s\S]{0,160}not supported"
@@ -554,6 +597,38 @@ Assert-SourceMatch 'reused payload zip is checked against the selected WebView2 
 Assert-SourceMatch 'build cleanup is isolated from installer smoke/output artifacts' $buildInstaller "out\\installer\\work"
 Assert-SourceMatch 'build validates PE x64 architecture' $buildInstaller 'Get-PeMachine'
 Assert-SourceMatch 'build creates a payload integrity manifest' $buildInstaller 'payload-integrity\.json'
+
+$localMemoryReleasePayload = @(
+  'web\local-memory-client.js',
+  'web\pet-memory-recall.js',
+  'web\pet-preference-policy.js',
+  'web\pet-preference-memory.js',
+  'out\lib\sqlite-jdbc-3.53.2.1-without-natives.jar',
+  'out\lib\sqlite-jdbc-3.53.2.1-natives-windows.jar',
+  'out\lib\slf4j-api-1.7.36.jar',
+  'native\windows\build\fe-monster-wincrypto.dll',
+  'third_party\java\local-memory\dependencies.json',
+  'third_party\java\local-memory\LICENSE-SQLITE-JDBC.txt',
+  'third_party\java\local-memory\LICENSE-SLF4J.txt'
+)
+foreach ($localMemoryRelative in $localMemoryReleasePayload) {
+  Assert-SourceMatch `
+    "build stages and requires encrypted-memory release artifact $localMemoryRelative" `
+    $buildInstaller `
+    ([regex]::Escape($localMemoryRelative))
+}
+Assert-SourceMatch `
+  'clean install performs an encrypted-memory write' `
+  (Read-Source 'scripts\check-windows-clean-install-runtime.ps1') `
+  '/api/local-memory/events'
+Assert-SourceMatch `
+  'clean install restarts before accepting encrypted-memory persistence' `
+  (Read-Source 'scripts\check-windows-clean-install-runtime.ps1') `
+  'memoryRestartVerified'
+Assert-SourceMatch `
+  'clean install scans the persistent vault for its plaintext canary' `
+  (Read-Source 'scripts\check-windows-clean-install-runtime.ps1') `
+  'memoryPlaintextScanPassed'
 Assert-SourceMatch 'build emits Authenticode diagnostics' $buildInstaller 'Get-AuthenticodeSignature'
 Assert-SourceMatch 'build emits a distributable SHA-256 checksum' $buildInstaller '\.sha256'
 Assert-SourceMatch 'build stages community configuration through an explicit policy' $buildInstaller 'function\s+Stage-CommunityServerConfiguration'
@@ -578,6 +653,10 @@ Assert-SourceMatch 'release without a pin uses the system-trusted HTTPS request 
 Assert-SourceMatch 'normalized public TLS pins are staged beside the community URL' $buildInstaller 'community-server-tls-pin\.txt[\s\S]{0,260}sha256:\$_'
 Assert-SourceMatch 'developer HTTPS fallback reads its local TLS pin file' $buildInstaller 'communityPinFile[\s\S]{0,520}Get-Content\s+-LiteralPath\s+\$communityPinFile\s+-Raw'
 Assert-SourceMatch 'developer HTTPS fallback validates service health with normalized pins' $buildInstaller 'Staged validated developer community HTTPS configuration'
+Assert-SourceMatch 'developer health bypass is exposed only as an explicit switch' $buildInstaller '\[switch\]\$SkipDeveloperCommunityHealthCheck'
+Assert-SourceMatch 'developer health bypass is restricted to local StageOnly validation' $buildInstaller 'SkipDeveloperCommunityHealthCheck\s+-and\s+!\$StageOnly[\s\S]{0,220}restricted to -StageOnly local payload validation'
+Assert-SourceMatch 'developer health bypass cannot weaken explicit release settings' $buildInstaller 'SkipDeveloperCommunityHealthCheck cannot be combined with explicit release community settings'
+Assert-SourceMatch 'developer health bypass leaves formal installer health validation enabled' $buildInstaller 'Skipping the developer community health probe for StageOnly local payload validation[\s\S]{0,260}else\s*\{[\s\S]{0,180}Assert-CommunityServerHealth'
 Assert-SourceNotMatch 'installer build does not hard-code a machine certificate fingerprint' $buildInstaller '(?i)sha256:[0-9a-f]{64}'
 Assert-SourceMatch 'explicit release settings cannot silently reuse an unvalidated payload' $buildInstaller 'Explicit community release settings cannot be combined with -ReusePayloadZip'
 Assert-SourceMatch 'payload zip community configuration is validated through a dedicated policy' $buildInstaller 'function\s+Assert-PayloadZipCommunityConfiguration'
@@ -628,6 +707,9 @@ Assert-SourceMatch `
 
 if (![string]::IsNullOrWhiteSpace($PayloadRoot)) {
   $payloadPath = (Resolve-Path -LiteralPath $PayloadRoot).Path
+  if (Test-Path -LiteralPath (Join-Path $payloadPath 'src\community-proprietary')) {
+    $failures.Add('staged payload contains proprietary community implementation source') | Out-Null
+  }
   $manifestPath = Join-Path $payloadPath 'payload-integrity.json'
   if (!(Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
     $failures.Add('staged payload manifest is missing') | Out-Null
@@ -686,6 +768,7 @@ if (![string]::IsNullOrWhiteSpace($PayloadRoot)) {
     }
 
     $expectedNativeAmd64Paths = [string[]]@(
+      'native/windows/build/fe-monster-wincrypto.dll',
       'native/windows/build/fe-monster-xaudio2.dll',
       'native/windows/build/fe_monster_upmix.dll',
       'native/windows/build/winforms/FE Monster.exe',
@@ -718,6 +801,66 @@ if (![string]::IsNullOrWhiteSpace($PayloadRoot)) {
       }
       if ($entry.peMachine -and (Get-PeMachine $path) -ne [int]$entry.peMachine) {
         $failures.Add("staged payload PE architecture mismatch: $relative") | Out-Null
+      }
+    }
+
+    $sourceMemoryReceiptPath = Join-Path $rootPath 'third_party\java\local-memory\dependencies.json'
+    $stagedMemoryReceiptPath = Join-Path $payloadPath 'third_party\java\local-memory\dependencies.json'
+    try {
+      if (!(Test-Path -LiteralPath $sourceMemoryReceiptPath -PathType Leaf) -or
+          !(Test-Path -LiteralPath $stagedMemoryReceiptPath -PathType Leaf)) {
+        throw 'dependency receipt is missing'
+      }
+      $sourceReceiptHash = (Get-FileHash -LiteralPath $sourceMemoryReceiptPath -Algorithm SHA256).Hash
+      $stagedReceiptHash = (Get-FileHash -LiteralPath $stagedMemoryReceiptPath -Algorithm SHA256).Hash
+      if ($sourceReceiptHash -cne $stagedReceiptHash) {
+        throw 'staged dependency receipt differs from the pinned source receipt'
+      }
+      $memoryReceipt = Get-Content -LiteralPath $stagedMemoryReceiptPath -Raw -Encoding UTF8 | ConvertFrom-Json
+      $expectedJarNames = [string[]]@(
+        'slf4j-api-1.7.36.jar',
+        'sqlite-jdbc-3.53.2.1-natives-windows.jar',
+        'sqlite-jdbc-3.53.2.1-without-natives.jar'
+      )
+      [Array]::Sort($expectedJarNames, [StringComparer]::Ordinal)
+      $stagedLibRoot = Join-Path $payloadPath 'out\lib'
+      $actualJarNames = [string[]]@(Get-ChildItem -LiteralPath $stagedLibRoot -File -Force |
+        ForEach-Object { $_.Name })
+      [Array]::Sort($actualJarNames, [StringComparer]::Ordinal)
+      if (($actualJarNames -join '|') -cne ($expectedJarNames -join '|')) {
+        throw "staged out/lib set is unexpected: $($actualJarNames -join ', ')"
+      }
+      foreach ($artifact in @($memoryReceipt.artifacts)) {
+        $relative = 'out/lib/' + [string]$artifact.file
+        $staged = Join-Path $payloadPath $relative.Replace('/', '\')
+        if (!(Test-Path -LiteralPath $staged -PathType Leaf)) {
+          throw "staged dependency is missing: $relative"
+        }
+        $hash = (Get-FileHash -LiteralPath $staged -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($hash -cne ([string]$artifact.sha256).ToLowerInvariant()) {
+          throw "staged dependency hash mismatch: $relative"
+        }
+      }
+      foreach ($license in @($memoryReceipt.licenses)) {
+        $relative = 'third_party/java/local-memory/' + [string]$license.file
+        $staged = Join-Path $payloadPath $relative.Replace('/', '\')
+        if (!(Test-Path -LiteralPath $staged -PathType Leaf)) {
+          throw "staged license is missing: $relative"
+        }
+        $hash = (Get-FileHash -LiteralPath $staged -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($hash -cne ([string]$license.sha256).ToLowerInvariant()) {
+          throw "staged license hash mismatch: $relative"
+        }
+      }
+    } catch {
+      $failures.Add("staged encrypted-memory dependency bundle is invalid: $($_.Exception.Message)") | Out-Null
+    }
+
+    $stagedJava = Join-Path $payloadPath 'runtime\java\bin\java.exe'
+    if (Test-Path -LiteralPath $stagedJava -PathType Leaf) {
+      $runtimeModules = & $stagedJava --list-modules 2>&1
+      if ($LASTEXITCODE -ne 0 -or !(@($runtimeModules) | Where-Object { [string]$_ -match '^java\.sql@' })) {
+        $failures.Add('staged Java runtime does not include java.sql') | Out-Null
       }
     }
 
@@ -755,6 +898,8 @@ if (![string]::IsNullOrWhiteSpace($PayloadRoot)) {
       $failures.Add("staged native audio build pair is invalid: $($_.Exception.Message)") | Out-Null
     }
     foreach ($sourceMatchedRelative in @(
+      'LICENSES\COMMUNITY-PROPRIETARY.txt',
+      'COMMUNITY_LICENSE_BOUNDARY.md',
       'scripts\install-fe-monster.ps1',
       'scripts\ensure-runtime-dependencies.ps1',
       'scripts\java-runtime.ps1',

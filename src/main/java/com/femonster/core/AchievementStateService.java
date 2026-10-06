@@ -13,11 +13,14 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 public final class AchievementStateService {
     private static final int VERSION = 2;
+    private static final int SCOPE_MEMORY_VERSION = 1;
     private static final Set<String> ACHIEVEMENT_IDS = Set.of(
         "first-block",
         "gap-runner",
@@ -42,7 +45,9 @@ public final class AchievementStateService {
     private static final Set<String> THEMES = Set.of("classic", "forge", "void", "frost");
 
     private final Path file;
+    private final Path scopeMemoryFile;
     private final Map<String, AchievementStateService> scopedServices = new LinkedHashMap<>();
+    private LinkedHashMap<String, String> rememberedScopes;
     private LinkedHashMap<String, Long> progress = new LinkedHashMap<>();
     private LinkedHashMap<String, Long> unlocked = new LinkedHashMap<>();
     private String pageTheme = "classic";
@@ -54,8 +59,109 @@ public final class AchievementStateService {
     private boolean restoredFromDisk;
 
     public AchievementStateService(Path file) {
+        this(file, defaultScopeMemoryFile(file));
+    }
+
+    private AchievementStateService(Path file, Path scopeMemoryFile) {
         this.file = file.toAbsolutePath().normalize();
+        this.scopeMemoryFile = scopeMemoryFile == null ? null : scopeMemoryFile.toAbsolutePath().normalize();
         restore();
+    }
+
+    // The last confirmed music-platform account for each provider is remembered
+    // next to the achievement state itself. A launch that cannot reach the
+    // music-API plugin yet must not report the empty anonymous partition: that
+    // made every restart look like the player's progress was reset.
+    private static Path defaultScopeMemoryFile(Path file) {
+        Path parent = file.getParent();
+        Path directory = parent == null ? Path.of(".") : parent;
+        return directory.resolve("achievement-scope.json");
+    }
+
+    public synchronized String rememberedScope(String provider) {
+        String id = normalizeProvider(provider);
+        if (id.isBlank()) return "";
+        return rememberedScopeMemory().getOrDefault(id, "");
+    }
+
+    public synchronized void rememberScope(String provider, String scope) {
+        String id = normalizeProvider(provider);
+        String value = scope == null ? "" : scope.trim();
+        if (id.isBlank() || !value.startsWith(id + ":") || value.length() > 160) return;
+        String accountId = value.substring(id.length() + 1);
+        if (accountId.isBlank()) return;
+        LinkedHashMap<String, String> memory = rememberedScopeMemory();
+        if (Objects.equals(memory.get(id), value)) return;
+        memory.put(id, value);
+        writeScopeMemory(memory);
+    }
+
+    private LinkedHashMap<String, String> rememberedScopeMemory() {
+        if (rememberedScopes == null) rememberedScopes = readScopeMemory();
+        return rememberedScopes;
+    }
+
+    private static String normalizeProvider(String provider) {
+        String value = provider == null ? "" : provider.trim().toLowerCase(Locale.ROOT);
+        return value.matches("[a-z0-9_-]{1,24}") ? value : "";
+    }
+
+    private LinkedHashMap<String, String> readScopeMemory() {
+        LinkedHashMap<String, String> memory = new LinkedHashMap<>();
+        if (scopeMemoryFile == null || !Files.isRegularFile(scopeMemoryFile)) return memory;
+        try {
+            Map<String, Object> root = SimpleJson.parseObjectStrict(
+                Files.readString(scopeMemoryFile, StandardCharsets.UTF_8)
+            );
+            if (SimpleJson.asInt(root.get("version"), 0) != SCOPE_MEMORY_VERSION) return memory;
+            Map<String, Object> scopes = SimpleJson.asMap(root.get("scopes"));
+            for (Map.Entry<String, Object> entry : scopes.entrySet()) {
+                String id = normalizeProvider(entry.getKey());
+                String scope = SimpleJson.asString(entry.getValue(), "").trim();
+                if (id.isBlank() || !scope.startsWith(id + ":") || scope.length() > 160) continue;
+                if (scope.substring(id.length() + 1).isBlank()) continue;
+                memory.put(id, scope);
+            }
+        } catch (IOException | RuntimeException ignored) {
+            return new LinkedHashMap<>();
+        }
+        return memory;
+    }
+
+    private void writeScopeMemory(LinkedHashMap<String, String> memory) {
+        if (scopeMemoryFile == null) return;
+        try {
+            Path parent = scopeMemoryFile.getParent();
+            if (parent != null) Files.createDirectories(parent);
+            Map<String, Object> root = new LinkedHashMap<>();
+            root.put("version", SCOPE_MEMORY_VERSION);
+            root.put("scopes", new LinkedHashMap<>(memory));
+            Path temporary = scopeMemoryFile.resolveSibling(scopeMemoryFile.getFileName() + ".tmp");
+            try {
+                Files.writeString(
+                    temporary,
+                    SimpleJson.stringify(root),
+                    StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING
+                );
+                try {
+                    Files.move(
+                        temporary,
+                        scopeMemoryFile,
+                        StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE
+                    );
+                } catch (AtomicMoveNotSupportedException ignored) {
+                    Files.move(temporary, scopeMemoryFile, StandardCopyOption.REPLACE_EXISTING);
+                }
+            } finally {
+                Files.deleteIfExists(temporary);
+            }
+        } catch (IOException ignored) {
+            // Losing the memory only costs the fallback; the next successful
+            // login probe rewrites it.
+        }
     }
 
     public synchronized Map<String, Object> snapshot() {
@@ -130,7 +236,7 @@ public final class AchievementStateService {
         String normalized = scope == null ? "" : scope.trim();
         if (normalized.isBlank() || "anonymous".equals(normalized)) return this;
         return scopedServices.computeIfAbsent(normalized, ignored ->
-            new AchievementStateService(scopedStateFile(normalized))
+            new AchievementStateService(scopedStateFile(normalized), null)
         );
     }
 

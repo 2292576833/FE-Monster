@@ -97,10 +97,15 @@ assert.match(html, /id=["']worldPeaceLinePrimary["'][^>]*>\s*(?:<span>)?世界�
 assert.match(html, /id=["']worldPeaceLineSecondary["'][^>]*>\s*(?:<span>)?愿天下没有战争</i);
 
 const appScriptIndex = html.indexOf('src="app.js');
-const achievementScriptIndex = html.indexOf('src="pixel-achievements.js');
-const adventureScriptIndex = html.indexOf('src="pixel-login-adventure.js');
-assert.ok(appScriptIndex >= 0 && achievementScriptIndex > appScriptIndex,
-  'pixel achievements must load after the main app API');
+const runtimeLoaderIndex = html.indexOf('src="runtime-module-loader.js');
+const runtimeLoader = read('web/runtime-module-loader.js');
+const runtimeModules = runtimeLoader.match(/const RUNTIME_MODULE_URLS\s*=\s*\[([\s\S]*?)\]/)?.[1] || '';
+assert.match(runtimeLoader, /PIXEL_ACHIEVEMENTS_URL\s*=\s*['"]pixel-achievements\.js\?v=/);
+assert.match(runtimeLoader, /PIXEL_LOGIN_ADVENTURE_URL\s*=\s*['"]pixel-login-adventure\.js\?v=/);
+const achievementScriptIndex = runtimeModules.indexOf('PIXEL_ACHIEVEMENTS_URL');
+const adventureScriptIndex = runtimeModules.indexOf('PIXEL_LOGIN_ADVENTURE_URL');
+assert.ok(appScriptIndex >= 0 && runtimeLoaderIndex > appScriptIndex && achievementScriptIndex >= 0,
+  'the runtime loader must load pixel achievements after the main app API');
 assert.ok(adventureScriptIndex > achievementScriptIndex,
   'the login adventure must load after the achievement API');
 assert.match(html, /href=["']pixel-adventure\.css\?[^"']+["']/i);
@@ -188,8 +193,13 @@ assert.match(achievements, /window\.fetch\(stateApiUrl\(\), \{[\s\S]*?method: 'P
   'achievement changes must be written through the application data API');
 assert.match(achievements, /async function drainPersistQueue\(\)[\s\S]*?while \(persistCompletedRevision < persistRequestedRevision\)[\s\S]*?await persistServerState\(\)/,
   'application-data writes must remain serialized and coalesce to the latest state');
-assert.match(achievements, /if \(persistDrainActive \|\| !hydrationFinished \|\| !serverHydrated\) return/,
+assert.match(achievements, /if \(persistDrainActive \|\| !localPersistenceReady\(\)\) return/,
   'the client must never overwrite unknown server state before a successful hydration');
+assert.match(
+  achievements,
+  /function localPersistenceReady\(\) \{\s*return hydrationFinished && \(serverHydrated \|\| localBackendHydrated\);/,
+  'the durable per-account store must be writable without waiting for the community mirror'
+);
 assert.match(achievements, /const HYDRATE_RETRY_DELAYS = Object\.freeze\(\[[^\]]+\]\)/,
   'transient achievement-state reads must retry before falling back');
 assert.match(achievements, /const PERSIST_RETRY_DELAYS = Object\.freeze\(\[[^\]]+\]\)/,

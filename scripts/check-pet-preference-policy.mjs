@@ -77,6 +77,22 @@ const active = policy.reduce([
 ], { now: '2026-08-31T10:00:01.000Z' });
 assert.equal(active.length, 0, 'retracted preference leaked into active projection');
 
+const behaviorAfterExplicitRetraction = {
+  ...first,
+  origin: 'behavior',
+  confidence: 0.9,
+  evidence: 8,
+  updatedAt: '2026-08-31T11:00:00.000Z'
+};
+const stillRetracted = policy.reduce([
+  fixtureRecord(first, '2026-08-31T08:00:00.000Z'),
+  fixtureRecord(correction, '2026-08-31T09:00:00.000Z'),
+  fixtureRecord(retraction, '2026-08-31T10:00:00.000Z'),
+  fixtureRecord(behaviorAfterExplicitRetraction, '2026-08-31T11:00:00.000Z')
+], { now: '2026-08-31T11:00:01.000Z' });
+assert.equal(stillRetracted.length, 0,
+  'updated behavioral evidence reactivated a preference after explicit retraction');
+
 const v1 = {
   schemaVersion: 1,
   category: 'music_like',

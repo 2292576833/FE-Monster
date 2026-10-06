@@ -28,6 +28,8 @@ const pipelineHeader = readFileSync(path.join(root, 'native/windows/audio/fe_aud
 const pipelineSource = readFileSync(path.join(root, 'native/windows/audio/fe_audio_pipeline.cpp'), 'utf8');
 const jniSource = readFileSync(path.join(root, 'native/windows/fe_monster_xaudio2.cpp'), 'utf8');
 const nativeProbe = readFileSync(path.join(root, 'native/windows/audio/fe_audio_probe.cpp'), 'utf8');
+const nativeCmake = readFileSync(path.join(root, 'native/windows/CMakeLists.txt'), 'utf8');
+const wasmCmake = readFileSync(path.join(root, 'native/google-obr-wasm/CMakeLists.txt'), 'utf8');
 const rustHeader = readFileSync(path.join(root, 'native/rust-audio-upmix/include/fe_rust_upmix.h'), 'utf8');
 const rustSource = readFileSync(path.join(root, 'native/rust-audio-upmix/src/lib.rs'), 'utf8');
 const obrHeaderPath = path.join(
@@ -189,8 +191,36 @@ try {
     assert.match(pipelineSource, /BinauralFilterProfile::kReverberant/);
   });
 
+  contract('realtimeDspTuningAndInPlaceSpatialUpdates', () => {
+    assert.match(pipelineHeader, /FE_AUDIO_OBR_SAMPLE_POINTS\s+8192u/);
+    assert.match(rustHeader, /FE_RUST_UPMIX_STFT_FFT_SIZE\s+2048u/);
+    assert.match(rustHeader, /FE_RUST_UPMIX_STFT_HOP_SIZE\s+512u/);
+    assert.match(rustHeader, /FE_RUST_UPMIX_STFT_OVERLAP_PERCENT\s+75u/);
+    assert.match(rustSource, /UPMIX_STFT_FFT_SIZE:\s*usize\s*=\s*2048/);
+    assert.match(rustSource, /UPMIX_STFT_HOP_SIZE:\s*usize\s*=\s*512/);
+    assert.match(rustSource, /process_passive_stft/);
+    assert.match(rustSource, /fe_rust_upmix_update/);
+    assert.match(pipelineSource, /SpatialControlsRequireModuleRebuild/);
+    assert.match(pipelineSource, /SpatialControlsRequireUpmixUpdate/);
+    const rebuildHelperStart = pipelineSource.indexOf('bool SpatialControlsRequireModuleRebuild');
+    const rebuildHelperEnd = pipelineSource.indexOf('\n}\n\nbool SpatialControlsRequireUpmixUpdate', rebuildHelperStart);
+    assert.ok(rebuildHelperStart >= 0 && rebuildHelperEnd > rebuildHelperStart);
+    const rebuildHelper = pipelineSource.slice(rebuildHelperStart, rebuildHelperEnd);
+    assert.doesNotMatch(rebuildHelper, /upmix_enabled|obr_enabled/,
+      'route enable/disable must reuse the prebuilt handles');
+    assert.match(pipelineSource, /rust_upmixer_\.Update\(sample_rate_, spatial_controls_\)/);
+    assert.match(pipelineSource, /spatial_cache_revision_\s*=\s*0/);
+    assert.match(pipelineSource, /GetProcAddress\(module_, "fe_rust_upmix_update"\)/);
+    assert.match(nativeCmake, /FE_OBR_FFT_MANAGER_SOURCE/);
+    assert.match(nativeCmake, /NextPowTwo\(frames_per_buffer\) \* 2/);
+    assert.match(nativeCmake, /"8192"/);
+    assert.match(wasmCmake, /FE_OBR_FFT_MANAGER_SOURCE/);
+    assert.match(wasmCmake, /NextPowTwo\(frames_per_buffer\) \* 2/);
+    assert.match(wasmCmake, /"8192"/);
+  });
+
   contract('queueBackpressureDoesNotBlockMixerControls', () => {
-    const submitStart = pipelineSource.indexOf('HRESULT Submit(const float* interleaved_pcm');
+    const submitStart = pipelineSource.indexOf('HRESULT Submit(');
     const submitEnd = pipelineSource.indexOf('\n    void GetStatus(', submitStart);
     assert.ok(submitStart >= 0 && submitEnd > submitStart,
       'native Submit implementation must be inspectable');

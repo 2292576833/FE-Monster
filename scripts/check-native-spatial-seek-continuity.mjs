@@ -138,13 +138,15 @@ let fetchHandler = async () => ({
 const recycled = [];
 const transportContext = vm.createContext({
   AbortController,
+  DOMException,
   Float32Array,
   Number,
   URLSearchParams,
   GOOGLE_OBR_NATIVE_TRANSPORT_FRAMES: 4096,
   GOOGLE_OBR_NATIVE_MAX_PENDING_BLOCKS: 4,
   GOOGLE_OBR_NATIVE_UPLOAD_RETRY_DELAYS: Object.freeze([20, 50]),
-  window: { setTimeout },
+  GOOGLE_OBR_NATIVE_UPLOAD_TIMEOUT_MS: 750,
+  window: { setTimeout, clearTimeout },
   fetch: async (...args) => {
     fetchCalls += 1;
     return fetchHandler(...args);
@@ -241,12 +243,12 @@ assert.match(
 );
 assert.match(
   pipelineSource,
-  /HRESULT ResetTimeline\(\)[\s\S]{0,4000}FlushSourceBuffers\(\)/,
+  /HRESULT ResetTimelineForGeneration\([^)]*\)[\s\S]{0,4000}FlushSourceBuffers\(\)/,
   'native timeline reset must stop and flush queued old audio'
 );
 assert.match(
   pipelineSource,
-  /HRESULT ResetTimeline\(\)[\s\S]{0,2500}std::cos\([\s\S]{0,500}SetVolume\([\s\S]{0,1500}FlushSourceBuffers\(\)/,
+  /HRESULT ResetTimelineForGeneration\([^)]*\)[\s\S]{0,3200}std::cos\([\s\S]{0,500}SetVolume\([\s\S]{0,1500}FlushSourceBuffers\(\)/,
   'XAudio2 must fade the obsolete voice on the control thread before flushing it'
 );
 assert.match(

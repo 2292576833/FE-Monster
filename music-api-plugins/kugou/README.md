@@ -1,6 +1,6 @@
 # FE Monster 酷狗音乐 API 插件
 
-版本：2.0.7
+版本：2.0.8
 上游：[MakcRe/KuGouMusicApi](https://github.com/MakcRe/KuGouMusicApi) `1.5.1`，源码提交 `283f1e97b110726b208a64b486a657c0fc0a6126`
 
 这是重建后的酷狗适配器。它只监听 `127.0.0.1:3012`，由 FE Monster 使用内置 Node.js 启动。用户在 FE Monster 中点击“打开官方扫码登录”后，宿主会在隔离浏览器中打开本地二维码展示页，并通过本地插件私下轮询酷狗官方授权状态；二维码接口不会暴露给 FE Monster 网页界面，也不会误跳到应用下载页。

@@ -15,6 +15,12 @@ RESOURCES_DIR="${CONTENTS}/Resources"
 JAVA_JAR="${MAC_BUILD_ROOT}/java/fe-monster-java.jar"
 
 require_command swift
+require_command node
+require_command npm
+require_command curl
+require_command shasum
+require_supported_macos
+node -e 'if(Number(process.versions.node.split(".")[0])<20)process.exit(1)' || fail "Build requires Node.js 20+."
 [[ -f "${APP_SOURCE_ROOT}/Package.swift" ]] || fail "缺少 Swift Package：${APP_SOURCE_ROOT}/Package.swift"
 assert_generated_path "${APP_BUNDLE}"
 
@@ -36,6 +42,12 @@ rm -rf "${APP_BUNDLE}"
 mkdir -p "${MACOS_DIR}" "${RESOURCES_DIR}"
 install -m 0755 "${SWIFT_EXECUTABLE}" "${MACOS_DIR}/${APP_NAME}"
 install -m 0644 "${SCRIPT_DIR}/Info.plist" "${CONTENTS}/Info.plist"
+# Keep the app version tied to the shared product manifest.
+VERSION="$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).version' "${SOURCE_PROJECT_ROOT}/package.json")"
+DISPLAY_VERSION="$(node -p 'const p=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));p.displayVersion||p.version' "${SOURCE_PROJECT_ROOT}/package.json")"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" "${CONTENTS}/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :FEMonsterDisplayVersion ${DISPLAY_VERSION}" "${CONTENTS}/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VERSION}" "${CONTENTS}/Info.plist"
 printf 'APPL????' > "${CONTENTS}/PkgInfo"
 
 require_command iconutil
@@ -51,9 +63,9 @@ if [[ "${FE_MONSTER_BUNDLE_JRE:-1}" != "0" ]]; then
   JDEPS="${JAVA_HOME_RESOLVED}/bin/jdeps"
   [[ -x "${JLINK}" ]] || fail "当前 JDK 不包含 jlink；设置 FE_MONSTER_BUNDLE_JRE=0 可改用系统 Java。"
   [[ -x "${JDEPS}" ]] || fail "当前 JDK 不包含 jdeps；设置 FE_MONSTER_BUNDLE_JRE=0 可改用系统 Java。"
-  JAVA_MODULES="$("${JDEPS}" --ignore-missing-deps --print-module-deps "${JAVA_JAR}")"
+  JAVA_MODULES="$("${JDEPS}" --ignore-missing-deps --multi-release 17 --class-path "${MAC_BUILD_ROOT}/java/lib/*" --print-module-deps "${JAVA_JAR}")"
   [[ -n "${JAVA_MODULES}" ]] || fail "无法计算 Java 运行时模块。"
-  for required_module in java.net.http jdk.crypto.ec; do
+  for required_module in java.net.http jdk.crypto.ec java.sql java.naming jdk.unsupported jdk.zipfs; do
     case ",${JAVA_MODULES}," in
       *,"${required_module}",*)
         ;;
@@ -71,11 +83,9 @@ if [[ "${FE_MONSTER_BUNDLE_JRE:-1}" != "0" ]]; then
     --output "${RESOURCES_DIR}/App/runtime/java"
 fi
 
-if [[ -n "${FE_MONSTER_NODE_BINARY:-}" ]]; then
-  [[ -x "${FE_MONSTER_NODE_BINARY}" ]] || fail "FE_MONSTER_NODE_BINARY 不是可执行文件：${FE_MONSTER_NODE_BINARY}"
-  mkdir -p "${RESOURCES_DIR}/App/runtime/node"
-  install -m 0755 "${FE_MONSTER_NODE_BINARY}" "${RESOURCES_DIR}/App/runtime/node/node"
-  note "已附带 Node.js：${FE_MONSTER_NODE_BINARY}"
+bash "${SCRIPT_DIR}/bundle-node.sh" "${RESOURCES_DIR}/App"
+if [[ -x "${RESOURCES_DIR}/App/runtime/java/bin/java" ]]; then
+  lipo -verify_arch "$(uname -m)" "${RESOURCES_DIR}/App/runtime/java/bin/java"
 fi
 
 case "${FE_MONSTER_CODESIGN:-none}" in
@@ -84,25 +94,27 @@ case "${FE_MONSTER_CODESIGN:-none}" in
     ;;
   adhoc)
     require_command codesign
-    codesign \
-      --force \
-      --deep \
-      --sign - \
-      --entitlements "${SCRIPT_DIR}/FE-Monster.entitlements" \
-      "${APP_BUNDLE}"
+    bash "${SCRIPT_DIR}/sign-app.sh" "${APP_BUNDLE}" -
     note "已进行本机测试用 ad-hoc 签名。"
     ;;
   *)
     require_command codesign
-    codesign \
-      --force \
-      --deep \
-      --sign "${FE_MONSTER_CODESIGN}" \
-      --entitlements "${SCRIPT_DIR}/FE-Monster.entitlements" \
-      "${APP_BUNDLE}"
+    bash "${SCRIPT_DIR}/sign-app.sh" "${APP_BUNDLE}" "${FE_MONSTER_CODESIGN}"
     note "已使用指定身份签名；发布前仍需完成公证。"
     ;;
 esac
+
+if [[ "${FE_MONSTER_DMG:-1}" != "0" ]]; then
+  DMG_ROOT="${MAC_BUILD_ROOT}/dmg"
+  assert_generated_path "${DMG_ROOT}"
+  rm -rf "${DMG_ROOT}"
+  mkdir -p "${DMG_ROOT}"
+  ditto "${APP_BUNDLE}" "${DMG_ROOT}/${APP_NAME}.app"
+  ln -s /Applications "${DMG_ROOT}/Applications"
+  DMG_PATH="${MAC_DIST_ROOT}/FE-Monster-${DISPLAY_VERSION}-$(uname -m).dmg"
+  hdiutil create -volname "FE Monster" -srcfolder "${DMG_ROOT}" -ov -format UDZO "${DMG_PATH}"
+  shasum -a 256 "${DMG_PATH}" > "${DMG_PATH}.sha256"
+fi
 
 note "macOS 应用已生成：${APP_BUNDLE}"
 printf '%s\n' "${APP_BUNDLE}"

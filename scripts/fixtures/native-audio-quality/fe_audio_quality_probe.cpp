@@ -748,9 +748,16 @@ StereoMetrics RenderCoherentObrStress(
     uint32_t channels,
     float amplitude,
     uint32_t warmup_blocks,
-    uint32_t measured_blocks
+    uint32_t measured_blocks,
+    float width = 1.0f
 ) {
-    FlexibleObrRenderer obr(OfficialObrPositions(channels));
+    auto positions = OfficialObrPositions(channels);
+    for (uint32_t channel = 0; channel < channels; ++channel) {
+        positions[channel].azimuth = fe::audio::SpatialBedAzimuthForWidth(
+            channels, channel, positions[channel].azimuth, width
+        );
+    }
+    FlexibleObrRenderer obr(positions);
     StereoAccumulator accumulator;
     if (!obr.Ready()) {
         StereoMetrics failed{};
@@ -1093,10 +1100,35 @@ void PrintStereoMetrics(const char* name, const StereoMetrics& metrics) {
         << "}";
 }
 
+double MonoRetentionDb(const StereoMetrics& metrics) {
+    const double mono_power = std::max(0.0, 0.25 * (
+        metrics.rms_left * metrics.rms_left + metrics.rms_right * metrics.rms_right
+        + 2.0 * metrics.left_right_correlation * metrics.rms_left * metrics.rms_right
+    ));
+    return 20.0 * std::log10(
+        std::max(1.0e-12, std::sqrt(mono_power)) / std::max(1.0e-12, metrics.rms)
+    );
+}
+
+void VerifyMonoMetric() {
+    StereoAccumulator coherent;
+    StereoAccumulator inverted;
+    for (uint32_t frame = 0; frame < kFramesPerBlock; ++frame) {
+        const float sample = std::sin(2.0f * kPi * frame / 32.0f) * 0.5f;
+        coherent.Add(sample, sample, frame);
+        inverted.Add(sample, -sample, frame);
+    }
+    Require(std::abs(MonoRetentionDb(coherent.Finish())) < 1.0e-6,
+        "mono metric must preserve coherent stereo");
+    Require(MonoRetentionDb(inverted.Finish()) < -100.0,
+        "mono metric must detect phase cancellation, not reward changed correlation");
+}
+
 }  // namespace
 
 int main() {
     VerifyCanonicalSpatialBed();
+    VerifyMonoMetric();
     std::cout << std::fixed << std::setprecision(8);
     const auto positions = CurrentProductPositions();
     float minimum_azimuth = positions.front().azimuth;
@@ -1330,6 +1362,16 @@ int main() {
         && obr_loudness_delta_db <= 1.5;
     const bool realtime_ok = high.process_p99_ms <
         (1000.0 * kFramesPerBlock / kSampleRate) * 0.75;
+    // Stress the optional preset's bounded 5.1 geometry independently of the
+    // upmixer. This proves renderer safety/mono retention, not listening quality.
+    const auto clear_spatial = RenderCoherentObrStress(6, 1.0f, 64, 192, 1.10f);
+    const double clear_spatial_mono_db = MonoRetentionDb(clear_spatial);
+    const bool clear_spatial_ok = clear_spatial.non_finite_samples == 0
+        && clear_spatial.hard_clip_samples == 0
+        && clear_spatial.peak <= kObrCeiling * 1.000001
+        && clear_spatial.thd_ratio <= 0.001
+        && std::isfinite(clear_spatial_mono_db)
+        && clear_spatial_mono_db >= -1.0;
     const bool pass = render_initialization_ok
         && render_completion_ok
         && finite_and_dc_ok
@@ -1340,7 +1382,8 @@ int main() {
         && distortion_ok
         && loudness_ok
         && four_state_quality_ok
-        && realtime_ok;
+        && realtime_ok
+        && clear_spatial_ok;
 
     const char* first_failing_metric = "";
     if (!render_initialization_ok) {
@@ -1375,11 +1418,20 @@ int main() {
         first_failing_metric = "four_state_quality";
     } else if (!realtime_ok) {
         first_failing_metric = "realtime";
+    } else if (!clear_spatial_ok) {
+        first_failing_metric = "clear_spatial_mono_and_clip";
     }
 
     std::cout << "{\n"
         << "  \"pass\": " << (pass ? "true" : "false") << ",\n"
         << "  \"firstFailingMetric\": \"" << first_failing_metric << "\",\n"
+        << "  \"clearSpatial\": {\"pass\":" << (clear_spatial_ok ? "true" : "false")
+        << ",\"scope\":\"coherent-5.1-renderer-stress\",\"width\":1.10"
+        << ",\"monoRetentionDb\":" << clear_spatial_mono_db
+        << ",\"peak\":" << clear_spatial.peak
+        << ",\"thdRatio\":" << clear_spatial.thd_ratio
+        << ",\"hardClipSamples\":" << clear_spatial.hard_clip_samples
+        << ",\"nonFiniteSamples\":" << clear_spatial.non_finite_samples << "},\n"
         << "  \"qualityGates\": {"
         << "\"renderInitialization\":"
         << (render_initialization_ok ? "true" : "false")

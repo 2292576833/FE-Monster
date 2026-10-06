@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
@@ -25,12 +27,14 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.ThreadPoolExecutor;
 
 public final class PlayerService {
     private static final long SAVE_DEBOUNCE_MILLIS = 180;
     private static final long SAVE_FLUSH_TIMEOUT_MILLIS = 2000;
     private static final int MAX_QUEUE_SIZE = 2_000;
     private static final int MAX_QUEUE_PAGE_SIZE = 200;
+    private static final long LOAD_TIMEOUT_MILLIS = 18_000;
 
     private final Path stateFile;
     private final MusicProviderRegistry music;
@@ -41,6 +45,16 @@ public final class PlayerService {
         return thread;
     });
     private ScheduledFuture<?> pendingSave;
+    // Network resolution never occupies the state lock or an unbounded worker
+    // queue. A new selection cancels obsolete work instead of waiting behind it.
+    private final ThreadPoolExecutor resolutionExecutor = new ThreadPoolExecutor(
+        2, 2, 30, TimeUnit.SECONDS, new ArrayBlockingQueue<>(1), runnable -> {
+            Thread thread = new Thread(runnable, "fe-player-source-resolver");
+            thread.setDaemon(true);
+            return thread;
+        }
+    );
+    private Future<PlaybackSource> pendingResolution;
     private long stateRevision = 0;
     private long queueRevision = 0;
     private long loadRevision = 0;
@@ -122,10 +136,12 @@ public final class PlayerService {
     public Map<String, Object> play() {
         Song songToResolve;
         String requestedQuality;
+        int resumePosition;
         synchronized (this) {
             if (!audioLoaded && currentSong.hasIdentity()) {
                 songToResolve = currentSong;
                 requestedQuality = quality;
+                resumePosition = position;
             } else {
                 playing = audioLoaded && error.isBlank();
                 positionAtClockStart = position;
@@ -136,11 +152,12 @@ public final class PlayerService {
                 return body;
             }
         }
-        return load(songToResolve, requestedQuality);
+        return load(songToResolve, requestedQuality, resumePosition);
     }
 
     public synchronized Map<String, Object> pause() {
         loadRevision += 1;
+        cancelPendingResolution();
         refreshClock();
         playing = false;
         save();
@@ -156,9 +173,14 @@ public final class PlayerService {
     }
 
     public Map<String, Object> load(Song song, String quality) {
+        return load(song, quality, 0);
+    }
+
+    private Map<String, Object> load(Song song, String quality, int resumePosition) {
         if (song == null || !song.hasIdentity()) {
             synchronized (this) {
                 loadRevision += 1;
+                cancelPendingResolution();
                 playing = false;
                 audioLoaded = false;
                 error = "no song id";
@@ -168,21 +190,45 @@ public final class PlayerService {
         }
         String requestedQuality = normalizeQuality(quality);
         long revision;
+        Future<PlaybackSource> resolution;
         synchronized (this) {
             if (closed) return supersededLoadBody();
             revision = ++loadRevision;
+            cancelPendingResolution();
+            resolution = resolutionExecutor.submit(() -> music.resolvePlayback(
+                MusicProviderRegistry.providerFromSong(song), song, requestedQuality
+            ));
+            pendingResolution = resolution;
         }
-        PlaybackSource source = music.resolvePlayback(
-            MusicProviderRegistry.providerFromSong(song),
-            song,
-            requestedQuality
-        );
+        PlaybackSource source;
+        try {
+            source = resolution.get(LOAD_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+        } catch (CancellationException cancelled) {
+            synchronized (this) { return supersededLoadBody(); }
+        } catch (TimeoutException timeout) {
+            cancelResolution(resolution);
+            source = PlaybackSource.unavailable(MusicProviderRegistry.providerFromSong(song), requestedQuality, "音源解析超时，请重试");
+        } catch (InterruptedException interrupted) {
+            cancelResolution(resolution);
+            Thread.currentThread().interrupt();
+            synchronized (this) { return supersededLoadBody(); }
+        } catch (ExecutionException failed) {
+            synchronized (this) {
+                if (closed || revision != loadRevision) return supersededLoadBody();
+            }
+            if (failed.getCause() instanceof RuntimeException cause) throw cause;
+            throw new IllegalStateException("audio source resolution failed", failed.getCause());
+        } finally {
+            synchronized (this) {
+                if (pendingResolution == resolution) pendingResolution = null;
+            }
+        }
         synchronized (this) {
             if (closed || revision != loadRevision) return supersededLoadBody();
             currentSong = song;
             duration = song.duration > 0 ? song.duration : 271;
-            position = 0;
-            positionAtClockStart = 0;
+            position = Math.max(0, Math.min(resumePosition, duration));
+            positionAtClockStart = position;
             this.quality = source.quality().isBlank() ? requestedQuality : source.quality();
             url = source.url();
             playbackRestriction = source.restriction();
@@ -199,6 +245,7 @@ public final class PlayerService {
             body.put("song", currentSong.toMap());
             body.put("url", url);
             body.put("quality", this.quality);
+            body.put("position", position);
             body.put("playable", audioLoaded && error.isBlank());
             if (!playbackRestriction.isEmpty()) {
                 body.put("restriction", new LinkedHashMap<>(playbackRestriction));
@@ -272,6 +319,56 @@ public final class PlayerService {
         return body;
     }
 
+    public synchronized Map<String, Object> removeFromQueue(int index, String songId, String provider, long expectedRevision) {
+        boolean matches = expectedRevision == queueRevision && index >= 0 && index < queue.size()
+            && songId != null && songId.equals(queue.get(index).id)
+            && provider != null && provider.equals(queue.get(index).provider);
+        if (matches) {
+            queue.remove(index);
+            queueRevision += 1;
+            if (queueIndex == index) queueIndex = -1;
+            else if (queueIndex > index) queueIndex -= 1;
+            // Queue membership is independent of the currently loaded audio.
+            // In particular, removing its row must not pause or reload it.
+            save();
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("ok", matches);
+        body.put("removed", matches);
+        if (!matches) body.put("code", "queue_changed");
+        body.put("queueLength", queue.size());
+        body.put("queueIndex", queueIndex);
+        body.put("queueRevision", queueRevision);
+        return body;
+    }
+
+    public synchronized Map<String, Object> moveInQueue(int fromIndex, int toIndex, String songId, String provider, long expectedRevision) {
+        boolean matches = expectedRevision == queueRevision
+            && fromIndex >= 0 && fromIndex < queue.size()
+            && toIndex >= 0 && toIndex < queue.size()
+            && songId != null && songId.equals(queue.get(fromIndex).id)
+            && provider != null && provider.equals(queue.get(fromIndex).provider);
+        boolean moved = matches && fromIndex != toIndex;
+        if (moved) {
+            Song entry = queue.remove(fromIndex);
+            queue.add(toIndex, entry);
+            if (queueIndex == fromIndex) queueIndex = toIndex;
+            else if (fromIndex < queueIndex && toIndex >= queueIndex) queueIndex -= 1;
+            else if (fromIndex > queueIndex && toIndex <= queueIndex) queueIndex += 1;
+            queueRevision += 1;
+            // Ordering changes never reload, seek, pause, or replace current audio.
+            save();
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("ok", matches);
+        body.put("moved", moved);
+        if (!matches) body.put("code", "queue_changed");
+        body.put("queueLength", queue.size());
+        body.put("queueIndex", queueIndex);
+        body.put("queueRevision", queueRevision);
+        return body;
+    }
+
     public synchronized Map<String, Object> queuePage(int requestedCursor, int requestedLimit) {
         int cursor = Math.max(0, Math.min(requestedCursor, queue.size()));
         int limit = Math.max(1, Math.min(requestedLimit, MAX_QUEUE_PAGE_SIZE));
@@ -301,6 +398,7 @@ public final class PlayerService {
 
     public void close() {
         if (!flushInternal(true)) return;
+        resolutionExecutor.shutdownNow();
         persistenceExecutor.shutdown();
         try {
             if (!persistenceExecutor.awaitTermination(SAVE_FLUSH_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
@@ -336,6 +434,7 @@ public final class PlayerService {
         for (int attempt = 0; attempt < queueSnapshot.size(); attempt++) {
             int candidateIndex = Math.floorMod(startIndex + (offset * (attempt + 1)), queueSnapshot.size());
             body = load(queueSnapshot.get(candidateIndex), requestedQuality);
+            if (Boolean.TRUE.equals(body.get("superseded"))) return body;
             if (Boolean.TRUE.equals(body.get("playable")) && !String.valueOf(body.getOrDefault("url", "")).isBlank()) {
                 body.put("action", offset < 0 ? "previous" : "next");
                 body.put("skipped", attempt);
@@ -358,6 +457,19 @@ public final class PlayerService {
         body.put("playable", false);
         body.put("superseded", true);
         return body;
+    }
+
+    // Called under the player lock. Removing a cancelled queued task keeps the
+    // single pending slot available for the newest selection during a burst.
+    private void cancelPendingResolution() {
+        if (pendingResolution == null) return;
+        cancelResolution(pendingResolution);
+        pendingResolution = null;
+    }
+
+    private void cancelResolution(Future<PlaybackSource> resolution) {
+        resolution.cancel(true);
+        if (resolution instanceof Runnable queued) resolutionExecutor.remove(queued);
     }
 
     private Map<String, Object> transportBody(boolean ok) {
@@ -432,8 +544,10 @@ public final class PlayerService {
             quality = normalizeQuality(SimpleJson.asString(root.get("quality"), "standard"));
             queueIndex = SimpleJson.asInt(root.get("queueIndex"), -1);
             queueRevision = Math.max(0L, SimpleJson.asLong(root.get("queueRevision"), 0L));
-            url = SimpleJson.asString(root.get("url"), "");
-            audioLoaded = !url.isBlank();
+            // Provider URLs and local relay tickets expire across sessions.
+            // Restore the song and position, then resolve a fresh URL on play.
+            url = "";
+            audioLoaded = false;
             playing = false;
             queue.clear();
             for (Object item : SimpleJson.asList(root.get("queue"))) {
@@ -471,7 +585,11 @@ public final class PlayerService {
         String json;
         synchronized (this) {
             if (closed) return false;
-            if (closing) closed = true;
+            if (closing) {
+                closed = true;
+                loadRevision += 1;
+                cancelPendingResolution();
+            }
             stateRevision += 1;
             if (pendingSave != null) pendingSave.cancel(false);
             pendingSave = null;

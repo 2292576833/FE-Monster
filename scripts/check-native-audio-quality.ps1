@@ -292,6 +292,7 @@ try {
   }
 
   & $javac -encoding UTF-8 --release 17 -d $javaClassesDir `
+    (Join-Path $rootPath 'src\main\java\com\femonster\json\SimpleJson.java') `
     (Join-Path $rootPath 'src\main\java\com\femonster\core\ProjectPaths.java') `
     (Join-Path $rootPath 'src\main\java\com\femonster\core\NativeAudioEngine.java') `
     (Join-Path $rootPath 'src\test\java\com\femonster\core\NativeAudioChannelRouterLiveProbe.java')

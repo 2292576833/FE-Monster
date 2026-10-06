@@ -20,7 +20,8 @@ const sliceBetween = (source, startToken, endToken) => {
 };
 const productionRuntimeSettings = sliceBetween(
   productionHtml,
-  '<section class="runtime-settings-panel" id="runtimeSettingsPanel"',
+  productionHtml.match(/<section\b[^>]*\bid="runtimeSettingsPanel"[^>]*>/)?.[0]
+    || '<section id="runtimeSettingsPanel"',
   'class="top-search'
 );
 const productionVoiceSettingsMarkup = productionRuntimeSettings.match(
@@ -548,6 +549,7 @@ const fixture = `<!doctype html><html><head><meta charset="utf-8">
   </script>
   <script src="/vendor/three.r128.min.js"></script>
   <script src="/pet-emotion-runtime.js"></script>
+  <script src="/app-command.js"></script>
   <script src="/pet-assistant.js"></script>
   <script src="/pet-particle-orb.js"></script>
 </body></html>`;
@@ -2106,6 +2108,11 @@ try {
   });
 
   await evaluate(`window.FeMonsterPetAssistant.send('reconnect test')`, true);
+  assert.equal(await evaluate(`(() => {
+    window.__petFixtureReconnectMessage = Array.from(document.querySelectorAll(
+      '#petAssistantMessages .pet-assistant__message.is-assistant')).at(-1);
+    return window.__petFixtureReconnectMessage?.classList.contains('is-pending');
+  })()`), true, 'reconnect fixture did not create a pending assistant reply');
   await evaluate(`window.dispatchEvent(new CustomEvent('fe-monster-pet-event', { detail: {
     type: 'pet.ai.complete',
     historical: true,
@@ -2128,7 +2135,9 @@ try {
   const replay = await evaluate(`(() => ({
     matches: Array.from(document.querySelectorAll('#petAssistantMessages p'))
       .filter((node) => node.textContent === 'recovered complete answer').length,
-    pending: document.querySelectorAll('#petAssistantMessages .is-pending').length
+    // The conversation timeline retains earlier test turns. Only this request
+    // must leave its pending state when its completion is replayed.
+    pending: Number(window.__petFixtureReconnectMessage.classList.contains('is-pending'))
   }))()`);
   assert.deepEqual(replay, { matches: 1, pending: 0 });
 
@@ -2150,12 +2159,12 @@ try {
       .map(({ role, text }) => ({ role, text }))
   }))()`);
   assert.equal(recovery.state, 'thinking', 'active session state did not override pet configuration state');
-  assert.deepEqual(recovery.messages, ['history answer'],
-    'compact reply bubble must render only the latest assistant response');
+  assert.deepEqual(recovery.messages, ['history user', 'history answer'],
+    'conversation history must retain both speakers without exposing tool receipts');
   assert.deepEqual(recovery.persistedMessages, [
     { role: 'user', text: 'history user' },
     { role: 'assistant', text: 'history answer' }
-  ], 'compact rendering must not discard the persisted conversation history');
+  ], 'history rendering must not discard the persisted conversation history');
 
   await evaluate(`window.dispatchEvent(new CustomEvent('fe-monster-pet-event', { detail: {
     type: 'pet.ai.error',
@@ -2737,11 +2746,42 @@ try {
 
   await evaluate(`(() => {
     window.__petFixtureClaims.length = 0;
+    window.__petFixtureInspections.length = 0;
+    window.__petFixtureExecutions.length = 0;
+    const currentManifest = window.FeMonsterAppCommands.manifestSummary();
+    for (const [actionId, commandManifest] of [
+      ['action-missing-manifest', null],
+      ['action-changed-manifest', { ...currentManifest, catalogRevision: 'sha256:' + '0'.repeat(64) }]
+    ]) {
+      window.dispatchEvent(new CustomEvent('fe-monster-pet-event', { detail: {
+        type: 'pet.ai.tool', payload: {
+          sessionId: 'session-qa', actionId, commandManifest,
+          targetComputerId: 'computer-qa', name: 'execute_app_command',
+          arguments: { command: 'community.market.work.publish', arguments: { title: 'blocked fixture' } }
+        }
+      }}));
+    }
+  })()`);
+  await delay(160);
+  const rejectedManifests = await evaluate(`(() => ({
+    executions: window.__petFixtureExecutions.length,
+    inspections: window.__petFixtureInspections.length,
+    cancellations: window.__petFixtureClaims.filter((claim) => claim.cancelled).map((claim) => claim.actionId).sort()
+  }))()`);
+  assert.deepEqual(rejectedManifests, {
+    executions: 0,
+    inspections: 0,
+    cancellations: ['action-changed-manifest', 'action-missing-manifest']
+  }, 'missing or mismatched command manifests reached command execution');
+
+  await evaluate(`(() => {
+    window.__petFixtureClaims.length = 0;
     window.__petFixtureActionResults.length = 0;
     window.__petFixtureExecutions.length = 0;
     window.dispatchEvent(new CustomEvent('fe-monster-pet-event', { detail: {
       type: 'pet.ai.tool', payload: {
         sessionId: 'session-qa', actionId: 'action-confirm', sequence: 30,
+        commandManifest: window.FeMonsterAppCommands.manifestSummary(),
         targetComputerId: 'computer-qa', name: 'execute_app_command',
         arguments: { command: 'community.market.work.publish', arguments: { title: 'fixture work' } }
       }
@@ -2765,6 +2805,7 @@ try {
   await evaluate(`window.dispatchEvent(new CustomEvent('fe-monster-pet-event', { detail: {
     type: 'pet.ai.tool', payload: {
       sessionId: 'session-qa', actionId: 'action-cancel', sequence: 31,
+      commandManifest: window.FeMonsterAppCommands.manifestSummary(),
       targetComputerId: 'computer-qa', name: 'execute_app_command',
         arguments: { command: 'fixture.high-impact', arguments: {} }
     }
@@ -2794,6 +2835,7 @@ try {
     window.dispatchEvent(new CustomEvent('fe-monster-pet-event', { detail: {
       type: 'pet.ai.tool', payload: {
         sessionId: 'session-qa', actionId: 'action-web-tainted', sequence: 32,
+        commandManifest: window.FeMonsterAppCommands.manifestSummary(),
         targetComputerId: 'computer-qa', name: 'execute_app_command',
         requiresConfirmation: false, readOnly: true,
         taintedByExternalContent: true, sourceTrust: 'untrusted-external-web',
@@ -2825,6 +2867,7 @@ try {
     window.dispatchEvent(new CustomEvent('fe-monster-pet-event', { detail: {
       type: 'pet.ai.tool', payload: {
         sessionId: 'session-qa', actionId: 'action-hide-cancel', sequence: 33,
+        commandManifest: window.FeMonsterAppCommands.manifestSummary(),
         targetComputerId: 'computer-qa', name: 'execute_app_command',
         arguments: { command: 'fixture.high-impact', arguments: {} }
       }

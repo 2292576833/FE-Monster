@@ -48,6 +48,8 @@ web/reactbits/vite-dev*.log
 *.lib
 native/windows/build/
 native/windows/build-next/
+native/windows/builds/
+native/windows/run-audio.txt
 native/windows/.cmake-build-*/
 native/windows/packages/
 native/windows/setup/bin/

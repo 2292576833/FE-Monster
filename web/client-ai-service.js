@@ -80,7 +80,7 @@
       ready,
       keylessLoopback
     };
-    if (!tts) return result;
+    if (!tts) return { ...result, memorySharingEnabled: source.memorySharingEnabled === true };
     const numberInRange = (raw, fallbackValue, min, max) => {
       const number = Number(raw);
       return Number.isFinite(number) ? Math.max(min, Math.min(max, Math.round(number))) : fallbackValue;
@@ -375,6 +375,9 @@
     }
     if (Object.hasOwn(source, 'baseUrl')) patch.baseUrl = boundedText(source.baseUrl, 800);
     if (Object.hasOwn(source, 'model')) patch.model = boundedText(source.model, 240);
+    if (!options.tts && Object.hasOwn(source, 'memorySharingEnabled')) {
+      patch.memorySharingEnabled = source.memorySharingEnabled === true;
+    }
     if (options.tts && Object.hasOwn(source, 'voice')) patch.voice = boundedText(source.voice, 240);
     const apiKey = boundedRaw(source.apiKey, 4096);
     if (apiKey) patch.apiKey = apiKey;
@@ -442,7 +445,8 @@
       const response = await window.fetch(`/api/client-ai/${kind}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: kind === 'tts' ? 'audio/*' : '*/*' },
-        body: JSON.stringify({ requestId: id, payload }),
+        body: JSON.stringify({ requestId: id, payload,
+          expectedConfigRevision: Number((options.serviceConfig || state).revision) || 0 }),
         signal,
         cache: 'no-store'
       });
@@ -463,14 +467,21 @@
     return boundedRaw(choices[0]?.delta?.content || choices[0]?.text || '', 8000);
   }
 
-  function mergeToolCall(toolCallMap, item) {
+  function mergeToolCall(toolCallMap, item, snapshot = false) {
     if (!item || typeof item !== 'object') return;
     const index = Number.isFinite(Number(item.index)) ? Number(item.index) : 0;
     const call = toolCallMap.get(index) || { id: '', name: '', arguments: '' };
     if (item.id) call.id = boundedText(item.id, 160, call.id);
-    if (item.function?.name) call.name = boundedText(item.function.name, 96, call.name);
-    if (item.function?.arguments) {
-      call.arguments = boundedRaw(call.arguments + String(item.function.arguments), 12_000);
+    if (item.function?.name) {
+      call.name = boundedText((snapshot ? '' : call.name) + item.function.name, 96, call.name);
+    }
+    const argumentValue = item.function?.arguments;
+    if (typeof argumentValue === 'string') {
+      call.arguments = boundedRaw((snapshot ? '' : call.arguments) + argumentValue, 12_000);
+    } else if (argumentValue && typeof argumentValue === 'object' && !Array.isArray(argumentValue)) {
+      // Some local gateways return the already-decoded object. Never coerce
+      // it to "[object Object]", which silently destroys executable arguments.
+      call.arguments = boundedRaw(JSON.stringify(argumentValue), 12_000);
     }
     toolCallMap.set(index, call);
   }
@@ -502,14 +513,14 @@
     calls.slice(0, 32).forEach((call, index) => mergeToolCall(toolCallMap, {
       ...call,
       index: Number.isFinite(Number(call?.index)) ? Number(call.index) : index
-    }));
+    }, true));
     const legacy = message?.function_call || delta?.function_call || choice?.function_call;
     if (legacy && typeof legacy === 'object') {
       mergeToolCall(toolCallMap, {
         index: toolCallMap.size,
         id: choice?.id || message?.id || '',
         function: legacy
-      });
+      }, true);
     }
     return finalToolCalls(toolCallMap);
   }
@@ -591,10 +602,10 @@
       calls.forEach((call, index) => mergeToolCall(toolCallMap, {
         ...call,
         index: Number.isFinite(Number(call?.index)) ? Number(call.index) : index
-      }));
+      }, !Array.isArray(choice?.delta?.tool_calls)));
       const legacy = choice?.delta?.function_call || choice?.message?.function_call || choice?.function_call;
       if (legacy && typeof legacy === 'object') {
-        mergeToolCall(toolCallMap, { index: 0, id: choice?.id || '', function: legacy });
+        mergeToolCall(toolCallMap, { index: 0, id: choice?.id || '', function: legacy }, !choice?.delta?.function_call);
       }
     };
     const drain = (final = false) => {

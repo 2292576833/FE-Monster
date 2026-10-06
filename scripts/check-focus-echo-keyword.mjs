@@ -69,7 +69,12 @@ assert.match(
   'the group-aware focus resolver bypasses explicit/fallback focus text'
 );
 assert.match(syncSource, /lyric-depth-[1-5]/, 'the soft echo layers are not selected independently from depth 0');
-assert.match(syncSource, /setPlaybackLayerText/, 'focus text never reaches the echo DOM layers');
+assert.match(syncSource, /syncPlaybackLayerText/, 'focus text never reaches the echo DOM layers');
+assert.match(
+  functionSource('syncPlaybackLayerText'),
+  /setPlaybackLayerText/,
+  'the deduplicated layer writer no longer falls back to the real DOM text renderer'
+);
 
 const lineSource = functionSource('setPlaybackLyricLine');
 assert.match(lineSource, /syncFocusEchoLayerText\s*\(/, 'line changes still clone the full line into every focus layer');

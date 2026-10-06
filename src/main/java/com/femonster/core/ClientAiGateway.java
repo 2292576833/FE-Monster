@@ -209,10 +209,17 @@ public final class ClientAiGateway implements AutoCloseable {
 
     /** Executes using only the persisted endpoint, model, voice and credential. */
     public UpstreamResponse execute(Kind kind, Map<String, Object> payload, String requestId) {
+        return execute(kind, payload, requestId, -1);
+    }
+
+    public UpstreamResponse execute(Kind kind, Map<String, Object> payload, String requestId, long expectedRevision) {
         ensureOpen();
         if (kind == null) throw ClientAiException.bad("client AI kind is required");
         if (stateError != null) throw ClientAiException.configInvalid();
         StoredState current = state;
+        if (expectedRevision >= 0 && expectedRevision != current.revision()) {
+            throw ClientAiException.bad("模型配置或记忆授权已变更，请重新发送这一轮对话");
+        }
         if (kind == Kind.TTS && !current.ttsEnabled()) {
             throw ClientAiException.notReady("客户端 TTS 已关闭");
         }
@@ -441,7 +448,12 @@ public final class ClientAiGateway implements AutoCloseable {
         } else if (!endpointSame) {
             key = "";
         }
-        Provider result = new Provider(provider, baseUrl, model, tts ? voice : "", key);
+        boolean sameMemoryDestination = previous.provider().equals(provider)
+            && trimTrailingSlash(previous.baseUrl()).equals(baseUrl);
+        boolean memorySharing = !tts && (patch.containsKey("memorySharingEnabled")
+            ? Boolean.TRUE.equals(patch.get("memorySharingEnabled"))
+            : sameMemoryDestination && previous.memorySharingEnabled());
+        Provider result = new Provider(provider, baseUrl, model, tts ? voice : "", key, memorySharing);
         if (!result.baseUrl().isBlank()) validateBaseUrl(result.baseUrl());
         return result;
     }
@@ -742,6 +754,7 @@ public final class ClientAiGateway implements AutoCloseable {
             && (!provider.apiKey().isBlank() || (!tts && isLoopback(provider.baseUrl())));
         result.put("ready", ready);
         result.put("keylessLoopback", !tts && provider.apiKey().isBlank() && isLoopback(provider.baseUrl()));
+        if (!tts) result.put("memorySharingEnabled", provider.memorySharingEnabled());
         return result;
     }
 
@@ -845,7 +858,8 @@ public final class ClientAiGateway implements AutoCloseable {
             SimpleJson.asString(root.get("baseUrl"), ""),
             SimpleJson.asString(root.get("model"), ""),
             tts ? SimpleJson.asString(root.get("voice"), "") : "",
-            SimpleJson.asString(root.get("apiKey"), "")
+            SimpleJson.asString(root.get("apiKey"), ""),
+            !tts && Boolean.TRUE.equals(root.get("memorySharingEnabled"))
         );
         return tts ? migrateLegacyTtsProvider(loaded) : loaded;
     }
@@ -949,6 +963,7 @@ public final class ClientAiGateway implements AutoCloseable {
         result.put("model", provider.model());
         result.put("voice", provider.voice());
         result.put("apiKey", provider.apiKey().isBlank() ? null : provider.apiKey());
+        result.put("memorySharingEnabled", provider.memorySharingEnabled());
         return result;
     }
 
@@ -1233,7 +1248,11 @@ public final class ClientAiGateway implements AutoCloseable {
         DoubaoTtsState doubaoTts
     ) {}
 
-    private record Provider(String provider, String baseUrl, String model, String voice, String apiKey) {}
+    private record Provider(String provider, String baseUrl, String model, String voice, String apiKey, boolean memorySharingEnabled) {
+        private Provider(String provider, String baseUrl, String model, String voice, String apiKey) {
+            this(provider, baseUrl, model, voice, apiKey, false);
+        }
+    }
 
     private record DoubaoTtsState(
         String resourceId,

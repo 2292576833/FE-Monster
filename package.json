@@ -1,6 +1,7 @@
 {
 	"license": "MIT",
-	"version": "2.1.1",
+	"version": "2.2.3",
+	"displayVersion": "2.2.3",
 	"scripts": {
 		"check:web-cache": "node scripts/check-web-cache-fingerprints.mjs",
 		"check:web-cache:copies": "node scripts/check-web-cache-fingerprints.mjs --copies"

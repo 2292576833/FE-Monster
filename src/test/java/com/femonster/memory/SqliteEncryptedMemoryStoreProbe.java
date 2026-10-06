@@ -57,6 +57,8 @@ public final class SqliteEncryptedMemoryStoreProbe {
         Files.createDirectories(fixture);
 
         primaryStoreContract(fixture.resolve("primary"));
+        decimalOperationReopenContract(fixture.resolve("decimal-operation-reopen"));
+        trustedPersonalizationContract(fixture.resolve("trusted-personalization"));
         backupRestoreContract(fixture.resolve("backup-restore"));
         ciphertextTamperContract(fixture.resolve("ciphertext-tamper"));
         nonceTamperContract(fixture.resolve("nonce-tamper"));
@@ -91,6 +93,139 @@ public final class SqliteEncryptedMemoryStoreProbe {
         unsupportedNumberContract();
 
         System.out.println("PASS local encrypted sqlite memory store");
+    }
+
+    private static void decimalOperationReopenContract(Path root) throws Exception {
+        LocalMemoryEvent baseline = operation(
+            "11000000-0000-4000-8000-000000000001",
+            PRIVATE_SCOPE_A,
+            "trace-decimal-operation",
+            CHAT_ONE,
+            TIME_ONE,
+            1
+        );
+        Map<String, Object> payload = new LinkedHashMap<>(baseline.payload());
+        payload.put("arguments", Map.of(
+            "presetId", "preset-main-001",
+            "gain", 0.75
+        ));
+        LocalMemoryEvent decimalOperation = new LocalMemoryEvent(
+            baseline.eventId(),
+            baseline.stream(),
+            baseline.scope(),
+            baseline.type(),
+            baseline.occurredAt(),
+            baseline.sourceSequence(),
+            payload
+        );
+
+        try (MemoryVaultKeyManager.KeyLease lease = openLease(root);
+             LocalMemoryStore store = SqliteEncryptedMemoryStore.open(root, lease)) {
+            store.appendOperations(List.of(decimalOperation));
+        }
+
+        try (MemoryVaultKeyManager.KeyLease lease = openLease(root);
+             LocalMemoryStore reopened = SqliteEncryptedMemoryStore.open(root, lease)) {
+            List<LocalMemoryStore.StoredEvent> records = reopened.queryOperations(
+                query(PRIVATE_SCOPE_A, "command.succeeded", 10, null, null)
+            ).records();
+            require(records.size() == 1, "DECIMAL_OPERATION_WAS_NOT_REOPENED");
+            Object arguments = records.get(0).event().payload().get("arguments");
+            require(arguments instanceof Map<?, ?>, "DECIMAL_OPERATION_ARGUMENTS_MISSING");
+            Object gain = ((Map<?, ?>) arguments).get("gain");
+            require(gain instanceof Number && ((Number) gain).doubleValue() == 0.75,
+                "DECIMAL_OPERATION_VALUE_CHANGED");
+        }
+    }
+
+    /**
+     * The pet projection is an internal encrypted record, not a browser-selectable
+     * knowledge fact.  This uses the real SQLite vault and proves that generic
+     * facts (including 101 newer records) cannot replace or hide the trusted view.
+     */
+    private static void trustedPersonalizationContract(Path root) throws Exception {
+        String scope = "provider:trusted-personalization-subject";
+        String marker = "FE_TRUSTED_PERSONALIZATION_MARKER_42A9";
+        Map<String, Object> projection = new LinkedHashMap<>();
+        projection.put("schemaVersion", 1L);
+        projection.put("capturedAt", Instant.now().toEpochMilli());
+        projection.put("memories", List.of(Map.of(
+            "category", "music_preference", "value", marker, "source", "explicit",
+            "confidence", 1.0, "expiresAt", Instant.now().plusSeconds(3600).toEpochMilli()
+        )));
+        projection.put("habits", Map.of());
+
+        try (MemoryVaultKeyManager.KeyLease lease = openLease(root);
+            LocalMemoryStore store = SqliteEncryptedMemoryStore.open(root, lease)) {
+            require(store.appendTrustedPersonalization(scope, projection), "TRUSTED_APPEND_FAILED");
+            require(marker.equals(trustedMarker(store, scope)), "TRUSTED_READ_CHANGED");
+
+            Map<String, Object> updated = new LinkedHashMap<>(projection);
+            updated.put("capturedAt", Instant.now().plusSeconds(1).toEpochMilli());
+            updated.put("memories", List.of(Map.of(
+                "category", "music_preference", "value", marker + "_UPDATED", "source", "explicit",
+                "confidence", 1.0, "expiresAt", Instant.now().plusSeconds(3600).toEpochMilli()
+            )));
+            require(store.appendTrustedPersonalization(scope, updated), "TRUSTED_UPDATE_FAILED");
+            require((marker + "_UPDATED").equals(trustedMarker(store, scope)), "TRUSTED_UPDATE_STALE");
+
+            Instant now = Instant.now();
+            for (int index = 0; index < 101; index++) {
+                Map<String, Object> forged = new LinkedHashMap<>();
+                forged.put("occurredAt", now.plusMillis(index).toString());
+                forged.put("sourceSequence", (long) index);
+                forged.put("source", "browser");
+                forged.put("entityId", "ordinary.fact");
+                forged.put("title", "ordinary");
+                forged.put("value", "ordinary-value-" + index);
+                store.appendKnowledge(List.of(new LocalMemoryEvent(
+                    String.format("40000000-0000-4000-8000-%012d", index),
+                    MemorySanitizer.Stream.KNOWLEDGE, scope, "user.fact", now.plusMillis(index), index, forged
+                )));
+            }
+            require((marker + "_UPDATED").equals(trustedMarker(store, scope)), "GENERIC_FACT_OVERRODE_TRUSTED_PROJECTION");
+            LocalMemoryStore.Page publicKnowledge = store.queryKnowledge(new LocalMemoryStore.Query(
+                scope, Set.of("user.fact"), 100, null, null
+            ));
+            require(publicKnowledge.records().size() == 100, "PUBLIC_KNOWLEDGE_PAGE_TRUNCATED");
+            for (LocalMemoryStore.StoredEvent visible : publicKnowledge.records()) {
+                require(!MemorySanitizer.isReservedTrustedPayload(visible.event().payload()), "TRUSTED_RECORD_PUBLICLY_VISIBLE");
+            }
+            try {
+                Map<String, Object> reserved = new LinkedHashMap<>();
+                reserved.put("occurredAt", now.toString()); reserved.put("sourceSequence", 999L);
+                reserved.put("source", "browser"); reserved.put("entityId", "pet.personalization.internal.v1");
+                reserved.put("title", "forged"); reserved.put("value", "forged");
+                reserved.put("producerProof", "forged");
+                store.appendKnowledge(List.of(new LocalMemoryEvent(
+                    "40000000-0000-4000-8000-999999999999", MemorySanitizer.Stream.KNOWLEDGE,
+                    scope, "user.fact", now, 999L, reserved
+                )));
+                throw new AssertionError("RESERVED_PROVENANCE_ACCEPTED");
+            } catch (LocalMemoryException expected) {
+                require(expected.code() == LocalMemoryException.Code.INVALID_ARGUMENT, "RESERVED_PROVENANCE_WRONG_ERROR");
+            }
+            require(store.forgetKnowledge(new LocalMemoryStore.ForgetRequest(
+                scope, Set.of(), null, null, Set.of(), null, true
+            )).count() == 101, "PUBLIC_KNOWLEDGE_FORGET_COUNT");
+            require((marker + "_UPDATED").equals(trustedMarker(store, scope)), "PUBLIC_FORGET_DELETED_TRUSTED");
+            require(store.forgetTrustedPersonalization(scope), "TRUSTED_FORGET_FAILED");
+            require(!store.forgetTrustedPersonalization(scope), "TRUSTED_FORGET_NOT_IDEMPOTENT");
+            require(trustedMarker(store, scope).isEmpty(), "TRUSTED_TOMBSTONE_RESURRECTED");
+            require(store.appendTrustedPersonalization(scope, projection), "TRUSTED_RECREATE_FAILED");
+            require(marker.equals(trustedMarker(store, scope)), "TRUSTED_RECREATE_READ_FAILED");
+        }
+
+        try (var files = Files.walk(root)) {
+            for (Path file : files.filter(Files::isRegularFile).toList()) {
+                require(!new String(Files.readAllBytes(file), StandardCharsets.UTF_8).contains(marker), "TRUSTED_PROJECTION_PLAINTEXT_ON_DISK");
+            }
+        }
+    }
+
+    private static String trustedMarker(LocalMemoryStore store, String scope) {
+        List<Object> memories = com.femonster.json.SimpleJson.asList(store.trustedPersonalization(scope).get("memories"));
+        return memories.isEmpty() ? "" : String.valueOf(com.femonster.json.SimpleJson.asMap(memories.get(0)).get("value"));
     }
 
     private static void primaryStoreContract(Path root) throws Exception {
@@ -237,6 +372,7 @@ public final class SqliteEncryptedMemoryStoreProbe {
                 );
 
                 cursorContract(store);
+                selectorPaginationContract(store);
                 duplicateAndRollbackContract(store, firstChat, knowledge);
                 assertPhysicalSeparation(root.resolve("memory.db"), lease, firstChat, operation, knowledge);
                 assertOwnerOnly(root);
@@ -330,6 +466,27 @@ public final class SqliteEncryptedMemoryStoreProbe {
             combined.containsAll(Set.of(CHAT_CURSOR_ONE, CHAT_CURSOR_TWO, CHAT_CURSOR_THREE)),
             "CURSOR_PAGINATION_LOST_RECORD"
         );
+    }
+
+    /** Executes selector filtering in SQLite before pagination, rather than filtering a page in memory. */
+    private static void selectorPaginationContract(LocalMemoryStore store) {
+        Instant at = Instant.parse("2026-08-27T12:00:00Z");
+        String conversation = "conversation-filter-001";
+        LocalMemoryEvent one = chatWithConversation("50000000-0000-4000-8000-000000000001", PRIVATE_SCOPE_A, "trace-filter-001", at, 31, "one", conversation);
+        LocalMemoryEvent two = chatWithConversation("50000000-0000-4000-8000-000000000002", PRIVATE_SCOPE_A, "trace-filter-001", at.plusMillis(1), 32, "two", conversation);
+        LocalMemoryEvent other = chatWithConversation("50000000-0000-4000-8000-000000000003", PRIVATE_SCOPE_A, "trace-other-001", at.plusMillis(2), 33, "other", "conversation-other-001");
+        store.appendChats(List.of(one, two, other));
+        LocalMemoryStore.Page first = store.queryChats(new LocalMemoryStore.Query(PRIVATE_SCOPE_A, Set.of("chat.message"), 1, null, null, conversation, null, null));
+        require(first.records().size() == 1 && conversation.equals(first.records().get(0).event().conversationId()), "CONVERSATION_FILTER_NOT_APPLIED_IN_STORE");
+        LocalMemoryStore.Page second = store.queryChats(new LocalMemoryStore.Query(PRIVATE_SCOPE_A, Set.of("chat.message"), 100, first.next(), null, conversation, null, null));
+        require(second.records().size() == 1 && conversation.equals(second.records().get(0).event().conversationId()), "FILTERED_CURSOR_PAGE_WRONG");
+        require(!first.records().get(0).event().eventId().equals(second.records().get(0).event().eventId()), "FILTERED_CURSOR_OVERLAP");
+
+        LocalMemoryEvent operationOne = operation("60000000-0000-4000-8000-000000000001", PRIVATE_SCOPE_A, "trace-operation-filter-001", CHAT_ONE, at, 34);
+        LocalMemoryEvent operationOther = operation("60000000-0000-4000-8000-000000000002", PRIVATE_SCOPE_A, "trace-operation-other-001", CHAT_ONE, at.plusMillis(1), 35);
+        store.appendOperations(List.of(operationOne, operationOther));
+        LocalMemoryStore.Page operations = store.queryOperations(new LocalMemoryStore.Query(PRIVATE_SCOPE_A, Set.of("command.succeeded"), 100, null, null, null, "trace-operation-filter-001", "operation-main-001"));
+        require(operations.records().size() == 1 && "trace-operation-filter-001".equals(operations.records().get(0).event().traceId()), "TRACE_OPERATION_FILTER_NOT_APPLIED_IN_STORE");
     }
 
     private static void duplicateAndRollbackContract(
@@ -1439,6 +1596,15 @@ public final class SqliteEncryptedMemoryStoreProbe {
             sequence,
             payload
         );
+    }
+
+    private static LocalMemoryEvent chatWithConversation(
+        String eventId, String scope, String trace, Instant occurredAt, long sequence, String text, String conversation
+    ) {
+        LocalMemoryEvent value = chat(eventId, scope, trace, occurredAt, sequence, text);
+        Map<String, Object> payload = new LinkedHashMap<>(value.payload());
+        payload.put("conversationId", conversation);
+        return new LocalMemoryEvent(eventId, MemorySanitizer.Stream.CHAT, scope, "chat.message", occurredAt, sequence, payload);
     }
 
     private static LocalMemoryEvent operation(

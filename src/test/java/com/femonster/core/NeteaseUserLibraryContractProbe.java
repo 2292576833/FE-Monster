@@ -54,13 +54,34 @@ public final class NeteaseUserLibraryContractProbe {
                 "public NetEase fallback was accepted as an authenticated user library");
             require(!Boolean.TRUE.equals(publicFallback.get("playlistsReady")),
                 "public NetEase fallback exposed playlist readiness");
+            verifyPersistenceFailureRetries(directory);
             System.out.println("NeteaseUserLibraryContractProbe passed");
         } finally {
             server.stop(0);
             Files.deleteIfExists(directory.resolve("netease-auth.json.tmp"));
             Files.deleteIfExists(directory.resolve("netease-auth.json"));
+            Files.deleteIfExists(directory.resolve("blocked-auth.json.tmp"));
+            Files.deleteIfExists(directory.resolve("blocked-auth.json"));
             Files.deleteIfExists(directory);
         }
+    }
+
+    private static void verifyPersistenceFailureRetries(Path directory) throws Exception {
+        Path blocked = directory.resolve("blocked-auth.json");
+        Files.createDirectory(blocked);
+        NeteaseClient client = new NeteaseClient("http://127.0.0.1:1", blocked);
+        Map<String, String> cookies = Map.of("MUSIC_U", "fixture-user-session");
+        boolean failed = false;
+        try {
+            client.rememberBrowserSession(cookies);
+        } catch (IllegalStateException expected) {
+            failed = true;
+        }
+        require(failed, "NetEase persistence failure was swallowed and could falsely report a durable login");
+        Files.delete(blocked);
+        client.rememberBrowserSession(cookies);
+        require(Files.isRegularFile(blocked), "NetEase did not retry persisting unchanged credentials after a failed save");
+        require(!Files.exists(directory.resolve("blocked-auth.json.tmp")), "NetEase repaired save left a partial auth file");
     }
 
     private static void send(HttpExchange exchange, String json) throws IOException {

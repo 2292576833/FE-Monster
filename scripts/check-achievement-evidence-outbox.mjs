@@ -100,14 +100,16 @@ const storage = new Storage();
 const posted = [];
 const offline = harness({ storage, posted, mode: 'offline' });
 await offline.api.ready;
+// Keep evidence recent while preserving the exact event timestamps under test.
+const evidenceEndedAt = Date.now() - 60_000;
 const interval = await offline.api.queueChallengeEvidence('listen-interval', {
-  trackId: 'qq:track-001', startedAt: 1786586360000, endedAt: 1786586400000, durationSec: 40
+  trackId: 'qq:track-001', startedAt: evidenceEndedAt - 40_000, endedAt: evidenceEndedAt, durationSec: 40
 });
-assert.equal(interval.event.occurredAt, 1786586400000, 'listen interval did not use its server-comparable endedAt');
+assert.equal(interval.event.occurredAt, evidenceEndedAt, 'listen interval did not use its server-comparable endedAt');
 assert.equal(interval.event.payload.durationSec, 30, 'a listen interval exceeded the thirty-second evidence limit');
-assert.equal(interval.event.payload.startedAt, 1786586360000);
+assert.equal(interval.event.payload.startedAt, evidenceEndedAt - 40_000);
 const queued = await offline.api.queueChallengeEvidence('track-completed', {
-  trackId: 'qq:track-001', durationSec: 242, completedAt: 1786586400000
+  trackId: 'qq:track-001', durationSec: 242, completedAt: evidenceEndedAt
 });
 assert.equal(queued.queued, true);
 assert.match(queued.event.eventId, /^evidence-/);
@@ -131,7 +133,7 @@ assert.equal(posted[3].event.type, 'track-completed');
 assert.equal(posted[3].event.payload.trackId, 'qq:track-001');
 
 const tooShort = await offline.api.queueChallengeEvidence('listen-interval', {
-  trackId: 'qq:track-001', startedAt: 1786586400000, endedAt: 1786586400500, durationSec: 0.5
+  trackId: 'qq:track-001', startedAt: evidenceEndedAt, endedAt: evidenceEndedAt + 500, durationSec: 0.5
 });
 assert.equal(tooShort.queued, false, 'sub-second listening was emitted outside the server 1..30 second contract');
 

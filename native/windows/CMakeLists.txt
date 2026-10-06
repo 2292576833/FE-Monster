@@ -69,13 +69,37 @@ if(MSVC)
   target_compile_definitions(pffft PRIVATE _USE_MATH_DEFINES)
   target_compile_options(pffft PRIVATE /O2 /fp:fast)
 else()
-  target_compile_options(pffft PRIVATE -O3)
+target_compile_options(pffft PRIVATE -O3)
 endif()
+
+# The pinned OBR API takes a small render quantum, while its FFT manager
+# derives the analysis size by doubling that quantum.  Generate a build-local
+# copy with the requested 8192-point analysis FFT so XAudio2 still receives
+# 256-frame realtime blocks and the source checkout remains pristine.
+set(FE_OBR_FFT_MANAGER_SOURCE
+  "${CMAKE_CURRENT_BINARY_DIR}/fe_obr_fft_manager_8192.cc"
+)
+file(READ
+  "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/fft_manager.cc"
+  FE_OBR_FFT_MANAGER_TEXT
+)
+string(REPLACE
+  "NextPowTwo(frames_per_buffer) * 2"
+  "8192"
+  FE_OBR_FFT_MANAGER_TEXT
+  "${FE_OBR_FFT_MANAGER_TEXT}"
+)
+set(FE_OBR_FFT_NEEDLE "NextPowTwo(frames_per_buffer) * 2")
+string(FIND "${FE_OBR_FFT_MANAGER_TEXT}" "${FE_OBR_FFT_NEEDLE}" FE_OBR_FFT_NEEDLE_POSITION)
+if(FE_OBR_FFT_NEEDLE_POSITION GREATER_EQUAL 0)
+  message(FATAL_ERROR "Unable to apply the 8192-point OBR FFT tuning")
+endif()
+file(WRITE "${FE_OBR_FFT_MANAGER_SOURCE}" "${FE_OBR_FFT_MANAGER_TEXT}")
 
 set(OBR_CORE_SOURCES
   "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/ambisonic_binaural_decoder.cc"
   "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/dsp_utils.cc"
-  "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/fft_manager.cc"
+  "${FE_OBR_FFT_MANAGER_SOURCE}"
   "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/partitioned_fft_filter.cc"
   "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/planar_interleaved_conversion.cc"
   "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/resampler.cc"

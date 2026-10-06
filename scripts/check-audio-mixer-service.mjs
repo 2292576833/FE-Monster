@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
+const noNativeDevice = process.argv.includes('--no-native-device');
 const scratch = path.join(root, 'tmp', 'audio-mixer-service-probe');
 const classes = path.join(scratch, 'classes');
 const data = path.join(scratch, 'data');
@@ -50,6 +51,7 @@ function run(command, args, timeout = 60_000) {
     environment.FE_MONSTER_ROOT = root;
     environment.FE_MONSTER_XAUDIO2_DLL = nativeDll;
   }
+  if (noNativeDevice) environment.FE_MONSTER_XAUDIO2_DLL = path.join(scratch, 'native-device-disabled.dll');
   const result = spawnSync(command, args, {
     cwd: root,
     encoding: 'utf8',
@@ -98,7 +100,7 @@ try {
   let nativeReapply = 'skipped';
   let nativeBoundaryBusy = 'skipped';
   let nativeDelayedPcm = 'skipped';
-  if (process.platform === 'win32' && existsSync(nativeDll)) {
+  if (!noNativeDevice && process.platform === 'win32' && existsSync(nativeDll)) {
     nativeReapply = run(java, [
       '--enable-native-access=ALL-UNNAMED',
       '-cp', classes,

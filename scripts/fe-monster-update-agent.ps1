@@ -132,7 +132,7 @@ namespace FeMonsterUpdateAgent {
             request.Timeout = timeoutMilliseconds;
             request.ReadWriteTimeout = timeoutMilliseconds;
             request.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
-            request.UserAgent = "FE-Monster-Update-Agent/2.1.1";
+            request.UserAgent = "FE-Monster-Update-Agent/2.2.3";
             request.ServerCertificateValidationCallback = delegate(
                 object sender,
                 X509Certificate certificate,
@@ -182,7 +182,7 @@ function Invoke-CommunityUpdateRequest {
 }
 
 function Get-InstalledVersion {
-  return '2.1.1'
+  return '2.2.3'
 }
 
 function ConvertTo-WindowsProcessArgument {

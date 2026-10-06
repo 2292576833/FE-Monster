@@ -5,6 +5,9 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -36,6 +39,15 @@ public final class AudioStreamProxyFixtureProbe {
         AtomicReference<String> observedResumeRange = new AtomicReference<>("");
         AtomicReference<String> observedResumeIfRange = new AtomicReference<>("");
         AtomicInteger interruptedRequests = new AtomicInteger();
+        AtomicInteger fixedInterruptedRequests = new AtomicInteger();
+        AtomicInteger idleInterruptedRequests = new AtomicInteger();
+        AtomicInteger twiceInterruptedRequests = new AtomicInteger();
+        AtomicReference<String> fixedResumeRange = new AtomicReference<>("");
+        AtomicReference<String> fixedResumeIfRange = new AtomicReference<>("");
+        AtomicReference<String> idleResumeRange = new AtomicReference<>("");
+        AtomicReference<String> idleResumeIfRange = new AtomicReference<>("");
+        AtomicReference<String> twiceResumeRange = new AtomicReference<>("");
+        AtomicReference<String> twiceResumeIfRange = new AtomicReference<>("");
         AtomicInteger validationCount = new AtomicInteger();
         AtomicInteger blockedEndpointHits = new AtomicInteger();
 
@@ -50,7 +62,17 @@ public final class AudioStreamProxyFixtureProbe {
             exchange,
             interruptedRequests,
             observedResumeRange,
-            observedResumeIfRange
+            observedResumeIfRange,
+            "eof"
+        ));
+        upstream.createContext("/fixed-disconnect", exchange -> serveInterruptedAudio(
+            exchange, fixedInterruptedRequests, fixedResumeRange, fixedResumeIfRange, "fixed"
+        ));
+        upstream.createContext("/idle-disconnect", exchange -> serveInterruptedAudio(
+            exchange, idleInterruptedRequests, idleResumeRange, idleResumeIfRange, "idle"
+        ));
+        upstream.createContext("/twice-disconnect", exchange -> serveInterruptedAudio(
+            exchange, twiceInterruptedRequests, twiceResumeRange, twiceResumeIfRange, "twice"
         ));
         upstream.createContext("/wrong-type.flac", AudioStreamProxyFixtureProbe::serveMislabelledFlac);
         upstream.createContext("/redirect-blocked", exchange -> redirect(exchange, "/blocked"));
@@ -125,6 +147,18 @@ public final class AudioStreamProxyFixtureProbe {
             } catch (IOException ignored) {
             }
             checks.put("resumesInterruptedBodyWithValidatedRange", resumedInterruptedStream);
+            checks.put("resumesFixedLengthDisconnectWithoutDuplicateBytes", recoveredInterruptedBody(
+                proxyBase, upstreamBase + "/fixed-disconnect", fixedInterruptedRequests, fixedResumeRange, fixedResumeIfRange
+            ));
+            checks.put("resumesIdleTimeoutWithoutDuplicateBytes", recoveredInterruptedBody(
+                proxyBase, upstreamBase + "/idle-disconnect", idleInterruptedRequests, idleResumeRange, idleResumeIfRange
+            ));
+            checks.put("downstreamWriteFailureDoesNotResume", downstreamFailureDoesNotResume(
+                fixtureProxy, fixtureClient, URI.create(upstreamBase + "/audio")
+            ));
+            checks.put("resumesTwoDisconnectsWithCumulativeOffset", recoveredInterruptedBody(
+                proxyBase, upstreamBase + "/twice-disconnect", twiceInterruptedRequests, twiceResumeRange, twiceResumeIfRange
+            ));
 
             HttpResponse<byte[]> correctedFlac = send(
                 proxyBase,
@@ -286,7 +320,8 @@ public final class AudioStreamProxyFixtureProbe {
         HttpExchange exchange,
         AtomicInteger requests,
         AtomicReference<String> observedResumeRange,
-        AtomicReference<String> observedResumeIfRange
+        AtomicReference<String> observedResumeIfRange,
+        String failureMode
     ) throws IOException {
         int request = requests.incrementAndGet();
         String range = value(exchange, "Range");
@@ -298,10 +333,18 @@ public final class AudioStreamProxyFixtureProbe {
                 "Content-Range",
                 "bytes 0-" + (AUDIO.length - 1) + "/" + AUDIO.length
             );
-            exchange.sendResponseHeaders(206, 0);
+            exchange.sendResponseHeaders(206,
+                "fixed".equals(failureMode) || "twice".equals(failureMode) ? AUDIO.length : 0);
             try {
                 exchange.getResponseBody().write(AUDIO, 0, 32768);
                 exchange.getResponseBody().flush();
+                if ("idle".equals(failureMode)) {
+                    try {
+                        Thread.sleep(2600);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
             } finally {
                 exchange.close();
             }
@@ -310,16 +353,87 @@ public final class AudioStreamProxyFixtureProbe {
 
         observedResumeRange.set(range);
         observedResumeIfRange.set(value(exchange, "If-Range"));
-        if (!"bytes=32768-".equals(range)) {
+        int expectedStart = "twice".equals(failureMode) && request > 2 ? 49152 : 32768;
+        if (!("bytes=" + expectedStart + "-").equals(range)) {
             exchange.sendResponseHeaders(416, -1);
             exchange.close();
             return;
         }
         exchange.getResponseHeaders().set(
             "Content-Range",
-            "bytes 32768-" + (AUDIO.length - 1) + "/" + AUDIO.length
+            "bytes " + expectedStart + "-" + (AUDIO.length - 1) + "/" + AUDIO.length
         );
-        serveBytes(exchange, 206, AUDIO, 32768, AUDIO.length - 32768);
+        if ("twice".equals(failureMode) && request == 2) {
+            exchange.getResponseHeaders().set("Content-Type", "audio/flac");
+            exchange.getResponseHeaders().set("ETag", "\"fixture-v1\"");
+            exchange.sendResponseHeaders(206, AUDIO.length - expectedStart);
+            try {
+                exchange.getResponseBody().write(AUDIO, expectedStart, 16384);
+                exchange.getResponseBody().flush();
+            } finally {
+                exchange.close();
+            }
+            return;
+        }
+        serveBytes(exchange, 206, AUDIO, expectedStart, AUDIO.length - expectedStart);
+    }
+
+    private static boolean recoveredInterruptedBody(
+        String proxyBase,
+        String target,
+        AtomicInteger requests,
+        AtomicReference<String> range,
+        AtomicReference<String> ifRange
+    ) throws InterruptedException {
+        try {
+            HttpResponse<byte[]> response = send(proxyBase, "/api/audio/stream", target, "bytes=0-", null);
+            return response.statusCode() == 206
+                && Arrays.equals(response.body(), AUDIO)
+                && requests.get() == (target.endsWith("/twice-disconnect") ? 3 : 2)
+                && (target.endsWith("/twice-disconnect") ? "bytes=49152-" : "bytes=32768-").equals(range.get())
+                && "\"fixture-v1\"".equals(ifRange.get());
+        } catch (IOException failure) {
+            return false;
+        }
+    }
+
+    private static boolean downstreamFailureDoesNotResume(
+        AudioStreamProxy proxy,
+        HttpClient client,
+        URI target
+    ) throws Exception {
+        // Deterministic equivalent of a browser closing an old seek response.
+        // A real socket can buffer the whole fixture before its close is observed.
+        HttpResponse<InputStream> response = client.send(
+            HttpRequest.newBuilder(target).GET().build(), HttpResponse.BodyHandlers.ofInputStream()
+        );
+        Class<?> planType = Class.forName("com.femonster.api.AudioStreamProxy$StreamPlan");
+        var createPlan = planType.getDeclaredMethod("from", HttpResponse.class);
+        createPlan.setAccessible(true);
+        Object plan = createPlan.invoke(null, response);
+        var copy = AudioStreamProxy.class.getDeclaredMethod(
+            "copyWithSafeResume", HttpExchange.class, HttpResponse.class, OutputStream.class, planType
+        );
+        copy.setAccessible(true);
+        long attempts = ((Number) proxy.status().get("resumeAttempts")).longValue();
+        long forwarded = ((Number) proxy.status().get("bytesForwarded")).longValue();
+        try (InputStream ignored = response.body()) {
+            try {
+                copy.invoke(proxy, null, response, new OutputStream() {
+                    @Override public void write(int value) throws IOException {
+                        throw new IOException("fixture downstream is closed");
+                    }
+                    @Override public void write(byte[] bytes, int offset, int length) throws IOException {
+                        throw new IOException("fixture downstream is closed");
+                    }
+                }, plan);
+                return false;
+            } catch (InvocationTargetException failure) {
+                return failure.getCause() instanceof IOException
+                    && ((Number) proxy.status().get("resumeAttempts")).longValue() == attempts
+                    && ((Number) proxy.status().get("bytesForwarded")).longValue() == forwarded;
+            }
+        }
     }
 
     private static void serveMislabelledFlac(HttpExchange exchange) throws IOException {
@@ -367,7 +481,8 @@ public final class AudioStreamProxyFixtureProbe {
     private static byte[] fixtureAudio() {
         byte[] bytes = new byte[256 * 1024];
         for (int index = 0; index < bytes.length; index++) {
-            bytes[index] = (byte) ((index * 31 + 17) & 0xff);
+            // Repeated blocks must differ so duplicate prefixes cannot pass equality.
+            bytes[index] = (byte) ((index * 31 + 17) ^ (index >>> 8) ^ (index >>> 16));
         }
         return bytes;
     }

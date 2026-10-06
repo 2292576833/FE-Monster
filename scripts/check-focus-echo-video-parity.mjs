@@ -11,12 +11,22 @@ function balancedBlock(source, marker) {
   const openIndex = source.indexOf('{', markerIndex + marker.length);
   if (openIndex < 0) return '';
   let depth = 0;
+  let quote = '';
+  let escaped = false;
   for (let index = openIndex; index < source.length; index += 1) {
-    if (source[index] === '{') depth += 1;
-    if (source[index] === '}') {
-      depth -= 1;
-      if (depth === 0) return source.slice(markerIndex, index + 1);
+    const character = source[index];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === quote) quote = '';
+      continue;
     }
+    if (character === '"' || character === "'" || character === '`') {
+      quote = character;
+      continue;
+    }
+    if (character === '{') depth += 1;
+    if (character === '}' && --depth === 0) return source.slice(markerIndex, index + 1);
   }
   return '';
 }
@@ -29,47 +39,135 @@ function functionBody(name) {
   return balancedBlock(app, `function ${name}`);
 }
 
+function numericConstant(name) {
+  const expression = app.match(new RegExp(`const\\s+${name}\\s*=\\s*([0-9.]+)\\s*;`))?.[1];
+  return expression == null ? Number.NaN : Number(expression);
+}
+
 const checks = [];
 function check(name, condition, detail) {
   checks.push({ name, ok: Boolean(condition), detail });
 }
 
-const converge = balancedBlock(css, '@keyframes focusEchoConverge');
+const visualLead = numericConstant('FOCUS_ECHO_VISUAL_LEAD_SECONDS');
+const minimumDuration = numericConstant('FOCUS_ECHO_TRANSITION_MIN_MS');
+const maximumDuration = numericConstant('FOCUS_ECHO_TRANSITION_MAX_MS');
+const layerStagger = numericConstant('FOCUS_ECHO_LAYER_STAGGER_MS');
+
 check(
-  'the main phrase focuses from a large soft image to a clear 1x image',
-  /0%\s*\{[\s\S]*?blur\(15px\)[\s\S]*?scale\(1\.62\)/.test(converge)
-    && /100%\s*\{[\s\S]*?blur\(0(?:px)?\)[\s\S]*?scale\(1\)/.test(converge),
-  'The reference enters around 1.6x/15px blur and settles at 1x/0px blur.'
+  'focus echo begins on the real lyric timestamp',
+  visualLead === 0,
+  `Expected zero FOCUS_ECHO_VISUAL_LEAD_SECONDS; received ${visualLead}.`
+);
+check(
+  'focus echo convergence is clamped to the confirmed 420-480ms window',
+  minimumDuration === 420 && maximumDuration === 480,
+  `Expected 420/480ms bounds; received ${minimumDuration}/${maximumDuration}.`
+);
+check(
+  'echo layers use a 20ms media-timeline stagger and settle within 520ms',
+  layerStagger === 20 && maximumDuration + layerStagger * 2 <= 520,
+  `Expected a 20ms stagger and <=520ms total; received ${layerStagger}ms/${maximumDuration + layerStagger * 2}ms.`
 );
 
-const shadowSettle = balancedBlock(css, '@keyframes focusEchoShadowSettle');
+const leadSource = functionBody('playbackLyricVisualLeadSeconds');
 check(
-  'all selected echo layers share a parameter-aware soft-focus settle',
-  /--focus-echo-blur/.test(shadowSettle)
-    && /--focus-echo-scale-x/.test(shadowSettle)
-    && /--focus-echo-scale/.test(shadowSettle),
-  'Echo entry must finish on each layer\'s computed blur/scale so controls remain live after a line change.'
+  'focus echo line selection uses zero synthetic lead',
+  /return\s+0\s*;/.test(leadSource),
+  'playbackLyricVisualLeadSeconds() must use the real media clock without lead.'
+);
+
+const disposeSource = functionBody('disposeFocusEchoTransition');
+const durationSource = functionBody('focusEchoTransitionDurationMs');
+const startSource = functionBody('startFocusEchoTransition');
+const syncSource = functionBody('syncFocusEchoTransition');
+
+check(
+  'focus echo owns one disposable transition runtime',
+  /focusEchoTransition\s*:/.test(app)
+    && /state\.focusEchoTransition/.test(disposeSource)
+    && /\.cancel\s*\(/.test(disposeSource),
+  'state.focusEchoTransition and disposeFocusEchoTransition() must own/cancel the WAAPI handles.'
+);
+check(
+  'focus echo duration is derived and clamped through the named timing bounds',
+  /FOCUS_ECHO_TRANSITION_MIN_MS/.test(durationSource)
+    && /FOCUS_ECHO_TRANSITION_MAX_MS/.test(durationSource)
+    && /clamp\s*\(/.test(durationSource),
+  'focusEchoTransitionDurationMs() must clamp the effective lyric duration to 420-480ms.'
+);
+check(
+  'line entry creates paused WAAPI animations with fill on both sides',
+  /\.animate\s*\(/.test(startSource)
+    && /fill\s*:\s*['"]both['"]/.test(startSource)
+    && /\.pause\s*\(\s*\)/.test(startSource)
+    && /\.currentTime\s*=\s*0/.test(startSource)
+    && /FOCUS_ECHO_LAYER_STAGGER_MS/.test(startSource),
+  'startFocusEchoTransition() must create, pause, and zero the staggered WAAPI animations.'
+);
+check(
+  'the focus phase is a pure function of effective display time',
+  /displayTime/.test(syncSource)
+    && /\.time/.test(syncSource)
+    && /1000/.test(syncSource)
+    && /\.currentTime\s*=/.test(syncSource),
+  'syncFocusEchoTransition(displayTime) must write (displayTime - line.time) * 1000 to every animation.'
+);
+check(
+  'focus transition code has no wall-clock scheduler',
+  !/(?:requestAnimationFrame|setTimeout|performance\.now|Date\.now)\s*\(/.test(`${startSource}\n${syncSource}`),
+  'The focus transition must not advance from rAF, timers, performance.now(), or Date.now().'
+);
+
+const setLineSource = functionBody('setPlaybackLyricLine');
+check(
+  'lyric line changes start the transition from sampled display time',
+  /startFocusEchoTransition\s*\(\s*currentTime/.test(setLineSource),
+  'setPlaybackLyricLine() must pass its effective display-time sample into startFocusEchoTransition().'
+);
+check(
+  'every lyric sample synchronizes the paused transition',
+  /syncFocusEchoTransition\s*\(\s*currentTime\s*\)/.test(setLineSource),
+  'setPlaybackLyricLine() must resample the focus phase even when the text did not change.'
+);
+check(
+  'the effective display time remains threaded through the playback update',
+  /setPlaybackLyricLine\s*\([\s\S]*?displayTime,[\s\S]*?currentTime/.test(functionBody('updatePlaybackLyricAtTime')),
+  'updatePlaybackLyricAtTime() must pass the calibrated displayTime to the focus transition path.'
+);
+
+check(
+  'the old class/rAF/timer transition path is removed',
+  !/triggerFocusEchoTransition|focusEchoAnimationFrame|focusEchoAnimationTimer|is-focus-echo-entering/.test(app),
+  'Legacy class toggling, requestAnimationFrame, or cleanup-timer state is still present.'
+);
+check(
+  'focus echo has no CSS animation or 160ms CSS delay',
+  !/@keyframes\s+focusEcho/.test(css)
+    && !/--focus-echo-main-delay/.test(css)
+    && !/is-focus-echo-entering/.test(css),
+  'Focus convergence must be owned by paused WAAPI, not CSS keyframes/delay selectors.'
 );
 
 const mainLayer = rule('.playback-lyric-scene.is-focus-echo-text .lyric-depth-0');
 check(
-  'the stable main phrase remains sharp and frontmost',
+  'the stable main phrase remains sharp, opaque, and frontmost',
   /filter\s*:\s*(?:none|blur\(0(?:px)?\))/.test(mainLayer)
     && /scale\(1\)/.test(mainLayer)
     && /opacity\s*:\s*1/.test(mainLayer),
-  'Only the background echoes may stay blurred; the settled main phrase must remain clear.'
+  'Only background echoes may retain blur; the settled main phrase must stay clear.'
 );
 
 const focusVisibleLayer = rule(
   '.playback-lyric-scene.is-focus-echo-text .playback-lyric-layer.is-text-composer-layer-visible'
 );
 check(
-  'focus echo visibility follows the echo-layer control',
+  'selected echo layers keep their static spatial blur profile',
   /display\s*:\s*block\s*!important/.test(focusVisibleLayer)
     && /blur\(var\(--focus-echo-blur\)\)/.test(focusVisibleLayer)
     && /scaleX\(var\(--focus-echo-scale-x\)\)/.test(focusVisibleLayer)
     && /scale\(var\(--focus-echo-scale\)\)/.test(focusVisibleLayer),
-  'The preset still hard-codes three sharp copies instead of using the selected echo layers.'
+  'Stable blur/scale must remain a CSS spatial profile while WAAPI animates only transform/opacity.'
 );
 
 for (let depth = 1; depth <= 5; depth += 1) {
@@ -86,84 +184,32 @@ for (let depth = 1; depth <= 5; depth += 1) {
 
 const focusAfter = rule('.playback-lyric-scene.is-focus-echo-text .lyric-depth-0::after');
 check(
-  'focus echo has no rolling color wipe',
+  'focus echo retains a single-color main phrase with no rolling wipe',
   /content\s*:\s*none\s*!important/.test(focusAfter)
     && /display\s*:\s*none\s*!important/.test(focusAfter),
-  'The reference keeps the main phrase one color; the generic rolling-highlight pseudo-element is still active.'
-);
-
-const continuousHighlightStart = css.indexOf('/* Continuous lyric highlight: start */');
-const continuousHighlightEnd = css.indexOf('/* Continuous lyric highlight: end */');
-const continuousHighlight = continuousHighlightStart >= 0 && continuousHighlightEnd > continuousHighlightStart
-  ? css.slice(continuousHighlightStart, continuousHighlightEnd)
-  : css.slice(20100);
-check(
-  'generic rolling-highlight selectors explicitly exclude focus echo',
-  (continuousHighlight.match(/:not\(\.is-focus-echo-text\)/g) || []).length >= 4,
-  'A later generic selector can still make the focus main layer transparent and replace it with a progress mask.'
-);
-
-const sharedLetterSpacingStart = css.indexOf('/* Composable text controls');
-const sharedLetterSpacing = sharedLetterSpacingStart >= 0
-  ? css.slice(sharedLetterSpacingStart, sharedLetterSpacingStart + 700)
-  : '';
-check(
-  'the generic important letter spacing does not override focus convergence',
-  /:not\(\.is-focus-echo-text\)[\s\S]{0,220}letter-spacing\s*:\s*var\(--text-letter-spacing\)\s*!important/.test(
-    sharedLetterSpacing
-  ),
-  'The focus keyframe cannot animate letter spacing while the shared !important rule targets it.'
-);
-
-const wordGlow = functionBody('wordGlowLyricActive');
-const handwrittenMood = functionBody('handwrittenMoodLyricActive');
-check(
-  'focus echo stays visually pure when other single-line effects were previously enabled',
-  /state\.textPreset\s*!==\s*['"]focus-echo['"]/.test(wordGlow)
-    && /state\.textPreset\s*!==\s*['"]focus-echo['"]/.test(handwrittenMood),
-  'Sweep/handwritten classes can still be inherited by focus echo and change the reference appearance.'
-);
-
-const focusScene = rule('.playback-lyric-scene.is-focus-echo-text');
-check(
-  'focus transition is clamped to the reference timing window',
-  /--focus-echo-duration\s*:\s*clamp\(720ms\s*,\s*var\(--lyric-duration\)\s*,\s*880ms\)/.test(focusScene),
-  'The measured reference settles in roughly 0.7–0.9 seconds.'
+  'The generic rolling-highlight pseudo-element is still active.'
 );
 
 check(
-  'the focus phrase has its own fitted display size',
+  'the focus phrase retains its independent larger fit',
   /function\s+focusEchoFitMetrics\s*\(/.test(app)
     && /focusEchoFitMetrics\s*\(focusText/.test(app)
     && /viewportWidth\s*\*\s*0\.102/.test(app),
-  'The reference focus phrase is roughly 72px at 708px wide, independent of the 40px main-line fit.'
+  'The semantic focus phrase must remain independently fitted from the full lyric line.'
 );
-
 check(
-  'stable echoes are centered and remain behind the main phrase',
+  'stable echoes stay centered behind the main phrase',
   /x:\s*-3,\s*y:\s*1\.5/.test(app)
     && /x:\s*2,\s*y:\s*2\.5/.test(app)
     && /x:\s*0,\s*y:\s*3\.5/.test(app),
-  'The video has a shared center anchor; large alternating x/y offsets create a trailing copy instead.'
+  'The confirmed shared-center echo geometry changed.'
 );
-
 check(
-  'echo opacity matches the subtle dark-teal reference layers',
+  'echo opacity retains the subtle dark-teal hierarchy',
   /opacity:\s*0\.24,\s*blur:\s*4\.8/.test(app)
     && /opacity:\s*0\.15,\s*blur:\s*8\.5/.test(app)
     && /opacity:\s*0\.09,\s*blur:\s*13/.test(app),
-  'The three reference layers are about 0.24/0.15/0.09 alpha, not dominant copies.'
-);
-
-const focusMainEntering = rule(
-  '.playback-lyric-scene.is-focus-echo-text.is-focus-echo-entering .lyric-depth-0'
-);
-check(
-  'the dark focus phrase leads the main refocus by about 160ms',
-  /var\(--focus-echo-main-delay\)/.test(focusMainEntering)
-    && /--focus-echo-main-delay\s*:\s*160ms/.test(focusScene)
-    && /cubic-bezier\(0\.16,\s*1,\s*0\.3,\s*1\)/.test(focusMainEntering),
-  'The reference echo appears 150–250ms before the main phrase and uses a strong ease-out.'
+  'The confirmed 0.24/0.15/0.09 echo hierarchy changed.'
 );
 
 for (const item of checks) {
@@ -173,8 +219,8 @@ for (const item of checks) {
 
 const failures = checks.filter((item) => !item.ok);
 if (failures.length) {
-  console.error(`\nFocus echo video parity failed: ${failures.length}/${checks.length}`);
+  console.error(`\nFocus echo media-clock parity failed: ${failures.length}/${checks.length}`);
   process.exit(1);
 }
 
-console.log(`\nFocus echo video parity passed: ${checks.length}/${checks.length}`);
+console.log(`\nFocus echo media-clock parity passed: ${checks.length}/${checks.length}`);

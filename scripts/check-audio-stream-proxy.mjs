@@ -62,7 +62,7 @@ try {
   report.checks.streamsWithoutBuffering =
     /BodyHandlers\.ofInputStream\(\)/.test(proxySource)
       && /copyWithSafeResume\(exchange,\s*upstream,\s*output,\s*plan\)/.test(proxySource)
-      && /copyObservable\(input,\s*output,\s*remaining\)/.test(proxySource)
+      && /copyObservable\(input,\s*output,\s*remaining,\s*progress\)/.test(proxySource)
       && !/BodyHandlers\.ofByteArray|readAllBytes\(/.test(proxySource);
   report.checks.routeRegistered =
     /["']\/api\/audio\/stream["']/.test(routeSource)

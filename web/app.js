@@ -8,6 +8,7 @@ const desktopSceneRuntime = {
   applying: false,
   queuedSnapshot: null,
   publishFrame: 0,
+  lastLyricClockPublishAt: Number.NEGATIVE_INFINITY,
   channel: null,
   lyricClock: null
 };
@@ -213,6 +214,7 @@ const els = {
   aiServiceModelBaseUrl: $('#aiServiceModelBaseUrl'),
   aiServiceModelApiKey: $('#aiServiceModelApiKey'),
   aiServiceModelName: $('#aiServiceModelName'),
+  aiServiceMemorySharing: $('#aiServiceMemorySharing'),
   aiServiceModelNameList: $('#aiServiceModelNameList'),
   aiServiceModelTestButton: $('#aiServiceModelTestButton'),
   aiServiceModelKeyClearButton: $('#aiServiceModelKeyClearButton'),
@@ -340,6 +342,7 @@ const els = {
   diyWallpaperModeButton: $('#diyWallpaperModeButton'),
   diyWallpaperPage: $('#diyWallpaperPage'),
   diyRhythmGameButton: $('#diyRhythmGameButton'),
+  diyPlaylistButton: $('#diyPlaylistButton'),
   diyNoTextPreset: $('#diyNoTextPreset'),
   diyLyricPreset: $('#diyLyricPreset'),
   diyFlowTextPreset: $('#diyFlowTextPreset'),
@@ -379,6 +382,16 @@ const els = {
   textLetterSpacingValue: $('#textLetterSpacingValue'),
   textLowBassGlow: $('#textLowBassGlow'),
   textLowBassGlowValue: $('#textLowBassGlowValue'),
+  textHighlightParticlesToggle: $('#textHighlightParticlesToggle'),
+  textHighlightParticlesValue: $('#textHighlightParticlesValue'),
+  textHighlightParticleSize: $('#textHighlightParticleSize'),
+  textHighlightParticleSizeValue: $('#textHighlightParticleSizeValue'),
+  textHighlightParticleDensity: $('#textHighlightParticleDensity'),
+  textHighlightParticleDensityValue: $('#textHighlightParticleDensityValue'),
+  textHighlightParticleSensitivity: $('#textHighlightParticleSensitivity'),
+  textHighlightParticleSensitivityValue: $('#textHighlightParticleSensitivityValue'),
+  textHighlightParticleSpread: $('#textHighlightParticleSpread'),
+  textHighlightParticleSpreadValue: $('#textHighlightParticleSpreadValue'),
   textGlitchControl: $('#textGlitchControl'),
   textGlitchToggle: $('#textGlitchToggle'),
   textGlitchValue: $('#textGlitchValue'),
@@ -407,10 +420,18 @@ const els = {
   playbackLyricPaletteAutoButton: $('#playbackLyricPaletteAutoButton'),
   playbackLyricPaletteCustomInput: $('#playbackLyricPaletteCustomInput'),
   playbackLyricPaletteResetButton: $('#playbackLyricPaletteResetButton'),
+  lyricParticlePaletteControl: $('#lyricParticlePaletteControl'),
+  lyricParticlePaletteStatus: $('#lyricParticlePaletteStatus'),
+  lyricParticlePaletteAutoButton: $('#lyricParticlePaletteAutoButton'),
+  lyricParticleCustomColor: $('#lyricParticleCustomColor'),
+  lyricParticlePaletteResetButton: $('#lyricParticlePaletteResetButton'),
   bilingualLyricsToggle: $('#bilingualLyricsToggle'),
   bilingualLyricsValue: $('#bilingualLyricsValue'),
   multiRowLineCount: $('#multiRowLineCount'),
   multiRowLineCountValue: $('#multiRowLineCountValue'),
+  bookLyricLineCount: $('#bookLyricLineCount'),
+  bookLyricLineCountValue: $('#bookLyricLineCountValue'),
+  bookLyricLineCountControl: $('#bookLyricLineCountControl'),
   translationFontSize: $('#translationFontSize'),
   translationFontSizeValue: $('#translationFontSizeValue'),
   translationGap: $('#translationGap'),
@@ -425,6 +446,7 @@ const els = {
   diyTopographyPreset: $('#diyTopographyPreset'),
   diySoundscapeWorkshopPreset: $('#diySoundscapeWorkshopPreset'),
   diyChladniPreset: $('#diyChladniPreset'),
+  diyHarmonicStatePreset: $('#diyHarmonicStatePreset'),
   diyRainGlassPreset: $('#diyRainGlassPreset'),
   diyCoverParticlesPreset: $('#diyCoverParticlesPreset'),
   diyCoverParticleControl: $('#diyCoverParticleControl'),
@@ -434,6 +456,7 @@ const els = {
   diyCoverParticleMotionValue: $('#diyCoverParticleMotionValue'),
   diyCoverParticleFloatSpeedRange: $('#diyCoverParticleFloatSpeedRange'),
   diyCoverParticleFloatSpeedValue: $('#diyCoverParticleFloatSpeedValue'),
+  coverImageMotionMode: $('#coverImageMotionMode'),
   scenePresetSettingsGroup: $('#scenePresetSettingsGroup'),
   scenePresetSettingsTitle: $('#scenePresetSettingsTitle'),
   scenePresetSettingsMeta: $('#scenePresetSettingsMeta'),
@@ -638,11 +661,14 @@ const els = {
   sonicTopographyCore: $('#sonicTopographyCore'),
   chladniScene: $('#chladniScene'),
   chladniCore: $('#chladniCore'),
+  harmonicStateScene: $('#harmonicStateScene'),
+  harmonicStateCore: $('#harmonicStateCore'),
   coverParticleScene: $('#coverParticleScene'),
   coverParticleRig: $('#coverParticleRig'),
   coverParticleWallpaperCanvas: $('#coverParticleWallpaperCanvas'),
   coverParticleEngine: $('#coverParticleEngine'),
   coverParticleCanvas: $('#coverParticleCanvas'),
+  coverSketchCanvas: $('#coverSketchCanvas'),
   sandboxPlaybackScene: $('#sandboxPlaybackScene'),
   sandboxPlaybackFallback: $('#sandboxPlaybackFallback'),
   sandboxPlaybackStatus: $('#sandboxPlaybackStatus'),
@@ -659,6 +685,7 @@ const els = {
   rainGlassCanvas: $('#rainGlassCanvas'),
   playbackLyricRig: $('#playbackLyricRig'),
   playbackLyricCore: $('#playbackLyricCore'),
+  lyricHighlightParticlesFront: $('#lyricHighlightParticlesFront'),
   blurLyricMount: $('#blurLyricMount'),
   playbackLyricText: $('#playbackLyricText'),
   playbackLyricBack: $('#playbackLyricBack'),
@@ -682,6 +709,8 @@ const els = {
   qishuiPlaybackTools: $('#qishuiPlaybackTools'),
   qishuiPlaybackBackdrop: $('#qishuiPlaybackBackdrop'),
   qishuiPlaybackCoverFrame: $('#qishuiPlaybackCoverFrame'),
+  qishuiPlaybackVolume: $('#qishuiPlaybackVolume'),
+  qishuiPlaybackVolumeRange: $('#qishuiPlaybackVolumeRange'),
   qishuiPlaybackCover: $('#qishuiPlaybackCover'),
   qishuiPlaybackCoverFallback: $('#qishuiPlaybackCoverFallback'),
   qishuiPlaybackAccount: $('#qishuiPlaybackAccount'),
@@ -707,6 +736,21 @@ const els = {
   qishuiPlaybackPlayButton: $('#qishuiPlaybackPlayButton'),
   qishuiPlaybackNextButton: $('#qishuiPlaybackNextButton'),
   qishuiPlaybackWheelHint: $('#qishuiPlaybackWheelHint'),
+  qishuiPlaybackModeToggle: $('#compactPlaybackModeToggle'),
+  compactPlaybackCard: $('#compactPlaybackCard'),
+  compactPlaybackCanvas: $('#compactPlaybackCanvas'),
+  compactPlaybackTitle: $('#compactPlaybackTitle'),
+  compactPlaybackArtist: $('#compactPlaybackArtist'),
+  compactPlaybackProgress: $('#compactPlaybackProgress'),
+  compactPlaybackCurrentTime: $('#compactPlaybackCurrentTime'),
+  compactPlaybackTotalTime: $('#compactPlaybackTotalTime'),
+  compactPlaybackPreviousButton: $('#compactPlaybackPreviousButton'),
+  compactPlaybackPlayButton: $('#compactPlaybackPlayButton'),
+  compactPlaybackNextButton: $('#compactPlaybackNextButton'),
+  compactPlaybackReturn: $('#compactPlaybackReturnButton'),
+  compactPlaybackVolume: $('#compactPlaybackVolume'),
+  compactPlaybackVolumeFill: $('#compactPlaybackVolumeFill'),
+  compactPlaybackVolumeHit: $('#compactPlaybackVolumeHit'),
   progressRange: $('#progressRange'),
   currentTime: $('#currentTime'),
   totalTime: $('#totalTime'),
@@ -728,6 +772,7 @@ let wallpaperResizeObserver = null;
 
 const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const ANDROID_CLIENT = Boolean(window.FeMonsterAndroid);
+const MACOS_CLIENT = window.FE_MONSTER_PLATFORM === 'macos';
 const MOBILE_RENDER_TARGET = Boolean(
   ANDROID_CLIENT || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '')
 );
@@ -739,6 +784,7 @@ const SONIC_HARDWARE_ANTIALIAS = !MOBILE_RENDER_TARGET || RENDER_PROFILE.tier !=
 document.documentElement.dataset.renderTier = RENDER_PROFILE.tier;
 const PLAYBACK_REST_YAW = 0.22;
 const PLAYBACK_REST_PITCH = -0.16;
+const HARMONIC_DEFAULT_ZOOM = 2.35;
 const COVER_PARTICLE_MICRO_WAVE_SEGMENTS = 200;
 const COVER_PARTICLE_BASS_JITTER_MAX = 1;
 const COVER_PARTICLE_BASS_JITTER_AMPLITUDE = 0.008;
@@ -747,6 +793,11 @@ const CLIENT_UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
 const COVER_PARTICLE_BASS_JITTER_DEPTH = 0.004;
 const COVER_PARTICLE_BASS_JITTER_DEPTH_LIMIT = 0.0054;
 const COVER_PARTICLE_BASS_JITTER_BASE_RATE = 104;
+// A cover should keep a restrained ambient motion while playback is paused.
+// Audio driven motion still uses motionGate; this separate gate prevents an
+// idle cover from becoming a static screenshot without making the idle loop
+// compete with the audio envelope.
+const COVER_PARTICLE_IDLE_MOTION_GATE = 0.18;
 const COVER_PARTICLE_CPU_FALLBACK_MAX_PARTICLES = 4096;
 const COVER_PARTICLE_CPU_FALLBACK_REDUCED_MAX_PARTICLES = 2048;
 const COVER_PARTICLE_CPU_FALLBACK_MAX_FPS = 30;
@@ -947,6 +998,15 @@ const PLAYBACK_QUALITY_OPTIONS = {
     { id: 'full', label: '官方完整音源', short: 'FULL', vip: false }
   ]
 };
+const AUDIO_SOURCE_QUALITY_OPTIONS = [
+  { type: '128k', rank: 0, label: '标准', short: 'STD', platformIds: { netease: 'standard', qq: '128', kugou: '128' } },
+  { type: '192k', rank: 1, label: '较高', short: 'HQ', platformIds: { netease: 'higher', qq: '192', kugou: '192' } },
+  { type: '320k', rank: 2, label: '高品', short: 'EX', platformIds: { netease: 'exhigh', qq: '320', kugou: '320' } },
+  { type: 'flac', rank: 3, label: '无损', short: 'SQ', platformIds: { netease: 'lossless', qq: 'flac', kugou: 'flac' } },
+  { type: 'wav', rank: 3, label: 'WAV', short: 'WAV', platformIds: {} },
+  { type: 'ape', rank: 3, label: 'APE', short: 'APE', platformIds: {} },
+  { type: 'flac24bit', rank: 4, label: 'Hi-Res', short: 'HR', platformIds: { netease: 'hires', qq: 'hires', kugou: 'hires' } }
+];
 const PLAYBACK_QUALITY_PREFS_KEY = 'fe-monster-playback-quality-prefs-v1';
 const ACTIVE_PROVIDER_PREFERENCE_KEY = 'fe-monster-active-provider-v1';
 const RENDER_CLARITY_PREFS_KEY = 'fe-monster-render-clarity-v1';
@@ -962,6 +1022,12 @@ const LYRIC_CLOCK_OFFSET_PREFERENCE_KEY = 'fe-monster-lyric-clock-offset-v1';
 const SONIC_SETTINGS_PREFS_KEY = 'fe-monster-sonic-settings-v1';
 const COVER_PARTICLE_PREFS_KEY = 'fe-monster-cover-particle-v1';
 const CURSOR_PREFERENCES_KEY = 'fe-monster-cursor-preferences-v1';
+const VOLUME_SLIDER_PREFERENCES_KEY = 'fe-monster-volume-slider-preferences-v1';
+const VOLUME_SLIDER_DEFAULTS = Object.freeze({
+  gradient: true, colorStart: '#72e6ff', colorEnd: '#b69cff',
+  duration: 6, hoverStrength: 70, wheelStep: 2, musicReactive: true, musicStrength: 65
+});
+const volumeSliderMotionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)');
 const MAX_CURSOR_IMPORT_BYTES = 4 * 1024 * 1024;
 const MAX_CURSOR_SOURCE_DIMENSION = 2048;
 const USER_CURSOR_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -1005,11 +1071,17 @@ const GOOGLE_OBR_BACKEND = 'google-obr-official';
 const GOOGLE_OBR_NATIVE_BACKEND = 'native-rust-x3d-obr-xaudio2';
 const GOOGLE_OBR_REVISION = '478dc7c752d5eccae534635139ff0253eee3a14a';
 const GOOGLE_OBR_WORKLET_URL = 'vendor/google-obr/obr-worklet.js?v=478dc7c752d5-surround2';
-const GOOGLE_OBR_NATIVE_WORKLET_URL = 'vendor/native-spatial/native-pcm-worklet.js?v=20260821-seek-epoch-3';
+const GOOGLE_OBR_NATIVE_WORKLET_URL = 'vendor/native-spatial/native-pcm-worklet.js?v=20260831-audible-clock-1';
 const GOOGLE_OBR_NATIVE_TRANSPORT_FRAMES = 4096;
 const GOOGLE_OBR_NATIVE_RENDER_FRAMES = 256;
 const GOOGLE_OBR_NATIVE_MAX_PENDING_BLOCKS = 4;
+const GOOGLE_OBR_NATIVE_LATENCY_RATE_EPSILON = 0.001;
+const GOOGLE_OBR_NATIVE_LATENCY_SMOOTHING = 0.12;
+const GOOGLE_OBR_NATIVE_LATENCY_MAX_STEP_SECONDS = 0.005;
+const GOOGLE_OBR_NATIVE_LATENCY_DEADZONE_SECONDS = 0.001;
 const GOOGLE_OBR_NATIVE_UPLOAD_RETRY_DELAYS = Object.freeze([20, 50]);
+const GOOGLE_OBR_NATIVE_UPLOAD_TIMEOUT_MS = 750;
+const GOOGLE_OBR_NATIVE_REQUEST_TIMEOUT_MS = 2000;
 const GOOGLE_OBR_NATIVE_UNDERRUN_FAILURE_THRESHOLD = 3;
 const GOOGLE_OBR_CHANNEL_LAYOUTS = Object.freeze({
   stereo: Object.freeze({ id: 'stereo', label: '2.0', channels: 2 }),
@@ -1022,8 +1094,10 @@ const AUDIO_PLAYBACK_STALL_TIMEOUT_MS = 450;
 const AUDIO_PLAYBACK_STALL_HINT_TIMEOUT_MS = 350;
 const AUDIO_PLAYBACK_RECOVERY_RETRY_MS = 7000;
 const AUDIO_PLAYBACK_ADVANCE_EPSILON_SECONDS = 0.035;
-const AUDIO_PLAYBACK_START_BUFFER_SECONDS = 6;
-const AUDIO_PLAYBACK_START_BUFFER_TIMEOUT_MS = 2400;
+const AUDIO_PLAYBACK_START_BUFFER_SECONDS = 1;
+const AUDIO_PLAYBACK_START_BUFFER_TIMEOUT_MS = 350;
+const AUDIO_PLAYBACK_LOAD_TIMEOUT_MS = 20000;
+const AUDIO_PLAYBACK_START_TIMEOUT_MS = 10000;
 const DEFAULT_TEXT_PRESET = 'depth';
 const DEFAULT_TEXT_COMPOSER_SETTINGS = Object.freeze({
   lyricsEnabled: true,
@@ -1040,6 +1114,13 @@ const DEFAULT_TEXT_COMPOSER_SETTINGS = Object.freeze({
   unsungBlur: 1.5,
   letterSpacing: 1,
   lowBassGlow: 75,
+  highlightParticlesEnabled: true,
+  highlightParticleSize: 0.75,
+  highlightParticleDensity: 78,
+  highlightParticleSensitivity: 68,
+  highlightParticleSpread: 56,
+  highlightParticleColorMode: 'auto',
+  highlightParticleColor: '#eafbff',
   glitchEnabled: false,
   glitchSpeed: 1.2,
   glitchRgbOffset: 6,
@@ -1047,12 +1128,14 @@ const DEFAULT_TEXT_COMPOSER_SETTINGS = Object.freeze({
   glitchBeatSensitivity: 56,
   glitchBeatDuration: 180,
   multiRowLineCount: 7,
+  bookLyricLineCount: 7,
   translationFontSize: 72,
   translationGap: 4,
   translationOpacity: 88
 });
 const TEXT_TRANSLATION_SETTING_KEYS = Object.freeze([
   'multiRowLineCount',
+  'bookLyricLineCount',
   'translationFontSize',
   'translationGap',
   'translationOpacity'
@@ -1067,6 +1150,15 @@ const TEXT_GLITCH_TUNING_SETTING_KEYS = Object.freeze([
 const TEXT_SINGLE_ROW_ANIMATION_SETTING_KEYS = Object.freeze([
   'lyricHighlightMode',
   'handwrittenMoodEnabled'
+]);
+const TEXT_HIGHLIGHT_PARTICLE_SETTING_KEYS = Object.freeze([
+  'highlightParticlesEnabled',
+  'highlightParticleSize',
+  'highlightParticleDensity',
+  'highlightParticleSensitivity',
+  'highlightParticleSpread',
+  'highlightParticleColorMode',
+  'highlightParticleColor'
 ]);
 const TEXT_GLITCH_BEAT_CLASSES = Object.freeze([
   'is-text-glitch-beat-a',
@@ -1139,7 +1231,10 @@ const FOCUS_ECHO_LAYER_PROFILES = Object.freeze([
 ]);
 const FOCUS_ECHO_REFERENCE_SPACING = 22;
 const FOCUS_ECHO_REFERENCE_DEPTH = 90;
-const FOCUS_ECHO_TRANSITION_CLEANUP_MS = 1080;
+const FOCUS_ECHO_VISUAL_LEAD_SECONDS = 0;
+const FOCUS_ECHO_TRANSITION_MIN_MS = 420;
+const FOCUS_ECHO_TRANSITION_MAX_MS = 480;
+const FOCUS_ECHO_LAYER_STAGGER_MS = 20;
 const DEFAULT_SONIC_SETTINGS = Object.freeze({
   centerColor: null,
   coreColor: null,
@@ -1188,7 +1283,7 @@ const DEFAULT_SONIC_SETTINGS = Object.freeze({
   fov: SONIC_TOPOGRAPHY_CAMERA.fov,
   smoothing: 1
 });
-const TEXT_PALETTE_PRESET_IDS = Object.freeze(['depth', 'flow', 'book-effect', 'focus-echo', 'glitch', 'book']);
+const TEXT_PALETTE_PRESET_IDS = Object.freeze(['depth', 'flow', 'book-effect', 'focus-echo', 'glitch', 'book', 'particle-lyrics']);
 const TEXT_PALETTE_DEFAULT_COLOR = '#eafbff';
 const TEXT_FONT_DEFAULT_ID = 'system';
 const TEXT_FONT_FALLBACKS = Object.freeze({
@@ -1405,7 +1500,10 @@ function loadPlaybackQualityPreferences() {
     if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return {};
     return Object.keys(PLAYBACK_QUALITY_OPTIONS).reduce((preferences, provider) => {
       const quality = typeof stored[provider] === 'string' ? stored[provider] : '';
-      if (PLAYBACK_QUALITY_OPTIONS[provider].some((option) => option.id === quality)) preferences[provider] = quality;
+      if (PLAYBACK_QUALITY_OPTIONS[provider].some((option) => option.id === quality)
+          || (provider !== 'qishui' && AUDIO_SOURCE_QUALITY_OPTIONS.some((option) => (option.platformIds[provider] || option.type) === quality))) {
+        preferences[provider] = quality;
+      }
       return preferences;
     }, {});
   } catch (error) {
@@ -1531,6 +1629,16 @@ function normalizeTextComposerSettings(source = {}) {
     unsungBlur: bounded('unsungBlur', 0, 12, 0.5),
     letterSpacing: bounded('letterSpacing', -2, 12, 0.5),
     lowBassGlow: bounded('lowBassGlow', 0, 100),
+    highlightParticlesEnabled: source?.highlightParticlesEnabled !== false,
+    highlightParticleSize: bounded('highlightParticleSize', 0.35, 2.4, 0.05),
+    highlightParticleDensity: bounded('highlightParticleDensity', 0, 100),
+    highlightParticleSensitivity: bounded('highlightParticleSensitivity', 20, 100),
+    highlightParticleSpread: bounded('highlightParticleSpread', 0, 100),
+    highlightParticleColorMode: source?.highlightParticleColorMode === 'manual' ? 'manual' : 'auto',
+    highlightParticleColor: normalizeTextPaletteColor(
+      source?.highlightParticleColor,
+      DEFAULT_TEXT_COMPOSER_SETTINGS.highlightParticleColor
+    ),
     glitchEnabled: source?.glitchEnabled === true,
     glitchSpeed: bounded('glitchSpeed', 0.2, 3, 0.1),
     glitchRgbOffset: bounded('glitchRgbOffset', 0, 20),
@@ -1538,6 +1646,7 @@ function normalizeTextComposerSettings(source = {}) {
     glitchBeatSensitivity: bounded('glitchBeatSensitivity', 20, 95),
     glitchBeatDuration: bounded('glitchBeatDuration', 80, 420, 10),
     multiRowLineCount: odd('multiRowLineCount', 3, 11),
+    bookLyricLineCount: bounded('bookLyricLineCount', 1, 15),
     translationFontSize: bounded('translationFontSize', 50, 100),
     translationGap: bounded('translationGap', 0, 24),
     translationOpacity: bounded('translationOpacity', 30, 100)
@@ -1605,6 +1714,9 @@ const LYRIC_CLOCK_OFFSET_MIN_SECONDS = -3;
 const LYRIC_CLOCK_OFFSET_MAX_SECONDS = 3;
 const LYRIC_CLOCK_OFFSET_STEP_SECONDS = 0.1;
 const LYRIC_AUDIO_OUTPUT_LATENCY_MAX_SECONDS = 0.35;
+const LYRIC_CLOCK_OFFSET_PREFERENCE_VERSION = 2;
+const LYRIC_CLOCK_OFFSET_TRACK_LIMIT = 200;
+let lyricClockOffsetPreferenceMigrationPending = false;
 
 function normalizeLyricClockOffsetSeconds(value) {
   const numeric = Number(value);
@@ -1614,21 +1726,55 @@ function normalizeLyricClockOffsetSeconds(value) {
     LYRIC_CLOCK_OFFSET_MIN_SECONDS,
     LYRIC_CLOCK_OFFSET_MAX_SECONDS
   );
-  return Math.round(bounded / LYRIC_CLOCK_OFFSET_STEP_SECONDS) * LYRIC_CLOCK_OFFSET_STEP_SECONDS;
+  return Number((Math.round(bounded / LYRIC_CLOCK_OFFSET_STEP_SECONDS) * LYRIC_CLOCK_OFFSET_STEP_SECONDS).toFixed(1));
+}
+
+function lyricClockOffsetSongKey(song) {
+  const provider = String(song?.provider || '').trim().toLowerCase();
+  const id = String(song?.id || '').trim();
+  return provider && id ? `${provider}|${id}` : '';
+}
+
+function normalizeLyricClockOffsetPreferences(value) {
+  if (!value || typeof value !== 'object' || Number(value.version) !== LYRIC_CLOCK_OFFSET_PREFERENCE_VERSION) {
+    return {};
+  }
+  const source = value.tracks && typeof value.tracks === 'object' && !Array.isArray(value.tracks)
+    ? value.tracks
+    : {};
+  return Object.entries(source)
+    .slice(-LYRIC_CLOCK_OFFSET_TRACK_LIMIT)
+    .reduce((tracks, [rawKey, rawOffset]) => {
+      const key = String(rawKey || '').trim().slice(0, 320);
+      if (!key || !key.includes('|')) return tracks;
+      const offset = normalizeLyricClockOffsetSeconds(rawOffset);
+      if (Math.abs(offset) >= LYRIC_CLOCK_OFFSET_STEP_SECONDS / 2) tracks[key] = offset;
+      return tracks;
+    }, {});
 }
 
 function loadLyricClockOffsetPreference() {
   try {
-    const stored = JSON.parse(window.localStorage.getItem(LYRIC_CLOCK_OFFSET_PREFERENCE_KEY) || '{}');
-    return normalizeLyricClockOffsetSeconds(
-      typeof stored === 'number' ? stored : stored?.offsetSeconds
-    );
+    const serialized = window.localStorage.getItem(LYRIC_CLOCK_OFFSET_PREFERENCE_KEY);
+    if (!serialized) return {};
+    const stored = JSON.parse(serialized);
+    const normalized = normalizeLyricClockOffsetPreferences(stored);
+    if (Number(stored?.version) !== LYRIC_CLOCK_OFFSET_PREFERENCE_VERSION) {
+      // v1 stored one global correction. Applying it to every future song is
+      // indistinguishable from a broken media clock, so migrate it to neutral.
+      window.localStorage.setItem(LYRIC_CLOCK_OFFSET_PREFERENCE_KEY, JSON.stringify({
+        version: LYRIC_CLOCK_OFFSET_PREFERENCE_VERSION,
+        tracks: {}
+      }));
+      lyricClockOffsetPreferenceMigrationPending = true;
+    }
+    return normalized;
   } catch (error) {
-    return 0;
+    return {};
   }
 }
 
-const INITIAL_LYRIC_CLOCK_OFFSET_SECONDS = loadLyricClockOffsetPreference();
+const INITIAL_LYRIC_CLOCK_OFFSETS_BY_TRACK = loadLyricClockOffsetPreference();
 
 function loadGoogleObrPreference() {
   try {
@@ -1812,14 +1958,47 @@ function normalizeCoverParticlePreferences(source = {}) {
   return {
     backgroundEnabled: source?.backgroundEnabled !== false,
     motionAmplitude: clamp(Number.isFinite(motionAmplitude) ? motionAmplitude : 0.8, 0, 2),
-    floatSpeed: normalizeCoverParticleFloatSpeed(source?.floatSpeed)
+    floatSpeed: normalizeCoverParticleFloatSpeed(source?.floatSpeed),
+    ...normalizeCoverVisualSettings(source)
+  };
+}
+
+function normalizeCoverVisualSettings(source = {}) {
+  const bounded = (key, fallback, min, max) => {
+    const value = source?.[key];
+    return clamp(value == null || !Number.isFinite(Number(value)) ? fallback : Number(value), min, max);
+  };
+  return {
+    renderMode: source?.renderMode === 'sketch' ? 'sketch' : 'particles',
+    imageMotionMode: source?.imageMotionMode === 'dissolve' ? 'dissolve' : 'parallax',
+    depthMapEnabled: source?.depthMapEnabled === true,
+    sketchLayers: Math.round(bounded('sketchLayers', 8, 2, 16)),
+    sketchDensity: bounded('sketchDensity', 1, 0.4, 1.6),
+    sketchLineWidth: bounded('sketchLineWidth', 0.8, 0.4, 2),
+    sketchFlowSpeed: bounded('sketchFlowSpeed', 0.65, 0, 2),
+    sketchFlowAmplitude: bounded('sketchFlowAmplitude', 0.65, 0, 2),
+    depthEnabled: source?.depthEnabled !== false,
+    depthStrength: bounded('depthStrength', 1, 0, 3),
+    depthContrast: bounded('depthContrast', 1, 0.25, 3),
+    depthInvert: source?.depthInvert === true,
+    depthLightingEnabled: source?.depthLightingEnabled !== false,
+    depthLightStrength: bounded('depthLightStrength', 0.8, 0, 2),
+    depthAmbient: bounded('depthAmbient', 0.65, 0.05, 1),
+    depthLightAngle: bounded('depthLightAngle', 315, 0, 360),
+    depthLightSpeed: bounded('depthLightSpeed', 0.25, 0, 2),
+    depthHighlight: bounded('depthHighlight', 0.35, 0, 2)
   };
 }
 
 function loadCoverParticlePreferences() {
   try {
     const stored = JSON.parse(window.localStorage.getItem(COVER_PARTICLE_PREFS_KEY) || '{}');
-    return normalizeCoverParticlePreferences(stored);
+    const preferences = normalizeCoverParticlePreferences(stored);
+    if (stored && ['depthMapDataUrl', 'depthMapName', 'depthMapSource'].some(key => Object.hasOwn(stored, key))) {
+      // Discard legacy imports so every cover uses its automatically generated depth.
+      try { window.localStorage.setItem(COVER_PARTICLE_PREFS_KEY, JSON.stringify(preferences)); } catch (error) {}
+    }
+    return preferences;
   } catch (error) {
     return normalizeCoverParticlePreferences();
   }
@@ -1836,9 +2015,12 @@ function saveCoverParticlePreferences() {
     window.localStorage.setItem(COVER_PARTICLE_PREFS_KEY, JSON.stringify({
       backgroundEnabled: !!state.coverParticle.backgroundEnabled,
       motionAmplitude: clamp(Number(state.coverParticle.motionAmplitude) || 0, 0, 2),
-      floatSpeed: normalizeCoverParticleFloatSpeed(state.coverParticle.floatSpeed)
+      floatSpeed: normalizeCoverParticleFloatSpeed(state.coverParticle.floatSpeed),
+      ...normalizeCoverVisualSettings(state.coverParticle)
     }));
   } catch (error) {}
+  scheduleClientPreferencesSync();
+  scheduleDesktopSceneSnapshot();
 }
 
 const VISUAL_SETTINGS_PREFS_KEY = 'fe-monster-visual-settings-v1';
@@ -1868,12 +2050,17 @@ function normalizeVisualSettingsPreferences(source = {}) {
     freeCubeMode: source.freeCubeMode === 'heart' ? 'heart' : 'free',
     freeCubeBackgroundEnabled: source.freeCubeBackgroundEnabled !== false,
     chladniMode: source.chladniMode === 'plane' ? 'plane' : 'cube',
+    harmonicEffects: window.FeHarmonicSettings.normalize(source.harmonicEffects),
+    particleLyricsEffects: window.FeParticleLyricsSettings.normalize(source.particleLyricsEffects),
     stormLightingMode: ['day', 'sunset', 'evening', 'realtime'].includes(source.stormLightingMode)
       ? source.stormLightingMode
       : 'sunset',
     stormWeatherMode: source.stormWeatherMode === 'on' ? 'on' : 'auto',
     diyCardYaw: clamp(Number.isFinite(diyCardYaw) ? diyCardYaw : -8, -42, 42),
-    diyCardPitch: clamp(Number.isFinite(diyCardPitch) ? diyCardPitch : 2, -18, 18)
+    diyCardPitch: clamp(Number.isFinite(diyCardPitch) ? diyCardPitch : 2, -18, 18),
+    // Keep the playback-bar DIY flyout closed by default, while remembering
+    // the user's explicit toggle choice for the next session.
+    diyEnabled: source.diyEnabled === true
   };
 }
 
@@ -2402,6 +2589,7 @@ const state = {
   queueIndex: -1,
   queueLength: 0,
   queueRevision: 0,
+  queueServerRevision: 0,
   currentSong: null,
   playerUrl: '',
   playbackQualityPreferences: INITIAL_PLAYBACK_QUALITY_PREFERENCES,
@@ -2454,7 +2642,9 @@ const state = {
     recovering: false,
     playingIntent: false,
     sourceGeneration: 0,
-    pendingLoadGeneration: 0
+    pendingLoadGeneration: 0,
+    loadAbortController: null,
+    sourcePositionCleanup: null
   },
   favoriteDirectories: loadFavoriteDirectories(),
   favoriteLibrary: {
@@ -2463,6 +2653,7 @@ const state = {
   },
   playlistFavorite: {
     open: false,
+    requestId: 0,
     song: null,
     provider: 'netease',
     loading: false,
@@ -2489,11 +2680,21 @@ const state = {
   localPlaylistSongs: loadMarketMusicLibrary(),
   localObjectUrls: new Set(),
   localQueueActive: false,
+  // The explicit queue and a playlist are separate playback sources. Keep
+  // this independent from localQueueActive, which only describes the audio
+  // transport used for imported local files.
+  playbackSelection: { kind: 'queue', index: -1, playlistId: '', songs: [] },
   activePlaylistId: '',
   playlistSignature: '',
   playlistRefreshTimer: 0,
   playlistsLoggedIn: false,
   playlistsLoading: false,
+  playlistRefreshRequestId: 0,
+  playlistRefreshAbortController: null,
+  playlistRefreshError: '',
+  audioSourceSelection: null,
+  audioSourceSelectionKnown: false,
+  audioSourceLibraryRevision: 0,
   playlistFocusIndex: 0,
   songFocusIndex: 0,
   songWheelDelta: 0,
@@ -2507,6 +2708,7 @@ const state = {
   playlistSongPageOpen: false,
   playbackPlaylistPickerOpen: false,
   playlistLoadRequestId: 0,
+  playlistLoadAbortController: null,
   activePlaylist: null,
   activePlaylistSongs: [],
   shelfLoadingPlaylistId: '',
@@ -2526,6 +2728,8 @@ const state = {
   shelfHiddenByUser: false,
   shelfLastRightClickAt: 0,
   playbackPage: true,
+  playbackCardMode: 'bar',
+  playbackCardPreferences: {},
   playbackChrome: {
     searchVisible: false,
     dockVisible: false,
@@ -2533,6 +2737,7 @@ const state = {
     communityVisible: false,
     controlsHidden: false
   },
+  diyEnabled: INITIAL_VISUAL_SETTINGS_PREFERENCES.diyEnabled,
   diyOpen: false,
   diyPeek: false,
   diyAutoHideTimer: 0,
@@ -2573,7 +2778,7 @@ const state = {
   playbackLyricPalettePreference: INITIAL_PLAYBACK_LYRIC_PALETTE_PREFERENCE,
   bilingualLyricsEnabled: INITIAL_BILINGUAL_LYRICS_ENABLED,
   multiRowLyricsEnabled: INITIAL_MULTI_ROW_LYRICS_ENABLED,
-  lyricClockOffsetSeconds: INITIAL_LYRIC_CLOCK_OFFSET_SECONDS,
+  lyricClockOffsetsByTrack: INITIAL_LYRIC_CLOCK_OFFSETS_BY_TRACK,
   multiRowLyricSignature: '',
   lyricBrightness: INITIAL_VISUAL_SETTINGS_PREFERENCES.lyricBrightness,
   lyricSpeed: INITIAL_VISUAL_SETTINGS_PREFERENCES.lyricSpeed,
@@ -2676,8 +2881,8 @@ const state = {
   lyricFrameTime: -1,
   lyricFramePreset: '',
   lyricFrameSignature: '',
-  focusEchoAnimationFrame: 0,
-  focusEchoAnimationTimer: 0,
+  focusEchoTransition: null,
+  focusEchoLineKey: '',
   focusEchoGroupKey: '',
   focusEchoGroupText: '',
   lyricBookScrollTarget: Number.NaN,
@@ -2697,6 +2902,7 @@ const state = {
     mouseX: 0.5,
     mouseY: 0.5,
     lyricPulse: 0,
+    lyricBassMotion: 0,
     glitchBeatArmed: true,
     glitchBeatLastAt: -Infinity,
     glitchBeatVariant: 0,
@@ -2709,9 +2915,19 @@ const state = {
     lastLyricRasterScale: Number.NaN,
     spriteDpr: 0,
     particleSprites: [],
-    particles: []
+    particles: [],
+    lyricHighlightParticleRenderer: null,
+    lyricHighlightParticleUnavailable: false,
+    lyricHighlightParticleTarget: null,
+    lyricHighlightParticleTargetText: '',
+    lyricHighlightParticleTargetMultiRow: false,
+    lyricHighlightParticleTargetIndex: -2
   },
   coverParticle: {
+    ...normalizeCoverVisualSettings(INITIAL_COVER_PARTICLE_PREFERENCES),
+    sketchRenderer: null,
+    sketchLastFrameAt: 0,
+    lightTime: 0,
     bundlePromise: null,
     engineContainer: null,
     enginePromise: null,
@@ -2822,6 +3038,8 @@ const state = {
   loginLoggedIn: false,
   appWindowFullscreen: false,
   runtimeSettingsOpen: false,
+  volumeSliderPreferences: { ...VOLUME_SLIDER_DEFAULTS },
+  volumeSliderMotion: { pulse: 0, phase: 0, lastFrameAt: 0 },
   cursorPreferences: {
     skin: 'glass',
     motion: 'off',
@@ -2835,6 +3053,8 @@ const state = {
     chunks: [],
     objectUrl: '',
     lastBlob: null,
+    nativeCapture: false,
+    nativeFileToken: '',
     lastFileName: '',
     mimeType: '',
     startedAt: 0,
@@ -2869,6 +3089,7 @@ const state = {
     Object.entries(MUSIC_PROVIDERS).map(([id, provider]) => [id, { ...provider }])
   ),
   loginStatusByProvider: {},
+  loginStatusRequestIds: {},
   loginStatusRetryTimers: {},
   loginStatusRetryAttempts: {},
   officialBrowserLoginSession: '',
@@ -2907,7 +3128,9 @@ const state = {
     pendingSeekTarget: null,
     pendingAudioSeekTarget: null,
     seekHandoffTarget: null,
-    seekHandoffStartedAt: 0
+    seekHandoffStartedAt: 0,
+    seekHandoffRunning: false,
+    seekHandoffSource: ''
   },
   community: {
     profile: null,
@@ -3108,6 +3331,7 @@ const state = {
     fluxMeteor: 0
   },
   visualBridge: {
+    receivedAt: 0,
     energy: 0,
     bass: 0,
     lowFrequencyAmplitude: 0,
@@ -3284,6 +3508,21 @@ const state = {
     runtime: null,
     mode: INITIAL_VISUAL_SETTINGS_PREFERENCES.chladniMode,
     palette: null,
+    frame: {},
+    lastDiagnostics: null
+  },
+  particleLyrics: {
+    runtime: null,
+    loading: null,
+    effects: INITIAL_VISUAL_SETTINGS_PREFERENCES.particleLyricsEffects,
+    frame: {},
+    lastDiagnostics: null
+  },
+  harmonicState: {
+    runtime: null,
+    zoom: HARMONIC_DEFAULT_ZOOM,
+    palette: null,
+    effects: INITIAL_VISUAL_SETTINGS_PREFERENCES.harmonicEffects,
     frame: {},
     lastDiagnostics: null
   },
@@ -3552,6 +3791,12 @@ function applyRuntimeDataset() {
   document.documentElement.dataset.gpuAcceleration = String(state.clientRuntime.settings.gpuAcceleration);
   document.documentElement.dataset.directX11 = String(state.clientRuntime.settings.directX11);
   document.documentElement.dataset.upscaler = safeText(state.clientRuntime.renderCapabilities?.diagnostics?.mode, 'detecting');
+  if (MACOS_CLIENT) {
+    for (const [id, label] of [['directX11Toggle', 'Metal'], ['xAudio2Toggle', 'CoreAudio'], ['x3DAudioToggle', '空间声场']]) {
+      const caption = document.getElementById(id)?.nextElementSibling;
+      if (caption) caption.textContent = label;
+    }
+  }
   syncGraphicsBackendStatus();
 }
 
@@ -4013,6 +4258,16 @@ function applyPresetUpscaler(options = {}) {
     if (state.playbackPage && isChladniPreset()) activeDiagnostics = diagnostics;
   }
 
+  if (state.harmonicState.runtime && window.FeHarmonicStateRuntime?.setRenderQuality) {
+    const result = window.FeHarmonicStateRuntime.setRenderQuality(
+      state.harmonicState.runtime,
+      presetFsrRequest(state.playbackPage && isHarmonicStatePreset())
+    );
+    const diagnostics = runtimeRenderQualityDiagnostics(window.FeHarmonicStateRuntime, state.harmonicState.runtime, result);
+    window.FeHarmonicStateRuntime.resize(state.harmonicState.runtime, presetFsrOutputPixelRatio(diagnostics));
+    if (state.playbackPage && isHarmonicStatePreset()) activeDiagnostics = diagnostics;
+  }
+
   state.presetFsr.lastDiagnostics = activeDiagnostics;
   if (activeDiagnostics) state.clientRuntime.renderCapabilities.diagnostics = activeDiagnostics;
   syncPresetFsrControls(activeDiagnostics);
@@ -4073,6 +4328,9 @@ function applyRenderClarity(options = {}) {
   }
   if (state.chladni.runtime && window.FeChladniRuntime) {
     window.FeChladniRuntime.resize(state.chladni.runtime, pixelRatio);
+  }
+  if (state.harmonicState.runtime && window.FeHarmonicStateRuntime) {
+    window.FeHarmonicStateRuntime.resize(state.harmonicState.runtime, pixelRatio);
   }
   const topo = state.sonicTopography;
   if (topo.renderer && Math.abs((topo.renderer.getPixelRatio?.() || 1) - pixelRatio) > 0.001) {
@@ -4201,6 +4459,144 @@ function initRenderCapabilityBridge() {
   state.clientRuntime.renderCapabilities.requestId = requestId;
   bridge.addEventListener('message', handleNativeRenderCapabilities);
   bridge.postMessage({ type: 'fe-render-capabilities', action: 'query', requestId });
+}
+
+function normalizeVolumeSliderPreferences(source = {}) {
+  const value = source && typeof source === 'object' && !Array.isArray(source) ? source : {};
+  const number = (key, min, max) => {
+    const raw = value[key];
+    const numeric = typeof raw === 'number' || (typeof raw === 'string' && raw.trim()) ? Number(raw) : NaN;
+    return Number.isFinite(numeric) ? clamp(Math.round(numeric), min, max) : VOLUME_SLIDER_DEFAULTS[key];
+  };
+  const color = (key) => typeof value[key] === 'string' && /^#[0-9a-f]{6}$/i.test(value[key])
+    ? value[key].toLowerCase() : VOLUME_SLIDER_DEFAULTS[key];
+  return {
+    gradient: typeof value.gradient === 'boolean' ? value.gradient : VOLUME_SLIDER_DEFAULTS.gradient,
+    colorStart: color('colorStart'), colorEnd: color('colorEnd'),
+    duration: number('duration', 2, 20), hoverStrength: number('hoverStrength', 0, 100),
+    wheelStep: number('wheelStep', 1, 10),
+    musicReactive: typeof value.musicReactive === 'boolean' ? value.musicReactive : VOLUME_SLIDER_DEFAULTS.musicReactive,
+    musicStrength: number('musicStrength', 0, 100)
+  };
+}
+
+function applyVolumeSliderPreferences() {
+  const preferences = normalizeVolumeSliderPreferences(state.volumeSliderPreferences);
+  state.volumeSliderPreferences = preferences;
+  const rail = els.qishuiPlaybackVolume;
+  if (rail) {
+    rail.dataset.gradient = String(preferences.gradient);
+    rail.style.setProperty('--volume-slider-color-start', preferences.colorStart);
+    rail.style.setProperty('--volume-slider-color-end', preferences.colorEnd);
+    rail.style.setProperty('--volume-slider-duration', `${preferences.duration}s`);
+    rail.style.setProperty('--volume-slider-hover-brightness', String(1 + preferences.hoverStrength / 100));
+    rail.style.setProperty('--volume-slider-glow', `${preferences.hoverStrength * .08}px`);
+    rail.title = `音量 ${els.qishuiPlaybackVolumeRange?.value || 0}% · 滚轮每格 ${preferences.wheelStep}%`;
+  }
+  const controls = {
+    gradient: 'volumeSliderGradientToggle', colorStart: 'volumeSliderColorStart', colorEnd: 'volumeSliderColorEnd',
+    duration: 'volumeSliderGradientDuration', hoverStrength: 'volumeSliderHoverStrength', wheelStep: 'volumeSliderWheelStep',
+    musicReactive: 'volumeSliderMusicReactiveToggle', musicStrength: 'volumeSliderMusicStrength'
+  };
+  for (const [key, id] of Object.entries(controls)) {
+    const input = document.getElementById(id);
+    if (!input) continue;
+    if (input.type === 'checkbox') input.checked = preferences[key];
+    else input.value = String(preferences[key]);
+    syncElasticRangeVisual(input);
+  }
+  for (const [id, text] of [
+    ['volumeSliderGradientDurationValue', `${preferences.duration} 秒 / 周期`],
+    ['volumeSliderHoverStrengthValue', `${preferences.hoverStrength}%`],
+    ['volumeSliderWheelStepValue', `${preferences.wheelStep}% / 格`],
+    ['volumeSliderMusicStrengthValue', `${preferences.musicStrength}%`]
+  ]) {
+    const output = document.getElementById(id);
+    if (output) output.textContent = text;
+  }
+  updateVolumeSliderMusicMotion();
+  requestOrbFrame();
+}
+
+function volumeSliderMusicEnabled() {
+  return state.volumeSliderPreferences.musicReactive
+    && state.volumeSliderPreferences.musicStrength > 0
+    && !volumeSliderMotionQuery?.matches
+    && !document.hidden
+    && playbackCardVisible()
+    && !state.qishuiPlaybackCard.hiddenByUser
+    && !els.qishuiPlaybackPhone?.inert;
+}
+
+function volumeSliderMusicNeedsFrame() {
+  return volumeSliderMusicEnabled()
+    && (isPlaybackClockRunning() || state.volumeSliderMotion.pulse > 0);
+}
+
+function updateVolumeSliderMusicMotion(now = performance.now()) {
+  const rail = els.qishuiPlaybackVolume;
+  if (!rail) return;
+  const motion = state.volumeSliderMotion;
+  const enabled = volumeSliderMusicEnabled();
+  const deltaMs = motion.lastFrameAt > 0 ? clamp(now - motion.lastFrameAt, 0, 100) : 1000 / 60;
+  motion.lastFrameAt = enabled ? now : 0;
+  // Consume the existing analyser/bridge snapshot only. This visual must never
+  // create an audio graph, change volume, or keep stale bridge samples dancing.
+  const analysis = state.audioAnalysis;
+  const local = analysis.live && !state.clientRuntime.nativeAudioActive;
+  const sampledAt = Number(local ? analysis.lastUpdateAt : state.visualBridge.receivedAt) || 0;
+  const fresh = sampledAt > 0 && now >= sampledAt && now - sampledAt <= (local ? 250 : 650);
+  // java-fallback is a synthetic scene animation, not a measured music signal.
+  const measured = local || (state.visualBridge.source === 'xaudio2-native-loopback'
+    && Number.isFinite(state.visualBridge.sampleRate) && state.visualBridge.sampleRate > 0);
+  const driving = enabled && isPlaybackClockRunning() && fresh && measured;
+  const audio = local ? state.visual : state.visualBridge;
+  const band = value => Number.isFinite(Number(value)) ? clamp(Number(value), 0, 1) : 0;
+  const bass = driving ? Math.max(band(audio.bass), band(audio.lowFrequencyAmplitude)) : 0;
+  const mid = driving ? band(audio.mid) : 0;
+  const treble = driving ? band(audio.treble) : 0;
+  const energy = driving ? band(audio.energy) : 0;
+  const beat = driving ? band(audio.beat) : 0;
+  const strength = state.volumeSliderPreferences.musicStrength / 100;
+  const target = clamp(bass * .65 + beat * .25 + energy * .2 + mid * .1 + treble * .08, 0, 1) * strength;
+  if (!enabled) {
+    motion.pulse = 0;
+    motion.phase = 0;
+  } else {
+    const response = 1 - Math.exp(-deltaMs / (target > motion.pulse ? 60 : 220));
+    motion.pulse += (target - motion.pulse) * response;
+    if (motion.pulse < .001) motion.pulse = 0;
+    if (target > .001) {
+      motion.phase = (motion.phase + deltaMs / 1000
+        * (.12 + mid * .65 + treble * 1.2 + beat * .35)
+        * strength * 6 / state.volumeSliderPreferences.duration) % 2;
+    }
+  }
+  const active = motion.pulse > 0;
+  if (rail.dataset.musicActive !== String(active)) rail.dataset.musicActive = String(active);
+  setStylePropertyIfChanged(rail, '--volume-slider-music-pulse', motion.pulse.toFixed(3));
+  setStylePropertyIfChanged(rail, '--volume-slider-music-position', `${((1 - Math.cos(motion.phase * Math.PI)) * 50).toFixed(2)}%`);
+}
+
+function setVolumeSliderPreferences(patch, { persist = true } = {}) {
+  state.volumeSliderPreferences = normalizeVolumeSliderPreferences({ ...state.volumeSliderPreferences, ...patch });
+  applyVolumeSliderPreferences();
+  if (persist) {
+    try { localStorage.setItem(VOLUME_SLIDER_PREFERENCES_KEY, JSON.stringify(state.volumeSliderPreferences)); }
+    catch { /* A locked profile must not prevent live control. */ }
+    scheduleClientPreferencesSync();
+  }
+}
+
+function initVolumeSliderPreferences() {
+  let stored = null;
+  try { stored = JSON.parse(localStorage.getItem(VOLUME_SLIDER_PREFERENCES_KEY) || 'null'); } catch {}
+  state.volumeSliderPreferences = normalizeVolumeSliderPreferences(stored);
+  applyVolumeSliderPreferences();
+  volumeSliderMotionQuery?.addEventListener('change', () => {
+    updateVolumeSliderMusicMotion();
+    requestOrbFrame();
+  });
 }
 
 function normalizeCursorPreferences(source = {}) {
@@ -4548,10 +4944,11 @@ async function activateInteractiveBackend(provider = state.activeProvider) {
 
 async function refreshClientRuntime() {
   try {
-    const runtime = await apiJson('/api/app/runtime');
+    const runtime = await apiJson('/api/app/runtime', { timeoutMs: 8000 });
     const nativeAudio = runtime.nativeAudio || {};
     const settings = runtime.settings || {};
     state.clientRuntime.mode = runtime.clientMode || state.clientRuntime.mode;
+    state.clientRuntime.architecture = runtime.architecture || state.clientRuntime.architecture;
     state.clientRuntime.renderPreset = runtime.renderPreset || state.clientRuntime.renderPreset;
     state.clientRuntime.renderBackend = runtime.renderBackend || state.clientRuntime.renderBackend;
     state.clientRuntime.audioBackend = runtime.audioBackend || state.clientRuntime.audioBackend;
@@ -4628,7 +5025,8 @@ function initializeSettingsCenter() {
     containingLabel('gpuAccelerationToggle'),
     containingLabel('directX11Toggle'),
     document.querySelector('.runtime-render-technology'),
-    document.querySelector('.runtime-clarity-control')
+    document.querySelector('.runtime-clarity-control'),
+    document.getElementById('runtimeVolumeSliderSettingsGroup')
   ]);
   moveControls('pet', [
     document.getElementById('petAssistantVoiceDisclosure'),
@@ -4832,6 +5230,7 @@ function clientAiServiceSyncControls(config = window.FeMonsterClientAiService?.l
   );
   if (els.aiServiceModelBaseUrl) els.aiServiceModelBaseUrl.value = normalized.model.baseUrl;
   if (els.aiServiceModelName) els.aiServiceModelName.value = normalized.model.model;
+  if (els.aiServiceMemorySharing) els.aiServiceMemorySharing.checked = normalized.model.memorySharingEnabled === true;
   if (els.aiServiceModelApiKey) {
     els.aiServiceModelApiKey.value = '';
     els.aiServiceModelApiKey.placeholder = normalized.model.hasApiKey
@@ -4871,7 +5270,8 @@ function clientAiServiceReadControls() {
       provider: els.aiServiceModelProviderSelect?.value || 'openai',
       baseUrl: els.aiServiceModelBaseUrl?.value || '',
       apiKey: els.aiServiceModelApiKey?.value || '',
-      model: els.aiServiceModelName?.value || ''
+      model: els.aiServiceModelName?.value || '',
+      memorySharingEnabled: els.aiServiceMemorySharing?.checked === true
     },
     tts: {
       provider: ttsProvider,
@@ -4929,6 +5329,7 @@ function clientAiServiceApplyProviderDefaults(kind) {
   } else {
     if (els.aiServiceModelApiKey) els.aiServiceModelApiKey.value = '';
     if (els.aiServiceModelBaseUrl) els.aiServiceModelBaseUrl.value = preset.baseUrl;
+    if (els.aiServiceMemorySharing) els.aiServiceMemorySharing.checked = false;
     if (els.aiServiceModelName) els.aiServiceModelName.value = preset.model;
     clientAiServiceFillModelOptions(els.aiServiceModelNameList, preset.models, preset.model);
     clientAiServiceSyncOfficialLinks('chat', provider);
@@ -5212,7 +5613,7 @@ function syncNativeRecordingToolbar() {
   postNativeRecordingToolbar('state', {
     mode: state.recording.mode,
     status: state.recording.status,
-    canSaveAs: !!state.recording.lastBlob
+    canSaveAs: !!(state.recording.lastBlob || state.recording.nativeFileToken)
   });
 }
 
@@ -5310,6 +5711,7 @@ function resetRecordingDownload() {
   if (state.recording.objectUrl) URL.revokeObjectURL(state.recording.objectUrl);
   state.recording.objectUrl = '';
   state.recording.lastBlob = null;
+  state.recording.nativeFileToken = '';
   state.recording.lastFileName = '';
   state.recording.mimeType = '';
   if (els.recordingDownloadButton) {
@@ -5397,6 +5799,14 @@ async function saveRecordingBlob(blob, fileName) {
 }
 
 async function saveRecordingAs(event) {
+  if (state.recording.nativeFileToken && window.FeMonsterMacCapture?.available) {
+    event?.preventDefault();
+    try {
+      const saved = await window.FeMonsterMacCapture.request('recording-save', { fileToken: state.recording.nativeFileToken });
+      if (!saved.cancelled) toast(`录制文件已另存：${saved.fileName || state.recording.lastFileName}`);
+    } catch (error) { toast(error.message || '另存失败'); }
+    return;
+  }
   if (!state.recording.lastBlob || !state.recording.objectUrl) return;
   event.preventDefault();
   const fileName = state.recording.lastFileName || recordingFileName();
@@ -5604,6 +6014,10 @@ async function finishRecording() {
 
 async function startProgramRecording() {
   if (state.recording.active) return;
+  if (MACOS_CLIENT && window.FeMonsterMacCapture?.available) {
+    await startMacProgramRecording();
+    return;
+  }
   if (!window.MediaRecorder) {
     toast('当前 WebView2 不支持 MediaRecorder');
     return;
@@ -5666,6 +6080,10 @@ async function startProgramRecording() {
 }
 
 function stopProgramRecording() {
+  if (state.recording.nativeCapture) {
+    void controlMacProgramRecording('recording-pause', 'paused');
+    return;
+  }
   const recorder = state.recording.recorder;
   if (!recorder || recorder.state !== 'recording' || state.recording.stopping) return;
   if (typeof recorder.pause !== 'function') {
@@ -5679,6 +6097,10 @@ function stopProgramRecording() {
 }
 
 function resumeProgramRecording() {
+  if (state.recording.nativeCapture) {
+    void controlMacProgramRecording('recording-resume', 'recording');
+    return;
+  }
   const recorder = state.recording.recorder;
   if (!recorder || recorder.state !== 'paused' || state.recording.stopping) return;
   if (typeof recorder.resume !== 'function') {
@@ -5692,6 +6114,10 @@ function resumeProgramRecording() {
 }
 
 function finishProgramRecording() {
+  if (state.recording.nativeCapture) {
+    void finishMacProgramRecording();
+    return;
+  }
   const recorder = state.recording.recorder;
   if (!recorder || state.recording.stopping) return;
   state.recording.stopping = true;
@@ -5704,6 +6130,105 @@ function finishProgramRecording() {
   }
   recorder.stop();
 }
+
+async function startMacProgramRecording() {
+  resetRecordingDownload();
+  resetRecordingPreview();
+  clearRecordingTimer();
+  state.recording.nativeCapture = true;
+  state.recording.stopping = false;
+  setRecordingControls('finalizing');
+  setRecordingStatus('正在请求 macOS 屏幕录制权限');
+  try {
+    await window.FeMonsterMacCapture.request('recording-start', readRecordingOptions());
+    startRecordingTimer();
+    setRecordingControls('recording');
+    setRecordingStatus('正在录制 FE Monster 窗口');
+  } catch (error) {
+    void window.FeMonsterMacCapture.request('cancel', {}, 5000).catch(() => {});
+    state.recording.nativeCapture = false;
+    clearRecordingTimer();
+    setRecordingControls('idle');
+    setRecordingStatus(error.message || 'macOS 录制启动失败');
+    toast(error.message || 'macOS 录制启动失败');
+  }
+}
+
+async function controlMacProgramRecording(action, mode) {
+  if (state.recording.stopping || !['recording', 'paused'].includes(state.recording.mode)) return;
+  const previousMode = state.recording.mode;
+  setRecordingControls('finalizing');
+  try {
+    const payload = await window.FeMonsterMacCapture.request(action, {}, 10_000);
+    clearRecordingTimer(false);
+    if (Number.isFinite(Number(payload.elapsedMs))) state.recording.elapsedMs = Math.max(0, Number(payload.elapsedMs));
+    if (mode === 'recording') startRecordingTimer();
+    setRecordingControls(mode);
+    setRecordingStatus(mode === 'recording' ? '正在继续录制 FE Monster 窗口' : '录制已暂停，可继续或完成录制');
+  } catch (error) {
+    setRecordingControls(previousMode);
+    setRecordingStatus(error.message || '录制操作失败');
+  }
+}
+
+function applyMacRecordingResult(payload) {
+  clearRecordingTimer(false);
+  state.recording.nativeCapture = false;
+  state.recording.stopping = false;
+  state.recording.nativeFileToken = safeText(payload.fileToken, '');
+  state.recording.lastFileName = safeText(payload.fileName, 'fe-monster.mp4');
+  state.recording.mimeType = 'video/mp4';
+  if (Number.isFinite(Number(payload.elapsedMs))) state.recording.elapsedMs = Math.max(0, Number(payload.elapsedMs));
+  if (els.recordingPreview && payload.previewURL) {
+    els.recordingPreview.srcObject = null;
+    els.recordingPreview.src = payload.previewURL;
+    els.recordingPreview.controls = true;
+    els.recordingPreview.muted = false;
+    if (els.recordingPreviewPlaceholder) els.recordingPreviewPlaceholder.hidden = true;
+  }
+  if (els.recordingDownloadButton) {
+    els.recordingDownloadButton.href = payload.previewURL || '#';
+    els.recordingDownloadButton.download = state.recording.lastFileName;
+    els.recordingDownloadButton.hidden = false;
+  }
+  setRecordingControls('idle');
+  setRecordingStatus(`录制完成，已保存到影片/FE Monster：${state.recording.lastFileName}`);
+  if (state.recording.nativeToolbar || state.recording.nativeToolbarPending) {
+    postNativeRecordingToolbar('hide');
+    state.recording.nativeToolbar = false;
+    state.recording.nativeToolbarPending = false;
+    showRecordingMiniFallback();
+  }
+}
+
+async function finishMacProgramRecording() {
+  if (state.recording.stopping || !['recording', 'paused'].includes(state.recording.mode)) return;
+  state.recording.stopping = true;
+  clearRecordingTimer(false);
+  setRecordingControls('finalizing');
+  setRecordingStatus('正在完成 MP4 录制文件');
+  try {
+    applyMacRecordingResult(await window.FeMonsterMacCapture.request('recording-finish'));
+  } catch (error) {
+    state.recording.nativeCapture = false;
+    state.recording.stopping = false;
+    setRecordingControls('idle');
+    setRecordingStatus(error.message || '完成录制失败');
+    toast(error.message || '完成录制失败');
+  }
+}
+
+window.addEventListener('fe-mac-capture-result', (event) => {
+  const payload = event.detail || {};
+  if (!payload.requestId && payload.ok && payload.fileToken) applyMacRecordingResult(payload);
+  if (!payload.requestId && payload.ok === false && payload.error) toast(payload.error);
+});
+
+window.addEventListener('fe-mac-capture-error', (event) => {
+  const payload = event.detail || {};
+  if (payload.source === 'recording') setRecordingStatus(payload.error || '录制捕获已中断');
+  if (payload.error) toast(payload.error);
+});
 
 window.feMonsterRecording = {
   start: startProgramRecording,
@@ -5924,6 +6449,10 @@ function isChladniPreset(preset = state.diyPreset) {
   return preset === 'chladni';
 }
 
+function isHarmonicStatePreset(preset = state.diyPreset) {
+  return preset === 'harmonic-state';
+}
+
 function playbackPresetsUseNativeRefresh() {
   return true;
 }
@@ -5967,6 +6496,7 @@ function normalizeDiyPreset(preset) {
     preset === 'topography' ||
     preset === 'soundscape-workshop' ||
     preset === 'chladni' ||
+    preset === 'harmonic-state' ||
     preset === 'rain-glass' ||
     preset === 'cover-particles' ||
     preset === 'sandbox-scene' ||
@@ -5979,6 +6509,10 @@ function normalizeDiyPreset(preset) {
 }
 
 const PRESET_RUNTIME_SOURCES = Object.freeze({
+  'particle-lyrics': Object.freeze({
+    src: 'particle-lyrics-runtime.js?v=20260926-particle-never-pause-2',
+    globalName: 'FeParticleLyricsRuntime'
+  }),
   'storm-ocean': Object.freeze({
     src: 'storm-ocean-runtime.js?v=20260811-cache-audit-1',
     globalName: 'FeStormOceanRuntime'
@@ -5995,8 +6529,17 @@ const PRESET_RUNTIME_SOURCES = Object.freeze({
     src: 'chladni-runtime.js?v=20260811-cache-audit-1',
     globalName: 'FeChladniRuntime'
   }),
+  'harmonic-state': Object.freeze({
+    src: 'harmonic-state-runtime.js?v=20260924-harmonic-cold-air-1',
+    parallelLoad: true,
+    dependencies: [
+      { src: 'harmonic-orbital-core.js?v=20260926-harmonic-rise-release-3', globalName: 'FeHarmonicOrbitalCore' },
+      { src: 'harmonic-orbital-atmosphere.js?v=20260924-harmonic-cold-air-4', globalName: 'FeHarmonicOrbitalAtmosphere' }
+    ],
+    globalName: 'FeHarmonicStateRuntime'
+  }),
   'soundscape-workshop': Object.freeze({
-    src: 'soundscape-runtime.js?v=20260824-durable-state-1',
+    src: 'soundscape-runtime.js?v=20260901-minimize-resume-1',
     globalName: 'FeSoundscapeRuntime'
   })
 });
@@ -6009,7 +6552,7 @@ function stormOceanReactivityProfile(value) {
 }
 
 function activePresetRuntimeKey(preset = state.diyPreset) {
-  if (preset === 'free-cubes' || preset === 'void-prism' || preset === 'chladni' || preset === 'soundscape-workshop') return preset;
+  if (preset === 'free-cubes' || preset === 'void-prism' || preset === 'chladni' || preset === 'harmonic-state' || preset === 'soundscape-workshop') return preset;
   if (preset === 'sandbox-scene' && isStormOceanPreset(activeDiyScenePreset())) return 'storm-ocean';
   return '';
 }
@@ -6017,9 +6560,29 @@ function activePresetRuntimeKey(preset = state.diyPreset) {
 function ensurePresetRuntime(runtimeKey) {
   const descriptor = PRESET_RUNTIME_SOURCES[runtimeKey];
   if (!descriptor) return Promise.resolve(null);
-  if (window[descriptor.globalName]) return Promise.resolve(window[descriptor.globalName]);
+  const dependencies = descriptor.dependencies || [];
+  if (window[descriptor.globalName] && dependencies.every(dependency => window[dependency.globalName])) {
+    return Promise.resolve(window[descriptor.globalName]);
+  }
   if (presetRuntimePromises.has(runtimeKey)) return presetRuntimePromises.get(runtimeKey);
-  const pending = loadScriptOnce(descriptor.src)
+  const loadRegistered = asset => {
+    if (window[asset.globalName]) return Promise.resolve();
+    return loadScriptOnce(asset.src).then(() => {
+      if (window[asset.globalName]) return;
+      // A 200 response containing a stale/invalid script fires load as well.
+      // Remove only that failed tag so the next activation can request it again.
+      const failedScript = Array.from(document.scripts).find(script => script.getAttribute('src') === asset.src);
+      if (failedScript) removeElement(failedScript);
+      throw new Error(`${asset.globalName} did not register`);
+    });
+  };
+  const dependenciesReady = Promise.all(dependencies.map(loadRegistered));
+  // Harmonic modules only register factories during evaluation. Their requests
+  // can overlap, while creation still waits for every registration below.
+  const registered = descriptor.parallelLoad
+    ? Promise.all([dependenciesReady, loadRegistered(descriptor)])
+    : dependenciesReady.then(() => loadRegistered(descriptor));
+  const pending = registered
     .then(() => {
       const runtime = window[descriptor.globalName];
       if (!runtime) throw new Error(`${runtimeKey} runtime did not register`);
@@ -6043,6 +6606,9 @@ function mountLoadedPresetRuntime(preset) {
       break;
     case 'chladni':
       updateChladniVisibility();
+      break;
+    case 'harmonic-state':
+      updateHarmonicStateVisibility();
       break;
     case 'soundscape-workshop':
       updateSoundscapeWorkshopVisibility();
@@ -6217,6 +6783,17 @@ function browserAudioUrl(url) {
   if (!source || mediaIsSameOrigin(source) || mediaIsLocalMusicApi(source)) return source;
   try {
     const parsed = new URL(source, window.location.href);
+    const page = new URL(window.location.href);
+    const loopbackHosts = new Set(['127.0.0.1', 'localhost', '[::1]']);
+    // Keep the capability URL on this page's origin, including localhost aliases.
+    // Other ports and paths must still go through the ordinary media policy.
+    if (parsed.protocol === 'http:' && page.protocol === 'http:'
+      && loopbackHosts.has(parsed.hostname) && loopbackHosts.has(page.hostname)
+      && parsed.port === page.port && !parsed.username && !parsed.password && !parsed.hash
+      && parsed.pathname === '/api/audio-sources/media'
+      && /^\?ticket=[A-Za-z0-9_-]{43}$/.test(parsed.search)) {
+      return parsed.pathname + parsed.search;
+    }
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return source;
     return `/api/audio/stream?url=${encodeURIComponent(parsed.href)}`;
   } catch (error) {
@@ -6324,6 +6901,8 @@ const CLIENT_PREFERENCES_LOCAL_KEYS = new Set([
   'fe-monster-active-provider-v1',
   'fe-monster-playback-quality-prefs-v1',
   'fe-monster-render-clarity-v1',
+  'fe-monster-volume-slider-preferences-v1',
+  'fe-monster-playback-card-v1',
   'fe-monster-preset-fsr-v1',
   'fe-monster-text-preset-palettes-v1',
   'fe-monster-text-preset-fonts-v1',
@@ -6783,10 +7362,13 @@ function visualSettingsPreferenceSnapshot() {
     freeCubeMode: state.freeCube.mode,
     freeCubeBackgroundEnabled: state.freeCube.backgroundEnabled,
     chladniMode: state.chladni.mode,
+    harmonicEffects: state.harmonicState.effects,
+    particleLyricsEffects: state.particleLyrics.effects,
     stormLightingMode: state.sandbox.stormLightingMode,
     stormWeatherMode: state.sandbox.stormWeatherMode,
     diyCardYaw: state.diyCardYaw,
-    diyCardPitch: state.diyCardPitch
+    diyCardPitch: state.diyCardPitch,
+    diyEnabled: state.diyEnabled === true
   });
 }
 
@@ -7083,6 +7665,7 @@ function lowFrequencyBandsHaveSignal(source, minimumSignal = 0.01) {
 }
 
 function applyBridgeVisual() {
+  if (MACOS_CLIENT && window.FeMonsterMacCapture?.latestSpectrum()) return;
   if (state.audioAnalysis.live && !state.clientRuntime.nativeAudioActive) return;
   const lowFrequency = clamp(
     Number(state.visualBridge.lowFrequencyAmplitude) || Number(state.visualBridge.bass) || 0,
@@ -7283,11 +7866,114 @@ function canUseNativeGoogleObr(channelLayout = state.obrSpatialAudio.channelLayo
   );
 }
 
-function nativeSpatialRequest(path) {
+function nativeSpatialRequest(path, options = {}) {
   return apiJson(path, {
     method: 'POST',
-    headers: { 'X-FE-Monster-Audio': '1' }
+    headers: { 'X-FE-Monster-Audio': '1' },
+    timeoutMs: GOOGLE_OBR_NATIVE_REQUEST_TIMEOUT_MS,
+    ...options
   });
+}
+
+function nativeSpatialLeaseDeadline(graph) {
+  const deadline = Date.now() + 1000;
+  graph.nativeLeaseDeadline = Math.max(Number(graph.nativeLeaseDeadline) || 0, deadline);
+  graph.nativeLeaseMonotonicDeadline = Math.max(Number(graph.nativeLeaseMonotonicDeadline) || 0, performance.now() + 1000);
+  return deadline;
+}
+
+async function waitForNativeSpatialDryGain(graph, gain, isCurrent) {
+  if (!isCurrent()) throw new DOMException('音频交接已更新', 'AbortError');
+  const context = graph.context;
+  const parameter = graph.dryGain?.gain;
+  if (!parameter || !context) throw new Error('原声输出节点不可用');
+  const now = Number(context.currentTime) || 0;
+  const settle = Math.max(0.012, (Number(context.baseLatency) || 0) + (Number(context.outputLatency) || 0));
+  if (context.state !== 'running') {
+    parameter.cancelScheduledValues(now);
+    parameter.setValueAtTime(gain, now);
+    await new Promise((resolve) => window.setTimeout(resolve, Math.ceil(settle * 1000)));
+    if (!isCurrent()) throw new DOMException('音频交接已更新', 'AbortError');
+    return;
+  }
+  setAudioParamSmoothly(parameter, gain, context, 0.018);
+  // Wall-clock timers alone cannot confirm a WebAudio envelope completed.
+  // Include the device's reported output pipeline before giving away headroom.
+  const deadline = now + 0.018 + settle;
+  const startedAt = performance.now();
+  while (Number(context.currentTime) < deadline) {
+    if (!isCurrent()) throw new DOMException('音频交接已更新', 'AbortError');
+    if (context.state !== 'running') {
+      parameter.cancelScheduledValues(context.currentTime);
+      parameter.setValueAtTime(gain, context.currentTime);
+      await new Promise((resolve) => window.setTimeout(resolve, Math.ceil(settle * 1000)));
+      if (!isCurrent()) throw new DOMException('音频交接已更新', 'AbortError');
+      return;
+    }
+    if (performance.now() - startedAt > 2000) throw new Error('音频输出时钟未推进');
+    await new Promise((resolve) => window.setTimeout(resolve, 8));
+  }
+  if (!isCurrent()) throw new DOMException('音频交接已更新', 'AbortError');
+}
+
+async function setNativeSpatialOutputGain(graph, gain, isCurrent) {
+  if (!isCurrent()) throw new DOMException('音频交接已更新', 'AbortError');
+  const generation = graph.generation;
+  const sequence = (Number(graph.nativeGainSequence) || 0) + 1;
+  graph.nativeGainSequence = sequence;
+  graph.nativeGainCeiling = Math.max(Number(graph.nativeGainCeiling) || 0, gain);
+  const expiresAt = nativeSpatialLeaseDeadline(graph);
+  const params = new URLSearchParams({
+    session: String(graph.session), generation: String(generation), sequence: String(sequence),
+    gain: String(gain), expiresAt: String(expiresAt)
+  });
+  const reply = await nativeSpatialRequest(`/api/audio/spatial/gain?${params}`, {
+    signal: graph.streamAbort?.signal,
+    timeoutMs: GOOGLE_OBR_NATIVE_UPLOAD_TIMEOUT_MS
+  });
+  if (!isCurrent()) throw new DOMException('音频交接已更新', 'AbortError');
+  if (!reply?.ok || reply.ignored || reply.stale
+    || Number(reply.session) !== Number(graph.session)
+    || Number(reply.generation) !== Number(generation)
+    || Number(reply.gainSequence) !== sequence
+    || !Number.isFinite(Number(reply.outputGain))
+    || Math.abs(Number(reply.outputGain) - gain) > 0.00001
+    || !Number.isFinite(Number(reply.gainLeaseExpiresAt))
+    || Number(reply.gainLeaseExpiresAt) <= Date.now()) {
+    throw new Error(safeText(reply?.error, '原生音量交接未确认'));
+  }
+  graph.nativeGainCeiling = gain;
+  return reply;
+}
+
+async function handoffNativeSpatialOutput(graph, target, options = {}) {
+  if (graph.outputOwner === target && !graph.disposed && (target === 'browser' || !graph.disposing)) return true;
+  const operation = (Number(graph.handoffOperation) || 0) + 1;
+  graph.handoffOperation = operation;
+  graph.outputOwner = 'transition';
+  const epoch = options.epoch ?? graph.captureTimelineEpoch;
+  const generation = graph.generation;
+  const isCurrent = () => !graph.disposed && graph.handoffOperation === operation
+    && graph.captureTimelineEpoch === epoch && graph.generation === generation
+    && (!state.obrSpatialAudio.graph || state.obrSpatialAudio.graph === graph)
+    && (target === 'browser' || !graph.disposing);
+  // Each acknowledgement releases headroom for the other path. No phase
+  // depends on IPC latency or allows both paths to reach full gain together.
+  if (target === 'native') {
+    if (Number(graph.nativeGainCeiling) > 0.5) await setNativeSpatialOutputGain(graph, 0.5, isCurrent);
+    await waitForNativeSpatialDryGain(graph, 0.5, isCurrent);
+    await setNativeSpatialOutputGain(graph, 0.5, isCurrent);
+    await waitForNativeSpatialDryGain(graph, 0, isCurrent);
+    await setNativeSpatialOutputGain(graph, 1, isCurrent);
+  } else {
+    const ceiling = Math.min(0.5, Number(graph.nativeGainCeiling) || 0);
+    await setNativeSpatialOutputGain(graph, ceiling, isCurrent);
+    await waitForNativeSpatialDryGain(graph, 0.5, isCurrent);
+    await setNativeSpatialOutputGain(graph, 0, isCurrent);
+    await waitForNativeSpatialDryGain(graph, 1, isCurrent);
+  }
+  graph.outputOwner = target;
+  return true;
 }
 
 function notifyNativeAudioChainChanged(reason) {
@@ -7365,11 +8051,23 @@ function enqueueNativeSpatialBlock(graph, pcm, ownership = {}) {
     return false;
   }
   if (graph.blockQueue.length >= GOOGLE_OBR_NATIVE_MAX_PENDING_BLOCKS) {
-    recycleNativeSpatialBlock(graph, graph.blockQueue.shift());
     if (graph.timelineTransitionActive) {
+      recycleNativeSpatialBlock(graph, graph.blockQueue.shift());
       graph.transportSeekDiscardedBlocks += 1;
     } else {
-      graph.transportDroppedBlocks += 1;
+      // Removing an audible block and uploading the next one under the same
+      // generation creates a discontinuity. Resume through the existing muted
+      // reset/preroll path instead of splicing across the missing PCM.
+      graph.transportDroppedBlocks += graph.blockQueue.length + 1;
+      recycleNativeSpatialBlock(graph, {
+        pcm, bufferId: ownership.bufferId, poolEpoch: ownership.poolEpoch,
+        timelineEpoch, released: false
+      });
+      graph.transportRecoveryCount += 1;
+      beginNativeSpatialTimelineTransition('transport-overflow').catch((error) => {
+        if (!graph.disposed) failGoogleObr(error, { announce: false, graph });
+      });
+      return false;
     }
   }
   graph.blockQueue.push({
@@ -7377,6 +8075,7 @@ function enqueueNativeSpatialBlock(graph, pcm, ownership = {}) {
     bufferId: ownership.bufferId,
     poolEpoch: ownership.poolEpoch,
     timelineEpoch,
+    captureMediaStartTime: Number(ownership.captureMediaStartTime),
     nativeGeneration: graph.timelineTransitionActive ? 0 : graph.generation,
     released: false
   });
@@ -7388,7 +8087,7 @@ async function pumpNativeSpatialBlocks(graph) {
   if (graph.disposed || graph.blockUploadActive || graph.timelineTransitionActive) return;
   graph.blockUploadActive = true;
   try {
-    while (!graph.disposed && graph.blockQueue.length) {
+    while (!graph.disposed && !graph.timelineTransitionActive && graph.blockQueue.length) {
       const block = graph.blockQueue.shift();
       if (
         (
@@ -7403,6 +8102,18 @@ async function pumpNativeSpatialBlocks(graph) {
       }
       graph.activeBlock = block;
       try {
+        if (
+          graph.nativeClockNeedsCaptureOrigin
+          && Number.isFinite(Number(block.captureMediaStartTime))
+        ) {
+          reanchorNativeGoogleObrClock(
+            graph,
+            Number(block.captureMediaStartTime),
+            Number(els.audio?.currentTime) || Number(block.captureMediaStartTime),
+            Number(els.audio?.playbackRate) || 1
+          );
+          graph.nativeClockNeedsCaptureOrigin = false;
+        }
         const sequence = graph.nextBlockSequence;
         graph.nextBlockSequence += 1;
         const params = new URLSearchParams({
@@ -7411,10 +8122,25 @@ async function pumpNativeSpatialBlocks(graph) {
           inputChannels: '2',
           sequence: String(sequence)
         });
+        if (graph.nativeGainSequence > 0) {
+          params.set('gainSequence', String(graph.nativeGainSequence));
+          params.set('expiresAt', String(nativeSpatialLeaseDeadline(graph)));
+        }
         let response = null;
         let payload = null;
         let uploadError = null;
         for (let attempt = 0; attempt < 3; attempt += 1) {
+          const uploadAbort = new AbortController();
+          const streamSignal = graph.streamAbort?.signal;
+          const abortUpload = () => uploadAbort.abort(streamSignal?.reason);
+          if (streamSignal?.aborted) abortUpload();
+          else streamSignal?.addEventListener?.('abort', abortUpload, { once: true });
+          graph.activeUploadAbort = uploadAbort;
+          // One transport block is ~85ms at 48kHz. Allow native queue
+          // backpressure and IPC jitter, but never hold the serial pump forever.
+          const uploadTimeout = window.setTimeout(() => uploadAbort.abort(
+            new DOMException('原生 PCM 上传超时', 'TimeoutError')
+          ), GOOGLE_OBR_NATIVE_UPLOAD_TIMEOUT_MS);
           try {
             response = await fetch(`/api/audio/spatial/block?${params}`, {
               method: 'POST',
@@ -7423,14 +8149,21 @@ async function pumpNativeSpatialBlocks(graph) {
                 'X-FE-Monster-Audio': '1'
               },
               body: block.pcm,
-              signal: graph.streamAbort.signal
+              signal: uploadAbort.signal
             });
             try {
               payload = await response.json();
             } catch (error) {
+              if (uploadAbort.signal.aborted) throw uploadAbort.signal.reason || error;
               payload = null;
             }
             if (response.ok && payload?.ok === true && Number(payload.sequence) === sequence) {
+              if (payload.gainLeaseExpired === true && Number(params.get('gainSequence')) === graph.nativeGainSequence) {
+                // PCM was accepted, so never replay it. Rotate output ownership
+                // even in a hidden window where periodic health checks pause.
+                uploadAbort.abort(new Error('原生音频输出租期已结束'));
+                throw uploadAbort.signal.reason;
+              }
               if (attempt > 0) graph.transportRecoveredBlocks += 1;
               uploadError = null;
               break;
@@ -7440,7 +8173,14 @@ async function pumpNativeSpatialBlocks(graph) {
             );
           } catch (error) {
             uploadError = error;
+          } finally {
+            window.clearTimeout(uploadTimeout);
+            streamSignal?.removeEventListener?.('abort', abortUpload);
+            if (graph.activeUploadAbort === uploadAbort) graph.activeUploadAbort = null;
           }
+          // An aborted request may already have reached native output. Rotate
+          // its generation instead of replaying that uncertain PCM body.
+          if (uploadAbort.signal.aborted) break;
           graph.transportRetryAttempts += 1;
           const obsoleteAttempt = graph.disposed
             || graph.timelineTransitionActive
@@ -7489,7 +8229,6 @@ async function pumpNativeSpatialBlocks(graph) {
     discardNativeSpatialBlocks(graph, { recycle: !graph.disposed });
     if (!graph.disposed && error?.name !== 'AbortError' && state.obrSpatialAudio.requested) {
       graph.transportRecoveryCount += 1;
-      setAudioParamSmoothly(graph.dryGain?.gain, 1, graph.context, 0.018);
       beginNativeSpatialTimelineTransition('transport-recovery').catch((recoveryError) => {
         if (!graph.disposed) {
           failGoogleObr(recoveryError || error, { announce: false, graph });
@@ -7529,7 +8268,7 @@ async function createNativeGoogleObrGraph(analysis) {
     algorithm: String(algorithm)
   });
   const start = await nativeSpatialRequest(`/api/audio/spatial/start?${startParams}`);
-  if (!start?.ok || !Number(start.session) || !Number(start.generation)) {
+  if (!start?.ok || !Number(start.session) || !Number(start.generation) || start.gainHandoffProtocol !== 1) {
     throw new Error(safeText(start?.error, '原生空间音频链路初始化失败'));
   }
   const session = Number(start.session);
@@ -7576,6 +8315,12 @@ async function createNativeGoogleObrGraph(analysis) {
       nativeStream: true,
       session,
       generation,
+      nativeGainSequence: Number(start.gainSequence) || 1,
+      nativeGainCeiling: 0,
+      nativeLeaseDeadline: Number(start.gainLeaseExpiresAt) || 0,
+      handoffOperation: 0,
+      outputOwner: 'browser',
+      disposing: false,
       streamAbort,
       blockQueue: [],
       blockUploadActive: false,
@@ -7588,6 +8333,8 @@ async function createNativeGoogleObrGraph(analysis) {
       transportRecoveredBlocks: 0,
       transportRecoveryCount: 0,
       poolStarvedFrames: 0,
+      timelineDroppedBlocksBaseline: 0,
+      timelineStarvedFramesBaseline: 0,
       captureTimelineEpoch: 1,
       appliedTimelineEpoch: 1,
       timelineTransitionActive: false,
@@ -7605,7 +8352,10 @@ async function createNativeGoogleObrGraph(analysis) {
       nativeOutputLatencySeconds: 0,
       nativeClockOriginMediaTime: Number(els.audio?.currentTime) || 0,
       nativeClockOriginConsumedFrames: 0,
-      nativeLastMediaTime: Number(els.audio?.currentTime) || 0
+      nativeLastMediaTime: Number(els.audio?.currentTime) || 0,
+      nativeClockPlaybackRate: Number(els.audio?.playbackRate) || 1,
+      nativeLatencySampleCount: 0,
+      nativeClockNeedsCaptureOrigin: true
     };
 
     node.port.onmessage = (event) => {
@@ -7614,10 +8364,29 @@ async function createNativeGoogleObrGraph(analysis) {
         if (graph.disposed || !(message.pcm instanceof Float32Array)) return;
         try {
           const pcm = message.pcm;
+          const captureSampleRate = Math.max(
+            1,
+            Number(message.captureSampleRate) || Number(graph.context?.sampleRate) || 48000
+          );
+          const captureEndContextTime = Number(message.captureEndFrame) / captureSampleRate;
+          const contextTime = Number(graph.context?.currentTime);
+          const mediaTime = Number(els.audio?.currentTime);
+          const playbackRate = Math.max(0.01, Number(els.audio?.playbackRate) || 1);
+          const deliveryDelaySeconds = Number.isFinite(captureEndContextTime) && Number.isFinite(contextTime)
+            ? Math.max(0, contextTime - captureEndContextTime)
+            : 0;
+          const captureMediaEndTime = Number.isFinite(mediaTime)
+            ? mediaTime - deliveryDelaySeconds * playbackRate
+            : Number.NaN;
+          const captureFrames = Math.max(1, Number(message.frames) || GOOGLE_OBR_NATIVE_TRANSPORT_FRAMES);
+          const captureMediaStartTime = Number.isFinite(captureMediaEndTime)
+            ? Math.max(0, captureMediaEndTime - captureFrames / captureSampleRate * playbackRate)
+            : Number.NaN;
           enqueueNativeSpatialBlock(graph, pcm, {
             bufferId: message.bufferId,
             poolEpoch: message.poolEpoch,
-            timelineEpoch: message.timelineEpoch
+            timelineEpoch: message.timelineEpoch,
+            captureMediaStartTime
           });
           graph.processedBlocks = Math.max(graph.processedBlocks, Number(message.blocks) || 0);
           graph.inputRms = Number(message.inputRms) || graph.inputRms;
@@ -7663,20 +8432,32 @@ async function createNativeGoogleObrGraph(analysis) {
   }
 }
 
-async function waitForNativeGoogleObrPreroll(graph) {
+async function waitForNativeGoogleObrPreroll(graph, timelineEpoch = null) {
   const startedAt = performance.now();
   const renderBlocksPerTransport = Math.ceil(
     GOOGLE_OBR_NATIVE_TRANSPORT_FRAMES / GOOGLE_OBR_NATIVE_RENDER_FRAMES
   );
   while (!graph.disposed && performance.now() - startedAt < 5000) {
-    if (graph.transportDroppedBlocks > 0 || graph.poolStarvedFrames > 0) {
+    if (timelineEpoch !== null && timelineEpoch !== graph.captureTimelineEpoch) return null;
+    const droppedBlocks = Math.max(0, graph.transportDroppedBlocks - (graph.timelineDroppedBlocksBaseline || 0));
+    const starvedFrames = Math.max(0, graph.poolStarvedFrames - (graph.timelineStarvedFramesBaseline || 0));
+    if (droppedBlocks > 0 || starvedFrames > 0) {
       throw new Error(
-        graph.poolStarvedFrames > 0
-          ? `原生 PCM 缓冲池耗尽：丢失 ${graph.poolStarvedFrames} 帧`
-          : `原生 PCM 上传队列溢出：丢失 ${graph.transportDroppedBlocks} 块`
+        starvedFrames > 0
+          ? `原生 PCM 缓冲池耗尽：丢失 ${starvedFrames} 帧`
+          : `原生 PCM 上传队列溢出：丢失 ${droppedBlocks} 块`
       );
     }
-    const status = await apiJson('/api/audio/spatial/status');
+    const status = await apiJson('/api/audio/spatial/status', {
+      timeoutMs: Math.min(
+        GOOGLE_OBR_NATIVE_REQUEST_TIMEOUT_MS,
+        Math.max(1, 5000 - (performance.now() - startedAt))
+      ),
+      signal: graph.streamAbort?.signal
+    });
+    if (graph.disposed || (timelineEpoch !== null && timelineEpoch !== graph.captureTimelineEpoch)) {
+      return null;
+    }
     if (
       !status?.active
       || Number(status.session) !== Number(graph.session)
@@ -7729,6 +8510,7 @@ function updateNativeGoogleObrMetrics(graph, status = {}) {
   const buffersConsumed = Math.max(0, Number(status.buffersConsumed) || 0);
   const consumedFrames = buffersConsumed * GOOGLE_OBR_NATIVE_RENDER_FRAMES;
   const mediaTime = Math.max(0, Number(els.audio?.currentTime) || 0);
+  const playbackRate = Math.max(0.01, Number(els.audio?.playbackRate) || 1);
   const previousMediaTime = Number(graph.nativeLastMediaTime);
   const mediaClockJumped = Number.isFinite(previousMediaTime)
     && Math.abs(mediaTime - previousMediaTime) > 1;
@@ -7740,36 +8522,64 @@ function updateNativeGoogleObrMetrics(graph, status = {}) {
     0,
     LYRIC_AUDIO_OUTPUT_LATENCY_MAX_SECONDS
   );
+  const storedLatency = Number(graph.nativeOutputLatencySeconds);
+  const hasTrustedLatency = Math.max(0, Number(graph.nativeLatencySampleCount) || 0) > 0
+    && Number.isFinite(storedLatency)
+    && storedLatency >= 0;
+  const preservedLatency = clamp(
+    hasTrustedLatency ? storedLatency : fallbackLatency,
+    0,
+    LYRIC_AUDIO_OUTPUT_LATENCY_MAX_SECONDS
+  );
+  const previousPlaybackRate = Number(graph.nativeClockPlaybackRate);
+  const playbackRateChanged = !Number.isFinite(previousPlaybackRate)
+    || Math.abs(playbackRate - previousPlaybackRate) > GOOGLE_OBR_NATIVE_LATENCY_RATE_EPSILON;
+  const variablePlaybackRate = Math.abs(playbackRate - 1) > GOOGLE_OBR_NATIVE_LATENCY_RATE_EPSILON;
+  const originUnavailable = !Number.isFinite(Number(graph.nativeClockOriginMediaTime))
+    || !Number.isFinite(Number(graph.nativeClockOriginConsumedFrames));
+  const mustReanchor = originUnavailable || mediaClockJumped || playbackRateChanged;
 
-  if (
-    !Number.isFinite(Number(graph.nativeClockOriginMediaTime))
-    || !Number.isFinite(Number(graph.nativeClockOriginConsumedFrames))
-  ) {
-    graph.nativeClockOriginMediaTime = mediaTime;
-    graph.nativeClockOriginConsumedFrames = consumedFrames;
-  } else if (mediaClockJumped) {
-    const preservedLatency = Math.max(
-      0,
-      Number(graph.nativeOutputLatencySeconds) || fallbackLatency
-    );
+  if (mustReanchor || variablePlaybackRate) {
+    // The native queue advances in real output frames while media.currentTime
+    // advances in content time. At non-1x rates their difference is not output
+    // latency, so retain the last trustworthy value and move the origin with
+    // the media clock. Re-anchor once more when returning to 1x.
     graph.nativeClockOriginMediaTime = mediaTime - preservedLatency;
     graph.nativeClockOriginConsumedFrames = consumedFrames;
   }
 
-  const measuredLatency = (
-    mediaTime - Number(graph.nativeClockOriginMediaTime)
-  ) - (
-    consumedFrames - Number(graph.nativeClockOriginConsumedFrames)
-  ) / sampleRate;
-  const outputLatency = clamp(
-    Number.isFinite(measuredLatency) && measuredLatency >= 0
-      ? measuredLatency
-      : Number(graph.nativeOutputLatencySeconds) || fallbackLatency,
-    0,
-    LYRIC_AUDIO_OUTPUT_LATENCY_MAX_SECONDS
-  );
+  let outputLatency = preservedLatency;
+  if (!variablePlaybackRate && !mustReanchor) {
+    const measuredLatency = (
+      mediaTime - Number(graph.nativeClockOriginMediaTime)
+    ) - (
+      consumedFrames - Number(graph.nativeClockOriginConsumedFrames)
+    ) / sampleRate;
+    if (Number.isFinite(measuredLatency) && measuredLatency >= 0) {
+      const boundedMeasurement = clamp(
+        measuredLatency,
+        0,
+        LYRIC_AUDIO_OUTPUT_LATENCY_MAX_SECONDS
+      );
+      const measurementError = boundedMeasurement - preservedLatency;
+      if (Math.abs(measurementError) > GOOGLE_OBR_NATIVE_LATENCY_DEADZONE_SECONDS) {
+        const smoothedStep = measurementError * GOOGLE_OBR_NATIVE_LATENCY_SMOOTHING;
+        outputLatency = clamp(
+          preservedLatency + clamp(
+            smoothedStep,
+            -GOOGLE_OBR_NATIVE_LATENCY_MAX_STEP_SECONDS,
+            GOOGLE_OBR_NATIVE_LATENCY_MAX_STEP_SECONDS
+          ),
+          0,
+          LYRIC_AUDIO_OUTPUT_LATENCY_MAX_SECONDS
+        );
+      }
+    }
+    graph.nativeLatencySampleCount = Math.max(0, Number(graph.nativeLatencySampleCount) || 0) + 1;
+  }
 
   graph.nativeLastMediaTime = mediaTime;
+  graph.nativeClockPlaybackRate = playbackRate;
   graph.nativeBuffersQueued = buffersQueued;
   graph.nativeQueueUnderruns = Math.max(0, Number(status.queueUnderruns) || 0);
   graph.nativeOutputLatencySeconds = outputLatency;
@@ -7779,28 +8589,56 @@ function updateNativeGoogleObrMetrics(graph, status = {}) {
   return outputLatency;
 }
 
+function reanchorNativeGoogleObrClock(
+  graph,
+  captureMediaTime,
+  currentMediaTime = captureMediaTime,
+  playbackRate = 1
+) {
+  if (!graph) return false;
+  const origin = Math.max(0, Number(captureMediaTime) || 0);
+  const mediaTime = Math.max(origin, Number(currentMediaTime) || origin);
+  graph.nativeClockOriginMediaTime = origin;
+  graph.nativeClockOriginConsumedFrames = 0;
+  graph.nativeLastMediaTime = mediaTime;
+  graph.nativeClockPlaybackRate = Math.max(0.01, Number(playbackRate) || 1);
+  return true;
+}
+
 function refreshNativeGoogleObrHealth() {
   const spatial = state.obrSpatialAudio;
   const graph = spatial.graph;
   if (
-    document.hidden
-    || !spatial.requested
+    !spatial.requested
     || !spatial.enabled
     || !graph?.nativeStream
     || graph.disposed
+    || graph.disposing
+    || graph.timelineTransitionActive
+    || graph.timelineResetPromise
   ) {
     return Promise.resolve(null);
   }
   if (spatial.nativeHealthRequest) return spatial.nativeHealthRequest;
 
+  const requestedGeneration = graph.generation;
+  const requestedEpoch = graph.captureTimelineEpoch;
   const previousUnderruns = Math.max(0, Number(graph.nativeQueueUnderruns) || 0);
-  const request = apiJson('/api/audio/spatial/status')
+  const request = apiJson('/api/audio/spatial/status', {
+    timeoutMs: GOOGLE_OBR_NATIVE_REQUEST_TIMEOUT_MS,
+    signal: graph.streamAbort?.signal
+  })
     .then((status) => {
       if (
         spatial.graph !== graph
         || graph.disposed
+        || graph.disposing
         || !spatial.requested
         || !spatial.enabled
+        || graph.timelineTransitionActive
+        || graph.timelineResetPromise
+        || graph.generation !== requestedGeneration
+        || graph.captureTimelineEpoch !== requestedEpoch
       ) {
         return null;
       }
@@ -7817,10 +8655,11 @@ function refreshNativeGoogleObrHealth() {
       const underruns = Math.max(0, Number(status.queueUnderruns) || 0);
       const underrunDelta = Math.max(0, underruns - previousUnderruns);
       const unhealthy = Number(status.droppedBuffers) > 0
+        || (status.gainHandoffProtocol === 1 && Number(status.gainLeaseExpiresAt) <= Date.now())
         || Number(status.bufferPoolExhaustions) > 0
         || Number(status.lastResult) < 0
-        || graph.transportDroppedBlocks > 0
-        || graph.poolStarvedFrames > 0;
+        || graph.transportDroppedBlocks > (graph.timelineDroppedBlocksBaseline || 0)
+        || graph.poolStarvedFrames > (graph.timelineStarvedFramesBaseline || 0);
       graph.nativeUnderrunStreak = underrunDelta > 0
         ? Math.max(0, Number(graph.nativeUnderrunStreak) || 0) + underrunDelta
         : 0;
@@ -7882,27 +8721,26 @@ function disconnectOfficialGoogleObrGraph(graph) {
   graph.connected = false;
 }
 
-function disposeOfficialGoogleObrGraph(graph = state.obrSpatialAudio.graph, options = {}) {
-  if (!graph) return Promise.resolve(null);
+function disposeNativeSpatialGraph(graph, options = {}) {
+  if (graph.disposePromise) return graph.disposePromise;
+  graph.disposing = true;
+  graph.handoffOperation = (Number(graph.handoffOperation) || 0) + 1;
   window.clearTimeout(graph.disableTimer);
   graph.disableTimer = 0;
-  // Keep the dry path audible while a failed/reconfigured OBR graph is rebuilt.
-  // The dry gain is owned by the shared analyser graph and remains connected
-  // after the wet worklet is disposed.
-  const now = Number(graph.context?.currentTime) || 0;
-  const dryGain = graph.dryGain?.gain;
-  const wetGain = graph.wetGain?.gain;
-  try {
-    dryGain?.cancelScheduledValues(now);
-    wetGain?.cancelScheduledValues(now);
-    if (dryGain) dryGain.value = 1;
-    if (wetGain) wetGain.value = 0;
-  } catch (error) {
-    if (dryGain) dryGain.value = 1;
-    if (wetGain) wetGain.value = 0;
-  }
-  if (graph.nativeStream) {
+  const ownsDryGain = () => !state.obrSpatialAudio.graph || state.obrSpatialAudio.graph === graph;
+  const dispose = (async () => {
+    let handoffFailed = false;
+    try {
+      if (ownsDryGain()) await handoffNativeSpatialOutput(graph, 'browser');
+      else await setNativeSpatialOutputGain(graph, 0, () => !graph.disposed);
+    } catch (error) {
+      handoffFailed = true;
+    }
+    // Preserve PCM until the reverse handoff has a chance to complete. Once
+    // stopped, no request may extend the last recorded absolute lease deadline.
     graph.disposed = true;
+    graph.ready = false;
+    graph.node.port.onmessage = null;
     discardNativeSpatialBlocks(graph);
     if (graph.pendingProcess) {
       const pending = graph.pendingProcess;
@@ -7912,51 +8750,123 @@ function disposeOfficialGoogleObrGraph(graph = state.obrSpatialAudio.graph, opti
     }
     try { graph.node.port.postMessage({ type: 'set-enabled', enabled: false }); } catch (error) {}
     disconnectOfficialGoogleObrGraph(graph);
-    try { graph.streamController?.close(); } catch (error) {}
     graph.streamAbort?.abort();
-    const nativeAction = options.nativeAction === 'pause' ? 'pause' : 'stop';
-    const nativeRelease = nativeSpatialRequest(
-      `/api/audio/spatial/${nativeAction}?session=${encodeURIComponent(graph.session)}&generation=${encodeURIComponent(graph.generation)}`
-    ).catch(() => null);
+    graph.activeUploadAbort?.abort();
+    try { graph.streamController?.close(); } catch (error) {}
+    const action = options.nativeAction === 'pause' ? 'pause' : 'stop';
+    let stopped = false;
+    let releaseTimer = 0;
+    try {
+      const release = nativeSpatialRequest(
+        `/api/audio/spatial/${action}?session=${encodeURIComponent(graph.session)}&generation=${encodeURIComponent(graph.generation)}`
+      );
+      const remaining = Math.max(0, Math.min(
+        (Number(graph.nativeLeaseDeadline) || 0) - Date.now(),
+        (Number(graph.nativeLeaseMonotonicDeadline) || 0) - performance.now()
+      )) + 100;
+      const reply = await Promise.race([release, new Promise((resolve) => {
+        releaseTimer = window.setTimeout(() => resolve(null), remaining);
+      })]);
+      stopped = reply?.ok === true && reply.ignored !== true && reply.stale !== true;
+    } catch (error) {} finally { window.clearTimeout(releaseTimer); }
+    if (handoffFailed && !stopped) {
+      // Unknown HTTP outcomes cannot prove silence. Expiring native ownership
+      // bounds all late commands and PCM, including an aborted gain increase.
+      const remaining = (Number(graph.nativeLeaseDeadline) || 0) - Date.now();
+      const monotonicRemaining = (Number(graph.nativeLeaseMonotonicDeadline) || 0) - performance.now();
+      const wait = Math.max(0, Math.min(remaining, monotonicRemaining)) + 100;
+      await new Promise((resolve) => window.setTimeout(resolve, wait));
+    }
+    if (ownsDryGain()) setAudioParamSmoothly(graph.dryGain?.gain, 1, graph.context, 0.018);
     try { graph.node.port.close(); } catch (error) {}
     graph.node.onprocessorerror = null;
-    graph.ready = false;
     if (state.obrSpatialAudio.graph === graph) {
       state.obrSpatialAudio.graph = null;
       state.obrSpatialAudio.nativeBuffersQueued = 0;
       state.obrSpatialAudio.nativeQueueUnderruns = 0;
       state.obrSpatialAudio.nativeOutputLatencySeconds = 0;
     }
-    return nativeRelease;
+    return null;
+  })();
+  graph.disposePromise = dispose;
+  return dispose;
+}
+
+function disposeOfficialGoogleObrGraph(graph = state.obrSpatialAudio.graph, options = {}) {
+  if (!graph) return Promise.resolve(null);
+  if (graph.disposePromise) return graph.disposePromise;
+  if (graph.nativeStream) return disposeNativeSpatialGraph(graph, options);
+  window.clearTimeout(graph.disableTimer);
+  graph.disableTimer = 0;
+  // Keep the dry path audible while a failed/reconfigured OBR graph is rebuilt.
+  // The dry gain is owned by the shared analyser graph and remains connected
+  // after the wet worklet is disposed.
+  const now = Number(graph.context?.currentTime) || 0;
+  const dryGain = graph.dryGain?.gain;
+  const wetGain = graph.wetGain?.gain;
+  const ownsDryGain = !state.obrSpatialAudio.graph || state.obrSpatialAudio.graph === graph;
+  const fadeSeconds = graph.context?.state === 'running' ? 0.018 : 0;
+  try {
+    if (fadeSeconds) {
+      if (ownsDryGain) setAudioParamSmoothly(dryGain, 1, graph.context, fadeSeconds);
+      setAudioParamSmoothly(wetGain, 0, graph.context, fadeSeconds);
+    } else {
+      if (ownsDryGain) {
+        dryGain?.cancelScheduledValues(now);
+        if (dryGain) dryGain.value = 1;
+      }
+      wetGain?.cancelScheduledValues(now);
+      if (wetGain) wetGain.value = 0;
+    }
+  } catch (error) {
+    if (ownsDryGain && dryGain) dryGain.value = 1;
+    if (wetGain) wetGain.value = 0;
   }
+  graph.disposed = true;
+  graph.ready = false;
+  graph.node.port.onmessage = null;
   if (graph.pendingProcess) {
     const pending = graph.pendingProcess;
     graph.pendingProcess = null;
     window.clearTimeout(pending.timeout);
     pending.reject(new Error('Google OBR 音频链路已重建'));
   }
-  try { graph.node.port.postMessage({ type: 'set-enabled', enabled: false }); } catch (error) {}
-  disconnectOfficialGoogleObrGraph(graph);
-  try { graph.node.port.close(); } catch (error) {}
   graph.node.onprocessorerror = null;
-  graph.ready = false;
   if (state.obrSpatialAudio.graph === graph) state.obrSpatialAudio.graph = null;
-  return Promise.resolve(null);
+  // Leave this exact wet node connected until its audio-thread fade finishes.
+  // A replacement graph may already exist when this cleanup runs; it must not
+  // change the shared dry gain or disconnect any replacement connections.
+  graph.disposePromise = new Promise((resolve) => {
+    const release = () => {
+      try { graph.node.port.postMessage({ type: 'set-enabled', enabled: false }); } catch (error) {}
+      disconnectOfficialGoogleObrGraph(graph);
+      try { graph.node.port.close(); } catch (error) {}
+      resolve(null);
+    };
+    if (fadeSeconds) window.setTimeout(release, Math.ceil(fadeSeconds * 1000) + 4);
+    else release();
+  });
+  return graph.disposePromise;
 }
 
 function beginNativeSpatialTimelineTransition(reason = 'seek') {
   const spatial = state.obrSpatialAudio;
   const graph = spatial.graph;
-  if (!graph?.nativeStream || graph.disposed) return Promise.resolve(false);
+  if (!graph?.nativeStream || graph.disposed || graph.disposing) return Promise.resolve(false);
 
   graph.captureTimelineEpoch = Math.max(
     Number(graph.captureTimelineEpoch) || 1,
     Number(graph.appliedTimelineEpoch) || 1
   ) + 1;
   graph.timelineTransitionActive = true;
+  graph.handoffOperation = (Number(graph.handoffOperation) || 0) + 1;
+  // A gain request from the prior epoch may already be in flight.
+  graph.outputOwner = 'transition';
+  graph.activeUploadAbort?.abort(new DOMException('原生 PCM 时间线已更新', 'AbortError'));
   graph.timelineResetReason = safeText(reason, 'seek');
   graph.timelineResetRequestedAt = performance.now();
-  setAudioParamEqualPower(graph.dryGain?.gain, 1, graph.context, 0.018);
+  graph.timelineDroppedBlocksBaseline = Math.max(0, Number(graph.transportDroppedBlocks) || 0);
+  graph.timelineStarvedFramesBaseline = Math.max(0, Number(graph.poolStarvedFrames) || 0);
   discardNativeSpatialBlocks(graph, { recycle: true });
   try {
     graph.node.port.postMessage({
@@ -7971,116 +8881,141 @@ function beginNativeSpatialTimelineTransition(reason = 'seek') {
 }
 
 function resetNativeSpatialTimeline(graph) {
-  if (!graph?.nativeStream || graph.disposed) return Promise.resolve(false);
+  if (!graph?.nativeStream || graph.disposed || graph.disposing) return Promise.resolve(false);
   if (graph.timelineResetPromise) return graph.timelineResetPromise;
 
   const reset = (async () => {
-    // The request starts immediately: browser dry gain and the XAudio2 voice
-    // follow complementary short fades while media seeking itself remains
-    // synchronous and neither audio render thread is blocked.
-    while (
-      !graph.disposed
-      && Number(graph.appliedTimelineEpoch) !== Number(graph.captureTimelineEpoch)
-    ) {
-      const targetEpoch = graph.captureTimelineEpoch;
-      const requestedGeneration = graph.generation;
-      let response = null;
-      let lastError = null;
-      for (let attempt = 0; attempt < 3 && !graph.disposed; attempt += 1) {
-        try {
-          response = await nativeSpatialRequest(
-            `/api/audio/spatial/timeline?session=${encodeURIComponent(graph.session)}`
-              + `&generation=${encodeURIComponent(requestedGeneration)}`
-          );
-          if (response?.ok === true) break;
-          lastError = new Error(safeText(response?.error, '原生音频时间线重置失败'));
-        } catch (error) {
-          lastError = error;
-        }
-        await new Promise((resolve) => window.setTimeout(resolve, 25 * (attempt + 1)));
-      }
-      if (graph.disposed) return false;
-      const nextGeneration = Number(response?.generation);
-      if (
-        response?.ok !== true
-        || Number(response?.session) !== Number(graph.session)
-        || !Number.isSafeInteger(nextGeneration)
-        || nextGeneration <= requestedGeneration
+    // Media seeking stays synchronous; output ownership transfers with ordered
+    // acknowledgements before the old native queue is flushed.
+    while (!graph.disposed && !graph.disposing) {
+      while (
+        !graph.disposed && !graph.disposing
+        && Number(graph.appliedTimelineEpoch) !== Number(graph.captureTimelineEpoch)
       ) {
-        throw lastError || new Error('原生音频时间线 generation 未推进');
+        const targetEpoch = graph.captureTimelineEpoch;
+        const requestedGeneration = graph.generation;
+        try {
+          await handoffNativeSpatialOutput(graph, 'browser', { epoch: targetEpoch });
+        } catch (error) {
+          if (graph.disposed || graph.disposing) return false;
+          if (targetEpoch !== graph.captureTimelineEpoch) continue;
+          throw error;
+        }
+        let response = null;
+        let lastError = null;
+        for (let attempt = 0; attempt < 3 && !graph.disposed && !graph.disposing; attempt += 1) {
+          try {
+            response = await nativeSpatialRequest(
+              `/api/audio/spatial/timeline?session=${encodeURIComponent(graph.session)}`
+                + `&generation=${encodeURIComponent(requestedGeneration)}`,
+              { signal: graph.streamAbort?.signal }
+            );
+            if (response?.ok === true) break;
+            lastError = new Error(safeText(response?.error, '原生音频时间线重置失败'));
+          } catch (error) {
+            lastError = error;
+          }
+          if (attempt < 2 && !graph.disposed && !graph.disposing) {
+            await new Promise((resolve) => window.setTimeout(resolve, 25 * (attempt + 1)));
+          }
+        }
+        if (graph.disposed || graph.disposing) return false;
+        const nextGeneration = Number(response?.generation);
+        if (
+          response?.ok !== true
+          || Number(response?.session) !== Number(graph.session)
+          || !Number.isSafeInteger(nextGeneration)
+          || nextGeneration <= requestedGeneration
+        ) {
+          throw lastError || new Error('原生音频时间线 generation 未推进');
+        }
+        graph.generation = nextGeneration;
+        graph.nativeGainCeiling = 0;
+        graph.outputOwner = 'browser';
+        graph.appliedTimelineEpoch = targetEpoch;
+        graph.timelineResetCount += 1;
+        const nativeResetMs = Number(response?.resetElapsedMs);
+        if (Number.isFinite(nativeResetMs) && nativeResetMs >= 0) {
+          graph.timelineLastNativeResetMs = nativeResetMs;
+          graph.timelineWorstNativeResetMs = Math.max(
+            Number(graph.timelineWorstNativeResetMs) || 0,
+            nativeResetMs
+          );
+        }
       }
-      graph.generation = nextGeneration;
-      graph.appliedTimelineEpoch = targetEpoch;
-      graph.timelineResetCount += 1;
-      const nativeResetMs = Number(response?.resetElapsedMs);
-      if (Number.isFinite(nativeResetMs) && nativeResetMs >= 0) {
-        graph.timelineLastNativeResetMs = nativeResetMs;
-        graph.timelineWorstNativeResetMs = Math.max(
-          Number(graph.timelineWorstNativeResetMs) || 0,
-          nativeResetMs
-        );
-      }
-    }
-    if (graph.disposed) return false;
+      if (graph.disposed || graph.disposing) return false;
 
-    const currentBlocks = [];
-    while (graph.blockQueue.length) {
-      const block = graph.blockQueue.shift();
-      if (block?.timelineEpoch === graph.captureTimelineEpoch) {
-        currentBlocks.push(block);
-      } else {
-        recycleNativeSpatialBlock(graph, block);
+      const currentBlocks = [];
+      while (graph.blockQueue.length) {
+        const block = graph.blockQueue.shift();
+        if (block?.timelineEpoch === graph.captureTimelineEpoch) {
+          currentBlocks.push(block);
+        } else {
+          recycleNativeSpatialBlock(graph, block);
+        }
       }
-    }
-    // Keep only the newest 4096-frame block. It contributes sixteen of the
-    // 24 production preroll quanta; the next live worklet block completes the
-    // queue while browser dry audio remains audible. This bounds scrub latency.
-    while (currentBlocks.length > 1) {
-      recycleNativeSpatialBlock(graph, currentBlocks.shift());
-      graph.transportSeekDiscardedBlocks += 1;
-    }
-    for (const block of currentBlocks) {
-      block.nativeGeneration = graph.generation;
-      graph.blockQueue.push(block);
-    }
-    graph.timelineTransitionActive = false;
-    pumpNativeSpatialBlocks(graph);
+      // Keep only the newest 4096-frame block. It contributes sixteen of the
+      // 24 production preroll quanta; the next live worklet block completes the
+      // queue while browser dry audio remains audible. This bounds scrub latency.
+      while (currentBlocks.length > 1) {
+        recycleNativeSpatialBlock(graph, currentBlocks.shift());
+        graph.transportSeekDiscardedBlocks += 1;
+      }
+      for (const block of currentBlocks) {
+        block.nativeGeneration = graph.generation;
+        graph.blockQueue.push(block);
+      }
+      graph.nativeClockNeedsCaptureOrigin = true;
+      graph.timelineTransitionActive = false;
+      pumpNativeSpatialBlocks(graph);
 
-    if (
-      els.audio?.src
-      && !els.audio.paused
-      && !els.audio.ended
-      && state.obrSpatialAudio.requested
-    ) {
-      await waitForNativeGoogleObrPreroll(graph);
-      if (graph.disposed || graph.timelineTransitionActive) return false;
-      const activation = await nativeSpatialRequest(
-        `/api/audio/spatial/activate?session=${encodeURIComponent(graph.session)}`
-          + `&generation=${encodeURIComponent(graph.generation)}`
-      );
-      if (!activation?.ok) {
-        throw new Error(safeText(activation?.error, '原生空间音频无法恢复输出'));
+      const readyEpoch = graph.appliedTimelineEpoch;
+      if (
+        els.audio?.src
+        && !els.audio.paused
+        && !els.audio.ended
+        && state.obrSpatialAudio.requested
+      ) {
+        try {
+          await waitForNativeGoogleObrPreroll(graph, readyEpoch);
+          if (graph.disposed || graph.disposing) return false;
+          if (readyEpoch !== graph.captureTimelineEpoch) continue;
+          const activation = await handoffNativeSpatialOutput(graph, 'native', { epoch: readyEpoch });
+          if (graph.disposed || graph.disposing) return false;
+          if (readyEpoch !== graph.captureTimelineEpoch) continue;
+          if (!activation) throw new Error('原生空间音频无法恢复输出');
+        } catch (error) {
+          if (graph.disposed || graph.disposing) return false;
+          if (readyEpoch !== graph.captureTimelineEpoch) continue;
+          throw error;
+        }
       }
-      setAudioParamEqualPower(graph.dryGain?.gain, 0, graph.context, 0.025);
+      return true;
     }
-    return true;
+    return false;
   })();
-  graph.timelineResetPromise = reset;
-  reset.catch((error) => {
+  const trackedReset = reset.catch((error) => {
+    if (graph.disposed || graph.disposing) return false;
     graph.timelineResetFailures += 1;
     graph.timelineTransitionActive = false;
-    setAudioParamEqualPower(graph.dryGain?.gain, 1, graph.context, 0.018);
     if (!graph.disposed && state.obrSpatialAudio.requested) {
       failGoogleObr(error, { announce: false, graph });
     }
+    throw error;
   }).finally(() => {
-    if (graph.timelineResetPromise === reset) graph.timelineResetPromise = null;
+    if (graph.timelineResetPromise === trackedReset) graph.timelineResetPromise = null;
   });
-  return reset;
+  graph.timelineResetPromise = trackedReset;
+  return trackedReset;
 }
 
 function setAudioCurrentTimeWithNativeContinuity(target, reason = 'seek') {
   if (!els.audio || !Number.isFinite(Number(target))) return Promise.resolve(false);
+  const handoffTarget = Math.max(0, Number(target));
+  state.qishuiPlaybackCard.seekHandoffTarget = handoffTarget;
+  state.qishuiPlaybackCard.seekHandoffStartedAt = performance.now();
+  state.qishuiPlaybackCard.seekHandoffRunning = !els.audio.paused && !els.audio.ended;
+  state.qishuiPlaybackCard.seekHandoffSource = String(els.audio.currentSrc || els.audio.src || '');
   const transition = beginNativeSpatialTimelineTransition(reason);
   state.audioPositionSync.nativeSeekPromise = transition;
   transition.catch(() => false).finally(() => {
@@ -8090,7 +9025,7 @@ function setAudioCurrentTimeWithNativeContinuity(target, reason = 'seek') {
   });
   // Move the media clock immediately. Native flush/preroll stays on the
   // control path while browser dry playback protects audible continuity.
-  els.audio.currentTime = Number(target);
+  els.audio.currentTime = handoffTarget;
   return transition;
 }
 
@@ -8155,7 +9090,7 @@ function failGoogleObr(error, options = {}) {
   }
   saveGoogleObrPreference(true);
   syncRealtimePolling();
-  if (spatial.graph) {
+  if (spatial.graph && !spatial.graph.nativeStream) {
     spatial.graph.node.port.postMessage({ type: 'set-enabled', enabled: false });
     setAudioParamSmoothly(spatial.graph.dryGain.gain, 1, spatial.graph.context);
     setAudioParamSmoothly(spatial.graph.wetGain.gain, 0, spatial.graph.context);
@@ -8283,6 +9218,7 @@ async function createOfficialGoogleObrGraph(analysis) {
 
 async function ensureOfficialGoogleObrGraph(analysis = state.audioAnalysis) {
   const spatial = state.obrSpatialAudio;
+  if (spatial.graph?.disposing) await spatial.graph.disposePromise;
   const control = spatial.mixerControl || DEFAULT_NATIVE_MIXER_CONTROL;
   const channelLayout = control.loaded === true
     ? (control.upmixOutputLayout === '7.1' ? '7.1' : '5.1')
@@ -8293,7 +9229,7 @@ async function ensureOfficialGoogleObrGraph(analysis = state.audioAnalysis) {
     && spatial.graph.channelLayout === channelLayout
     && (!spatial.graph.nativeStream || spatial.graph.mixerControlSignature === controlSignature)
   ) return spatial.graph;
-  if (spatial.graph?.ready) disposeOfficialGoogleObrGraph(spatial.graph);
+  if (spatial.graph?.ready) await disposeOfficialGoogleObrGraph(spatial.graph);
   if (spatial.graphPromise) return spatial.graphPromise;
   const createPreferredGraph = async () => {
     if (control.loaded && control.enabled) {
@@ -8326,8 +9262,8 @@ async function ensureOfficialGoogleObrGraph(analysis = state.audioAnalysis) {
   return spatial.graphPromise;
 }
 
-function waitForGoogleObrProcessedBlock(graph) {
-  if (graph.nativeStream) return waitForNativeGoogleObrPreroll(graph);
+function waitForGoogleObrProcessedBlock(graph, timelineEpoch = null) {
+  if (graph.nativeStream) return waitForNativeGoogleObrPreroll(graph, timelineEpoch);
   if (graph.pendingProcess) return graph.pendingProcess.promise;
   const afterBlock = graph.processedBlocks;
   let resolvePending;
@@ -8351,6 +9287,28 @@ function waitForGoogleObrProcessedBlock(graph) {
   return promise;
 }
 
+async function waitForNativeGoogleObrActivationStep(action, graph, deadline) {
+  const remaining = deadline - performance.now();
+  if (remaining <= 0) throw new DOMException('原生空间音频启用超时', 'TimeoutError');
+  const signal = graph.streamAbort?.signal;
+  if (signal?.aborted) throw signal.reason || new DOMException('原生空间音频已停止', 'AbortError');
+  let timer;
+  let abort;
+  try {
+    return await Promise.race([
+      action(),
+      new Promise((resolve, reject) => {
+        timer = window.setTimeout(() => reject(new DOMException('原生空间音频启用超时', 'TimeoutError')), remaining);
+        abort = () => reject(signal.reason || new DOMException('原生空间音频已停止', 'AbortError'));
+        signal?.addEventListener?.('abort', abort, { once: true });
+      })
+    ]);
+  } finally {
+    window.clearTimeout(timer);
+    if (abort) signal?.removeEventListener?.('abort', abort);
+  }
+}
+
 async function activateOfficialGoogleObr(options = {}) {
   const spatial = state.obrSpatialAudio;
   if (spatial.activationPromise) return spatial.activationPromise;
@@ -8364,7 +9322,9 @@ async function activateOfficialGoogleObr(options = {}) {
   const activationIsCurrent = () => spatial.requested && operationId === spatial.operationId;
   const disposeStaleActivation = async (graph) => {
     if (!graph) return false;
-    try { graph.node.port.postMessage({ type: 'set-enabled', enabled: false }); } catch (error) {}
+    if (!graph.nativeStream) {
+      try { graph.node.port.postMessage({ type: 'set-enabled', enabled: false }); } catch (error) {}
+    }
     await disposeOfficialGoogleObrGraph(graph);
     return false;
   };
@@ -8378,20 +9338,48 @@ async function activateOfficialGoogleObr(options = {}) {
     window.clearTimeout(graph.disableTimer);
     graph.disableTimer = 0;
     connectOfficialGoogleObrGraph(graph);
-    const processed = waitForGoogleObrProcessedBlock(graph);
+    const processed = graph.nativeStream ? null : waitForGoogleObrProcessedBlock(graph);
     graph.node.port.postMessage({ type: 'set-enabled', enabled: true });
-    await processed;
-    if (!activationIsCurrent()) return disposeStaleActivation(graph);
     if (graph.nativeStream) {
-      const nativeActivation = await nativeSpatialRequest(
-        `/api/audio/spatial/activate?session=${encodeURIComponent(graph.session)}&generation=${encodeURIComponent(graph.generation)}`
-      );
-      if (!nativeActivation?.ok) {
-        throw new Error(safeText(nativeActivation?.error, 'XAudio2 原生输出无法解除静音'));
+      // Initial enable can overlap a seek just like a later timeline reset.
+      // Give repeated seeks one bounded activation budget and keep browser dry
+      // output until the acknowledgement belongs to the latest epoch.
+      const deadline = performance.now() + 10_000;
+      while (true) {
+        if (!activationIsCurrent() || graph.disposed) return disposeStaleActivation(graph);
+        if (graph.timelineResetPromise) {
+          await waitForNativeGoogleObrActivationStep(() => graph.timelineResetPromise, graph, deadline);
+          if (!activationIsCurrent() || graph.disposed) return disposeStaleActivation(graph);
+          if (graph.timelineResetPromise) continue;
+        }
+        if (graph.timelineTransitionActive) throw new Error('原生空间音频时间线未完成重置');
+        const epoch = graph.captureTimelineEpoch;
+        const generation = graph.generation;
+        const timelineIsCurrent = () => !graph.disposed && !graph.timelineTransitionActive
+          && epoch === graph.captureTimelineEpoch && generation === graph.generation;
+        try {
+          const ready = await waitForNativeGoogleObrActivationStep(
+            () => waitForGoogleObrProcessedBlock(graph, epoch), graph, deadline
+          );
+          if (!activationIsCurrent() || graph.disposed) return disposeStaleActivation(graph);
+          if (!timelineIsCurrent()) continue;
+          if (!ready) throw new Error('原生空间音频预缓冲未完成');
+          const nativeActivation = await waitForNativeGoogleObrActivationStep(
+            () => handoffNativeSpatialOutput(graph, 'native', { epoch }), graph, deadline
+          );
+          if (!activationIsCurrent() || graph.disposed) return disposeStaleActivation(graph);
+          if (!timelineIsCurrent()) continue;
+          if (!nativeActivation) throw new Error('XAudio2 原生输出无法完成交接');
+          break;
+        } catch (error) {
+          if (!activationIsCurrent() || graph.disposed) return disposeStaleActivation(graph);
+          if (!timelineIsCurrent() && performance.now() < deadline) continue;
+          throw error;
+        }
       }
-      if (!activationIsCurrent()) return disposeStaleActivation(graph);
-    }
-    setAudioParamSmoothly(graph.dryGain.gain, 0, graph.context);
+    } else await processed;
+    if (!activationIsCurrent()) return disposeStaleActivation(graph);
+    if (!graph.nativeStream) setAudioParamSmoothly(graph.dryGain.gain, 0, graph.context);
     setAudioParamSmoothly(graph.wetGain.gain, 1, graph.context);
     spatial.enabled = true;
     spatial.loading = false;
@@ -8427,7 +9415,7 @@ async function activateOfficialGoogleObr(options = {}) {
       syncGoogleObrToggle();
       return false;
     }
-    return failGoogleObr(error, options);
+    return failGoogleObr(error, { ...options, graph: activationGraph });
   } finally {
     if (spatial.activationPromise === activation) spatial.activationPromise = null;
   }
@@ -8449,17 +9437,17 @@ async function setGoogleObrSpatialAudioEnabled(enabled, options = {}) {
     if (spatial.graph) {
       const graph = spatial.graph;
       window.clearTimeout(graph.disableTimer);
-      setAudioParamSmoothly(graph.dryGain.gain, 1, graph.context);
-      setAudioParamSmoothly(graph.wetGain.gain, 0, graph.context);
-      graph.disableTimer = window.setTimeout(() => {
+      if (graph.nativeStream) {
+        await disposeOfficialGoogleObrGraph(graph);
+      } else {
+        setAudioParamSmoothly(graph.dryGain.gain, 1, graph.context);
+        setAudioParamSmoothly(graph.wetGain.gain, 0, graph.context);
+        graph.disableTimer = window.setTimeout(() => {
         graph.disableTimer = 0;
-        if (graph.nativeStream) {
-          disposeOfficialGoogleObrGraph(graph);
-          return;
-        }
         graph.node.port.postMessage({ type: 'set-enabled', enabled: false });
         disconnectOfficialGoogleObrGraph(graph);
-      }, 70);
+        }, 70);
+      }
     }
     syncGoogleObrToggle();
     notifyNativeAudioChainChanged('disabled');
@@ -8519,8 +9507,10 @@ async function ensureNativeAudioMixerChain(request = {}) {
     clearGoogleObrRecovery();
     const graph = spatial.graph;
     if (graph) {
-      setAudioParamSmoothly(graph.dryGain?.gain, 1, graph.context, 0.03);
-      setAudioParamSmoothly(graph.wetGain?.gain, 0, graph.context, 0.03);
+      if (!graph.nativeStream) {
+        setAudioParamSmoothly(graph.dryGain?.gain, 1, graph.context, 0.03);
+        setAudioParamSmoothly(graph.wetGain?.gain, 0, graph.context, 0.03);
+      }
       await disposeOfficialGoogleObrGraph(graph);
     }
     setGoogleObrRuntimeBackend(false);
@@ -8534,6 +9524,14 @@ async function ensureNativeAudioMixerChain(request = {}) {
   spatial.channelLayout = control.upmixOutputLayout;
   spatial.nativeFallback = false;
   spatial.nativeError = '';
+  if (request?.reason === 'retry'
+      || !state.clientRuntime.nativeAudioActive
+      || state.clientRuntime.nativeAudio?.spatialStreaming !== true) {
+    // A backend outage during bootstrap must not permanently disable the mixer.
+    const operationId = spatial.operationId;
+    await refreshClientRuntime();
+    if (spatial.operationId !== operationId || !spatial.requested) return false;
+  }
   if (spatial.graph?.ready && spatial.graph.nativeStream !== true) {
     spatial.operationId += 1;
     spatial.enabled = false;
@@ -8627,8 +9625,10 @@ async function setGoogleObrChannelLayout(value, options = {}) {
   const staleActivation = spatial.activationPromise;
   const graph = spatial.graph;
   if (graph) {
-    setAudioParamSmoothly(graph.dryGain.gain, 1, graph.context, 0.03);
-    setAudioParamSmoothly(graph.wetGain.gain, 0, graph.context, 0.03);
+    if (!graph.nativeStream) {
+      setAudioParamSmoothly(graph.dryGain.gain, 1, graph.context, 0.03);
+      setAudioParamSmoothly(graph.wetGain.gain, 0, graph.context, 0.03);
+    }
     await disposeOfficialGoogleObrGraph(graph);
   }
   if (staleActivation) {
@@ -8688,6 +9688,12 @@ async function ensureAudioAnalysis(options = {}) {
   if (!AudioContextCtor || !els.audio) return false;
 
   const analysis = state.audioAnalysis;
+  // A MediaElementSource keeps the media clock moving while its AudioContext
+  // is suspended. Resume output before waiting for mixer/network discovery,
+  // especially after ended -> next where the previous track suspended it.
+  if (analysis.context && audioAnalysisPlaybackActive()) {
+    await resumeAudioAnalysis();
+  }
   if (
     !options.skipMixerControlRefresh
     && !state.obrSpatialAudio.mixerControl?.attempted
@@ -8703,7 +9709,7 @@ async function ensureAudioAnalysis(options = {}) {
       analysis.context = new AudioContextCtor();
     }
     analysis.backend = 'web-audio';
-    analysis.output = 'windows-wasapi';
+    analysis.output = MACOS_CLIENT ? 'macos-coreaudio' : 'windows-wasapi';
     analysis.sampleRate = analysis.context.sampleRate || 0;
     if (!state.clientRuntime.nativeAudioActive) state.clientRuntime.audioBackend = 'web-audio';
     state.clientRuntime.audioSampleRate = analysis.sampleRate;
@@ -8834,13 +9840,14 @@ function ensureAudioSpectrumAggregateLookup(analysis, dataLength, sampleRate) {
 
 function updateAudioSpectrum() {
   const analysis = state.audioAnalysis;
-  if (state.clientRuntime.nativeAudioActive && state.clientRuntime.settings.xAudio2) {
+  const macSpectrum = MACOS_CLIENT ? window.FeMonsterMacCapture?.latestSpectrum() : null;
+  if (!macSpectrum && state.clientRuntime.nativeAudioActive && state.clientRuntime.settings.xAudio2) {
     analysis.lastUpdateAt = 0;
     analysis.live = false;
     analysis.blocked = false;
     return true;
   }
-  if (!analysis.analyser || !analysis.data || els.audio.paused) {
+  if (!macSpectrum && (!analysis.analyser || !analysis.data || els.audio.paused)) {
     analysis.lastUpdateAt = 0;
     if (els.audio.paused) {
       analysis.live = false;
@@ -8863,13 +9870,13 @@ function updateAudioSpectrum() {
   const fluxResponse = audioFrameResponse(0.4, responseScale);
   const beatResponse = audioFrameResponse(0.42, responseScale);
 
-  analysis.analyser.getByteFrequencyData(analysis.data);
-  if (!analysis.previousData || analysis.previousData.length !== analysis.data.length) {
-    analysis.previousData = new Float32Array(analysis.data.length);
+  if (!macSpectrum) analysis.analyser.getByteFrequencyData(analysis.data);
+  const data = macSpectrum?.bins || analysis.data;
+  if (!analysis.previousData || analysis.previousData.length !== data.length) {
+    analysis.previousData = new Float32Array(data.length);
   }
 
-  const data = analysis.data;
-  const spectrumSampleRate = analysis.analyser.context?.sampleRate || analysis.sampleRate || 44100;
+  const spectrumSampleRate = macSpectrum?.sampleRate || analysis.analyser.context?.sampleRate || analysis.sampleRate || 44100;
   ensureAudioSpectrumAggregateLookup(analysis, data.length, spectrumSampleRate);
   const lastDataIndex = data.length - 1;
   const scaleBin = data.length / 512;
@@ -8958,6 +9965,12 @@ function updateAudioSpectrum() {
       analysis.blocked = true;
       analysis.lowFrequencyBands.fill(0);
       state.visual.lowFrequencyBands.fill(0);
+      if (macSpectrum) {
+        analysis.blocked = false;
+        for (const key of ['energy', 'bass', 'lowFrequencyAmplitude', 'beat', 'mid', 'treble', 'fluxPulse', 'fluxMeteor']) state.visual[key] = 0;
+        updateSpectrumUi();
+        return true;
+      }
       applyBridgeVisual();
       return false;
     }
@@ -9863,6 +10876,429 @@ function chladniRuntimeSnapshot() {
   };
 }
 
+function particleLyricsVisible() {
+  return state.playbackPage && state.textPreset === 'particle-lyrics' && textLyricsEnabled();
+}
+
+function setParticleLyricsEffect(key, value) {
+  const api = window.FeParticleLyricsSettings;
+  state.particleLyrics.effects = key === 'reset' ? api.normalize() : api.change(state.particleLyrics.effects, key, value);
+  window.FeParticleLyricsRuntime?.setSettings(state.particleLyrics.runtime, state.particleLyrics.effects);
+  const host = $('#particleLyricsSettings');
+  if (host) api.syncControls(host, state.particleLyrics.effects);
+  saveVisualSettingsPreferences();
+  requestOrbFrame();
+}
+
+function saveParticleLyricsTransform(transform) {
+  state.particleLyrics.effects = window.FeParticleLyricsSettings.normalize({ ...state.particleLyrics.effects, ...transform });
+  const host = $('#particleLyricsSettings');
+  if (host) window.FeParticleLyricsSettings.syncControls(host, state.particleLyrics.effects);
+  saveVisualSettingsPreferences();
+  requestOrbFrame();
+}
+
+function updateParticleLyricsVisibility() {
+  const visible = particleLyricsVisible();
+  const section = $('#particleLyricsScene');
+  const controls = $('#particleLyricsSettings');
+  if (section) section.hidden = !visible;
+  if (controls) {
+    controls.hidden = state.textPreset !== 'particle-lyrics';
+    if (!controls.hidden) window.FeParticleLyricsSettings.renderControls(controls, state.particleLyrics.effects, setParticleLyricsEffect);
+  }
+  if (!visible) {
+    if (state.particleLyrics.runtime) {
+      window.FeParticleLyricsRuntime.dispose(state.particleLyrics.runtime);
+      state.particleLyrics.lastDiagnostics = window.FeParticleLyricsRuntime.diagnostics(state.particleLyrics.runtime);
+      state.particleLyrics.runtime = null;
+    }
+    return;
+  }
+  if (state.particleLyrics.runtime || state.particleLyrics.loading || !heavyWebGLRenderingAllowed()) return;
+  state.particleLyrics.loading = ensurePresetRuntime('particle-lyrics').then(api => {
+    if (!particleLyricsVisible() || state.particleLyrics.runtime) return;
+    state.particleLyrics.runtime = api.create($('#particleLyricsCore'), {
+      settings: state.particleLyrics.effects,
+      onTransformChange: saveParticleLyricsTransform,
+      onInvalidate: requestOrbFrame,
+      mobile: MOBILE_RENDER_TARGET,
+      palette: state.playbackVisual.palette || fallbackLyricPalette(state.currentSong),
+      pixelRatio: renderPixelRatio('webgl'),
+      createRenderer: options => createDirectX11Renderer(window.THREE, options)
+    });
+    requestOrbFrame();
+  }).catch(error => {
+    console.warn('[particle-lyrics] unable to initialize', error);
+    if (particleLyricsVisible()) {
+      const accessible = $('#particleLyricsAccessible');
+      if (accessible) accessible.textContent = '粒子歌词加载失败，请重新选择此预设。';
+      toast('粒子歌词加载失败，请重新选择此预设');
+    }
+  }).finally(() => { state.particleLyrics.loading = null; });
+}
+
+function particleLyricHasContent(line) {
+  const text = safeText(line?.text, '').trim();
+  if (!text) return false;
+  // Some providers return timed display notices instead of an empty LRC.
+  // Match the whole notice, not words inside a genuine sung sentence.
+  const notice = text.normalize('NFKC').replace(/[\s\p{P}\p{S}\u200b-\u200d\ufeff]/gu, '').toLowerCase();
+  if (!notice || /^(?:(?:此歌曲为)?纯音乐(?:请欣赏|无歌词)?|(?:此歌曲為)?純音樂(?:請欣賞|無歌詞)?|暂无歌词|暫無歌詞|无歌词|無歌詞|没有歌词|沒有歌詞|请欣赏|請欣賞|(?:thissongis)?instrumental(?:music|version|only)?(?:pleaseenjoy)?|puremusic(?:pleaseenjoy)?|nolyrics?(?:available)?|lyrics?(?:notavailable|unavailable))$/.test(notice)) return false;
+  return !/^(?:作词|作詞|作曲|编曲|編曲|制作人|製作人|制作|製作|出品|发行|發行|词|詞|曲|lyricist|composer|arranger|producer|lyrics?(?:\s+by)?|music(?:\s+by)?)\s*[:：]/i.test(text);
+}
+
+function particleLyricContentState(runtime, lines) {
+  const cached = runtime.lyricContentCache;
+  if (cached?.lines === lines && cached.length === lines.length) return cached;
+  // Parsed lyric arrays are replaced on song/load/timing changes. Classify
+  // once per array, not with a full text/regex scan on every animation frame.
+  const usable = lines.map(particleLyricHasContent);
+  const first = usable.indexOf(true);
+  let previous = first;
+  const fallbackIndices = usable.map((hasContent, index) => {
+    if (hasContent) previous = index;
+    return previous;
+  });
+  runtime.lyricContentCache = { lines, length: lines.length, usable, first, fallbackIndices };
+  return runtime.lyricContentCache;
+}
+
+function updateParticleLyricsMotion() {
+  const r = state.particleLyrics.runtime;
+  if (!r || !particleLyricsVisible()) return;
+  const api = window.FeParticleLyricsRuntime;
+  const position = currentPlaybackLyricTime(Number(state.currentSong?.position) || 0);
+  const time = effectivePlaybackLyricTime(position);
+  const index = findLyricIndexAtDisplayTime(state.lyricLines, time);
+  const line = state.lyricLines[index];
+  const duration = Number(els.audio?.duration) || Number(state.currentSong?.duration) || 0;
+  const end = bookLyricProgressEndTime(line, state.lyricLines[index + 1]?.time || Number(line?.endTime) || duration);
+  const live = state.audioAnalysis.live ? state.audioAnalysis : state.visual;
+  const frame = state.particleLyrics.frame;
+  frame.now = performance.now();
+  frame.playing = isPlaybackClockRunning();
+  const lyricTrackKey = lyricSignatureForSong(state.currentSong);
+  const lyricContent = particleLyricContentState(r, state.lyricLines);
+  frame.lyricTrackKey = lyricTrackKey;
+  frame.hasLyrics = Boolean(
+    lyricTrackKey
+    && state.lyricSignature === lyricTrackKey
+    && state.lyricNoLyricSignature !== lyricTrackKey
+    && lyricContent.first >= 0
+  );
+  frame.hasLyric = frame.hasLyrics && lyricContent.usable[index] === true
+    && time >= Number(line.time) && (!end || time < end);
+  const fallbackIndex = frame.hasLyrics
+    ? (lyricContent.fallbackIndices[index] ?? lyricContent.first)
+    : -1;
+  const fallbackLine = fallbackIndex >= 0 ? state.lyricLines[fallbackIndex] : null;
+  const fallbackEnd = fallbackLine
+    ? bookLyricProgressEndTime(fallbackLine, state.lyricLines[fallbackIndex + 1]?.time || duration)
+    : 0;
+  frame.fallbackText = !frame.hasLyric ? safeText(fallbackLine?.text, '') : '';
+  frame.fallbackLyricKey = `${lyricTrackKey}|fallback|${fallbackIndex}`;
+  frame.fallbackLineStart = Number(fallbackLine?.time) || 0;
+  frame.fallbackLineEnd = fallbackEnd;
+  frame.fallbackGlyphTimings = !frame.hasLyric ? fallbackLine?.glyphTimings : undefined;
+  frame.text = frame.hasLyrics && lyricContent.usable[index] ? safeText(line?.text, '') : '';
+  frame.lyricKey = `${harmonicStateSongSignature()}|${index}`;
+  frame.lineStart = Number(line?.time) || 0;
+  frame.lineEnd = end;
+  frame.displayTime = time;
+  frame.audioTime = time;
+  if (line?.glyphTimings?.length) {
+    frame.glyphTimings = line.glyphTimings;
+  } else {
+    // Parsed lyric arrays are replaced when lyrics/timing calibration changes.
+    // Retain just the current line instead of allocating its glyphs every frame.
+    const words = line?.wordTimings;
+    const cached = r.lyricTimingCache;
+    if (!cached || cached.line !== line || cached.words !== words || cached.length !== words?.length || cached.end !== end) {
+      r.lyricTimingCache = { line, words, length: words?.length, end, glyphs: glyphTimingsFromWordTimings(words, end) };
+    }
+    frame.glyphTimings = r.lyricTimingCache.glyphs;
+  }
+  frame.bass = frame.playing ? Math.max(Number(live.lowFrequencyAmplitude) || 0, Number(live.bass) || 0, Number(live.subBass) || 0) : 0;
+  frame.beat = frame.playing ? Number(live.beat) || 0 : 0;
+  frame.reducedMotion = reducedMotion;
+  frame.fontFamily = textFontFamilyStack();
+  api.resize(r, renderPixelRatio('webgl'));
+  api.update(r, frame);
+  const accessible = $('#particleLyricsAccessible');
+  const accessibleText = frame.hasLyric ? frame.text : (frame.fallbackText || frame.text);
+  if (accessible && accessible.textContent !== accessibleText) accessible.textContent = accessibleText;
+}
+
+function particleLyricsRuntimeSnapshot() {
+  return window.FeParticleLyricsRuntime?.diagnostics(state.particleLyrics.runtime) || state.particleLyrics.lastDiagnostics || { active: false };
+}
+
+function setHarmonicStateEffect(key, value) {
+  const api = window.FeHarmonicSettings;
+  const field = api.schema.find(item => item.key === key);
+  if (!field) return;
+  const colorModeKey = ['colorA', 'colorB', 'colorC'].includes(key) ? 'colorMode'
+    : ({ towerColor: 'towerColorMode', cubeColor: 'cubeColorMode', fogColor: 'fogColorMode', coldAirColor: 'coldAirColorMode' })[key];
+  const next = api.normalize({
+    ...state.harmonicState.effects, [key]: value,
+    ...(colorModeKey ? { [colorModeKey]: 'custom' } : {})
+  });
+  if (next[key] === state.harmonicState.effects[key]
+      && (!colorModeKey || next[colorModeKey] === state.harmonicState.effects[colorModeKey])) return;
+  state.harmonicState.effects = next;
+  if (state.harmonicState.runtime) window.FeHarmonicStateRuntime?.setEffects?.(state.harmonicState.runtime, next);
+  syncHarmonicStateControls();
+  saveVisualSettingsPreferences();
+  requestOrbFrame();
+}
+
+function resetHarmonicStateEffects(groupName = '') {
+  const api = window.FeHarmonicSettings;
+  const source = groupName
+    ? { ...state.harmonicState.effects, ...Object.fromEntries(api.schema
+      .filter(field => field.group === groupName)
+      .map(field => [field.key, field.defaultValue])) }
+    : undefined;
+  state.harmonicState.effects = api.normalize(source);
+  if (state.harmonicState.runtime) {
+    window.FeHarmonicStateRuntime?.setEffects?.(state.harmonicState.runtime, state.harmonicState.effects);
+  }
+  syncHarmonicStateControls();
+  saveVisualSettingsPreferences();
+  requestOrbFrame();
+}
+
+function harmonicStateControlValue(field, value) {
+  if (field.format === 'percent') return `${Math.round(value * 100)}%`;
+  if (field.format === 'degrees') return `${Number(value.toFixed(1))}°`;
+  return typeof value === 'number' ? String(Number(value.toFixed(2))) : String(value);
+}
+
+function syncHarmonicStateControls() {
+  const list = els.diySelectedPresetConfigList;
+  if (!list) return;
+  list.querySelectorAll('[data-harmonic-effect]').forEach(control => {
+    const field = window.FeHarmonicSettings.schema.find(item => item.key === control.dataset.harmonicEffect);
+    if (!field) return;
+    const value = state.harmonicState.effects[field.key];
+    if (field.type === 'checkbox') control.checked = value;
+    else control.value = String(value);
+    const output = control.parentElement.querySelector('output');
+    if (output) output.textContent = harmonicStateControlValue(field, value);
+    if (field.type === 'range') control.setAttribute('aria-valuetext', harmonicStateControlValue(field, value));
+  });
+}
+
+function renderHarmonicStateControls() {
+  const list = els.diySelectedPresetConfigList;
+  if (!list) return;
+  if (list.dataset.harmonicSettingsMounted === 'true') {
+    syncHarmonicStateControls();
+    return;
+  }
+  clearElement(list);
+  list.dataset.harmonicSettingsMounted = 'true';
+  const groups = new Map();
+  for (const field of window.FeHarmonicSettings.schema) {
+    if (!groups.has(field.group)) {
+      const group = document.createElement('fieldset');
+      group.className = 'harmonic-settings-group';
+      const legend = document.createElement('legend');
+      legend.textContent = field.group;
+      const groupReset = document.createElement('button');
+      groupReset.type = 'button';
+      groupReset.className = 'harmonic-settings-group-reset';
+      groupReset.dataset.harmonicResetGroup = field.group;
+      groupReset.textContent = '恢复本组';
+      groupReset.setAttribute('aria-label', `恢复${field.group}默认设置`);
+      groupReset.addEventListener('click', () => resetHarmonicStateEffects(field.group));
+      legend.appendChild(groupReset);
+      group.appendChild(legend);
+      groups.set(field.group, group);
+      list.appendChild(group);
+    }
+    const row = document.createElement('div');
+    row.className = `harmonic-setting-row harmonic-setting-row--${field.type}`;
+    const label = document.createElement('label');
+    label.textContent = field.label;
+    const control = document.createElement(field.type === 'select' ? 'select' : 'input');
+    control.id = `harmonic-effect-${field.key}`;
+    control.dataset.harmonicEffect = field.key;
+    label.htmlFor = control.id;
+    if (field.type === 'select') {
+      field.options.forEach(option => {
+        const item = document.createElement('option');
+        item.value = option.value;
+        item.textContent = option.label;
+        control.appendChild(item);
+      });
+    } else {
+      control.type = field.type;
+      if (field.type === 'range') {
+        control.min = String(field.min);
+        control.max = String(field.max);
+        control.step = String(field.step);
+      }
+    }
+    const eventName = field.type === 'checkbox' || field.type === 'select' ? 'change' : 'input';
+    control.addEventListener(eventName, () => {
+      const value = field.type === 'checkbox' ? control.checked
+        : field.type === 'range' ? Number(control.value) : control.value;
+      setHarmonicStateEffect(field.key, value);
+    });
+    row.append(label, control);
+    if (field.type === 'range' || field.type === 'color') {
+      const output = document.createElement('output');
+      output.setAttribute('for', control.id);
+      row.appendChild(output);
+    }
+    groups.get(field.group).appendChild(row);
+  }
+  const reset = document.createElement('button');
+  reset.type = 'button';
+  reset.className = 'harmonic-settings-reset';
+  reset.textContent = '恢复谐波默认设置';
+  reset.addEventListener('click', () => resetHarmonicStateEffects());
+  list.appendChild(reset);
+  syncHarmonicStateControls();
+}
+
+function buildHarmonicState() {
+  if (!els.harmonicStateCore || state.harmonicState.runtime || !window.FeHarmonicStateRuntime || !window.THREE) return;
+  if (!heavyWebGLRenderingAllowed()) return;
+  const lowEndAndroid = ANDROID_CLIENT && RENDER_PROFILE.tier === 'economy';
+  const particleCount = lowEndAndroid
+    ? 36000
+    : MOBILE_RENDER_TARGET
+      ? 52000
+      : 96000;
+  state.harmonicState.runtime = window.FeHarmonicStateRuntime.create(els.harmonicStateCore, {
+    particleCount,
+    effects: state.harmonicState.effects,
+    palette: state.harmonicState.palette || fallbackLyricPalette(state.currentSong),
+    pixelRatio: renderPixelRatio('webgl'),
+    createRenderer: (options) => createDirectX11Renderer(window.THREE, options)
+  });
+  applyHarmonicStatePalette(state.harmonicState.palette || fallbackLyricPalette(state.currentSong));
+}
+
+function applyHarmonicStatePalette(palette) {
+  const source = palette || fallbackLyricPalette(state.currentSong);
+  state.harmonicState.palette = source;
+  if (state.harmonicState.runtime && window.FeHarmonicStateRuntime) {
+    window.FeHarmonicStateRuntime.setPalette(state.harmonicState.runtime, source);
+  }
+}
+
+function disposeHarmonicState() {
+  const runtime = state.harmonicState.runtime;
+  if (!runtime || !window.FeHarmonicStateRuntime) return;
+  const before = window.FeHarmonicStateRuntime.diagnostics(runtime);
+  window.FeHarmonicStateRuntime.dispose(runtime);
+  state.harmonicState.lastDiagnostics = {
+    ...before,
+    ...window.FeHarmonicStateRuntime.diagnostics(runtime)
+  };
+  state.harmonicState.runtime = null;
+}
+
+function resizeHarmonicStateRenderer() {
+  if (!state.harmonicState.runtime || !window.FeHarmonicStateRuntime) return;
+  window.FeHarmonicStateRuntime.resize(state.harmonicState.runtime, renderPixelRatio('webgl'));
+}
+
+function updateHarmonicStateVisibility() {
+  const visible = state.playbackPage && isHarmonicStatePreset();
+  if (els.harmonicStateScene) els.harmonicStateScene.hidden = !visible;
+  if (els.appShell) els.appShell.classList.toggle('has-harmonic-state', visible);
+  if (visible) buildHarmonicState();
+  else disposeHarmonicState();
+}
+
+function harmonicStateSongSignature() {
+  const song = state.currentSong || {};
+  return [safeText(song.provider, ''), safeText(song.id, ''), safeText(song.title, ''), safeText(song.artist, '')].join('|');
+}
+
+function harmonicStateLyricWindow(displayTime) {
+  const index = findLyricIndexAtDisplayTime(state.lyricLines, displayTime);
+  const song = state.currentSong || {};
+  const entries = Array.from({ length: 7 }, (_, slot) => {
+    const offset = slot - 3;
+    const lineIndex = index + offset;
+    const line = state.lyricLines[lineIndex];
+    return {
+      key: `${harmonicStateSongSignature()}|${lineIndex}`,
+      text: safeText(line && line.text, safeText(song.title, 'HARMONIC\nSTATE')),
+      subtitle: playbackLyricSecondaryText(line, song),
+      active: offset === 0
+    };
+  });
+  return { index, entries, previous: entries[2].text, current: entries[3].text, next: entries[4].text };
+}
+
+function updateHarmonicStateMotion() {
+  const runtime = state.harmonicState.runtime;
+  if (!state.playbackPage || !isHarmonicStatePreset() || !runtime || !window.FeHarmonicStateRuntime) return;
+  const playing = isPlaybackClockRunning();
+  const live = state.audioAnalysis.live ? state.audioAnalysis : state.visual;
+  const frame = state.harmonicState.frame;
+  frame.now = performance.now();
+  frame.playing = playing;
+  frame.effects = state.harmonicState.effects;
+  frame.bass = playing
+    ? Math.max(Number(live.lowFrequencyAmplitude) || 0, Number(live.bass) || 0, Number(live.subBass) || 0)
+    : 0;
+  frame.energy = playing ? Number(live.energy) || 0 : 0;
+  frame.mid = playing ? Math.max(Number(live.mid) || 0, Number(live.highMid) || 0) : 0;
+  frame.treble = playing ? Math.max(Number(live.treble) || 0, Number(live.brilliance) || 0) : 0;
+  frame.beat = playing ? Number(live.beat) || 0 : 0;
+  frame.yaw = state.playbackVisual.yaw;
+  frame.pitch = state.playbackVisual.pitch;
+  frame.zoom = clamp(state.harmonicState.zoom || HARMONIC_DEFAULT_ZOOM, 0.58, 2.35);
+  frame.reducedMotion = reducedMotion;
+  frame.pixelRatio = presetFsrOutputPixelRatio(state.presetFsr.lastDiagnostics);
+  frame.title = safeText(state.currentSong && state.currentSong.title, 'HARMONIC\nSTATE');
+  frame.subtitle = safeText(state.currentSong && state.currentSong.artist, 'FE MONSTER');
+  const songSignature = harmonicStateSongSignature();
+  if (songSignature !== state.harmonicState.lastSongSignature) {
+    state.harmonicState.lastSongSignature = songSignature;
+    applyHarmonicStatePalette();
+  }
+  const duration = Number(els.audio && els.audio.duration) || Number(state.currentSong && state.currentSong.duration) || 0;
+  const position = currentPlaybackLyricTime(Number(state.currentSong && state.currentSong.position) || 0);
+  const displayTime = effectivePlaybackLyricTime(position);
+  const lyricWindow = harmonicStateLyricWindow(displayTime);
+  frame.lines = lyricWindow;
+  frame.entries = lyricWindow.entries;
+  frame.songKey = songSignature;
+  frame.lyricKey = `${songSignature}|${lyricWindow.index}`;
+  frame.coverUrl = proxiedImageUrl(safeText(state.currentSong && state.currentSong.cover, ''));
+  const line = state.lyricLines[lyricWindow.index];
+  const nextLine = state.lyricLines[lyricWindow.index + 1];
+  const lineEnd = nextLine ? nextLine.time : Number(line && line.endTime) || duration;
+  frame.lyricFraction = line ? lyricProgressForLineAtTime(line, displayTime, bookLyricProgressEndTime(line, lineEnd)) : 0;
+  frame.progress = duration > 0 ? clamp(position / duration, 0, 1) : 0;
+  window.FeHarmonicStateRuntime.update(runtime, frame);
+}
+
+function harmonicStateRuntimeSnapshot() {
+  if (state.harmonicState.runtime && window.FeHarmonicStateRuntime) {
+    return {
+      ...window.FeHarmonicStateRuntime.diagnostics(state.harmonicState.runtime),
+      selected: isHarmonicStatePreset(),
+      controlsVisible: false
+    };
+  }
+  return {
+    ...(state.harmonicState.lastDiagnostics || {}),
+    active: false,
+    selected: isHarmonicStatePreset(),
+    canvasCount: els.harmonicStateCore ? els.harmonicStateCore.querySelectorAll('canvas').length : 0
+  };
+}
+
 const SOUNDSCAPE_WORKSHOP_ENTRY_URL = 'assets/soundscape-workshop/runtime.html';
 
 function soundscapeWorkshopApi() {
@@ -10188,7 +11624,8 @@ function updateSoundscapeWorkshopVisibility() {
 
 function soundscapeWorkshopAudioValues() {
   if (state.audioAnalysis.live) {
-    return state.audioAnalysis.data || state.audioAnalysis.frequencyData || [];
+    return (MACOS_CLIENT ? window.FeMonsterMacCapture?.latestSpectrum()?.bins : null)
+      || state.audioAnalysis.data || state.audioAnalysis.frequencyData || [];
   }
   // Desktop client native-audio path: the Web Audio analyser is suspended in
   // favor of XAudio2 loopback capture, so state.visual carries the 512-bin
@@ -15093,7 +16530,7 @@ function coverParticlePresetVisible() {
 function playCoverParticleEngine() {
   const cover = state.coverParticle;
   const container = cover.engineContainer;
-  if (!cover.engineVisible || !coverParticlePresetVisible() || !isPlaybackClockRunning() || cover.enginePlaying || typeof container?.play !== 'function') return;
+  if (cover.renderMode === 'sketch' || !cover.engineVisible || !coverParticlePresetVisible() || !isPlaybackClockRunning() || cover.enginePlaying || typeof container?.play !== 'function') return;
   try {
     container.play();
     cover.enginePlaying = true;
@@ -15112,6 +16549,13 @@ function pauseCoverParticleEngine(force = false) {
 
 function disposeCoverParticleResources() {
   const cover = state.coverParticle;
+  cover.sketchRenderer?.destroy();
+  cover.sketchRenderer = null;
+  cover.sketchLastFrameAt = 0;
+  if (els.coverSketchCanvas) {
+    els.coverSketchCanvas.width = 1;
+    els.coverSketchCanvas.height = 1;
+  }
   pauseCoverParticleEngine(true);
   cover.imageSignature = '';
   if (cover.image) {
@@ -15150,6 +16594,7 @@ function disposeCoverParticleResources() {
   cover.motionGate = 0;
   cover.wholeJump = 0;
   cover.bassJitter = 0;
+  cover.lightTime = 0;
   cover.lastWidth = 0;
   cover.lastHeight = 0;
   cover.lastDpr = 0;
@@ -15191,11 +16636,12 @@ function updateCoverParticleVisibility() {
   if (visible) {
     applyCoverParticlePalette(state.coverParticle.palette || fallbackLyricPalette(state.currentSong));
     updateCoverParticleImage(state.currentSong);
-    if (visibilityChanged) ensureCoverParticleEngine().then(playCoverParticleEngine);
+    if (visibilityChanged && state.coverParticle.renderMode !== 'sketch') ensureCoverParticleEngine().then(playCoverParticleEngine);
     syncSceneWallpaperSurface('cover-particles');
   } else if (
     visibilityChanged
     || state.coverParticle.gpuRenderer
+    || state.coverParticle.sketchRenderer
     || state.coverParticle.particles.length
     || state.coverParticle.wallpaperImage
   ) {
@@ -15204,6 +16650,7 @@ function updateCoverParticleVisibility() {
 }
 
 function updateCoverParticleBackgroundMode() {
+  syncCoverVisualControls();
   const enabled = !!state.coverParticle.backgroundEnabled && coverParticlePresetVisible();
   if (els.coverParticleScene) els.coverParticleScene.classList.toggle('has-soft-background', enabled);
   if (els.diyCoverParticleBackgroundToggle) {
@@ -15260,6 +16707,107 @@ function updateCoverParticleBackgroundMode() {
   }
 }
 
+function syncCoverVisualControls() {
+  const cover = state.coverParticle;
+  const sketch = cover.renderMode === 'sketch';
+  if (els.coverParticleCanvas) els.coverParticleCanvas.hidden = sketch;
+  if (els.coverSketchCanvas) els.coverSketchCanvas.hidden = !sketch;
+  if (els.coverParticleEngine) els.coverParticleEngine.hidden = sketch;
+  els.coverParticleScene?.setAttribute('aria-label', sketch ? '素描封面' : '粒子封面');
+  const controls = els.diyCoverParticleControl;
+  if (!controls) return;
+  controls.querySelectorAll('[data-cover-render-mode]').forEach((button) => {
+    button.setAttribute('aria-pressed', String(button.dataset.coverRenderMode === cover.renderMode));
+  });
+  const depthMapToggle = document.getElementById('coverDepthMapToggle');
+  if (depthMapToggle) {
+    depthMapToggle.setAttribute('aria-pressed', String(cover.depthMapEnabled));
+    depthMapToggle.textContent = cover.depthMapEnabled ? '深度图：开启' : '深度图：关闭';
+  }
+  controls.querySelectorAll('[data-cover-mode-controls]').forEach((group) => {
+    group.hidden = group.dataset.coverModeControls !== cover.renderMode;
+  });
+  const depthStatus = document.getElementById('coverDepthStatus');
+  if (depthStatus) {
+    const inactive = !cover.depthEnabled || cover.depthStrength <= 0;
+    depthStatus.dataset.inactive = String(inactive);
+    depthStatus.textContent = !cover.depthEnabled
+      ? '深度效果已关闭。开启后可显示封面的立体层次。'
+      : cover.depthStrength <= 0
+        ? '深度强度为 0%，位移与光照均未生效。提高强度或恢复默认值即可启用。'
+        : !cover.depthLightingEnabled || cover.depthLightStrength <= 0
+          ? '深度已启用；光照已关闭，拖动封面可查看立体层次。'
+          : cover.depthLightSpeed <= 0
+            ? '深度已启用；扫光速度为 0%，光源保持静止。'
+            : '深度与扫光已启用，随当前封面自动更新。';
+  }
+  controls.querySelectorAll('[data-cover-setting]').forEach((input) => {
+    const key = input.dataset.coverSetting;
+    const value = cover[key];
+    if (input.tagName === 'SELECT') {
+      input.value = String(value);
+    } else if (input.type === 'checkbox') {
+      input.checked = !!value;
+    } else {
+      const scaled = Math.round(value * (key === 'sketchLayers' || key === 'depthLightAngle' ? 1 : 100));
+      input.value = String(scaled);
+      const text = key === 'sketchLayers' ? `${scaled} 层` : key === 'depthLightAngle' ? `${scaled}°` : `${scaled}%`;
+      input.setAttribute('aria-valuetext', text);
+      const output = document.getElementById(`${input.id}Value`);
+      if (output) output.textContent = text;
+      syncElasticRangeVisual(input);
+    }
+    if (key === 'depthStrength' || key === 'depthContrast' || key === 'depthInvert') {
+      input.disabled = !cover.depthEnabled;
+    }
+    if (key === 'depthLightingEnabled') input.disabled = !cover.depthEnabled;
+    else if (['depthLightStrength', 'depthAmbient', 'depthLightAngle', 'depthLightSpeed', 'depthHighlight'].includes(key)) {
+      input.disabled = !cover.depthEnabled || !cover.depthLightingEnabled;
+    }
+  });
+
+}
+
+function setCoverRenderMode(mode) {
+  const cover = state.coverParticle;
+  cover.renderMode = mode === 'sketch' ? 'sketch' : 'particles';
+  cover.sketchLastFrameAt = 0;
+  cover.gpuRenderSignature = '';
+  if (cover.renderMode === 'sketch') pauseCoverParticleEngine(true);
+  else if (coverParticlePresetVisible()) ensureCoverParticleEngine().then(playCoverParticleEngine);
+  saveCoverParticlePreferences();
+  updateCoverParticleBackgroundMode();
+  renderDiySelectedPresetConfig();
+  requestOrbFrame();
+}
+
+function setCoverVisualSetting(key, value) {
+  const settings = normalizeCoverVisualSettings(state.coverParticle);
+  if (!Object.prototype.hasOwnProperty.call(settings, key) || key === 'renderMode') return false;
+  Object.assign(state.coverParticle, normalizeCoverVisualSettings({ ...settings, [key]: value }));
+  state.coverParticle.sketchLastFrameAt = 0;
+  state.coverParticle.gpuRenderSignature = '';
+  saveCoverParticlePreferences();
+  updateCoverParticleBackgroundMode();
+  renderDiySelectedPresetConfig();
+  requestOrbFrame();
+  return true;
+}
+
+function resetCoverDepthSettings() {
+  const defaults = normalizeCoverVisualSettings();
+  for (const [key, value] of Object.entries(defaults)) {
+    if (key.startsWith('depth') && key !== 'depthMapEnabled') state.coverParticle[key] = value;
+  }
+  state.coverParticle.lightTime = 0;
+  state.coverParticle.sketchLastFrameAt = 0;
+  state.coverParticle.gpuRenderSignature = '';
+  saveCoverParticlePreferences();
+  updateCoverParticleBackgroundMode();
+  renderDiySelectedPresetConfig();
+  requestOrbFrame();
+}
+
 function coverParticleMotionPercent() {
   return Math.round(clamp(Number(state.coverParticle.motionAmplitude) || 0, 0, 2) * 100);
 }
@@ -15274,6 +16822,22 @@ function coverParticleFloatSpeedPercent() {
 
 function coverParticleFloatSpeedScale() {
   return normalizeCoverParticleFloatSpeed(state.coverParticle.floatSpeed);
+}
+
+// Keep a very small amount of cover motion while playback is idle.  The
+// particle shader already has cached per-particle phases, so this only keeps
+// its clock alive; it does not allocate or rebuild the particle buffers.
+function coverParticleIdleMotionGate() {
+  const cover = state.coverParticle;
+  return !reducedMotion
+    && !isPlaybackClockRunning()
+    && coverParticlePresetVisible()
+    && cover.renderMode === 'particles'
+    && cover.particles.length > 0
+    && coverParticleMotionScale() > 0
+    && coverParticleFloatSpeedScale() > 0
+    ? 1
+    : 0;
 }
 
 function addSonicTopographyRipple(x, z, strength = 1, white = false) {
@@ -16556,6 +18120,8 @@ function applyQishuiPlaybackLyricPalette(coverPalette) {
 function applyLyricPalette(palette) {
   if (!palette) return;
   state.playbackVisual.palette = palette;
+  applyHarmonicStatePalette(palette);
+  window.FeParticleLyricsRuntime?.setPalette(state.particleLyrics.runtime, palette);
   applyQishuiPlaybackPalette(palette);
   const lyricPalette = resolvedTextLyricPalette(palette);
   const target = els.playbackLyricScene;
@@ -16614,6 +18180,8 @@ function applyLyricPalette(palette) {
   if (els.textPaletteControl) {
     els.textPaletteControl.style.setProperty('--text-palette-auto-color', rgbCss(palette.primary));
   }
+  syncLyricHighlightParticleRendererColor(palette);
+  syncLyricParticlePaletteControls();
   applyDynamicCubePalette(palette);
   applyFreeCubePalette(palette);
   applyChladniPalette(palette);
@@ -16859,6 +18427,9 @@ function resetCoverParticleSamples() {
   state.coverParticle.particles = [];
   state.coverParticle.gpuSignature = '';
   state.coverParticle.gpuRenderSignature = '';
+  state.coverParticle.sketchRenderer?.reset();
+  state.coverParticle.sketchLastFrameAt = 0;
+  requestOrbFrame();
 }
 
 function updateCoverParticleImage(song = state.currentSong) {
@@ -16874,6 +18445,7 @@ function updateCoverParticleImage(song = state.currentSong) {
     state.coverParticle.image = null;
   }
   state.coverParticle.imageSignature = signature;
+  syncCoverVisualControls();
   resetCoverParticleSamples();
   if (!url) {
     state.coverParticle.image = null;
@@ -17001,18 +18573,21 @@ function bookGlyphEase(value) {
   return x * x * (3 - 2 * x);
 }
 
-const BOOK_LYRIC_VISUAL_LEAD_SECONDS = 0.34;
-const BOOK_LYRIC_GLYPH_VISUAL_LEAD_SECONDS = 0.045;
-const BOOK_LYRIC_MIN_GLYPH_VISUAL_SECONDS = 0.08;
+const BOOK_LYRIC_VISUAL_LEAD_SECONDS = 0;
+const BOOK_LYRIC_GLYPH_VISUAL_LEAD_SECONDS = 0;
 const BOOK_LYRIC_GLYPH_SAMPLE_SECONDS = 0;
 const BOOK_LYRIC_ROLL_WINDOW_GLYPHS = 1.2;
-const LYRIC_TIMESTAMP_COMPENSATION_SECONDS = 0.22;
-const MULTI_ROW_LYRIC_VISUAL_LEAD_SECONDS = LYRIC_TIMESTAMP_COMPENSATION_SECONDS;
+const LYRIC_TIMESTAMP_COMPENSATION_SECONDS = 0;
+const MULTI_ROW_LYRIC_VISUAL_LEAD_SECONDS = 0;
+const DESKTOP_SCENE_LYRIC_EXTRAPOLATION_MAX_SECONDS = 0.5;
+const DESKTOP_SCENE_LYRIC_PUBLISH_INTERVAL_MS = 80;
 const BOOK_LYRIC_SCROLL_SNAP_PX = 0.65;
 const BOOK_LYRIC_SCROLL_MIN_STEP_SECONDS = 0;
 const BOOK_LYRIC_SCROLL_MAX_STEP_SECONDS = 0.08;
-const QISHUI_LYRIC_TRANSITION_SECONDS = 0.18;
-const QISHUI_LYRIC_SCROLL_SETTLE_SECONDS = 0.024;
+// Line changes must visually settle inside a single perceptual beat without
+// advancing the provider timeline. The media clock remains authoritative.
+const QISHUI_LYRIC_TRANSITION_SECONDS = 0.075;
+const QISHUI_LYRIC_SCROLL_SETTLE_SECONDS = 0.01;
 const QISHUI_SEEK_HANDOFF_TOLERANCE_SECONDS = 0.08;
 const QISHUI_SEEK_HANDOFF_MAX_MS = 1600;
 
@@ -17034,6 +18609,29 @@ function resetBookLyricScrollState(options = {}) {
   store[layoutVersionKey] = (Number(store[layoutVersionKey]) || 0) + 1;
 }
 
+// Book and playback-card lyric pages use a transform instead of a clipping
+// scroll container so future lines can extend beyond their layout boxes.
+function lyricListViewportIsTransform(list) {
+  return !!(list && list.dataset && list.dataset.lyricOffset === 'transform');
+}
+
+function lyricListViewportOffset(list) {
+  if (!list) return 0;
+  if (lyricListViewportIsTransform(list)) return Number(list.__lyricOffset) || 0;
+  return Number(list.scrollTop) || 0;
+}
+
+function setLyricListViewportOffset(list, value) {
+  if (!list) return 0;
+  if (lyricListViewportIsTransform(list)) {
+    list.__lyricOffset = value;
+    list.style.setProperty('--lyric-offset', `${Math.round(value * 100) / 100}px`);
+    return value;
+  }
+  list.scrollTop = value;
+  return Number(list.scrollTop) || 0;
+}
+
 function bookLyricTargetScrollTop(line, options = {}) {
   const list = options.list || els.bookLyricList;
   const store = options.store || state;
@@ -17051,14 +18649,36 @@ function bookLyricTargetScrollTop(line, options = {}) {
   ) {
     return line.__bookScrollTarget;
   }
-  const maxScroll = Math.max(0, scrollHeight - clientHeight);
-  const target = line.offsetTop - Math.max(0, (clientHeight - line.offsetHeight) / 2);
-  const scrollTop = clamp(target, 0, maxScroll);
+  let target = line.offsetTop - Math.max(0, (clientHeight - line.offsetHeight) / 2);
+  // Preserve readable type: move the visible window near song boundaries
+  // instead of shrinking every lyric to keep the active row exactly centered.
+  const cardLines = list.__qishuiPlaybackLyricLines;
+  const activeIndex = options.activeIndex;
+  if (lyricListViewportIsTransform(list) && Array.isArray(cardLines) && Number.isInteger(activeIndex)) {
+    const count = Number(list.dataset.visibleLineCount) || 3;
+    const start = Math.max(0, Math.min(activeIndex - Math.floor(count / 2), cardLines.length - count));
+    const end = Math.min(cardLines.length - 1, start + count - 1);
+    const first = cardLines[start];
+    const last = cardLines[end];
+    if (first && last) {
+      const minimum = last.offsetTop + last.offsetHeight - clientHeight + 16;
+      const maximum = first.offsetTop - 16;
+      target = minimum <= maximum
+        ? clamp(target, minimum, maximum)
+        : (minimum + maximum) / 2;
+    }
+  }
+  // Transform-based lyric pages have no clipping boundary: keep the active
+  // line on the reading axis even at the first and last song timestamps.
+  // Retain the clamped path for callers that still use native scrollTop.
+  const offset = lyricListViewportIsTransform(list)
+    ? target
+    : clamp(target, 0, Math.max(0, scrollHeight - clientHeight));
   line.__bookScrollVersion = layoutVersion;
   line.__bookScrollClientHeight = clientHeight;
   line.__bookScrollHeight = scrollHeight;
-  line.__bookScrollTarget = scrollTop;
-  return scrollTop;
+  line.__bookScrollTarget = offset;
+  return offset;
 }
 
 function syncBookLyricScroll(line, options = {}) {
@@ -17078,17 +18698,13 @@ function syncBookLyricScroll(line, options = {}) {
   const targetChanged = !Number.isFinite(previousTarget) || Math.abs(previousTarget - target) > BOOK_LYRIC_SCROLL_SNAP_PX;
   store[targetKey] = target;
 
-  const current = Number(list.scrollTop) || 0;
-  const delta = target - current;
-  if (Math.abs(delta) <= BOOK_LYRIC_SCROLL_SNAP_PX) {
-    list.scrollTop = target;
-    store[frameAtKey] = now;
-    return true;
-  }
-
   const clockTime = Number(options.clockTime);
   const previousClockTime = Number(store[clockTimeKey]);
   const usesMediaClock = Number.isFinite(clockTime);
+  const mediaClockChanged = usesMediaClock && (
+    !Number.isFinite(previousClockTime)
+    || Math.abs(clockTime - previousClockTime) > Number.EPSILON
+  );
   const lastAt = Number(store[frameAtKey]) || now;
   const dt = usesMediaClock
     ? clamp(
@@ -17103,14 +18719,30 @@ function syncBookLyricScroll(line, options = {}) {
       );
   store[frameAtKey] = now;
   if (usesMediaClock) store[clockTimeKey] = clockTime;
+  if (usesMediaClock && dt <= 0 && !mediaClockChanged && !targetChanged) return false;
+
+  const current = lyricListViewportOffset(list);
+  const delta = target - current;
+  if (Math.abs(delta) <= BOOK_LYRIC_SCROLL_SNAP_PX) {
+    setLyricListViewportOffset(list, target);
+    return true;
+  }
+
+  // A provider timestamp is a discrete line boundary, not an animation
+  // destination. Once the authoritative media clock selects a new target,
+  // place that line at the reading axis in the same frame. Continuing to
+  // integrate the old scroll position makes correct timestamps look late.
+  if (usesMediaClock && targetChanged) {
+    setLyricListViewportOffset(list, target);
+    return true;
+  }
 
   const reducedMotionEnabled = options.reducedMotion ?? state.orb.reducedMotion;
   const playbackRunning = options.playbackRunning ?? isPlaybackClockRunning();
   if (reducedMotionEnabled || !playbackRunning || Math.abs(delta) > list.clientHeight * 1.4) {
-    list.scrollTop = target;
+    setLyricListViewportOffset(list, target);
     return true;
   }
-  if (usesMediaClock && dt <= 0) return false;
 
   const configuredResponseSeconds = Number(options.responseSeconds);
   let easedDelta = 0;
@@ -17130,17 +18762,16 @@ function syncBookLyricScroll(line, options = {}) {
     const step = clamp(dt / responseSeconds, targetChanged ? 0.28 : 0.08, 0.82);
     easedDelta = delta * bookGlyphEase(step);
   }
-  list.scrollTop = current + easedDelta;
-  const observed = Number(list.scrollTop) || 0;
+  const observed = setLyricListViewportOffset(list, current + easedDelta);
   // Chromium can quantize a sub-pixel scroll write back to the same CSS pixel.
   if (
     Math.abs(observed - current) < 0.01
     && Math.abs(delta) > BOOK_LYRIC_SCROLL_SNAP_PX
   ) {
-    list.scrollTop = current + Math.sign(delta) * Math.min(1, Math.abs(delta));
+    setLyricListViewportOffset(list, current + Math.sign(delta) * Math.min(1, Math.abs(delta)));
   }
-  if (Math.abs(target - list.scrollTop) <= BOOK_LYRIC_SCROLL_SNAP_PX) {
-    list.scrollTop = target;
+  if (Math.abs(target - lyricListViewportOffset(list)) <= BOOK_LYRIC_SCROLL_SNAP_PX) {
+    setLyricListViewportOffset(list, target);
     return true;
   }
   return false;
@@ -17151,6 +18782,8 @@ function cachedBookLyricGlyphs(line) {
   if (Array.isArray(line.__bookGlyphs)) return line.__bookGlyphs;
   const glyphs = Array.from(line.querySelectorAll('.book-lyric-glyph:not(.book-lyric-glyph--space)'));
   let hasTimedGlyphs = false;
+  let firstTime = Number.POSITIVE_INFINITY;
+  let settledTime = Number.NEGATIVE_INFINITY;
   glyphs.forEach((glyph, fallbackIndex) => {
     const index = Number(glyph.dataset.bookGlyphIndex);
     glyph.__bookGlyphIndex = Number.isFinite(index) ? index : fallbackIndex;
@@ -17158,10 +18791,25 @@ function cachedBookLyricGlyphs(line) {
     const end = Number(glyph.dataset.bookGlyphEnd);
     glyph.__bookGlyphStart = start;
     glyph.__bookGlyphEnd = end;
-    if (Number.isFinite(start) && Number.isFinite(end) && end > start) hasTimedGlyphs = true;
+    if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
+      hasTimedGlyphs = true;
+      const visualStart = start - BOOK_LYRIC_GLYPH_VISUAL_LEAD_SECONDS;
+      firstTime = Math.min(firstTime, visualStart - BOOK_LYRIC_GLYPH_SAMPLE_SECONDS);
+      // The rolling glow reaches zero at normalized glyph time 1.44.
+      settledTime = Math.max(settledTime, visualStart
+        + Math.max(0.001, end - visualStart) * 1.44 - BOOK_LYRIC_GLYPH_SAMPLE_SECONDS);
+    }
   });
   line.__bookGlyphs = glyphs;
   line.__bookHasTimedGlyphs = hasTimedGlyphs;
+  line.__bookGlyphFirstTime = firstTime;
+  line.__bookGlyphSettledTime = settledTime;
+  line.__bookGlyphLayers = {
+    mainBase: line.querySelector('.book-lyric-copy--base'),
+    mainHot: line.querySelector('.book-lyric-copy--hot'),
+    translationBase: line.querySelector('.book-lyric-translation-copy--base'),
+    translationHot: line.querySelector('.book-lyric-translation-copy--hot')
+  };
   return glyphs;
 }
 
@@ -17170,16 +18818,19 @@ function setBookLyricGlyphProgress(line, progressPercent, currentTime = Number.N
   const glyphs = cachedBookLyricGlyphs(line);
   const progressValue = clamp(Number(progressPercent) || 0, 0, 100);
   const timed = !!line.__bookHasTimedGlyphs && Number.isFinite(Number(currentTime));
+  // Outside the glyph animation window, advancing media time cannot change
+  // any glyph. Reuse the settled frame instead of walking every character.
+  // Seeking back into the window still produces a fresh key immediately.
+  const glyphTime = timed
+    ? clamp(Number(currentTime), line.__bookGlyphFirstTime, line.__bookGlyphSettledTime)
+    : Number.NaN;
   const progressKey = timed
-    ? `t:${Number(currentTime).toFixed(3)}`
+    ? `t:${glyphTime.toFixed(3)}|p:${progressValue.toFixed(2)}`
     : `p:${progressValue.toFixed(2)}`;
   if (line.__bookGlyphProgress === progressKey) return;
   line.__bookGlyphProgress = progressKey;
-  const mainBase = line.querySelector('.book-lyric-copy--base');
-  const mainHot = line.querySelector('.book-lyric-copy--hot');
+  const { mainBase, mainHot, translationBase, translationHot } = line.__bookGlyphLayers;
   setSequentialLyricHighlight(mainHot, mainBase, progressValue);
-  const translationBase = line.querySelector('.book-lyric-translation-copy--base');
-  const translationHot = line.querySelector('.book-lyric-translation-copy--hot');
   setSequentialLyricHighlight(translationHot, translationBase, progressValue);
   if (!glyphs.length) return;
 
@@ -17191,9 +18842,11 @@ function setBookLyricGlyphProgress(line, progressPercent, currentTime = Number.N
 
     if (timed && Number.isFinite(glyph.__bookGlyphStart) && Number.isFinite(glyph.__bookGlyphEnd)) {
       const start = glyph.__bookGlyphStart - BOOK_LYRIC_GLYPH_VISUAL_LEAD_SECONDS;
-      const end = Math.max(start + BOOK_LYRIC_MIN_GLYPH_VISUAL_SECONDS, glyph.__bookGlyphEnd);
-      const timedProgress = (Number(currentTime) + BOOK_LYRIC_GLYPH_SAMPLE_SECONDS - start) / Math.max(0.001, end - start);
-      hot = bookGlyphEase(timedProgress);
+      const end = glyph.__bookGlyphEnd;
+      const timedProgress = (glyphTime + BOOK_LYRIC_GLYPH_SAMPLE_SECONDS - start) / Math.max(0.001, end - start);
+      // Provider glyph timestamps already describe the vocal clock. Easing this value
+      // makes the highlight trail during the first half, then run ahead in the second.
+      hot = clamp(timedProgress, 0, 1);
       roll = bookGlyphEase(1 - Math.abs(timedProgress - 0.72) / 0.72);
     } else {
       hot = bookGlyphEase(head - glyphIndex);
@@ -17272,6 +18925,9 @@ function scheduleBookLyricFit() {
   state.lyricBookFitFrame = window.requestAnimationFrame(() => {
     state.lyricBookFitFrame = 0;
     fitBookLyricLinesToPage();
+    if (state.playbackPage && state.textPreset === 'book' && state.lyricBookCurrentLine) {
+      updateBookLyricLines();
+    }
   });
 }
 
@@ -17330,9 +18986,15 @@ function createBookLyricLine(line, index, options = {}) {
 function renderBookLyricList(list, lines, options = {}) {
   if (!list) return;
   clearElement(list);
+  const renderedLines = [];
+  const fragment = document.createDocumentFragment();
   lines.forEach((line, index) => {
-    list.appendChild(createBookLyricLine(line, index, options));
+    const element = createBookLyricLine(line, index, options);
+    renderedLines.push(element);
+    fragment.appendChild(element);
   });
+  list.appendChild(fragment);
+  list.__bookLyricLines = renderedLines;
 }
 
 function renderBookLyricLines(force = false) {
@@ -17354,30 +19016,69 @@ function updateBookLyricLines(progressPercent = state.lyricProgressPercent, curr
   renderBookLyricLines();
   const lines = bookLyricDisplayLines();
   const active = state.lyricLines.length ? clamp(state.lyricIndex, -1, Math.max(0, lines.length - 1)) : 0;
-  const progressValue = clamp(Number(progressPercent) || 0, 0, 100);
-  const progress = `${progressValue.toFixed(2)}%`;
+  const visibleCount = Math.round(clamp(Number(state.textComposerSettings?.bookLyricLineCount)
+    || DEFAULT_TEXT_COMPOSER_SETTINGS.bookLyricLineCount, 1, 15));
+  let progressValue = clamp(Number(progressPercent) || 0, 0, 100);
   const currentTimeValue = Number.isFinite(Number(currentTime))
     ? Number(currentTime)
     : effectivePlaybackLyricTime(
         currentPlaybackLyricTime(),
         BOOK_LYRIC_VISUAL_LEAD_SECONDS
       );
+  const activeSourceLine = lines[active];
+  const renderedLines = els.bookLyricList.__bookLyricLines;
+  const activeElement = renderedLines[active];
+  if (activeElement) cachedBookLyricGlyphs(activeElement);
+  const activeMeasureElement = activeElement?.__bookGlyphLayers?.mainBase;
+  if (Number.isFinite(activeElement?.__bookProgressCompleteAt)
+    && currentTimeValue >= activeElement.__bookProgressCompleteAt) {
+    progressValue = 100;
+  } else if (activeSourceLine && Array.isArray(activeSourceLine.karaokeSegments) && activeSourceLine.karaokeSegments.length) {
+    const nextLine = lines[active + 1];
+    const timedEnd = Number(activeSourceLine.endTime);
+    const fallbackDuration = playbackDurationForLyricSpeed();
+    const fallbackEnd = nextLine
+      ? nextLine.time
+      : Math.max((Number(activeSourceLine.time) || 0) + 4, fallbackDuration || (Number(activeSourceLine.time) || 0) + 4);
+    const endTime = Number.isFinite(timedEnd) && timedEnd > Number(activeSourceLine.time)
+      ? (nextLine ? Math.min(timedEnd, nextLine.time) : timedEnd)
+      : fallbackEnd;
+    progressValue = lyricProgressForLineAtTime(
+      activeSourceLine,
+      currentTimeValue,
+      bookLyricProgressEndTime(activeSourceLine, endTime),
+      { measureElement: activeMeasureElement }
+    ) * 100;
+    if (progressValue >= 100 && activeElement) activeElement.__bookProgressCompleteAt = currentTimeValue;
+  }
+  const progress = `${progressValue.toFixed(2)}%`;
   let current = state.lyricBookCurrentLine;
 
-  if (state.lyricBookIndex !== active) {
+  if (state.lyricBookIndex !== active || state.lyricBookLineCount !== visibleCount) {
     state.lyricBookIndex = active;
+    state.lyricBookLineCount = visibleCount;
     state.lyricBookCurrentLine = null;
-    els.bookLyricList.querySelectorAll('.book-lyric-line').forEach((line) => {
+    resetBookLyricScrollState();
+    const firstVisible = clamp(Math.max(0, active) - Math.floor((visibleCount - 1) / 2),
+      0, Math.max(0, lines.length - visibleCount));
+    renderedLines.forEach((line) => {
       const index = Number(line.dataset.bookLyricIndex) || 0;
       const distance = Math.min(6, Math.abs(index - active));
       const isCurrent = index === active;
       const isEnded = isCurrent && progressValue >= 99.6;
+      const visible = index >= firstVisible && index < firstVisible + visibleCount;
+      // Hide whole rows, never clip the page or truncate a line's 3D glow.
+      // Keep layout slots so the chosen window cannot move the reading axis.
+      line.classList.toggle('is-outside-book-window', !visible);
+      line.setAttribute('aria-hidden', String(!visible));
+      line.tabIndex = visible ? 0 : -1;
       line.classList.toggle('is-current', isCurrent);
       line.classList.toggle('is-ended', isEnded);
       line.classList.toggle('is-past', index < active);
       line.classList.toggle('is-future', index > active);
       line.style.setProperty('--book-line-distance', distance.toFixed(0));
-      line.style.setProperty('--book-line-progress', isCurrent ? progress : '0%');
+      line.__bookLineProgress = isCurrent ? progress : '0%';
+      line.style.setProperty('--book-line-progress', line.__bookLineProgress);
       setBookLyricGlyphProgress(line, isCurrent ? progressValue : 0, isCurrent ? currentTimeValue : Number.NaN);
       if (isCurrent) {
         current = line;
@@ -17390,17 +19091,44 @@ function updateBookLyricLines(progressPercent = state.lyricProgressPercent, curr
 
   } else {
     if (!current || Number(current.dataset.bookLyricIndex) !== active) {
-      current = els.bookLyricList.querySelector(`.book-lyric-line[data-book-lyric-index="${active}"]`);
+      current = activeElement;
       state.lyricBookCurrentLine = current;
     }
   }
 
   if (current) {
     current.classList.toggle('is-ended', progressValue >= 99.6);
-    current.style.setProperty('--book-line-progress', progress);
+    if (current.__bookLineProgress !== progress) {
+      current.__bookLineProgress = progress;
+      current.style.setProperty('--book-line-progress', progress);
+    }
     setBookLyricGlyphProgress(current, progressValue, currentTimeValue);
-    syncBookLyricScroll(current);
+    // Layout changes and line switches invalidate this version. Once centered,
+    // a steady lyric needs no per-frame clientHeight/scrollHeight measurements.
+    const layoutVersion = Number(state.lyricBookLayoutVersion) || 0;
+    if (current.__bookScrollSettledVersion !== layoutVersion) {
+      const arrived = syncBookLyricScroll(current, {
+        clockTime: currentTimeValue,
+        playbackRunning: isPlaybackClockRunning(),
+        lines,
+        activeIndex: active
+      });
+      if (arrived) current.__bookScrollSettledVersion = layoutVersion;
+    }
   }
+}
+
+function scrollBookLyricFromWheel(event) {
+  const list = els.bookLyricList;
+  if (!list || !lyricListViewportIsTransform(list)) return;
+  const delta = Number(event.deltaY);
+  if (!Number.isFinite(delta) || delta === 0) return;
+  const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? list.clientHeight : 1;
+  event.preventDefault();
+  event.stopPropagation();
+  setLyricListViewportOffset(list, lyricListViewportOffset(list) + delta * unit);
+  resetBookLyricScrollState();
+  requestOrbFrame();
 }
 
 function seekToBookLyric(time) {
@@ -17537,6 +19265,33 @@ function recordAppLocalMemoryOperation(type, details = {}) {
   });
 }
 
+function recordPlaylistSnapshotMemory(provider, playlists) {
+  const client = appLocalMemoryClient();
+  if (!client || !Array.isArray(playlists)) return null;
+  const occurredAt = new Date().toISOString();
+  const providerId = appLocalMemoryCorrelationId(provider, 'unknown-provider');
+  return client.append({
+    provider: safeText(provider, state.activeProvider).toLowerCase(),
+    stream: 'knowledge',
+    type: 'library.playlist_snapshot',
+    occurredAt,
+    payload: {
+      source: 'app',
+      entityId: `playlist-library:${providerId}`.slice(0, 128),
+      title: 'logged_in_playlist_snapshot',
+      timeAccuracy: 'exact',
+      value: {
+        providerId,
+        playlists: playlists.slice(0, 1_000).map((playlist) => ({
+          id: appLocalMemoryCorrelationId(playlist?.id, 'unknown-playlist'),
+          name: safeText(playlist?.name || playlist?.title, '').slice(0, 320),
+          trackCount: Math.max(0, Math.floor(Number(playlist?.trackCount || playlist?.count) || 0))
+        }))
+      }
+    }
+  });
+}
+
 function recordScenePresetMemory(type, preset, options = {}) {
   if (!preset) return null;
   const sceneText = (value, maximum) => {
@@ -17582,8 +19337,10 @@ function recordScenePresetMemory(type, preset, options = {}) {
 function saveFavoriteDirectories() {
   try {
     window.localStorage.setItem(FAVORITE_SONGS_KEY, JSON.stringify(state.favoriteDirectories));
+    return true;
   } catch (error) {
     toast('收藏目录保存失败');
+    return false;
   }
 }
 
@@ -18368,7 +20125,7 @@ function updateFavoriteControls(song = state.currentSong) {
 }
 
 function favoriteProviderIds() {
-  return Object.keys(MUSIC_PROVIDERS).filter((provider) => providerConfigured(provider));
+  return audioSourceLibraryProviders().filter((provider) => providerConfigured(provider));
 }
 
 function favoriteCount(provider) {
@@ -18383,6 +20140,10 @@ function setFavoriteLibraryOpen(open, provider = state.favoriteLibrary.provider)
   if (!els.favoriteLibrary) return;
   state.favoriteLibrary.open = !!open && playbackTopSearchAvailable();
   state.favoriteLibrary.provider = providerInfo(provider || state.activeProvider).id;
+  const availableProviders = favoriteProviderIds();
+  if (!availableProviders.includes(state.favoriteLibrary.provider)) {
+    state.favoriteLibrary.provider = availableProviders[0] || state.activeProvider;
+  }
   els.favoriteLibrary.hidden = !state.favoriteLibrary.open;
   if (els.topFavoritesButton) {
     els.topFavoritesButton.setAttribute('aria-expanded', String(state.favoriteLibrary.open));
@@ -18480,7 +20241,8 @@ function renderFavoriteLibraryList() {
   if (!els.favoriteLibraryList) return;
   const provider = providerInfo(state.favoriteLibrary.provider).id;
   const info = providerInfo(provider);
-  const songs = favoriteDirectory(provider);
+  const supported = favoriteProviderIds().includes(provider);
+  const songs = supported ? favoriteDirectory(provider) : [];
   clearElement(els.favoriteLibraryList);
   if (els.favoriteLibraryMeta) {
     els.favoriteLibraryMeta.textContent = `${info.label} ${songs.length} 首 / 共 ${totalFavoriteCount()} 首`;
@@ -18488,7 +20250,7 @@ function renderFavoriteLibraryList() {
   if (!songs.length) {
     const empty = document.createElement('div');
     empty.className = 'favorite-library-empty';
-    empty.textContent = `暂无${info.label}收藏，搜索歌曲后点星标保存。`;
+    empty.textContent = supported ? `暂无${info.label}收藏，搜索歌曲后点星标保存。` : '当前音源暂无可用平台，请在音源管理中检查配置。';
     els.favoriteLibraryList.appendChild(empty);
     return;
   }
@@ -18695,16 +20457,22 @@ function setPlaylistFavoriteOpen(open, song = state.playlistFavorite.song, optio
 
 async function loadFavoriteTargetPlaylists(provider = state.playlistFavorite.provider, force = false) {
   const id = providerInfo(provider).id;
+  const sourceRevision = state.audioSourceLibraryRevision;
+  const sourceId = state.audioSourceSelection?.id || '';
   const loadedAt = Number(state.playlistFavorite.loadedAtByProvider[id]) || 0;
   if (!force && favoriteTargetPlaylists(id).length && Date.now() - loadedAt < PLAYLIST_FAVORITE_CACHE_MS) return favoriteTargetPlaylists(id);
 
   state.playlistFavorite.loading = true;
+  const requestId = ++state.playlistFavorite.requestId;
+  const isCurrent = () => requestId === state.playlistFavorite.requestId && sourceRevision === state.audioSourceLibraryRevision;
   state.playlistFavorite.error = '';
   renderPlaylistFavoritePopover();
   try {
     const data = await apiJson(providerPath('/user/playlists', id));
+    if (!isCurrent()) return [];
     const source = Array.isArray(data) ? data : (Array.isArray(data.playlists) ? data.playlists : []);
-    const playlists = source.map(normalizePlatformPlaylist).filter((playlist) => playlist.id);
+    const playlists = source.filter(playlist => playlist && (!playlist.provider || playlist.provider === id))
+      .map(playlist => ({ ...normalizePlatformPlaylist(playlist), provider: id, audioSourceId: sourceId })).filter((playlist) => playlist.id);
     state.playlistFavorite.playlistsByProvider[id] = playlists;
     state.playlistFavorite.loadedAtByProvider[id] = Date.now();
     if (id === state.activeProvider) {
@@ -18713,11 +20481,13 @@ async function loadFavoriteTargetPlaylists(provider = state.playlistFavorite.pro
     }
     return playlists;
   } catch (error) {
-    state.playlistFavorite.error = error.message || '读取歌单失败';
+    if (isCurrent()) state.playlistFavorite.error = error.message || '读取歌单失败';
     return [];
   } finally {
-    state.playlistFavorite.loading = false;
-    renderPlaylistFavoritePopover();
+    if (isCurrent()) {
+      state.playlistFavorite.loading = false;
+      renderPlaylistFavoritePopover();
+    }
   }
 }
 
@@ -18752,7 +20522,19 @@ async function addSongToPlatformPlaylist(playlistId) {
       body: JSON.stringify({ playlistId, song })
     });
     if (payload && payload.ok === false) throw new Error(payload.error || '平台收藏失败');
-    toggleFavoriteSong(song, { toast: false, forceAdd: true });
+    toggleFavoriteSong(song, { toast: false, forceAdd: true, recordMemory: false });
+    recordAppLocalMemoryOperation('library.favorite_changed', {
+      actor: 'user',
+      provider,
+      providerId: provider,
+      songId: song.id || favoriteSongKey(song),
+      playlistId,
+      title: song.title,
+      artist: song.artist,
+      action: 'add',
+      before: { platformPlaylistFavorite: false },
+      after: { platformPlaylistFavorite: true }
+    });
     toast(`已收藏到${playlist ? playlist.name : '平台歌单'}：${safeText(song.title, '歌曲')}`);
     setPlaylistFavoriteOpen(false);
   } catch (error) {
@@ -18775,16 +20557,36 @@ function toggleFavoriteSong(song, options = {}) {
   const key = favoriteSongKey(normalized);
   const existingIndex = directory.findIndex((item) => favoriteSongKey(item) === key);
   const providerLabel = providerInfo(normalized.provider).label;
+  let changed = false;
+  let action = 'unchanged';
   if (existingIndex >= 0 && !options.forceAdd) {
     directory.splice(existingIndex, 1);
+    changed = true;
+    action = 'remove';
     if (options.toast !== false) toast(`已从${providerLabel}收藏目录移除：${safeText(normalized.title, '歌曲')}`);
   } else if (existingIndex < 0) {
     directory.unshift(normalized);
+    changed = true;
+    action = 'add';
     if (options.toast !== false) toast(`已收藏到${providerLabel}收藏目录：${safeText(normalized.title, '歌曲')}`);
   } else if (options.toast !== false) {
     toast(`已在${providerLabel}收藏目录：${safeText(normalized.title, '歌曲')}`);
   }
-  saveFavoriteDirectories();
+  const persisted = saveFavoriteDirectories();
+  if (changed && persisted && options.recordMemory !== false) {
+    recordAppLocalMemoryOperation('library.favorite_changed', {
+      actor: options.actor || 'user',
+      provider: normalized.provider,
+      providerId: normalized.provider,
+      songId: normalized.id || favoriteSongKey(normalized),
+      playlistId: options.playlistId,
+      title: normalized.title,
+      artist: normalized.artist,
+      action,
+      before: { favorite: action === 'remove' },
+      after: { favorite: action === 'add' }
+    });
+  }
   if (existingIndex < 0) unlockAppAchievement('first-favorite');
   updateFavoriteControls(state.currentSong);
   if (state.favoriteLibrary.open) renderFavoriteLibrary();
@@ -19064,6 +20866,12 @@ async function resolveQishuiMetadataViaGuestSearch(song) {
 
 async function fetchSearchSuggestions(keyword) {
   const provider = providerInfo(state.activeProvider).id;
+  if (!audioSourceLibraryProviders().includes(provider)) {
+    state.searchSuggestions.songs = [];
+    state.searchSuggestions.loading = false;
+    renderSearchSuggestionStatus('当前音源不支持此平台，请在音源管理中选择可用平台。');
+    return;
+  }
   if (!providerConfigured(provider)) {
     state.searchSuggestions.songs = [];
     state.searchSuggestions.loading = false;
@@ -19094,7 +20902,7 @@ async function fetchSearchSuggestions(keyword) {
       signal: controller.signal
     });
     if (requestId !== state.searchSuggestions.requestId || (els.searchInput && els.searchInput.value.trim() !== keyword)) return;
-    const songs = normalizeSearchResults(data.songs).slice(0, 8);
+    const songs = audioSourceLibrarySongs(normalizeSearchResults(data.songs), provider).slice(0, 8);
     state.searchSuggestions.songs = songs;
     setBoundedCacheValue(
       state.searchSuggestions.cache,
@@ -19148,8 +20956,46 @@ async function playSearchSuggestion(song) {
   }
 }
 
+// The expanded search surface uses the same provider and normalization rules
+// as the compact suggestions list, but asks the provider for additional pages.
+// Keeping this helper in the main app preserves the existing playback path and
+// avoids creating a second, subtly different song loader in the search window.
+async function searchCurrentPlatformSongs(keyword, options = {}) {
+  const text = safeText(keyword, '').trim();
+  if (!text) return { provider: providerInfo(state.activeProvider).id, songs: [] };
+  const provider = providerInfo(state.activeProvider).id;
+  if (!audioSourceLibraryProviders().includes(provider)) {
+    throw new Error('当前音源不支持此平台，请在音源管理中选择可用平台。');
+  }
+  if (!providerConfigured(provider)) {
+    throw new Error(`请先导入${providerInfo(provider).label} API 插件`);
+  }
+  const pageSize = Math.min(50, Math.max(1, Number(options.pageSize) || 50));
+  const maxPages = Math.min(6, Math.max(1, Number(options.maxPages) || 4));
+  const songs = [];
+  const seen = new Set();
+  for (let page = 1; page <= maxPages; page += 1) {
+    const data = await apiJson(`/api/search?${query({ q: text, limit: pageSize, page, provider })}`, {
+      signal: options.signal
+    });
+    const pageSongs = audioSourceLibrarySongs(normalizeSearchResults(data.songs), provider);
+    pageSongs.forEach((song) => {
+      const key = favoriteSongKey(song) || `${song.provider || provider}:${song.id || song.title}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      songs.push(song);
+    });
+    if (pageSongs.length < pageSize) break;
+  }
+  return { provider, songs };
+}
+
 async function playFavoriteLibrarySong(song) {
   if (!song) return;
+  if (!audioSourceLibraryProviders().includes(safeText(song.provider, state.activeProvider))) {
+    toast('当前音源不支持此歌曲的平台，请先切换音源。');
+    return;
+  }
   const loaded = await loadSong(song);
   if (loaded) {
     setFavoriteLibraryOpen(false);
@@ -19234,7 +21080,7 @@ function addCreativeMarketMusic(item = {}, options = {}) {
   else state.localPlaylistSongs.push(song);
   saveMarketMusicLibrary();
   renderPlaylistOrbit(playbackPlaylists());
-  if (options.openShelf !== false) {
+  if (options.openShelf !== false && audioSourceLibraryAllows(localPlaylistDescriptor())) {
     state.activePlaylistId = LOCAL_PLAYLIST_ID;
     if (!state.playbackPage) enterPlaybackPage();
     renderPlaylistShelf(localPlaylistDescriptor(), state.localPlaylistSongs);
@@ -19296,12 +21142,13 @@ function localPlaylistDescriptor() {
 function playbackPlaylists() {
   const playlists = [
     localPlaylistDescriptor(),
+    ...(window.feLxPlaylists?.getPlaylists?.(state.activeProvider) || []),
     ...state.recommendedPlaylists,
     ...state.userPlaylists
   ];
   const seen = new Set();
   return playlists.filter((playlist) => {
-    if (!playlist || !playlist.id) return false;
+    if (!playlist || !playlist.id || !audioSourceLibraryAllows(playlist)) return false;
     const key = `${safeText(playlist.provider, state.activeProvider)}:${playlist.id}`;
     if (seen.has(key)) return false;
     seen.add(key);
@@ -19310,6 +21157,7 @@ function playbackPlaylists() {
 }
 
 function openLocalPlaylist() {
+  if (!audioSourceLibraryAllows(localPlaylistDescriptor())) return;
   state.activePlaylistId = LOCAL_PLAYLIST_ID;
   updateActivePlaylistCard();
   if (!state.playbackPage) enterPlaybackPage();
@@ -19360,7 +21208,7 @@ async function importLocalAudioFiles(fileList, options = {}) {
   });
 
   renderPlaylistOrbit(playbackPlaylists());
-  if (added > 0 && options.openShelf !== false) {
+  if (added > 0 && options.openShelf !== false && audioSourceLibraryAllows(localPlaylistDescriptor())) {
     state.activePlaylistId = LOCAL_PLAYLIST_ID;
     if (!state.playbackPage) enterPlaybackPage();
     renderPlaylistShelf(localPlaylistDescriptor(), state.localPlaylistSongs);
@@ -19379,12 +21227,14 @@ function revokeLocalObjectUrls() {
 }
 
 function visiblePlaylists(playlists) {
-  return playlists.filter((playlist) => playlist && playlist.id);
+  return playlists.filter((playlist) => playlist && playlist.id && audioSourceLibraryAllows(playlist));
 }
 
 function playlistSignature(playlists) {
   return playlists
     .map((playlist) => [
+      playlist.provider || '',
+      playlist.audioSourceId || '',
       playlist.id,
       playlist.name || '',
       playlist.cover || '',
@@ -19425,10 +21275,12 @@ function compareClientVersions(left, right) {
   return next.prerelease ? -1 : 1;
 }
 
-function officialGitHubReleaseAsset(asset) {
+function officialGitHubReleaseAsset(asset, macOS = false, architecture = '') {
   const name = safeText(asset?.name, '').trim();
   const url = safeText(asset?.browser_download_url, '').trim();
-  if (!name || !/^FE[-_. ]?Monster.*\.exe$/i.test(name)) return false;
+  const installerPattern = macOS ? /^FE[-_. ]?Monster.*\.(?:dmg|pkg)$/i : /^FE[-_. ]?Monster.*\.exe$/i;
+  if (!name || !installerPattern.test(name)) return false;
+  if (macOS && (!['arm64', 'x86_64'].includes(architecture) || !name.toLowerCase().endsWith(`-${architecture}.dmg`))) return false;
   try {
     const parsed = new URL(url);
     return parsed.protocol === 'https:'
@@ -19439,10 +21291,10 @@ function officialGitHubReleaseAsset(asset) {
   }
 }
 
-function normalizeGitHubRelease(payload = {}) {
+function normalizeGitHubRelease(payload = {}, macOS = false, architecture = '') {
   const version = safeText(payload.tag_name || payload.name, '').trim().replace(/^v(?=\d)/i, '');
   if (!clientVersionDescriptor(version)) return null;
-  const assets = Array.isArray(payload.assets) ? payload.assets.filter(officialGitHubReleaseAsset) : [];
+  const assets = Array.isArray(payload.assets) ? payload.assets.filter((asset) => officialGitHubReleaseAsset(asset, macOS, architecture)) : [];
   const installer = assets.find((asset) => /(?:setup|installer)/i.test(safeText(asset.name, '')))
     || assets[0]
     || null;
@@ -19509,7 +21361,7 @@ async function checkGitHubClientUpdate({ force = false } = {}) {
       })
     ]);
     if (!response.ok) throw new Error(`GitHub release check failed: ${response.status}`);
-    const release = normalizeGitHubRelease(await response.json());
+    const release = normalizeGitHubRelease(await response.json(), MACOS_CLIENT, state.clientRuntime.architecture || '');
     if (release && compareClientVersions(release.version, installed.version) > 0) {
       setAvailableClientUpdate(release);
       return release;
@@ -19541,7 +21393,7 @@ function showUpdateDialog(release = {}) {
   if (els.updateNotes) els.updateNotes.textContent = safeText(release.releaseNotes || release.notes, '服务器已发布新客户端版本。');
   if (els.updateInstallButton) {
     els.updateInstallButton.disabled = !downloadUrl;
-    els.updateInstallButton.textContent = downloadUrl ? '立即更新' : '暂无安装包';
+    els.updateInstallButton.textContent = downloadUrl ? '立即更新' : '暂无适用安装包';
   }
   if (els.updateLaterButton) els.updateLaterButton.disabled = false;
   updateProgress(0, '等待确认');
@@ -20035,7 +21887,8 @@ function normalizeCommunitySharedScene(scene = {}) {
     normalized.coverParticle = {
       backgroundEnabled: scene.coverParticle.backgroundEnabled !== false,
       motionAmplitude: clamp(Number(scene.coverParticle.motionAmplitude) || 0, 0, 2),
-      floatSpeed: normalizeCoverParticleFloatSpeed(scene.coverParticle.floatSpeed)
+      floatSpeed: normalizeCoverParticleFloatSpeed(scene.coverParticle.floatSpeed),
+      ...normalizeCoverVisualSettings(scene.coverParticle)
     };
   }
   // wallpaperUrl, local file paths, media sources, tokens and arbitrary extension fields are never shared.
@@ -20065,7 +21918,8 @@ function communitySharedSceneSnapshot() {
     coverParticle: {
       backgroundEnabled: state.coverParticle.backgroundEnabled,
       motionAmplitude: state.coverParticle.motionAmplitude,
-      floatSpeed: state.coverParticle.floatSpeed
+      floatSpeed: state.coverParticle.floatSpeed,
+      ...normalizeCoverVisualSettings(state.coverParticle)
     }
   });
 }
@@ -20133,6 +21987,11 @@ async function applyCommunitySharedScene(scene = {}, options = {}) {
       setStormThunderstormMode(normalized.storm.weatherMode);
     }
     if (normalized.coverParticle) {
+      Object.assign(state.coverParticle, normalizeCoverVisualSettings(normalized.coverParticle));
+      state.coverParticle.sketchLastFrameAt = 0;
+      state.coverParticle.gpuRenderSignature = '';
+      if (state.coverParticle.renderMode === 'sketch') pauseCoverParticleEngine(true);
+      else if (coverParticlePresetVisible()) ensureCoverParticleEngine().then(playCoverParticleEngine);
       state.coverParticle.backgroundEnabled = normalized.coverParticle.backgroundEnabled;
       state.coverParticle.motionAmplitude = normalized.coverParticle.motionAmplitude;
       state.coverParticle.floatSpeed = normalized.coverParticle.floatSpeed;
@@ -21015,6 +22874,7 @@ function renderCommunityState(payload = {}) {
   }
   const communityProfileDetail = Object.freeze({
     loggedIn,
+    resolved: !serverFailed && !requestFailed && !providerUnavailable,
     hasCommunityIdentity,
     provider: provider.id || payload.provider || state.activeProvider,
     profile: hasCommunityIdentity ? Object.freeze({ ...profile }) : null,
@@ -24879,7 +26739,8 @@ async function checkOfficialBrowserLogin(loopToken = state.officialBrowserLoginL
     if (controller === state.officialBrowserLoginAbortController) {
       state.officialBrowserLoginAbortController = null;
     }
-    if (session !== state.officialBrowserLoginSession
+    if (controller?.signal.aborted
+      || session !== state.officialBrowserLoginSession
       || provider !== state.officialBrowserLoginProvider
       || loopToken !== state.officialBrowserLoginLoopToken) return;
     const revision = Number(payload.revision);
@@ -24889,21 +26750,30 @@ async function checkOfficialBrowserLogin(loopToken = state.officialBrowserLoginL
     setOfficialBrowserLoginStatus(payload.message || '请在官方窗口中完成登录');
     if (payload.loggedIn) {
       clearOfficialBrowserLoginTimer();
+      const completionToken = state.officialBrowserLoginLoopToken;
+      clearLoginStatusRetry(provider);
+      if (payload.accountPayload?.loggedIn === true) {
+        renderLoginStatus({ ...payload.accountPayload, provider });
+      }
       setOfficialBrowserLoginStatus(`${providerInfo(provider).label}官方登录成功，正在同步账号与歌单`);
       const [accountResult] = await Promise.allSettled([
         refreshLoginStatus(provider),
         refreshUserPlaylists()
       ]);
-      if (provider !== state.activeProvider) return;
+      if (provider !== state.activeProvider || completionToken !== state.officialBrowserLoginLoopToken) return;
       const account = accountResult.status === 'fulfilled' ? accountResult.value : null;
       scheduleCommunityRefresh(0);
       if (account?.loggedIn) {
         setOfficialBrowserLoginStatus(`${providerInfo(provider).label}官方登录成功，账号与歌单已同步`);
-        window.setTimeout(closeLoginDialog, 700);
+        window.setTimeout(() => {
+          if (provider === state.activeProvider && completionToken === state.officialBrowserLoginLoopToken) closeLoginDialog();
+        }, 700);
       } else {
         scheduleLoginStatusRetry(provider);
         setOfficialBrowserLoginStatus(`${providerInfo(provider).label}官方登录成功，账号资料将在后台自动同步`);
-        window.setTimeout(closeLoginDialog, 1100);
+        window.setTimeout(() => {
+          if (provider === state.activeProvider && completionToken === state.officialBrowserLoginLoopToken) closeLoginDialog();
+        }, 1100);
       }
       return;
     }
@@ -25382,10 +27252,11 @@ function mergeMusicApiProviders(payload = {}) {
     };
   });
   syncMusicApiProviderTabs();
-  if (!loginProviderVisible(state.providers[state.activeProvider])) {
+  if (els.loginDialog?.hidden === false && !loginProviderVisible(state.providers[state.activeProvider])) {
     const fallback = Object.keys(MUSIC_PROVIDERS).find((provider) => providerConfigured(provider));
     setActiveProvider(fallback || 'qishui');
   }
+  if (state.audioSourceSelectionKnown) void reconcileAudioSourceLibrary();
   return providers;
 }
 
@@ -25482,7 +27353,7 @@ async function importMusicApiFile(file, options = {}) {
     const importedId = inspection.providers[0].id;
     setMusicApiImportStatus(`客户端已识别并启用：${clientLabels}`);
     await refreshMusicApiProviders({ silent: true });
-    if (importedId && providerConfigured(importedId)) {
+    if (els.loginDialog?.hidden === false && options.preserveActiveProvider !== true && importedId && providerConfigured(importedId)) {
       setActiveProvider(importedId);
     }
     toast('音乐 API 已导入并应用');
@@ -25510,15 +27381,32 @@ function playbackQualityProvider(song = state.currentSong) {
 
 function qualityDefinitions(provider = playbackQualityProvider()) {
   const id = providerInfo(provider).id;
-  return PLAYBACK_QUALITY_OPTIONS[id] || PLAYBACK_QUALITY_OPTIONS.netease;
+  return audioSourceQualityOptions(id) || PLAYBACK_QUALITY_OPTIONS[id] || PLAYBACK_QUALITY_OPTIONS.netease;
+}
+
+function audioSourceQualityOptions(provider = playbackQualityProvider(), source = state.audioSourceSelection) {
+  if (!source || source.builtin === true || provider === 'qishui') return null;
+  const sourceId = { netease: 'wy', qq: 'tx', kugou: 'kg' }[provider];
+  const capability = source.capabilities?.[sourceId];
+  if (!Array.isArray(capability?.actions) || !capability.actions.includes('musicUrl') || !Array.isArray(capability.qualitys)) return [];
+  return AUDIO_SOURCE_QUALITY_OPTIONS.filter(option => capability.qualitys.includes(option.type))
+    .map(option => ({ ...option, id: option.platformIds[provider] || option.type, vip: false }));
+}
+
+function lxPlaybackQualityType(quality) {
+  const value = safeText(quality, '').toLowerCase();
+  return ({ standard: '128k', normal: '128k', '128': '128k', higher: '192k', '192': '192k',
+    exhigh: '320k', high: '320k', '320': '320k', lossless: 'flac', hires: 'flac24bit' })[value] || value;
 }
 
 function preferredPlaybackQuality(provider = playbackQualityProvider(), fallback = '') {
   const id = providerInfo(provider).id;
+  const definitions = audioSourceQualityOptions(id) === null ? PLAYBACK_QUALITY_OPTIONS[id]
+    : AUDIO_SOURCE_QUALITY_OPTIONS.map(option => ({ id: option.platformIds[id] || option.type }));
   const preferred = safeText(state.playbackQualityPreferences[id], '');
-  if (qualityDefinitions(id).some((option) => option.id === preferred)) return preferred;
+  if (definitions.some((option) => option.id === preferred)) return preferred;
   const fallbackQuality = safeText(fallback, '');
-  if (qualityDefinitions(id).some((option) => option.id === fallbackQuality)) return fallbackQuality;
+  if (definitions.some((option) => option.id === fallbackQuality)) return fallbackQuality;
   return (qualityDefinitions(id)[0] || { id: 'standard' }).id;
 }
 
@@ -25619,6 +27507,8 @@ function providerHasPlaybackVip(provider = playbackQualityProvider()) {
 }
 
 function playbackQualityOptions(provider = playbackQualityProvider()) {
+  const sourceOptions = audioSourceQualityOptions(provider);
+  if (sourceOptions) return sourceOptions;
   const hasVip = providerHasPlaybackVip(provider);
   return qualityDefinitions(provider).filter((option) => !option.vip || hasVip);
 }
@@ -25628,6 +27518,15 @@ function normalizePlaybackQuality(provider = playbackQualityProvider(), quality 
   const preferred = safeText(quality, '');
   const match = options.find((option) => option.id === preferred);
   if (match) return match.id;
+  if (audioSourceQualityOptions(provider)) {
+    const type = lxPlaybackQualityType(preferred);
+    const exact = options.find(option => option.type === type);
+    if (exact) return exact.id;
+    const requested = AUDIO_SOURCE_QUALITY_OPTIONS.find(option => option.type === type);
+    const candidates = requested ? options.filter(option => option.rank <= requested.rank) : [];
+    const closest = candidates.reduce((best, option) => !best || option.rank > best.rank ? option : best, null);
+    return (closest || options[0] || { id: preferred || 'standard' }).id;
+  }
   return (options[0] || qualityDefinitions(provider)[0] || { id: 'standard' }).id;
 }
 
@@ -25718,17 +27617,7 @@ async function ensureQualityLoginStatus(provider = playbackQualityProvider()) {
   const id = providerInfo(provider).id;
   if (state.loginStatusByProvider[id]) return state.loginStatusByProvider[id];
   if (state.qualityLoginRequests[id]) return state.qualityLoginRequests[id];
-  state.qualityLoginRequests[id] = apiJson(`/api/login/status?${query({ provider: id })}`)
-    .then((payload) => {
-      state.loginStatusByProvider[id] = payload;
-      if (id === state.activeProvider) renderLoginStatus(payload);
-      return payload;
-    })
-    .catch(() => {
-      const payload = { provider: id, loggedIn: false, account: {} };
-      state.loginStatusByProvider[id] = payload;
-      return payload;
-    })
+  state.qualityLoginRequests[id] = refreshLoginStatus(id)
     .finally(() => {
       delete state.qualityLoginRequests[id];
     });
@@ -25775,6 +27664,7 @@ function notifyAchievementAccountChange(provider, payload = {}) {
     detail: {
       provider: normalizedProvider,
       loggedIn: payload.loggedIn === true,
+      resolved: payload.loggedIn === true || !loginStatusNeedsRetry(payload),
       account
     }
   }));
@@ -25782,7 +27672,9 @@ function notifyAchievementAccountChange(provider, payload = {}) {
 
 function setActiveProvider(provider) {
   const requestedProvider = safeText(provider, 'netease');
-  if (!MUSIC_PROVIDERS[requestedProvider] || !loginProviderVisible(MUSIC_PROVIDERS[requestedProvider])) {
+  const importedLibrary = (window.feLxPlaylists?.getPlaylists?.(requestedProvider)?.length || 0) > 0
+    && audioSourceLibraryProviders().includes(requestedProvider);
+  if (!MUSIC_PROVIDERS[requestedProvider] || (!loginProviderVisible(MUSIC_PROVIDERS[requestedProvider]) && !importedLibrary)) {
     setMusicApiImportStatus(`等待导入${safeText(MUSIC_PROVIDERS[requestedProvider]?.label, '音乐')} API 插件`);
     els.musicApiImportButton?.focus();
     return false;
@@ -25792,8 +27684,21 @@ function setActiveProvider(provider) {
   if (changed) clearOfficialBrowserLoginTimer({ cancel: true });
   state.activeProvider = nextProvider;
   if (changed) saveActiveProviderPreference(nextProvider);
-  if (changed && state.loginStatusByProvider[nextProvider]) {
-    notifyAchievementAccountChange(nextProvider, state.loginStatusByProvider[nextProvider]);
+  if (changed) {
+    // Move achievement writes into the newly selected provider partition before
+    // its asynchronous login probe completes.  A missing probe must never leave
+    // the previous platform account as the active achievement owner.
+    const cachedProviderStatus = state.loginStatusByProvider[nextProvider];
+    notifyAchievementAccountChange(
+      nextProvider,
+      cachedProviderStatus?.loggedIn === true
+        ? cachedProviderStatus
+        : {
+            provider: nextProvider,
+            loggedIn: false,
+            account: {}
+          }
+    );
   }
   const info = providerInfo(nextProvider);
 
@@ -25818,6 +27723,9 @@ function setActiveProvider(provider) {
 
   if (changed) {
     state.playbackQuality = preferredPlaybackQuality(nextProvider);
+    state.audioSourceLibraryRevision += 1;
+    cancelPlaylistRefresh();
+    state.playlistRefreshError = '';
     state.userPlaylists = [];
     state.recommendedPlaylists = [];
     state.playlistsLoggedIn = false;
@@ -25833,6 +27741,8 @@ function setActiveProvider(provider) {
     setSearchSuggestionsOpen(false);
     setFavoriteLibraryOpen(false, nextProvider);
     setPlaylistFavoriteOpen(false);
+    state.playlistFavorite.requestId += 1;
+    state.playlistFavorite.loading = false;
     setDockQualityMenuOpen(false);
     stopCommunityEventStream(true);
     renderPlaylistOrbit(playbackPlaylists());
@@ -25853,6 +27763,9 @@ function renderLoginStatus(payload = {}) {
   const provider = providerInfo(payload.provider || state.activeProvider);
   const vip = loggedIn && accountHasVip(payload);
   const showVipStatus = loggedIn && ['qq', 'kugou'].includes(provider.id);
+  // Applying a verified login or account reset also invalidates older probes.
+  state.loginStatusRequestIds ||= {};
+  state.loginStatusRequestIds[provider.id] = (Number(state.loginStatusRequestIds[provider.id]) || 0) + 1;
   state.loginStatusByProvider[provider.id] = payload;
   if (provider.id === state.activeProvider) notifyAchievementAccountChange(provider.id, payload);
   window.fePixelLogin?.syncProviders?.();
@@ -25915,6 +27828,9 @@ function scheduleLoginStatusRetry(provider = state.activeProvider) {
 
 async function refreshLoginStatus(provider = state.activeProvider) {
   const id = providerInfo(provider).id;
+  const requestIds = state.loginStatusRequestIds ||= {};
+  const requestId = (Number(requestIds[id]) || 0) + 1;
+  requestIds[id] = requestId;
   if (!providerConfigured(id)) {
     clearLoginStatusRetry(id);
     const payload = { provider: id, loggedIn: false, pluginRequired: true };
@@ -25926,20 +27842,30 @@ async function refreshLoginStatus(provider = state.activeProvider) {
     const payload = await apiJson(`/api/login/status?${query({ provider: id })}`, {
       timeoutMs: COMMUNITY_API_TIMEOUT_MS
     });
+    if (requestIds[id] !== requestId) {
+      return state.loginStatusByProvider[id] || { provider: id, loggedIn: false, retryable: true };
+    }
     const retryable = loginStatusNeedsRetry(payload);
-    renderLoginStatus(payload);
+    const previous = state.loginStatusByProvider[id];
+    const account = !payload.loggedIn && retryable && previous?.loggedIn
+      ? previous
+      : { ...payload, provider: id };
+    renderLoginStatus(account);
     if (payload.loggedIn || !retryable) clearLoginStatusRetry(id);
     else scheduleLoginStatusRetry(id);
-    if (id !== state.activeProvider) return payload;
-    if (payload.loggedIn) scheduleCommunityRefresh(120);
+    if (id !== state.activeProvider) return account;
+    if (account.loggedIn) scheduleCommunityRefresh(120);
     else renderCommunityState({
       provider: id,
       loggedIn: false,
       account: payload.account || {},
       error: payload.error || ''
     });
-    return payload;
+    return account;
   } catch (error) {
+    if (requestIds[id] !== requestId) {
+      return state.loginStatusByProvider[id] || { provider: id, loggedIn: false, retryable: true };
+    }
     const previous = state.loginStatusByProvider[id];
     if (!previous?.loggedIn) renderLoginStatus({ provider: id, loggedIn: false });
     scheduleLoginStatusRetry(id);
@@ -25993,6 +27919,7 @@ function createPlaylistCard(playlist, index) {
   button.type = 'button';
   button.dataset.playlistId = playlist.id;
   button.dataset.playlistProvider = provider.id;
+  button.dataset.audioSourceId = safeText(playlist.audioSourceId, state.audioSourceSelection?.id || '');
   button.dataset.playlistName = safeText(playlist.name, `${provider.label}\u6b4c\u5355`);
   button.dataset.playlistCover = safeText(playlist.cover, '');
   button.dataset.playlistRecommended = String(recommended);
@@ -26196,6 +28123,20 @@ function setSongFocus(index, options = {}) {
 function renderPlaylistOrbit(playlists) {
   const visible = visiblePlaylists(playlists);
   if (!visible.length) {
+    if (state.audioSourceSelectionKnown && state.audioSourceSelection?.builtin !== true) {
+      clearElement(els.playlistCards);
+      const empty = document.createElement('p');
+      empty.className = 'audio-source-library-empty';
+      empty.setAttribute('role', 'status');
+      empty.textContent = state.playlistRefreshError || (state.playlistsLoading
+        ? '正在读取当前音源支持的平台歌单…'
+        : '当前音源暂无可显示的歌单，请在音源管理中检查平台配置或重新连接。');
+      els.playlistCards.appendChild(empty);
+      els.playlistStatus.textContent = `${safeText(state.audioSourceSelection?.name, '音源未连接')} · 歌单`;
+      state.playlistSignature = '';
+      els.playlistOrbit.hidden = false;
+      return;
+    }
     hidePlaylistOrbit();
     return;
   }
@@ -26206,7 +28147,9 @@ function renderPlaylistOrbit(playlists) {
     return;
   }
 
-  els.playlistStatus.textContent = visible.some((playlist) => playlist.recommended === true)
+  els.playlistStatus.textContent = state.audioSourceSelection && !state.audioSourceSelection.builtin
+    ? `${state.audioSourceSelection.name} · ${providerInfo().label}`
+    : visible.some((playlist) => playlist.recommended === true)
     ? '今日推荐 · 我的歌单'
     : '\u6211\u7684\u6b4c\u5355';
   const fragment = document.createDocumentFragment();
@@ -26219,25 +28162,179 @@ function renderPlaylistOrbit(playlists) {
   window.requestAnimationFrame(updateActivePlaylistCard);
 }
 
+function cancelPlaylistRefresh() {
+  state.playlistRefreshRequestId += 1;
+  state.playlistRefreshAbortController?.abort();
+  state.playlistRefreshAbortController = null;
+  state.playlistsLoading = false;
+}
+
+function audioSourceLibraryProviders() {
+  if (!state.audioSourceSelectionKnown) return Object.keys(MUSIC_PROVIDERS);
+  const source = state.audioSourceSelection;
+  if (!source) return [];
+  const providers = source.builtin ? Object.keys(MUSIC_PROVIDERS) : source.supportedProviders;
+  return [...new Set(Array.isArray(providers) ? providers.filter((id) => !!MUSIC_PROVIDERS[id]) : [])];
+}
+
+function audioSourceLibraryAllows(playlist) {
+  if (!playlist) return false;
+  const source = state.audioSourceSelection;
+  const custom = state.audioSourceSelectionKnown && source && !source.builtin;
+  if (playlist.local || playlist.provider === 'local' || String(playlist.id) === LOCAL_PLAYLIST_ID) return !custom;
+  const provider = safeText(playlist.provider, state.activeProvider);
+  return provider === state.activeProvider && audioSourceLibraryProviders().includes(provider)
+    && (!playlist.audioSourceId || playlist.audioSourceId === source?.id);
+}
+
+function audioSourceLibrarySongs(songs, provider) {
+  return Array.isArray(songs) ? songs.filter(song => song && safeText(song.provider, provider) === provider)
+    .map(song => song.provider ? song : { ...song, provider }) : [];
+}
+
+function audioSourceLibraryContext() {
+  return { provider: state.activeProvider, providers: Object.values(MUSIC_PROVIDERS).map(({ id, label }) => ({
+    id, label, configured: providerConfigured(id),
+    localLibraryAvailable: (window.feLxPlaylists?.getPlaylists?.(id)?.length || 0) > 0
+  })) };
+}
+
+function changeAudioSourceLibraryProvider(provider) {
+  const importedLibrary = (window.feLxPlaylists?.getPlaylists?.(provider)?.length || 0) > 0;
+  if (!audioSourceLibraryProviders().includes(provider) || (!providerConfigured(provider) && !importedLibrary)) {
+    return Promise.reject(new Error('当前音源不支持该平台，或平台目录服务尚未配置。'));
+  }
+  if (!setActiveProvider(provider)) return Promise.reject(new Error('未能切换歌单平台，请检查平台配置。'));
+  return refreshUserPlaylists({ force: true });
+}
+
+function reconcileAudioSourceLibrary() {
+  const providers = audioSourceLibraryProviders();
+  const available = provider => providerConfigured(provider) || (window.feLxPlaylists?.getPlaylists?.(provider)?.length || 0) > 0;
+  if (state.audioSourceSelection && !state.audioSourceSelection.builtin
+      && (!providers.includes(state.activeProvider) || !available(state.activeProvider))) {
+    const fallback = providers.find(available);
+    if (fallback) setActiveProvider(fallback);
+  }
+  return refreshUserPlaylists({ force: true });
+}
+
+function onAudioSourceSelectionChanged(source) {
+  const selection = source ? {
+    id: safeText(source.id, ''), name: safeText(source.name, '自定义音源'), builtin: source.builtin === true,
+    supportedProviders: Array.isArray(source.supportedProviders) ? source.supportedProviders.slice() : [],
+    capabilities: source.capabilities && typeof source.capabilities === 'object'
+      ? JSON.parse(JSON.stringify(source.capabilities)) : {}
+  } : null;
+  const changed = !state.audioSourceSelectionKnown
+    || JSON.stringify(state.audioSourceSelection) !== JSON.stringify(selection);
+  state.audioSourceSelectionKnown = true;
+  state.audioSourceSelection = selection;
+  if (!changed) {
+    return playbackPlaylists();
+  }
+  renderDockQualityMenu();
+  const pickerOpen = state.playbackPlaylistPickerOpen || state.playlistSongPageOpen;
+  state.audioSourceLibraryRevision += 1;
+  cancelPlaylistRefresh();
+  closePlaylistShelf({ resetActive: true, reopenPicker: false });
+  state.userPlaylists = [];
+  state.recommendedPlaylists = [];
+  state.playlistsLoggedIn = false;
+  state.playlistSignature = '';
+  state.searchSuggestions.songs = [];
+  state.searchSuggestions.query = '';
+  state.searchSuggestions.requestId += 1;
+  state.searchSuggestions.loading = false;
+  state.searchSuggestions.abortController?.abort();
+  state.searchSuggestions.abortController = null;
+  window.clearTimeout(state.searchSuggestions.timer);
+  state.searchSuggestions.cache.clear();
+  setSearchSuggestionsOpen(false);
+  setPlaylistFavoriteOpen(false);
+  setFavoriteLibraryOpen(false);
+  state.playlistFavorite.requestId += 1;
+  state.playlistFavorite.loading = false;
+  state.playlistFavorite.playlistsByProvider = {};
+  state.playlistFavorite.loadedAtByProvider = {};
+  const pending = reconcileAudioSourceLibrary();
+  if (pickerOpen && state.playbackPage) setPlaybackPlaylistPickerOpen(true);
+  return pending;
+}
+
+function browseAudioSourceLibrary() {
+  closeLoginDialog();
+  if (!state.playbackPage) enterPlaybackPage();
+  setPlaybackPlaylistPickerOpen(true);
+  els.playlistCards?.focus({ preventScroll: true });
+}
+
+function onLxPlaylistsChanged() {
+  state.playlistSignature = '';
+  if (state.activePlaylist?.lxImported) {
+    const current = window.feLxPlaylists?.getPlaylists?.(state.activeProvider)
+      .find(playlist => playlist.id === state.activePlaylist.id);
+    if (!current) closePlaylistShelf({ resetActive: true, reopenPicker: false });
+    else if (state.playlistSongPageOpen && audioSourceLibraryAllows(current)) {
+      renderPlaylistShelf(current, window.feLxPlaylists.getSongs(current.id), { preserveScroll: true });
+    }
+  }
+  renderPlaylistOrbit(playbackPlaylists());
+}
+
+function openLxPlaylist(playlist) {
+  if (!state.audioSourceSelectionKnown || !state.audioSourceSelection) throw new Error('请先连接音源服务，再打开洛雪歌单。');
+  if (!audioSourceLibraryProviders().includes(playlist.provider)) throw new Error('当前音源不支持此歌单的平台，请先选择支持该平台的音源。');
+  const imported = window.feLxPlaylists?.getPlaylists?.(playlist.provider).find(item => item.id === playlist.id);
+  if (!imported) throw new Error('该导入歌单已被移除。');
+  if (state.activeProvider !== imported.provider && !setActiveProvider(imported.provider)) throw new Error('无法切换歌单平台。');
+  state.playlistLoadRequestId += 1;
+  state.playlistLoadAbortController?.abort();
+  state.playlistLoadAbortController = null;
+  state.shelfLoadingPlaylistId = '';
+  window.feAudioSources?.close?.();
+  browseAudioSourceLibrary();
+  state.playbackPlaylistPickerOpen = false;
+  state.activePlaylistId = imported.id;
+  renderPlaylistShelf(imported, window.feLxPlaylists.getSongs(imported.id));
+}
+
 async function refreshUserPlaylists(options = {}) {
-  if ((document.hidden && options.force !== true) || state.playlistsLoading) return playbackPlaylists();
+  if ((document.hidden && options.force !== true) || (state.playlistsLoading && options.force !== true)) return playbackPlaylists();
+  cancelPlaylistRefresh();
+  const requestId = state.playlistRefreshRequestId;
   const provider = state.activeProvider;
-  if (!providerConfigured(provider)) {
+  const previousError = state.playlistRefreshError;
+  state.playlistRefreshError = '';
+  if (!providerConfigured(provider) || !audioSourceLibraryProviders().includes(provider)) {
+    if ((window.feLxPlaylists?.getPlaylists?.(provider)?.length || 0) > 0 && audioSourceLibraryProviders().includes(provider)) {
+      state.playlistRefreshError = '平台目录未配置，当前显示洛雪导入歌单。';
+    } else if (state.audioSourceSelection && !state.audioSourceSelection.builtin) {
+      state.playlistRefreshError = `${safeText(state.audioSourceSelection.name, '当前音源')}暂无已配置的可用平台；请在音源管理中选择支持的平台，或先配置对应平台服务。`;
+      if (state.playlistRefreshError !== previousError) toast(state.playlistRefreshError);
+    }
     state.playlistsLoggedIn = false;
     state.userPlaylists = [];
     state.recommendedPlaylists = [];
     renderPlaylistOrbit(playbackPlaylists());
     return playbackPlaylists();
   }
+  const controller = new AbortController();
+  state.playlistRefreshAbortController = controller;
   state.playlistsLoading = true;
+  const sourceId = state.audioSourceSelection?.id || '';
+  const sourceRevision = state.audioSourceLibraryRevision;
+  const isCurrent = () => requestId === state.playlistRefreshRequestId && provider === state.activeProvider
+    && sourceRevision === state.audioSourceLibraryRevision;
+  renderPlaylistOrbit(playbackPlaylists());
   try {
     const [libraryResult, recommendationResult] = await Promise.allSettled([
-      apiJson(providerPath('/user/playlists', provider), { timeoutMs: COMMUNITY_API_TIMEOUT_MS }),
+      apiJson(providerPath('/user/playlists', provider), { timeoutMs: COMMUNITY_API_TIMEOUT_MS, signal: controller.signal }),
       apiJson(`/api/recommend/playlists?${query({ provider, limit: 12 })}`, {
-        timeoutMs: COMMUNITY_API_TIMEOUT_MS
+        timeoutMs: COMMUNITY_API_TIMEOUT_MS, signal: controller.signal
       })
     ]);
-    if (provider !== state.activeProvider) return;
+    if (!isCurrent()) return playbackPlaylists();
     const library = libraryResult.status === 'fulfilled' ? libraryResult.value : {};
     const recommendations = recommendationResult.status === 'fulfilled'
       ? recommendationResult.value
@@ -26246,21 +28343,35 @@ async function refreshUserPlaylists(options = {}) {
     const recommended = Array.isArray(recommendations.playlists) ? recommendations.playlists : [];
     state.playlistsLoggedIn = !!library.loggedIn || !!library.libraryAvailable;
     state.userPlaylists = state.playlistsLoggedIn
-      ? playlists.map((playlist) => ({ ...playlist, provider }))
+      ? playlists.filter(playlist => playlist && (!playlist.provider || playlist.provider === provider))
+        .map((playlist) => ({ ...playlist, provider, audioSourceId: sourceId }))
       : [];
-    state.recommendedPlaylists = recommended.map((playlist) => ({
+    state.recommendedPlaylists = recommended.filter(playlist => playlist && (!playlist.provider || playlist.provider === provider)).map((playlist) => ({
       ...playlist,
       provider,
+      audioSourceId: sourceId,
       recommended: true
     }));
+    const failures = [libraryResult, recommendationResult].filter((result) => result.status === 'rejected' || result.value?.ok === false).length;
+    state.playlistRefreshError = failures === 2 ? '平台歌单读取失败，请重试。'
+      : failures ? '部分歌单读取失败，可重试；已显示可用内容。' : '';
+    if (libraryResult.status === 'fulfilled' && state.playlistsLoggedIn) {
+      recordPlaylistSnapshotMemory(provider, state.userPlaylists);
+    }
     renderPlaylistOrbit(playbackPlaylists());
   } catch (error) {
+    if (!isCurrent()) return playbackPlaylists();
+    state.playlistRefreshError = '平台歌单读取失败，请重试。';
     state.playlistsLoggedIn = false;
     state.userPlaylists = [];
     state.recommendedPlaylists = [];
     renderPlaylistOrbit(playbackPlaylists());
   } finally {
-    state.playlistsLoading = false;
+    if (isCurrent()) {
+      state.playlistsLoading = false;
+      state.playlistRefreshAbortController = null;
+      renderPlaylistOrbit(playbackPlaylists());
+    }
   }
   return playbackPlaylists();
 }
@@ -26270,10 +28381,9 @@ function scheduleUserPlaylistsRefresh(delay = 0) {
   state.playlistRefreshTimer = window.setTimeout(refreshUserPlaylists, delay);
 }
 
-function playlistById(playlistId) {
-  if (String(playlistId) === LOCAL_PLAYLIST_ID) return localPlaylistDescriptor();
-  return [...state.recommendedPlaylists, ...state.userPlaylists]
-    .find((playlist) => String(playlist.id) === String(playlistId)) || null;
+function playlistById(playlistId, provider = state.activeProvider) {
+  return playbackPlaylists().find(playlist => String(playlist.id) === String(playlistId)
+    && (String(playlistId) === LOCAL_PLAYLIST_ID || safeText(playlist.provider, state.activeProvider) === provider)) || null;
 }
 
 function degrees360(value) {
@@ -26647,9 +28757,18 @@ function syncQishuiPlaybackHiddenState() {
     els.qishuiPlaybackScaleToggle.disabled = hiddenByUser;
   }
   if (els.runtimeSettingsButton) {
-    els.runtimeSettingsButton.hidden = hiddenByUser;
-    els.runtimeSettingsButton.setAttribute('aria-hidden', String(hiddenByUser));
-    if (hiddenByUser && document.activeElement === els.runtimeSettingsButton) {
+    // Keep the original top-right control on the playback phone. Move the
+    // same button outside it only while the compact card hides the phone.
+    const cardMode = state.playbackCardMode === 'card';
+    const settingsParent = cardMode ? els.appShell : els.qishuiPlaybackPhone;
+    if (settingsParent && els.runtimeSettingsButton.parentElement !== settingsParent) {
+      settingsParent.appendChild(els.runtimeSettingsButton);
+    }
+    els.runtimeSettingsButton.classList.toggle('compact-playback-settings-button', cardMode);
+    const hideSettingsButton = hiddenByUser && !cardMode;
+    els.runtimeSettingsButton.hidden = hideSettingsButton;
+    els.runtimeSettingsButton.setAttribute('aria-hidden', String(hideSettingsButton));
+    if (hideSettingsButton && document.activeElement === els.runtimeSettingsButton) {
       els.qishuiPlaybackVisibilityToggle?.focus({ preventScroll: true });
     }
   }
@@ -26901,37 +29020,19 @@ function startQishuiLyricTransition(
   const durationMs = QISHUI_LYRIC_TRANSITION_SECONDS * 1000;
   const animations = [];
   snapshots.forEach((snapshot, line) => {
-    const nextRect = line.getBoundingClientRect();
-    if (!nextRect.width || !nextRect.height) return;
     const index = Number(line.dataset.bookLyricIndex);
     const targetOpacity = index === activeIndex
       ? 1
       : clamp(Number.parseFloat(getComputedStyle(line).opacity) || 0, 0, 1);
     const fromOpacity = clamp(Number(snapshot.opacity) || 0, 0, 1);
-    const deltaX = snapshot.rect.left - nextRect.left;
-    const deltaY = snapshot.rect.top - nextRect.top;
-    const scaleX = clamp(snapshot.rect.width / nextRect.width, 0.72, 1.38);
-    const scaleY = clamp(snapshot.rect.height / nextRect.height, 0.72, 1.38);
-    const changed = Math.abs(deltaX) > 0.2
-      || Math.abs(deltaY) > 0.2
-      || Math.abs(scaleX - 1) > 0.005
-      || Math.abs(scaleY - 1) > 0.005
-      || Math.abs(targetOpacity - fromOpacity) > 0.01
+    const changed = Math.abs(targetOpacity - fromOpacity) > 0.01
       || index === activeIndex
       || index === previousIndex;
     if (!changed || typeof line.animate !== 'function') return;
 
     const animation = line.animate([
-      {
-        translate: `${deltaX.toFixed(2)}px ${deltaY.toFixed(2)}px`,
-        scale: `${scaleX.toFixed(4)} ${scaleY.toFixed(4)}`,
-        opacity: fromOpacity
-      },
-      {
-        translate: '0px 0px',
-        scale: '1 1',
-        opacity: targetOpacity
-      }
+      { opacity: fromOpacity },
+      { opacity: targetOpacity }
     ], {
       duration: durationMs,
       easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
@@ -26970,14 +29071,18 @@ function syncQishuiLyricTransition(playbackTime, arrived) {
   return progress;
 }
 
-function qishuiPlaybackBookFrame(lines, playbackTime = Number.NaN) {
+function qishuiPlaybackBookFrame(lines, playbackTime = Number.NaN, options = {}) {
   if (!state.lyricLines.length) {
     return { activeIndex: 0, currentTime: Number.NaN, progressPercent: 0 };
   }
   const currentTime = Number.isFinite(Number(playbackTime))
     ? Math.max(0, Number(playbackTime))
     : currentPlaybackLyricTime();
-  const displayTime = effectivePlaybackLyricTime(currentTime, BOOK_LYRIC_VISUAL_LEAD_SECONDS);
+  // The ordinary lyric renderer already calibrated this audio timestamp.
+  // Reuse that exact sample; standalone redraws use the same shared clock.
+  const displayTime = Number.isFinite(options.effectiveTime)
+    ? options.effectiveTime
+    : effectivePlaybackLyricTime(currentTime, playbackLyricVisualLeadSeconds());
   const activeIndex = findLyricIndexAtDisplayTime(lines, displayTime);
   const line = lines[activeIndex] || {};
   const nextLine = lines[activeIndex + 1];
@@ -26989,12 +29094,19 @@ function qishuiPlaybackBookFrame(lines, playbackTime = Number.NaN) {
   const endTime = Number.isFinite(timedEnd) && timedEnd > Number(line.time)
     ? (nextLine ? Math.min(timedEnd, nextLine.time) : timedEnd)
     : fallbackEnd;
-  const progressEndTime = bookLyricProgressEndTime(line, endTime);
-  const progressPercent = lyricProgressForLineAtTime(
-    line,
-    displayTime,
-    progressEndTime
-  ) * 100;
+  const progressEndTime = state.textPreset === 'book' ? bookLyricProgressEndTime(line, endTime) : endTime;
+  const progressPercent = Number.isFinite(options.progressPercent)
+    ? clamp(options.progressPercent, 0, 100)
+    : lyricProgressForLineAtTime(
+        line,
+        displayTime,
+        progressEndTime,
+        {
+          measureElement: typeof options.measureElementForIndex === 'function'
+            ? options.measureElementForIndex(activeIndex)
+            : null
+        }
+      ) * 100;
   return { activeIndex, currentTime: displayTime, progressPercent };
 }
 
@@ -27002,6 +29114,9 @@ function scheduleQishuiPlaybackLyricLayout() {
   window.cancelAnimationFrame(state.qishuiPlaybackCard.lyricBookLayoutFrame);
   state.qishuiPlaybackCard.lyricBookLayoutFrame = window.requestAnimationFrame(() => {
     state.qishuiPlaybackCard.lyricBookLayoutFrame = 0;
+    // The cached arrival belongs to the old geometry, not just this lyric.
+    // Recenter after resizing/font changes even when the media clock is paused.
+    state.qishuiPlaybackCard.lyricBookArrivedIndex = -2;
     resetBookLyricScrollState({ store: state.qishuiPlaybackCard });
     invalidateSequentialLyricHighlights(els.qishuiPlaybackLyricPage);
     updateQishuiPlaybackLyrics(state.lyricDisplayText, state.lyricSubtitleText);
@@ -27036,9 +29151,20 @@ function updateQishuiPlaybackLyrics(
       lazyGlyphs: true
     });
     list.__qishuiPlaybackLyricLines = Array.from(list.children);
+    // The card lyric page is offset with a transform instead of a clipped
+    // scroll window, so no line is ever cut by a boundary.
+    list.dataset.lyricOffset = 'transform';
+    list.__lyricOffset = 0;
+    list.style.setProperty('--lyric-offset', '0px');
   }
 
-  const { activeIndex, currentTime, progressPercent } = qishuiPlaybackBookFrame(lines, playbackTime);
+  const { activeIndex, currentTime, progressPercent } = qishuiPlaybackBookFrame(lines, playbackTime, {
+    effectiveTime: scrollOptions.effectiveTime,
+    progressPercent: scrollOptions.progressPercent,
+    measureElementForIndex: (index) => (
+      list.__qishuiPlaybackLyricLines?.[index]?.querySelector('.book-lyric-copy--base') || null
+    )
+  });
   const previousIndex = cardState.lastLyricIndex;
   const direction = previousIndex < 0
     ? 'none'
@@ -27049,7 +29175,14 @@ function updateQishuiPlaybackLyrics(
         : 'backward';
   cardState.lastLyricIndex = activeIndex;
 
-  if (cardState.lyricBookIndex !== activeIndex) {
+  // Keep three lyric entries in every window/card mode. Only the type and
+  // sentence spacing scale; maximizing must not take space from the cover.
+  const visibleLineCount = 3;
+  if (cardState.lyricBookIndex !== activeIndex || cardState.lyricVisibleLineCount !== visibleLineCount) {
+    cardState.lyricVisibleLineCount = visibleLineCount;
+    list.dataset.visibleLineCount = String(visibleLineCount);
+    const windowStart = Math.max(0, Math.min(activeIndex - 1, lines.length - visibleLineCount));
+    const windowEnd = Math.min(lines.length - 1, windowStart + visibleLineCount - 1);
     const previousBookIndex = cardState.lyricBookIndex;
     disposeQishuiLyricTransition();
     cardState.lyricBookIndex = activeIndex;
@@ -27078,7 +29211,6 @@ function updateQishuiPlaybackLyrics(
           .slice(updateStart, updateEnd + 1)
           .filter(Boolean)
           .map((line) => [line, {
-            rect: line.getBoundingClientRect(),
             opacity: Number.parseFloat(getComputedStyle(line).opacity) || 0
           }]));
     for (let elementIndex = updateStart; elementIndex <= updateEnd; elementIndex += 1) {
@@ -27092,6 +29224,11 @@ function updateQishuiPlaybackLyrics(
       line.classList.toggle('is-past', index < activeIndex);
       line.classList.toggle('is-future', index > activeIndex);
       line.style.setProperty('--book-line-distance', distance.toFixed(0));
+      line.dataset.lyricDistance = String(distance);
+      const visible = index >= windowStart && index <= windowEnd;
+      line.dataset.lyricVisible = String(visible);
+      line.setAttribute('aria-hidden', String(!visible));
+      line.tabIndex = visible ? 0 : -1;
       line.style.setProperty('--book-line-progress', '0%');
       setBookLyricGlyphProgress(line, 0, Number.NaN);
       line.removeAttribute('aria-current');
@@ -27252,6 +29389,8 @@ function beginQishuiPlaybackSeek() {
   state.qishuiPlaybackCard.pendingAudioSeekTarget = null;
   state.qishuiPlaybackCard.seekHandoffTarget = null;
   state.qishuiPlaybackCard.seekHandoffStartedAt = 0;
+  state.qishuiPlaybackCard.seekHandoffRunning = false;
+  state.qishuiPlaybackCard.seekHandoffSource = '';
   disposeQishuiLyricTransition();
   els.playbackLyricText?.__lyricGeometryFlip?.cancel?.();
   els.playbackLyricSubtitle?.__lyricGeometryFlip?.cancel?.();
@@ -27271,7 +29410,7 @@ function previewQishuiPlaybackSeek() {
   }
   updateQishuiPlaybackProgress(target, duration, { forceRange: true });
   resetLyricFrameSync();
-  syncPlaybackLyricAtTime(target);
+  syncPlaybackLyricAtTime(target, { authoritativeSample: true });
   return true;
 }
 
@@ -27299,13 +29438,15 @@ async function commitQishuiPlaybackSeek() {
     state.qishuiPlaybackCard.pendingAudioSeekTarget = target;
     state.qishuiPlaybackCard.seekHandoffTarget = target;
     state.qishuiPlaybackCard.seekHandoffStartedAt = performance.now();
+    state.qishuiPlaybackCard.seekHandoffRunning = resumeNativeAfterSeek;
+    state.qishuiPlaybackCard.seekHandoffSource = String(els.audio.currentSrc || els.audio.src || '');
   }
   state.qishuiPlaybackCard.pendingSeekTarget = target;
   if (state.currentSong) state.currentSong = { ...state.currentSong, position: target };
   updatePlayerClock(target, duration, isPlaybackClockRunning());
   updateQishuiPlaybackProgress(target, duration, { forceRange: true });
   resetLyricFrameSync();
-  syncPlaybackLyricAtTime(target);
+  syncPlaybackLyricAtTime(target, { authoritativeSample: true });
   if (resumeNativeAfterSeek) ensureAudioAnalysis({ announceObrFailure: false }).catch(() => {});
   if (!state.localQueueActive) {
     const requestId = state.qishuiPlaybackCard.seekRequestId + 1;
@@ -27395,7 +29536,10 @@ function renderQishuiPlaybackCard(song = state.currentSong) {
 
 function syncPlaybackCardPanelState() {
   const visible = playbackCardVisible();
-  const diyPanelOpen = visible && state.diyOpen && state.diyCardOpen;
+  // The playback-bar scene, text, and wallpaper tools own the right flyout.
+  // Keep the existing page/menu state intact so closing it is reversible
+  // without losing the user's selected page or preset.
+  const diyPanelOpen = visible && state.diyEnabled && state.diyOpen && state.diyCardOpen;
   const playlistPickerOpen = visible && state.playbackPlaylistPickerOpen && !state.playlistSongPageOpen;
   const songPanelOpen = visible && state.playlistSongPageOpen;
   const rhythmGameOpen = visible && els.appShell.classList.contains('has-rhythm-game');
@@ -27412,6 +29556,11 @@ function syncPlaybackCardPanelState() {
   if (els.runtimeSettingsButton) {
     els.runtimeSettingsButton.classList.toggle('is-active', state.runtimeSettingsOpen);
     els.runtimeSettingsButton.setAttribute('aria-expanded', String(state.runtimeSettingsOpen));
+  }
+  if (els.diyPlaylistButton) {
+    const playlistActive = playlistPickerOpen || songPanelOpen;
+    els.diyPlaylistButton.classList.toggle('is-active', playlistActive);
+    els.diyPlaylistButton.setAttribute('aria-pressed', String(playlistActive));
   }
   if (!els.qishuiPlaybackTools) return;
   els.qishuiPlaybackTools.querySelectorAll('[data-playback-tool]').forEach((button) => {
@@ -27431,9 +29580,10 @@ function syncPlaybackCardPanelState() {
 function syncQishuiPlaybackCard() {
   if (!els.qishuiPlaybackCard) return;
   const visible = playbackCardVisible();
-  els.qishuiPlaybackCard.hidden = !visible;
-  els.appShell.classList.toggle('has-qishui-playback-card', visible);
-  if (visible) {
+  const showBar = visible && state.playbackCardMode !== 'card';
+  els.qishuiPlaybackCard.hidden = !showBar;
+  els.appShell.classList.toggle('has-qishui-playback-card', showBar);
+  if (showBar) {
     syncQishuiPlaybackExpansion();
     syncQishuiPlaybackHiddenState();
     renderQishuiPlaybackCard();
@@ -27450,6 +29600,8 @@ function syncQishuiPlaybackCard() {
   state.qishuiPlaybackCard.pendingAudioSeekTarget = null;
   state.qishuiPlaybackCard.seekHandoffTarget = null;
   state.qishuiPlaybackCard.seekHandoffStartedAt = 0;
+  state.qishuiPlaybackCard.seekHandoffRunning = false;
+  state.qishuiPlaybackCard.seekHandoffSource = '';
   state.qishuiPlaybackCard.seekRequestId += 1;
   state.qishuiPlaybackCard.switchId += 1;
   state.qishuiPlaybackCard.lyricSignature = '';
@@ -27559,14 +29711,94 @@ function nextPlaybackQueueIndex(direction) {
   return (current + offset + state.queue.length) % state.queue.length;
 }
 
+function setPlaybackQueueSelection(index = state.queueIndex) {
+  state.playbackSelection = {
+    kind: 'queue',
+    index: Number.isInteger(index) ? index : -1,
+    playlistId: '',
+    songs: []
+  };
+}
+
+function setPlaybackPlaylistSelection(playlist, songs, index) {
+  const tracks = Array.isArray(songs) ? songs.slice() : [];
+  state.playbackSelection = {
+    kind: 'playlist',
+    index: Number.isInteger(index) ? index : -1,
+    playlistId: safeText(playlist?.id, ''),
+    playlistProvider: safeText(playlist?.provider, state.activeProvider),
+    playlist: playlist ? { ...playlist } : null,
+    songs: tracks
+  };
+  return state.playbackSelection;
+}
+
+function playbackSelectionIsPlaylist() {
+  return state.playbackSelection?.kind === 'playlist'
+    && Array.isArray(state.playbackSelection.songs)
+    && state.playbackSelection.songs.length > 0;
+}
+
+async function advancePlaybackSelection(direction, options = {}) {
+  const offset = direction < 0 ? -1 : 1;
+  if (playbackSelectionIsPlaylist()) {
+    const selection = state.playbackSelection;
+    const tracks = selection.songs;
+    const hasSelectionIndex = Number.isInteger(selection.index) && selection.index >= 0
+      && selection.index < tracks.length;
+    const matchedIndex = hasSelectionIndex ? selection.index : tracks.findIndex((song) => (
+      String(song?.id || '') === String(state.currentSong?.id || '')
+      && safeText(song?.provider, state.activeProvider) === safeText(state.currentSong?.provider, state.activeProvider)
+    ));
+    const current = hasSelectionIndex
+      ? selection.index
+      : matchedIndex >= 0
+        ? matchedIndex
+        : offset < 0 ? 0 : -1;
+    const index = (current + offset + tracks.length) % tracks.length;
+    const playlist = selection.playlist || state.activePlaylist || {
+      id: selection.playlistId,
+      provider: selection.playlistProvider
+    };
+    const result = await playPlaylistTracks(playlist, tracks, index, {
+      closeShelf: false,
+      updateShelf: options.updateShelf !== false
+    });
+    return result ? true : false;
+  }
+
+  const index = nextPlaybackQueueIndex(direction);
+  if (index < 0) {
+    toast('播放队列暂无歌曲');
+    return false;
+  }
+  return playQueueIndex(index);
+}
+
+function syncPlaybackQueueIndexToCurrentSong() {
+  const song = state.currentSong;
+  if (!song || !Array.isArray(state.queue) || !state.queue.length) {
+    state.queueIndex = -1;
+    return -1;
+  }
+  const index = state.queue.findIndex((item) => (
+    String(item?.id || '') === String(song.id || '')
+    && safeText(item?.provider, state.activeProvider) === safeText(song.provider, state.activeProvider)
+  ));
+  state.queueIndex = index;
+  return index;
+}
+
 function switchQishuiPlaybackTrack(direction) {
   const song = playbackCardSong();
-  if (!song || state.qishuiPlaybackCard.switching) return;
+  if (!song) return;
   const previous = direction < 0;
   const switchId = state.qishuiPlaybackCard.switchId + 1;
   const exitClass = previous ? 'is-switching-previous' : 'is-switching-next';
   const enterClass = previous ? 'is-switching-enter-previous' : 'is-switching-enter-next';
   state.qishuiPlaybackCard.switchId = switchId;
+  window.clearTimeout(state.qishuiPlaybackCard.switchTimer);
+  state.qishuiPlaybackCard.switchTimer = 0;
   state.qishuiPlaybackCard.switching = true;
   state.qishuiPlaybackCard.progressDragging = false;
   state.qishuiPlaybackCard.seekPending = false;
@@ -27574,6 +29806,8 @@ function switchQishuiPlaybackTrack(direction) {
   state.qishuiPlaybackCard.pendingAudioSeekTarget = null;
   state.qishuiPlaybackCard.seekHandoffTarget = null;
   state.qishuiPlaybackCard.seekHandoffStartedAt = 0;
+  state.qishuiPlaybackCard.seekHandoffRunning = false;
+  state.qishuiPlaybackCard.seekHandoffSource = '';
   state.qishuiPlaybackCard.seekRequestId += 1;
   if (els.qishuiPlaybackPhone) {
     clearQishuiPlaybackSwitchClasses();
@@ -27585,22 +29819,14 @@ function switchQishuiPlaybackTrack(direction) {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const minimumExit = reducedMotion
     ? Promise.resolve()
-    : new Promise((resolve) => window.setTimeout(resolve, 110));
-  const queuedIndex = nextPlaybackQueueIndex(direction);
-  const switchTrack = queuedIndex >= 0
-    ? playQueueIndex(queuedIndex).then(() => updateShelfCurrentSong())
-    : transport(previous ? '/api/player/previous' : '/api/player/next');
-  let watchdogTimer = 0;
-  const transportReady = Promise.race([
-    Promise.resolve(switchTrack).catch(() => {}),
-    new Promise((resolve) => {
-      watchdogTimer = window.setTimeout(resolve, 6000);
-    })
-  ]).finally(() => window.clearTimeout(watchdogTimer));
-  Promise.all([
-    transportReady,
-    minimumExit
-  ]).finally(() => {
+    : new Promise((resolve) => window.setTimeout(resolve, 60));
+  const switchTrack = advancePlaybackSelection(direction);
+  Promise.resolve(switchTrack).then(() => {
+    if (switchId === state.qishuiPlaybackCard.switchId) updateShelfCurrentSong();
+  }).catch(() => {});
+  // The card animation is a gesture response, not a network lock. Every new
+  // wheel intent can select the next queue item while its predecessor resolves.
+  minimumExit.finally(() => {
     if (switchId !== state.qishuiPlaybackCard.switchId) return;
     const phone = els.qishuiPlaybackPhone;
     if (reducedMotion || !phone) {
@@ -27617,7 +29843,7 @@ function switchQishuiPlaybackTrack(direction) {
         window.clearTimeout(state.qishuiPlaybackCard.switchTimer);
         state.qishuiPlaybackCard.switchTimer = window.setTimeout(
           () => finishQishuiPlaybackSwitch(switchId),
-          250
+          160
         );
       });
     });
@@ -27629,12 +29855,10 @@ function handleQishuiPlaybackWheel(event) {
   const target = event.target instanceof Element ? event.target : null;
   if (!target?.closest('#qishuiPlaybackCard')) return false;
   if (target.closest('input, button, select, textarea, [role="slider"]')) return false;
+  if (event.ctrlKey || !Number.isFinite(event.deltaY) || event.deltaY === 0) return false;
   event.preventDefault();
   event.stopPropagation();
-  const unit = event.deltaMode === 1 ? 32 : event.deltaMode === 2 ? window.innerHeight : 1;
-  state.qishuiPlaybackCard.wheelDelta += event.deltaY * unit;
-  if (Math.abs(state.qishuiPlaybackCard.wheelDelta) < 52) return true;
-  const direction = state.qishuiPlaybackCard.wheelDelta < 0 ? -1 : 1;
+  const direction = event.deltaY < 0 ? -1 : 1;
   state.qishuiPlaybackCard.wheelDelta = 0;
   switchQishuiPlaybackTrack(direction);
   return true;
@@ -27651,6 +29875,7 @@ function updatePlaybackPageClass() {
   updateVoidPrismVisibility();
   updateChladniVisibility();
   updateChladniTextTransform();
+  updateHarmonicStateVisibility();
   updateSonicTopographyVisibility();
   updateSoundscapeWorkshopVisibility();
   updateCoverParticleVisibility();
@@ -28055,6 +30280,8 @@ function renderShelfSongs() {
 }
 
 function renderPlaylistShelf(playlist, songs, options = {}) {
+  if (!audioSourceLibraryAllows(playlist)) return;
+  songs = audioSourceLibrarySongs(songs, safeText(playlist.provider, state.activeProvider));
   const previousScroll = els.playlistShelfScroll ? els.playlistShelfScroll.scrollTop : 0;
   state.activePlaylist = playlist;
   state.activePlaylistSongs = songs;
@@ -28087,6 +30314,7 @@ function renderPlaylistShelf(playlist, songs, options = {}) {
 }
 
 function renderShelfLoading(playlist) {
+  if (!audioSourceLibraryAllows(playlist)) return;
   state.activePlaylist = playlist;
   state.activePlaylistSongs = [];
   state.songFocusIndex = 0;
@@ -28124,6 +30352,8 @@ function renderShelfLoading(playlist) {
 function closePlaylistShelf({ resetActive = false, reopenPicker = true } = {}) {
   clearShelfPressTimer();
   state.playlistLoadRequestId += 1;
+  state.playlistLoadAbortController?.abort();
+  state.playlistLoadAbortController = null;
   state.shelfLoadingPlaylistId = '';
   els.playlistShelf.classList.remove('is-open', 'is-loading', 'is-playback-mode', 'is-pressing', 'is-dragging', 'is-position-dragging', 'is-back-facing');
   els.playlistShelf.hidden = true;
@@ -28139,6 +30369,8 @@ function closePlaylistShelf({ resetActive = false, reopenPicker = true } = {}) {
     state.activePlaylistId = '';
     state.activePlaylist = null;
     state.activePlaylistSongs = [];
+    clearElement(els.playlistSongStack);
+    if (els.playlistSongStackBack) clearElement(els.playlistSongStackBack);
     window.clearTimeout(state.songCoverHydrationTimer);
     state.songCoverHydrationTimer = 0;
     state.songButtonCache = [];
@@ -28156,7 +30388,7 @@ async function loadPlaylistFromCard(card) {
   const playlistId = card.dataset.playlistId;
   const provider = card.dataset.playlistProvider || state.activeProvider;
   const playlistIndex = Number(card.dataset.playlistIndex || '0');
-  if (!playlistId) return;
+  if (!playlistId || !audioSourceLibraryAllows({ id: playlistId, provider, audioSourceId: card.dataset.audioSourceId })) return;
   if (Number.isFinite(playlistIndex) && playlistIndex !== state.playlistFocusIndex) {
     setPlaylistFocus(playlistIndex);
   }
@@ -28168,18 +30400,25 @@ async function loadPlaylistFromCard(card) {
   }
   const info = providerInfo(provider);
   const playlistName = card.dataset.playlistName || `${info.label}\u6b4c\u5355`;
-  const playlist = playlistById(playlistId) || {
+  const playlist = playlistById(playlistId, provider) || {
     id: playlistId,
     name: playlistName,
     cover: card.dataset.playlistCover || '',
-    provider: info.id
+    provider: info.id,
+    audioSourceId: state.audioSourceSelection?.id || ''
   };
+  if (playlist.lxImported) {
+    openLxPlaylist(playlist);
+    return;
+  }
 
   state.activePlaylistId = playlistId;
   updateActivePlaylistCard();
   if (!state.playbackPage) enterPlaybackPage();
 
-  if (String(state.activePlaylist && state.activePlaylist.id) === String(playlistId) && state.activePlaylistSongs.length) {
+  if (String(state.activePlaylist && state.activePlaylist.id) === String(playlistId)
+      && safeText(state.activePlaylist?.provider, state.activeProvider) === provider
+      && audioSourceLibraryAllows(state.activePlaylist) && state.activePlaylistSongs.length) {
     renderPlaylistShelf(state.activePlaylist, state.activePlaylistSongs, { preserveScroll: true });
     return;
   }
@@ -28187,20 +30426,25 @@ async function loadPlaylistFromCard(card) {
 
   const requestId = state.playlistLoadRequestId + 1;
   state.playlistLoadRequestId = requestId;
+  state.playlistLoadAbortController?.abort();
+  const controller = new AbortController();
+  state.playlistLoadAbortController = controller;
+  const sourceRevision = state.audioSourceLibraryRevision;
   state.shelfLoadingPlaylistId = String(playlistId);
   card.classList.add('is-loading');
   card.disabled = true;
   card.setAttribute('aria-busy', 'true');
   renderShelfLoading(playlist);
   const requestStillActive = () => requestId === state.playlistLoadRequestId
+    && sourceRevision === state.audioSourceLibraryRevision
     && state.playbackPage
     && state.playlistSongPageOpen
     && state.activeProvider === info.id
     && String(state.activePlaylistId) === String(playlistId);
   try {
-    const data = await apiJson(`${providerPath('/playlist/tracks', provider)}?${query({ id: playlistId })}`);
+    const data = await apiJson(`${providerPath('/playlist/tracks', provider)}?${query({ id: playlistId })}`, { signal: controller.signal });
     if (!requestStillActive()) return;
-    const songs = Array.isArray(data.songs) ? data.songs : [];
+    const songs = audioSourceLibrarySongs(data.songs, provider);
     if (!songs.length) {
       renderPlaylistShelf(playlist, []);
       toast(`歌单「${playlistName}」暂无可播放歌曲`);
@@ -28213,7 +30457,10 @@ async function loadPlaylistFromCard(card) {
       toast(error.message);
     }
   } finally {
-    if (requestId === state.playlistLoadRequestId) state.shelfLoadingPlaylistId = '';
+    if (requestId === state.playlistLoadRequestId) {
+      state.shelfLoadingPlaylistId = '';
+      state.playlistLoadAbortController = null;
+    }
     card.classList.remove('is-loading');
     card.disabled = false;
     card.removeAttribute('aria-busy');
@@ -28221,6 +30468,7 @@ async function loadPlaylistFromCard(card) {
 }
 
 async function playlistTracksForPlayback(playlist = {}) {
+  if (!audioSourceLibraryAllows(playlist)) throw new Error('该歌单不属于当前音源支持的平台，请重新选择歌单。');
   if (playlist.local || playlist.provider === 'local' || String(playlist.id) === LOCAL_PLAYLIST_ID) {
     return state.localPlaylistSongs.slice();
   }
@@ -28232,55 +30480,73 @@ async function playlistTracksForPlayback(playlist = {}) {
     return state.activePlaylistSongs.slice();
   }
   const provider = safeText(playlist.provider, state.activeProvider);
+  const sourceRevision = state.audioSourceLibraryRevision;
   const data = await apiJson(`${providerPath('/playlist/tracks', provider)}?${query({ id: playlist.id })}`);
-  return Array.isArray(data.songs) ? data.songs.slice(0, 2000) : [];
+  if (sourceRevision !== state.audioSourceLibraryRevision || !audioSourceLibraryAllows(playlist)) {
+    throw new Error('音源已切换，请重新选择当前音源的歌单。');
+  }
+  return audioSourceLibrarySongs(data.songs, provider).slice(0, 2000);
 }
 
 async function playPlaylistTracks(playlist, songs, requestedIndex = 0, options = {}) {
-  const tracks = Array.isArray(songs) ? songs.filter(Boolean).slice(0, 2000) : [];
+  const sourceRevision = state.audioSourceLibraryRevision;
+  const ensureCurrentSource = () => {
+    if (sourceRevision !== state.audioSourceLibraryRevision || !audioSourceLibraryAllows(playlist)) {
+      throw new Error('音源已切换，请重新选择当前音源的歌单。');
+    }
+  };
+  ensureCurrentSource();
+  let tracks = Array.isArray(songs) ? songs.filter(Boolean).slice(0, 2000) : [];
   if (!tracks.length) throw new Error('The selected playlist has no playable songs.');
   const index = clamp(Math.floor(Number(requestedIndex) || 0), 0, tracks.length - 1);
   let song = tracks[index];
   state.activePlaylistId = safeText(playlist?.id, '');
   state.activePlaylist = playlist ? { ...playlist } : null;
   state.activePlaylistSongs = tracks;
+  const selection = setPlaybackPlaylistSelection(playlist, tracks, index);
 
-  if (isLocalSong(song)) {
-    state.queue = tracks;
-    state.queueLength = tracks.length;
-    state.queueIndex = index;
-    state.localQueueActive = true;
-    const loaded = await loadSong(song, { silent: options.silent === true });
-    if (!loaded) throw new Error('The local song could not be played.');
-  } else {
-    let playbackQueue = tracks;
-    let playbackQueueIndex = index;
-    if (isQishuiMetadataSong(song)) {
-      const matched = await resolveQishuiMetadataViaGuestSearch(song);
-      if (!matched) {
-        throw new Error('No public guest-search match was found; protected Qishui audio was not read or decrypted.');
-      }
-      song = matched;
-      playbackQueue = [matched];
-      playbackQueueIndex = 0;
+  // Selecting a song from a playlist starts that song only. The playback queue
+  // is an explicit user-managed list populated through the queue button; a
+  // playlist must never silently replace it with every track it contains.
+  if (isQishuiMetadataSong(song)) {
+    const matched = await resolveQishuiMetadataViaGuestSearch(song);
+    // A newer song-bar or queue click owns playback, even while resolving
+    // metadata before loadSong has created an audio source generation.
+    if (state.playbackSelection !== selection) return null;
+    ensureCurrentSource();
+    if (!matched) {
+      throw new Error('No public guest-search match was found; protected Qishui audio was not read or decrypted.');
     }
-    const queueState = await apiJson('/api/player/queue', {
-      method: 'POST',
-      body: JSON.stringify({ songs: playbackQueue, currentIndex: playbackQueueIndex })
-    });
-    state.queue = playbackQueue;
-    state.queueLength = Number.isInteger(queueState?.queueLength) ? queueState.queueLength : playbackQueue.length;
-    state.queueRevision = Number.isInteger(queueState?.queueRevision) ? queueState.queueRevision : state.queueRevision;
-    state.queueIndex = playbackQueueIndex;
-    state.localQueueActive = false;
-    const loaded = await loadSong(song, { silent: true });
-    if (!loaded) throw new Error(
-      `${safeText(song.title, '\u6240\u9009\u6b4c\u66f2')} \u5f53\u524d\u8d26\u53f7\u65e0\u64ad\u653e\u6743\u9650\uff0c\u53ef\u80fd\u9700\u8981 VIP \u6216\u53d7\u7248\u6743\u9650\u5236\u3002`
-    );
-    await refreshPlayerState().catch(() => {});
+    song = matched;
+    if (tracks[index] !== song) {
+      tracks = tracks.slice();
+      tracks[index] = song;
+      state.activePlaylistSongs = tracks;
+      selection.songs = tracks.slice();
+    }
   }
+  state.localQueueActive = isLocalSong(song);
+  const loaded = await loadSong(song, { silent: true, throwOnError: true });
+  if (!loaded || state.playbackSelection !== selection) return null;
+  // The backend keeps the authoritative queue index for remote songs. Local
+  // playback has no backend refresh, so derive the index from explicit items.
+  if (state.localQueueActive && state.playbackSelection?.kind !== 'playlist') {
+    state.queueIndex = state.queue.findIndex((item) => (
+      String(item?.id || '') === String(song?.id || '')
+      && safeText(item?.provider, state.activeProvider) === safeText(song?.provider, state.activeProvider)
+    ));
+  }
+  if (!state.localQueueActive) await refreshPlayerState().catch(() => {});
 
+  if (state.playbackSelection !== selection) return null;
+  ensureCurrentSource();
+  // Selecting a song from the song bar must not keep an unrelated playback
+  // queue entry marked as the current one: the queue position always follows
+  // the song that is actually playing, and the queue itself is untouched.
+  syncPlaybackQueueIndexToCurrentSong();
   updateShelfCurrentSong();
+  selection.index = index;
+  selection.songs = tracks.slice();
   const playingIndex = tracks.findIndex((item) => String(item.id || '') === String(state.currentSong?.id || ''));
   if (options.updateShelf !== false) setSongFocus(playingIndex >= 0 ? playingIndex : index);
   if (options.closeShelf === true) closePlaylistShelf({ reopenPicker: false });
@@ -28301,9 +30567,10 @@ async function playShelfSong(button) {
   button.disabled = true;
   try {
     const result = await playPlaylistTracks(state.activePlaylist, state.activePlaylistSongs, index, {
-      closeShelf: true,
+      closeShelf: false,
       updateShelf: true
     });
+    if (!result) return;
     toast(`正在播放：${safeText(result.started?.title, safeText(song.title, '歌曲'))}`);
   } catch (error) {
     toast(error.message);
@@ -28373,11 +30640,33 @@ function glyphTimingsFromWordTimings(wordTimings, lineEndTime = Number.NaN) {
   if (!Array.isArray(wordTimings) || !wordTimings.length) return [];
   return wordTimings
     .map((timing, index) => {
-      const start = Number(timing && timing.startTime);
+      const segmentStart = Number(timing && timing.segmentStartTime);
+      const segmentEnd = Number(timing && timing.segmentEndTime);
+      const segmentGlyphIndex = Number(timing && timing.segmentGlyphIndex);
+      const segmentGlyphCount = Number(timing && timing.segmentGlyphCount);
+      const completedSegmentEnd = Number.isFinite(segmentEnd) && segmentEnd > segmentStart
+        ? segmentEnd
+        : Number.isFinite(lineEndTime) && lineEndTime > segmentStart
+        ? lineEndTime
+        : Number.NaN;
+      const hasSegmentTiming = Number.isFinite(segmentStart)
+        && Number.isInteger(segmentGlyphIndex)
+        && Number.isInteger(segmentGlyphCount)
+        && segmentGlyphIndex >= 0
+        && segmentGlyphCount > 0
+        && segmentGlyphIndex < segmentGlyphCount;
+      const segmentStep = hasSegmentTiming && Number.isFinite(completedSegmentEnd)
+        ? (completedSegmentEnd - segmentStart) / segmentGlyphCount
+        : Number.NaN;
+      const start = Number.isFinite(segmentStep) && segmentStep > 0
+        ? segmentStart + segmentStep * segmentGlyphIndex
+        : Number(timing && timing.startTime);
       if (!Number.isFinite(start)) return null;
       const explicitDuration = Number(timing.duration);
       const nextStart = Number(wordTimings[index + 1] && wordTimings[index + 1].startTime);
-      const end = Number.isFinite(explicitDuration) && explicitDuration > 0
+      const end = Number.isFinite(segmentStep) && segmentStep > 0
+        ? segmentStart + segmentStep * (segmentGlyphIndex + 1)
+        : Number.isFinite(explicitDuration) && explicitDuration > 0
         ? start + explicitDuration
         : Number.isFinite(nextStart) && nextStart > start
         ? nextStart
@@ -28415,41 +30704,136 @@ function normalizeGlyphTimeline(glyphTimings) {
     .sort((left, right) => left.start - right.start);
 }
 
+function normalizeKaraokeSegments(text, segments) {
+  const rawText = String(text || '');
+  const leadingWhitespace = rawText.length - rawText.trimStart().length;
+  const normalizedText = rawText.trim();
+  return {
+    text: normalizedText,
+    segments: (Array.isArray(segments) ? segments : [])
+      .map((segment) => {
+        const rawStart = Number(segment && segment.textStart);
+        const rawEnd = Number(segment && segment.textEnd);
+        const textStart = clamp(
+          (Number.isFinite(rawStart) ? rawStart : 0) - leadingWhitespace,
+          0,
+          normalizedText.length
+        );
+        const textEnd = clamp(
+          (Number.isFinite(rawEnd) ? rawEnd : rawStart) - leadingWhitespace,
+          textStart,
+          normalizedText.length
+        );
+        const startTime = Number(segment && (segment.startTime ?? segment.start));
+        const explicitEndTime = Number(segment && segment.endTime);
+        const duration = Number(segment && segment.duration);
+        const endTime = Number.isFinite(explicitEndTime) && explicitEndTime > startTime
+          ? explicitEndTime
+          : Number.isFinite(duration) && duration > 0
+          ? startTime + duration
+          : Number.NaN;
+        if (!Number.isFinite(startTime) || textEnd <= textStart) return null;
+        return {
+          ...segment,
+          text: normalizedText.slice(textStart, textEnd),
+          textStart,
+          textEnd,
+          startTime,
+          endTime,
+          duration: Number.isFinite(endTime) ? endTime - startTime : Number.NaN
+        };
+      })
+      .filter(Boolean)
+  };
+}
+
+function karaokeTimelineFromTokens(tokens, trackId = LYRIC_TRACK_MAIN) {
+  let rawText = '';
+  const rawSegments = [];
+  (Array.isArray(tokens) ? tokens : []).forEach((token) => {
+    const tokenText = String(token && token.text || '');
+    if (!tokenText) return;
+    const textStart = rawText.length;
+    rawText += tokenText;
+    const startTime = Number(token.startMs) / 1000;
+    const duration = Math.max(Number(token.durationMs) / 1000, 0.001);
+    rawSegments.push({
+      text: tokenText,
+      textStart,
+      textEnd: rawText.length,
+      startTime,
+      endTime: startTime + duration,
+      duration,
+      trackId
+    });
+  });
+  return normalizeKaraokeSegments(rawText, rawSegments);
+}
+
 function parseInlineLrcLyric(rawText, trackId = LYRIC_TRACK_MAIN) {
   const source = String(rawText || '');
   const wordTimings = [];
-  let text = '';
-  let cursor = 0;
-  let currentStart = Number.NaN;
+  const karaokeSegments = [];
   LYRIC_INLINE_MARKER_PATTERN.lastIndex = 0;
-  let markerMatch;
-
-  const appendChunk = (chunk) => {
-    Array.from(chunk || '').forEach((char) => {
-      text += char;
-      if (char.trim() && Number.isFinite(currentStart)) {
-        wordTimings.push({
-          char,
-          startTime: currentStart,
-          duration: Number.NaN,
-          trackId
-        });
-      }
-    });
-  };
-
-  while ((markerMatch = LYRIC_INLINE_MARKER_PATTERN.exec(source))) {
-    appendChunk(source.slice(cursor, markerMatch.index));
-    currentStart = parseLyricTime(markerMatch[1]);
-    cursor = LYRIC_INLINE_MARKER_PATTERN.lastIndex;
+  const markers = Array.from(source.matchAll(LYRIC_INLINE_MARKER_PATTERN));
+  if (!markers.length) {
+    return { text: source.trim(), wordTimings, glyphTimings: [], karaokeSegments };
   }
-  appendChunk(source.slice(cursor));
 
-  const cleanText = text.trim();
+  let text = source.slice(0, markers[0].index);
+  markers.forEach((marker, segmentIndex) => {
+    const nextMarker = markers[segmentIndex + 1];
+    const chunkStart = Number(marker.index) + marker[0].length;
+    const chunkEnd = nextMarker ? Number(nextMarker.index) : source.length;
+    const chunk = source.slice(chunkStart, chunkEnd);
+    const textStart = text.length;
+    text += chunk;
+
+    const segmentStartTime = parseLyricTime(marker[1]);
+    const candidateEndTime = nextMarker ? parseLyricTime(nextMarker[1]) : Number.NaN;
+    const segmentEndTime = Number.isFinite(candidateEndTime) && candidateEndTime > segmentStartTime
+      ? candidateEndTime
+      : Number.NaN;
+    if (chunk) {
+      karaokeSegments.push({
+        text: chunk,
+        textStart,
+        textEnd: text.length,
+        startTime: segmentStartTime,
+        endTime: segmentEndTime,
+        duration: Number.isFinite(segmentEndTime) ? segmentEndTime - segmentStartTime : Number.NaN,
+        trackId
+      });
+    }
+    const glyphs = Array.from(chunk).filter((char) => char.trim());
+    const segmentGlyphCount = glyphs.length;
+    if (!Number.isFinite(segmentStartTime) || !segmentGlyphCount) return;
+    const segmentStep = Number.isFinite(segmentEndTime)
+      ? (segmentEndTime - segmentStartTime) / segmentGlyphCount
+      : Number.NaN;
+    glyphs.forEach((char, segmentGlyphIndex) => {
+      wordTimings.push({
+        char,
+        startTime: Number.isFinite(segmentStep)
+          ? segmentStartTime + segmentStep * segmentGlyphIndex
+          : segmentStartTime,
+        duration: Number.isFinite(segmentStep) ? segmentStep : Number.NaN,
+        segmentStartTime,
+        segmentEndTime,
+        segmentGlyphIndex,
+        segmentGlyphCount,
+        trackId
+      });
+    });
+  });
+
+  const normalizedTimeline = normalizeKaraokeSegments(text, karaokeSegments);
+  const cleanText = normalizedTimeline.text;
   return {
     text: cleanText,
     wordTimings,
-    glyphTimings: glyphTimingsFromWordTimings(wordTimings)
+    glyphTimings: glyphTimingsFromWordTimings(wordTimings),
+    karaokeSegments: normalizedTimeline.segments
   };
 }
 
@@ -28460,7 +30844,11 @@ function normalizeParsedLyricLines(lines) {
     .reduce((result, line) => {
       const previous = result[result.length - 1];
       if (previous && Math.abs(Number(previous.time) - Number(line.time)) < 0.001) {
-        previous.text = mergeLyricText(previous.text, line.text);
+        const previousText = String(previous.text || '');
+        const incomingText = String(line.text || '');
+        const distinctText = incomingText && incomingText !== previousText;
+        const segmentOffset = previousText && distinctText ? previousText.length + 1 : 0;
+        previous.text = mergeLyricText(previousText, incomingText);
         if (Number.isFinite(Number(line.endTime))) {
           previous.endTime = Number.isFinite(Number(previous.endTime))
             ? Math.max(Number(previous.endTime), Number(line.endTime))
@@ -28468,6 +30856,16 @@ function normalizeParsedLyricLines(lines) {
         }
         previous.wordTimings = [...(previous.wordTimings || []), ...(line.wordTimings || [])];
         previous.glyphTimings = [...(previous.glyphTimings || []), ...(line.glyphTimings || [])];
+        if (distinctText) {
+          previous.karaokeSegments = [
+            ...(previous.karaokeSegments || []),
+            ...(line.karaokeSegments || []).map((segment) => ({
+              ...segment,
+              textStart: Number(segment.textStart) + segmentOffset,
+              textEnd: Number(segment.textEnd) + segmentOffset
+            }))
+          ];
+        }
         return result;
       }
       result.push({ ...line });
@@ -28475,22 +30873,84 @@ function normalizeParsedLyricLines(lines) {
     }, []);
   return merged.map((line) => ({
     ...line,
-    glyphTimings: normalizeGlyphTimeline(line.glyphTimings)
+    glyphTimings: normalizeGlyphTimeline(line.glyphTimings),
+    karaokeSegments: Array.isArray(line.karaokeSegments) ? line.karaokeSegments : []
   }));
 }
 
 function completeLineWordTimings(lines) {
   return (Array.isArray(lines) ? lines : []).map((line, index, allLines) => {
-    if (!Array.isArray(line.wordTimings) || !line.wordTimings.length) return line;
     const nextTime = Number(allLines[index + 1] && allLines[index + 1].time);
     const lineEndTime = Number.isFinite(Number(line.endTime))
       ? Number(line.endTime)
       : Number.isFinite(nextTime)
       ? nextTime
       : Number.NaN;
+    const wordTimings = (Array.isArray(line.wordTimings) ? line.wordTimings : []).map((timing) => {
+      const segmentStart = Number(timing && timing.segmentStartTime);
+      const explicitSegmentEnd = Number(timing && timing.segmentEndTime);
+      const segmentGlyphIndex = Number(timing && timing.segmentGlyphIndex);
+      const segmentGlyphCount = Number(timing && timing.segmentGlyphCount);
+      const fallbackSegmentEnd = Number.isFinite(segmentStart) && Number.isInteger(segmentGlyphCount)
+        ? segmentStart + Math.max(0.16, segmentGlyphCount * 0.16)
+        : Number.NaN;
+      const segmentEnd = Number.isFinite(explicitSegmentEnd) && explicitSegmentEnd > segmentStart
+        ? explicitSegmentEnd
+        : Number.isFinite(lineEndTime) && lineEndTime > segmentStart
+        ? lineEndTime
+        : fallbackSegmentEnd;
+      if (
+        !Number.isFinite(segmentStart)
+        || !Number.isFinite(segmentEnd)
+        || segmentEnd <= segmentStart
+        || !Number.isInteger(segmentGlyphIndex)
+        || !Number.isInteger(segmentGlyphCount)
+        || segmentGlyphIndex < 0
+        || segmentGlyphCount <= 0
+        || segmentGlyphIndex >= segmentGlyphCount
+      ) return timing;
+      const duration = (segmentEnd - segmentStart) / segmentGlyphCount;
+      const {
+        segmentStartTime: _segmentStartTime,
+        segmentEndTime: _segmentEndTime,
+        segmentGlyphIndex: _segmentGlyphIndex,
+        segmentGlyphCount: _segmentGlyphCount,
+        ...completedTiming
+      } = timing;
+      return {
+        ...completedTiming,
+        startTime: segmentStart + duration * segmentGlyphIndex,
+        duration
+      };
+    });
+    const karaokeSegments = (Array.isArray(line.karaokeSegments) ? line.karaokeSegments : [])
+      .map((segment, segmentIndex, allSegments) => {
+        const startTime = Number(segment && segment.startTime);
+        const explicitEndTime = Number(segment && segment.endTime);
+        const explicitDuration = Number(segment && segment.duration);
+        const nextStartTime = Number(allSegments[segmentIndex + 1] && allSegments[segmentIndex + 1].startTime);
+        const endTime = Number.isFinite(explicitEndTime) && explicitEndTime > startTime
+          ? explicitEndTime
+          : Number.isFinite(explicitDuration) && explicitDuration > 0
+          ? startTime + explicitDuration
+          : Number.isFinite(nextStartTime) && nextStartTime > startTime
+          ? nextStartTime
+          : Number.isFinite(lineEndTime) && lineEndTime > startTime
+          ? lineEndTime
+          : startTime + 0.16;
+        return {
+          ...segment,
+          startTime,
+          endTime,
+          duration: Math.max(0.001, endTime - startTime)
+        };
+      })
+      .filter((segment) => Number.isFinite(segment.startTime) && Number.isFinite(segment.endTime));
     return {
       ...line,
-      glyphTimings: glyphTimingsFromWordTimings(line.wordTimings, lineEndTime)
+      wordTimings,
+      glyphTimings: glyphTimingsFromWordTimings(wordTimings, lineEndTime),
+      karaokeSegments
     };
   });
 }
@@ -28521,13 +30981,20 @@ function parseLrc(text, trackId = LYRIC_TRACK_MAIN) {
       trackId,
       wordTimings: parsed.wordTimings.map((timing) => ({
         ...timing,
-        startTime: shiftTimestamp(timing.startTime)
+        startTime: shiftTimestamp(timing.startTime),
+        segmentStartTime: shiftTimestamp(timing.segmentStartTime),
+        segmentEndTime: shiftTimestamp(timing.segmentEndTime)
       })),
       glyphTimings: parsed.glyphTimings.map((timing) => ({
         ...timing,
         start: shiftTimestamp(timing.start),
         end: shiftTimestamp(timing.end),
         startTime: shiftTimestamp(timing.startTime)
+      })),
+      karaokeSegments: parsed.karaokeSegments.map((segment) => ({
+        ...segment,
+        startTime: shiftTimestamp(segment.startTime),
+        endTime: shiftTimestamp(segment.endTime)
       }))
     });
   });
@@ -28539,7 +31006,7 @@ function pushKaraokeGlyphTimings(glyphTimings, tokenText, tokenStartMs, tokenDur
   const glyphCount = glyphs.length;
   if (!glyphCount) return;
   const start = tokenStartMs / 1000;
-  const duration = Math.max(tokenDurationMs / 1000, 0.04 * glyphCount);
+  const duration = Math.max(tokenDurationMs / 1000, 0.001);
   const step = duration / glyphCount;
   for (let index = 0; index < glyphCount; index += 1) {
     const char = glyphs[index];
@@ -28563,27 +31030,142 @@ function pushKaraokeGlyphTimings(glyphTimings, tokenText, tokenStartMs, tokenDur
   }
 }
 
+function parseJsonKaraokeLyric(text, trackId = LYRIC_TRACK_MAIN) {
+  const source = typeof text === 'string' ? text.trim() : '';
+  const firstCharacterCode = source.charCodeAt(0);
+  if (!source || (firstCharacterCode !== 123 && firstCharacterCode !== 91)) return [];
+
+  const decodedLines = [];
+  const collectLines = (value) => {
+    if (Array.isArray(value)) {
+      value.forEach(collectLines);
+      return;
+    }
+    if (!value || typeof value !== 'object') return;
+    const nested = value.lines || value.lyrics;
+    if (Array.isArray(nested)) nested.forEach(collectLines);
+    else decodedLines.push(value);
+  };
+
+  try {
+    collectLines(JSON.parse(source));
+  } catch (_error) {
+    source.split(/\r?\n/).forEach((rawLine) => {
+      try {
+        collectLines(JSON.parse(rawLine));
+      } catch (_lineError) {
+        // Ignore malformed JSON lines so the caller can fall back to LRC.
+      }
+    });
+  }
+
+  const lines = [];
+  decodedLines.forEach((rawLine) => {
+    const rawTokens = Array.isArray(rawLine.c)
+      ? rawLine.c
+      : Array.isArray(rawLine.words)
+      ? rawLine.words
+      : Array.isArray(rawLine.components)
+      ? rawLine.components
+      : [];
+    const lineStartMs = Number(rawLine.t ?? rawLine.time ?? rawLine.start ?? rawLine.startTime);
+    if (!Number.isFinite(lineStartMs)) return;
+
+    const tokens = [];
+    rawTokens.forEach((rawToken) => {
+      if (!rawToken || typeof rawToken !== 'object') return;
+      const tokenText = String(rawToken.tx ?? rawToken.text ?? rawToken.word ?? '');
+      if (!tokenText) return;
+      const rawTokenStartMs = Number(rawToken.t ?? rawToken.time ?? rawToken.start ?? rawToken.startTime);
+      if (!Number.isFinite(rawTokenStartMs)) return;
+      const explicitDurationMs = Number(rawToken.d ?? rawToken.duration ?? rawToken.durationMs);
+      const tokenStartMs = rawTokenStartMs >= lineStartMs - 2
+        ? rawTokenStartMs
+        : lineStartMs + rawTokenStartMs;
+      const fallbackDurationMs = Math.max(40, Array.from(tokenText).filter((glyph) => glyph.trim()).length * 40);
+      tokens.push({
+        text: tokenText,
+        startMs: tokenStartMs,
+        durationMs: Number.isFinite(explicitDurationMs) && explicitDurationMs > 0
+          ? explicitDurationMs
+          : fallbackDurationMs
+      });
+    });
+    if (!tokens.length) return;
+
+    const karaokeTimeline = karaokeTimelineFromTokens(tokens, trackId);
+    const lyric = karaokeTimeline.text;
+    if (!lyric || isLyricCreditLine(lyric)) return;
+    const glyphTimings = [];
+    const wordTimings = [];
+    tokens.forEach((token) => pushKaraokeGlyphTimings(
+      glyphTimings,
+      token.text,
+      token.startMs,
+      token.durationMs,
+      wordTimings,
+      trackId
+    ));
+    if (!glyphTimings.length) return;
+
+    const explicitLineDurationMs = Number(rawLine.d ?? rawLine.duration ?? rawLine.durationMs);
+    const tokenEndMs = tokens.reduce(
+      (latest, token) => Math.max(latest, token.startMs + token.durationMs),
+      lineStartMs
+    );
+    const lineEndMs = Number.isFinite(explicitLineDurationMs) && explicitLineDurationMs > 0
+      ? Math.max(lineStartMs + explicitLineDurationMs, tokenEndMs)
+      : tokenEndMs;
+    lines.push({
+      time: lineStartMs / 1000,
+      endTime: Math.max(lineStartMs + 1, lineEndMs) / 1000,
+      text: lyric,
+      trackId,
+      wordTimings,
+      glyphTimings,
+      karaokeSegments: karaokeTimeline.segments
+    });
+  });
+  return normalizeParsedLyricLines(lines);
+}
+
 function parseKaraokeLyric(text, trackId = LYRIC_TRACK_MAIN) {
   if (!text || typeof text !== 'string') return [];
+  const offsetMilliseconds = Number(LYRIC_LRC_OFFSET_PATTERN.exec(text)?.[1]);
+  const timelineOffsetMs = Number.isFinite(offsetMilliseconds) ? offsetMilliseconds : 0;
   const lines = [];
   text.split(/\r?\n/).forEach((rawLine) => {
     const lineMatch = LYRIC_KARAOKE_LINE_PATTERN.exec(rawLine.trim());
     if (!lineMatch) return;
-    const lineStartMs = Number(lineMatch[1]);
+    const rawLineStartMs = Number(lineMatch[1]);
     const lineDurationMs = Number(lineMatch[2]);
-    if (!Number.isFinite(lineStartMs) || !Number.isFinite(lineDurationMs)) return;
+    if (!Number.isFinite(rawLineStartMs) || !Number.isFinite(lineDurationMs)) return;
+    const lineStartMs = Math.max(0, rawLineStartMs + timelineOffsetMs);
     const tokens = [];
+    // Native QQ QRC is text(start,duration); YRC and KRC put timing before text.
+    const tokenBody = lineMatch[3] || '';
+    const suffixQrc = !/^\s*[<(]\d+\s*,\s*\d+/u.test(tokenBody) && /\(\d+,\d+\)/u.test(tokenBody);
+    const tokenPattern = suffixQrc ? /(.*?)\((\d+),(\d+)\)/gu : LYRIC_KARAOKE_TOKEN_PATTERN;
     LYRIC_KARAOKE_TOKEN_PATTERN.lastIndex = 0;
     let tokenMatch;
-    while ((tokenMatch = LYRIC_KARAOKE_TOKEN_PATTERN.exec(lineMatch[3] || ''))) {
-      const rawTokenStartMs = Number(tokenMatch[1] || tokenMatch[3]);
-      const tokenDurationMs = Number(tokenMatch[2] || tokenMatch[4]);
-      const tokenText = tokenMatch[5] || '';
+    while ((tokenMatch = tokenPattern.exec(tokenBody))) {
+      const absoluteTimelineToken = suffixQrc || tokenMatch[1] !== undefined;
+      const rawTokenStartMs = Number(suffixQrc ? tokenMatch[2] : absoluteTimelineToken ? tokenMatch[1] : tokenMatch[3]);
+      const tokenDurationMs = Number(suffixQrc ? tokenMatch[3] : absoluteTimelineToken ? tokenMatch[2] : tokenMatch[4]);
+      const tokenText = (suffixQrc ? tokenMatch[1] : tokenMatch[5]) || '';
       if (!Number.isFinite(rawTokenStartMs) || !Number.isFinite(tokenDurationMs) || !tokenText) continue;
-      const tokenStartMs = rawTokenStartMs >= lineStartMs - 2 ? rawTokenStartMs : lineStartMs + rawTokenStartMs;
+      // YRC/QRC parentheses carry absolute track timestamps. Kugou KRC angle
+      // brackets carry offsets relative to this line, even when the offset is
+      // numerically greater than the line's early-song start timestamp.
+      const tokenStartMs = Math.max(
+        0,
+        (absoluteTimelineToken ? rawTokenStartMs : rawLineStartMs + rawTokenStartMs)
+          + timelineOffsetMs
+      );
       tokens.push({ startMs: tokenStartMs, durationMs: tokenDurationMs, text: tokenText });
     }
-    const lyric = tokens.map((token) => token.text).join('').trim();
+    const karaokeTimeline = karaokeTimelineFromTokens(tokens, trackId);
+    const lyric = karaokeTimeline.text;
     if (!lyric || isLyricCreditLine(lyric)) return;
     const glyphTimings = [];
     const wordTimings = [];
@@ -28595,10 +31177,13 @@ function parseKaraokeLyric(text, trackId = LYRIC_TRACK_MAIN) {
       text: lyric,
       trackId,
       wordTimings,
-      glyphTimings
+      glyphTimings,
+      karaokeSegments: karaokeTimeline.segments
     });
   });
-  return normalizeParsedLyricLines(lines);
+  return lines.length
+    ? normalizeParsedLyricLines(lines)
+    : parseJsonKaraokeLyric(text, trackId);
 }
 
 function lyricPayloadText(payload) {
@@ -28630,7 +31215,8 @@ function lyricTrackFromLine(line, trackId) {
     endTime: Number.isFinite(Number(line.endTime)) ? Number(line.endTime) : undefined,
     text: safeText(line.text, ''),
     wordTimings: Array.isArray(line.wordTimings) ? line.wordTimings : [],
-    glyphTimings: Array.isArray(line.glyphTimings) ? line.glyphTimings : []
+    glyphTimings: Array.isArray(line.glyphTimings) ? line.glyphTimings : [],
+    karaokeSegments: Array.isArray(line.karaokeSegments) ? line.karaokeSegments : []
   };
 }
 
@@ -28715,6 +31301,59 @@ function parseLyricPayload(payload) {
 
 function lyricPayloadHasNoLyric(payload) {
   return !!(payload && (payload.nolyric || payload.uncollected || payload.needDesc));
+}
+
+function requestLyricPayload(provider, song = state.currentSong) {
+  return apiJson(`/api/lyric?${query({
+    provider,
+    id: safeText(song && song.id, ''),
+    title: safeText(song && song.title, ''),
+    artist: safeText(song && song.artist, ''),
+    duration: Math.max(0, Math.round(Number(song && song.duration) || 0))
+  })}`);
+}
+
+function playbackLyricTimelineResolver() {
+  if (playbackLyricTimelineResolver.instance) return playbackLyricTimelineResolver.instance;
+  const factory = window.FeLyricTimelineResolver;
+  if (!factory || typeof factory.create !== 'function') {
+    playbackLyricTimelineResolver.instance = Object.freeze({
+      async resolve(song, provider) {
+        const payload = await requestLyricPayload(provider, song);
+        const lines = parseLyricPayload(payload);
+        return {
+          payload,
+          lines,
+          detailed: lines.some((line) => lineHasTrustedLyricTiming(line)),
+          cacheHit: false,
+          sourceProvider: provider,
+          sourceSongId: safeText(song && song.id, ''),
+          strategy: 'provider-line-timeline'
+        };
+      }
+    });
+    return playbackLyricTimelineResolver.instance;
+  }
+  playbackLyricTimelineResolver.instance = factory.create({
+    storage: window.localStorage,
+    allowCrossProvider: false,
+    parsePayload: parseLyricPayload,
+    providerIds: () => Object.keys(MUSIC_PROVIDERS),
+    isProviderConfigured: providerConfigured,
+    loadPrimary: (song, provider) => requestLyricPayload(provider, song),
+    searchProvider: async (provider, keyword) => {
+      const payload = await apiJson(`/api/search?${query({
+        q: keyword,
+        limit: 8,
+        provider
+      })}`);
+      return (Array.isArray(payload.songs) ? payload.songs : [])
+        .map((song) => normalizedSong(song, provider))
+        .filter((song) => song.id && song.provider === provider);
+    },
+    loadLyrics: (provider, song) => requestLyricPayload(provider, song)
+  });
+  return playbackLyricTimelineResolver.instance;
 }
 
 function medianNumber(values) {
@@ -28820,7 +31459,8 @@ function lineHasTrustedLyricTiming(line) {
   const end = Number(line && line.endTime);
   return (Number.isFinite(start) && Number.isFinite(end) && end > start)
     || (Array.isArray(line && line.glyphTimings) && line.glyphTimings.length > 0)
-    || (Array.isArray(line && line.wordTimings) && line.wordTimings.length > 0);
+    || (Array.isArray(line && line.wordTimings) && line.wordTimings.length > 0)
+    || (Array.isArray(line && line.karaokeSegments) && line.karaokeSegments.length > 0);
 }
 
 function autoFitPlainLyricLinePacing(lines, song = state.currentSong) {
@@ -28887,6 +31527,15 @@ function scaleLyricWordTiming(timing, anchorTime, scale) {
   };
 }
 
+function scaleLyricKaraokeSegment(segment, anchorTime, scale) {
+  return {
+    ...segment,
+    startTime: scaleLyricTimingValue(segment.startTime, anchorTime, scale),
+    endTime: scaleLyricTimingValue(segment.endTime, anchorTime, scale),
+    duration: scaleLyricDurationValue(segment.duration, scale)
+  };
+}
+
 function scaleLyricLineTiming(line, anchorTime, scale) {
   const next = { ...line };
   next.time = scaleLyricTimingValue(line.time, anchorTime, scale);
@@ -28899,6 +31548,11 @@ function scaleLyricLineTiming(line, anchorTime, scale) {
   if (Array.isArray(line.wordTimings)) {
     next.wordTimings = line.wordTimings.map((timing) => scaleLyricWordTiming(timing, anchorTime, scale));
   }
+  if (Array.isArray(line.karaokeSegments)) {
+    next.karaokeSegments = line.karaokeSegments.map((segment) => (
+      scaleLyricKaraokeSegment(segment, anchorTime, scale)
+    ));
+  }
   if (line.tracks && typeof line.tracks === 'object') {
     next.tracks = Object.fromEntries(Object.entries(line.tracks).map(([trackId, track]) => [trackId, {
       ...track,
@@ -28909,7 +31563,10 @@ function scaleLyricLineTiming(line, anchorTime, scale) {
         : track.glyphTimings,
       wordTimings: Array.isArray(track.wordTimings)
         ? track.wordTimings.map((timing) => scaleLyricWordTiming(timing, anchorTime, scale))
-        : track.wordTimings
+        : track.wordTimings,
+      karaokeSegments: Array.isArray(track.karaokeSegments)
+        ? track.karaokeSegments.map((segment) => scaleLyricKaraokeSegment(segment, anchorTime, scale))
+        : track.karaokeSegments
     }]));
   }
   return next;
@@ -28937,7 +31594,10 @@ function lyricAutoSpeedScale(lines, song = state.currentSong) {
 }
 
 function autoDetectLyricSpeed(lines, song = state.currentSong) {
-  // Provider timestamps are authoritative; track duration can include untimed intros and outros.
+  // Provider timestamps remain authoritative: never move line, word, or glyph timestamps.
+  // Plain LRC has no vocal-end timestamp, though, so a long pause before the next line
+  // must not be treated as if the singer were still voicing the current line. Attach a
+  // visual-only end point for that fallback path; detailed provider timing is untouched.
   state.lyricTimingScale = 1;
   return autoFitPlainLyricLinePacing(lines, song);
 }
@@ -29084,6 +31744,30 @@ function setPlaybackLayerText(
   layer.__wordGlow = null;
 }
 
+function syncPlaybackLayerText(
+  layer,
+  text,
+  fit = lyricLineFitMetrics(text, state.textComposerSettings?.letterSpacing)
+) {
+  if (!layer) return false;
+  const metrics = typeof fit === 'string'
+    ? { ...lyricLineFitMetrics(text), mode: fit }
+    : fit;
+  const value = safeText(text, '');
+  const fontSize = `${metrics.fontSize.toFixed(3)}px`;
+  const contentMatches = layer.dataset.text === value
+    && layer.textContent === value
+    && !layer.__wordGlow;
+  if (!contentMatches) {
+    setPlaybackLayerText(layer, value, metrics);
+    return true;
+  }
+  layer.classList.toggle('is-lyric-long', metrics.mode === 'long');
+  layer.classList.toggle('is-lyric-compact', metrics.mode === 'compact');
+  setStylePropertyIfChanged(layer, '--lyric-fit-font-size', fontSize);
+  return false;
+}
+
 function focusEchoFallbackText(text) {
   const source = safeText(text, '').replace(/\s+/g, ' ').trim();
   if (!source) return '';
@@ -29187,13 +31871,14 @@ function syncFocusEchoLayerText(
   const focusFit = focusActive
     ? focusEchoFitMetrics(focusText, state.textComposerSettings?.letterSpacing)
     : fit;
-  setPlaybackLayerText(els.playbackLyricText, mainText, fit);
+  syncPlaybackLayerText(els.playbackLyricText, mainText, fit);
   els.playbackLyricScene
     .querySelectorAll('.lyric-depth-1, .lyric-depth-2, .lyric-depth-3, .lyric-depth-4, .lyric-depth-5')
-    .forEach((layer) => setPlaybackLayerText(layer, focusText, focusFit));
-  if (els.playbackLyricBack) setPlaybackLayerText(els.playbackLyricBack, focusText, focusFit);
+    .forEach((layer) => syncPlaybackLayerText(layer, focusText, focusFit));
+  if (els.playbackLyricBack) syncPlaybackLayerText(els.playbackLyricBack, focusText, focusFit);
   els.playbackLyricScene.dataset.focusEchoText = focusActive ? focusText : '';
   if (!focusActive) {
+    disposeFocusEchoTransition(true);
     state.focusEchoGroupKey = '';
     state.focusEchoGroupText = '';
   }
@@ -29569,28 +32254,162 @@ function syncSingleRowLyricEffects() {
   }
 }
 
-function triggerFocusEchoTransition() {
-  if (!els.playbackLyricScene) return;
-  if (state.focusEchoAnimationFrame) {
-    window.cancelAnimationFrame(state.focusEchoAnimationFrame);
-    state.focusEchoAnimationFrame = 0;
+function disposeFocusEchoTransition(resetLine = false) {
+  const transition = state.focusEchoTransition;
+  if (transition) {
+    transition.animations.forEach(({ animation }) => {
+      try { animation.cancel(); } catch (error) {}
+    });
   }
-  if (state.focusEchoAnimationTimer) {
-    window.clearTimeout(state.focusEchoAnimationTimer);
-    state.focusEchoAnimationTimer = 0;
+  state.focusEchoTransition = null;
+  if (resetLine) state.focusEchoLineKey = '';
+}
+
+function focusEchoTransitionDurationMs() {
+  const playbackSpeed = clamp(Number(state.lyricSpeed) || 1, 0.6, 1.8);
+  return Math.round(clamp(
+    460 / playbackSpeed,
+    FOCUS_ECHO_TRANSITION_MIN_MS,
+    FOCUS_ECHO_TRANSITION_MAX_MS
+  ));
+}
+
+function focusEchoTransform(profile, options = {}) {
+  const x = Number(profile?.x) || 0;
+  const y = Number(profile?.y) || 0;
+  const z = Number(profile?.z) || 0;
+  const shiftX = Number(options.shiftX) || 0;
+  const shiftY = Number(options.shiftY) || 0;
+  const scaleX = Math.max(0.1, (Number(profile?.scaleX) || 1) + (Number(options.scaleX) || 0));
+  const scale = Math.max(0.1, (Number(profile?.scale) || 1) + (Number(options.scale) || 0));
+  return `translate3d(${(x + shiftX).toFixed(2)}px, calc(var(--lyric-bounce) + ${(y + shiftY).toFixed(2)}px), ${z.toFixed(2)}px) scaleX(${scaleX.toFixed(4)}) scale(${scale.toFixed(4)})`;
+}
+
+function startFocusEchoTransition(currentTime, lineIndex = state.lyricIndex) {
+  if (state.textPreset !== 'focus-echo') {
+    disposeFocusEchoTransition(true);
+    return null;
   }
-  els.playbackLyricScene.classList.remove('is-focus-echo-entering');
-  if (state.textPreset !== 'focus-echo' || reducedMotion) return;
-  state.focusEchoAnimationFrame = window.requestAnimationFrame(() => {
-    state.focusEchoAnimationFrame = 0;
-    if (state.textPreset === 'focus-echo') {
-      els.playbackLyricScene.classList.add('is-focus-echo-entering');
-      state.focusEchoAnimationTimer = window.setTimeout(() => {
-        state.focusEchoAnimationTimer = 0;
-        els.playbackLyricScene?.classList.remove('is-focus-echo-entering');
-      }, FOCUS_ECHO_TRANSITION_CLEANUP_MS);
+  disposeFocusEchoTransition();
+  const line = state.lyricLines[lineIndex] || null;
+  const sampledDisplayTime = Number(currentTime);
+  const lineTime = Number(line?.time);
+  const startTime = Number.isFinite(lineTime)
+    ? lineTime
+    : Number.isFinite(sampledDisplayTime)
+      ? sampledDisplayTime
+      : 0;
+  const lineKey = `${state.lyricSignature}|${lineIndex}|${startTime.toFixed(3)}`;
+  state.focusEchoLineKey = lineKey;
+  if (
+    reducedMotion
+    || !els.playbackLyricScene
+    || !els.playbackLyricText
+    || typeof els.playbackLyricText.animate !== 'function'
+  ) return null;
+
+  const durationMs = focusEchoTransitionDurationMs();
+  const animations = [];
+  const mainProfile = { x: 0, y: 0, z: 70, opacity: 1, scaleX: 1, scale: 1 };
+  const mainAnimation = els.playbackLyricText.animate([
+    {
+      opacity: 0.34,
+      transform: focusEchoTransform(mainProfile, { shiftX: -2, shiftY: 3, scaleX: 0.08, scale: 0.14 }),
+      offset: 0
+    },
+    {
+      opacity: 0.9,
+      transform: focusEchoTransform(mainProfile, { shiftX: 0.5, shiftY: 0.8, scaleX: 0.025, scale: 0.035 }),
+      offset: 0.24
+    },
+    {
+      opacity: 1,
+      transform: focusEchoTransform(mainProfile, { scaleX: -0.003, scale: 0.006 }),
+      offset: 0.66
+    },
+    {
+      opacity: 1,
+      transform: focusEchoTransform(mainProfile),
+      offset: 1
     }
+  ], {
+    duration: durationMs,
+    easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+    fill: 'both'
   });
+  mainAnimation.pause();
+  mainAnimation.currentTime = 0;
+  animations.push({ animation: mainAnimation, delayMs: 0 });
+
+  const entryShift = [-5, 5, -2, 2, -1];
+  els.playbackLyricScene
+    .querySelectorAll('.playback-lyric-layer.is-text-composer-layer-visible')
+    .forEach((layer) => {
+      const depth = FOCUS_ECHO_LAYER_PROFILES.findIndex((profile, index) => (
+        index > 0 && profile && layer.classList.contains(`lyric-depth-${index}`)
+      ));
+      const profile = FOCUS_ECHO_LAYER_PROFILES[depth];
+      if (!profile || typeof layer.animate !== 'function') return;
+      const delayMs = Math.min(2, Math.max(0, depth - 1)) * FOCUS_ECHO_LAYER_STAGGER_MS;
+      const animation = layer.animate([
+        {
+          opacity: profile.opacity * 0.42,
+          transform: focusEchoTransform(profile, {
+            shiftX: entryShift[depth - 1],
+            shiftY: 7,
+            scaleX: 0.06,
+            scale: 0.12
+          }),
+          offset: 0
+        },
+        {
+          opacity: profile.opacity * 1.04,
+          transform: focusEchoTransform(profile, { shiftY: 0.5, scaleX: 0.012, scale: 0.024 }),
+          offset: 0.54
+        },
+        {
+          opacity: profile.opacity,
+          transform: focusEchoTransform(profile),
+          offset: 1
+        }
+      ], {
+        duration: durationMs,
+        delay: delayMs,
+        easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+        fill: 'both'
+      });
+      animation.pause();
+      animation.currentTime = 0;
+      animations.push({ animation, delayMs });
+    });
+
+  state.focusEchoTransition = {
+    line,
+    lineIndex,
+    startTime,
+    durationMs,
+    animations
+  };
+  syncFocusEchoTransition(sampledDisplayTime);
+  return state.focusEchoTransition;
+}
+
+function syncFocusEchoTransition(displayTime) {
+  const transition = state.focusEchoTransition;
+  const sampledDisplayTime = Number(displayTime);
+  if (!transition || !Number.isFinite(sampledDisplayTime)) return 1;
+  const lineTime = Number(transition.line?.time);
+  const startTime = Number.isFinite(lineTime) ? lineTime : transition.startTime;
+  const elapsedMs = Math.max(0, (sampledDisplayTime - startTime) * 1000);
+  let complete = true;
+  transition.animations.forEach(({ animation, delayMs }) => {
+    const endTime = transition.durationMs + delayMs;
+    animation.pause();
+    animation.currentTime = Math.min(elapsedMs, endTime);
+    if (elapsedMs < endTime) complete = false;
+  });
+  if (complete) disposeFocusEchoTransition();
+  return clamp(elapsedMs / Math.max(1, transition.durationMs), 0, 1);
 }
 
 function animateLyricGeometryFlip(element, previousRect, options = {}) {
@@ -29676,11 +32495,13 @@ function setPlaybackLyricLine(
   const nextSubtitle = safeText(subtitle, playbackLyricSubtitle());
   const progressPercent = clamp(progress, 0, 1) * 100;
   const previousLine = state.lyricDisplayText;
-  const lineChanged = line !== state.lyricDisplayText;
-  const subtitleChanged = nextSubtitle !== state.lyricSubtitleText;
+  const lyricDomPending = state.playbackVisual.lyricDomPending === true;
+  const lineChanged = lyricDomPending || line !== state.lyricDisplayText;
+  const subtitleChanged = lyricDomPending || nextSubtitle !== state.lyricSubtitleText;
   const shineActive = wordGlowLyricActive();
   const moodActive = handwrittenMoodLyricActive();
-  if (!textLyricsEnabled()) {
+  if (!textLyricsEnabled() || state.textPreset === 'particle-lyrics') {
+    state.playbackVisual.lyricDomPending = true;
     state.lyricDisplayText = line;
     state.lyricSubtitleText = nextSubtitle;
     state.lyricProgressPercent = progressPercent;
@@ -29690,11 +32511,13 @@ function setPlaybackLyricLine(
         nextSubtitle,
         Number.isFinite(Number(authoritativeTime))
           ? Math.max(0, Number(authoritativeTime))
-          : currentPlaybackLyricTime()
+          : currentPlaybackLyricTime(),
+        { effectiveTime: currentTime, progressPercent }
       );
     }
     return;
   }
+  state.playbackVisual.lyricDomPending = false;
   const seekPreviewActive = state.qishuiPlaybackCard.progressDragging;
   const lyricTransformActive = !!(
     state.textPresetGesture?.dragging
@@ -29708,10 +32531,14 @@ function setPlaybackLyricLine(
   if (rigidLyricMotionActive) {
     cancelPlaybackLyricGeometryFlips();
   }
-  const previousMainRect = lineChanged && !rigidLyricMotionActive
+  const previousMainRect = lineChanged
+    && !rigidLyricMotionActive
+    && state.textPreset !== 'focus-echo'
     ? els.playbackLyricText?.getBoundingClientRect()
     : null;
-  const previousSubtitleRect = (lineChanged || subtitleChanged) && !rigidLyricMotionActive
+  const previousSubtitleRect = (lineChanged || subtitleChanged)
+    && !rigidLyricMotionActive
+    && state.textPreset !== 'focus-echo'
     ? els.playbackLyricSubtitle?.getBoundingClientRect()
     : null;
 
@@ -29720,7 +32547,6 @@ function setPlaybackLyricLine(
     const fitMetrics = lyricLineFitMetrics(line, letterSpacing);
     syncFocusEchoLayerText(line, fitMetrics);
     state.lyricDisplayText = line;
-    if (state.textPreset === 'focus-echo') triggerFocusEchoTransition();
     const wordGlowSegments = shineActive || moodActive
       ? segmentWordGlowTokens(line)
       : null;
@@ -29736,6 +32562,24 @@ function setPlaybackLyricLine(
       syncHandwrittenMoodText(line, wordGlowSegments);
       triggerHandwrittenMoodTransition();
     }
+  }
+
+  if (state.textPreset === 'focus-echo') {
+    const activeLine = state.lyricLines[state.lyricIndex] || null;
+    const activeLineTime = Number(activeLine?.time);
+    const sampledDisplayTime = Number(currentTime);
+    const focusStartTime = Number.isFinite(activeLineTime)
+      ? activeLineTime
+      : Number.isFinite(sampledDisplayTime)
+        ? sampledDisplayTime
+        : 0;
+    const focusLineKey = `${state.lyricSignature}|${state.lyricIndex}|${focusStartTime.toFixed(3)}`;
+    if (lineChanged || state.focusEchoLineKey !== focusLineKey) {
+      startFocusEchoTransition(currentTime, state.lyricIndex);
+    }
+    syncFocusEchoTransition(currentTime);
+  } else if (state.focusEchoTransition || state.focusEchoLineKey) {
+    disposeFocusEchoTransition(true);
   }
 
   if (subtitleChanged) {
@@ -29770,7 +32614,7 @@ function setPlaybackLyricLine(
         duration: 280
       });
     }
-    if (!rigidLyricMotionActive) {
+    if (!rigidLyricMotionActive && state.textPreset !== 'focus-echo') {
       animateLyricGeometryFlip(els.playbackLyricSubtitle, previousSubtitleRect, {
         contentChanged: subtitleChanged,
         enterY: 6,
@@ -29780,7 +32624,7 @@ function setPlaybackLyricLine(
   }
   updateBookLyricArtist(playbackLyricSubtitle());
 
-  if (Math.abs(progressPercent - state.lyricProgressPercent) >= 0.01) {
+  if (lyricDomPending || Math.abs(progressPercent - state.lyricProgressPercent) >= 0.01) {
     els.playbackLyricScene.style.setProperty('--lyric-line-progress', `${progressPercent.toFixed(2)}%`);
     state.lyricProgressPercent = progressPercent;
   }
@@ -29790,21 +32634,25 @@ function setPlaybackLyricLine(
   if (state.textPreset === 'book') updateBookLyricLines(progressPercent, currentTime);
   if (state.multiRowLyricsEnabled) renderMultiRowLyrics(false, currentTime);
   if (playbackCardLyricsVisible()) {
-    // The playback-card renderer applies lyricTimelineTime itself. Feed it the
-    // authoritative media clock so latency/offset calibration is applied once.
+    // Both surfaces render the same calibrated sample and highlight progress.
+    // Keep raw audio time for standalone/seek handling, never calibrate twice.
     updateQishuiPlaybackLyrics(
       line,
       nextSubtitle,
       Number.isFinite(Number(authoritativeTime))
         ? Math.max(0, Number(authoritativeTime))
-        : currentPlaybackLyricTime()
+        : currentPlaybackLyricTime(),
+      { effectiveTime: currentTime, progressPercent }
     );
   }
   if (lineChanged || subtitleChanged) scheduleDesktopSceneSnapshot();
 }
 
-function lyricClockOffsetSeconds() {
-  return normalizeLyricClockOffsetSeconds(state.lyricClockOffsetSeconds);
+function lyricClockOffsetSeconds(song = state.currentSong) {
+  const key = lyricClockOffsetSongKey(song);
+  return key
+    ? normalizeLyricClockOffsetSeconds(state.lyricClockOffsetsByTrack?.[key])
+    : 0;
 }
 
 function lyricAudioOutputLatencySeconds() {
@@ -29814,6 +32662,8 @@ function lyricAudioOutputLatencySeconds() {
     spatial?.enabled === true
     && nativeGraph?.nativeStream === true
     && nativeGraph.disposed !== true
+    && nativeGraph.timelineTransitionActive !== true
+    && !nativeGraph.timelineResetPromise
   ) {
     return clamp(
       Number(nativeGraph.nativeOutputLatencySeconds)
@@ -29823,53 +32673,55 @@ function lyricAudioOutputLatencySeconds() {
       LYRIC_AUDIO_OUTPUT_LATENCY_MAX_SECONDS
     );
   }
-  const analysis = state.audioAnalysis;
-  const context = analysis?.context;
-  if (
-    !context
-    || context.state === 'closed'
-    || analysis.sourceMode !== 'media'
-    || analysis.outputConnected !== true
-  ) {
-    return 0;
-  }
-  const baseLatency = Math.max(0, Number(context.baseLatency) || 0);
-  const outputLatency = Math.max(0, Number(context.outputLatency) || 0);
-  return clamp(
-    baseLatency + outputLatency,
-    0,
-    LYRIC_AUDIO_OUTPUT_LATENCY_MAX_SECONDS
-  );
+  // The ordinary media/WebAudio path shares the browser's media presentation
+  // clock. Only the native PCM -> HTTP/JNI -> XAudio2 route owns an additional,
+  // independently measured output queue that must be removed here.
+  return 0;
 }
 
 function lyricTimelineTime(currentTime, visualLead = 0) {
   const mediaTime = Number(currentTime);
-  const lead = Number(visualLead);
+  // HTMLMediaElement.currentTime remains authoritative. The native OBR/XAudio2
+  // path is the sole exception because its PCM transport owns a measured queue
+  // after the media element; align lyrics to the frame currently being heard.
+  void visualLead;
   return Math.max(
     0,
     (Number.isFinite(mediaTime) ? mediaTime : 0)
-      + (Number.isFinite(lead) ? lead : 0)
-      - LYRIC_TIMESTAMP_COMPENSATION_SECONDS
       - lyricAudioOutputLatencySeconds()
       + lyricClockOffsetSeconds()
   );
 }
 
-function desktopSceneEffectiveLyricTimeAt(clock, _nowMs = 0, visualLead = 0) {
+function desktopSceneEffectiveLyricTimeAt(clock, nowMs = 0, visualLead = 0) {
   const base = Number(clock?.time);
   if (!Number.isFinite(base)) return Number.NaN;
-  const lead = Number(visualLead);
-  return Math.max(0, base + (Number.isFinite(lead) ? lead : 0));
+  const updatedAt = Number(clock?.updatedAt);
+  const playbackRate = clamp(Number(clock?.playbackRate) || 1, 0.25, 4);
+  const elapsed = clock?.playing === true && Number.isFinite(updatedAt)
+    ? clamp(
+        (Number(nowMs) - updatedAt) / 1000,
+        0,
+        DESKTOP_SCENE_LYRIC_EXTRAPOLATION_MAX_SECONDS
+      ) * playbackRate
+    : 0;
+  const duration = Number(clock?.duration);
+  const timelineTime = Number.isFinite(duration) && duration > 0
+    ? Math.min(base + elapsed, duration)
+    : base + elapsed;
+  void visualLead;
+  return Math.max(0, timelineTime);
 }
 
-function updateDesktopSceneLyricClock(effectiveTime, duration = 0, playing = false) {
+function updateDesktopSceneLyricClock(effectiveTime, effectiveDuration = 0, playing = false, playbackRate = 1) {
   const time = Number(effectiveTime);
   desktopSceneRuntime.lyricClock = DESKTOP_SCENE_CLIENT && Number.isFinite(time)
     ? {
         time: Math.max(0, time),
-        duration: Math.max(0, Number(duration) || 0),
+        duration: Math.max(0, Number(effectiveDuration) || 0),
         updatedAt: performance.now(),
-        playing: playing === true
+        playing: playing === true,
+        playbackRate: clamp(Number(playbackRate) || 1, 0.25, 4)
       }
     : null;
 }
@@ -29911,10 +32763,7 @@ function findLyricIndexAtTime(lines, currentTime, visualLead = 0) {
 }
 
 function playbackLyricVisualLeadSeconds() {
-  if (state.textPreset === 'book') return BOOK_LYRIC_VISUAL_LEAD_SECONDS;
-  return state.multiRowLyricsEnabled
-    ? MULTI_ROW_LYRIC_VISUAL_LEAD_SECONDS
-    : LYRIC_TIMESTAMP_COMPENSATION_SECONDS;
+  return 0;
 }
 
 function updatePlayerClock(position, duration, playing = false) {
@@ -29954,29 +32803,48 @@ function currentPlaybackLyricTime(fallback = 0) {
     return Math.max(0, previewTarget);
   }
   const audioTime = Number(els.audio?.currentTime);
-  if (els.audio?.src && Number.isFinite(audioTime)) {
-    cardState.seekHandoffTarget = null;
-    cardState.seekHandoffStartedAt = 0;
-    return Math.max(0, audioTime);
-  }
   const handoffTarget = cardState.seekHandoffTarget == null
     ? Number.NaN
     : Number(cardState.seekHandoffTarget);
   if (Number.isFinite(handoffTarget)) {
-    const handoffAge = performance.now() - (Number(cardState.seekHandoffStartedAt) || 0);
-    if (
-      Number.isFinite(audioTime)
-      && Math.abs(audioTime - handoffTarget) <= QISHUI_SEEK_HANDOFF_TOLERANCE_SECONDS
-    ) {
+    const now = performance.now();
+    const handoffStartedAt = Number(cardState.seekHandoffStartedAt) || now;
+    const handoffAge = Math.max(0, now - handoffStartedAt);
+    const audioSource = String(els.audio?.currentSrc || els.audio?.src || '');
+    const handoffSource = String(cardState.seekHandoffSource || '');
+    const sameSource = Boolean(audioSource) && (!handoffSource || audioSource === handoffSource);
+    const playbackRate = Math.max(0, Number(els.audio?.playbackRate) || 1);
+    const settleTolerance = Math.max(
+      QISHUI_SEEK_HANDOFF_TOLERANCE_SECONDS,
+      handoffAge / 1000 * playbackRate + QISHUI_SEEK_HANDOFF_TOLERANCE_SECONDS
+    );
+    const mediaReadyAtTarget = sameSource
+      && Number.isFinite(audioTime)
+      && els.audio?.seeking !== true
+      && Number(els.audio?.readyState) >= 2
+      && Math.abs(audioTime - handoffTarget) <= settleTolerance;
+    if (mediaReadyAtTarget) {
       cardState.seekHandoffTarget = null;
       cardState.seekHandoffStartedAt = 0;
+      cardState.seekHandoffRunning = false;
+      cardState.seekHandoffSource = '';
       return Math.max(0, audioTime);
     }
-    if (els.audio?.src && handoffAge <= QISHUI_SEEK_HANDOFF_MAX_MS) {
-      return Math.max(0, handoffTarget);
+    if (sameSource && handoffAge <= QISHUI_SEEK_HANDOFF_MAX_MS) {
+      const shouldAdvance = cardState.seekHandoffRunning === true
+        && els.audio?.paused !== true
+        && els.audio?.ended !== true;
+      const projected = handoffTarget + (shouldAdvance ? handoffAge / 1000 * playbackRate : 0);
+      const duration = Number(els.audio?.duration);
+      return Math.max(0, Number.isFinite(duration) && duration > 0 ? Math.min(projected, duration) : projected);
     }
     cardState.seekHandoffTarget = null;
     cardState.seekHandoffStartedAt = 0;
+    cardState.seekHandoffRunning = false;
+    cardState.seekHandoffSource = '';
+  }
+  if (els.audio?.src && Number.isFinite(audioTime)) {
+    return Math.max(0, audioTime);
   }
   if (state.playerClock && state.playerClock.updatedAt > 0 && Number.isFinite(Number(state.playerClock.position))) {
     return estimatedPlayerClockTime(fallback);
@@ -29986,14 +32854,18 @@ function currentPlaybackLyricTime(fallback = 0) {
   return Math.max(0, Number(fallback) || 0);
 }
 
-function syncPlaybackLyricAtTime(currentTime = Number.NaN) {
-  const time = currentPlaybackLyricTime(currentTime);
+function syncPlaybackLyricAtTime(currentTime = Number.NaN, options) {
+  const sampledTime = Number(currentTime);
+  const authoritativeSample = options?.authoritativeSample === true;
+  const time = authoritativeSample && Number.isFinite(sampledTime)
+    ? Math.max(0, sampledTime)
+    : currentPlaybackLyricTime(currentTime);
   updatePlaybackLyricAtTime(time, playbackLyricVisualLeadSeconds());
-  scheduleDesktopSceneSnapshot();
+  scheduleDesktopSceneSnapshot({ lyricClockFrame: options?.lyricClockFrame === true });
 }
 
 function syncPlaybackLyricToCurrentTime() {
-  syncPlaybackLyricAtTime(currentPlaybackLyricTime());
+  syncPlaybackLyricAtTime();
 }
 
 function syncPlaybackLyricAnimationFrame() {
@@ -30010,15 +32882,213 @@ function syncPlaybackLyricAnimationFrame() {
   state.lyricFrameTime = time;
   state.lyricFramePreset = state.textPreset;
   state.lyricFrameSignature = signature;
-  syncPlaybackLyricAtTime(time);
+  syncPlaybackLyricAtTime(time, { authoritativeSample: true, lyricClockFrame: true });
 }
 
-function lyricProgressForLineAtTime(line, displayTime, endTime, options = {}) {
+function syncPlaybackLyricMediaClockEdge() {
+  const time = Math.max(0, Number(els.audio?.currentTime) || 0);
+  resetLyricFrameSync();
+  syncPlaybackLyricAtTime(time, { authoritativeSample: true });
+  requestOrbFrame();
+}
+
+function lyricKaraokeElementMeasurer(element) {
+  if (
+    !element
+    || typeof document === 'undefined'
+    || typeof getComputedStyle !== 'function'
+  ) return null;
+  const style = getComputedStyle(element);
+  const font = style.font || '';
+  const signature = [
+    font,
+    style.fontFamily,
+    style.fontSize,
+    style.fontWeight,
+    style.fontStyle,
+    style.fontStretch,
+    style.fontVariant,
+    style.letterSpacing,
+    style.fontKerning || '',
+    style.fontFeatureSettings || '',
+    style.fontVariationSettings || '',
+    style.textRendering || '',
+    style.textTransform || '',
+    document.fonts?.status || ''
+  ].join('|');
+  let measurementNode = null;
+  let textNode = null;
+  let range = null;
+  const prepare = (text) => {
+    measurementNode = lyricKaraokeElementMeasurer.node;
+    if (!measurementNode) {
+      measurementNode = document.createElement('span');
+      measurementNode.setAttribute('aria-hidden', 'true');
+      measurementNode.style.position = 'fixed';
+      measurementNode.style.left = '-100000px';
+      measurementNode.style.top = '0';
+      measurementNode.style.visibility = 'hidden';
+      measurementNode.style.pointerEvents = 'none';
+      measurementNode.style.whiteSpace = 'pre';
+      measurementNode.style.inlineSize = 'max-content';
+      measurementNode.style.maxInlineSize = 'none';
+      measurementNode.style.contain = 'layout style paint';
+      (document.body || document.documentElement).appendChild(measurementNode);
+      lyricKaraokeElementMeasurer.node = measurementNode;
+    }
+    measurementNode.style.font = font;
+    measurementNode.style.fontFamily = style.fontFamily;
+    measurementNode.style.fontSize = style.fontSize;
+    measurementNode.style.fontWeight = style.fontWeight;
+    measurementNode.style.fontStyle = style.fontStyle;
+    measurementNode.style.fontStretch = style.fontStretch;
+    measurementNode.style.fontVariant = style.fontVariant;
+    measurementNode.style.fontKerning = style.fontKerning;
+    measurementNode.style.fontFeatureSettings = style.fontFeatureSettings;
+    measurementNode.style.fontVariationSettings = style.fontVariationSettings;
+    measurementNode.style.letterSpacing = style.letterSpacing;
+    measurementNode.style.textRendering = style.textRendering;
+    measurementNode.style.textTransform = style.textTransform;
+    measurementNode.textContent = text;
+    textNode = measurementNode.firstChild;
+    range = document.createRange();
+    range.setStart(textNode, 0);
+  };
+  return {
+    signature,
+    measurePrefixes(text, offsets) {
+      prepare(text);
+      const widths = [];
+      for (let index = 0; index < offsets.length; index += 1) {
+        range.setEnd(textNode, clamp(Math.floor(Number(offsets[index]) || 0), 0, text.length));
+        widths.push(range.getBoundingClientRect().width);
+      }
+      range.detach?.();
+      return widths;
+    }
+  };
+}
+
+function lyricKaraokeVisualRanges(line, options = {}) {
+  const text = String(line && line.text || '');
+  const segments = Array.isArray(line && line.karaokeSegments)
+    ? line.karaokeSegments
+    : [];
+  if (!text || !segments.length) return null;
+
+  const customMeasure = typeof options.measureText === 'function' ? options.measureText : null;
+  const elementProfile = customMeasure || !options.measureElement
+    ? null
+    : lyricKaraokeElementMeasurer(options.measureElement);
+  if (!customMeasure && !elementProfile) return null;
+
+  const signature = customMeasure
+    ? ''
+    : `${text}|${segments.map((segment) => `${segment.textStart}:${segment.textEnd}`).join(',')}|${elementProfile.signature}`;
+  if (signature) {
+    const cached = line.__karaokeVisualRangeCache?.get(signature);
+    if (cached) return cached;
+  }
+
+  const prefixOffsets = [];
+  if (elementProfile) {
+    prefixOffsets.push(text.length);
+    for (let index = 0; index < segments.length; index += 1) {
+      const segment = segments[index];
+      prefixOffsets.push(Number(segment.textStart), Number(segment.textEnd));
+    }
+  }
+  const measuredPrefixes = elementProfile
+    ? elementProfile.measurePrefixes(text, prefixOffsets)
+    : null;
+  const fullWidth = Number(customMeasure ? customMeasure(text) : measuredPrefixes?.[0]);
+  if (!Number.isFinite(fullWidth) || fullWidth <= 0) return null;
+  const ranges = segments.map((segment, index) => {
+    const textStart = clamp(Math.floor(Number(segment.textStart) || 0), 0, text.length);
+    const textEnd = clamp(Math.ceil(Number(segment.textEnd) || textStart), textStart, text.length);
+    const startWidth = customMeasure
+      ? Number(customMeasure(text.slice(0, textStart)))
+      : Number(measuredPrefixes?.[index * 2 + 1]);
+    const endWidth = customMeasure
+      ? Number(customMeasure(text.slice(0, textEnd)))
+      : Number(measuredPrefixes?.[index * 2 + 2]);
+    const p0 = clamp(startWidth / fullWidth, 0, 1);
+    const p1 = clamp(endWidth / fullWidth, p0, 1);
+    return { p0, p1 };
+  });
+  if (signature) {
+    const cache = line.__karaokeVisualRangeCache instanceof Map
+      ? line.__karaokeVisualRangeCache
+      : new Map();
+    if (cache.size >= 12) cache.delete(cache.keys().next().value);
+    cache.set(signature, ranges);
+    line.__karaokeVisualRangeCache = cache;
+  }
+  return ranges;
+}
+
+function lyricProgressForLineAtTime(line, displayTime, endTime, options) {
   const start = Number(line && line.time);
   const stop = Number(endTime);
   if (!Number.isFinite(start) || !Number.isFinite(stop) || stop <= start) return 1;
-  const linear = clamp((displayTime - start) / (stop - start), 0, 1);
-  if (options.linear) return linear;
+  const karaokeSegments = Array.isArray(line && line.karaokeSegments)
+    ? line.karaokeSegments
+    : [];
+  if (karaokeSegments.length) {
+    const customMeasure = typeof options?.measureText === 'function' ? options.measureText : null;
+    const visualRanges = customMeasure
+      ? (() => {
+          const text = String(line && line.text || '');
+          const fullWidth = Number(customMeasure(text));
+          if (!Number.isFinite(fullWidth) || fullWidth <= 0) return null;
+          const ranges = [];
+          for (let index = 0; index < karaokeSegments.length; index += 1) {
+            const segment = karaokeSegments[index];
+            const textStart = clamp(Math.floor(Number(segment.textStart) || 0), 0, text.length);
+            const textEnd = clamp(Math.ceil(Number(segment.textEnd) || textStart), textStart, text.length);
+            const p0 = clamp(Number(customMeasure(text.substring(0, textStart))) / fullWidth, 0, 1);
+            const p1 = clamp(Number(customMeasure(text.substring(0, textEnd))) / fullWidth, p0, 1);
+            ranges.push({ p0, p1 });
+          }
+          return ranges;
+        })()
+      : options?.measureElement
+      ? lyricKaraokeVisualRanges(line, options)
+      : null;
+    const textLength = Math.max(1, String(line && line.text || '').length);
+    let lastProgress = 0;
+    for (let index = 0; index < karaokeSegments.length; index += 1) {
+      const segment = karaokeSegments[index];
+      const segmentStart = Number(segment && segment.startTime);
+      const explicitEnd = Number(segment && segment.endTime);
+      const duration = Number(segment && segment.duration);
+      const segmentEnd = Number.isFinite(explicitEnd) && explicitEnd > segmentStart
+        ? explicitEnd
+        : Number.isFinite(duration) && duration > 0
+        ? segmentStart + duration
+        : segmentStart + 0.001;
+      if (!Number.isFinite(segmentStart) || !Number.isFinite(segmentEnd)) continue;
+      const fallbackStart = clamp(Number(segment.textStart) / textLength, 0, 1);
+      const fallbackEnd = clamp(Number(segment.textEnd) / textLength, fallbackStart, 1);
+      const range = visualRanges?.[index];
+      const p0 = Number.isFinite(Number(range && range.p0)) ? Number(range.p0) : fallbackStart;
+      const p1 = Number.isFinite(Number(range && range.p1)) ? Number(range.p1) : fallbackEnd;
+      // Keep the previous token's exact visual boundary during a real vocal gap.
+      // Advancing to p0 here reveals spaces/punctuation before the next supplied
+      // provider timestamp and becomes especially visible in slow performances.
+      if (displayTime < segmentStart) return lastProgress;
+      if (displayTime <= segmentEnd) {
+        const localProgress = clamp(
+          (Number(displayTime) - segmentStart) / Math.max(0.001, segmentEnd - segmentStart),
+          0,
+          1
+        );
+        return Math.max(lastProgress, p0 + (p1 - p0) * localProgress);
+      }
+      lastProgress = Math.max(lastProgress, p1);
+    }
+    return 1;
+  }
   const glyphTimings = Array.isArray(line && line.glyphTimings)
     ? line.glyphTimings
     : [];
@@ -30028,18 +33098,25 @@ function lyricProgressForLineAtTime(line, displayTime, endTime, options = {}) {
       const timing = glyphTimings[index];
       if (displayTime < timing.start) return index / glyphCount;
       if (displayTime <= timing.end) {
-        const glyphProgress = bookGlyphEase((displayTime - timing.start) / (timing.end - timing.start));
+        const glyphProgress = clamp(
+          (displayTime - timing.start) / Math.max(0.001, timing.end - timing.start),
+          0,
+          1
+        );
         return (index + glyphProgress) / glyphCount;
       }
     }
     return 1;
   }
+  // Standard LRC has line timestamps rather than per-glyph timestamps. Keep the line
+  // start on the provider clock, but do not spread the highlight across a long silent
+  // tail before the next line. autoVocalEndTime is visual-only and is never used to
+  // select the active line or rewrite provider timestamps.
   const autoVocalEnd = Number(line && line.autoVocalEndTime);
-  if (!Number.isFinite(autoVocalEnd) || autoVocalEnd <= start || autoVocalEnd >= stop) return linear;
-  if (displayTime <= autoVocalEnd) {
-    return bookGlyphEase((displayTime - start) / (autoVocalEnd - start));
-  }
-  return 1;
+  const progressStop = Number.isFinite(autoVocalEnd) && autoVocalEnd > start && autoVocalEnd < stop
+    ? autoVocalEnd
+    : stop;
+  return clamp((Number(displayTime) - start) / (progressStop - start), 0, 1);
 }
 
 function bookLyricProgressEndTime(line, fallbackEndTime) {
@@ -30091,7 +33168,9 @@ function updatePlaybackLyricAtTime(currentTime = els.audio.currentTime || 0, vis
     ? (nextLine ? Math.min(timedEnd, nextLine.time) : timedEnd)
     : fallbackEnd;
   const progressEndTime = state.textPreset === 'book' ? bookLyricProgressEndTime(line, endTime) : endTime;
-  const progress = lyricProgressForLineAtTime(line, displayTime, progressEndTime, { linear: state.textPreset === 'book' });
+  const progress = lyricProgressForLineAtTime(line, displayTime, progressEndTime, {
+    measureElement: els.playbackLyricText
+  });
   if (state.lyricIndex !== index) state.lyricIndex = index;
   setPlaybackLyricLine(
     line.text,
@@ -30176,15 +33255,13 @@ async function loadPlaybackLyrics(song = state.currentSong) {
 
   try {
     const provider = playbackQualityProvider(song);
-    const payload = await apiJson(`/api/lyric?${query({
-      provider,
-      id,
-      title: safeText(song && song.title, ''),
-      artist: safeText(song && song.artist, ''),
-      duration: Math.max(0, Math.round(Number(song && song.duration) || 0))
-    })}`);
+    const timeline = await playbackLyricTimelineResolver().resolve(song, provider);
+    const payload = timeline.payload;
     if (signature !== state.lyricSignature) return;
-    const parsed = autoDetectLyricSpeed(parseLyricPayload(payload), song);
+    const parsed = autoDetectLyricSpeed(
+      Array.isArray(timeline.lines) ? timeline.lines : parseLyricPayload(payload),
+      song
+    );
     state.lyricLines = parsed.length ? parsed : [];
     if (!parsed.length) {
       if (lyricPayloadHasNoLyric(payload)) state.lyricNoLyricSignature = signature;
@@ -30265,7 +33342,8 @@ function textLyricsEnabled(preset = state.textPreset) {
 
 function syncPlaybackLyricVisibility() {
   const enabled = textLyricsEnabled();
-  setPlaybackLyricVisible(state.playbackPage && enabled);
+  setPlaybackLyricVisible(state.playbackPage && enabled && state.textPreset !== 'particle-lyrics');
+  updateParticleLyricsVisibility();
   if (els.qishuiPlaybackLyrics) els.qishuiPlaybackLyrics.hidden = false;
   if (els.qishuiPlaybackPhone) {
     els.qishuiPlaybackPhone.classList.remove('is-lyrics-hidden');
@@ -30273,6 +33351,11 @@ function syncPlaybackLyricVisibility() {
   [els.lyricBrightnessRange, els.lyricSpeedRange].forEach((control) => {
     if (control) control.disabled = !enabled;
   });
+  // A paused player has no lyric animation tick to repopulate a newly visible
+  // ordinary lyric scene after the particle renderer kept only its state fresh.
+  if (state.playbackVisual.lyricDomPending && els.playbackLyricScene?.hidden === false) {
+    syncPlaybackLyricToCurrentTime();
+  }
 }
 
 function updatePlaybackSceneTransform() {
@@ -30302,11 +33385,11 @@ function updatePlaybackSceneTransform() {
 
 function selectableTextPreset(preset) {
   if (preset === 'book') return 'book';
-  return ['depth', 'focus-echo'].includes(preset) ? preset : DEFAULT_TEXT_PRESET;
+  return ['depth', 'focus-echo', 'particle-lyrics'].includes(preset) ? preset : DEFAULT_TEXT_PRESET;
 }
 
 function singleRowOnlyTextPreset(preset = state.textPreset) {
-  return preset === 'focus-echo';
+  return preset === 'focus-echo' || preset === 'particle-lyrics';
 }
 
 function textPresetButtons() {
@@ -30337,7 +33420,8 @@ function textComposerTemplateSettings(preset = state.textPreset, options = {}) {
   const independent = [
     ...TEXT_TRANSLATION_SETTING_KEYS,
     ...TEXT_GLITCH_TUNING_SETTING_KEYS,
-    ...TEXT_SINGLE_ROW_ANIMATION_SETTING_KEYS
+    ...TEXT_SINGLE_ROW_ANIMATION_SETTING_KEYS,
+    ...TEXT_HIGHLIGHT_PARTICLE_SETTING_KEYS
   ]
     .reduce((settings, key) => {
       settings[key] = current[key];
@@ -30386,6 +33470,9 @@ function textComposerOutputText(key, value) {
     return value === 'shine' ? '擦亮扫光' : '滚动高亮';
   }
   if (key === 'echoLayers') return `${value} 层`;
+  if (key === 'highlightParticleSize') {
+    return `${Number(value).toFixed(2).replace(/0$/, '').replace(/\.0$/, '')}px`;
+  }
   if (key === 'echoSpacing' || key === 'unsungBlur' || key === 'letterSpacing'
       || key === 'glitchRgbOffset' || key === 'translationGap') {
     return `${Number(value).toFixed(Number(value) % 1 ? 1 : 0)}px`;
@@ -30393,7 +33480,7 @@ function textComposerOutputText(key, value) {
   if (key === 'glitchSpeed') return `${Number(value).toFixed(1)}×`;
   if (key === 'glitchSliceDensity') return `${value} 切片`;
   if (key === 'glitchBeatDuration') return `${value}ms`;
-  if (key === 'multiRowLineCount') return `${value} 行`;
+  if (key === 'multiRowLineCount' || key === 'bookLyricLineCount') return `${value} 行`;
   return `${Number(value).toFixed(Number(value) % 1 ? 1 : 0)}%`;
 }
 
@@ -30426,12 +33513,17 @@ function syncTextComposerControls() {
     ['unsungBlur', els.textUnsungBlur, els.textUnsungBlurValue],
     ['letterSpacing', els.textLetterSpacing, els.textLetterSpacingValue],
     ['lowBassGlow', els.textLowBassGlow, els.textLowBassGlowValue],
+    ['highlightParticleSize', els.textHighlightParticleSize, els.textHighlightParticleSizeValue],
+    ['highlightParticleDensity', els.textHighlightParticleDensity, els.textHighlightParticleDensityValue],
+    ['highlightParticleSensitivity', els.textHighlightParticleSensitivity, els.textHighlightParticleSensitivityValue],
+    ['highlightParticleSpread', els.textHighlightParticleSpread, els.textHighlightParticleSpreadValue],
     ['glitchSpeed', els.textGlitchSpeed, els.textGlitchSpeedValue],
     ['glitchRgbOffset', els.textGlitchRgbOffset, els.textGlitchRgbOffsetValue],
     ['glitchSliceDensity', els.textGlitchSliceDensity, els.textGlitchSliceDensityValue],
     ['glitchBeatSensitivity', els.textGlitchBeatSensitivity, els.textGlitchBeatSensitivityValue],
     ['glitchBeatDuration', els.textGlitchBeatDuration, els.textGlitchBeatDurationValue],
     ['multiRowLineCount', els.multiRowLineCount, els.multiRowLineCountValue],
+    ['bookLyricLineCount', els.bookLyricLineCount, els.bookLyricLineCountValue],
     ['translationFontSize', els.translationFontSize, els.translationFontSizeValue],
     ['translationGap', els.translationGap, els.translationGapValue],
     ['translationOpacity', els.translationOpacity, els.translationOpacityValue]
@@ -30469,6 +33561,17 @@ function syncTextComposerControls() {
   if (els.textLyricsValue) {
     els.textLyricsValue.textContent = settings.lyricsEnabled ? 'ON' : 'OFF';
   }
+  if (els.textHighlightParticlesToggle) {
+    els.textHighlightParticlesToggle.checked = settings.highlightParticlesEnabled;
+    els.textHighlightParticlesToggle.disabled = !enabled;
+    els.textHighlightParticlesToggle.setAttribute(
+      'aria-checked',
+      String(settings.highlightParticlesEnabled)
+    );
+  }
+  if (els.textHighlightParticlesValue) {
+    els.textHighlightParticlesValue.textContent = settings.highlightParticlesEnabled ? 'ON' : 'OFF';
+  }
   if (els.textHandwrittenMoodToggle) {
     els.textHandwrittenMoodToggle.checked = settings.handwrittenMoodEnabled;
     els.textHandwrittenMoodToggle.disabled = !singleRowEffectsEnabled;
@@ -30492,7 +33595,7 @@ function syncTextComposerControls() {
     if (!control) return;
     const value = settings[key];
     if (control.value !== String(value)) control.value = String(value);
-    control.disabled = !enabled
+    control.disabled = key === 'bookLyricLineCount' ? state.textPreset !== 'book' : !enabled
       || (key === 'unsungBlur' && singleRowLocked)
       || (singleRowEffectKeys.has(key) && !singleRowEffectsEnabled)
       || (glitchKeys.has(key) && !glitchControlsEnabled)
@@ -30501,6 +33604,8 @@ function syncTextComposerControls() {
     if (output) output.textContent = textComposerOutputText(key, value);
     if (control.type === 'range') syncElasticRangeVisual(control);
   });
+  if (els.bookLyricLineCountControl) els.bookLyricLineCountControl.hidden = state.textPreset !== 'book';
+  syncLyricParticlePaletteControls();
   if (els.textComposerResetButton) els.textComposerResetButton.disabled = !enabled;
 }
 
@@ -30609,6 +33714,7 @@ function applyTextComposerSettings({
     scene.dataset.textLayout = state.textPreset === 'book' ? 'book-page' : settings.layoutMode;
     scene.dataset.textEchoLayers = String(settings.echoLayers);
     scene.dataset.textGlitch = glitchActive ? 'on' : 'off';
+    scene.dataset.highlightParticles = settings.highlightParticlesEnabled && textEnabled ? 'on' : 'off';
     scene.classList.toggle('has-text-composer-flow', textEnabled && settings.flowIntensity > 0);
     scene.classList.toggle('has-text-composer-echo', textEnabled && settings.echoLayers > 0);
     scene.classList.toggle('is-book-effect-text', false);
@@ -30636,6 +33742,9 @@ function applyTextComposerSettings({
     );
     scene.style.setProperty('--text-letter-spacing', `${settings.letterSpacing.toFixed(2)}px`);
     scene.style.setProperty('--text-bass-spread', (settings.lowBassGlow / 100).toFixed(3));
+    scene.style.setProperty('--lyric-particle-size', `${settings.highlightParticleSize.toFixed(2)}px`);
+    scene.style.setProperty('--lyric-particle-density', (settings.highlightParticleDensity / 100).toFixed(3));
+    scene.style.setProperty('--lyric-particle-spread', (settings.highlightParticleSpread / 100).toFixed(3));
     applyGlitchTextCssVars(scene, settings);
     scene.style.setProperty('--multi-row-line-count', String(settings.multiRowLineCount));
     scene.style.setProperty('--translation-font-size', `${settings.translationFontSize.toFixed(0)}%`);
@@ -30711,6 +33820,7 @@ function applyTextComposerSettings({
     applyGlitchTextCssVars(els.appShell, settings);
   }
   applyGlitchTextCssVars(els.textGlitchControl, settings);
+  syncLyricHighlightParticleRendererSettings(settings);
   syncSingleRowLyricEffects();
   if (syncGlitch) syncGlitchTextLayers();
   syncTextComposerControls();
@@ -30757,7 +33867,8 @@ function setTextComposerSetting(key, value, options = {}) {
     shiftPlaybackLyricSubtitleGap(previous.translationGap, next.translationGap);
   }
   state.textComposerSettings = next;
-  const structural = key === 'lyricsEnabled' || key === 'layoutMode' || key === 'multiRowLineCount';
+  const structural = key === 'lyricsEnabled' || key === 'layoutMode'
+    || key === 'multiRowLineCount' || key === 'bookLyricLineCount';
   const highlightLayoutChanged = structural
     || key === 'letterSpacing'
     || key === 'translationFontSize';
@@ -30776,6 +33887,7 @@ function setTextComposerSetting(key, value, options = {}) {
     invalidateSequentialLyricHighlights(els.bookLyricList);
     invalidateSequentialLyricHighlights(els.qishuiPlaybackLyricPage);
   }
+  if (key === 'bookLyricLineCount' && state.textPreset === 'book') updateBookLyricLines();
   if (key === 'lyricsEnabled') syncPlaybackLyricVisibility();
 }
 
@@ -31092,6 +34204,75 @@ function setTextPalettePreference(mode, color) {
   requestOrbFrame();
 }
 
+function resolvedLyricHighlightParticleColor(palette = state.playbackVisual.palette) {
+  const settings = normalizeTextComposerSettings(state.textComposerSettings);
+  if (settings.highlightParticleColorMode === 'manual') {
+    return settings.highlightParticleColor;
+  }
+  const sourcePalette = palette || fallbackLyricPalette();
+  const lyricPalette = resolvedTextLyricPalette(sourcePalette);
+  return rgbHexValue(lyricPalette.highlight);
+}
+
+function syncLyricParticlePaletteControls() {
+  if (!els.lyricParticlePaletteControl) return;
+  const settings = normalizeTextComposerSettings(state.textComposerSettings);
+  const lyricsEnabled = textLyricsEnabled();
+  const enabled = lyricsEnabled && settings.highlightParticlesEnabled;
+  const manual = settings.highlightParticleColorMode === 'manual';
+  const resolvedColor = resolvedLyricHighlightParticleColor();
+  els.lyricParticlePaletteControl.classList.toggle('is-disabled', !enabled);
+  els.lyricParticlePaletteControl.dataset.paletteMode = settings.highlightParticleColorMode;
+  els.lyricParticlePaletteControl.style.setProperty('--text-palette-auto-color', resolvedColor);
+  if (els.lyricParticlePaletteStatus) {
+    els.lyricParticlePaletteStatus.textContent = !lyricsEnabled
+      ? '启用歌词后可调色'
+      : !settings.highlightParticlesEnabled
+        ? '粒子已关闭'
+        : manual
+          ? settings.highlightParticleColor.toUpperCase()
+          : '跟随歌词';
+  }
+  if (els.lyricParticlePaletteAutoButton) {
+    els.lyricParticlePaletteAutoButton.disabled = !enabled;
+    els.lyricParticlePaletteAutoButton.classList.toggle('is-active', enabled && !manual);
+    els.lyricParticlePaletteAutoButton.setAttribute('aria-pressed', String(enabled && !manual));
+  }
+  if (els.lyricParticleCustomColor) {
+    els.lyricParticleCustomColor.disabled = !enabled;
+    if (els.lyricParticleCustomColor.value.toLowerCase() !== settings.highlightParticleColor) {
+      els.lyricParticleCustomColor.value = settings.highlightParticleColor;
+    }
+  }
+  if (els.lyricParticlePaletteResetButton) {
+    els.lyricParticlePaletteResetButton.disabled = !enabled;
+  }
+  els.lyricParticlePaletteControl
+    .querySelectorAll('[data-lyric-particle-palette-color]')
+    .forEach((button) => {
+      const color = normalizeTextPaletteColor(button.dataset.lyricParticlePaletteColor);
+      const active = enabled && manual && color === settings.highlightParticleColor;
+      button.disabled = !enabled;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+}
+
+function setLyricParticlePalettePreference(mode, color) {
+  const previous = normalizeTextComposerSettings(state.textComposerSettings);
+  state.textComposerSettings = normalizeTextComposerSettings({
+    ...previous,
+    highlightParticleColorMode: mode === 'manual' ? 'manual' : 'auto',
+    highlightParticleColor: normalizeTextPaletteColor(color, previous.highlightParticleColor)
+  });
+  applyTextComposerSettings({
+    persist: true,
+    renderLyrics: false,
+    measureSubtitle: false,
+    syncGlitch: false
+  });
+}
+
 function savePlaybackLyricPalettePreference() {
   try {
     window.localStorage.setItem(PLAYBACK_LYRIC_PALETTE_PREFS_KEY, JSON.stringify({
@@ -31156,12 +34337,18 @@ function restoreSavedVisualWorkspace() {
 
 function saveLyricClockOffsetPreference() {
   try {
+    const tracks = normalizeLyricClockOffsetPreferences({
+      version: LYRIC_CLOCK_OFFSET_PREFERENCE_VERSION,
+      tracks: state.lyricClockOffsetsByTrack
+    });
+    state.lyricClockOffsetsByTrack = tracks;
     window.localStorage.setItem(LYRIC_CLOCK_OFFSET_PREFERENCE_KEY, JSON.stringify({
-      version: 1,
-      offsetSeconds: lyricClockOffsetSeconds()
+      version: LYRIC_CLOCK_OFFSET_PREFERENCE_VERSION,
+      tracks
     }));
   } catch (error) {
   }
+  scheduleClientPreferencesSync();
 }
 
 function lyricClockOffsetLabel(offset = lyricClockOffsetSeconds()) {
@@ -31171,8 +34358,8 @@ function lyricClockOffsetLabel(offset = lyricClockOffsetSeconds()) {
   return normalized > 0 ? `\u63d0\u524d ${amount}s` : `\u5ef6\u540e ${amount}s`;
 }
 
-function syncLyricClockControls() {
-  const offset = lyricClockOffsetSeconds();
+function syncLyricClockControls(song = state.currentSong) {
+  const offset = lyricClockOffsetSeconds(song);
   const label = lyricClockOffsetLabel(offset);
   if (els.qishuiPlaybackLyricEarlierButton) {
     els.qishuiPlaybackLyricEarlierButton.disabled = offset >= LYRIC_CLOCK_OFFSET_MAX_SECONDS;
@@ -31187,7 +34374,12 @@ function syncLyricClockControls() {
 function setLyricClockOffsetSeconds(value) {
   const previousOffset = lyricClockOffsetSeconds();
   const nextOffset = normalizeLyricClockOffsetSeconds(value);
-  state.lyricClockOffsetSeconds = nextOffset;
+  const songKey = lyricClockOffsetSongKey(state.currentSong);
+  if (!songKey) return 0;
+  const tracks = { ...(state.lyricClockOffsetsByTrack || {}) };
+  delete tracks[songKey];
+  if (Math.abs(nextOffset) >= LYRIC_CLOCK_OFFSET_STEP_SECONDS / 2) tracks[songKey] = nextOffset;
+  state.lyricClockOffsetsByTrack = tracks;
   saveLyricClockOffsetPreference();
   syncLyricClockControls();
   resetLyricFrameSync();
@@ -31205,6 +34397,7 @@ function setLyricClockOffsetSeconds(value) {
       });
     }
   }
+  return nextOffset;
 }
 
 function adjustLyricClockOffsetSeconds(delta) {
@@ -31695,7 +34888,7 @@ function computeMultiLyricHighlightProgress(startTime, endTime, currentTime) {
   return Math.min(1, Math.max(0, (current - start) / (end - start)));
 }
 
-function multiRowLyricHighlightProgress(model, active, currentTime = Number.NaN) {
+function multiRowLyricHighlightProgress(model, active, currentTime = Number.NaN, measureElement = null) {
   const fallback = clamp((Number(state.lyricProgressPercent) || 0) / 100, 0, 1);
   const line = model?.lines?.[active];
   if (!line || line.fallback) return fallback;
@@ -31717,14 +34910,7 @@ function multiRowLyricHighlightProgress(model, active, currentTime = Number.NaN)
         currentPlaybackLyricTime(),
         playbackLyricVisualLeadSeconds()
       );
-  const glyphTimings = Array.isArray(line.glyphTimings) ? line.glyphTimings : [];
-  const autoVocalEnd = Number(line.autoVocalEndTime);
-  const hasDetailedTiming = glyphTimings.length > 0
-    || (Number.isFinite(autoVocalEnd) && autoVocalEnd > startTime && autoVocalEnd < endTime);
-  if (hasDetailedTiming && state.textPreset !== 'book') {
-    return lyricProgressForLineAtTime(line, displayTime, endTime);
-  }
-  return computeMultiLyricHighlightProgress(startTime, endTime, displayTime);
+  return lyricProgressForLineAtTime(line, displayTime, endTime, { measureElement });
 }
 
 function multiRowLyricMotionDuration(baseDuration) {
@@ -32042,17 +35228,17 @@ function renderMultiRowLyrics(force = false, currentTime = Number.NaN) {
     list.__multiRowCurrentLine = current;
   }
   if (current) {
-    const progress = multiRowLyricHighlightProgress(displayModel, active, currentTime) * 100;
-    const progressText = `${progress.toFixed(2)}%`;
-    if (current.__multiRowProgress !== progressText) {
-      current.__multiRowProgress = progressText;
-      current.style.setProperty('--multi-row-progress', progressText);
-    }
     const main = current.__multiRowMain || current.querySelector('.multi-row-lyric-main');
     const translation = current.__multiRowTranslation
       || current.querySelector('.multi-row-lyric-translation');
     current.__multiRowMain = main;
     current.__multiRowTranslation = translation;
+    const progress = multiRowLyricHighlightProgress(displayModel, active, currentTime, main) * 100;
+    const progressText = `${progress.toFixed(2)}%`;
+    if (current.__multiRowProgress !== progressText) {
+      current.__multiRowProgress = progressText;
+      current.style.setProperty('--multi-row-progress', progressText);
+    }
     if (force) {
       invalidateSequentialLyricHighlight(main);
       invalidateSequentialLyricHighlight(translation);
@@ -32625,6 +35811,7 @@ function resetPlaybackView() {
   state.playbackVisual.yaw = PLAYBACK_REST_YAW;
   state.playbackVisual.pitch = PLAYBACK_REST_PITCH;
   state.playbackVisual.zoom = 1;
+  if (state.harmonicState) state.harmonicState.zoom = HARMONIC_DEFAULT_ZOOM;
   state.playbackVisual.velocityYaw = 0;
   state.playbackVisual.velocityPitch = 0;
   updatePlaybackSceneTransform();
@@ -32632,6 +35819,7 @@ function resetPlaybackView() {
   resizeFreeCubeRenderer();
   resizeVoidPrismRenderer();
   resizeChladniRenderer();
+  resizeHarmonicStateRenderer();
 }
 
 function updateLyricDiyVars() {
@@ -32830,6 +36018,23 @@ const DIY_PRESET_CONFIG_LABELS = Object.freeze({
   lyricSpeed: '歌词速度',
   cubeIntensity: '场景强度',
   coverBackground: '封面背景',
+  coverRenderMode: '封面样式',
+  coverDepthEnabled: '深度效果',
+  coverDepthMapEnabled: '深度图显示',
+  coverDepthStrength: '深度强度',
+  coverDepthContrast: '深度对比',
+  coverDepthInvert: '反向深度',
+  depthLightingEnabled: '深度光照',
+  depthLightStrength: '光照强度',
+  depthAmbient: '暗部亮度',
+  depthLightAngle: '光源方向',
+  depthLightSpeed: '扫光速度',
+  depthHighlight: '高光强度',
+  sketchLayers: '线条层数',
+  sketchDensity: '单层疏密',
+  sketchLineWidth: '线条粗细',
+  sketchFlowSpeed: '流动速度',
+  sketchFlowAmplitude: '流动幅度',
   freeCubeStyle: '方块样式',
   freeCubeBackground: '柔光背景',
   cubeCount: '方块数量',
@@ -32895,6 +36100,7 @@ function builtinDiyPresetConfiguration() {
     topography: 'Sonic Terrain',
     'soundscape-workshop': '音域回响',
     chladni: '克拉尼',
+    'harmonic-state': '谐波之境',
     'rain-glass': '雨天玻璃',
     'cover-particles': '粒子封面',
     book: '书页歌词',
@@ -32964,10 +36170,26 @@ function builtinDiyPresetConfiguration() {
     runtimeControls.nodalMode = `${diagnostics.modeFrom?.join(' × ') || '2 × 3'} → ${diagnostics.modeTo?.join(' × ') || '3 × 5'}`;
     runtimeControls.autoRotation = diagnostics.autoRotation !== false;
   } else if (preset === 'cover-particles') {
+    runtimeControls.coverRenderMode = state.coverParticle.renderMode === 'sketch' ? '素描封面' : '粒子封面';
+    runtimeControls.coverDepthEnabled = state.coverParticle.depthEnabled;
+    runtimeControls.coverDepthMapEnabled = state.coverParticle.depthMapEnabled;
+    runtimeControls.coverDepthStrength = `${Math.round(state.coverParticle.depthStrength * 100)}%`;
+    runtimeControls.coverDepthContrast = `${Math.round(state.coverParticle.depthContrast * 100)}%`;
+    runtimeControls.coverDepthInvert = state.coverParticle.depthInvert;
+    for (const key of ['depthLightingEnabled', 'depthLightStrength', 'depthAmbient', 'depthLightAngle', 'depthLightSpeed', 'depthHighlight']) {
+      runtimeControls[key] = state.coverParticle[key];
+    }
+    if (state.coverParticle.renderMode === 'sketch') {
+      runtimeControls.sketchLayers = state.coverParticle.sketchLayers;
+      runtimeControls.sketchDensity = `${Math.round(state.coverParticle.sketchDensity * 100)}%`;
+      runtimeControls.sketchLineWidth = `${Math.round(state.coverParticle.sketchLineWidth * 100)}%`;
+      runtimeControls.sketchFlowSpeed = `${Math.round(state.coverParticle.sketchFlowSpeed * 100)}%`;
+      runtimeControls.sketchFlowAmplitude = `${Math.round(state.coverParticle.sketchFlowAmplitude * 100)}%`;
+    }
     runtimeControls.coverBackground = !!state.coverParticle.backgroundEnabled;
     runtimeControls.coverMotionAmplitude = `${coverParticleMotionPercent()}%`;
     runtimeControls.coverFloatSpeed = `${coverParticleFloatSpeedPercent()}%`;
-    runtimeControls.particleCount = state.coverParticle.particles.length || (
+    runtimeControls.particleCount = state.coverParticle.renderMode === 'sketch' ? 0 : state.coverParticle.particles.length || (
       reducedMotion ? 192 * 192 : MOBILE_RENDER_TARGET ? 224 * 224 : 256 * 256
     );
   } else if (['lyric', 'rain-glass', 'book'].includes(preset)) {
@@ -33007,7 +36229,9 @@ function syncScenePresetSettingsGroup(stormOcean = false, activeScenePreset = nu
   if (state.diyPreset === 'topography') sceneName = 'Sonic';
   else if (state.diyPreset === 'soundscape-workshop') sceneName = '音域回响';
   else if (state.diyPreset === 'chladni') sceneName = '克拉尼';
+  else if (state.diyPreset === 'harmonic-state') sceneName = '谐波之境';
   else if (state.diyPreset === 'cover-particles') sceneName = '粒子封面';
+  else if (state.diyPreset === 'book') sceneName = '书页歌词';
   else if (state.diyPreset === 'cube') sceneName = '动态魔方';
   else if (isFreeCubePreset()) sceneName = '自由方块';
   else if (stormOcean) sceneName = safeText(activeScenePreset?.name, '风暴海域');
@@ -33032,7 +36256,8 @@ function syncSceneFeatureGroups(activeScenePreset = null, stormOcean = false) {
       .split(',')
       .map((preset) => preset.trim())
       .filter(Boolean);
-    group.hidden = !supportedPresets.includes(featurePreset);
+    group.hidden = !supportedPresets.includes(featurePreset)
+      || (!!group.dataset.coverModeControls && group.dataset.coverModeControls !== state.coverParticle.renderMode);
     if (stormOcean && group.id === 'stormLightingFeatureGroup') {
       group.dataset.stormPresetId = safeText(activeScenePreset?.id, '');
     }
@@ -33138,6 +36363,17 @@ function appendDiyPresetConfigNode(parent, key, value, depth = 0, visited = new 
 
 function renderDiySelectedPresetConfig() {
   if (!els.diySelectedPresetConfigList) return;
+  if (isHarmonicStatePreset()) {
+    if (els.diySelectedPresetConfig) els.diySelectedPresetConfig.hidden = false;
+    if (els.diySelectedPresetConfigTitle) els.diySelectedPresetConfigTitle.textContent = '谐波之境 · 环轨与粒子';
+    if (els.diySelectedPresetConfigMeta) els.diySelectedPresetConfigMeta.textContent = '即时生效 · 自动保存';
+    renderHarmonicStateControls();
+    return;
+  }
+  if (els.diySelectedPresetConfigList.dataset.harmonicSettingsMounted === 'true') {
+    delete els.diySelectedPresetConfigList.dataset.harmonicSettingsMounted;
+    if (els.diySelectedPresetConfig) els.diySelectedPresetConfig.hidden = true;
+  }
   if (els.diySelectedPresetConfig?.hidden) {
     clearElement(els.diySelectedPresetConfigList);
     return;
@@ -33315,6 +36551,7 @@ function setDiyPreset(preset, options = {}) {
   if (els.diyTopographyPreset) els.diyTopographyPreset.classList.toggle('is-active', state.diyPreset === 'topography');
   if (els.diySoundscapeWorkshopPreset) els.diySoundscapeWorkshopPreset.classList.toggle('is-active', isSoundscapeWorkshopPreset());
   if (els.diyChladniPreset) els.diyChladniPreset.classList.toggle('is-active', isChladniPreset());
+  if (els.diyHarmonicStatePreset) els.diyHarmonicStatePreset.classList.toggle('is-active', isHarmonicStatePreset());
   if (els.diyRainGlassPreset) els.diyRainGlassPreset.classList.toggle('is-active', isRainGlassPreset());
   if (els.diyCoverParticlesPreset) els.diyCoverParticlesPreset.classList.toggle('is-active', isCoverParticlePreset());
   if (els.diyBookLyricPreset) els.diyBookLyricPreset.classList.toggle('is-active', state.diyPreset === 'book');
@@ -33327,6 +36564,7 @@ function setDiyPreset(preset, options = {}) {
   updateVoidPrismVisibility();
   updateChladniVisibility();
   updateChladniTextTransform();
+  updateHarmonicStateVisibility();
   updateSonicTopographyVisibility();
   updateSoundscapeWorkshopVisibility();
   updateCoverParticleVisibility();
@@ -33358,6 +36596,9 @@ function setTextPreset(preset, options = {}) {
     return;
   }
   state.textPreset = nextPreset;
+  if (nextPreset === 'particle-lyrics') {
+    state.textComposerSettings = normalizeTextComposerSettings({ ...state.textComposerSettings, lyricsEnabled: true, layoutMode: 'single' });
+  }
   if (requestedPreset === 'none') {
     state.textComposerSettings = normalizeTextComposerSettings({
       ...state.textComposerSettings,
@@ -33412,7 +36653,8 @@ function setTextPreset(preset, options = {}) {
     measureSubtitle: false
   });
   resetLyricFrameSync();
-  triggerFocusEchoTransition();
+  if (state.textPreset === 'focus-echo') syncPlaybackLyricToCurrentTime();
+  else disposeFocusEchoTransition(true);
   updateTextPresetAvailability();
   updateBookEffectTextTransform();
   updateChladniTextTransform();
@@ -33476,6 +36718,7 @@ function scheduleDiyAutoHide(delay = 1500) {
 
 function setDiyOpen(open) {
   state.diyOpen = !!open;
+  state.diyEnabled = state.diyOpen;
   els.appShell.classList.toggle('is-diy-open', state.diyOpen);
   if (els.diyButton) els.diyButton.setAttribute('aria-expanded', String(state.diyOpen));
   if (els.diyQuickMenu) els.diyQuickMenu.setAttribute('aria-hidden', String(!state.diyOpen));
@@ -33495,6 +36738,7 @@ function setDiyOpen(open) {
     setDiyCardOpen(false);
     setDiyPeek(false);
   }
+  saveVisualSettingsPreferences();
   syncPlaybackCardPanelState();
 }
 
@@ -36533,6 +39777,7 @@ function desktopSceneSnapshot() {
   const duration = Number.isFinite(audioDuration) && audioDuration > 0 ? audioDuration : fallbackDuration;
   const position = currentPlaybackLyricTime(Number(state.currentSong?.position) || 0);
   const effectiveLyricTime = lyricTimelineTime(position, 0);
+  const effectiveLyricDuration = duration > 0 ? lyricTimelineTime(duration, 0) : 0;
   const activeLine = state.lyricLines[state.lyricIndex];
   const nextLine = state.lyricLines[state.lyricIndex + 1];
   const lineStart = Number(activeLine?.time);
@@ -36565,6 +39810,7 @@ function desktopSceneSnapshot() {
     coverParticleBackgroundEnabled: !!state.coverParticle.backgroundEnabled,
     coverParticleMotionAmplitude: state.coverParticle.motionAmplitude,
     coverParticleFloatSpeed: state.coverParticle.floatSpeed,
+    coverVisualSettings: normalizeCoverVisualSettings(state.coverParticle),
     textPalettePreferences: state.textPalettePreferences,
     textFontPreferences: state.textFontPreferences,
     textComposerSettings: normalizeTextComposerSettings(state.textComposerSettings),
@@ -36593,10 +39839,12 @@ function desktopSceneSnapshot() {
       progressPercent: state.lyricProgressPercent,
       position,
       effectiveLyricTime,
+      effectiveLyricDuration,
       lyricLineStartTime,
       lyricLineEndTime,
       duration,
       playing: isPlaybackClockRunning(),
+      playbackRate: clamp(Number(els.audio?.playbackRate) || Number(state.playerClock?.playbackRate) || 1, 0.25, 4),
       bilingualLyricsEnabled: state.bilingualLyricsEnabled !== false,
       multiRowLyricsEnabled: state.multiRowLyricsEnabled === true
     }
@@ -36651,18 +39899,32 @@ function publishDesktopSceneSnapshot() {
     || !desktopSceneRuntime.enabled
     || desktopSceneRuntime.applying
   ) return;
+  desktopSceneRuntime.lastLyricClockPublishAt = performance.now();
   const snapshot = desktopSceneSnapshot();
   desktopSceneRuntime.channel?.postMessage({ type: 'state', snapshot });
   postNativeDesktopScene('update', snapshot);
 }
 
-function scheduleDesktopSceneSnapshot() {
+function scheduleDesktopSceneSnapshot(options = {}) {
   if (
     DESKTOP_SCENE_CLIENT
     || !desktopSceneRuntime.enabled
     || desktopSceneRuntime.applying
-    || desktopSceneRuntime.publishFrame
   ) return;
+  if (document.hidden) {
+    if (desktopSceneRuntime.publishFrame) {
+      window.cancelAnimationFrame(desktopSceneRuntime.publishFrame);
+      desktopSceneRuntime.publishFrame = 0;
+    }
+    publishDesktopSceneSnapshot();
+    return;
+  }
+  if (
+    options.lyricClockFrame === true
+    && performance.now() - desktopSceneRuntime.lastLyricClockPublishAt
+      < DESKTOP_SCENE_LYRIC_PUBLISH_INTERVAL_MS
+  ) return;
+  if (desktopSceneRuntime.publishFrame) return;
   desktopSceneRuntime.publishFrame = window.requestAnimationFrame(publishDesktopSceneSnapshot);
 }
 
@@ -36728,8 +39990,11 @@ async function applyDesktopSceneSnapshot(snapshot = {}) {
       );
       updateDesktopSceneLyricClock(
         lyricPlayback.effectiveLyricTime,
-        lyricPlayback.duration,
-        lyricPlayback.playing
+        Number(lyricPlayback.effectiveLyricDuration) > 0
+          ? lyricPlayback.effectiveLyricDuration
+          : lyricPlayback.duration,
+        lyricPlayback.playing,
+        lyricPlayback.playbackRate
       );
       resetLyricFrameSync();
     }
@@ -36744,6 +40009,11 @@ async function applyDesktopSceneSnapshot(snapshot = {}) {
       snapshot.coverParticleFloatSpeed,
       state.coverParticle.floatSpeed
     );
+    Object.assign(state.coverParticle, normalizeCoverVisualSettings(snapshot.coverVisualSettings));
+    state.coverParticle.sketchLastFrameAt = 0;
+    state.coverParticle.gpuRenderSignature = '';
+    if (state.coverParticle.renderMode === 'sketch') pauseCoverParticleEngine(true);
+    else if (coverParticlePresetVisible()) ensureCoverParticleEngine().then(playCoverParticleEngine);
 
     const sandboxPresetId = safeText(snapshot.sandboxPresetId, '');
     const sandboxPreset = sandboxPresetId
@@ -36931,6 +40201,7 @@ async function quitAppWindow() {
 
 function renderCurrent(song = state.currentSong) {
   resetSpectrumForSong(song);
+  syncLyricClockControls(song);
   const active = song || { title: '未播放', artist: '等待播放器状态' };
   els.dockTitle.textContent = safeText(active.title, '未播放');
   const artist = safeText(active.artist || active.album, '等待播放器状态');
@@ -36965,9 +40236,23 @@ function updatePlayState() {
   scheduleDesktopSceneSnapshot();
 }
 
+let playerStatePollRequest = null;
+
+function pollPlayerState() {
+  // Timer ticks share one request. Explicit playback actions still call
+  // refreshPlayerState directly and can supersede an older poll by requestId.
+  if (!playerStatePollRequest) {
+    playerStatePollRequest = refreshPlayerState()
+      .catch(() => {})
+      .finally(() => { playerStatePollRequest = null; });
+  }
+  return playerStatePollRequest;
+}
+
 async function refreshPlayerState() {
   if (DESKTOP_SCENE_CLIENT) return;
   if (document.hidden) return;
+  if (state.audioPlaybackContinuity.pendingLoadGeneration > 0) return;
   if (state.localQueueActive && isLocalSong(state.currentSong)) {
     const position = Number.isFinite(els.audio.currentTime) ? els.audio.currentTime : 0;
     const duration = Number.isFinite(els.audio.duration) ? els.audio.duration : Number(state.currentSong.duration) || 0;
@@ -36980,7 +40265,9 @@ async function refreshPlayerState() {
   state.playerStateSync.requestId = requestId;
   const sourceGeneration = state.audioPlaybackContinuity.sourceGeneration;
   const seekRevision = state.qishuiPlaybackCard.seekRequestId;
-  const data = await apiJson('/api/player/state');
+  const volumeRevision = playerVolumeRevision;
+  const volumeWasPending = pendingPlayerVolume != null || playerVolumeCommitInFlight;
+  const data = await apiJson('/api/player/state', { timeoutMs: 8000 });
   if (
     requestId !== state.playerStateSync.requestId
     || sourceGeneration !== state.audioPlaybackContinuity.sourceGeneration
@@ -37007,16 +40294,27 @@ async function refreshPlayerState() {
     || seekRevision !== state.qishuiPlaybackCard.seekRequestId
   );
   state.localQueueActive = false;
-  if (Array.isArray(data.queue)) state.queue = data.queue;
+  if (Array.isArray(data.queue)) {
+    state.queue = data.queue;
+    if (Number.isInteger(data.queueRevision)) state.queueRevision = Math.max(0, data.queueRevision);
+  }
   state.queueLength = Math.max(0, Number.isInteger(data.queueLength)
     ? data.queueLength
     : Array.isArray(data.queue)
       ? data.queue.length
       : state.queueLength || state.queue.length);
-  state.queueRevision = Math.max(0, Number.isInteger(data.queueRevision)
+  // The transport response usually omits entries. Keep their revision paired
+  // with the queue snapshot; the queue panel reconciles a newer server revision.
+  state.queueServerRevision = Math.max(0, Number.isInteger(data.queueRevision)
     ? data.queueRevision
-    : state.queueRevision);
-  state.queueIndex = Number.isInteger(data.queueIndex) ? data.queueIndex : -1;
+    : state.queueServerRevision);
+  // A playlist song is loaded independently of the explicit queue. Refresh
+  // the queue contents, but keep its selected index until the user chooses a
+  // queue item again.
+  if (state.playbackSelection?.kind !== 'playlist'
+    && (Array.isArray(data.queue) || data.queueRevision === state.queueRevision)) {
+    state.queueIndex = Number.isInteger(data.queueIndex) ? data.queueIndex : -1;
+  }
   const playerPosition = Number(data.position);
   const playerDuration = Number(data.duration);
   const playerPlaying = data.playing === true && data.paused !== true;
@@ -37078,9 +40376,9 @@ async function refreshPlayerState() {
     const provider = playbackQualityProvider(data.song || state.currentSong);
     state.playbackQuality = preferredPlaybackQuality(provider, safeText(data.quality, state.playbackQuality));
   }
-  els.volumeRange.value = Math.round((Number(data.volume) || 0.8) * 100);
-  syncElasticRangeVisual(els.volumeRange);
-  els.volumeLabel.textContent = `${els.volumeRange.value}%`;
+  if (!volumeWasPending && volumeRevision === playerVolumeRevision && pendingPlayerVolume == null && !playerVolumeCommitInFlight) {
+    syncPlayerVolume(data.volume);
+  }
   if (Number.isFinite(effectivePosition)) {
     if (els.audio && els.audio.src) {
       if (!preservePosition) {
@@ -37100,6 +40398,7 @@ async function refreshPlayerState() {
 }
 
 function applyAudioBridgePayload(audio = {}) {
+  state.visualBridge.receivedAt = performance.now();
   const energy = Number(audio.energy) || 0;
   const lowFrequency = clamp(Number(audio.lowFrequencyAmplitude) || Number(audio.bass) || 0, 0, 1);
   state.visualBridge.energy = energy;
@@ -37120,7 +40419,7 @@ function refreshNativeAudioSample() {
   if (document.hidden) return;
   if (!state.clientRuntime.nativeAudioActive || !state.clientRuntime.settings.xAudio2) return;
   if (nativeAudioSampleRequest) return nativeAudioSampleRequest;
-  nativeAudioSampleRequest = apiJson('/api/audio/sample')
+  nativeAudioSampleRequest = apiJson('/api/audio/sample', { timeoutMs: 2000 })
     .then((data) => applyAudioBridgePayload(data || {}))
     .catch(() => {
       // Native sampling is optional; Web Audio or the bridge fallback can keep visuals alive.
@@ -37131,14 +40430,19 @@ function refreshNativeAudioSample() {
   return nativeAudioSampleRequest;
 }
 
-async function refreshVisualBridge() {
+let visualBridgeRefreshRequest = null;
+
+function refreshVisualBridge() {
   if (document.hidden) return;
-  try {
-    const data = await apiJson('/api/visual-bridge/state');
-    applyAudioBridgePayload(data.audio || {});
-  } catch (error) {
-    // The particle stage keeps breathing even without bridge data.
+  if (!visualBridgeRefreshRequest) {
+    visualBridgeRefreshRequest = apiJson('/api/visual-bridge/state', { timeoutMs: 8000 })
+      .then(data => applyAudioBridgePayload(data.audio || {}))
+      .catch(() => {
+        // The particle stage keeps breathing even without bridge data.
+      })
+      .finally(() => { visualBridgeRefreshRequest = null; });
   }
+  return visualBridgeRefreshRequest;
 }
 
 function resetAudioPlaybackContinuity(position = Number.NaN, now = performance.now()) {
@@ -37154,6 +40458,8 @@ function resetAudioPlaybackContinuity(position = Number.NaN, now = performance.n
 
 function cancelStalledAudioPlaybackRecovery() {
   const continuity = state.audioPlaybackContinuity;
+  continuity.loadAbortController?.abort();
+  continuity.sourcePositionCleanup?.();
   continuity.sourceGeneration += 1;
   continuity.pendingLoadGeneration = 0;
   continuity.playingIntent = false;
@@ -37170,9 +40476,87 @@ function prepareAudioPlaybackSource(position = 0, autoplay = true, recoveryToken
   } else {
     continuity.sourceGeneration += 1;
   }
+  continuity.loadAbortController?.abort();
+  continuity.loadAbortController = typeof AbortController === 'function' ? new AbortController() : null;
+  continuity.sourcePositionCleanup?.();
+  continuity.pendingLoadGeneration = 0;
   continuity.playingIntent = autoplay !== false;
   resetAudioPlaybackContinuity(position);
   return continuity.sourceGeneration;
+}
+
+function audioPlaybackLoadIsCurrent(sourceGeneration) {
+  return sourceGeneration === state.audioPlaybackContinuity.sourceGeneration
+    && !state.audioPlaybackContinuity.loadAbortController?.signal.aborted;
+}
+
+function audioPlaybackSourceCanRenew(error) {
+  if (error?.name === 'NotAllowedError' || error?.name === 'AbortError') return false;
+  return ['NotSupportedError', 'NetworkError', 'TimeoutError'].includes(error?.name)
+    || [2, 4].includes(Number(els.audio.error?.code));
+}
+
+function audioPlaybackFailure(error, mediaFailure = false) {
+  let message = '';
+  if (error?.name === 'NotAllowedError') message = '浏览器暂未允许播放，请点击播放按钮重试';
+  else if (error?.name === 'TimeoutError') message = '音源加载超时，请重试播放';
+  else if (error?.name === 'NotSupportedError' || mediaFailure && [3, 4].includes(Number(els.audio.error?.code))) {
+    message = '音源无法加载或格式不受支持，请重试播放或切换音质';
+  } else if (error?.name === 'NetworkError' || mediaFailure && Number(els.audio.error?.code) === 2) {
+    message = '音源连接中断，请重试播放';
+  }
+  // Keep actual provider/API errors intact, including explicit permission denials.
+  if (!message) return error;
+  const failure = new Error(message);
+  failure.name = error?.name || 'Error';
+  return failure;
+}
+
+function playAudioPlaybackSource(sourceGeneration) {
+  if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return Promise.reject(new DOMException('已切换歌曲', 'AbortError'));
+  const signal = state.audioPlaybackContinuity.loadAbortController?.signal;
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
+      if (error) reject(error);
+      else resolve();
+    };
+    const abort = () => finish(new DOMException('已切换歌曲', 'AbortError'));
+    const timer = window.setTimeout(() => finish(new DOMException('音频缓冲超时', 'TimeoutError')), AUDIO_PLAYBACK_START_TIMEOUT_MS);
+    signal?.addEventListener('abort', abort, { once: true });
+    try {
+      Promise.resolve(els.audio.play()).then(() => finish(), finish);
+    } catch (error) {
+      finish(error);
+    }
+  });
+}
+
+function applyAudioPlaybackSourcePosition(position, sourceGeneration) {
+  if (!(position > 0)) return;
+  const audio = els.audio;
+  const source = audio.src;
+  const continuity = state.audioPlaybackContinuity;
+  continuity.sourcePositionCleanup?.();
+  const cleanup = () => {
+    audio.removeEventListener('loadedmetadata', applyPosition);
+    if (continuity.sourcePositionCleanup === cleanup) continuity.sourcePositionCleanup = null;
+  };
+  const applyPosition = () => {
+    cleanup();
+    if (audioPlaybackLoadIsCurrent(sourceGeneration) && audio.src === source) {
+      setAudioPlaybackPosition(position, 0.25);
+    }
+  };
+  if (audio.readyState >= 1) applyPosition();
+  else {
+    continuity.sourcePositionCleanup = cleanup;
+    audio.addEventListener('loadedmetadata', applyPosition, { once: true });
+  }
 }
 
 function audioBufferedSecondsAhead(position = Number.NaN) {
@@ -37199,7 +40583,8 @@ function waitForAudioPlaybackStartBuffer(position = 0, timeoutMs = AUDIO_PLAYBAC
   if (!audio?.src) return Promise.resolve('no-source');
   const source = audio.src;
   const enoughBuffered = () => (
-    audioBufferedSecondsAhead(position) >= AUDIO_PLAYBACK_START_BUFFER_SECONDS
+    Number(audio.readyState) >= 3
+    || audioBufferedSecondsAhead(position) >= AUDIO_PLAYBACK_START_BUFFER_SECONDS
     || (Number.isFinite(audio.duration)
       && audio.duration > 0
       && audioBufferedSecondsAhead(position) >= Math.max(0, audio.duration - Number(position) - 0.15))
@@ -37208,10 +40593,12 @@ function waitForAudioPlaybackStartBuffer(position = 0, timeoutMs = AUDIO_PLAYBAC
 
   return new Promise((resolve) => {
     let settled = false;
-    const eventNames = ['progress', 'canplay', 'canplaythrough', 'loadeddata', 'durationchange'];
+    const eventNames = ['progress', 'canplay', 'canplaythrough', 'loadeddata', 'durationchange', 'emptied', 'error'];
+    const signal = state.audioPlaybackContinuity.loadAbortController?.signal;
     const cleanup = () => {
       window.clearTimeout(timer);
       eventNames.forEach((name) => audio.removeEventListener(name, check));
+      signal?.removeEventListener('abort', abort);
     };
     const finish = (result) => {
       if (settled) return;
@@ -37219,12 +40606,16 @@ function waitForAudioPlaybackStartBuffer(position = 0, timeoutMs = AUDIO_PLAYBAC
       cleanup();
       resolve(result);
     };
-    const check = () => {
+    const abort = () => finish('cancelled');
+    const check = (event) => {
       if (audio.src !== source) finish('source-changed');
+      else if (event?.type === 'error' || audio.error) finish('media-error');
       else if (enoughBuffered()) finish('buffered');
     };
     const timer = window.setTimeout(() => finish('timeout'), Math.max(0, Number(timeoutMs) || 0));
     eventNames.forEach((name) => audio.addEventListener(name, check));
+    signal?.addEventListener('abort', abort, { once: true });
+    if (signal?.aborted) abort();
     check();
   });
 }
@@ -37424,6 +40815,7 @@ function markAudioPlaybackStallHint(now = performance.now()) {
 
 async function recoverStalledAudioPlayback(position, detectedAt = performance.now()) {
   const continuity = state.audioPlaybackContinuity;
+  if (continuity.pendingLoadGeneration > 0) return false;
   const song = state.currentSong && { ...state.currentSong };
   if (!song || (!song.id && !isLocalSong(song))) return false;
 
@@ -37439,7 +40831,8 @@ async function recoverStalledAudioPlayback(position, detectedAt = performance.no
       recovery: true,
       recoveryToken
     });
-    if (!loaded || continuity.sourceGeneration !== recoveryToken) {
+    if (continuity.sourceGeneration !== recoveryToken) return false;
+    if (!loaded) {
       continuity.lastAdvanceAt = detectedAt;
       continuity.retryAfter = detectedAt + AUDIO_PLAYBACK_RECOVERY_RETRY_MS;
       return false;
@@ -37454,6 +40847,10 @@ async function recoverStalledAudioPlayback(position, detectedAt = performance.no
 
 async function monitorAudioPlaybackContinuity(now = performance.now()) {
   const continuity = state.audioPlaybackContinuity;
+  // The previous song may keep playing while its replacement resolves. Its
+  // stall must not start a competing load that steals the user's new selection.
+  if (continuity.pendingLoadGeneration === continuity.sourceGeneration
+      && continuity.pendingLoadGeneration > 0) return 'loading';
   const sampleAt = Number.isFinite(Number(now)) ? Number(now) : performance.now();
   const audio = els.audio;
   const current = Number(audio?.currentTime);
@@ -37464,13 +40861,21 @@ async function monitorAudioPlaybackContinuity(now = performance.now()) {
     && !audio.ended
   );
 
-  if (!active || audio.seeking || document.hidden || !Number.isFinite(current)) {
+  if (!active || audio.seeking || !Number.isFinite(current)) {
     if (Number.isFinite(current)) {
       continuity.lastMediaTime = Math.max(0, current);
       continuity.lastAdvanceAt = sampleAt;
     }
     continuity.stallHintAt = 0;
     return 'idle';
+  }
+
+  // Do not mistake an advancing HTMLMediaElement clock for audible output.
+  // An ended/pause transition can suspend the graph while the next source's
+  // clock has already started. Recover that graph even without a stall hint.
+  if (state.audioAnalysis.context?.state === 'suspended') {
+    await resumeAudioAnalysis();
+    return 'output-resumed';
   }
 
   if (noteAudioPlaybackProgress(sampleAt)) return 'advanced';
@@ -37538,7 +40943,10 @@ function setAudioPlaybackPosition(position, tolerance = 1.25) {
     const current = Number.isFinite(els.audio.currentTime) ? els.audio.currentTime : 0;
     const shouldSeek = Math.abs(current - target) >= tolerance;
     if (shouldSeek) setAudioCurrentTimeWithNativeContinuity(target, 'position-sync');
-    syncPlaybackLyricAtTime(shouldSeek ? target : currentPlaybackLyricTime(target));
+    syncPlaybackLyricAtTime(
+      shouldSeek ? target : currentPlaybackLyricTime(target),
+      { authoritativeSample: true }
+    );
   } catch (error) {
   }
 }
@@ -37574,7 +40982,7 @@ function smoothlySyncAudioPlaybackPosition(position, options = {}) {
   try {
     if (mediaBuffering) {
       resetSyncedAudioPlaybackRate();
-      syncPlaybackLyricAtTime(currentPlaybackLyricTime(target));
+      syncPlaybackLyricAtTime(currentPlaybackLyricTime(target), { authoritativeSample: true });
       return 'buffering';
     }
     if (!activelyPlaying || absoluteDrift >= hardTolerance) {
@@ -37582,7 +40990,7 @@ function smoothlySyncAudioPlaybackPosition(position, options = {}) {
         setAudioCurrentTimeWithNativeContinuity(target, 'remote-clock-hard-sync');
       }
       resetSyncedAudioPlaybackRate();
-      syncPlaybackLyricAtTime(target);
+      syncPlaybackLyricAtTime(target, { authoritativeSample: true });
       return absoluteDrift >= hardTolerance ? 'seek' : 'aligned';
     }
 
@@ -37594,7 +41002,7 @@ function smoothlySyncAudioPlaybackPosition(position, options = {}) {
     }
     if (nextRate === 1) resetSyncedAudioPlaybackRate();
     else scheduleSyncedAudioPlaybackRateReset();
-    syncPlaybackLyricAtTime(currentPlaybackLyricTime(target));
+    syncPlaybackLyricAtTime(currentPlaybackLyricTime(target), { authoritativeSample: true });
     return nextRate === 1 ? 'aligned' : 'rate';
   } catch (error) {
     resetSyncedAudioPlaybackRate();
@@ -37684,23 +41092,30 @@ async function applyCommunityPlaybackControls(song = {}) {
     softTolerance: 0.22,
     maxRateDelta: 0.04
   });
+  let sourceGeneration = state.audioPlaybackContinuity.sourceGeneration;
   if (song.playing === false) {
-    cancelStalledAudioPlaybackRecovery();
+    sourceGeneration = cancelStalledAudioPlaybackRecovery();
     await invalidateNativeGoogleObrTimeline('pause');
+    if (sourceGeneration !== state.audioPlaybackContinuity.sourceGeneration) return;
     els.audio.pause();
-    await apiJson('/api/player/pause').catch(() => {});
+    await apiJson('/api/player/pause', { timeoutMs: 2000 }).catch(() => {});
   } else if (els.audio.paused) {
-    state.audioPlaybackContinuity.playingIntent = true;
-    await apiJson('/api/player/play').catch(() => {});
+    sourceGeneration = prepareAudioPlaybackSource(els.audio.currentTime || 0, true);
+    const signal = state.audioPlaybackContinuity.loadAbortController?.signal;
+    await apiJson('/api/player/play', { timeoutMs: AUDIO_PLAYBACK_LOAD_TIMEOUT_MS, signal }).catch(() => {});
+    if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return;
     try {
-      await els.audio.play();
+      await playAudioPlaybackSource(sourceGeneration);
     } catch (error) {
+      if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return;
       state.audioPlaybackContinuity.playingIntent = false;
       await skipUnavailableCommunitySong(error.message);
       return;
     }
   }
+  if (sourceGeneration !== state.audioPlaybackContinuity.sourceGeneration) return;
   if (song.playing !== false) await ensureAudioAnalysis();
+  if (sourceGeneration !== state.audioPlaybackContinuity.sourceGeneration) return;
   updateProgress();
   updatePlayState();
 }
@@ -37709,49 +41124,60 @@ async function loadLocalSong(song, options = {}) {
   if (!isLocalSong(song)) throw new Error('本地歌曲文件已失效，请重新导入');
   const targetPosition = Number(options.position ?? song.position) || 0;
   const requestedDuration = Number(song.duration) || 0;
-  const sourceGeneration = prepareAudioPlaybackSource(
+  const sourceGeneration = options.sourceGeneration || prepareAudioPlaybackSource(
     targetPosition,
     options.autoplay !== false,
     options.recoveryToken
   );
-  if (!sourceGeneration) return false;
+  if (!sourceGeneration || !audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
+  if (els.audio.src !== song.localUrl) {
+    await invalidateNativeGoogleObrTimeline('source-change');
+    if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
+    els.audio.src = song.localUrl;
+  }
   state.localQueueActive = true;
   state.playerUrl = song.localUrl;
   state.currentSong = { ...song, duration: requestedDuration, position: targetPosition };
-  if (els.audio.src !== song.localUrl) {
-    await invalidateNativeGoogleObrTimeline('source-change');
-    els.audio.src = song.localUrl;
-  }
+  if (state.playbackSelection?.kind !== 'playlist') syncPlaybackQueueIndexToCurrentSong();
   els.audio.volume = Number(els.volumeRange.value) / 100;
-  if (targetPosition > 0) {
-    const applyPosition = () => setAudioPlaybackPosition(targetPosition, 0.25);
-    if (els.audio.readyState >= 1) applyPosition();
-    else els.audio.addEventListener('loadedmetadata', applyPosition, { once: true });
-  }
+  applyAudioPlaybackSourcePosition(targetPosition, sourceGeneration);
   resetSpectrumForSong(state.currentSong);
   renderCurrent(state.currentSong);
   if (options.autoplay === false) {
     state.audioPlaybackContinuity.playingIntent = false;
     els.audio.pause();
   }
-  else await els.audio.play();
-  if (options.autoplay !== false) await ensureAudioAnalysis();
+  else await playAudioPlaybackSource(sourceGeneration);
+  if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
+  if (options.autoplay !== false) ensureAudioAnalysis().catch(() => {});
   updateProgress();
   updatePlayState();
   return true;
 }
 
 async function loadSong(song, options = {}) {
-  let pendingLoadGeneration = 0;
+  const targetPosition = Number(options.position ?? song.position) || 0;
+  const sourceGeneration = prepareAudioPlaybackSource(
+    targetPosition,
+    options.autoplay !== false,
+    options.recoveryToken
+  );
+  if (!sourceGeneration) return false;
+  const continuity = state.audioPlaybackContinuity;
+  const signal = continuity.loadAbortController?.signal;
+  continuity.pendingLoadGeneration = sourceGeneration;
+  let sourceAttached = false;
   try {
-    if (isLocalSong(song)) return await loadLocalSong(song, options);
+    if (isLocalSong(song)) return await loadLocalSong(song, { ...options, sourceGeneration });
     if (isQishuiMetadataSong(song)) {
       const qishuiIdentity = await ensureQualityLoginStatus('qishui');
+      if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
       if (qishuiIdentity?.playbackAuthorized !== true) {
         if (!options.silent && !options.communitySync) {
           toast(`正在为「${safeText(song.title, '歌曲')}」寻找合法公开音源`);
         }
         const matched = await resolveQishuiMetadataViaGuestSearch(song);
+        if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
         if (!matched) {
           throw new Error('未找到可公开播放的游客搜索匹配；未读取或解密汽水受保护音源');
         }
@@ -37761,24 +41187,18 @@ async function loadSong(song, options = {}) {
         }
       }
     }
-    const targetPosition = Number(options.position ?? song.position) || 0;
-    const sourceGeneration = prepareAudioPlaybackSource(
-      targetPosition,
-      options.autoplay !== false,
-      options.recoveryToken
-    );
-    if (!sourceGeneration) return false;
-    pendingLoadGeneration = sourceGeneration;
-    state.audioPlaybackContinuity.pendingLoadGeneration = sourceGeneration;
-    state.localQueueActive = false;
     const provider = playbackQualityProvider(song);
     const quality = normalizePlaybackQuality(
       provider,
       options.quality || preferredPlaybackQuality(provider, state.playbackQuality)
     );
     state.playbackQuality = quality;
-    const data = await apiJson(`/api/player/load?${songParams(song, { quality })}`);
-    if (sourceGeneration !== state.audioPlaybackContinuity.sourceGeneration) return false;
+    const data = await apiJson(`/api/player/load?${songParams(song, { quality })}`, {
+      timeoutMs: AUDIO_PLAYBACK_LOAD_TIMEOUT_MS,
+      signal
+    });
+    if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
+    if (data.superseded === true) return false;
     if (!data.playable || !data.url) {
       if (options.communitySync) {
         applyCommunityUnavailableSong(song, data.error || '当前歌曲不可播放');
@@ -37788,39 +41208,44 @@ async function loadSong(song, options = {}) {
       throw new Error(data.error || '当前歌曲不可播放');
     }
     const requestedDuration = Number(song.duration) || 0;
+    await invalidateNativeGoogleObrTimeline('source-change');
+    if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
+    state.localQueueActive = false;
     state.community.listenUnavailableSignature = '';
     state.currentSong = {
       ...song,
       ...(data.song || {}),
       duration: Number(data.song && data.song.duration) || requestedDuration
     };
+    if (state.playbackSelection?.kind !== 'playlist') syncPlaybackQueueIndexToCurrentSong();
     state.playbackQuality = safeText(data.quality, quality);
     state.playerUrl = data.url;
-    await invalidateNativeGoogleObrTimeline('source-change');
     els.audio.src = browserAudioUrl(data.url);
-    if (state.audioPlaybackContinuity.pendingLoadGeneration === sourceGeneration) {
-      state.audioPlaybackContinuity.pendingLoadGeneration = 0;
-    }
+    sourceAttached = true;
     els.audio.volume = Number(els.volumeRange.value) / 100;
+    applyAudioPlaybackSourcePosition(targetPosition, sourceGeneration);
     if (targetPosition > 0) {
-      await apiJson(`/api/player/seek?${query({ position: Math.round(targetPosition) })}`).catch(() => {});
-      const applyPosition = () => setAudioPlaybackPosition(targetPosition, 0.25);
-      if (els.audio.readyState >= 1) applyPosition();
-      else els.audio.addEventListener('loadedmetadata', applyPosition, { once: true });
+      await apiJson(`/api/player/seek?${query({ position: Math.round(targetPosition) })}`, {
+        timeoutMs: 2000, signal
+      }).catch(() => {});
+      if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
     }
     resetSpectrumForSong(state.currentSong);
     renderCurrent(state.currentSong);
     if (options.autoplay === false) {
       state.audioPlaybackContinuity.playingIntent = false;
       els.audio.pause();
-      await apiJson('/api/player/pause').catch(() => {});
+      await apiJson('/api/player/pause', { timeoutMs: 2000, signal }).catch(() => {});
     } else {
       await waitForAudioPlaybackStartBuffer(targetPosition);
-      if (sourceGeneration !== state.audioPlaybackContinuity.sourceGeneration) return false;
-      await els.audio.play();
+      if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
+      await playAudioPlaybackSource(sourceGeneration);
     }
+    if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
     if (targetPosition > 0) setAudioPlaybackPosition(targetPosition, 0.25);
-    if (options.autoplay !== false) await ensureAudioAnalysis();
+    // Audio playback is already running. Native analysis negotiates separately
+    // and must not keep the selected track or wheel transition pending.
+    if (options.autoplay !== false) ensureAudioAnalysis().catch(() => {});
     updateProgress();
     updatePlayState();
     if (!options.communitySync && state.community.activeSession) {
@@ -37828,17 +41253,30 @@ async function loadSong(song, options = {}) {
     }
     return true;
   } catch (error) {
+    if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
+    if (error.name === 'TimeoutError' && sourceAttached) els.audio.pause();
+    // A signed URL can expire between resolution and the first media request.
+    // Renew it once through the normal provider path; never retry permissions,
+    // autoplay denial, local formats, or another recovery recursively.
+    if (sourceAttached && options.autoplay !== false && !options.recovery
+        && audioPlaybackSourceCanRenew(error)) {
+      return await loadSong(song, {
+        ...options, position: targetPosition, recovery: true, recoveryToken: sourceGeneration
+      });
+    }
     if (options.communitySync) {
       applyCommunityUnavailableSong(song, error.message || '当前歌曲音源加载失败');
       await skipUnavailableCommunitySong(error.message || '当前歌曲音源加载失败');
       return false;
     }
-    if (!options.silent) toast(error.message);
+    const failure = audioPlaybackFailure(error, sourceAttached || isLocalSong(song));
+    if (sourceAttached) continuity.playingIntent = false;
+    if (options.throwOnError) throw failure;
+    if (!options.silent) toast(failure.message);
     return false;
   } finally {
     if (
-      pendingLoadGeneration > 0
-      && state.audioPlaybackContinuity.pendingLoadGeneration === pendingLoadGeneration
+      state.audioPlaybackContinuity.pendingLoadGeneration === sourceGeneration
     ) {
       state.audioPlaybackContinuity.pendingLoadGeneration = 0;
     }
@@ -37854,7 +41292,13 @@ async function submitSearch(event) {
     els.searchInput.focus();
     return;
   }
-  if (!providerConfigured(state.activeProvider)) {
+  const provider = state.activeProvider;
+  const sourceRevision = state.audioSourceLibraryRevision;
+  if (!audioSourceLibraryProviders().includes(provider)) {
+    toast('当前音源不支持此平台，请在音源管理中选择可用平台。');
+    return;
+  }
+  if (!providerConfigured(provider)) {
     toast(`请先导入${providerInfo(state.activeProvider).label} API 插件`);
     showLoginDialog();
     return;
@@ -37867,8 +41311,9 @@ async function submitSearch(event) {
       ? state.searchSuggestions.songs
       : [];
     if (!songs.length) {
-      const data = await apiJson(`/api/search?${query({ q: keyword, limit: 8, provider: state.activeProvider })}`);
-      songs = normalizeSearchResults(data.songs).slice(0, 8);
+      const data = await apiJson(`/api/search?${query({ q: keyword, limit: 8, provider })}`);
+      if (sourceRevision !== state.audioSourceLibraryRevision || provider !== state.activeProvider) return;
+      songs = audioSourceLibrarySongs(normalizeSearchResults(data.songs), provider).slice(0, 8);
       state.searchSuggestions.query = keyword;
       state.searchSuggestions.songs = songs;
       renderSearchSuggestions();
@@ -37889,14 +41334,21 @@ async function submitSearch(event) {
 }
 
 async function playQueueIndex(index) {
-  const song = state.queue[index];
+  const selectedIndex = Math.floor(Number(index));
+  const song = state.queue[selectedIndex];
   if (!song) {
     toast('播放栏暂无歌曲');
     return;
   }
-  state.queueIndex = index;
-  const loaded = await loadSong(song);
-  if (loaded && !isLocalSong(song)) await refreshPlayerState();
+  state.queueIndex = selectedIndex;
+  setPlaybackQueueSelection(selectedIndex);
+  const load = loadSong(song);
+  const sourceGeneration = state.audioPlaybackContinuity.sourceGeneration;
+  const loaded = await load;
+  if (loaded && audioPlaybackLoadIsCurrent(sourceGeneration) && !isLocalSong(song)) {
+    await refreshPlayerState();
+  }
+  return loaded;
 }
 
 async function transport(path, options = {}) {
@@ -37917,7 +41369,15 @@ async function transport(path, options = {}) {
     }
     playbackIntelligenceTrackSignature = '';
   }
-  if (state.localQueueActive) {
+  if (playbackSelectionIsPlaylist()) {
+    try {
+      return await advancePlaybackSelection(path.endsWith('/previous') ? -1 : 1, options);
+    } catch (error) {
+      toast(error.message || '歌单切歌失败');
+      return false;
+    }
+  }
+  if (state.localQueueActive && (state.playbackSelection?.kind || 'queue') === 'queue') {
     if (!state.queue.length) {
       toast('本地歌单暂无歌曲');
       return;
@@ -37932,49 +41392,92 @@ async function transport(path, options = {}) {
 
   const maxAttempts = Math.max(1, Math.min(Number(options.maxAttempts) || state.queue.length || 1, 100));
   let lastError = safeText(options.unavailableReason, '');
+  const sourceGeneration = prepareAudioPlaybackSource(0, true);
+  const continuity = state.audioPlaybackContinuity;
+  continuity.pendingLoadGeneration = sourceGeneration;
   try {
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      const data = await apiJson(path);
+      const data = await apiJson(path, {
+        timeoutMs: AUDIO_PLAYBACK_LOAD_TIMEOUT_MS, signal: continuity.loadAbortController?.signal
+      });
+      if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
+      if (data.superseded === true) return false;
       if (!data.playable || !data.url) {
-        lastError = safeText(data.error, lastError || '歌曲无可用音源或需要会员');
+        lastError = safeText(data.error, lastError || '歌曲暂无可用音源');
         if (Number(data.skipped) >= maxAttempts) break;
         continue;
       }
-      prepareAudioPlaybackSource(0, true);
+      await invalidateNativeGoogleObrTimeline('source-change');
+      if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
       state.currentSong = data.song || state.currentSong;
       state.playerUrl = data.url;
       if (data.quality) state.playbackQuality = safeText(data.quality, state.playbackQuality);
-      await invalidateNativeGoogleObrTimeline('source-change');
       els.audio.src = browserAudioUrl(data.url);
       resetSpectrumForSong(state.currentSong);
       renderCurrent(state.currentSong);
       try {
         await waitForAudioPlaybackStartBuffer(0);
-        await els.audio.play();
+        if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
+        await playAudioPlaybackSource(sourceGeneration);
       } catch (error) {
-        lastError = safeText(error && error.message, '音频源格式不受支持');
-        state.audioPlaybackContinuity.playingIntent = false;
-        els.audio.removeAttribute('src');
-        els.audio.load();
-        continue;
+        if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
+        let failure = audioPlaybackFailure(error, true);
+        let renewed = false;
+        if (state.currentSong && audioPlaybackSourceCanRenew(error)) {
+          try {
+            renewed = await loadSong(state.currentSong, {
+              quality: state.playbackQuality, position: 0, recovery: true,
+              recoveryToken: sourceGeneration, silent: true, throwOnError: true
+            });
+            if (!renewed || !audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
+          } catch (renewalError) {
+            if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
+            failure = renewalError;
+          }
+        }
+        if (failure.name === 'NotAllowedError') {
+          continuity.playingIntent = false;
+          throw audioPlaybackFailure(failure, true);
+        }
+        if (!renewed) {
+          lastError = failure.message || '音源加载失败';
+          continuity.pendingLoadGeneration = sourceGeneration;
+          continuity.playingIntent = false;
+          els.audio.removeAttribute('src');
+          els.audio.load();
+          continue;
+        }
       }
+      if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
       state.community.listenUnavailableSignature = '';
-      await ensureAudioAnalysis();
+      ensureAudioAnalysis().catch(() => {});
+      continuity.pendingLoadGeneration = 0;
       await refreshPlayerState().catch(() => {});
+      if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
       if (state.community.activeSession) await reportCommunityListening(true).catch(() => {});
-      if (options.autoSkipUnavailable) toast('已自动跳过无音源或会员歌曲');
+      if (options.autoSkipUnavailable) toast('已跳过暂时无法播放的歌曲');
       return true;
     }
+    continuity.pendingLoadGeneration = 0;
     await refreshPlayerState();
+    if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
     toast(lastError || '队列里没有可播放歌曲');
     return false;
   } catch (error) {
+    if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return false;
     toast(error.message);
     return false;
+  } finally {
+    if (continuity.pendingLoadGeneration === sourceGeneration) continuity.pendingLoadGeneration = 0;
   }
 }
 
 async function togglePlay() {
+  if (state.currentSong && !isLocalSong(state.currentSong)
+      && (els.audio.error || els.audio.networkState === 3)) {
+    await loadSong(state.currentSong, { position: Number(els.audio.currentTime) || 0 });
+    return;
+  }
   if (!els.audio.src && state.currentSong) {
     await loadSong(state.currentSong);
     return;
@@ -37989,38 +41492,57 @@ async function togglePlay() {
   }
   if (state.localQueueActive && isLocalSong(state.currentSong)) {
     if (els.audio.paused) {
+      const sourceGeneration = prepareAudioPlaybackSource(els.audio.currentTime || 0, true);
       try {
-        state.audioPlaybackContinuity.playingIntent = true;
-        await els.audio.play();
-        ensureAudioAnalysis();
+        await playAudioPlaybackSource(sourceGeneration);
+        if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return;
+        ensureAudioAnalysis().catch(() => {});
       } catch (error) {
+        if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return;
         state.audioPlaybackContinuity.playingIntent = false;
         toast(error.message || '本地歌曲无法播放');
       }
     } else {
-      cancelStalledAudioPlaybackRecovery();
+      const sourceGeneration = cancelStalledAudioPlaybackRecovery();
       await invalidateNativeGoogleObrTimeline('pause');
+      if (sourceGeneration !== state.audioPlaybackContinuity.sourceGeneration) return;
       els.audio.pause();
     }
     updatePlayState();
     return;
   }
   if (els.audio.paused) {
+    const sourceGeneration = prepareAudioPlaybackSource(els.audio.currentTime || 0, true);
+    const signal = state.audioPlaybackContinuity.loadAbortController?.signal;
+    let resumingMedia = false;
     try {
-      state.audioPlaybackContinuity.playingIntent = true;
-      await apiJson('/api/player/play');
-      await els.audio.play();
-      ensureAudioAnalysis();
+      const data = await apiJson('/api/player/play', { timeoutMs: AUDIO_PLAYBACK_LOAD_TIMEOUT_MS, signal });
+      if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return;
+      if (data.playable === false) throw new Error(data.error || '歌曲暂无可用音源');
+      resumingMedia = true;
+      await playAudioPlaybackSource(sourceGeneration);
+      if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return;
+      ensureAudioAnalysis().catch(() => {});
       if (state.community.activeSession) reportCommunityListening(true).catch(() => {});
     } catch (error) {
+      if (!audioPlaybackLoadIsCurrent(sourceGeneration)) return;
+      if (resumingMedia && audioPlaybackSourceCanRenew(error) && state.currentSong) {
+        await loadSong(state.currentSong, {
+          position: Number(els.audio.currentTime) || 0,
+          recovery: true, recoveryToken: sourceGeneration
+        });
+        return;
+      }
       state.audioPlaybackContinuity.playingIntent = false;
-      toast(error.message);
+      toast(audioPlaybackFailure(error, resumingMedia).message);
     }
   } else {
-    cancelStalledAudioPlaybackRecovery();
+    const sourceGeneration = cancelStalledAudioPlaybackRecovery();
     await invalidateNativeGoogleObrTimeline('pause');
+    if (sourceGeneration !== state.audioPlaybackContinuity.sourceGeneration) return;
     els.audio.pause();
-    await apiJson('/api/player/pause').catch(() => {});
+    await apiJson('/api/player/pause', { timeoutMs: 2000 }).catch(() => {});
+    if (sourceGeneration !== state.audioPlaybackContinuity.sourceGeneration) return;
     if (state.community.activeSession) reportCommunityListening(true).catch(() => {});
   }
   updatePlayState();
@@ -38034,7 +41556,7 @@ function updateProgress() {
   syncElasticRangeVisual(els.progressRange);
   els.currentTime.textContent = formatTime(current);
   els.totalTime.textContent = formatTime(duration || (state.currentSong && state.currentSong.duration) || 0);
-  syncPlaybackLyricAtTime(current);
+  syncPlaybackLyricAtTime(current, { authoritativeSample: true });
   updateQishuiPlaybackProgress(current, duration);
 }
 
@@ -38203,12 +41725,12 @@ function canStartWindowDrag(event) {
   if (event.button !== 0) return false;
   const target = event.target instanceof Element ? event.target : null;
   if (!target) return false;
-  if (target.closest('.runtime-settings-panel, .recording-dialog, .netease-login-dialog, .community-card, .community-message-dialog, .community-profile-dialog, .community-message-bubbles, .community-broadcast-toast, .listen-mini, .playlist-song-page, .orb-playlists, .player-dock, .diy-sidebar, .search-suggestions, .favorite-library, .pet-assistant')) {
+  if (target.closest('.runtime-settings-panel, .recording-dialog, .netease-login-dialog, .community-card, .community-message-dialog, .community-profile-dialog, .community-message-bubbles, .community-broadcast-toast, .listen-mini, .playlist-song-page, .orb-playlists, .player-dock, .diy-sidebar, .search-suggestions, .search-results-window, .favorite-library, .pet-assistant')) {
     return false;
   }
   if (target.closest('.runtime-topbar')) return true;
   if (target.closest('button, [role="button"], input, textarea, select, a')) return false;
-  return !!target.closest('.runtime-topbar, .top-search, .search-suggestions, .favorite-library') || event.clientY <= 34;
+  return !!target.closest('.runtime-topbar, .top-search, .search-suggestions, .search-results-window, .favorite-library') || event.clientY <= 34;
 }
 
 function beginWindowDragGesture(event) {
@@ -38237,6 +41759,26 @@ function beginWindowDragGesture(event) {
 }
 
 function suppressWindowDragClick(event) {
+  // The settings gear is a real playback control even though it now lives on
+  // the playback phone rather than the legacy runtime topbar. Never let a
+  // stale native-window drag gesture swallow its click.
+  const target = event.target instanceof Element ? event.target : null;
+  const settingsButton = els.runtimeSettingsButton;
+  const settingsRect = settingsButton?.getBoundingClientRect?.();
+  const insideSettingsHitArea = settingsRect
+    && event.clientX >= settingsRect.left
+    && event.clientX <= settingsRect.right
+    && event.clientY >= settingsRect.top
+    && event.clientY <= settingsRect.bottom;
+  if (target?.closest('#runtimeSettingsButton') || insideSettingsHitArea) {
+    state.windowDragSuppressClick = false;
+    if (event.type === 'click' && !state.runtimeSettingsOpen) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setRuntimeSettingsOpen(true, { pageId: 'general', reason: 'playback-settings' });
+    }
+    return;
+  }
   if (!state.windowDragSuppressClick) return;
   state.windowDragSuppressClick = false;
   event.preventDefault();
@@ -38292,17 +41834,46 @@ function dismissTopUiLayer() {
 const PLAYER_VOLUME_COMMIT_DEBOUNCE_MS = 160;
 let playerVolumeCommitTimer = 0;
 let pendingPlayerVolume = null;
+let playerVolumeRevision = 0;
+let playerVolumeCommitInFlight = 0;
+
+function syncPlayerVolume(volume, { updateAudio = true } = {}) {
+  const numeric = volume == null || volume === '' ? Number.NaN : Number(volume);
+  const normalized = clamp(Number.isFinite(numeric) ? numeric : 0.8, 0, 1);
+  const percent = Math.round(normalized * 100);
+  if (updateAudio && els.audio && els.audio.volume !== normalized) els.audio.volume = normalized;
+  [els.volumeRange, els.qishuiPlaybackVolumeRange].forEach((input) => {
+    if (!input) return;
+    input.value = String(percent);
+    input.setAttribute('aria-valuetext', `${percent}%`);
+    syncElasticRangeVisual(input);
+  });
+  if (els.volumeLabel) els.volumeLabel.textContent = `${percent}%`;
+  if (els.qishuiPlaybackVolume) {
+    els.qishuiPlaybackVolume.style.setProperty('--volume-slider-progress', `${percent}%`);
+    els.qishuiPlaybackVolume.title = `音量 ${percent}% · 滚轮每格 ${state.volumeSliderPreferences.wheelStep}%`;
+  }
+  return normalized;
+}
 
 function commitPlayerVolume() {
   window.clearTimeout(playerVolumeCommitTimer);
   playerVolumeCommitTimer = 0;
+  if (playerVolumeCommitInFlight) return;
   const volume = pendingPlayerVolume;
   pendingPlayerVolume = null;
   if (volume == null || state.localQueueActive) return;
-  apiJson(`/api/player/volume?${query({ value: volume.toFixed(2) })}`).catch(() => {});
+  playerVolumeCommitInFlight += 1;
+  apiJson(`/api/player/volume?${query({ value: volume.toFixed(2) })}`)
+    .catch(() => {})
+    .finally(() => {
+      playerVolumeCommitInFlight -= 1;
+      if (pendingPlayerVolume != null) commitPlayerVolume();
+    });
 }
 
 function schedulePlayerVolumeCommit(volume, { immediate = false } = {}) {
+  playerVolumeRevision += 1;
   if (state.localQueueActive) {
     window.clearTimeout(playerVolumeCommitTimer);
     playerVolumeCommitTimer = 0;
@@ -38836,6 +42407,10 @@ function bindEvents() {
   if (els.aiServiceModelTestButton) els.aiServiceModelTestButton.addEventListener('click', () => clientAiServiceTest('model'));
   if (els.aiServiceTtsTestButton) els.aiServiceTtsTestButton.addEventListener('click', () => clientAiServiceTest('tts'));
   if (els.aiServiceSaveButton) els.aiServiceSaveButton.addEventListener('click', () => clientAiServicePersistControls());
+  els.aiServiceMemorySharing?.addEventListener('change', () => clientAiServiceSchedulePersist(0));
+  els.aiServiceModelBaseUrl?.addEventListener('input', () => {
+    if (els.aiServiceMemorySharing) els.aiServiceMemorySharing.checked = false;
+  });
   [
     els.aiServiceModelBaseUrl,
     els.aiServiceModelName,
@@ -38931,6 +42506,15 @@ function bindEvents() {
     enterPlaybackPage();
   });
   if (els.diyWallpaperModeButton) els.diyWallpaperModeButton.addEventListener('click', () => setDiyPage('wallpaper'));
+  if (els.diyPlaylistButton) {
+    els.diyPlaylistButton.addEventListener('click', () => {
+      // The playlist flyout is intentionally reachable from the DIY menu only.
+      // Reuse the existing picker state so the playlist cards keep their
+      // selection, loading, and close behavior across entry points.
+      if (!state.playbackPage) enterPlaybackPage();
+      setPlaybackPlaylistPickerOpen(!(state.playbackPlaylistPickerOpen || state.playlistSongPageOpen));
+    });
+  }
   if (els.diySidebar) {
     els.diySidebar.addEventListener('pointerdown', beginDiyCardRotation);
     els.diySidebar.addEventListener('pointermove', moveDiyCardRotation);
@@ -38960,6 +42544,14 @@ function bindEvents() {
   }
   if (els.textFontSelect) {
     els.textFontSelect.addEventListener('change', () => setTextFontPreference(els.textFontSelect.value));
+  }
+  if (els.bookLyricLineCount) {
+    els.bookLyricLineCount.addEventListener('input', () => {
+      setTextComposerSetting('bookLyricLineCount', els.bookLyricLineCount.value);
+    });
+    els.bookLyricLineCount.addEventListener('change', () => {
+      setTextComposerSetting('bookLyricLineCount', els.bookLyricLineCount.value, { commit: true });
+    });
   }
   if (els.textComposerControl) {
     const updateTextComposerFromControl = (event, commit = false) => {
@@ -38997,6 +42589,32 @@ function bindEvents() {
   if (els.textPaletteCustomInput) {
     els.textPaletteCustomInput.addEventListener('input', () => {
       setTextPalettePreference('manual', els.textPaletteCustomInput.value);
+    });
+  }
+  if (els.lyricParticlePaletteAutoButton) {
+    els.lyricParticlePaletteAutoButton.addEventListener(
+      'click',
+      () => setLyricParticlePalettePreference('auto')
+    );
+  }
+  if (els.lyricParticlePaletteResetButton) {
+    els.lyricParticlePaletteResetButton.addEventListener(
+      'click',
+      () => setLyricParticlePalettePreference('auto')
+    );
+  }
+  if (els.lyricParticlePaletteControl) {
+    els.lyricParticlePaletteControl
+      .querySelectorAll('[data-lyric-particle-palette-color]')
+      .forEach((button) => {
+        button.addEventListener('click', () => {
+          setLyricParticlePalettePreference('manual', button.dataset.lyricParticlePaletteColor);
+        });
+      });
+  }
+  if (els.lyricParticleCustomColor) {
+    els.lyricParticleCustomColor.addEventListener('input', () => {
+      setLyricParticlePalettePreference('manual', els.lyricParticleCustomColor.value);
     });
   }
   if (els.playbackLyricPaletteAutoButton) {
@@ -39043,12 +42661,29 @@ function bindEvents() {
       adjustLyricClockOffsetSeconds(-LYRIC_CLOCK_OFFSET_STEP_SECONDS);
     });
   }
+  if (els.qishuiPlaybackLyrics && 'ResizeObserver' in window) {
+    // Panel/card resizing can change the lyric container without changing
+    // window.innerWidth. Recenter the existing row, even while paused.
+    const playbackLyricLayoutObserver = new ResizeObserver(scheduleQishuiPlaybackLyricLayout);
+    playbackLyricLayoutObserver.observe(els.qishuiPlaybackLyrics);
+    window.addEventListener('beforeunload', () => playbackLyricLayoutObserver.disconnect(), { once: true });
+  }
   window.addEventListener('pointerup', endDiyCardRotation);
   window.addEventListener('pointercancel', endDiyCardRotation);
   updateDiyCardRotation();
   if (els.diyBookLyricPreset) els.diyBookLyricPreset.addEventListener('click', () => enterPresetPlaybackPage('book', { recordMemory: true, actor: 'user', provider: state.activeProvider }));
   if (els.bookLyricList) {
     els.bookLyricList.addEventListener('pointerdown', (event) => event.stopPropagation());
+    els.bookLyricList.addEventListener('scroll', () => resetBookLyricScrollState(), { passive: true });
+    els.bookLyricList.addEventListener('wheel', scrollBookLyricFromWheel, { passive: false });
+    if ('ResizeObserver' in window) {
+      const bookLayoutObserver = new ResizeObserver(() => {
+        resetBookLyricScrollState();
+        scheduleBookLyricFit();
+      });
+      bookLayoutObserver.observe(els.bookLyricList);
+      window.addEventListener('beforeunload', () => bookLayoutObserver.disconnect(), { once: true });
+    }
     els.bookLyricList.addEventListener('click', (event) => {
       if (state.bookLyricTransform.suppressClick) {
         state.bookLyricTransform.suppressClick = false;
@@ -39088,6 +42723,7 @@ function bindEvents() {
   if (els.diyTopographyPreset) els.diyTopographyPreset.addEventListener('click', () => enterPresetPlaybackPage('topography', { recordMemory: true, actor: 'user', provider: state.activeProvider }));
   if (els.diySoundscapeWorkshopPreset) els.diySoundscapeWorkshopPreset.addEventListener('click', () => enterPresetPlaybackPage('soundscape-workshop', { recordMemory: true, actor: 'user', provider: state.activeProvider }));
   if (els.diyChladniPreset) els.diyChladniPreset.addEventListener('click', () => enterPresetPlaybackPage('chladni', { recordMemory: true, actor: 'user', provider: state.activeProvider }));
+  if (els.diyHarmonicStatePreset) els.diyHarmonicStatePreset.addEventListener('click', () => enterPresetPlaybackPage('harmonic-state', { recordMemory: true, actor: 'user', provider: state.activeProvider }));
   if (els.diyRainGlassPreset) els.diyRainGlassPreset.addEventListener('click', () => enterPresetPlaybackPage('rain-glass', { recordMemory: true, actor: 'user', provider: state.activeProvider }));
   if (els.diyCoverParticlesPreset) els.diyCoverParticlesPreset.addEventListener('click', () => enterPresetPlaybackPage('cover-particles', { recordMemory: true, actor: 'user', provider: state.activeProvider }));
   if (els.wallpaperImportedModeButton) els.wallpaperImportedModeButton.addEventListener('click', () => setWallpaperSource('imported'));
@@ -39403,6 +43039,24 @@ function bindEvents() {
   if (els.chladniCubeButton) {
     els.chladniCubeButton.addEventListener('click', () => setChladniMode('cube'));
   }
+  els.diyCoverParticleControl?.querySelectorAll('[data-cover-render-mode]').forEach((button) => {
+    button.addEventListener('click', () => setCoverRenderMode(button.dataset.coverRenderMode));
+  });
+  document.getElementById('coverDepthReset')?.addEventListener('click', resetCoverDepthSettings);
+  document.getElementById('coverDepthMapToggle')?.addEventListener('click', () => {
+    setCoverVisualSetting('depthMapEnabled', !state.coverParticle.depthMapEnabled);
+  });
+  els.diyCoverParticleControl?.querySelectorAll('[data-cover-setting]').forEach((input) => {
+    input.addEventListener(input.tagName === 'SELECT' || input.type === 'checkbox' ? 'change' : 'input', () => {
+      const key = input.dataset.coverSetting;
+      const value = input.tagName === 'SELECT'
+        ? input.value
+        : input.type === 'checkbox'
+          ? input.checked
+          : Number(input.value) / (key === 'sketchLayers' || key === 'depthLightAngle' ? 1 : 100);
+      setCoverVisualSetting(key, value);
+    });
+  });
   if (els.diyCoverParticleBackgroundToggle) {
     els.diyCoverParticleBackgroundToggle.addEventListener('change', () => {
       state.coverParticle.backgroundEnabled = !!els.diyCoverParticleBackgroundToggle.checked;
@@ -39490,6 +43144,21 @@ function bindEvents() {
       setCursorPreferences({ skin: els.cursorSkinSelect.value });
     });
   }
+  for (const [id, key] of [
+    ['volumeSliderGradientToggle', 'gradient'], ['volumeSliderColorStart', 'colorStart'],
+    ['volumeSliderColorEnd', 'colorEnd'], ['volumeSliderGradientDuration', 'duration'],
+    ['volumeSliderHoverStrength', 'hoverStrength'], ['volumeSliderWheelStep', 'wheelStep'],
+    ['volumeSliderMusicReactiveToggle', 'musicReactive'], ['volumeSliderMusicStrength', 'musicStrength']
+  ]) {
+    const input = document.getElementById(id);
+    if (!input) continue;
+    const update = () => setVolumeSliderPreferences({ [key]: input.type === 'checkbox' ? input.checked : input.value });
+    input.addEventListener('input', update);
+    input.addEventListener('change', update);
+  }
+  document.getElementById('volumeSliderAppearanceReset')?.addEventListener('click', () => {
+    setVolumeSliderPreferences(VOLUME_SLIDER_DEFAULTS);
+  });
   if (els.cursorImportButton && els.cursorImportInput) {
     els.cursorImportButton.addEventListener('click', () => els.cursorImportInput.click());
     els.cursorImportInput.addEventListener('change', () => {
@@ -39566,7 +43235,7 @@ function bindEvents() {
   document.addEventListener('pointerdown', (event) => {
     if (!state.runtimeSettingsOpen) return;
     const target = event.target;
-    if (target && target.closest('.runtime-topbar, .runtime-settings-panel')) return;
+    if (target && target.closest('.runtime-topbar, .runtime-settings-panel, #runtimeSettingsButton')) return;
     setRuntimeSettingsOpen(false);
   });
   document.addEventListener('pointerdown', (event) => {
@@ -39868,10 +43537,12 @@ function bindEvents() {
     window.cancelAnimationFrame(desktopSceneRuntime.publishFrame);
     desktopSceneRuntime.publishFrame = 0;
     desktopSceneRuntime.channel?.close?.();
+    destroyLyricHighlightParticleRenderer();
     revokeLocalObjectUrls();
     flushClientPreferencesSync();
   }, { once: true });
-  window.addEventListener('pagehide', () => {
+  window.addEventListener('pagehide', (event) => {
+    if (!event.persisted) destroyLyricHighlightParticleRenderer();
     flushCommunityListeningStats();
     flushHighDifficultyListenInterval();
     clearSceneWallpaperLiveRefresh();
@@ -39905,6 +43576,7 @@ function bindEvents() {
   }, { passive: true });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
+      updateVolumeSliderMusicMotion();
       clearSceneWallpaperLiveRefresh();
       releaseCommunityMessageBackgroundMedia();
       flushWallpaperPrefs();
@@ -39971,16 +43643,44 @@ function bindEvents() {
     }
   });
 
-  els.volumeRange.addEventListener('input', () => {
-    const volume = Number(els.volumeRange.value) / 100;
-    els.audio.volume = volume;
-    els.volumeLabel.textContent = `${els.volumeRange.value}%`;
+  [els.volumeRange, els.qishuiPlaybackVolumeRange].filter(Boolean).forEach((input) => {
+    input.addEventListener('input', () => {
+      schedulePlayerVolumeCommit(syncPlayerVolume(Number(input.value) / 100));
+    });
+    input.addEventListener('change', () => {
+      const volume = syncPlayerVolume(Number(input.value) / 100);
+      schedulePlayerVolumeCommit(volume, { immediate: true });
+      notifyPlaybackIntelligence('volume-change', { volume: Math.round(volume * 100) });
+    });
+  });
+  // Labels and the rail's padding belong to the control too, not the card's
+  // wheel-to-skip gesture or the scene's wheel-to-zoom gesture.
+  let volumeWheelPixels = 0;
+  let volumeWheelAt = 0;
+  els.qishuiPlaybackVolume?.addEventListener('pointerleave', () => { volumeWheelPixels = 0; });
+  els.qishuiPlaybackVolume?.addEventListener('wheel', (event) => {
+    event.stopPropagation();
+    const input = els.qishuiPlaybackVolumeRange;
+    if (!input || input.disabled || event.ctrlKey || event.metaKey || !Number.isFinite(event.deltaY)
+      || !event.deltaY || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+    event.preventDefault();
+    const now = performance.now();
+    const unit = event.deltaMode === 1 ? 40 : event.deltaMode === 2 ? 120 : 1;
+    const delta = Math.sign(event.deltaY) * Math.min(40, Math.abs(event.deltaY) * unit);
+    if (now - volumeWheelAt > 250 || Math.sign(volumeWheelPixels) !== Math.sign(delta)) volumeWheelPixels = 0;
+    volumeWheelAt = now;
+    volumeWheelPixels += delta;
+    if (Math.abs(volumeWheelPixels) < 40) return;
+    const direction = Math.sign(volumeWheelPixels);
+    volumeWheelPixels = 0;
+    const current = Number(input.value);
+    const next = clamp(current - direction * state.volumeSliderPreferences.wheelStep, 0, 100);
+    if (next === current) return;
+    const volume = syncPlayerVolume(next / 100);
     schedulePlayerVolumeCommit(volume);
-  });
-  els.volumeRange.addEventListener('change', () => {
-    schedulePlayerVolumeCommit(Number(els.volumeRange.value) / 100, { immediate: true });
-    notifyPlaybackIntelligence('volume-change', { volume: Number(els.volumeRange.value) });
-  });
+    notifyPlaybackIntelligence('volume-change', { volume: next });
+  }, { passive: false });
+  els.audio.addEventListener('volumechange', () => syncPlayerVolume(els.audio.volume, { updateAudio: false }));
 
   els.audio.addEventListener('timeupdate', () => {
     noteAudioPlaybackProgress();
@@ -39992,6 +43692,9 @@ function bindEvents() {
     });
   });
   els.audio.addEventListener('durationchange', updateProgress);
+  els.audio.addEventListener('ratechange', () => {
+    syncPlaybackLyricMediaClockEdge();
+  });
   els.audio.addEventListener('seeking', updateProgress);
   els.audio.addEventListener('seeked', updateProgress);
   els.audio.addEventListener('loadedmetadata', () => {
@@ -40033,6 +43736,7 @@ function bindEvents() {
   els.audio.addEventListener('playing', () => {
     state.audioPlaybackContinuity.playingIntent = true;
     resetAudioPlaybackContinuity(els.audio.currentTime);
+    syncPlaybackLyricMediaClockEdge();
     syncRealtimePolling();
     window.feAchievements?.handlePlaybackStarted?.(state.currentSong);
   });
@@ -40048,6 +43752,7 @@ function bindEvents() {
   els.audio.addEventListener('stalled', () => markAudioPlaybackStallHint());
   els.audio.addEventListener('pause', () => {
     state.audioPlaybackContinuity.playingIntent = false;
+    syncPlaybackLyricMediaClockEdge();
     invalidateNativeGoogleObrTimeline('pause').catch(() => {});
     resetSyncedAudioPlaybackRate();
     flushCommunityListeningStats();
@@ -40062,6 +43767,7 @@ function bindEvents() {
   });
   els.audio.addEventListener('ended', () => {
     state.audioPlaybackContinuity.playingIntent = false;
+    syncPlaybackLyricMediaClockEdge();
     resetAudioPlaybackContinuity(els.audio.currentTime);
     resetSyncedAudioPlaybackRate();
     flushCommunityListeningStats();
@@ -40080,18 +43786,28 @@ function bindEvents() {
     }
     notifyPlaybackIntelligence('track-complete', { song: playbackIntelligenceSongPayload() });
     playbackIntelligenceTrackSignature = '';
+    if (state.audioPlaybackContinuity.pendingLoadGeneration > 0) return;
     transport('/api/player/next', { completed: true });
   });
   els.audio.addEventListener('error', () => {
     resetSyncedAudioPlaybackRate();
     suspendAudioAnalysis();
     syncRealtimePolling();
+    const continuity = state.audioPlaybackContinuity;
+    // The owning load handles startup failure (and one bounded URL renewal).
+    // Recovering here could load the previous song while its successor waits.
+    if (continuity.pendingLoadGeneration > 0) return;
     const extension = isLocalSong(state.currentSong) ? localAudioExtension(state.currentSong.fileName) : '';
     if (!extension && state.community.activeSession && !state.community.listenRecoveryActive) {
-      window.setTimeout(() => skipUnavailableCommunitySong('当前音频源格式不受支持').catch(() => {}), 0);
+      const errorGeneration = continuity.sourceGeneration;
+      const errorSource = els.audio.src;
+      window.setTimeout(() => {
+        if (errorGeneration !== continuity.sourceGeneration || errorSource !== els.audio.src
+            || continuity.pendingLoadGeneration > 0) return;
+        skipUnavailableCommunitySong('当前音频源格式不受支持').catch(() => {});
+      }, 0);
       return;
     }
-    const continuity = state.audioPlaybackContinuity;
     const expectedPlaying = continuity.playingIntent
       || state.playerClock?.playing === true
       || state.currentSong?.playing === true;
@@ -40104,11 +43820,12 @@ function bindEvents() {
     ) {
       continuity.playingIntent = true;
       const recovery = recoverStalledAudioPlayback(Number(els.audio.currentTime) || 0);
+      const recoveryGeneration = continuity.sourceGeneration;
       continuity.recoveryPromise = recovery;
       recovery.then((recovered) => {
-        if (!recovered) toast('音频续流失败，请重试播放');
+        if (!recovered && recoveryGeneration === continuity.sourceGeneration) toast('音频续流失败，请重试播放');
       }).catch(() => {
-        toast('音频续流失败，请重试播放');
+        if (recoveryGeneration === continuity.sourceGeneration) toast('音频续流失败，请重试播放');
       }).finally(() => {
         if (continuity.recoveryPromise === recovery) continuity.recoveryPromise = null;
       });
@@ -40124,6 +43841,11 @@ function updateStageZoom(deltaY) {
   const zoomIn = deltaY < 0;
   const factor = zoomIn ? 1.12 : 1 / 1.12;
   if (state.playbackPage) {
+    if (isHarmonicStatePreset()) {
+      state.harmonicState.zoom = clamp((state.harmonicState.zoom || HARMONIC_DEFAULT_ZOOM) * factor, 0.58, 2.35);
+      requestOrbFrame();
+      return;
+    }
     state.playbackVisual.zoom = clamp((state.playbackVisual.zoom || 1) * factor, 0.58, 2.35);
     updatePlaybackSceneTransform();
     resizeDynamicCubeRenderer();
@@ -40479,13 +44201,13 @@ function coverParticleEngineOptions() {
 }
 
 function ensureCoverParticleEngine() {
-  if (!els.coverParticleEngine || !coverParticlePresetVisible()) return Promise.resolve(null);
+  if (!els.coverParticleEngine || !coverParticlePresetVisible() || state.coverParticle.renderMode === 'sketch') return Promise.resolve(null);
   const cover = state.coverParticle;
   if (cover.engineContainer) return Promise.resolve(cover.engineContainer);
   if (cover.enginePromise) return cover.enginePromise;
   const pending = ensureTsParticlesBundle()
     .then((engine) => {
-      if (!coverParticlePresetVisible() || cover.engineContainer || !engine || typeof engine.load !== 'function') {
+      if (!coverParticlePresetVisible() || cover.renderMode === 'sketch' || cover.engineContainer || !engine || typeof engine.load !== 'function') {
         return cover.engineContainer;
       }
       return engine.load({
@@ -40498,7 +44220,7 @@ function ensureCoverParticleEngine() {
         cover.engineContainer = container;
         cover.enginePlaying = false;
       }
-      if (container && (!cover.engineVisible || !coverParticlePresetVisible())) {
+      if (container && (!cover.engineVisible || !coverParticlePresetVisible() || cover.renderMode === 'sketch')) {
         pauseCoverParticleEngine(true);
         if (typeof container.destroy === 'function') {
           try { container.destroy(); } catch (error) {}
@@ -40551,7 +44273,7 @@ function buildCoverParticleSamples(width, height, dpr, gpuAvailable = true) {
   const stepX = 1;
   const stepY = highDensityDesktop ? 2 : 1;
   const signature = `${state.coverParticle.imageSignature}|${sampleSize}|${stepX}x${stepY}`;
-  if (signature === state.coverParticle.sampleSignature && state.coverParticle.particles.length) return;
+  if (signature === state.coverParticle.sampleSignature) return;
 
   let data = null;
   if (image && image.complete && image.naturalWidth) {
@@ -40578,11 +44300,17 @@ function buildCoverParticleSamples(width, height, dpr, gpuAvailable = true) {
   }
 
   const particles = [];
+  // Generate the relief and its surface normals together from this cover once.
+  // Geometry and lighting reuse it until the cover or sampling resolution changes.
+  const depthLightField = data && window.FeCoverDepthLight
+    ? window.FeCoverDepthLight.buildField(data, sampleSize, sampleSize) : null;
   const luminanceAt = data
     ? (sampleX, sampleY) => {
         const clampedX = Math.max(0, Math.min(sampleSize - 1, sampleX));
         const clampedY = Math.max(0, Math.min(sampleSize - 1, sampleY));
-        const offset = (clampedY * sampleSize + clampedX) * 4;
+        const index = clampedY * sampleSize + clampedX;
+        if (depthLightField) return depthLightField.heights[index];
+        const offset = index * 4;
         const alpha = data[offset + 3] / 255;
         return (
           data[offset] * 0.2126
@@ -40607,21 +44335,7 @@ function buildCoverParticleSamples(width, height, dpr, gpuAvailable = true) {
         alpha = data[offset + 3] / 255;
         if (alpha <= 0.05) continue;
         color = { r: data[offset], g: data[offset + 1], b: data[offset + 2] };
-        const centerLuma = luminanceAt(x, y);
-        const crossLuma = (
-          luminanceAt(x - 1, y)
-          + luminanceAt(x + 1, y)
-          + luminanceAt(x, y - 1)
-          + luminanceAt(x, y + 1)
-        ) * 0.1;
-        const diagonalLuma = (
-          luminanceAt(x - 1, y - 1)
-          + luminanceAt(x + 1, y - 1)
-          + luminanceAt(x - 1, y + 1)
-          + luminanceAt(x + 1, y + 1)
-        ) * 0.05;
-        const smoothLuma = centerLuma * 0.4 + crossLuma + diagonalLuma;
-        const reliefLuma = clamp(smoothLuma * 0.68 + centerLuma * 0.32, 0, 1);
+        const reliefLuma = clamp(luminanceAt(x, y), 0, 1);
         depth = Math.pow(reliefLuma, 1.42) * 0.14 - 0.04;
       }
       const relief = clamp((depth + 0.04) / 0.14, 0, 1);
@@ -40650,7 +44364,13 @@ function buildCoverParticleSamples(width, height, dpr, gpuAvailable = true) {
         x: px,
         y: py,
         z: depth,
+        normalX: depthLightField ? depthLightField.normals[(y * sampleSize + x) * 3] : 0,
+        normalY: depthLightField ? depthLightField.normals[(y * sampleSize + x) * 3 + 1] : 0,
+        normalZ: depthLightField ? depthLightField.normals[(y * sampleSize + x) * 3 + 2] : 1,
         colorCss: `rgb(${displayR}, ${displayG}, ${displayB})`,
+        displayR,
+        displayG,
+        displayB,
         shadowColorCss: `rgba(${displayR}, ${displayG}, ${displayB}, 0.12)`,
         r: color.r / 255,
         g: color.g / 255,
@@ -40722,8 +44442,20 @@ function coverParticleGpuMaterial(THREE) {
       uCoverPixelSize: { value: 1 },
       uMotionScale: { value: 1 },
       uFloatSpeed: { value: 1 },
+      uImageMotionMode: { value: 0 },
       uWholeJump: { value: 0 },
       uBassJitter: { value: 0 },
+      uDepthStrength: { value: 1 },
+      uDepthContrast: { value: 1 },
+      uDepthInvert: { value: 0 },
+      uDepthMapEnabled: { value: 0 },
+      uDepthLightingEnabled: { value: 0 },
+      uDepthLightDirection: { value: new THREE.Vector3(0, 0, 1) },
+      uDepthLightHalfVector: { value: new THREE.Vector3(0, 0, 1) },
+      uDepthLightStrength: { value: 0 },
+      uDepthAmbient: { value: 0.65 },
+      uDepthHighlight: { value: 0.35 },
+      uDepthNormalScale: { value: 1 },
       uMouseActive: { value: 0 },
       uMouseLimit: { value: 1 },
       uMousePullBase: { value: 0 },
@@ -40731,6 +44463,7 @@ function coverParticleGpuMaterial(THREE) {
     },
     vertexShader: `
       attribute vec3 aColor;
+      attribute vec3 aNormal;
       attribute float aAlpha;
       attribute float aSize;
       attribute float aWavePhase;
@@ -40752,8 +44485,19 @@ function coverParticleGpuMaterial(THREE) {
       uniform float uCoverPixelSize;
       uniform float uMotionScale;
       uniform float uFloatSpeed;
+      uniform float uImageMotionMode;
       uniform float uWholeJump;
       uniform float uBassJitter;
+      uniform float uDepthStrength;
+      uniform float uDepthContrast;
+      uniform float uDepthInvert;
+      uniform float uDepthLightingEnabled;
+      uniform vec3 uDepthLightDirection;
+      uniform vec3 uDepthLightHalfVector;
+      uniform float uDepthLightStrength;
+      uniform float uDepthAmbient;
+      uniform float uDepthHighlight;
+      uniform float uDepthNormalScale;
       uniform float uMouseActive;
       uniform float uMouseLimit;
       uniform float uMousePullBase;
@@ -40763,6 +44507,11 @@ function coverParticleGpuMaterial(THREE) {
       varying float vBump;
       varying float vInteraction;
       varying float vRelief;
+      varying float vDepthLighting;
+      varying float vDepthReflection;
+      varying float vDissolve;
+
+      ${window.FeCoverDepthLight?.glslSnippet || ''}
 
       void main() {
         float relief = clamp((position.z + 0.04) / 0.14, 0.0, 1.0);
@@ -40784,6 +44533,25 @@ function coverParticleGpuMaterial(THREE) {
         float naturalFloat = particleFloat * 0.64 + baseNaturalWave * 0.28 + microWave * 0.08;
         float flowWave = sin(position.x * 4.2 + position.y * 2.3 - sheetTime * 0.85);
         float flowStrength = uAudioActive * (0.006 + uEnergy * 0.006) * min(uMotionScale, 1.4);
+        // The dissolve preset reuses the cached image particles but moves them
+        // along a smooth radial/tangential field. This keeps the image readable
+        // while creating a continuous dissolve/reform cycle without per-frame
+        // ImageData reads or geometry rebuilds.
+        float dissolveSeed = 0.5;
+        float dissolveSignal = 0.0;
+        vec2 dissolveOffset = vec2(0.0);
+        float dissolveDepth = 0.0;
+        if (uImageMotionMode > 0.5) {
+          dissolveSeed = fract(sin(dot(position.xy + vec2(aWavePhase, aFloatPhase), vec2(12.9898, 78.233))) * 43758.5453);
+          dissolveSignal = sin(sheetTime * (0.42 + uFloatSpeed * 0.18) + aFloatPhase * 1.7 + aWavePhase * 0.23);
+          float dissolveTangent = sin(sheetTime * 0.67 + aWavePhase * 1.11 + position.y * 4.8);
+          vec2 dissolveRadial = normalize(position.xy + vec2(0.0001));
+          vec2 dissolveTangentAxis = vec2(-dissolveRadial.y, dissolveRadial.x);
+          float dissolveEnvelope = 0.004 + uEnergy * 0.036 + uAudioActive * 0.006;
+          dissolveOffset = (dissolveRadial * dissolveSignal + dissolveTangentAxis * dissolveTangent * 0.48)
+            * dissolveEnvelope * (0.45 + dissolveSeed * 0.9) * uMotionScale;
+          dissolveDepth = dissolveSignal * dissolveEnvelope * (0.34 + dissolveSeed * 0.42) * uMotionScale;
+        }
         float waveDepth = uAudioActive * naturalFloat
           * (0.016 + relief * 0.008) * aWaveStrength * uMotionScale;
         float dynamicDepth = clamp(waveDepth, -0.050, 0.050);
@@ -40822,11 +44590,19 @@ function coverParticleGpuMaterial(THREE) {
         );
         vec3 source = vec3(position.xy, position.z)
           + vec3(aDrift * lateralWave, depthLayerOffset + dynamicDepth);
+        float depthLuma = pow(clamp((position.z + 0.04) / 0.14, 0.0, 1.0), 1.0 / 1.42);
+        depthLuma = mix(depthLuma, 1.0 - depthLuma, uDepthInvert);
+        depthLuma = clamp((depthLuma - 0.5) * uDepthContrast + 0.5, 0.0, 1.0);
+        float mappedDepth = (pow(depthLuma, 1.42) * 0.14 - 0.04) * uDepthStrength;
+        source.z += mappedDepth - position.z;
         source.y += flowWave * flowStrength * 0.28;
         source.z += flowWave * flowStrength;
+        source.xy += dissolveOffset * uImageMotionMode;
+        source.z += dissolveDepth * uImageMotionMode;
         source.xy += bassJitterOffset;
         source.z += wholeJumpOffset;
         source.z += bassJitterDepth;
+        if (uDepthStrength <= 0.0) source.z = 0.0;
 
         float rotatedX = source.x * uYawCos + source.z * uYawSin;
         float rotatedZ = -source.x * uYawSin + source.z * uYawCos;
@@ -40858,6 +44634,11 @@ function coverParticleGpuMaterial(THREE) {
         gl_Position = vec4(clip, clipDepth, 1.0);
 
         vColor = aColor;
+        float lighting = ${window.FeCoverDepthLight ? 'feCoverDepthLighting(aNormal, uDepthLightDirection, uDepthLightHalfVector, uDepthLightStrength, uDepthAmbient, uDepthHighlight, uDepthNormalScale)' : '1.0'};
+        vDepthLighting = mix(1.0, lighting, uDepthLightingEnabled);
+        float reflection = ${window.FeCoverDepthLight ? 'feCoverDepthHighlight(aNormal, uDepthLightHalfVector, uDepthLightStrength, uDepthHighlight, uDepthNormalScale)' : '0.0'};
+        vDepthReflection = reflection * uDepthLightingEnabled;
+        vDissolve = dissolveSeed * 0.72 + dissolveSignal * 0.18 + 0.5;
         vAlpha = clamp((
           0.86 + depth * 0.12 + depthLayer * 0.04 * depthLayerMotion
             + motionAmount * 0.03 + interaction * 0.08 + uEnergy * 0.035
@@ -40868,12 +44649,19 @@ function coverParticleGpuMaterial(THREE) {
       }
     `,
     fragmentShader: `
-      precision mediump float;
+      precision highp float;
+      uniform float uDepthMapEnabled;
+      uniform float uImageMotionMode;
       varying vec3 vColor;
       varying float vAlpha;
       varying float vBump;
       varying float vInteraction;
       varying float vRelief;
+      varying float vDepthLighting;
+      varying float vDepthReflection;
+      varying float vDissolve;
+
+      ${window.FeCoverDepthLight?.glslDepthMapSnippet || ''}
 
       void main() {
         vec2 p = gl_PointCoord - vec2(0.5);
@@ -40887,8 +44675,11 @@ function coverParticleGpuMaterial(THREE) {
         float colorLuma = dot(liftedColor, vec3(0.2126, 0.7152, 0.0722));
         vec3 vividColor = max(mix(vec3(colorLuma), liftedColor, 1.12), vec3(0.014));
         vec3 displayColor = clamp((vividColor - vec3(0.5)) * 1.18 + vec3(0.5), 0.0, 1.0);
+        ${window.FeCoverDepthLight?.glslDepthMapSnippet ? 'if (uDepthMapEnabled > 0.5) displayColor = feCoverDepthMapColor(vColor);' : ''}
         vec3 color = displayColor * (reliefLight + halo * 0.1 + vBump * 0.08 + vInteraction * 0.08);
-        gl_FragColor = vec4(color, vAlpha * mask);
+        vec3 reflectedLight = (vec3(1.0) - clamp(color, 0.0, 1.0)) * vDepthReflection;
+        float dissolveMask = mix(1.0, smoothstep(0.16, 0.9, vDissolve), uImageMotionMode);
+        gl_FragColor = vec4(color * vDepthLighting + reflectedLight, vAlpha * mask * dissolveMask);
       }
     `,
     transparent: true,
@@ -40951,6 +44742,7 @@ function rebuildCoverParticleGpuGeometry() {
   const floatPhases = new Float32Array(count);
   const floatRates = new Float32Array(count);
   const drifts = new Float32Array(count * 2);
+  const normals = new Float32Array(count * 3);
   for (let index = 0; index < count; index += 1) {
     const particle = particles[index];
     const p3 = index * 3;
@@ -40969,6 +44761,9 @@ function rebuildCoverParticleGpuGeometry() {
     floatRates[index] = particle.floatRate;
     drifts[p2] = particle.bumpDriftX;
     drifts[p2 + 1] = particle.bumpDriftY;
+    normals[p3] = particle.normalX;
+    normals[p3 + 1] = particle.normalY;
+    normals[p3 + 2] = particle.normalZ;
   }
 
   const geometry = new THREE.BufferGeometry();
@@ -40981,6 +44776,7 @@ function rebuildCoverParticleGpuGeometry() {
   geometry.setAttribute('aFloatPhase', new THREE.BufferAttribute(floatPhases, 1));
   geometry.setAttribute('aFloatRate', new THREE.BufferAttribute(floatRates, 1));
   geometry.setAttribute('aDrift', new THREE.BufferAttribute(drifts, 2));
+  geometry.setAttribute('aNormal', new THREE.BufferAttribute(normals, 3));
 
   const points = new THREE.Points(geometry, cover.gpuMaterial);
   cover.gpuScene.add(points);
@@ -40994,8 +44790,16 @@ function coverParticlePointSize(coverSize, particleCount) {
   return coverSize / Math.max(1, Math.sqrt(Math.max(1, particleCount)));
 }
 
+function coverDepthLightAnimated() {
+  const cover = state.coverParticle;
+  return !reducedMotion && cover.depthEnabled && cover.depthLightingEnabled
+    && cover.depthStrength > 0 && cover.depthLightSpeed > 0 && cover.depthLightStrength > 0
+    && (cover.depthAmbient < 1 || cover.depthHighlight > 0);
+}
+
 function updateCoverParticleMotionEnvelope(audioActive, envelopeStepMs) {
   const cover = state.coverParticle;
+  if (coverDepthLightAnimated()) cover.lightTime += Math.min(100, envelopeStepMs) / 1000;
   const audioEnergy = audioActive
     ? clamp(Number(state.visual.energy) || 0, 0, 1)
     : 0;
@@ -41039,7 +44843,13 @@ function updateCoverParticleMotionEnvelope(audioActive, envelopeStepMs) {
     COVER_PARTICLE_BASS_JITTER_MAX
   );
   if (bassJitterTarget === 0 && cover.bassJitter < 0.006) cover.bassJitter = 0;
+  // Playback drives the stronger audio envelope; when paused, keep only the
+  // cached low-amplitude phase animation alive. Reduced-motion disables the
+  // idle gate above, so this remains a no-op for accessibility mode.
   if (audioActive) cover.waveTime += envelopeStepMs / 1000 * 0.72;
+  else if (coverParticleIdleMotionGate() > 0) {
+    cover.waveTime += envelopeStepMs / 1000 * 0.72 * COVER_PARTICLE_IDLE_MOTION_GATE;
+  }
 }
 
 function drawCoverParticleSceneGpu(
@@ -41068,7 +44878,7 @@ function drawCoverParticleSceneGpu(
   const mouseActive = state.orb.mouseActive && now - state.orb.lastMouseAt < 1600;
   const coverYaw = state.playbackVisual.yaw - PLAYBACK_REST_YAW;
   const coverPitch = state.playbackVisual.pitch - PLAYBACK_REST_PITCH;
-  const animated = isPlaybackClockRunning()
+  const animated = coverDepthLightAnimated() || isPlaybackClockRunning()
     || motionGate > 0
     || cover.energy > 0
     || cover.wholeJump > 0
@@ -41086,7 +44896,17 @@ function drawCoverParticleSceneGpu(
       coverYaw.toFixed(5),
       coverPitch.toFixed(5),
       coverParticleMotionScale().toFixed(3),
-      coverParticleFloatSpeedScale().toFixed(3)
+      coverParticleFloatSpeedScale().toFixed(3),
+      cover.depthEnabled,
+      cover.depthStrength,
+      cover.depthContrast,
+      cover.depthInvert,
+      cover.depthMapEnabled,
+      cover.depthLightingEnabled,
+      cover.depthLightStrength,
+      cover.depthAmbient,
+      cover.depthLightAngle,
+      cover.depthHighlight
     ].join('|');
     if (cover.gpuRenderSignature === staticSignature) return true;
     cover.gpuRenderSignature = staticSignature;
@@ -41108,8 +44928,23 @@ function drawCoverParticleSceneGpu(
   uniforms.uCoverPixelSize.value = coverPixelSize;
   uniforms.uMotionScale.value = coverParticleMotionScale();
   uniforms.uFloatSpeed.value = coverParticleFloatSpeedScale();
+  uniforms.uImageMotionMode.value = cover.imageMotionMode === 'dissolve' ? 1 : 0;
   uniforms.uWholeJump.value = cover.wholeJump;
   uniforms.uBassJitter.value = cover.bassJitter;
+  uniforms.uDepthStrength.value = cover.depthEnabled ? cover.depthStrength : 0;
+  uniforms.uDepthContrast.value = cover.depthContrast;
+  uniforms.uDepthInvert.value = cover.depthInvert ? 1 : 0;
+  uniforms.uDepthMapEnabled.value = cover.depthMapEnabled ? 1 : 0;
+  const light = window.FeCoverDepthLight?.prepare(cover, cover.lightTime);
+  uniforms.uDepthLightingEnabled.value = light?.enabled ? 1 : 0;
+  if (light) {
+    uniforms.uDepthLightDirection.value.set(...light.direction);
+    uniforms.uDepthLightHalfVector.value.set(...light.halfVector);
+    uniforms.uDepthLightStrength.value = light.strength;
+    uniforms.uDepthAmbient.value = light.ambient;
+    uniforms.uDepthHighlight.value = light.highlight;
+    uniforms.uDepthNormalScale.value = light.normalScale;
+  }
   uniforms.uMouseActive.value = mouseActive ? 1 : 0;
   uniforms.uMouseLimit.value = 132 * dpr;
   uniforms.uMousePullBase.value = (16 + cover.energy * 28) * dpr;
@@ -41119,7 +44954,47 @@ function drawCoverParticleSceneGpu(
   return true;
 }
 
+function drawCoverSketchScene(width, height, dpr) {
+  const cover = state.coverParticle;
+  const canvas = els.coverSketchCanvas;
+  if (!canvas || !window.FeCoverSketch) return;
+  const now = performance.now();
+  const cssWidth = Math.max(1, Math.round(width / dpr));
+  const cssHeight = Math.max(1, Math.round(height / dpr));
+  const sketchDpr = Math.min(dpr, MOBILE_RENDER_TARGET ? 1.25 : 1.5);
+  const renderWidth = Math.max(1, Math.round(cssWidth * sketchDpr));
+  const renderHeight = Math.max(1, Math.round(cssHeight * sketchDpr));
+  const resized = canvas.width !== renderWidth || canvas.height !== renderHeight;
+  // A static scene may receive only one redraw after an input or snapshot.
+  // Throttle continuous animation, but always honor that final standalone frame.
+  if (!resized && cover.sketchLastFrameAt && now - cover.sketchLastFrameAt < 1000 / 30
+      && coverParticleNeedsContinuousFrame(now)) return;
+  const deltaMs = cover.sketchLastFrameAt ? Math.min(100, now - cover.sketchLastFrameAt) : 1000 / 30;
+  cover.sketchLastFrameAt = now;
+  if (resized) {
+    canvas.width = renderWidth;
+    canvas.height = renderHeight;
+  }
+  canvas.style.width = `${cssWidth}px`;
+  canvas.style.height = `${cssHeight}px`;
+  if (!cover.sketchRenderer) cover.sketchRenderer = window.FeCoverSketch.create(canvas);
+  updateCoverParticleMotionEnvelope(isPlaybackClockRunning(), deltaMs);
+  cover.sketchRenderer.render({
+    width: renderWidth, height: renderHeight, dpr: sketchDpr, now, deltaMs,
+    image: cover.image, imageSignature: cover.imageSignature,
+    settings: cover, palette: cover.palette || fallbackLyricPalette(state.currentSong),
+    yaw: state.playbackVisual.yaw - PLAYBACK_REST_YAW,
+    pitch: state.playbackVisual.pitch - PLAYBACK_REST_PITCH,
+    zoom: clamp(state.playbackVisual.zoom || 1, 0.58, 2.35),
+    energy: cover.energy, lightTime: cover.lightTime, reducedMotion, mobile: MOBILE_RENDER_TARGET
+  });
+}
+
 function drawCoverParticleScene(width, height, dpr) {
+  if (state.coverParticle.renderMode === 'sketch') {
+    drawCoverSketchScene(width, height, dpr);
+    return;
+  }
   const frame = syncCoverParticleCanvas(width, height, dpr);
   if (!frame) return;
   width = frame.width;
@@ -41147,6 +45022,12 @@ function drawCoverParticleScene(width, height, dpr) {
   const envelopeStepMs = Math.max(1, frameStep * RENDER_PROFILE.targetFrameMs);
   updateCoverParticleMotionEnvelope(audioActive, envelopeStepMs);
 
+  if (!particles.length) {
+    if (gpuAvailable) cover.gpuRenderer.clear();
+    else frame.canvas.getContext('2d')?.clearRect(0, 0, width, height);
+    return;
+  }
+
   if (gpuAvailable && drawCoverParticleSceneGpu(
     frame,
     width,
@@ -41154,7 +45035,7 @@ function drawCoverParticleScene(width, height, dpr) {
     dpr,
     now,
     cover.waveTime,
-    cover.motionGate
+    Math.max(cover.motionGate, coverParticleIdleMotionGate())
   )) return;
   if (gpuAvailable) cover.gpuFailed = true;
 
@@ -41186,7 +45067,9 @@ function drawCoverParticleScene(width, height, dpr) {
   const pitchCos = Math.cos(coverPitch);
   const pitchSin = Math.sin(coverPitch);
   const motionScale = coverParticleMotionScale();
-  const motionGate = cover.motionGate;
+  // Reuse the existing shader/CPU envelope for a low-amplitude idle float;
+  // audio energy and beat values remain zero while playback is paused.
+  const motionGate = Math.max(cover.motionGate, coverParticleIdleMotionGate());
   const energy = cover.energy;
   const mouseLimit = 132 * dpr;
   const mouseLimitSq = mouseLimit * mouseLimit;
@@ -41253,6 +45136,7 @@ function drawCoverParticleScene(width, height, dpr) {
   context.imageSmoothingEnabled = false;
   context.shadowBlur = 0;
   let coverParticleShadowActive = false;
+  const depthLight = window.FeCoverDepthLight?.prepare(cover, cover.lightTime);
   for (let drawIndex = 0; drawIndex < particleLimit; drawIndex += 1) {
     const sampleIndex = drawAllParticles
       ? drawIndex
@@ -41298,6 +45182,18 @@ function drawCoverParticleScene(width, height, dpr) {
     const audioGate = motionGate;
     const flowWave = Math.sin(particle.x * 4.2 + particle.y * 2.3 - sheetTime * 0.85);
     const flowStrength = audioGate * (0.006 + energy * 0.006) * Math.min(motionScale, 1.4);
+    const dissolveSeed = coverParticleNoise(sampleIndex, Math.round(particle.wavePhase * 1000), 13);
+    const dissolveSignal = Math.sin(sheetTime * (0.42 + coverParticleFloatSpeedScale() * 0.18) + particle.floatPhase * 1.7 + particle.wavePhase * 0.23);
+    const dissolveTangent = Math.sin(sheetTime * 0.67 + particle.wavePhase * 1.11 + particle.y * 4.8);
+    const dissolveEnvelope = 0.004 + energy * 0.036 + audioGate * 0.006;
+    const radialLength = Math.hypot(particle.x, particle.y) || 1;
+    const radialX = particle.x / radialLength;
+    const radialY = particle.y / radialLength;
+    const dissolveOffsetX = (radialX * dissolveSignal - radialY * dissolveTangent * 0.48)
+      * dissolveEnvelope * (0.45 + dissolveSeed * 0.9) * motionScale;
+    const dissolveOffsetY = (radialY * dissolveSignal + radialX * dissolveTangent * 0.48)
+      * dissolveEnvelope * (0.45 + dissolveSeed * 0.9) * motionScale;
+    const dissolveDepth = dissolveSignal * dissolveEnvelope * (0.34 + dissolveSeed * 0.42) * motionScale;
     const waveDepth = audioGate * naturalFloat
       * (0.016 + relief * 0.008) * particle.waveStrength * motionScale;
     const dynamicDepth = clamp(waveDepth, -0.05, 0.05);
@@ -41313,10 +45209,17 @@ function drawCoverParticleScene(width, height, dpr) {
     const sourceY = particle.y + particle.bumpDriftY * lateralWave;
     const sourceZ = particle.z + depthLayerOffset + dynamicDepth + wholeJumpOffset;
     const flowedSourceY = sourceY + flowWave * flowStrength * 0.28;
+    const depthLuma = Math.pow(clamp((particle.z + 0.04) / 0.14, 0, 1), 1 / 1.42);
+    const mappedDepth = window.FeCoverSketch.depthFromLuminance(depthLuma, cover);
     const flowedSourceZ = sourceZ + flowWave * flowStrength;
-    const jitteredSourceX = sourceX + bassJitterX;
-    const jitteredSourceY = flowedSourceY + bassJitterY;
-    const jitteredSourceZ = flowedSourceZ + bassJitterDepth;
+    const dissolveMode = cover.imageMotionMode === 'dissolve';
+    const motionSourceX = sourceX + (dissolveMode ? dissolveOffsetX : 0);
+    const motionSourceY = flowedSourceY + (dissolveMode ? dissolveOffsetY : 0);
+    const motionSourceZ = flowedSourceZ + (dissolveMode ? dissolveDepth : 0);
+    const jitteredSourceX = motionSourceX + bassJitterX;
+    const jitteredSourceY = motionSourceY + bassJitterY;
+    const jitteredSourceZ = cover.depthEnabled && cover.depthStrength > 0
+      ? motionSourceZ + bassJitterDepth + mappedDepth - particle.z : 0;
     const rotatedX = jitteredSourceX * yawCos + jitteredSourceZ * yawSin;
     const rotatedZ = -jitteredSourceX * yawSin + jitteredSourceZ * yawCos;
     const rotatedY = jitteredSourceY * pitchCos - rotatedZ * pitchSin;
@@ -41350,21 +45253,46 @@ function drawCoverParticleScene(width, height, dpr) {
       0.86 + depth * 0.12 + depthLayer * 0.04 * depthLayerMotion
         + motionAmount * 0.03 + interaction * 0.08 + energy * 0.035
     ) * particle.alpha;
+    if (dissolveMode) alpha *= smoothstep(0.16, 0.9, dissolveSeed * 0.72 + dissolveSignal * 0.18 + 0.5);
     if (alpha < 0.52) alpha = 0.52;
     else if (alpha > 1) alpha = 1;
+    if (cover.depthMapEnabled && !particle.depthMapColorCss) {
+      // CPU fallback caches its transformed colors on demand; GPU particles
+      // use the fragment shader and need no second set of color strings.
+      const mapped = window.FeCoverDepthLight?.depthMapColor(particle.r, particle.g, particle.b)
+        || [particle.displayR / 255, particle.displayG / 255, particle.displayB / 255];
+      particle.depthMapR = Math.round(mapped[0] * 255);
+      particle.depthMapG = Math.round(mapped[1] * 255);
+      particle.depthMapB = Math.round(mapped[2] * 255);
+      particle.depthMapColorCss = `rgb(${particle.depthMapR}, ${particle.depthMapG}, ${particle.depthMapB})`;
+      particle.depthMapShadowColorCss = `rgba(${particle.depthMapR}, ${particle.depthMapG}, ${particle.depthMapB}, 0.12)`;
+    }
     if (mouseActive) {
       const shadowActive = interaction > 0.28;
       if (shadowActive) {
         coverParticleShadowActive = true;
         context.shadowBlur = (0.45 + interaction * 2.2) * dpr;
-        context.shadowColor = particle.shadowColorCss;
+        context.shadowColor = cover.depthMapEnabled ? particle.depthMapShadowColorCss : particle.shadowColorCss;
       } else if (coverParticleShadowActive) {
         coverParticleShadowActive = false;
         context.shadowBlur = 0;
       }
     }
     context.globalAlpha = alpha;
-    context.fillStyle = particle.colorCss;
+    const displayR = cover.depthMapEnabled ? particle.depthMapR : particle.displayR;
+    const displayG = cover.depthMapEnabled ? particle.depthMapG : particle.displayG;
+    const displayB = cover.depthMapEnabled ? particle.depthMapB : particle.displayB;
+    if (depthLight?.enabled) {
+      const brightness = window.FeCoverDepthLight.lightingFromNormal(
+        particle.normalX, particle.normalY, particle.normalZ, depthLight
+      );
+      const reflection = window.FeCoverDepthLight.highlightFromNormal(
+        particle.normalX, particle.normalY, particle.normalZ, depthLight
+      );
+      context.fillStyle = `rgb(${Math.round(clamp(displayR * brightness + (255 - displayR) * reflection, 0, 255))}, ${Math.round(clamp(displayG * brightness + (255 - displayG) * reflection, 0, 255))}, ${Math.round(clamp(displayB * brightness + (255 - displayB) * reflection, 0, 255))})`;
+    } else {
+      context.fillStyle = cover.depthMapEnabled ? particle.depthMapColorCss : particle.colorCss;
+    }
     context.fillRect(x - size / 2, y - size / 2, size, size);
   }
   context.restore();
@@ -41424,6 +45352,126 @@ function updateTextPresetBassGlow(playbackRunning) {
   );
 }
 
+function lyricHighlightParticleProfile() {
+  if (MOBILE_RENDER_TARGET) return 'mobile';
+  if (RENDER_PROFILE.tier === 'high') return 'high';
+  if (RENDER_PROFILE.tier === 'economy') return 'economy';
+  return 'balanced';
+}
+
+function lyricHighlightParticleSettings(settings = state.textComposerSettings) {
+  const normalized = normalizeTextComposerSettings(settings);
+  return {
+    enabled: normalized.highlightParticlesEnabled,
+    size: normalized.highlightParticleSize,
+    density: normalized.highlightParticleDensity,
+    sensitivity: normalized.highlightParticleSensitivity,
+    spread: normalized.highlightParticleSpread,
+    color: resolvedLyricHighlightParticleColor()
+  };
+}
+
+function ensureLyricHighlightParticleRenderer() {
+  const runtime = state.playbackVisual;
+  if (runtime.lyricHighlightParticleRenderer) return runtime.lyricHighlightParticleRenderer;
+  if (runtime.lyricHighlightParticleUnavailable) return null;
+  if (!window.FeMonsterLyricHighlightParticles?.create || !els.playbackLyricScene) return null;
+  try {
+    runtime.lyricHighlightParticleRenderer = window.FeMonsterLyricHighlightParticles.create({
+      canvas: els.lyricHighlightParticlesFront,
+      scene: els.playbackLyricScene,
+      settings: lyricHighlightParticleSettings(),
+      profile: lyricHighlightParticleProfile(),
+      reducedMotion: state.orb.reducedMotion || reducedMotion,
+      maxPixelRatio: RENDER_PROFILE.webglDprMax,
+      createRenderer: (options) => createDirectX11Renderer(window.THREE, options)
+    });
+  } catch (error) {
+    runtime.lyricHighlightParticleUnavailable = true;
+    console.warn('[lyric-particles] Three.js renderer unavailable', error);
+  }
+  return runtime.lyricHighlightParticleRenderer;
+}
+
+function destroyLyricHighlightParticleRenderer() {
+  const runtime = state.playbackVisual;
+  runtime.lyricHighlightParticleRenderer?.destroy?.();
+  runtime.lyricHighlightParticleRenderer = null;
+  runtime.lyricHighlightParticleUnavailable = false;
+  runtime.lyricHighlightParticleTarget = null;
+  runtime.lyricHighlightParticleTargetText = '';
+  runtime.lyricHighlightParticleTargetIndex = -2;
+}
+
+function syncLyricHighlightParticleRendererSettings(settings = state.textComposerSettings) {
+  const renderer = state.playbackVisual.lyricHighlightParticleRenderer;
+  if (!renderer) return;
+  renderer.setSettings(lyricHighlightParticleSettings(settings));
+  renderer.setProfile(lyricHighlightParticleProfile());
+  renderer.setReducedMotion(state.orb.reducedMotion || reducedMotion);
+}
+
+function syncLyricHighlightParticleRendererColor(palette = state.playbackVisual.palette) {
+  const color = resolvedLyricHighlightParticleColor(palette);
+  state.playbackVisual.lyricHighlightParticleRenderer?.setColor(color);
+  if (els.lyricParticlePaletteControl) {
+    els.lyricParticlePaletteControl.style.setProperty('--text-palette-auto-color', color);
+  }
+}
+
+function lyricHighlightParticleTarget() {
+  const runtime = state.playbackVisual;
+  const multiRow = state.multiRowLyricsEnabled;
+  const targetIndex = multiRow ? Number(state.lyricIndex) : -1;
+  if (
+    runtime.lyricHighlightParticleTarget
+    && runtime.lyricHighlightParticleTargetMultiRow === multiRow
+    && runtime.lyricHighlightParticleTargetIndex === targetIndex
+    && runtime.lyricHighlightParticleTargetText === state.lyricDisplayText
+    && runtime.lyricHighlightParticleTarget.isConnected
+  ) {
+    return runtime.lyricHighlightParticleTarget;
+  }
+  runtime.lyricHighlightParticleRenderer?.markBoundsDirty();
+  runtime.lyricHighlightParticleTargetMultiRow = multiRow;
+  runtime.lyricHighlightParticleTargetIndex = targetIndex;
+  runtime.lyricHighlightParticleTargetText = state.lyricDisplayText;
+  runtime.lyricHighlightParticleTarget = multiRow
+    ? els.multiRowLyricList?.querySelector('.multi-row-lyric-line.is-current .multi-row-lyric-main')
+      || els.multiRowLyricList?.querySelector('.multi-row-lyric-line.is-current')
+      || els.multiRowLyricStage
+    : els.playbackLyricText || els.playbackLyricCore;
+  return runtime.lyricHighlightParticleTarget;
+}
+
+function updateLyricHighlightParticles(playbackRunning, simulationStep = 1) {
+  const settings = state.textComposerSettings;
+  const active = playbackRunning
+    && state.playbackPage
+    && textLyricsEnabled()
+    && settings.highlightParticlesEnabled
+    && state.textPreset !== 'book'
+    && !els.playbackLyricScene?.hidden;
+  const renderer = state.playbackVisual.lyricHighlightParticleRenderer
+    || (active ? ensureLyricHighlightParticleRenderer() : null);
+  if (!renderer) return;
+  renderer.setTarget(lyricHighlightParticleTarget());
+  renderer.setReducedMotion(state.orb.reducedMotion || reducedMotion);
+  const lowFrequency = active
+    ? clamp(Math.max(
+      Number(state.visual.lowFrequencyAmplitude) || 0,
+      Number(state.visual.bass) || 0,
+      Number(state.visualBridge.lowFrequencyAmplitude) || 0,
+      Number(state.visualBridge.bass) || 0
+    ), 0, 1)
+    : 0;
+  renderer.update(
+    lowFrequency,
+    clamp(simulationStep, 0.05, 2) * RENDER_PROFILE.targetFrameMs,
+    active
+  );
+}
+
 function updateGlitchBeatMotion(playbackRunning, now = performance.now()) {
   const scene = els.playbackLyricScene;
   const shell = els.appShell;
@@ -41434,8 +45482,9 @@ function updateGlitchBeatMotion(playbackRunning, now = performance.now()) {
   const beatClasses = TEXT_GLITCH_BEAT_CLASSES;
   if (!active) {
     runtime.glitchBeatArmed = true;
-    scene.classList.remove(...beatClasses);
-    shell.classList.remove(...beatClasses);
+    for (const element of [scene, shell]) {
+      if (beatClasses.some(name => element.classList.contains(name))) element.classList.remove(...beatClasses);
+    }
     setStylePropertyIfChanged(scene, '--text-glitch-beat-strength', '0');
     setStylePropertyIfChanged(shell, '--text-glitch-beat-strength', '0');
     return;
@@ -41471,6 +45520,7 @@ function updateGlitchBeatMotion(playbackRunning, now = performance.now()) {
 }
 
 function updatePlaybackSceneMotion() {
+  updateParticleLyricsMotion();
   const visual = state.playbackVisual;
   const now = performance.now();
   const playbackRunning = isPlaybackClockRunning();
@@ -41479,12 +45529,13 @@ function updatePlaybackSceneMotion() {
     : 1;
   visual.lastMotionAt = now;
   visual.frameStep = simulationStep;
-  const multiRowLyricsNeedFrame = textLyricsEnabled() && state.multiRowLyricsEnabled;
-  const centralLyricsNeedFrame = textLyricsEnabled()
+  const standardLyricsVisible = textLyricsEnabled() && state.textPreset !== 'particle-lyrics';
+  const multiRowLyricsNeedFrame = standardLyricsVisible && state.multiRowLyricsEnabled;
+  const centralLyricsNeedFrame = standardLyricsVisible
     && state.textPreset !== 'book'
     && !state.multiRowLyricsEnabled;
   const cardLyricsNeedFrame = playbackCardLyricsVisible();
-  if ((centralLyricsNeedFrame || multiRowLyricsNeedFrame || cardLyricsNeedFrame) && state.lyricLines.length) {
+  if ((centralLyricsNeedFrame || multiRowLyricsNeedFrame || cardLyricsNeedFrame || particleLyricsVisible()) && state.lyricLines.length) {
     syncPlaybackLyricAnimationFrame();
   }
   if (!visual.dragging) {
@@ -41502,6 +45553,7 @@ function updatePlaybackSceneMotion() {
   visual.pitch = wrapRadians(visual.pitch);
   updatePlaybackSceneTransform();
   updateTextPresetBassGlow(playbackRunning);
+  updateLyricHighlightParticles(playbackRunning, simulationStep);
   updateGlitchBeatMotion(playbackRunning, now);
 
   if (centralLyricsNeedFrame) {
@@ -41513,11 +45565,20 @@ function updatePlaybackSceneMotion() {
     const responseBase = clamp(0.08 * state.lyricSpeed, 0.045, 0.24);
     const response = 1 - Math.pow(1 - responseBase, simulationStep);
     visual.lyricPulse += (targetPulse - visual.lyricPulse) * response;
-    const bassJump = playbackRunning ? clamp(lowFrequency * 0.95 + beat * 0.58 + visual.lyricPulse * 0.18, 0, 1.45) : 0;
-    const bounce = playbackRunning
-      ? Math.sin(now / 1000 * (2.2 + state.lyricSpeed * 0.72)) * 2.4 - bassJump * 16
+    const bassJumpTarget = playbackRunning
+      ? clamp(lowFrequency * 0.95 + beat * 0.58 + visual.lyricPulse * 0.18, 0, 1.45)
       : 0;
-    const scale = 1 + visual.lyricPulse * 0.026 + bassJump * 0.05;
+    const bassMotionBase = bassJumpTarget > visual.lyricBassMotion ? 0.16 : 0.07;
+    const bassMotionResponse = 1 - Math.pow(1 - bassMotionBase, simulationStep);
+    visual.lyricBassMotion += (bassJumpTarget - visual.lyricBassMotion) * bassMotionResponse;
+    if (!playbackRunning && visual.lyricBassMotion < 0.002) visual.lyricBassMotion = 0;
+    const bassJump = visual.lyricBassMotion;
+    const focusEchoMotion = state.textPreset === 'focus-echo';
+    const bounce = playbackRunning
+      ? Math.sin(now / 1000 * (2.2 + state.lyricSpeed * 0.72)) * (focusEchoMotion ? 1.2 : 2.4)
+        - bassJump * (focusEchoMotion ? 5.5 : 16)
+      : 0;
+    const scale = 1 + visual.lyricPulse * 0.026 + bassJump * (focusEchoMotion ? 0.024 : 0.05);
     const glowSize = Math.round(1 + bassJump * 8);
     const glowAlpha = clamp(bassJump * 0.42, 0, 0.48);
     setStylePropertyIfChanged(els.playbackLyricScene, '--lyric-pulse', visual.lyricPulse.toFixed(3));
@@ -41544,6 +45605,9 @@ function updatePlaybackSceneMotion() {
       break;
     case 'chladni':
       updateChladniMotion();
+      break;
+    case 'harmonic-state':
+      updateHarmonicStateMotion();
       break;
     case 'topography':
       updateSonicTopographyMotion();
@@ -42078,7 +46142,12 @@ function coverParticleNeedsContinuousFrame(now = performance.now()) {
   if (!state.playbackPage || !isCoverParticlePreset()) return true;
   const cover = state.coverParticle;
   const visual = state.playbackVisual;
-  return isPlaybackClockRunning()
+  return volumeSliderMusicNeedsFrame()
+    || (cover.renderMode === 'sketch' && !reducedMotion && cover.sketchFlowSpeed > 0 && cover.sketchFlowAmplitude > 0)
+    || coverDepthLightAnimated()
+    || coverParticleIdleMotionGate() > 0
+    || (!reducedMotion && particleLyricsVisible() && state.particleLyrics.runtime?.activeCount === 0)
+    || isPlaybackClockRunning()
     || cover.motionGate > 0
     || cover.energy > 0
     || cover.wholeJump > 0
@@ -42098,6 +46167,11 @@ function orbFrameBudgetMs() {
   const activeMotion = state.orb.dragging
     || state.playbackVisual.dragging
     || isPlaybackClockRunning();
+  if (!activeMotion && coverParticleIdleMotionGate() > 0) {
+    // Idle covers remain visibly alive at a bounded cadence so their ambient
+    // motion does not consume the full playback frame budget.
+    return Math.max(displayBudget, 1000 / 30);
+  }
   return activeMotion ? displayBudget : Math.max(displayBudget, 1000 / 60);
 }
 
@@ -42107,14 +46181,17 @@ function resetOrbFrameBudget() {
 }
 
 function playbackFrameRateUncapped() {
-  return state.playbackPage && isPlaybackClockRunning();
+  return state.playbackPage && (isPlaybackClockRunning()
+    || (isHarmonicStatePreset()
+      && state.harmonicState.runtime
+      && els.harmonicStateScene?.hidden === false));
 }
 
 function consumeOrbFrameBudget(now) {
   if (playbackFrameRateUncapped()) {
     // Playback UI and scene presets render on every frame the compositor offers.
     // requestAnimationFrame still follows the display/WebView presentation clock,
-    // but there is no additional 60/120 FPS software gate while music is playing.
+    // with no software gate while music plays or the harmonic surface is visible.
     state.orb.frameBudgetAt = now;
     state.orb.frameBudgetCarryMs = 0;
     return true;
@@ -42144,6 +46221,9 @@ function coveredPlaybackCanvasKey() {
   if (isFreeCubePreset()) return 'free-cubes';
   if (isVoidPrismPreset()) return 'void-prism';
   if (isChladniPreset()) return 'chladni';
+  if (isHarmonicStatePreset() && state.harmonicState.runtime && els.harmonicStateScene?.hidden === false) {
+    return 'harmonic-state';
+  }
   if (isSonicTopographyPreset()) return 'topography';
   if (state.textPreset === 'book') return 'book';
   return '';
@@ -42212,11 +46292,13 @@ function drawOrb(now = performance.now()) {
   syncBookLyricFrame();
   observeRenderClarityFrame(now);
   updateAudioSpectrum();
+  updateVolumeSliderMusicMotion();
   const canvas = els.canvas;
   const coveredCanvasKey = coveredPlaybackCanvasKey();
   if (coveredCanvasKey) {
     const needsContinuousPlaybackMotion = coveredCanvasKey !== 'wallpaper'
       || textLyricsEnabled()
+      || volumeSliderMusicNeedsFrame()
       || (playbackCardLyricsVisible() && state.lyricLines.length && isPlaybackClockRunning());
     if (needsContinuousPlaybackMotion) updatePlaybackSceneMotion();
     clearCoveredPlaybackCanvas(canvas, coveredCanvasKey);
@@ -42468,8 +46550,7 @@ function clearRealtimePolling() {
 }
 
 function realtimePollingActive() {
-  return !document.hidden
-    && !!els.audio?.src
+  return !!els.audio?.src
     && !els.audio.paused
     && !els.audio.ended;
 }
@@ -42480,7 +46561,7 @@ function syncRealtimePolling() {
   const every = (callback, interval) => {
     realtimePollingTimers.push(window.setInterval(callback, interval));
   };
-  if (state.clientRuntime.nativeAudioActive && state.clientRuntime.settings.xAudio2) {
+  if (!document.hidden && state.clientRuntime.nativeAudioActive && state.clientRuntime.settings.xAudio2) {
     every(refreshNativeAudioSample, MOBILE_RENDER_TARGET ? 120 : 50);
   }
   const spatial = state.obrSpatialAudio;
@@ -42498,10 +46579,12 @@ function syncRealtimePolling() {
 }
 
 function clearBackgroundPolling() {
-  clearRealtimePolling();
   while (backgroundPollingTimers.length) {
     window.clearInterval(backgroundPollingTimers.pop());
   }
+  // Background visual/network work can stop; playback output supervision
+  // remains active for minimized windows and automatic track changes.
+  syncRealtimePolling();
 }
 
 function startBackgroundPolling() {
@@ -42511,7 +46594,7 @@ function startBackgroundPolling() {
     backgroundPollingTimers.push(window.setInterval(callback, interval));
   };
   every(refreshVisualBridge, 1000);
-  every(() => refreshPlayerState().catch(() => {}), 5000);
+  every(pollPlayerState, 5000);
   every(refreshUserPlaylists, 30000);
   every(() => {
     if (!state.community.eventConnected) scheduleCommunityRefresh(0);
@@ -43593,7 +47676,12 @@ async function petAssistantSearchAndPlayFuzzy(argumentsValue) {
   state.searchSuggestions.songs = songs;
   renderSearchSuggestions();
   if (!await loadSong(song, { silent: true })) throw new Error('歌曲暂时无法播放');
-  return { ...petAssistantPlaybackSnapshot(), matched: petAssistantSongSummary(song) };
+  return {
+    ...petAssistantPlaybackSnapshot(),
+    changed: true,
+    played: true,
+    matched: petAssistantSongSummary(song)
+  };
 }
 
 async function petAssistantPlaySimilar(argumentsValue = {}) {
@@ -43629,6 +47717,8 @@ async function petAssistantPlaySimilar(argumentsValue = {}) {
   if (!await loadSong(song, { silent: true })) throw new Error('相似歌曲暂时无法播放');
   return {
     ...petAssistantPlaybackSnapshot(),
+    changed: true,
+    played: true,
     seed: petAssistantSongSummary(seed),
     matched: petAssistantSongSummary(song)
   };
@@ -43644,10 +47734,7 @@ function petAssistantSetVolume(argumentsValue, relative = false) {
   }
   const current = Math.round(clamp(Number(els.audio?.volume) || 0, 0, 1) * 100);
   const volume = Math.round(clamp(relative ? current + numeric : numeric, 0, 100));
-  els.volumeRange.value = String(volume);
-  els.audio.volume = volume / 100;
-  els.volumeLabel.textContent = `${volume}%`;
-  syncElasticRangeVisual(els.volumeRange);
+  syncPlayerVolume(volume / 100);
   schedulePlayerVolumeCommit(volume / 100, { immediate: true });
   notifyPlaybackIntelligence('volume-change', { volume });
   return {
@@ -43837,13 +47924,17 @@ function petAssistantParameterPurpose(control) {
 }
 
 function petAssistantControlParameter(control) {
-  const id = safeText(control?.id, '');
-  if (!id || control?.dataset?.petParameterIgnore === 'true' || PET_PARAMETER_CONTROL_EXCLUSIONS.test(id)) return null;
+  const explicitKey = safeText(control?.dataset?.petParameterKey, '');
+  const id = safeText(control?.id || explicitKey, '');
+  if (!id || control?.dataset?.petParameterIgnore === 'true'
+    || control?.dataset?.petParameterIgnoreReason
+    || (!explicitKey && PET_PARAMETER_CONTROL_EXCLUSIONS.test(id))) return null;
   const tag = safeText(control.tagName, '').toLowerCase();
   const inputType = safeText(control.type, '').toLowerCase();
-  if (tag !== 'select' && !['range', 'number', 'checkbox', 'color'].includes(inputType)) return null;
+  const roleSwitch = tag === 'button' && control.getAttribute?.('role') === 'switch';
+  if (!roleSwitch && tag !== 'select' && !['range', 'number', 'checkbox', 'color'].includes(inputType)) return null;
   const purpose = petAssistantParameterPurpose(control);
-  const scope = petAssistantParameterScope(`${id} ${purpose}`);
+  const scope = safeText(control?.dataset?.petParameterScope, '') || petAssistantParameterScope(`${id} ${purpose}`);
   const feature = control.closest?.('[data-scene-feature-preset]');
   const preset = safeText(feature?.dataset?.sceneFeaturePreset, '') || 'global';
   const compactId = id.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
@@ -43853,7 +47944,7 @@ function petAssistantControlParameter(control) {
   let type = 'string';
   let range = null;
   let options = null;
-  if (inputType === 'checkbox') type = 'boolean';
+  if (inputType === 'checkbox' || roleSwitch) type = 'boolean';
   else if (inputType === 'range' || inputType === 'number') {
     type = 'number';
     range = {
@@ -43872,23 +47963,47 @@ function petAssistantControlParameter(control) {
     if (!options.length) return null;
   }
   const get = () => type === 'boolean'
-    ? control.checked === true
+    ? (roleSwitch ? control.getAttribute('aria-checked') === 'true' : control.checked === true)
     : type === 'number' ? Number(control.value) : safeText(control.value, '');
+  let pendingRoleSwitchValue = null;
   const set = async (value) => {
     if (control.disabled) {
       const error = new Error(`${purpose} 当前不可用`);
       error.code = 'parameter_unavailable';
       throw error;
     }
-    if (type === 'boolean') control.checked = value === true;
-    else control.value = String(value);
-    control.dispatchEvent(new Event('input', { bubbles: true }));
-    control.dispatchEvent(new Event('change', { bubbles: true }));
+    if (roleSwitch) {
+      pendingRoleSwitchValue = value === true;
+      if (get() !== pendingRoleSwitchValue) control.click();
+    } else {
+      if (type === 'boolean') control.checked = value === true;
+      else control.value = String(value);
+      control.dispatchEvent(new Event('input', { bubbles: true }));
+      control.dispatchEvent(new Event('change', { bubbles: true }));
+    }
     await Promise.resolve();
     return get();
   };
+  const settle = async () => {
+    if (roleSwitch && pendingRoleSwitchValue !== null) {
+      const deadline = Date.now() + 2500;
+      while ((control.disabled || get() !== pendingRoleSwitchValue) && Date.now() < deadline) {
+        await new Promise((resolve) => window.setTimeout(resolve, 25));
+      }
+      if (get() !== pendingRoleSwitchValue) throw new Error(`${purpose} 尚未完成持久化`);
+      pendingRoleSwitchValue = null;
+    }
+    if (!control.closest?.('.audio-mixer-ui') || !mixerController?.settled) return;
+    await mixerController.settled();
+    const snapshot = mixerController.snapshot?.() || {};
+    const pending = [
+      ...(Array.isArray(snapshot.pendingKeys) ? snapshot.pendingKeys : []),
+      ...(Array.isArray(snapshot.channelRouter?.pendingKeys) ? snapshot.channelRouter.pendingKeys : [])
+    ];
+    if (pending.length) throw new Error(`${purpose} 尚未完成持久化`);
+  };
   return {
-    key: `ui.${compactId}`,
+    key: explicitKey || `ui.${compactId}`,
     name: purpose,
     purpose,
     scope,
@@ -43900,7 +48015,8 @@ function petAssistantControlParameter(control) {
     options,
     available: control.disabled !== true,
     get,
-    set
+    set,
+    settle
   };
 }
 
@@ -43924,7 +48040,9 @@ function petAssistantSoundscapeWorkshopParameters() {
     highImpactValues: Array.isArray(parameter.highImpactValues) ? [...parameter.highImpactValues] : null,
     requiresExplicitSelection: parameter.requiresExplicitSelection === true,
     available: true,
-    get: () => soundscapeWorkshopPropertyValue(parameter.sourceProperty),
+    get: () => parameter.sourceProperty === 'gridSize'
+      ? soundscapeWorkshopRequestedPropertyValue(parameter.sourceProperty)
+      : soundscapeWorkshopPropertyValue(parameter.sourceProperty),
     set: async (value) => applySoundscapeWorkshopProperty(parameter.sourceProperty, value)
   }));
 }
@@ -43979,11 +48097,48 @@ function petAssistantSemanticParameters() {
 function petAssistantParameterEntries() {
   const entries = new Map();
   petAssistantSemanticParameters().forEach((entry) => entries.set(entry.key, entry));
-  document.querySelectorAll('input[id], select[id]').forEach((control) => {
+  document.querySelectorAll('input[id], select[id], [data-pet-parameter-key]').forEach((control) => {
     const entry = petAssistantControlParameter(control);
     if (entry && !entries.has(entry.key)) entries.set(entry.key, entry);
   });
-  return Array.from(entries.values()).sort((left, right) => left.key.localeCompare(right.key, 'en'));
+  const values = Array.from(entries.values());
+  if (window.FeMonsterParameters?.replaceOwner) {
+    return Array.from(window.FeMonsterParameters.replaceOwner('pet-assistant-runtime', values));
+  }
+  return values.sort((left, right) => left.key.localeCompare(right.key, 'en'));
+}
+
+function petAssistantParameterCoverage() {
+  const panel = els.runtimeSettingsPanel;
+  if (!panel) return { total: 0, operable: [], delegated: [], manual: [], missing: [] };
+  const registered = new Set(petAssistantParameterEntries().map((entry) => entry.key));
+  const commandNames = new Set((window.FeMonsterAppCommands?.catalog?.() || []).map((entry) => entry.command));
+  const coverage = { total: 0, operable: [], delegated: [], manual: [], missing: [] };
+  const controls = Array.from(panel.querySelectorAll(
+    'input[id], select[id], textarea[id], button[role="switch"][id], [data-pet-parameter-key]'
+  ));
+  Array.from(new Set(controls)).forEach((control) => {
+    coverage.total += 1;
+    const id = safeText(control.id || control.dataset?.petParameterKey, '');
+    const reason = safeText(control.dataset?.petParameterIgnoreReason, '');
+    if (reason.startsWith('command:')) {
+      const command = reason.slice('command:'.length);
+      const target = commandNames.has(command) ? coverage.delegated : coverage.missing;
+      target.push({ id, command, reason });
+      return;
+    }
+    if (reason) {
+      coverage.manual.push({ id, reason });
+      return;
+    }
+    const entry = petAssistantControlParameter(control);
+    if (entry && registered.has(entry.key)) {
+      coverage.operable.push({ id, key: entry.key, available: entry.available !== false });
+      return;
+    }
+    coverage.missing.push({ id, reason: 'unregistered-setting-control' });
+  });
+  return coverage;
 }
 
 function petAssistantPublicParameter(entry, includeValue = true) {
@@ -44108,22 +48263,28 @@ function petAssistantParameterChanges(argumentsValue = {}) {
 
 async function petAssistantApplyParameterBatch(argumentsValue = {}, context = {}) {
   const changes = petAssistantParameterChanges(argumentsValue);
+  const highImpact = changes.filter((change) => change.entry.impact === 'high');
   const highLoad = changes.filter((change) => (
     change.entry.requiresExplicitSelection === true
     && Array.isArray(change.entry.highImpactValues)
     && change.entry.highImpactValues.map(Number).includes(Number(change.value))
   ));
+  if (highImpact.length) {
+    if (context.automatic === true) throw new Error('高影响参数不能由桌宠主动执行');
+    if (context.confirmed !== true) throw new Error('高影响参数需要用户确认');
+  }
   if (highLoad.length) {
-    if (context.automatic === true) throw new Error('高负载场景参数不能由桌宠主动执行');
     if (petAssistantArguments(argumentsValue).explicit !== true) throw new Error('高负载场景参数必须明确选择');
-    if (context.confirmed !== true) throw new Error('高负载场景参数需要用户确认');
   }
   const applied = [];
   const attempted = [];
   try {
     for (const change of changes) {
       attempted.push(change);
-      const after = await change.entry.set(change.value);
+      const receipt = window.FeMonsterParameters?.apply
+        ? await window.FeMonsterParameters.apply(change.key, change.value, context)
+        : null;
+      const after = receipt ? receipt.after : await change.entry.set(change.value);
       applied.push({
         key: change.key,
         name: change.entry.name,
@@ -44134,11 +48295,25 @@ async function petAssistantApplyParameterBatch(argumentsValue = {}, context = {}
     }
   } catch (error) {
     for (const change of [...attempted].reverse()) {
-      try { await change.entry.set(change.before); } catch (rollbackError) {}
+      try {
+        if (window.FeMonsterParameters?.apply) {
+          await window.FeMonsterParameters.apply(change.key, change.before, { ...context, confirmed: true, rollback: true });
+        } else {
+          await change.entry.set(change.before);
+        }
+      } catch (rollbackError) {}
     }
     throw error;
   }
   return { applied, count: applied.length };
+}
+
+function petAssistantParameterBatchRequiresConfirmation(argumentsValue = {}) {
+  try {
+    return petAssistantParameterChanges(argumentsValue).some((change) => change.entry.impact === 'high');
+  } catch (_) {
+    return false;
+  }
 }
 
 function petAssistantRecommendParameters(argumentsValue = {}) {
@@ -44401,6 +48576,115 @@ async function petAssistantServerUpdateOpen() {
   return { ...status, opened: true };
 }
 
+function petAssistantLocalMemoryClient() {
+  const client = window.FeLocalMemory;
+  if (!client?.vaultHealth || !client?.context || !client?.forget) {
+    throw new Error('本地加密记忆服务当前不可用');
+  }
+  return client;
+}
+
+function petAssistantLocalMemoryProvider() {
+  const providerId = safeText(state.activeProvider, 'netease').trim().toLowerCase();
+  return /^[a-z0-9][a-z0-9._:-]{0,39}$/.test(providerId) ? providerId : 'netease';
+}
+
+async function petAssistantLocalMemoryStatus() {
+  const client = petAssistantLocalMemoryClient();
+  const [vault, browser] = await Promise.all([
+    client.vaultHealth({ provider: petAssistantLocalMemoryProvider() }),
+    Promise.resolve(client.health?.() || {})
+  ]);
+  return {
+    available: vault.available === true,
+    locked: vault.locked === true,
+    encrypted: true,
+    schemaVersion: Math.max(0, Number(vault.schemaVersion) || 0),
+    temporaryConversation: client.isTemporaryConversation?.() === true,
+    queued: Math.max(0, Number(browser.queued) || 0),
+    lastRecordedAt: safeText(browser.lastRecordedAt, '')
+  };
+}
+
+function petAssistantMemoryTypes(value) {
+  const raw = Array.isArray(value) ? value : safeText(value, '').split(',');
+  return raw.map((entry) => safeText(entry, '').trim()).filter(Boolean).slice(0, 24);
+}
+
+async function petAssistantLocalMemoryRecords(argumentsValue = {}) {
+  const args = petAssistantArguments(argumentsValue);
+  const client = petAssistantLocalMemoryClient();
+  const provider = petAssistantLocalMemoryProvider();
+  const stream = safeText(args.stream, 'chat').trim().toLowerCase();
+  if (!['chat', 'operation', 'knowledge'].includes(stream)) throw new Error('记忆类型只能是 chat、operation 或 knowledge');
+  const limit = clamp(Math.floor(Number(args.limit) || 12), 1, 20);
+  const queryText = safeText(args.query || args.q, '').trim().slice(0, 240);
+  const types = petAssistantMemoryTypes(args.types);
+  if (stream === 'chat') {
+    const page = await client.chats({
+      provider,
+      limit,
+      q: queryText,
+      conversationId: safeText(args.conversationId, ''),
+      types
+    });
+    return { stream, records: page.records || [], next: page.next || null, count: page.records?.length || 0 };
+  }
+  const page = await client.context({ provider, limit: Math.max(limit, 24), q: queryText, types });
+  const records = (stream === 'operation' ? page.operations : page.knowledge) || [];
+  return { stream, records: records.slice(0, limit), count: Math.min(limit, records.length) };
+}
+
+async function petAssistantForgetLocalMemory(argumentsValue = {}) {
+  const args = petAssistantArguments(argumentsValue);
+  const client = petAssistantLocalMemoryClient();
+  const stream = safeText(args.stream, '').trim().toLowerCase();
+  if (!['chat', 'operation', 'knowledge'].includes(stream)) throw new Error('删除记忆时必须指定 chat、operation 或 knowledge');
+  const eventIds = (Array.isArray(args.eventIds) ? args.eventIds : [])
+    .map((value) => safeText(value, '').trim().toLowerCase())
+    .filter((value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value))
+    .slice(0, 100);
+  const selector = {
+    provider: petAssistantLocalMemoryProvider(),
+    stream,
+    eventIds,
+    conversationId: safeText(args.conversationId, '').trim(),
+    operationId: safeText(args.operationId, '').trim(),
+    types: petAssistantMemoryTypes(args.types),
+    occurredBefore: safeText(args.occurredBefore, '').trim(),
+    entireScope: args.entireScope === true
+  };
+  const result = await client.forget(selector);
+  const count = Math.max(0, Number(result?.count) || 0);
+  return { changed: count > 0, status: count > 0 ? 'forgotten' : 'unchanged', stream, count };
+}
+
+function petAssistantVoiceCatalog() {
+  const assistant = window.FeMonsterPetAssistant;
+  const voices = typeof assistant?.voices === 'function' ? assistant.voices() : [];
+  return {
+    voices: Array.from(voices || []).map((voice) => ({
+      id: safeText(voice.id, '').slice(0, 180),
+      label: safeText(voice.label, voice.id).slice(0, 120),
+      provider: safeText(voice.provider, '').slice(0, 80),
+      available: voice.available === true
+    })),
+    selectedVoiceId: safeText(document.getElementById('petAssistantVoiceSelect')?.value, '').slice(0, 180)
+  };
+}
+
+async function petAssistantSelectVoice(argumentsValue = {}) {
+  const args = petAssistantArguments(argumentsValue);
+  const voiceId = safeText(args.voiceId ?? args.voice, '').trim();
+  if (!voiceId || voiceId.length > 180) throw new Error('必须指定有效的桌宠音色 ID');
+  const catalog = petAssistantVoiceCatalog();
+  const voice = catalog.voices.find((candidate) => candidate.id === voiceId && candidate.available);
+  if (!voice) throw new Error('该桌宠音色当前不可用');
+  const changed = await window.FeMonsterPetAssistant?.selectVoice?.(voiceId);
+  if (changed !== true) throw new Error('桌宠音色保存失败');
+  return { changed: catalog.selectedVoiceId !== voiceId, selectedVoiceId: voiceId, voice };
+}
+
 function registerPetAssistantAppCommands() {
   const commands = window.FeMonsterAppCommands;
   if (!commands) throw new Error('通用程序命令模块没有加载');
@@ -44456,6 +48740,12 @@ function registerPetAssistantAppCommands() {
       handler: (args) => petAssistantParameterPage(args, false)
     },
     {
+      command: 'app.parameters.coverage.query', category: 'read', readOnly: true,
+      title: '检查设置参数覆盖率',
+      description: '列出设置中心中可直接操作、由专用命令操作、必须人工处理以及尚未注册的控件。',
+      handler: petAssistantParameterCoverage
+    },
+    {
       command: 'app.parameters.recommend.query', aliases: ['app.parameters.recommend', 'app.parameters.plan.recommend'],
       category: 'read', readOnly: true, title: '按目标推荐参数方案',
       description: '只从实时参数目录和真实范围生成小型可读方案，不会自动应用。',
@@ -44467,12 +48757,52 @@ function registerPetAssistantAppCommands() {
       title: '批量应用客户端参数',
       description: '批量设置或增减已发现的场景颜色、光效、歌词、壁纸、音频、渲染等注册参数；拒绝 path/url/code，复用现有设置事件与持久化并返回 before/after。',
       parameters: { changes: '[{key,value|delta}]' },
-      requiresConfirmation: (args) => Array.isArray(args?.changes) && args.changes.some((change) => (
-        change?.key === 'preset.soundscape-workshop.gridSize'
-        && [640, 1080, 4096].includes(Number(change?.value))
-      )),
-      confirmationMessage: () => '高负载网格会显著增加显存、功耗和卡顿风险，确认应用吗？',
+      requiresConfirmation: petAssistantParameterBatchRequiresConfirmation,
+      confirmationMessage: () => '这些设置包含高影响参数，可能改变渲染后端、硬件加速或显著增加资源占用，确认应用吗？',
       handler: petAssistantApplyParameterBatch
+    },
+    {
+      command: 'pet.memory.status.query', aliases: ['pet.memory.status'], category: 'read', readOnly: true,
+      title: '读取本地记忆状态',
+      description: '读取当前账号分区的加密记忆可用性、临时模式与待入库数量；不返回任何记忆正文或凭据。',
+      handler: petAssistantLocalMemoryStatus
+    },
+    {
+      command: 'pet.memory.records.query', aliases: ['pet.memory.records.list'],
+      category: 'read', readOnly: true,
+      title: '查询本地加密记忆',
+      description: '按聊天、操作或知识流查询当前账号的有界记忆记录；该私密读取不会开放给任意自备模型。',
+      parameters: {
+        stream: 'chat|operation|knowledge?', query: 'string?', conversationId: 'string?',
+        types: 'string[]?', limit: 'number 1..20?'
+      },
+      handler: petAssistantLocalMemoryRecords
+    },
+    {
+      command: 'pet.memory.records.forget', aliases: ['pet.memory.local.forget'], category: 'settings',
+      title: '删除本地加密记忆',
+      description: '按记录、会话、操作、类型、时间或当前流全部删除本地加密记忆；删除不可撤销。',
+      parameters: {
+        stream: 'chat|operation|knowledge', eventIds: 'uuid[]?', conversationId: 'string?',
+        operationId: 'string?', types: 'string[]?', occurredBefore: 'ISO timestamp?', entireScope: 'boolean?'
+      },
+      requiredParameterGroups: [['stream']],
+      requiresConfirmation: true,
+      confirmationMessage: () => '删除的本地加密记忆无法撤销，确认继续吗？',
+      handler: petAssistantForgetLocalMemory
+    },
+    {
+      command: 'pet.voice.catalog.query', aliases: ['pet.voice.list'], category: 'read', readOnly: true,
+      title: '读取桌宠回复音色',
+      description: '读取服务器提供且当前可选择的桌宠回复音色，以及当前选中的音色。',
+      handler: petAssistantVoiceCatalog
+    },
+    {
+      command: 'pet.voice.select', category: 'settings',
+      title: '切换桌宠回复音色',
+      description: '从服务器提供的可用音色目录中选择桌宠回复音色。',
+      parameters: { voiceId: 'available pet voice id' }, requiredParameterGroups: [['voiceId', 'voice']],
+      handler: petAssistantSelectVoice
     },
     {
       command: 'pet.mascot.visibility.query', aliases: ['pet.visibility.query'], category: 'read', readOnly: true,
@@ -44791,10 +49121,19 @@ function registerPetAssistantAppCommands() {
       description: '按歌名、歌手、别名或近似文本搜索歌曲。',
       handler: async (args) => {
         const { request, songs } = await petAssistantSearchSongs(args, 12);
+        if (!songs.length) throw new Error(`没有找到“${request.query || request.title || request.artist}”`);
         state.searchSuggestions.query = request.query;
         state.searchSuggestions.songs = songs;
+        if (els.searchInput) els.searchInput.value = request.query;
+        if (state.playbackPage) setPlaybackChromeVisibility({ searchVisible: true });
         renderSearchSuggestions();
-        return { query: request.query, songs: songs.map(petAssistantSongSummary) };
+        setSearchSuggestionsOpen(true);
+        return {
+          ok: true,
+          query: request.query,
+          found: songs.length,
+          songs: songs.map(petAssistantSongSummary)
+        };
       }
     },
     {
@@ -45487,6 +49826,7 @@ function registerPetAssistantAppCommands() {
 }
 
 registerPetAssistantAppCommands();
+window.FeMonsterAppCommands.installCustomCommands();
 
 function resolvePetAssistantRoutableCommand(name) {
   const legacyCommand = PET_ASSISTANT_LEGACY_COMMANDS[name];
@@ -45583,7 +49923,30 @@ window.FeMonsterPetActionBridge = Object.freeze({
 });
 
 async function init() {
+  window.feLxPlaylists?.configure?.({ onChanged: onLxPlaylistsChanged, onOpen: openLxPlaylist });
+  window.feAudioSources?.configure?.({
+    getCurrentSong: () => state.currentSong?.id ? {
+      song: {
+        id: state.currentSong.id,
+        title: state.currentSong.title,
+        artist: state.currentSong.artist,
+        album: state.currentSong.album,
+        duration: state.currentSong.duration,
+        provider: state.currentSong.provider,
+        sourceRef: state.currentSong.sourceRef || {}
+      },
+      provider: state.currentSong.provider || state.activeProvider,
+      quality: preferredPlaybackQuality(state.currentSong.provider || state.activeProvider)
+    } : null,
+    importPlatformPackage: (file) => importMusicApiFile(file, { preserveActiveProvider: true }),
+    onSelectionChanged: onAudioSourceSelectionChanged,
+    getLibraryContext: audioSourceLibraryContext,
+    onLibraryProviderChanged: changeAudioSourceLibraryProvider,
+    onBrowseRequested: browseAudioSourceLibrary
+  });
+  void window.feAudioSources?.refresh?.();
   initCursorPreferences();
+  initVolumeSliderPreferences();
   clientAiServiceSyncControls();
   initCursorMotionRuntime();
   initDesktopSceneBridge();
@@ -45619,6 +49982,10 @@ async function init() {
   initPlaybackParticles();
   initRenderClarity();
   restoreSavedVisualWorkspace();
+  if (state.diyEnabled) {
+    setDiyOpen(true);
+    setDiyPage(state.diyPage || 'preset');
+  }
   updateLyricDiyVars();
   initializeTextFontOptions();
   applyTextFontPreference();
@@ -45627,6 +49994,10 @@ async function init() {
   syncBilingualLyricsControl();
   syncMultiRowLyricsControl();
   syncLyricClockControls();
+  if (lyricClockOffsetPreferenceMigrationPending) {
+    lyricClockOffsetPreferenceMigrationPending = false;
+    scheduleClientPreferencesSync();
+  }
   syncGoogleObrToggle();
   updateWallpaperDiyVars();
   updateBookLyricTransform();
@@ -45651,7 +50022,9 @@ async function init() {
   ]);
   scheduleClientPreferencesSync();
   finishDesktopSceneInitialization();
-  document.documentElement.dataset.interactiveServices = DESKTOP_SCENE_CLIENT ? 'started' : 'deferred';
+  // Async bootstrap may finish after entry; keep the live interface running.
+  document.documentElement.dataset.interactiveServices = DESKTOP_SCENE_CLIENT || bootVisual.servicesStarted
+    ? 'started' : 'deferred';
   requestOrbFrame();
 }
 
@@ -45671,4 +50044,48 @@ function scheduleButtonGlowEnhancement() {
   }
 }
 
+// The compact playback surface is kept in a small companion module so the
+// existing player remains readable. This bridge deliberately exposes only the
+// state and transport helpers that the companion needs.
+window.FeMonsterPlaybackContext = {
+  els,
+  state,
+  clamp,
+  coverUrl,
+  playbackCardSong,
+  playbackCardProvider,
+  renderQishuiPlaybackCard,
+  syncQishuiPlaybackCard,
+  syncQishuiPlaybackHiddenState,
+  updateQishuiPlaybackProgress,
+  updateQishuiPlaybackPlayState,
+  beginQishuiPlaybackSeek,
+  previewQishuiPlaybackSeek,
+  commitQishuiPlaybackSeek,
+  switchQishuiPlaybackTrack,
+  playQueueIndex,
+  refreshPlayerState,
+  togglePlay,
+  syncPlayerVolume,
+  schedulePlayerVolumeCommit,
+  setVolumeSliderPreferences,
+  requestOrbFrame,
+  scheduleClientPreferencesSync
+};
+window.FeMonsterSearchContext = {
+  state,
+  els,
+  safeText,
+  formatTime,
+  proxiedImageUrl,
+  providerLabel: () => providerInfo(state.activeProvider).label,
+  activeProvider: () => providerInfo(state.activeProvider).id,
+  searchCurrentPlatformSongs,
+  isSongFavorite,
+  toggleFavoriteSong,
+  playSearchSuggestion,
+  setSearchSuggestionsOpen,
+  scheduleSearchSuggestions
+};
+window.dispatchEvent(new CustomEvent('fe-monster-playback-context-ready'));
 init().catch((error) => toast(error.message));

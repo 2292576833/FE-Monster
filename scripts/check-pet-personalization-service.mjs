@@ -17,6 +17,10 @@ const homes = [
 ].filter(Boolean);
 const java = homes.map((home) => path.join(home, 'bin', `java${suffix}`)).find(existsSync) || 'java';
 const javac = homes.map((home) => path.join(home, 'bin', `javac${suffix}`)).find(existsSync) || 'javac';
+const appJar = path.join(root, 'out', 'fe-monster-java.jar');
+const runtimeClasspath = [classes, appJar, path.join(root, 'out', 'lib', '*')].join(path.delimiter);
+
+assert.ok(existsSync(appJar), 'built application jar is required; run scripts/build-java.ps1 first');
 
 rmSync(scratch, { recursive: true, force: true });
 mkdirSync(classes, { recursive: true });
@@ -35,13 +39,10 @@ function run(command, args) {
 
 try {
   run(javac, [
-    '-encoding', 'UTF-8', '--release', '17', '-d', classes,
-    path.join(root, 'src/main/java/com/femonster/json/SimpleJson.java'),
-    path.join(root, 'src/main/java/com/femonster/core/PetPersonalizationSnapshot.java'),
-    path.join(root, 'src/main/java/com/femonster/core/PetPersonalizationService.java'),
+    '-encoding', 'UTF-8', '--release', '17', '-cp', appJar, '-d', classes,
     path.join(root, 'src/test/java/com/femonster/core/PetPersonalizationServiceProbe.java'),
   ]);
-  const output = run(java, ['-cp', classes, 'com.femonster.core.PetPersonalizationServiceProbe']);
+  const output = run(java, ['-cp', runtimeClasspath, 'com.femonster.core.PetPersonalizationServiceProbe']);
   assert.match(output, /PetPersonalizationServiceProbe passed/);
   console.log(output);
 } finally {

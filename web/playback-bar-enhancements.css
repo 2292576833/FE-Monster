@@ -1,0 +1,484 @@
+/* The supplied GlassSurface component owns the playback panel material.
+ * Keep the surrounding interaction/3D wrapper transparent and unclipped. */
+#qishuiPlaybackPhone {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Clear glass only: sample the backdrop without adding a colored fill,
+ * gradient, border, shadow, saturation boost or brightness adjustment. */
+#qishuiPlaybackPhone .qishui-playback-ambient {
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+
+#qishuiPlaybackPhone .qishui-playback-ambient.glass-surface--svg {
+  backdrop-filter: var(--filter-id, url(#glass-filter));
+  -webkit-backdrop-filter: var(--filter-id, url(#glass-filter));
+}
+
+#qishuiPlaybackPhone .qishui-playback-ambient.glass-surface--fallback {
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+#qishuiPlaybackPhone .qishui-playback-ambient::before,
+#qishuiPlaybackPhone .qishui-playback-ambient::after {
+  content: none;
+  display: none;
+}
+
+/* The DIY switch joins the existing playback tools without shrinking the
+ * hit areas of the other controls. */
+#qishuiPlaybackTools {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+@media (max-width: 767px) {
+  #qishuiPlaybackTools {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Three-dimensional, grainy lyric lettering instead of a flat paper layer. */
+#qishuiPlaybackLyricPage {
+  perspective: 760px;
+  transform-style: preserve-3d;
+}
+
+#qishuiPlaybackLyricPage .qishui-playback-lyric-line {
+  position: relative;
+  transform-style: preserve-3d;
+  transform: translate3d(calc(var(--book-line-distance) * 2px), 0, calc(var(--lyric-depth, 0) * 1px)) rotateX(4deg);
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.25),
+    0 2px 0 rgba(8, 15, 22, 0.6),
+    0 7px 12px rgba(3, 8, 12, 0.26);
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.13));
+}
+
+#qishuiPlaybackLyricPage .qishui-playback-lyric-line .book-lyric-line-text {
+  position: relative;
+  display: inline-block;
+  transform: translate3d(0, 0, 13px);
+  transform-style: preserve-3d;
+  -webkit-text-stroke: 0.22px rgba(244, 253, 255, 0.34);
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.25),
+    0 2px 0 rgba(255, 255, 255, 0.28),
+    0 3px 0 rgba(255, 255, 255, 0.12),
+    0 5px 3px rgba(7, 19, 27, 0.54),
+    0 10px 16px rgba(1, 8, 13, 0.24);
+  letter-spacing: 0.012em;
+  font-weight: 760;
+}
+
+#qishuiPlaybackLyricPage .qishui-playback-lyric-line .book-lyric-copy,
+#qishuiPlaybackLyricPage .qishui-playback-lyric-line .book-lyric-translation {
+  transform: translateZ(4px);
+  transform-style: preserve-3d;
+}
+
+#qishuiPlaybackLyricPage .qishui-playback-lyric-line .book-lyric-translation {
+  filter: drop-shadow(0 3px 5px rgba(2, 11, 17, 0.34));
+  opacity: 0.86;
+  letter-spacing: 0.018em;
+}
+
+/* White ink on both copies; the existing progress masks, line opacity and
+ * current-line emphasis still provide the scrolling / karaoke highlight. */
+#qishuiPlaybackPhone #qishuiPlaybackLyricPage :is(.book-lyric-copy, .book-lyric-copy--base, .book-lyric-copy--hot, .book-lyric-translation, .book-lyric-translation-copy--hot) {
+  color: #fff;
+  background-image: none;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.18), 0 2px 0 rgba(7, 16, 23, 0.62);
+}
+
+#qishuiPlaybackLyricPage .qishui-playback-lyric-line.is-current {
+  --lyric-depth: 14;
+  transform: translate3d(calc(var(--book-line-distance) * 2px + 3px), -2px, 14px) rotateX(0deg) scale(1.045);
+  filter: drop-shadow(0 10px 11px rgba(0, 0, 0, 0.3));
+}
+
+#qishuiPlaybackLyricPage .qishui-playback-lyric-line.is-current .book-lyric-line-text {
+  -webkit-text-stroke: 0.34px rgba(255, 255, 255, 0.58);
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.42),
+    0 2px 0 rgba(255, 255, 255, 0.7),
+    0 4px 0 rgba(255, 255, 255, 0.22),
+    0 7px 5px rgba(3, 13, 19, 0.72),
+    0 14px 20px rgba(0, 0, 0, 0.36);
+}
+
+/* Lower-left icon dock with an external left-side queue panel. */
+.qishui-playback-queue-button {
+  position: absolute;
+  top: auto;
+  left: 6px;
+  bottom: 8px;
+  width: 32px;
+  height: 34px;
+  z-index: 8;
+  display: grid;
+  min-height: 34px;
+  place-items: center;
+  gap: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  color: rgba(239, 252, 255, 0.84);
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  cursor: pointer;
+  pointer-events: auto;
+  font: 700 11px/1 "Microsoft YaHei UI", system-ui, sans-serif;
+  transform: none;
+  transition: transform 180ms ease, opacity 180ms ease, background 180ms ease, border-color 180ms ease;
+}
+
+.qishui-playback-queue-button:hover,
+.qishui-playback-queue-button:focus-visible,
+.qishui-playback-queue-button.is-active {
+  border-color: transparent;
+  background: transparent;
+  color: #fff;
+  filter: drop-shadow(0 0 7px rgba(184, 242, 255, 0.74));
+  transform: translateY(-2px);
+}
+
+/* Keep the affordance as a bare glyph on the playback surface. The queue
+ * card remains the only material container; this control must not inherit a
+ * dark button plate from the global playback-card theme. */
+#qishuiPlaybackCard.qishui-playback-card .qishui-playback-queue-button.qishui-playback-queue-button,
+#qishuiPlaybackCard.qishui-playback-card .qishui-playback-queue-button.qishui-playback-queue-button:hover,
+#qishuiPlaybackCard.qishui-playback-card .qishui-playback-queue-button.qishui-playback-queue-button:focus-visible,
+#qishuiPlaybackCard.qishui-playback-card .qishui-playback-queue-button.qishui-playback-queue-button.is-active {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.qishui-playback-queue-button__icon { font-size: 20px; line-height: 0.75; }
+.qishui-playback-queue-button__label { display: none; }
+.qishui-playback-queue-button b {
+  display: none;
+}
+
+.qishui-playback-queue-panel {
+  position: absolute;
+  top: auto;
+  right: calc(100% + 10px);
+  left: auto;
+  bottom: 8px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: min(286px, calc(100vw - 34px));
+  max-height: min(62vh, 430px);
+  overflow: hidden;
+  border: 1px solid rgba(232, 251, 255, 0.3);
+  border-radius: 26px;
+  color: rgba(241, 251, 255, 0.92);
+  background:
+    linear-gradient(145deg, rgba(236, 252, 255, 0.11), rgba(255, 255, 255, 0.028)),
+    rgba(16, 28, 35, 0.3);
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(25px) saturate(1.28) brightness(1.1);
+  -webkit-backdrop-filter: blur(25px) saturate(1.28) brightness(1.1);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(24px, 0, 0) scale(0.97);
+  transform-origin: right bottom;
+  transition: opacity 220ms cubic-bezier(0.22, 1, 0.36, 1), transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.qishui-playback-queue-panel.is-open { opacity: 1; pointer-events: auto; transform: translate3d(0, 0, 0) scale(1); }
+.qishui-playback-queue-panel[hidden] { display: flex; }
+.qishui-playback-queue-panel__header { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 16px 12px; border-bottom: 1px solid rgba(234, 251, 255, 0.14); }
+.qishui-playback-queue-panel__header div { min-width: 0; }
+.qishui-playback-queue-panel__header strong, .qishui-playback-queue-panel__header small { display: block; }
+.qishui-playback-queue-panel__header strong { font-size: 14px; letter-spacing: 0.02em; }
+.qishui-playback-queue-panel__header small { margin-top: 4px; color: rgba(225, 245, 252, 0.62); font-size: 10px; }
+.qishui-playback-queue-panel__header button { width: 30px; height: 30px; border: 0; border-radius: 50%; padding: 0; color: inherit; background: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; cursor: pointer; font-size: 19px; line-height: 1; }
+#qishuiPlaybackCard.qishui-playback-card .qishui-playback-queue-panel__header button.qishui-playback-queue-close,
+#qishuiPlaybackCard.qishui-playback-card .qishui-playback-queue-panel__header button.qishui-playback-queue-close:hover,
+#qishuiPlaybackCard.qishui-playback-card .qishui-playback-queue-panel__header button.qishui-playback-queue-close:focus-visible,
+#qishuiPlaybackCard.qishui-playback-card .qishui-playback-queue-panel__header button.qishui-playback-queue-close:active {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.qishui-playback-queue-list { display: grid; flex: 0 1 auto; min-height: 0; align-content: start; grid-auto-rows: max-content; gap: 6px; overflow-x: hidden; overflow-y: auto; margin: 0; padding: 9px; list-style: none; scrollbar-width: thin; scrollbar-gutter: stable; overscroll-behavior: contain; }
+.qishui-playback-queue-item { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto 26px 26px; align-items: center; gap: 6px; min-height: 52px; border: 1px solid transparent; border-radius: 15px; padding: 6px 8px; cursor: pointer; transition: background 160ms ease, border-color 160ms ease, transform 160ms ease; }
+.qishui-playback-queue-item:hover, .qishui-playback-queue-item:focus-visible, .qishui-playback-queue-item[aria-selected="true"] { border-color: rgba(229, 252, 255, 0.32); background: rgba(225, 250, 255, 0.11); transform: translateX(2px); }
+.qishui-playback-queue-item__cover { display: grid; place-items: center; width: 38px; height: 38px; overflow: hidden; border-radius: 11px; color: rgba(237, 252, 255, .76); background: linear-gradient(145deg, rgba(224,251,255,.34), rgba(130,183,198,.2)); font-size: 10px; font-weight: 800; }
+.qishui-playback-queue-item__cover img { width: 100%; height: 100%; object-fit: cover; }
+.qishui-playback-queue-item__copy { min-width: 0; }
+.qishui-playback-queue-item__copy strong, .qishui-playback-queue-item__copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qishui-playback-queue-item__copy strong { font-size: 12px; }
+.qishui-playback-queue-item__copy small { margin-top: 4px; color: rgba(226, 247, 252, .6); font-size: 10px; }
+.qishui-playback-queue-item__state { color: rgba(214, 244, 251, .56); font-size: 10px; white-space: nowrap; }
+.qishui-playback-queue-item[aria-current="true"] .qishui-playback-queue-item__state { color: rgba(195, 255, 226, .9); }
+.qishui-playback-queue-item__play, .qishui-playback-queue-item__remove { display: grid; place-items: center; width: 26px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: transparent; box-shadow: none; color: rgba(226, 247, 252, .68); font-size: 20px; line-height: 1; cursor: pointer; }
+.qishui-playback-queue-item__play { font-size: 12px; }
+.qishui-playback-queue-item__play:hover { color: rgba(195, 255, 226, .9); }
+.qishui-playback-queue-item__remove:hover { color: #ffb3bc; }
+.qishui-playback-queue-item__play:focus-visible, .qishui-playback-queue-item__remove:focus-visible { outline: 2px solid rgba(229, 252, 255, .7); outline-offset: 2px; }
+.qishui-playback-queue-item__play:disabled, .qishui-playback-queue-item__remove:disabled { opacity: .35; cursor: wait; }
+.qishui-playback-queue-item { touch-action: none; user-select: none; -webkit-user-select: none; }
+.qishui-playback-queue-list.is-reordering { cursor: grabbing; }
+.qishui-playback-queue-item.is-dragging { cursor: grabbing; border-color: rgba(195, 255, 226, .8); background: rgba(195, 255, 226, .16); transform: scale(1.015); box-shadow: 0 5px 16px rgba(0, 0, 0, .18); transition: none; }
+.qishui-playback-queue-empty { padding: 20px 14px; color: rgba(225,245,252,.64); font-size: 11px; line-height: 1.5; text-align: center; }
+
+/* Queue affordance on the existing song cards. */
+.shelf-song-queue-button { position: absolute; right: 41px; bottom: 8px; z-index: 2; display: grid; place-items: center; width: 21px; height: 21px; border: 1px solid rgba(229, 251, 255, 0.18); border-radius: 7px; color: rgba(220, 248, 255, 0.76); background: rgba(255, 255, 255, 0.045); opacity: 0.62; cursor: pointer; transition: opacity 150ms ease, color 150ms ease, border-color 150ms ease, background 150ms ease, transform 150ms ease; }
+.shelf-song-button:hover .shelf-song-queue-button, .shelf-song-button:focus-within .shelf-song-queue-button, .shelf-song-queue-button:hover { opacity: 1; }
+.shelf-song-queue-button:hover { border-color: rgba(214, 250, 255, .55); color: rgba(239, 255, 255, .96); background: rgba(171, 236, 250, .16); transform: translateY(-1px); }
+.shelf-song-queue-button span { font-size: 15px; line-height: 0.8; }
+
+@media (max-width: 767px) {
+  .qishui-playback-queue-panel {
+    top: auto;
+    right: auto;
+    left: 0;
+    bottom: 42px;
+    width: min(276px, calc(100vw - 24px));
+    transform: translate3d(-12px, 10px, 0) scale(0.97);
+    transform-origin: left bottom;
+  }
+  .qishui-playback-queue-panel.is-open { transform: translate3d(0, 0, 0) scale(1); }
+  .qishui-playback-queue-button {
+    top: auto;
+    left: 8px;
+    bottom: 7px;
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    border-radius: 12px;
+    transform: none;
+  }
+  .qishui-playback-queue-button:hover,
+  .qishui-playback-queue-button:focus-visible,
+  .qishui-playback-queue-button.is-active { transform: translateY(-2px); }
+}
+
+.qishui-playback-card.is-user-hidden .qishui-playback-queue-button,
+.qishui-playback-card.is-user-hidden .qishui-playback-queue-panel { display: none; }
+
+/* Final lyric pass: dimensional lettering on the bare playback surface.  The
+ * shared book renderer keeps its state classes and seek interaction, but the
+ * new playback bar must not draw a glass container around the lyrics. */
+#qishuiPlaybackPhone {
+  --playback-lyric-ink: 255, 255, 255;
+  --playback-lyric-accent: 255, 255, 255;
+  --playback-lyric-deep: 4, 12, 19;
+  /* The actual lyric column bounds the window-driven scale in both axes.
+   * Small bars reduce type instead of borrowing space from the cover. */
+  --qishui-lyric-current-size: clamp(16px, min(calc(9px + 0.55vw + 0.6dvh), 8cqi, 9.5cqb), 28px);
+  --qishui-lyric-base-size: calc(var(--qishui-lyric-current-size) * 0.8);
+  --qishui-lyric-translation-size: max(12px, calc(var(--qishui-lyric-current-size) * 0.66));
+  --qishui-lyric-paragraph-gap: clamp(4px, min(2cqi, 3cqb), 8px);
+  --qishui-cover-row-min: clamp(88px, 14dvh, 144px);
+  --qishui-lyric-row-min: clamp(144px, 22dvh, 240px);
+  --qishui-lyric-row-flex: 1.2fr;
+}
+
+@media (min-width: 901px) {
+  .qishui-playback-card.is-expanded #qishuiPlaybackPhone {
+    --qishui-lyric-current-size: clamp(18px, min(calc(10px + 0.65vw + 0.7dvh), 6cqi, 11cqb), 30px);
+  }
+}
+
+@media (min-height: 561px) {
+  #qishuiPlaybackCard:not(.is-expanded) .qishui-playback-content {
+    grid-template-rows: auto auto auto minmax(var(--qishui-cover-row-min), 1.05fr) minmax(var(--qishui-lyric-row-min), var(--qishui-lyric-row-flex)) auto auto auto;
+    gap: 4px;
+    padding: 11px;
+  }
+}
+
+@media (min-height: 561px) and (max-height: 800px) {
+  #qishuiPlaybackCard:not(.is-expanded) {
+    bottom: 64px;
+  }
+}
+
+@media (min-height: 561px) and (max-height: 760px) {
+  #qishuiPlaybackPhone { --qishui-lyric-row-flex: 1.5fr; }
+}
+
+/* Below the two-column breakpoint, keep the stacked cover / lyric balance
+ * consistent with the compact bar instead of using equal-height rows. */
+@media (max-width: 900px) and (min-height: 561px) {
+  #qishuiPlaybackCard.is-expanded .qishui-playback-content {
+    grid-template-rows: auto auto auto minmax(var(--qishui-cover-row-min), 1.05fr) minmax(var(--qishui-lyric-row-min), var(--qishui-lyric-row-flex)) auto auto auto;
+    gap: 4px;
+    padding: 11px;
+  }
+}
+
+#qishuiPlaybackPhone .qishui-playback-lyrics {
+  container-type: size;
+  position: relative;
+  box-sizing: border-box;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: visible;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+
+/* The playback bar itself is the only boundary the lyrics may meet: the
+ * content wrapper must not clip them, so a line can never be cut by the card
+ * layout. Rounded corners stay on the ambient glass layer. */
+#qishuiPlaybackPhone .qishui-playback-content {
+  overflow: visible;
+  min-height: 0;
+}
+
+/* The new playback bar keeps only its own glass panel behind the lyrics: the
+ * shared lyric stylesheet's well (border, tint, vignette and inner frame) and
+ * every per-line plate are switched off here. */
+#qishuiPlaybackPhone .qishui-playback-lyrics::before,
+#qishuiPlaybackPhone .qishui-playback-lyrics::after {
+  content: none !important;
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  display: none !important;
+  pointer-events: none;
+}
+
+#qishuiPlaybackPhone #qishuiPlaybackLyricPage {
+  /* Cover palettes are written inline on the phone. Keep white ink local
+   * to the lyric subtree, including per-word highlights, after song changes. */
+  --playback-lyric-base: rgba(255, 255, 255, 0.9);
+  --playback-lyric-base-rgb: 255, 255, 255;
+  --playback-lyric-muted: rgba(255, 255, 255, 0.72);
+  --playback-lyric-current: #fff;
+  --playback-lyric-current-rgb: 255, 255, 255;
+  --book-hot: #fff;
+  --book-hot-rgb: 255, 255, 255;
+  perspective: 980px;
+  /* Keep the perspective axis in the viewport, not at the start of the song. */
+  perspective-origin: 50% calc(50% + var(--lyric-offset, 0px));
+  isolation: isolate;
+  /* No clipping at all: the reading axis centres the active line with a
+   * transform offset, so a lyric line is never cut by a container boundary.
+   * Lines that leave the reading area fade out with their distance instead. */
+  overflow: visible !important;
+  /* The shared book list includes paint containment, which still clips text
+   * even with visible overflow. Keep layout/style isolation, not a paint box. */
+  contain: layout style;
+  transform: translate3d(0, calc(-1 * var(--lyric-offset, 0px)), 0);
+  pointer-events: none;
+}
+
+#qishuiPlaybackPhone #qishuiPlaybackLyricPage .qishui-playback-lyric-line {
+  opacity: calc(0.72 - min(var(--book-line-distance, 6), 2) * 0.12);
+}
+
+#qishuiPlaybackPhone #qishuiPlaybackLyricPage .qishui-playback-lyric-line.is-current {
+  opacity: 1;
+}
+
+/* JS shares this window with the reading-axis calculation, including native
+ * maximize/fullscreen changes while paused and the first/last song lines.
+ * Retain every DOM row and layout slot; never crop a sentence or translation. */
+#qishuiPlaybackPhone #qishuiPlaybackLyricPage .qishui-playback-lyric-line:not([data-lyric-visible="true"]) {
+  visibility: hidden;
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+#qishuiPlaybackPhone #qishuiPlaybackLyricPage .qishui-playback-lyric-line[data-lyric-visible="true"] {
+  pointer-events: auto;
+}
+
+#qishuiPlaybackPhone #qishuiPlaybackLyricPage .qishui-playback-lyric-line {
+  position: relative;
+  min-height: 0;
+  margin: 0 0 var(--qishui-lyric-paragraph-gap);
+  padding-block: 2px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding-inline: 2px;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.1),
+    0 3px 8px rgba(var(--playback-lyric-deep), 0.62);
+  transition: opacity 280ms ease, transform 360ms cubic-bezier(0.22, 1, 0.36, 1), background 280ms ease;
+}
+
+/* The new playback bar shows the lyric text directly on its own glass panel:
+ * no plate, plate border or highlight background sits behind a line. */
+#qishuiPlaybackPhone #qishuiPlaybackLyricPage .qishui-playback-lyric-line::before,
+#qishuiPlaybackPhone #qishuiPlaybackLyricPage .qishui-playback-lyric-line::after {
+  content: none !important;
+  display: none !important;
+}
+
+#qishuiPlaybackPhone #qishuiPlaybackLyricPage .qishui-playback-lyric-line.is-current.is-scroll-arrived {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding-inline: 2px !important;
+  transform: translate3d(0, -1px, 26px) scale(1.04) !important;
+}
+
+#qishuiPlaybackPhone #qishuiPlaybackLyricPage .book-lyric-line-text {
+  font-size: var(--qishui-lyric-base-size);
+  /* A timed lyric entry is one paragraph. Keep its wrapped sentences tight;
+   * the row's paragraph-gap margin separates it from the next paragraph. */
+  line-height: 1.18;
+  letter-spacing: 0.008em;
+  text-wrap: pretty;
+  -webkit-text-stroke: 0.32px rgba(var(--playback-lyric-deep), 0.62);
+}
+
+#qishuiPlaybackPhone #qishuiPlaybackLyricPage :is(.is-arriving, .is-current.is-scroll-arrived) .book-lyric-line-text {
+  font-size: var(--qishui-lyric-current-size);
+  letter-spacing: 0.012em;
+  font-weight: 820;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.32),
+    0 2px 0 rgba(var(--playback-lyric-accent), 0.58),
+    0 5px 8px rgba(var(--playback-lyric-deep), 0.78),
+    0 0 16px rgba(var(--playback-lyric-accent), 0.18);
+}
+
+#qishuiPlaybackPhone #qishuiPlaybackLyricPage .book-lyric-translation {
+  font-size: var(--qishui-lyric-translation-size);
+  line-height: 1.15;
+  margin-top: 2px;
+  color: rgba(var(--playback-lyric-ink), 0.72);
+  letter-spacing: 0.018em;
+  text-shadow: 0 2px 6px rgba(var(--playback-lyric-deep), 0.62);
+}
+
+#qishuiPlaybackPhone #qishuiPlaybackLyricPage .is-current.is-scroll-arrived .book-lyric-translation {
+  color: rgba(var(--playback-lyric-ink), 0.94);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #qishuiPlaybackPhone #qishuiPlaybackLyricPage .qishui-playback-lyric-line {
+    transition: opacity 1ms linear !important;
+  }
+}
+
+@media (max-width: 767px) {
+  #qishuiPlaybackPhone #qishuiPlaybackLyricPage .qishui-playback-lyric-line { padding-inline: 2px; }
+  #qishuiPlaybackPhone #qishuiPlaybackLyricPage .qishui-playback-lyric-line.is-current.is-scroll-arrived {
+    transform: translate3d(0, -1px, 18px) scale(1.025) !important;
+  }
+}

@@ -50,6 +50,8 @@ const lines = [
   "",
   "This plugin contains @sansenjian/qq-music-api 2.4.0 and its production dependencies.",
   "The upstream QQ Music API MIT license is included as LICENSE.",
+  "QRC DES decoder derived from valenbine/LRC-GET (MIT, copyright 2026 valenbine).",
+  "Decoder source and LRC-GET-LICENSE.txt are in runtime.tgz under the QQ API dist directory.",
   "Dependency license files remain embedded in runtime.tgz under node_modules/<package>/.",
   "",
   "Packages:",

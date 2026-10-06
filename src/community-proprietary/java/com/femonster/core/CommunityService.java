@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.HexFormat;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -117,6 +118,7 @@ public final class CommunityService implements CommunityClient {
     private static final long HEALTH_CACHE_MILLIS = 1800L;
     private static final long DISCOVERY_RETRY_MILLIS = 3000L;
     private static final long REGISTRATION_CACHE_MILLIS = 3000L;
+    private static final Pattern MEMORY_SUBJECT = Pattern.compile("memsub_[A-Za-z0-9_-]{43}");
     private static final long SERVER_CLOCK_OFFSET_TTL_MILLIS = Duration.ofMinutes(10).toMillis();
     private static final long MAX_SERVER_CLOCK_OFFSET_MILLIS = Duration.ofHours(24).toMillis();
     private static final long MAX_CLOCK_SYNC_ROUND_TRIP_MILLIS = Duration.ofSeconds(5).toMillis();
@@ -210,6 +212,24 @@ public final class CommunityService implements CommunityClient {
 
         Map<String, Object> registered = register(provider, providerLabel, accountPayload);
         if (SimpleJson.asBoolean(registered.get("ok"), false)) {
+            String serverMemorySubject = SimpleJson.asString(registered.get("memorySubjectId"), "");
+            if (!serverMemorySubject.isBlank() && !MEMORY_SUBJECT.matcher(serverMemorySubject).matches()) {
+                body.put("ok", false);
+                body.put("profile", accountProfiles.profile(accountKey));
+                body.put("friends", List.of());
+                body.put("friendRequests", Map.of("incoming", List.of(), "outgoing", List.of()));
+                body.put("error", "community memory identity is invalid");
+                return body;
+            }
+            if (!serverMemorySubject.isBlank()
+                && !accountProfiles.rememberMemorySubject(accountKey, memoryBinding(serverMemorySubject))) {
+                body.put("ok", false);
+                body.put("profile", accountProfiles.profile(accountKey));
+                body.put("friends", List.of());
+                body.put("friendRequests", Map.of("incoming", List.of(), "outgoing", List.of()));
+                body.put("error", "community memory identity could not be stored");
+                return body;
+            }
             Map<String, Object> profile = accountProfiles.merge(
                 accountKey,
                 SimpleJson.asMap(registered.get("profile"))
@@ -815,6 +835,40 @@ public final class CommunityService implements CommunityClient {
         if (feId.isBlank()) feId = currentFeId(provider, providerLabel, accountPayload);
         if (feId.isBlank()) return "";
         return baseUrl + "\n" + requireFeId(feId);
+    }
+
+    @Override
+    public String localMemorySubject(
+        String provider,
+        String providerLabel,
+        Map<String, Object> accountPayload
+    ) {
+        if (accountPayload == null || !SimpleJson.asBoolean(accountPayload.get("loggedIn"), false)) return "";
+        String key = accountKey(provider, accountPayload);
+        if (key.isBlank()) return "";
+        String binding = accountProfiles.memorySubject(key);
+        // Local encrypted memory must remain available when the community
+        // service is offline or has not yet issued its immutable subject. The
+        // fallback is a persisted random opaque value scoped to this provider
+        // account; it is never derived from the renameable FEID. If a server
+        // subject arrives later it is retained separately without moving the
+        // local vault or making earlier memories disappear.
+        if (binding.isBlank()) binding = accountProfiles.openOrCreateLocalMemorySubject(key);
+        return binding;
+    }
+
+    private static String memoryBinding(String serverSubject) {
+        byte[] domain = "fe-monster/local-memory-binding/v1\0".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] raw = serverSubject.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] input = new byte[domain.length + raw.length];
+        System.arraycopy(domain, 0, input, 0, domain.length);
+        System.arraycopy(raw, 0, input, domain.length, raw.length);
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(input);
+            return "membind_v1_" + HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("SHA-256 unavailable");
+        }
     }
 
     @Override

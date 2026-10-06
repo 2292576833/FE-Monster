@@ -59,9 +59,9 @@ public final class MusicApiConfigService implements AutoCloseable {
     private static final Set<String> PACKAGE_MANIFESTS = Set.of("music-api-package.json", "fe-music-api.json");
     private static final String BUNDLED_NETEASE_VERSION = "4.32.0";
     private static final String BUNDLED_NETEASE_FILE = "FE-Monster-Netease-API-Plugin-" + BUNDLED_NETEASE_VERSION + ".zip";
-    private static final String BUNDLED_QQ_VERSION = "2.4.1";
+    private static final String BUNDLED_QQ_VERSION = "2.4.2";
     private static final String BUNDLED_QQ_FILE = "FE-Monster-QQ-API-Plugin-" + BUNDLED_QQ_VERSION + ".zip";
-    private static final String BUNDLED_KUGOU_VERSION = "2.0.7";
+    private static final String BUNDLED_KUGOU_VERSION = "2.0.8";
     private static final String BUNDLED_KUGOU_FILE = "FE-Monster-Kugou-API-Plugin-" + BUNDLED_KUGOU_VERSION + ".zip";
     private static final String BUNDLED_QISHUI_VERSION = "3.1.1";
     private static final String BUNDLED_QISHUI_FILE = "FE-Monster-Qishui-OpenAPI-Plugin-" + BUNDLED_QISHUI_VERSION + ".zip";
@@ -1036,7 +1036,7 @@ public final class MusicApiConfigService implements AutoCloseable {
 
     private Set<Long> listenerProcessIds(int port) {
         LinkedHashSet<Long> ids = new LinkedHashSet<>();
-        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("windows");
         List<String> command = windows
             ? List.of("netstat.exe", "-ano", "-p", "TCP")
             : List.of("lsof", "-nP", "-iTCP:" + port, "-sTCP:LISTEN", "-t");
@@ -1107,7 +1107,7 @@ public final class MusicApiConfigService implements AutoCloseable {
     private String[] processArguments(ProcessHandle process, ProcessHandle.Info info) {
         String[] direct = info.arguments().orElse(new String[0]);
         if (direct.length > 0) return direct;
-        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("windows");
         if (!windows) return direct;
 
         String script = "$p=Get-CimInstance Win32_Process -Filter 'ProcessId = " + process.pid()
@@ -1219,13 +1219,13 @@ public final class MusicApiConfigService implements AutoCloseable {
 
     private static String javaExecutable() {
         String home = System.getProperty("java.home", "");
-        Path java = Path.of(home, "bin", System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win") ? "java.exe" : "java");
+        Path java = Path.of(home, "bin", System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("windows") ? "java.exe" : "java");
         return Files.isRegularFile(java) ? java.toString() : "java";
     }
 
     private String nodeExecutable() {
         List<Path> candidates = new ArrayList<>();
-        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("windows");
         String executable = windows ? "node.exe" : "node";
         String override = System.getenv("FE_MONSTER_NODE");
         if (override != null && !override.isBlank()) candidates.add(Path.of(override.trim()));

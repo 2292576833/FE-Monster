@@ -538,7 +538,7 @@ async function checkOfflineLocalUseAndReconnectUpload() {
   assert.equal(harness.api.getProgress('gap-runner'), 7,
     'offline startup did not expose account-local progress');
   assert.equal(postBodies.length, 0,
-    'offline startup treated an unsynced local response as a completed server hydration');
+    'offline startup uploaded empty defaults instead of waiting for the mirror');
   assert.equal(harness.api.unlock('gap-runner', { silent: true }), true,
     'offline client could not unlock a new achievement');
   assert.equal(harness.api.claimOrnament('gap-runner'), true,
@@ -548,18 +548,30 @@ async function checkOfflineLocalUseAndReconnectUpload() {
     'offline achievement unlock was not saved locally');
   assert.ok(offlineSaved.ornaments.claimed['gap-runner'],
     'offline ornament claim was not saved locally');
+  // A pending mirror backup still writes the durable per-account copy, so the
+  // unlock survives a restart even before the mirror returns.
+  await eventually(() => postBodies.length >= 1,
+    'offline progress did not reach the durable app backend store');
+  assert.equal(postBodies[0].progress['gap-runner'], 7,
+    'offline durable write regressed the higher local progress');
+  assert.ok(postBodies[0].unlocked['first-block'],
+    'offline durable write lost the account-local unlock');
 
   online = true;
   harness.clock.advance(5000);
   await eventually(() => getCount >= 2, 'reconnect did not retry server hydration');
-  await eventually(() => postBodies.length === 1, 'reconnect did not upload the pending local state');
-  assert.equal(postBodies[0].progress['gap-runner'], 7,
+  await eventually(
+    () => postBodies.some((payload) => payload.unlocked?.['world-peace']),
+    'reconnect did not upload the restored server state'
+  );
+  const reconnectUpload = postBodies.filter((payload) => payload.unlocked?.['world-peace']).at(-1);
+  assert.equal(reconnectUpload.progress['gap-runner'], 7,
     'reconnect upload regressed the higher offline progress');
-  assert.ok(postBodies[0].unlocked['first-block'],
+  assert.ok(reconnectUpload.unlocked['first-block'],
     'reconnect upload lost the offline unlock');
-  assert.ok(postBodies[0].unlocked['world-peace'],
+  assert.ok(reconnectUpload.unlocked['world-peace'],
     'reconnect upload did not include the restored server unlock');
-  assert.ok(postBodies[0].ornaments.claimed['gap-runner'],
+  assert.ok(reconnectUpload.ornaments.claimed['gap-runner'],
     'reconnect upload did not back up the offline ornament claim');
 }
 
@@ -724,22 +736,29 @@ async function checkPostOutageReconnectsAfterRetryBudget() {
   await harness.api.ready;
   await eventually(() => postBodies.length === 1, 'initial online synchronization did not finish');
 
+  // The community mirror is a deferred backup.  Its outage must not stop the
+  // app backend's per-account file from receiving new progress, otherwise a
+  // restart (which always starts from a fresh web-view storage area) looks like
+  // a reset achievement profile.
   online = false;
   assert.equal(harness.api.setProgress('gap-runner', 6), true);
-  await eventually(() => postBodies.length === 2, 'offline progress write was not attempted');
+  await eventually(() => postBodies.length === 2, 'offline progress write did not reach the app backend');
+  assert.equal(postBodies[1].progress['gap-runner'], 6,
+    'offline progress write to the app backend lost the local value');
   for (const delay of [180, 650, 1800]) {
     harness.clock.advance(delay);
     await settleMicrotasks();
   }
-  const attemptsAfterBudget = postBodies.length;
-  assert.equal(attemptsAfterBudget, 5, 'bounded POST retry budget changed unexpectedly');
+  const postsAfterBudget = postBodies.length;
+  assert.equal(postsAfterBudget, 2, 'a pending mirror backup retried the local save unexpectedly');
+  assert.ok(harness.clock.pendingCount > 0, 'a pending mirror backup did not schedule its reconnect retry');
 
   online = true;
   const getsBeforeReconnect = getCount;
   harness.clock.advance(5000);
   await eventually(() => getCount > getsBeforeReconnect,
-    'exhausted POST retries did not fall back to reconnect hydration');
-  await eventually(() => postBodies.length > attemptsAfterBudget,
+    'a pending mirror backup did not retry hydration after reconnecting');
+  await eventually(() => postBodies.length > postsAfterBudget,
     'reconnect hydration did not upload the locally saved progress');
   assert.equal(postBodies.at(-1).progress['gap-runner'], 6,
     'post-outage reconnect upload lost local progress');
@@ -1181,6 +1200,441 @@ async function checkFlushWaitsForTargetRevisionBeforeQuit() {
   assert.deepEqual(appWindowActions, ['quit'], 'quit did not run exactly once after flush completed');
 }
 
+async function checkPlaybackWaitsForRestoredAchievement() {
+  let release;
+  const restored = {
+    ...emptyServerState,
+    unlocked: { 'first-play': { unlockedAt: 1712345678000 } },
+    _sync: { provider: 'netease', scope: 'netease:123', serverSynced: true }
+  };
+  const harness = createHarness({ withToast: true, fetchImpl: (_url, options = {}) => {
+    if (options.method === 'POST') return Promise.resolve(jsonResponse(200, JSON.parse(options.body)));
+    return new Promise(resolve => { release = () => resolve(jsonResponse(200, restored)); });
+  } });
+  harness.api.handlePlaybackStarted({ title: '普通歌曲', id: 'track' });
+  assert.equal(harness.audioInstances.length, 0, 'startup playback notified before restoring the account');
+  release();
+  await harness.api.ready;
+  await settleMicrotasks();
+  assert.equal(harness.api.isUnlocked('first-play'), true);
+  assert.equal(harness.audioInstances.length, 0, 'restored first-play was announced again');
+  harness.window.dispatchEvent(new harness.window.CustomEvent('fe-monster-community-profile', {
+    detail: { provider: 'netease', loggedIn: true, hasCommunityIdentity: false,
+      account: { userId: '123' } }
+  }));
+  harness.api.handlePlaybackStarted({ title: '普通歌曲', id: 'track' });
+  assert.equal(harness.api.isUnlocked('first-play'), true, 'missing community profile discarded account achievements');
+  assert.equal(harness.audioInstances.length, 0, 'temporary missing profile replayed first-play');
+  harness.window.dispatchEvent(new harness.window.CustomEvent('fe-community-account-change', {
+    detail: { provider: 'netease', loggedIn: false, resolved: false }
+  }));
+  assert.equal(harness.api.isUnlocked('first-play'), true, 'unresolved login status discarded account achievements');
+}
+
+async function checkFirstPlaybackPersistsAcrossRestart() {
+  let release;
+  const fetchImpl = (_url, options = {}) => options.method === 'POST'
+    ? Promise.resolve(jsonResponse(200, JSON.parse(options.body)))
+    : new Promise(resolve => { release = () => resolve(jsonResponse(200, emptyServerState)); });
+  const harness = createHarness({ withToast: true, fetchImpl });
+  harness.api.handlePlaybackStarted({ title: '普通歌曲', id: 'track' });
+  harness.api.handlePlaybackStarted({ title: '普通歌曲', id: 'track' });
+  release();
+  await harness.api.ready;
+  await settleMicrotasks();
+  assert.equal(harness.audioInstances.length, 1, 'first-ever playback must announce exactly once after restoration');
+  const saved = harness.localStorage.getItem('fe-monster-achievements-v2');
+  assert.ok(JSON.parse(saved).unlocked['first-play'], 'first-play was not saved locally');
+
+  const restarted = createHarness({ withToast: true, fetchImpl,
+    storageSeed: { 'fe-monster-achievements-v2': saved }
+  });
+  restarted.api.handlePlaybackStarted({ title: '普通歌曲', id: 'track' });
+  release();
+  await restarted.api.ready;
+  assert.equal(restarted.api.isUnlocked('first-play'), true);
+  assert.equal(restarted.audioInstances.length, 0, 'restarting with a saved unlock must stay silent');
+}
+
+async function checkStaleFailedHydrationCannotReleasePlayback() {
+  let rejectOld;
+  let releaseCurrent;
+  let gets = 0;
+  const restored = { ...emptyServerState,
+    unlocked: { 'first-play': { unlockedAt: 1712345678000 } },
+    _sync: { provider: 'netease', scope: 'netease:456', serverSynced: true }
+  };
+  const harness = createHarness({ withToast: true, fetchImpl: (_url, options = {}) => {
+    if (options.method === 'POST') return Promise.resolve(jsonResponse(200, JSON.parse(options.body)));
+    gets += 1;
+    if (gets === 1) return new Promise((_resolve, reject) => { rejectOld = reject; });
+    if (gets === 2) return new Promise(resolve => { releaseCurrent = () => resolve(jsonResponse(200, restored)); });
+    return Promise.resolve(jsonResponse(503, {}));
+  } });
+  harness.window.dispatchEvent(new harness.window.CustomEvent('fe-community-account-change', {
+    detail: { provider: 'netease', loggedIn: true, account: { userId: '456' } }
+  }));
+  harness.api.handlePlaybackStarted({ title: '普通歌曲', id: 'track' });
+  rejectOld(new Error('previous account unavailable'));
+  await settleMicrotasks();
+  for (const delay of [180, 650, 1800]) {
+    harness.clock.advance(delay);
+    await settleMicrotasks();
+  }
+  assert.equal(harness.audioInstances.length, 0,
+    'a stale failed account restore released playback before the current account was loaded');
+  releaseCurrent();
+  await settleMicrotasks();
+  assert.equal(harness.api.isUnlocked('first-play'), true);
+  assert.equal(harness.audioInstances.length, 0);
+}
+
+async function checkRememberedAccountScopeSurvivesUnresolvedLogin() {
+  // The music-API plugin frequently is not listening yet when the client asks
+  // for its achievements right after launch, so the local service answers with
+  // the scope it remembered for the last confirmed music-platform account.
+  // That answer must restore the account partition instead of the empty
+  // anonymous one.
+  const scope = 'netease:remembered-account';
+  const harness = createHarness({ withToast: true, fetchImpl: (url, options = {}) => {
+    if (!url.startsWith('/api/app/achievements')) return Promise.resolve(jsonResponse(200, {}));
+    if (options.method === 'POST') return Promise.resolve(jsonResponse(200, JSON.parse(options.body)));
+    return Promise.resolve(jsonResponse(200, {
+      ...emptyServerState,
+      unlocked: { 'first-play': { unlockedAt: 1712345678000 } },
+      _sync: {
+        provider: 'netease',
+        scope,
+        accountId: 'remembered-account',
+        confirmed: false,
+        remembered: true,
+        serverSynced: true
+      }
+    }));
+  } });
+  harness.window.dispatchEvent(new harness.window.CustomEvent('fe-community-account-change', {
+    detail: { provider: 'netease', loggedIn: false, resolved: true }
+  }));
+  await harness.api.ready;
+  await settleMicrotasks();
+  assert.equal(harness.api.isUnlocked('first-play'), true,
+    'a remembered music-platform account lost its achievements on restart');
+  const stored = harness.localStorage.getItem(scopedStorageKey(scope));
+  assert.ok(stored && JSON.parse(stored).unlocked['first-play'],
+    'the remembered account partition was not adopted locally');
+  assert.equal(harness.audioInstances.length, 0,
+    'restoring a remembered account replayed an existing unlock');
+}
+
+async function checkPlaybackBeforeInitialAccountResolution() {
+  for (const alreadyUnlocked of [false, true]) {
+    const loads = [];
+    const harness = createHarness({ withToast: true, fetchImpl: (url, options = {}) => {
+      if (!url.startsWith('/api/app/achievements')) return Promise.resolve(jsonResponse(200, {}));
+      if (options.method === 'POST') return Promise.resolve(jsonResponse(200, JSON.parse(options.body)));
+      return new Promise(resolve => { loads.push(payload => resolve(jsonResponse(200, payload))); });
+    } });
+    harness.api.handlePlaybackStarted({ title: '普通歌曲', id: 'track' });
+    harness.window.dispatchEvent(new harness.window.CustomEvent('fe-monster-community-profile', {
+      detail: { provider: 'netease', loggedIn: true, resolved: true,
+        hasCommunityIdentity: false, account: { userId: 'initial-account' } }
+    }));
+    assert.equal(loads.length, 2, 'initial account resolution did not start its own restore');
+    loads[0]({ ...emptyServerState,
+      _sync: { provider: 'netease', scope: 'anonymous', serverSynced: true }
+    });
+    await harness.api.ready;
+    assert.equal(harness.audioInstances.length, 0, 'a stale anonymous restore released the pending playback');
+    loads[1]({ ...emptyServerState,
+      unlocked: alreadyUnlocked ? { 'first-play': { unlockedAt: 1712345678000 } } : {},
+      _sync: { provider: 'netease', scope: 'netease:initial-account', serverSynced: true }
+    });
+    await settleMicrotasks();
+    assert.equal(harness.api.isUnlocked('first-play'), true,
+      'initial account resolution discarded the first real playback');
+    assert.equal(harness.audioInstances.length, alreadyUnlocked ? 0 : 1,
+      'pending initial playback must announce only a genuinely new unlock');
+    const saved = JSON.parse(harness.localStorage.getItem(scopedStorageKey('netease:initial-account')));
+    assert.ok(saved.unlocked['first-play'], 'the initial pending playback unlock was not persisted to its account');
+  }
+}
+
+async function checkPendingPlaybackStaysWithResolvedAccount() {
+  for (const nextAccountId of ['account-b', null]) {
+    const loads = [];
+    const harness = createHarness({ withToast: true, fetchImpl: (url, options = {}) => {
+      if (!url.startsWith('/api/app/achievements')) return Promise.resolve(jsonResponse(200, {}));
+      if (options.method === 'POST') return Promise.resolve(jsonResponse(200, JSON.parse(options.body)));
+      return new Promise(resolve => { loads.push(payload => resolve(jsonResponse(200, payload))); });
+    } });
+    harness.window.dispatchEvent(new harness.window.CustomEvent('fe-community-account-change', {
+      detail: { provider: 'netease', loggedIn: true, resolved: true, account: { userId: 'account-a' } }
+    }));
+    harness.api.handlePlaybackStarted({ title: '普通歌曲', id: 'track-a' });
+    harness.window.dispatchEvent(new harness.window.CustomEvent('fe-monster-community-profile', {
+      detail: { provider: 'netease', loggedIn: !!nextAccountId, resolved: true,
+        account: nextAccountId ? { userId: nextAccountId } : null }
+    }));
+    assert.equal(loads.length, 3);
+    for (const [index, scope] of ['anonymous', 'netease:account-a',
+      nextAccountId ? `netease:${nextAccountId}` : 'anonymous'].entries()) {
+      loads[index]({ ...emptyServerState,
+        _sync: { provider: 'netease', scope, serverSynced: true }
+      });
+    }
+    await harness.api.ready;
+    await settleMicrotasks();
+    assert.equal(harness.api.isUnlocked('first-play'), false,
+      'account A pending playback leaked through an account switch or logout');
+    assert.equal(harness.audioInstances.length, 0,
+      'account A pending playback notified a different account');
+    harness.api.handlePlaybackStarted({ title: '新的播放', id: 'track-b' });
+    assert.equal(harness.api.isUnlocked('first-play'), true, 'the new scope could not unlock its own first playback');
+    assert.equal(harness.audioInstances.length, 1);
+  }
+}
+
+async function checkProfileAccountRestoresBeforePlayback() {
+  for (const hasCommunityIdentity of [true, false]) {
+    const scope = 'netease:profile-first';
+    let initialLoad = true;
+    let releaseAccount;
+    const restored = {
+      ...emptyServerState,
+      unlocked: { 'first-play': { unlockedAt: 1712345678000 } },
+      _sync: { provider: 'netease', scope, serverSynced: true }
+    };
+    const harness = createHarness({ withToast: true, fetchImpl: (url, options = {}) => {
+      if (!url.startsWith('/api/app/achievements')) return Promise.resolve(jsonResponse(200, {}));
+      if (options.method === 'POST') return Promise.resolve(jsonResponse(200, JSON.parse(options.body)));
+      if (initialLoad) {
+        initialLoad = false;
+        return Promise.resolve(jsonResponse(200, {
+          ...emptyServerState,
+          _sync: { provider: 'netease', scope: 'anonymous', serverSynced: true }
+        }));
+      }
+      return new Promise(resolve => { releaseAccount = () => resolve(jsonResponse(200, restored)); });
+    } });
+    await harness.api.ready;
+    await settleMicrotasks();
+
+    harness.window.dispatchEvent(new harness.window.CustomEvent('fe-monster-community-profile', {
+      detail: {
+        provider: 'netease', resolved: true, hasCommunityIdentity,
+        ...(hasCommunityIdentity ? { profile: { feId: '12345678' } } : { loggedIn: true }),
+        account: { userId: 'profile-first' }
+      }
+    }));
+    harness.api.handlePlaybackStarted({ title: '普通歌曲', id: 'track' });
+    assert.equal(harness.audioInstances.length, 0,
+      'a profile arriving before login status announced first-play before restoring its account');
+    harness.window.dispatchEvent(new harness.window.CustomEvent('fe-community-account-change', {
+      detail: { provider: 'netease', loggedIn: true, account: { userId: 'profile-first' } }
+    }));
+    assert.equal(typeof releaseAccount, 'function', 'the profile account never started achievement restoration');
+    releaseAccount();
+    await settleMicrotasks();
+    assert.equal(harness.api.isUnlocked('first-play'), true);
+    assert.equal(harness.audioInstances.length, 0, 'the profile account repeated its restored first-play');
+    const saved = JSON.parse(harness.localStorage.getItem(scopedStorageKey(scope)));
+    assert.equal(saved.unlocked['first-play'].unlockedAt, 1712345678000);
+  }
+}
+
+async function checkResolvedAccountRejectsMismatchedSnapshots() {
+  for (const mismatchedScope of ['anonymous', 'netease:old-account']) {
+    const scope = 'netease:current-account';
+    const saved = {
+      ...emptyServerState,
+      unlocked: { 'first-play': { unlockedAt: 1712345678000 } }
+    };
+    let responseScope = 'anonymous';
+    const posts = [];
+    const harness = createHarness({ withToast: true,
+      storageSeed: { [scopedStorageKey(scope)]: JSON.stringify(saved) },
+      fetchImpl: (url, options = {}) => {
+        if (!url.startsWith('/api/app/achievements')) return Promise.resolve(jsonResponse(200, {}));
+        if (options.method === 'POST') {
+          const payload = JSON.parse(options.body);
+          posts.push(payload);
+          return Promise.resolve(jsonResponse(200, payload));
+        }
+        return Promise.resolve(jsonResponse(200, {
+          ...emptyServerState,
+          unlocked: responseScope === scope ? saved.unlocked
+            : responseScope === 'netease:old-account' ? { 'world-peace': { unlockedAt: 1712345679000 } } : {},
+          _sync: { provider: 'netease', scope: responseScope, serverSynced: true }
+        }));
+      }
+    });
+    await harness.api.ready;
+    await settleMicrotasks();
+    const initialPosts = posts.length;
+
+    responseScope = mismatchedScope;
+    harness.window.dispatchEvent(new harness.window.CustomEvent('fe-community-account-change', {
+      detail: { provider: 'netease', loggedIn: true, resolved: true, account: { userId: 'current-account' } }
+    }));
+    harness.api.handlePlaybackStarted({ title: '普通歌曲', id: 'track' });
+    await settleMicrotasks();
+    for (const delay of [180, 650, 1800]) {
+      harness.clock.advance(delay);
+      await settleMicrotasks();
+    }
+    assert.equal(harness.api.isUnlocked('first-play'), true,
+      'a mismatched GET snapshot discarded the resolved account unlock');
+    assert.equal(harness.api.isUnlocked('world-peace'), false,
+      'a mismatched GET snapshot imported another account achievement');
+    assert.equal(harness.audioInstances.length, 0,
+      'a mismatched GET snapshot repeated the resolved account first-play');
+    assert.equal(posts.length, initialPosts, 'a mismatched GET snapshot enabled uploads to the wrong account');
+
+    responseScope = scope;
+    harness.clock.advance(5000);
+    await settleMicrotasks();
+    assert.ok(posts.at(-1).unlocked['first-play'], 'the resolved account did not recover after a matching snapshot');
+    assert.equal(posts.length, initialPosts + 1);
+
+    responseScope = 'anonymous';
+    harness.window.dispatchEvent(new harness.window.CustomEvent('fe-monster-community-profile', {
+      detail: { provider: 'netease', loggedIn: false, resolved: true }
+    }));
+    await settleMicrotasks();
+    assert.equal(harness.api.isUnlocked('first-play'), false,
+      'an explicit logout retained the previous account achievement');
+    assert.ok(JSON.parse(harness.localStorage.getItem(scopedStorageKey(scope))).unlocked['first-play'],
+      'logging out erased the previous account stored unlock');
+  }
+}
+
+async function checkOrdinaryUnlocksWaitForRestoration() {
+  for (const alreadyUnlocked of [true, false]) {
+    let release;
+    const restored = {
+      ...emptyServerState,
+      unlocked: alreadyUnlocked ? { 'first-block': { unlockedAt: 1712345678000 } } : {},
+      _sync: { provider: 'netease', scope: 'netease:ordinary-restore', serverSynced: true }
+    };
+    const harness = createHarness({ withToast: true, fetchImpl: (_url, options = {}) => {
+      if (options.method === 'POST') return Promise.resolve(jsonResponse(200, JSON.parse(options.body)));
+      return new Promise(resolve => { release = () => resolve(jsonResponse(200, restored)); });
+    } });
+    assert.equal(harness.api.unlock('first-block'), true, 'a pending unlock should be accepted');
+    assert.equal(harness.api.unlock('first-block'), false, 'a duplicate pending unlock should be ignored');
+    assert.equal(harness.audioInstances.length, 0, 'ordinary achievements notified before history was restored');
+    release();
+    await harness.api.ready;
+    await settleMicrotasks();
+    assert.equal(harness.api.isUnlocked('first-block'), true, 'the pending unlock was lost');
+    harness.clock.advance(10000);
+    assert.equal(harness.audioInstances.reduce((sum, audio) => sum + audio.playCount, 0),
+      alreadyUnlocked ? 0 : 1, 'only a genuinely new achievement should be announced once');
+    const saved = JSON.parse(harness.localStorage.getItem(scopedStorageKey('netease:ordinary-restore')));
+    if (alreadyUnlocked) assert.equal(saved.unlocked['first-block'].unlockedAt, 1712345678000);
+  }
+}
+
+async function checkFreshStoredUnlockIsNotAnnounced() {
+  for (const saveBeforeUnlock of [false, true]) {
+    const harness = createHarness({ withToast: true, fetchImpl: (_url, options = {}) =>
+      Promise.resolve(jsonResponse(200, options.method === 'POST' ? JSON.parse(options.body) : emptyServerState))
+    });
+    await harness.api.ready;
+    await settleMicrotasks();
+    const saved = { ...emptyServerState, unlocked: { 'first-block': { unlockedAt: 1712345678000 } } };
+    harness.localStorage.setItem('fe-monster-achievements-v2', JSON.stringify(saved));
+    if (saveBeforeUnlock) harness.api.setTheme('toast', 'frost');
+    assert.equal(harness.api.unlock('first-block'), false, 'another view already persisted this achievement');
+    assert.equal(harness.api.isUnlocked('first-block'), true, 'stored unlock was not merged into live state');
+    assert.equal(harness.audioInstances.length, 0, 'an already persisted achievement played its sound again');
+    const stored = JSON.parse(harness.localStorage.getItem('fe-monster-achievements-v2'));
+    assert.equal(stored.unlocked['first-block'].unlockedAt, 1712345678000);
+  }
+}
+
+async function checkUnlockedWorldPeaceDoesNotReplay() {
+  const restored = { ...emptyServerState, unlocked: {
+    'world-peace': { unlockedAt: 1712345678000 },
+    'first-play': { unlockedAt: 1712345677000 }
+  } };
+  const harness = createHarness({ withToast: true, fetchImpl: (_url, options = {}) =>
+    Promise.resolve(jsonResponse(200, options.method === 'POST' ? JSON.parse(options.body) : restored))
+  });
+  await harness.api.ready;
+  for (const song of [
+    { provider: 'netease', id: '1985', title: 'We Are the World' },
+    { id: 'ordinary', title: '普通歌曲' },
+    { provider: 'qq', id: 'cover', title: 'WE ARE THE WORLD (Live)' }
+  ]) {
+    assert.equal(harness.api.handlePlaybackStarted(song), false, 'an unlocked achievement replayed its cinematic');
+    await settleMicrotasks();
+  }
+  assert.equal(harness.audioInstances.length, 0, 'replaying songs must not announce completed achievements');
+}
+
+async function checkPendingOrdinaryUnlocksStayWithTheirAccount() {
+  for (const logout of [false, true]) {
+    const pending = [];
+    const harness = createHarness({ withToast: true, fetchImpl: (_url, options = {}) => {
+      if (!String(_url).startsWith('/api/app/achievements')) return Promise.resolve(jsonResponse(200, {}));
+      if (options.method === 'POST') return Promise.resolve(jsonResponse(200, JSON.parse(options.body)));
+      return new Promise(resolve => pending.push(scope => resolve(jsonResponse(200, {
+        ...emptyServerState,
+        _sync: { provider: 'netease', scope, serverSynced: true }
+      }))));
+    } });
+    // Initial account resolution keeps the user's pending action.
+    harness.api.unlock('first-block', { silent: true });
+    harness.window.dispatchEvent(new harness.window.CustomEvent('fe-community-account-change', {
+      detail: { provider: 'netease', loggedIn: true, account: { userId: 'initial' } }
+    }));
+    pending.shift()('anonymous');
+    pending.shift()('netease:initial');
+    await settleMicrotasks();
+    assert.equal(harness.api.isUnlocked('first-block'), true, 'initial account resolution lost its pending unlock');
+    assert.equal(harness.audioInstances.length, 0, 'restoration lost the pending silent option');
+    harness.window.dispatchEvent(new harness.window.CustomEvent('fe-community-account-change', {
+      detail: { provider: 'netease', loggedIn: true, account: { userId: 'waiting' } }
+    }));
+    harness.api.unlock('manual-sync');
+    harness.window.dispatchEvent(new harness.window.CustomEvent('fe-community-account-change', {
+      detail: { provider: 'netease', loggedIn: !logout, account: logout ? {} : { userId: 'next' } }
+    }));
+    pending.shift()('netease:waiting');
+    pending.shift()(logout ? 'anonymous' : 'netease:next');
+    await settleMicrotasks();
+    assert.equal(harness.api.isUnlocked('manual-sync'), false, 'a pending unlock leaked into another account');
+    assert.equal(harness.audioInstances.length, 0, 'an old account announced an unlock after switching');
+    assert.equal(harness.api.unlock('manual-sync'), true, 'the new account cannot earn its own achievement');
+    assert.equal(harness.audioInstances.reduce((sum, audio) => sum + audio.playCount, 0), 1);
+  }
+}
+
+await checkPendingOrdinaryUnlocksStayWithTheirAccount();
+console.log('PASS pending ordinary unlocks preserve initial resolution and cannot cross account switches');
+await checkOrdinaryUnlocksWaitForRestoration();
+console.log('PASS ordinary achievements wait for history and announce new unlocks only once');
+await checkFreshStoredUnlockIsNotAnnounced();
+console.log('PASS fresh stored unlocks merge into memory without replaying notifications');
+await checkUnlockedWorldPeaceDoesNotReplay();
+console.log('PASS completed world-peace achievement does not replay its cinematic');
+await checkPlaybackBeforeInitialAccountResolution();
+console.log('PASS playback before initial account resolution is restored and announced once');
+await checkPendingPlaybackStaysWithResolvedAccount();
+console.log('PASS pending playback cannot cross a resolved account switch or logout');
+await checkProfileAccountRestoresBeforePlayback();
+console.log('PASS profile-first account restoration waits before announcing playback');
+await checkResolvedAccountRejectsMismatchedSnapshots();
+console.log('PASS resolved accounts reject stale snapshots and preserve explicit logout');
+await checkPlaybackWaitsForRestoredAchievement();
+console.log('PASS playback waits for account restore and ignores transient missing profiles');
+await checkFirstPlaybackPersistsAcrossRestart();
+console.log('PASS first-ever playback announces once and stays unlocked across restart');
+await checkStaleFailedHydrationCannotReleasePlayback();
+console.log('PASS stale failed account hydration cannot release pending playback');
+await checkRememberedAccountScopeSurvivesUnresolvedLogin();
+console.log('PASS remembered music-platform account survives an unresolved login probe');
 await checkAccountScopedLocalWinsWithoutProgressRegression();
 console.log('PASS account-scoped local state wins without progress regression');
 await checkCorruptAccountLocalRestoresFromServer();
@@ -1192,7 +1646,7 @@ console.log('PASS equal-timestamp ornament equipment converges deterministically
 await checkAccountSwitchKeepsLocalStatesIsolated();
 console.log('PASS account switching keeps local and server uploads isolated');
 await checkPostOutageReconnectsAfterRetryBudget();
-console.log('PASS exhausted POST retries reconnect and upload the local state');
+console.log('PASS mirror outage still saves locally and reconnects to upload');
 await checkSerializedLatestThemeWrite();
 console.log('PASS serialized achievement writes keep latest frost theme');
 await checkLegacyMigrationRetry();

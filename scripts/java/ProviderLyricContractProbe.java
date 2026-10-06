@@ -30,13 +30,32 @@ public final class ProviderLyricContractProbe {
                 json(exchange, 200, "{\"ok\":false,\"error\":\"try compatible route\"}");
                 return;
             }
+            if ("/lyric/new".equals(path) && "netease-song".equals(query.get("id"))) {
+                json(exchange, 200, "{"
+                    + "\"lrc\":{\"lyric\":\"[00:04.00]Netease line\"},"
+                    + "\"yrc\":{\"lyric\":\"{\\\"t\\\":4000,\\\"c\\\":[{\\\"tx\\\":\\\"Netease \\\",\\\"t\\\":4000,\\\"d\\\":500},{\\\"tx\\\":\\\"line\\\",\\\"t\\\":4500,\\\"d\\\":500}]}\"}"
+                    + "}");
+                return;
+            }
             if (!"/lyric".equals(path)) {
                 json(exchange, 404, "{\"ok\":false,\"error\":\"not found\"}");
                 return;
             }
             String id = query.getOrDefault("id", "");
             if ("qq-song".equals(id)) {
-                json(exchange, 200, "{\"data\":{\"lyric\":\"[00:01.00]QQ line\"}}");
+                json(exchange, 200, "{\"data\":{"
+                    + "\"lyric\":\"[00:01.00]QQ line\","
+                    + "\"qrc\":\"[1000,1000]QQ (1000,500)line(1500,500)\","
+                    + "\"trans\":\"[00:01.00]QQ translation\","
+                    + "\"roma\":\"[00:01.00]QQ romanization\""
+                    + "}}");
+                return;
+            }
+            if ("qishui-song".equals(id)) {
+                json(exchange, 200, "{\"data\":{"
+                    + "\"lyric\":\"[00:02.00]Qishui line\","
+                    + "\"yrc\":\"[2000,1000](2000,1000,0)Qishui line\""
+                    + "}}");
                 return;
             }
             if ("0123456789ABCDEF0123456789ABCDEF".equals(query.get("hash"))) {
@@ -48,6 +67,7 @@ public final class ProviderLyricContractProbe {
                 }
                 json(exchange, 200, "{\"data\":{"
                     + "\"lyrics\":\"[00:03.00]Kugou line\","
+                    + "\"krc\":\"[3000,1000]<0,500,0>Ku<500,500,0>gou\","
                     + "\"translation\":\"[00:03.00]酷狗译文\""
                     + "}}");
                 return;
@@ -64,14 +84,27 @@ public final class ProviderLyricContractProbe {
             String baseUrl = "http://127.0.0.1:" + server.getAddress().getPort();
             GenericMusicClient qq = new GenericMusicClient("qq", "QQ", baseUrl);
             GenericMusicClient kugou = new GenericMusicClient("kugou", "Kugou", baseUrl);
+            GenericMusicClient qishui = new GenericMusicClient("qishui", "Qishui", baseUrl);
             NeteaseClient netease = new NeteaseClient(baseUrl);
-            MusicProviderRegistry registry = new MusicProviderRegistry(netease, qq, kugou);
+            MusicProviderRegistry registry = new MusicProviderRegistry(netease, qq, kugou, qishui);
 
             Map<String, Object> qqPayload = registry.lyricPayload("qq", "qq-song");
             require("[00:01.00]QQ line".equals(track(qqPayload, "lrc")), "QQ lyric was not normalized");
+            require(track(qqPayload, "klyric").contains("QQ (1000,500)line(1500,500)"),
+                "QQ word-level QRC timing was not normalized");
+            require("[00:01.00]QQ translation".equals(track(qqPayload, "tlyric")),
+                "QQ trans field was not normalized");
+            require("[00:01.00]QQ romanization".equals(track(qqPayload, "romalrc")),
+                "QQ roma field was not normalized");
             require(paths.size() >= 2
                 && "/getLyric".equals(paths.get(0))
                 && "/lyric".equals(paths.get(1)), "QQ compatible endpoint fallback did not run");
+
+            Map<String, Object> qishuiPayload = registry.lyricPayload("qishui", "qishui-song");
+            require("[00:02.00]Qishui line".equals(track(qishuiPayload, "lrc")),
+                "Qishui lyric was not normalized");
+            require(track(qishuiPayload, "yrc").contains("(2000,1000,0)Qishui line"),
+                "Qishui word-level timing was not preserved");
 
             String kugouId = "kg|0123456789ABCDEF0123456789ABCDEF|24680|13579";
             Map<String, Object> kugouPayload = registry.lyricPayload(
@@ -82,6 +115,8 @@ public final class ProviderLyricContractProbe {
                 206
             );
             require("[00:03.00]Kugou line".equals(track(kugouPayload, "lrc")), "Kugou lyric was not normalized");
+            require(track(kugouPayload, "klyric").contains("<0,500,0>Ku"),
+                "Kugou word-level KRC timing was not normalized");
             require("[00:03.00]酷狗译文".equals(track(kugouPayload, "tlyric")), "Kugou translation was not normalized");
             Map<String, String> restored = kugouQuery.get();
             require("0123456789ABCDEF0123456789ABCDEF".equals(restored.get("hash")), "Kugou hash was not restored");
@@ -101,8 +136,13 @@ public final class ProviderLyricContractProbe {
             require(Boolean.TRUE.equals(noLyricPayload.get("nolyric")), "Kugou no-lyric marker was lost");
             require(track(noLyricPayload, "lrc").isBlank(), "Kugou no-lyric payload created fake lyrics");
 
+            int neteaseRequestStart = paths.size();
             Map<String, Object> neteasePayload = registry.lyricPayload("netease", "netease-song");
             require("[00:04.00]Netease line".equals(track(neteasePayload, "lrc")), "Netease lyric was not preserved");
+            require(track(neteasePayload, "yrc").contains("\"t\":4000"),
+                "Netease word-level YRC timing was not preserved");
+            require("/lyric/new".equals(paths.get(neteaseRequestStart)),
+                "Netease lyrics did not prefer the word-level endpoint");
             require("netease".equals(neteasePayload.get("provider")), "Netease provider id is missing");
             System.out.println("Provider lyric contract PASS");
         } finally {

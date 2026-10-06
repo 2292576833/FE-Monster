@@ -12,6 +12,8 @@ const profile = path.join(tempRoot, `edge-profile-${process.pid}`);
 const screenshotPath = path.join(tempRoot, `main-boot-ready-${process.pid}.png`);
 const edge = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+const stallNativeRuntime = process.argv.includes('--stall-native-runtime');
+const stalledNativeResponses = new Set();
 
 assert.ok(existsSync(edge), `Microsoft Edge was not found at ${edge}`);
 mkdirSync(profile, { recursive: true });
@@ -34,6 +36,12 @@ function fixtureApi(pathname, response) {
     return true;
   }
   if (!pathname.startsWith('/api/')) return false;
+  if (stallNativeRuntime && ['/api/app/runtime', '/api/visual-bridge/state'].includes(pathname)) {
+    // Reproduce the live JVM class-loading failure: HTTP accepts the request
+    // but never sends headers. The real browser must abort and finish booting.
+    response.once('close', () => stalledNativeResponses.add(pathname));
+    return true;
+  }
 
   const payloads = {
     '/api/music-apis': { ok: true, providers: [] },
@@ -63,7 +71,7 @@ function fixtureApi(pathname, response) {
     '/api/sandbox/presets': { ok: true, presets: [], folder: 'browser-fixture' },
     '/api/sandbox/components': { ok: true, components: [] },
     '/api/app/interactive/activate': { ok: true },
-    '/api/app/version': { ok: true, version: '2.1.1' },
+    '/api/app/version': { ok: true, version: '2.1.2' },
     '/api/update/latest': { ok: true, available: false },
     '/api/community/status': { ok: true, authenticated: false },
     '/api/community/pet/status': { ok: true, pet: { state: 'idle', voices: [] }, sessions: [] }
@@ -312,9 +320,14 @@ try {
     `startup stalled at the sandbox-only surface: ${JSON.stringify(diagnostics)}`);
   assert.equal(pageErrors.length, 0,
     `real startup raised page exceptions: ${pageErrors.join(' | ')}`);
+  if (stallNativeRuntime) {
+    for (let attempt = 0; attempt < 120 && stalledNativeResponses.size < 2; attempt++) await wait(100);
+    assert.equal(stalledNativeResponses.size, 2, 'both stalled native bootstrap requests must be released');
+  }
 
   process.stdout.write(`${JSON.stringify({
     ok: true,
+    stallNativeRuntime,
     diagnostics,
     pageErrors,
     consoleErrors,

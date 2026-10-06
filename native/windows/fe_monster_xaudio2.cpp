@@ -854,6 +854,93 @@ extern "C" JNIEXPORT jint JNICALL Java_com_femonster_core_NativeAudioEngine_nati
     ));
 }
 
+extern "C" JNIEXPORT jint JNICALL Java_com_femonster_core_NativeAudioEngine_nativeInitializeSpatialGeneration(
+    JNIEnv*, jclass, jlong generation
+) {
+    if (generation <= 0) return static_cast<jint>(E_INVALIDARG);
+    std::shared_lock lock(g_spatial_pipeline_mutex);
+    if (g_spatial_pipeline == nullptr) return static_cast<jint>(E_HANDLE);
+    return static_cast<jint>(fe_audio_pipeline_initialize_generation(
+        g_spatial_pipeline, static_cast<uint64_t>(generation)
+    ));
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_com_femonster_core_NativeAudioEngine_nativeSubmitSpatialPcmGeneration(
+    JNIEnv* env, jclass, jfloatArray pcm, jint frame_count, jlong generation
+) {
+    if (pcm == nullptr || frame_count <= 0 || generation <= 0) return static_cast<jint>(E_INVALIDARG);
+    std::shared_lock lock(g_spatial_pipeline_mutex);
+    if (g_spatial_pipeline == nullptr || g_spatial_input_channels == 0) return static_cast<jint>(E_HANDLE);
+    const uint64_t required_samples = static_cast<uint64_t>(frame_count) * g_spatial_input_channels;
+    if (required_samples > static_cast<uint64_t>(env->GetArrayLength(pcm))) {
+        return static_cast<jint>(E_INVALIDARG);
+    }
+    jfloat* samples = env->GetFloatArrayElements(pcm, nullptr);
+    if (samples == nullptr) return static_cast<jint>(E_OUTOFMEMORY);
+    const int32_t result = fe_audio_pipeline_submit_generation(
+        g_spatial_pipeline, samples, static_cast<uint32_t>(frame_count),
+        static_cast<uint64_t>(generation), UINT64_MAX
+    );
+    env->ReleaseFloatArrayElements(pcm, samples, JNI_ABORT);
+    return static_cast<jint>(result);
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_com_femonster_core_NativeAudioEngine_nativeSubmitSpatialPcmDirectGeneration(
+    JNIEnv* env, jclass, jobject pcm, jint frame_count, jlong generation, jlong sequence
+) {
+    if (pcm == nullptr || frame_count <= 0 || generation <= 0 || sequence < -1) {
+        return static_cast<jint>(E_INVALIDARG);
+    }
+    std::shared_lock lock(g_spatial_pipeline_mutex);
+    if (g_spatial_pipeline == nullptr || g_spatial_input_channels == 0) return static_cast<jint>(E_HANDLE);
+    void* address = env->GetDirectBufferAddress(pcm);
+    const jlong capacity = env->GetDirectBufferCapacity(pcm);
+    const uint64_t required_bytes = static_cast<uint64_t>(frame_count) * g_spatial_input_channels * sizeof(float);
+    if (address == nullptr || capacity < 0 || required_bytes > static_cast<uint64_t>(capacity)) {
+        return static_cast<jint>(E_INVALIDARG);
+    }
+    return static_cast<jint>(fe_audio_pipeline_submit_generation(
+        g_spatial_pipeline, static_cast<const float*>(address), static_cast<uint32_t>(frame_count),
+        static_cast<uint64_t>(generation), static_cast<uint64_t>(sequence)
+    ));
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_com_femonster_core_NativeAudioEngine_nativeResetSpatialTimelineGeneration(
+    JNIEnv*, jclass, jlong generation, jlong next_generation
+) {
+    if (generation <= 0 || next_generation <= generation) return static_cast<jint>(E_INVALIDARG);
+    std::shared_lock lock(g_spatial_pipeline_mutex);
+    if (g_spatial_pipeline == nullptr) return static_cast<jint>(E_HANDLE);
+    return static_cast<jint>(fe_audio_pipeline_reset_timeline_generation(
+        g_spatial_pipeline, static_cast<uint64_t>(generation), static_cast<uint64_t>(next_generation)
+    ));
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_com_femonster_core_NativeAudioEngine_nativeSetSpatialOutputGain(
+    JNIEnv*, jclass, jlong generation, jlong sequence, jfloat gain, jlong expires_at_unix_ms
+) {
+    if (generation <= 0 || sequence <= 0 || !std::isfinite(gain)
+        || gain < 0.0f || gain > 1.0f || expires_at_unix_ms <= 0) return static_cast<jint>(E_INVALIDARG);
+    std::shared_lock lock(g_spatial_pipeline_mutex);
+    if (g_spatial_pipeline == nullptr) return static_cast<jint>(E_HANDLE);
+    return static_cast<jint>(fe_audio_pipeline_set_output_gain(
+        g_spatial_pipeline, static_cast<uint64_t>(generation), static_cast<uint64_t>(sequence),
+        gain, static_cast<int64_t>(expires_at_unix_ms)
+    ));
+}
+
+extern "C" JNIEXPORT jint JNICALL Java_com_femonster_core_NativeAudioEngine_nativeRenewSpatialOutputGainLease(
+    JNIEnv*, jclass, jlong generation, jlong sequence, jlong expires_at_unix_ms
+) {
+    if (generation <= 0 || sequence <= 0 || expires_at_unix_ms <= 0) return static_cast<jint>(E_INVALIDARG);
+    std::shared_lock lock(g_spatial_pipeline_mutex);
+    if (g_spatial_pipeline == nullptr) return static_cast<jint>(E_HANDLE);
+    return static_cast<jint>(fe_audio_pipeline_renew_output_gain_lease(
+        g_spatial_pipeline, static_cast<uint64_t>(generation), static_cast<uint64_t>(sequence),
+        static_cast<int64_t>(expires_at_unix_ms)
+    ));
+}
+
 extern "C" JNIEXPORT jint JNICALL Java_com_femonster_core_NativeAudioEngine_nativeResetSpatialTimeline(
     JNIEnv*,
     jclass

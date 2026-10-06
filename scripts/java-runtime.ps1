@@ -8,9 +8,28 @@ function Update-JavaRuntimeEnvironment {
   $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
   $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
   $processPath = [Environment]::GetEnvironmentVariable('Path', 'Process')
-  $pathParts = @($machinePath, $userPath, $processPath) | Where-Object { ![string]::IsNullOrWhiteSpace($_) }
-  if ($pathParts.Count -gt 0) {
-    $Env:Path = ($pathParts -join ';')
+  # The process PATH already contains the effective machine and user PATH.
+  # Concatenating all three on every probe grows it exponentially and can hit
+  # Windows' environment-value limit during repeated installer builds.
+  $pathSources = if (![string]::IsNullOrWhiteSpace($processPath)) {
+    @($processPath)
+  } else {
+    @($machinePath, $userPath)
+  }
+  $pathParts = New-Object System.Collections.Generic.List[string]
+  foreach ($source in $pathSources) {
+    foreach ($part in @([string]$source -split ';')) {
+      $candidate = $part.Trim()
+      if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
+      if (!($pathParts | Where-Object { [string]::Equals($_, $candidate, [StringComparison]::OrdinalIgnoreCase) })) {
+        $pathParts.Add($candidate) | Out-Null
+      }
+    }
+  }
+  $normalizedPath = $pathParts -join ';'
+  if (![string]::IsNullOrWhiteSpace($normalizedPath) -and $normalizedPath.Length -le 30000 -and
+      ![string]::Equals($normalizedPath, $processPath, [StringComparison]::Ordinal)) {
+    $Env:Path = $normalizedPath
   }
 
   $machineJavaHome = [Environment]::GetEnvironmentVariable('JAVA_HOME', 'Machine')
@@ -201,7 +220,9 @@ function Find-JavaDevelopmentKit {
   $bestMajor = [int]::MaxValue
   foreach ($candidate in Get-JavaExecutableCandidates -Root $Root) {
     $major = Get-JavaMajorVersion $candidate
-    if ($major -lt $MinimumMajor -or $major -gt $bestMajor) { continue }
+    # Keep the first complete candidate at the lowest compatible major so
+    # explicit Java homes retain their priority over later system discoveries.
+    if ($major -lt $MinimumMajor -or $major -ge $bestMajor) { continue }
     $jdkCandidateHome = Split-Path -Parent (Split-Path -Parent $candidate)
     $requiredTools = @('javac.exe', 'jar.exe', 'jdeps.exe', 'jlink.exe')
     $complete = @($requiredTools | Where-Object {

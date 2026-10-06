@@ -17,6 +17,8 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -68,8 +70,8 @@ public class GenericMusicClient implements MusicProviderClient {
         this.id = id == null || id.isBlank() ? "music" : id.trim();
         this.label = label == null || label.isBlank() ? this.id : label.trim();
         this.baseUrl = normalizeBase(baseUrl);
-        this.sessionFile = sessionFile;
-        this.session = loadSession(sessionFile);
+        this.sessionFile = sessionFile == null ? null : sessionFile.toAbsolutePath().normalize();
+        this.session = loadSession(this.sessionFile);
         this.protocol = protocol;
         this.explicitProtocol = explicitProtocol;
         this.cookieManager = new CookieManager(null, CookiePolicy.ACCEPT_ALL);
@@ -291,6 +293,7 @@ public class GenericMusicClient implements MusicProviderClient {
             if (sessionFile == null) return;
             try {
                 Files.deleteIfExists(sessionFile);
+                Files.deleteIfExists(sessionFile.resolveSibling(sessionFile.getFileName().toString() + ".tmp"));
             } catch (IOException error) {
                 throw new IllegalStateException("unable to clear " + id + " browser session", error);
             }
@@ -497,9 +500,9 @@ public class GenericMusicClient implements MusicProviderClient {
         body.putIfAbsent("ok", !isErrorPayload(raw));
         body.put("provider", id);
         putLyricTrack(body, "lrc", namedLyricText(body, "lrc", "lyric", "lyrics"));
-        putLyricTrack(body, "tlyric", namedLyricText(body, "tlyric", "translation", "translatedLyric"));
-        putLyricTrack(body, "romalrc", namedLyricText(body, "romalrc", "romanization", "romanizedLyric"));
-        putLyricTrack(body, "klyric", namedLyricText(body, "klyric", "krc"));
+        putLyricTrack(body, "tlyric", namedLyricText(body, "tlyric", "translation", "translatedLyric", "trans"));
+        putLyricTrack(body, "romalrc", namedLyricText(body, "romalrc", "romanization", "romanizedLyric", "roma"));
+        putLyricTrack(body, "klyric", namedLyricText(body, "klyric", "krc", "qrc"));
         putLyricTrack(body, "yrc", namedLyricText(body, "yrc"));
         return body;
     }
@@ -1264,23 +1267,35 @@ public class GenericMusicClient implements MusicProviderClient {
         if (updates.isEmpty()) return;
         synchronized (session) {
             boolean changed = false;
+            Map<String, String> next = new LinkedHashMap<>(session);
             for (Map.Entry<String, String> entry : updates.entrySet()) {
                 if (entry.getValue() == null || entry.getValue().isBlank()) continue;
-                String previous = session.get(entry.getKey());
+                String previous = next.get(entry.getKey());
                 if (entry.getValue().equals(previous)) continue;
-                session.put(entry.getKey(), entry.getValue());
+                next.put(entry.getKey(), entry.getValue());
                 changed = true;
             }
-            if (changed) saveSessionLocked();
+            if (changed) {
+                saveSessionLocked(next);
+                session.clear();
+                session.putAll(next);
+            }
         }
     }
 
-    private void saveSessionLocked() {
+    private void saveSessionLocked(Map<String, String> next) {
         if (sessionFile == null) return;
         try {
             Files.createDirectories(sessionFile.getParent());
-            Files.writeString(sessionFile, SimpleJson.stringify(session), StandardCharsets.UTF_8);
-        } catch (IOException ignored) {
+            Path temporary = sessionFile.resolveSibling(sessionFile.getFileName().toString() + ".tmp");
+            Files.writeString(temporary, SimpleJson.stringify(next), StandardCharsets.UTF_8);
+            try {
+                Files.move(temporary, sessionFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException ignored) {
+                Files.move(temporary, sessionFile, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException error) {
+            throw new IllegalStateException("unable to save " + id + " browser session", error);
         }
     }
 

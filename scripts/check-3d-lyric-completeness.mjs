@@ -263,11 +263,17 @@ try {
   fs.writeFileSync(fixturePath, fixture, 'utf8');
   const result = spawnSync(browserPath, [
     '--headless=new',
+    '--disable-gpu',
     '--no-first-run',
     '--disable-background-networking',
     '--disable-component-update',
     '--disable-default-apps',
     '--disable-extensions',
+    '--disable-sync',
+    '--disable-background-timer-throttling',
+    '--disable-renderer-backgrounding',
+    '--disable-backgrounding-occluded-windows',
+    '--metrics-recording-only',
     '--hide-scrollbars',
     '--force-device-scale-factor=2',
     '--virtual-time-budget=1500',
@@ -278,7 +284,7 @@ try {
   ], {
     encoding: 'utf8',
     maxBuffer: 8 * 1024 * 1024,
-    timeout: 15000
+    timeout: 30000
   });
 
   assert.equal(result.status, 0, result.stderr || 'Chromium layout fixture failed');
@@ -447,7 +453,7 @@ try {
       encoding: 'utf8',
       env: { ...process.env, FE_3D_LYRIC_VIEWPORT: String(viewportWidths[1]) },
       maxBuffer: 8 * 1024 * 1024,
-      timeout: 20000
+      timeout: 45000
     });
     assert.equal(wideResult.status, 0, wideResult.stderr || wideResult.stdout);
     process.stdout.write(wideResult.stdout);

@@ -585,7 +585,7 @@ test("idempotent module-backed playback resolution retries transient network err
   assert.equal(events.filter((entry) => entry.event === "song-url").length, 3);
 });
 
-test("lyrics resolve a composite song id through Kugou lyric search and return an LRC contract", async (context) => {
+test("lyrics resolve a composite song id and return a decoded KRC timeline", async (context) => {
   const dataDir = await mkdtemp(path.join(os.tmpdir(), "fe-kugou-lyrics-"));
   const logPath = path.join(dataDir, "upstream.jsonl");
   const plugin = await startPlugin(dataDir, {
@@ -604,8 +604,8 @@ test("lyrics resolve a composite song id through Kugou lyric search and return a
   assert.equal(response.status, 200);
   assert.equal(payload.ok, true);
   assert.equal(payload.provider, "kugou");
-  assert.equal(payload.lyric, "[00:00.00]fixture lyric\n[00:01.00]fixture line");
-  assert.deepEqual(payload.lrc, { lyric: payload.lyric });
+  assert.match(payload.lyric, /^\[0,1000\]<0,500,0>fixture /);
+  assert.deepEqual(payload.klyric, { lyric: payload.lyric });
 
   const events = (await readFile(logPath, "utf8"))
     .trim()
@@ -617,7 +617,7 @@ test("lyrics resolve a composite song id through Kugou lyric search and return a
   assert.equal(events[0].albumAudioId, "123456");
   assert.equal(events[1].id, "fixture-lyric-id");
   assert.equal(events[1].accesskey, "fixture-access-key");
-  assert.equal(events[1].fmt, "lrc");
+  assert.equal(events[1].fmt, "krc");
   assert.equal(events[1].decode, true);
 });
 
@@ -643,7 +643,7 @@ test("playlist lyrics use title and millisecond duration when hash-only matching
   const payload = await response.json();
   assert.equal(response.status, 200);
   assert.equal(payload.ok, true);
-  assert.match(payload.lrc.lyric, /^\[00:00\.00\]fixture lyric/);
+  assert.match(payload.klyric.lyric, /^\[0,1000\]<0,500,0>fixture /);
 
   const events = (await readFile(logPath, "utf8"))
     .trim()
@@ -678,7 +678,7 @@ test("lyrics retry by hash when a cached composite id contains a stale audio id"
   const payload = await response.json();
   assert.equal(response.status, 200);
   assert.equal(payload.ok, true);
-  assert.match(payload.lrc.lyric, /^\[00:00\.00\]fixture lyric/);
+  assert.match(payload.klyric.lyric, /^\[0,1000\]<0,500,0>fixture /);
 
   const events = (await readFile(logPath, "utf8"))
     .trim()
@@ -935,19 +935,19 @@ test("CORS credentials are granted only to loopback browser origins", async (con
   assert.match(allowed.headers.get("vary") || "", /Origin/i);
 });
 
-test("the rebuilt package carries the 2.0.7 provider-QR contract", async () => {
+test("the rebuilt package carries the 2.0.8 provider contract", async () => {
   const manifest = JSON.parse(await readFile(path.join(pluginRoot, "music-api-package.json"), "utf8"));
   const build = await readFile(path.join(pluginRoot, "build.ps1"), "utf8");
   const readme = await readFile(path.join(pluginRoot, "README.md"), "utf8");
   const notices = await readFile(path.join(pluginRoot, "THIRD-PARTY-NOTICES.md"), "utf8");
 
-  assert.equal(manifest.version, "2.0.7");
+  assert.equal(manifest.version, "2.0.8");
   assert.equal(manifest.loginQr, false);
   assert.ok(manifest.launcher.args.includes("--data-dir=${data}/kugou-music-api"));
-  assert.match(build, /\$pluginVersion\s*=\s*"2\.0\.7"/);
+  assert.match(build, /\$pluginVersion\s*=\s*"2\.0\.8"/);
   assert.match(build, /283f1e97b110726b208a64b486a657c0fc0a6126/);
   assert.match(build, /FE-Monster-Kugou-API-Plugin-\$pluginVersion\.zip/);
-  assert.match(readme, /版本：2\.0\.7/);
+  assert.match(readme, /版本：2\.0\.8/);
   assert.match(readme, /官方扫码登录/);
   assert.match(readme, /--data-dir/);
   assert.match(notices, /kugoumusicapi.*283f1e97b110726b208a64b486a657c0fc0a6126/i);

@@ -1,10 +1,12 @@
 package com.femonster.memory;
 
+import com.femonster.json.SimpleJson;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -87,6 +89,7 @@ public final class MemorySanitizer {
     private static final Set<String> CHAT_FIELDS = Set.of(
         "messageId",
         "conversationId",
+        "conversationStartedAt",
         "traceId",
         "turnId",
         "role",
@@ -139,7 +142,8 @@ public final class MemorySanitizer {
         "title",
         "value",
         "timeAccuracy",
-        "traceId"
+        "traceId",
+        "producerProof"
     );
 
     private static final Set<String> CHAT_REQUIRED = Set.of(
@@ -256,6 +260,13 @@ public final class MemorySanitizer {
         return type != null && allowedTypes(stream).contains(type);
     }
 
+    /** Reserved trusted-producer fields are not accepted through public store append. */
+    public static boolean isReservedTrustedPayload(Map<String, Object> payload) {
+        if (payload == null) return false;
+        return payload.containsKey("producerProof")
+            || "pet.personalization.internal.v1".equals(payload.get("entityId"));
+    }
+
     public static Map<String, Object> sanitize(Stream stream, String type, Map<String, Object> payload) {
         if (stream == null) throw failure("MEMORY_STREAM_INVALID");
         if (type == null || type.isBlank()) throw failure("MEMORY_TYPE_NOT_ALLOWED");
@@ -305,6 +316,9 @@ public final class MemorySanitizer {
             && payload.get("occurredAt") == null;
         if (!legacyUnknown) {
             validateTimestamp(payload.get("occurredAt"));
+            if (stream == Stream.CHAT && payload.containsKey("conversationStartedAt")) {
+                validateTimestamp(payload.get("conversationStartedAt"));
+            }
             if (stream == Stream.CHAT && !"exact".equals(payload.get("timeAccuracy"))) {
                 throw failure("MEMORY_TIMESTAMP_INVALID");
             }
@@ -531,7 +545,7 @@ public final class MemorySanitizer {
         String normalized = Normalizer.normalize(text, Normalizer.Form.NFKC);
         if (AUTHORIZATION_VALUE.matcher(normalized).find()
             || SECRET_ASSIGNMENT_VALUE.matcher(normalized).find()
-            || JWT_VALUE.matcher(normalized).find()
+            || containsJwt(normalized)
             || PROVIDER_KEY_VALUE.matcher(normalized).find()
             || PRIVATE_KEY_VALUE.matcher(normalized).find()
             || RAW_HTTP_VALUE.matcher(normalized.trim()).find()) {
@@ -553,6 +567,25 @@ public final class MemorySanitizer {
                 && Character.isLetter(value.charAt(0))
                 && value.charAt(1) == ':'
                 && (value.charAt(2) == '\\' || value.charAt(2) == '/'));
+    }
+
+    private static boolean containsJwt(String text) {
+        var candidates = JWT_VALUE.matcher(text);
+        while (candidates.find()) {
+            String token = candidates.group();
+            String header = token.substring(0, token.indexOf('.'));
+            if (header.length() > 4096) return true;
+            try {
+                // Dotted command/preference IDs are not credentials. A JWT
+                // has a base64url-encoded JOSE header with an algorithm field.
+                Map<String, Object> jose = SimpleJson.parseObjectStrict(new String(
+                    Base64.getUrlDecoder().decode(header), StandardCharsets.UTF_8));
+                if (jose.get("alg") instanceof String algorithm && !algorithm.isBlank()) return true;
+            } catch (IllegalArgumentException notJwt) {
+                // Ordinary dotted identifiers must still be stored verbatim.
+            }
+        }
+        return false;
     }
 
     private static boolean isAbsoluteUnixPath(String value) {

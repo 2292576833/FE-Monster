@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import vm from 'node:vm';
 
 const root = path.resolve(import.meta.dirname, '..');
 const app = readFileSync(path.join(root, 'web', 'app.js'), 'utf8');
@@ -38,6 +39,10 @@ const cardLineSource = functionBlock(
   'qishuiPlaybackBookLines',
   'disposeQishuiLyricTransition'
 );
+const cardTransitionSource = functionBlock(
+  'startQishuiLyricTransition',
+  'syncQishuiLyricTransition'
+);
 
 const visualLead = constant('BOOK_LYRIC_VISUAL_LEAD_SECONDS');
 const timestampCompensation = constant('LYRIC_TIMESTAMP_COMPENSATION_SECONDS');
@@ -46,30 +51,47 @@ const settleSeconds = optionalConstant('QISHUI_LYRIC_SCROLL_SETTLE_SECONDS');
 const effectiveLeadSeconds = visualLead - timestampCompensation;
 const transitionTailMs = Math.max(0, transitionSeconds - effectiveLeadSeconds) * 1000;
 
-// Replays the qishui card's actual media-clock scroll response at 60 Hz.
-// The fixture represents a common one/two-line advance inside the compact card.
+// Execute the production scroll and viewport helpers, including the card's
+// transform-backed viewport, rather than inferring behavior from scrollTop writes.
+function scrollFixture(clockTime = 0) {
+  const list = {
+    dataset: { lyricOffset: 'transform' }, __lyricOffset: 0,
+    clientHeight: 200, style: { setProperty() {} }
+  };
+  const store = { lyricBookScrollTarget: 0, lyricBookScrollClockTime: clockTime };
+  const context = vm.createContext({
+    performance,
+    state: { orb: { reducedMotion: false } }, els: {},
+    clamp: (value, min, max) => Math.max(min, Math.min(max, value)),
+    bookGlyphEase: (value) => value * value * (3 - 2 * value),
+    isPlaybackClockRunning: () => true,
+    bookLyricTargetScrollTop: (line) => line.target,
+    BOOK_LYRIC_SCROLL_SNAP_PX: constant('BOOK_LYRIC_SCROLL_SNAP_PX'),
+    BOOK_LYRIC_SCROLL_MIN_STEP_SECONDS: constant('BOOK_LYRIC_SCROLL_MIN_STEP_SECONDS'),
+    BOOK_LYRIC_SCROLL_MAX_STEP_SECONDS: constant('BOOK_LYRIC_SCROLL_MAX_STEP_SECONDS')
+  });
+  vm.runInContext(functionBlock('lyricListViewportIsTransform', 'bookLyricTargetScrollTop') + scrollSource, context);
+  return {
+    list, store,
+    scroll(target, time) {
+      return context.syncBookLyricScroll({ target }, {
+        list, store, lines: [], activeIndex: 0, clockTime: time,
+        responseSeconds: settleSeconds
+      });
+    }
+  };
+}
+
 function simulatedScrollArrivalMs({
   initialDeltaPx = 92,
   snapPx = 0.65,
   frameSeconds = 1 / 60
 } = {}) {
-  let remaining = initialDeltaPx;
+  const fixture = scrollFixture();
   let elapsedSeconds = 0;
-  let firstFrame = true;
-  while (remaining > snapPx && elapsedSeconds < 10) {
-    let fraction = 0;
-    if (Number.isFinite(settleSeconds) && !firstFrame) {
-      fraction = 1 - Math.exp(-frameSeconds / settleSeconds);
-    } else if (!firstFrame) {
-      // Mirrors the pre-fix media-clock branch: targetChanged is consumed by
-      // its zero-delta first frame, then the 0.08 minimum step is eased.
-      const responseSeconds = 0.26;
-      const step = Math.max(0.08, Math.min(0.82, frameSeconds / responseSeconds));
-      fraction = step * step * (3 - 2 * step);
-    }
-    remaining -= remaining * fraction;
+  while (Math.abs(initialDeltaPx - fixture.list.__lyricOffset) > snapPx && elapsedSeconds < 10) {
     elapsedSeconds += frameSeconds;
-    firstFrame = false;
+    fixture.scroll(initialDeltaPx, elapsedSeconds);
   }
   return elapsedSeconds * 1000;
 }
@@ -83,6 +105,10 @@ const scrollArrivalByHz = [60, 120, 165].map((refreshHz) => {
   };
 });
 const worstScrollTailMs = Math.max(...scrollArrivalByHz.map(({ tailMs }) => tailMs));
+const pausedFixture = scrollFixture(5);
+const pausedTargetArrived = pausedFixture.scroll(92, 5);
+const pausedTargetOffset = pausedFixture.list.__lyricOffset;
+const backwardsTargetArrived = pausedFixture.scroll(-24, 2);
 
 const checks = {
   actualCardHotPathUsesMediaClock:
@@ -104,10 +130,16 @@ const checks = {
   frameRateIndependentScrollResponse:
     cardUpdateSource.includes('responseSeconds: QISHUI_LYRIC_SCROLL_SETTLE_SECONDS')
       && scrollSource.includes('1 - Math.exp(-dt / responseSeconds)'),
+  positionTransitionDoesNotHoldOldScrollPosition:
+    !/\b(?:translate|scale):/.test(cardTransitionSource),
   transitionSettlesPromptly:
     transitionTailMs <= 80 + Number.EPSILON,
-  activeLineReachesReadingPositionPromptly:
-    worstScrollTailMs <= 80 + Number.EPSILON
+  activeLineReachesReadingPositionWithinOneFrame:
+    worstScrollTailMs <= 1000 / 60 + Number.EPSILON,
+  pausedClockStillAppliesChangedTarget:
+    pausedTargetArrived && pausedTargetOffset === 92,
+  backwardsSeekAppliesChangedTarget:
+    backwardsTargetArrived && pausedFixture.list.__lyricOffset === -24
 };
 
 const result = {

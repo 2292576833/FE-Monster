@@ -9,18 +9,23 @@
     },
     {
       "path": "components/GlassSurface.css",
-      "version": "20260811-cache-audit-1",
-      "sha256": "07b0d4ea8b3f99e68af873e194dac6eb9297adcbce5eedc38afb7b9111c05c97"
+      "version": "20260926-playback-glass-brightness-1",
+      "sha256": "5e6e098dbe46953c9dc0eb4f30e83be74ddb59e51dd8155c1797e34dfe6dd9ed"
     },
     {
       "path": "web/app-command.js",
-      "version": "20260827-pet-command-manifest-1",
-      "sha256": "f5401dbfe445fe2ce5e51682f191692e5e5d16a299ebb635fa3c43543ac26789"
+      "version": "20260926-pet-self-register-1",
+      "sha256": "1f27d6bcbb7b429f315c0850176227220b22453273403c0d381dd3a5c3f5ba4d"
+    },
+    {
+      "path": "web/app-parameter-registry.js",
+      "version": "20260831-complete-parameter-registry-1",
+      "sha256": "a0acb041d5b08bc4bead4dd6621105d33c7afcf33d62dbedc40de1dd166a9855"
     },
     {
       "path": "web/app.js",
-      "version": "20260827-pet-command-context-1",
-      "sha256": "cc3067a048f59d1c0c401d5b8b474e03291dc5c1cfdadee2d809ea95694e07fb"
+      "version": "20261007-playback-macos-sync-3",
+      "sha256": "024a1b75538bc9464444e91a2c027e8fb69219c109e73bb379f21ac9c0f3e544"
     },
     {
       "path": "web/assets/soundscape-workshop/assets/index-CSU_B_T9.js",
@@ -34,13 +39,23 @@
     },
     {
       "path": "web/audio-mixer-ui.js",
-      "version": "20260825-desktop-layout-1",
-      "sha256": "ead9f720d50d5a111e0043a60b4ede604fa261771128394cf8f130610fbcb275"
+      "version": "20260918-mixer-catalog-compat-2",
+      "sha256": "7d6f22b5af4497083217850ed6a806c72e34c844c4fe516450e9a92735d0d302"
     },
     {
       "path": "web/audio-mixer-visuals.js",
       "version": "20260827-soundscape-state-pair-1",
       "sha256": "32ba27df7f19129efd6b9cedc2335e322e8a733394be65c9022fc1531dad8b06"
+    },
+    {
+      "path": "web/audio-source-manager.css",
+      "version": "20260919-audio-source-library-switch-1",
+      "sha256": "3e52b00b9c03982a1bdafe3cd7fff8716b27f7e8f478cd16bc6a2cb60216a37b"
+    },
+    {
+      "path": "web/audio-source-manager.js",
+      "version": "20260926-release-2.2.3-1",
+      "sha256": "75433df8b05a251a840517d767217f2887626d22f77b8e118a0b8ccbed29c39b"
     },
     {
       "path": "web/black-gold-buttons.css",
@@ -84,8 +99,8 @@
     },
     {
       "path": "web/client-ai-service.js",
-      "version": "20260819-soundscape-parity-1",
-      "sha256": "bc6e71e61bc9715c023e67946d6ef4ca4b29b726c54cfe0df7a82979c92be9bb"
+      "version": "20260917-tool-consent-2",
+      "sha256": "4b8a486bd7d57337d96a73f12b042ef637d2f388d37dd894c6032aa7e2d87ba6"
     },
     {
       "path": "web/client-runtime-loader.js",
@@ -106,6 +121,16 @@
       "path": "web/companion-care-actions.js",
       "version": "20260817-care-autonomy-1",
       "sha256": "293164357b630db3da30fbf3eb538ca037ad25b13645c9ceb397ff2302116f4a"
+    },
+    {
+      "path": "web/cover-depth-light.js",
+      "version": "20260918-cover-depth-map-display-3",
+      "sha256": "9c8df54fac56f08227b46643f3a6aa9050774903a6c83443328009fca114e8ae"
+    },
+    {
+      "path": "web/cover-sketch-runtime.js",
+      "version": "20260924-cover-dynamic-1",
+      "sha256": "9e23144895dae1b100077318a1a0388e6c12156dafad30b9c97e9ec5f189739a"
     },
     {
       "path": "web/creative-community.js",
@@ -133,9 +158,44 @@
       "sha256": "41f1d4025de4c6103574182a2464a45baf9e8ced898b2d250ff0b1f8525c5ebb"
     },
     {
+      "path": "web/harmonic-orbital-atmosphere.js",
+      "version": "20260924-harmonic-cold-air-4",
+      "sha256": "9012aa0842157709dbe4720ea1c09df0e5575764da9fb85fb72325951d4a4f1c"
+    },
+    {
+      "path": "web/harmonic-orbital-core.js",
+      "version": "20260926-harmonic-rise-release-3",
+      "sha256": "b1ebbe579b587e366a2d5b555655e233926c2b2231d5c120d971927fc89eb951"
+    },
+    {
+      "path": "web/harmonic-state-runtime.js",
+      "version": "20260924-harmonic-cold-air-1",
+      "sha256": "d327dafa96f39c518cfcc777366905e9882a5706c0ea9a6e7fd8ea3380b8ef81"
+    },
+    {
+      "path": "web/harmonic-state-settings.js",
+      "version": "20260926-harmonic-bass-rise-2",
+      "sha256": "4f5cbe32f3779852c8ee4104b07c84d4cee548194ec1a579b32d6179311efa6f"
+    },
+    {
       "path": "web/liquid-ether-switches.js",
       "version": "20260811-cache-audit-1",
       "sha256": "84bd8df54389a3c85af1acabbe73a007f02b1ac8783c37d2321963b5dd1e4cd3"
+    },
+    {
+      "path": "web/local-memory-client.js",
+      "version": "20260917-account-health-8",
+      "sha256": "734762c5f200d2bf1de52d1bd43ebd4055e96951aa8491f04e65caa97217eba8"
+    },
+    {
+      "path": "web/lx-playlists.js",
+      "version": "20260927-lx-playlist-import-1",
+      "sha256": "4683ab3d071b442c2fb817c347db9fbc5a6985ecf69eb8559cc8b3f3fe59735d"
+    },
+    {
+      "path": "web/lyric-highlight-particles.js",
+      "version": "20260918-lyric-particles-performance-1",
+      "sha256": "abfd8eec9bea67c2b4ca19c1c479a4ed517328054005a28cb38ce85b7d0b7c0f"
     },
     {
       "path": "web/lyric-render-quality.css",
@@ -143,9 +203,39 @@
       "sha256": "b33fddde95b6b5f73d6255b6e7579cf1d272b16934125014bde0850d1cb18e4a"
     },
     {
+      "path": "web/lyric-timeline-resolver.js",
+      "version": "20260911-native-provider-1",
+      "sha256": "5470c1cb6d0d4eea5e5bece64fa60307f78457b0cdaf956472624397fc5cfb4f"
+    },
+    {
+      "path": "web/mac-capture.js",
+      "version": "20261007-macos-native-1",
+      "sha256": "b3c947f9e9d94c6df6a8673f438331fc91ff54824e5b5b677e716d08bd9371b5"
+    },
+    {
       "path": "web/music-api-package-client.js",
       "version": "20260811-cache-audit-1",
       "sha256": "34e000b4e32a1d3e83180076b1f37aba12c1345af20fa1b32d5f90026a41ab2d"
+    },
+    {
+      "path": "web/particle-lyrics-runtime.js",
+      "version": "20260926-particle-never-pause-2",
+      "sha256": "e71ac7e43dd04a2e79b7df4afc49981532dd20830426e14727a23676e2e58550"
+    },
+    {
+      "path": "web/particle-lyrics-settings.js",
+      "version": "20260926-particle-idle-suppression-1",
+      "sha256": "c426e5a34b0cad5c268e71803df5400678565ee39bc7fe804c56648c84f24c87"
+    },
+    {
+      "path": "web/particle-lyrics-shape-editor.js",
+      "version": "20260918-particle-idle-custom-2",
+      "sha256": "743d6f8d45394ac5ea3a0bbc0ed9c592464af73d66ddbe275cad9f3c4a6c30a6"
+    },
+    {
+      "path": "web/particle-lyrics.css",
+      "version": "20260918-particle-idle-custom-2",
+      "sha256": "881fba838442f0b20ca97714e67cfdad5045ca12bfac6ea33e280f7f838f4e9b"
     },
     {
       "path": "web/pet-affect-plan.js",
@@ -154,13 +244,13 @@
     },
     {
       "path": "web/pet-assistant.css",
-      "version": "20260816-pet-chain-fix-1",
-      "sha256": "d9a48595d18748b67eed2b86aa078ccbcff3974d8db2a6676ad48535c1f432f2"
+      "version": "20260830-permanent-chat-history-1",
+      "sha256": "507ce1b9196d8b6ff6f8cb8f4e6fab4ad9e21e6ecdf6aba724c85af43654a6bf"
     },
     {
       "path": "web/pet-assistant.js",
-      "version": "20260827-pet-command-manifest-2",
-      "sha256": "e1cdc291311109b6b261bbacd171dd2540881aa5f14f994d112597dc0e525ec2"
+      "version": "20260926-pet-self-register-1",
+      "sha256": "0cf660b06aead296395799b176d5740dd0214196188c466a5d93543da1604e59"
     },
     {
       "path": "web/pet-client-context.js",
@@ -208,9 +298,24 @@
       "sha256": "4325a21003cd1a67b9d735ca9edeb9fcf9635a7e623fdb3701cc374203cd784d"
     },
     {
+      "path": "web/pet-memory-recall.js",
+      "version": "20260831-relevant-cross-session-memory-1",
+      "sha256": "c7ca92c450067c59b2665e67aa75510a1b97f4bae9877bf10c9f40db2893a359"
+    },
+    {
       "path": "web/pet-particle-orb.js",
       "version": "20260812-audio-reactive-sphere-2",
       "sha256": "e1cfbdf859e55c37b412cdc48781390fc15284b453c5dc0f97a756203e6332dc"
+    },
+    {
+      "path": "web/pet-preference-memory.js",
+      "version": "20260901-cross-session-preferences-3",
+      "sha256": "d82b9337121d4b6a800083546670668c90121a1946d9534c733ff23aa306bc6a"
+    },
+    {
+      "path": "web/pet-preference-policy.js",
+      "version": "20260831-preference-ledger-v2-1",
+      "sha256": "990a15c65dd00cb73bf7e81ba1d56501657070293bc21b05b18134b672bd385a"
     },
     {
       "path": "web/pet-product-tour.css",
@@ -224,8 +329,8 @@
     },
     {
       "path": "web/pixel-achievements.js",
-      "version": "20260813-achievement-rewards-1",
-      "sha256": "979fe17730e9026d96cc9351ff629df8010c0ef540bdb1777bf76edd8653b311"
+      "version": "20260926-achievement-notification-dedupe-3",
+      "sha256": "9b26c8ee8e1aba91b1d5c380f6c2f81986ca7aa53b4f3a35354cd9ecf35e9d90"
     },
     {
       "path": "web/pixel-adventure.css",
@@ -238,9 +343,44 @@
       "sha256": "464cd1479478f4beb910d208e4446d5b2e174ba544c0c7fbb2c5d7210f74dc69"
     },
     {
+      "path": "web/playback-bar-enhancements.css",
+      "version": "20260926-queue-wheel-selection-1",
+      "sha256": "85851f574e217ad03bd37d89e19901336d917145cc80081408b48ede5c05ca27"
+    },
+    {
+      "path": "web/playback-card-app.js",
+      "version": "20261007-card-wheel-28",
+      "sha256": "5c91e6577ea9b5ec99850c3171a1579119864ea65b4916aed0c1661318329558"
+    },
+    {
+      "path": "web/playback-card-runtime.js",
+      "version": "20260924-three-card-5",
+      "sha256": "dbc24648303f28835b6e47452acef8906c59185dc0623a3cd882681aa3877a49"
+    },
+    {
+      "path": "web/playback-card-settings.js",
+      "version": "20260924-card-settings-6",
+      "sha256": "9653221d9961779674e9aca2c19c9a760f2bedef0a5d5670e438e04ebeefdbbe"
+    },
+    {
+      "path": "web/playback-card-transition.js",
+      "version": "20260924-particle-morph-11",
+      "sha256": "a906bba7fb24af30052084d616b66930ff2fd57fb3ef8fafb7b59857af8753bc"
+    },
+    {
+      "path": "web/playback-card.css",
+      "version": "20260924-card-border-volume-1",
+      "sha256": "3ab08869a035a9be305ba7f5e610525abeda2ca74bacdfec96c3b9ca6cf8d7cb"
+    },
+    {
       "path": "web/playback-intelligence.js",
-      "version": "20260811-cache-audit-1",
-      "sha256": "6184e4a0e89246dc04e50705092e39a2c6bc17a5c4ccccf7f8fa3ab1532eba93"
+      "version": "20260901-cross-session-preferences-2",
+      "sha256": "c73c0f58672ae389c786466fca9ee20889fcc3fb2d753c6c36ea93f4cd60544b"
+    },
+    {
+      "path": "web/playback-queue.js",
+      "version": "20260926-queue-wheel-selection-1",
+      "sha256": "9ce010f9c48f945b3ad249b19ee3f05d545079407434e1751966b7125013580b"
     },
     {
       "path": "web/render-quality.js",
@@ -259,8 +399,18 @@
     },
     {
       "path": "web/runtime-module-loader.js",
-      "version": "20260827-pet-command-manifest-2",
-      "sha256": "29577730d833e907c71ee3fab8e8f6ed5822854d731fb171ffada8a9b85ce7d1"
+      "version": "20260926-pet-self-register-1",
+      "sha256": "25cc59c3cdf296f1f5fe5a3ff621cb477d471b0abbdd2e5895445d35177eb6be"
+    },
+    {
+      "path": "web/search-window.css",
+      "version": "20260926-search-bare-buttons-1",
+      "sha256": "4007a9dcec22cc68248b58e78085cd52e337e30795e3f18e7c268840c561da54"
+    },
+    {
+      "path": "web/search-window.js",
+      "version": "20260926-search-bare-buttons-1",
+      "sha256": "e7f27ae5f8e3292761e47f78807f48c7160a935c3a96a13d34e57b6fc299b6b8"
     },
     {
       "path": "web/settings-center.js",
@@ -269,8 +419,8 @@
     },
     {
       "path": "web/soundscape-runtime.js",
-      "version": "20260824-durable-state-1",
-      "sha256": "3471e6d97775206527a451cb7ab06a2a9f03bf827ec611ae41cea1bcea9ca679"
+      "version": "20260901-minimize-resume-1",
+      "sha256": "177ae43612e8eef22ee6926e791d1ead9fabd64b5b54c1535ec0190db9f94c21"
     },
     {
       "path": "web/storm-ocean-runtime.js",
@@ -279,8 +429,8 @@
     },
     {
       "path": "web/styles.css",
-      "version": "20260825-desktop-mixer-layout-1",
-      "sha256": "e5f819c6c84334a40f5dca12e08ced71a8e456dc478558ca5a9704d472dc8a58"
+      "version": "20261007-wheel-transition-2",
+      "sha256": "adafc6089d601182871b0bdb1eaa66dddc0046d79e8cd78869b1bef2129636e3"
     },
     {
       "path": "web/text-fonts.css",
@@ -299,8 +449,8 @@
     },
     {
       "path": "web/vendor/native-spatial/native-pcm-worklet.js",
-      "version": "20260821-seek-epoch-3",
-      "sha256": "e719f729e94f81a41a0fbc718a2b7688e714dee99f38f5fceb463ba66579b996"
+      "version": "20260831-audible-clock-1",
+      "sha256": "f8ff27b8ac5b10bf2b8231fb03efb8cf8030c25757eaed6860d63d2d1de5a879"
     },
     {
       "path": "web/vendor/three.r128.min.js",

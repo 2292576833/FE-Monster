@@ -35,6 +35,12 @@
   const COMMAND_RECEIPT_SCHEMA = 'fe-monster.app-command-receipt/v1';
   const COMMAND_UNDO_SCHEMA = 'fe-monster.app-command-undo/v1';
   const operationReceipts = new Map();
+  const customCommands = new Map();
+  const CUSTOM_COMMAND_PREFIX = 'pet.custom.';
+  const CUSTOM_COMMAND_LIMIT = 32;
+  const CUSTOM_STEP_LIMIT = 8;
+  const CUSTOM_PRIVATE_COMMAND_PATTERN = /^(?:community\.(?:messages?|mailbox)\.(?:query|list)|pet\.memory\.(?:query|records\.(?:query|list)))$|^(?:account|auth|security)(?:\.|$)|^(?:settings|config)\.(?:account|auth|security)(?:\.|$)/i;
+  let customCommandsInstalled = false;
   let commandManifestCache = null;
 
   function commandError(message, code = 'invalid_command') {
@@ -67,20 +73,20 @@
     }
   }
 
-  function sanitizeValue(value, depth = 0) {
+  function sanitizeValue(value, depth = 0, maxDepth = 5) {
     if (value === null || value === undefined) return value;
     if (typeof value === 'string') return SENSITIVE_VALUE_PATTERN.test(value) ? '[redacted]' : value.slice(0, 8_000);
     if (typeof value === 'boolean') return value;
     if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-    if (depth >= 5) return null;
-    if (Array.isArray(value)) return value.slice(0, 64).map((item) => sanitizeValue(item, depth + 1));
+    if (depth >= maxDepth) return null;
+    if (Array.isArray(value)) return value.slice(0, 64).map((item) => sanitizeValue(item, depth + 1, maxDepth));
     if (typeof value !== 'object') return String(value).slice(0, 1_000);
     const output = Object.create(null);
     Object.entries(value).slice(0, 64).forEach(([key, item]) => {
       if (!/^[A-Za-z0-9_.-]{1,80}$/.test(key)) return;
       if (key === '__proto__' || key === 'prototype' || key === 'constructor') return;
       if (SENSITIVE_FIELD_PATTERN.test(key.replace(/[^A-Za-z0-9]/g, ''))) return;
-      output[key] = sanitizeValue(item, depth + 1);
+      output[key] = sanitizeValue(item, depth + 1, maxDepth);
     });
     return output;
   }
@@ -255,7 +261,8 @@
   }
 
   function resultWithReceipt(value, receipt) {
-    const safe = sanitizeValue(value ?? { ok: true });
+    const safe = sanitizeValue(value ?? { ok: true }, 0,
+      receipt.command === 'app.commands.register' ? 8 : 5);
     if (safe && typeof safe === 'object' && !Array.isArray(safe)) {
       const handlerReceipt = receipt.replayed === true && safe.receipt && typeof safe.receipt === 'object'
         ? Object.freeze({ ...safe.receipt, replayed: true })
@@ -362,6 +369,7 @@
       readOnly: definition.readOnly,
       reversible: definition.reversible,
       automaticAllowed: definition.automaticAllowed,
+      ...(definition.recipeRevision ? { recipeRevision: definition.recipeRevision } : {}),
       requiresConfirmation: definition.requiresConfirmation === true
         || typeof definition.requiresConfirmation === 'function'
     });
@@ -380,6 +388,7 @@
       readOnly: definition.readOnly === true,
       reversible: definition.reversible === true,
       automaticAllowed: definition.automaticAllowed === true,
+      ...(definition.recipeRevision ? { recipeRevision: definition.recipeRevision } : {}),
       requiresConfirmation: definition.requiresConfirmation === true
         || typeof definition.requiresConfirmation === 'function'
     });
@@ -513,6 +522,7 @@
       readOnly,
       reversible,
       automaticAllowed,
+      recipeRevision: definition.recipeRevision || '',
       requiresConfirmation: definition.requiresConfirmation === true
         ? true
         : typeof definition.requiresConfirmation === 'function'
@@ -543,6 +553,168 @@
       if (registered.length) notifyCatalogChange();
     }
     return registered;
+  }
+
+  function normalizeCustomRecipe(input) {
+    const command = normalizeName(input.command);
+    if (!/^pet\.custom\.[a-z0-9][a-z0-9.-]{0,63}$/.test(command)) {
+      throw commandError('自定义命令必须使用 pet.custom. 前缀和英文名称', 'invalid_custom_command');
+    }
+    if (!Array.isArray(input.steps) || !input.steps.length || input.steps.length > CUSTOM_STEP_LIMIT) {
+      throw commandError(`自定义命令必须包含 1 到 ${CUSTOM_STEP_LIMIT} 个已有操作`, 'invalid_custom_steps');
+    }
+    const steps = input.steps.map((step) => {
+      if (!step || typeof step !== 'object' || Array.isArray(step)) {
+        throw commandError('每个操作必须包含 command 和可选 arguments', 'invalid_custom_steps');
+      }
+      const definition = resolve(step.command);
+      if (definition.command.startsWith(CUSTOM_COMMAND_PREFIX)
+        || definition.command.startsWith('app.commands.')
+        || CUSTOM_PRIVATE_COMMAND_PATTERN.test(definition.command)) {
+        throw commandError('自定义命令不能嵌套命令注册、其他自定义命令或私密数据操作', 'unsafe_custom_step');
+      }
+      const parameters = step.arguments ?? {};
+      if (!parameters || typeof parameters !== 'object' || Array.isArray(parameters)
+        || ['confirmed', 'automatic', 'proactive', 'operationId', 'idempotencyKey']
+          .some((key) => Object.hasOwn(parameters, key))) {
+        throw commandError('操作参数必须是对象，且不能自带授权或执行标识', 'invalid_custom_arguments');
+      }
+      const safeParameters = sanitizeValue(parameters);
+      assertRequiredParameters(definition, safeParameters);
+      assertParameterTypes(definition, safeParameters);
+      return { command: definition.command, arguments: safeParameters };
+    });
+    if (JSON.stringify(steps).length > 8_000) {
+      throw commandError('自定义命令参数过长', 'invalid_custom_arguments');
+    }
+    return {
+      command,
+      title: String(input.title || command).trim().slice(0, 120),
+      description: String(input.description || '桌宠注册的客户端组合操作；注册不会执行操作。').trim().slice(0, 500),
+      steps
+    };
+  }
+
+  function registerCustomCommand(input) {
+    const recipe = normalizeCustomRecipe(input);
+    const recipeRevision = `sha256:${sha256Hex(JSON.stringify(stableValue(recipe.steps)))}`;
+    const existing = customCommands.get(recipe.command);
+    if (existing) {
+      if (existing.recipeRevision !== recipeRevision) {
+        throw commandError('同名自定义命令已存在，请先移除再注册，不能静默覆盖', 'custom_command_conflict');
+      }
+      return { changed: false, command: publicDefinition(resolve(recipe.command)), recipe: existing.recipe };
+    }
+    if (customCommands.size >= CUSTOM_COMMAND_LIMIT) {
+      throw commandError(`最多注册 ${CUSTOM_COMMAND_LIMIT} 个自定义命令`, 'custom_command_limit');
+    }
+    const readOnly = recipe.steps.every((step) => resolve(step.command).readOnly);
+    const assertCurrent = () => {
+      if (customCommands.get(recipe.command)?.recipeRevision !== recipeRevision) {
+        throw commandError('该自定义命令已移除或发生变化', 'custom_command_changed');
+      }
+    };
+    const childContext = (context, index) => ({
+      ...context,
+      ...(context.operationId ? {
+        operationId: `recipe:${sha256Hex(`${context.operationId}:${recipeRevision}:${index}`)}`
+      } : {})
+    });
+    // Mutating recipes stay manual-only: registration must not grant automatic
+    // execution or claim an atomic rollback across unrelated client handlers.
+    const registered = registerDefinition({
+      command: recipe.command, title: recipe.title, description: recipe.description,
+      category: 'custom', readOnly, recipeRevision,
+      requiresConfirmation: (_args, context) => recipe.steps.some((step, index) =>
+        inspect(step.command, step.arguments, childContext(context, index)).requiresConfirmation),
+      handler: async (_args, context) => {
+        assertCurrent();
+        // Validate the whole plan before any step changes the client.
+        recipe.steps.forEach((step, index) => inspect(step.command, step.arguments, childContext(context, index)));
+        const results = [];
+        for (const [index, step] of recipe.steps.entries()) {
+          try {
+            assertCurrent();
+            const result = await execute(step.command, step.arguments, childContext(context, index));
+            if (result?.ok === false || result?.success === false
+              || /^(?:error|failed|denied|blocked|cancelled|canceled|not-found|not-playable)$/.test(String(result?.status || ''))) {
+              return { ok: false, status: results.length ? 'partial' : 'failed', completedSteps: results.length,
+                failedStep: index + 1, result, results };
+            }
+            results.push(result);
+          } catch (error) {
+            return { ok: false, status: results.length ? 'partial' : 'failed', completedSteps: results.length,
+              failedStep: index + 1, error: String(error?.message || '操作失败').slice(0, 300), results };
+          }
+        }
+        return { ok: true, completedSteps: results.length, results };
+      }
+    });
+    customCommands.set(recipe.command, { recipe, recipeRevision });
+    notifyCatalogChange();
+    return { changed: true, command: registered, recipe,
+      undo: { command: 'app.commands.unregister', parameters: { command: recipe.command, recipeRevision } } };
+  }
+
+  function unregisterCustomCommand(input) {
+    const command = normalizeName(input.command);
+    if (!command.startsWith(CUSTOM_COMMAND_PREFIX)) {
+      throw commandError('只能移除桌宠注册的自定义命令', 'invalid_custom_command');
+    }
+    const existing = customCommands.get(command);
+    if (!existing) return { changed: false, command };
+    if (input.recipeRevision !== existing.recipeRevision) {
+      throw commandError('命令版本已变化，请重新查询后移除', 'custom_command_changed');
+    }
+    for (const [key, receipt] of operationReceipts) {
+      if (key.startsWith(`${command}:`) && receipt.state === 'pending') {
+        throw commandError('命令正在执行，暂时不能移除', 'custom_command_busy');
+      }
+    }
+    customCommands.delete(command);
+    registry.delete(command);
+    for (const key of operationReceipts.keys()) {
+      if (key.startsWith(`${command}:`)) operationReceipts.delete(key);
+    }
+    notifyCatalogChange();
+    return { changed: true, command };
+  }
+
+  function installCustomCommands() {
+    if (customCommandsInstalled) return;
+    registerMany([
+      {
+        command: 'app.commands.register', category: 'commands', title: '注册桌宠自定义操作命令',
+        description: '在当前客户端会话注册 pet.custom.* 命令。steps:[{command,arguments}] 只能组合 1–8 个已有安全命令；不会执行步骤，不能注入代码或覆盖命令。',
+        parameters: { command: 'string', title: 'string?', description: 'string?', steps: 'array of {command,arguments?}' },
+        requiredParameterGroups: [['command'], ['steps']], reversible: true, automaticAllowed: true,
+        handler: registerCustomCommand
+      },
+      {
+        command: 'app.commands.unregister', category: 'commands', title: '移除桌宠自定义操作命令',
+        description: '仅移除版本匹配的 pet.custom.* 命令，不影响内置命令。先查询 recipeRevision。',
+        parameters: { command: 'string', recipeRevision: 'string' },
+        requiredParameterGroups: [['command'], ['recipeRevision']],
+        handler: unregisterCustomCommand
+      },
+      {
+        command: 'app.commands.custom.query', category: 'read', title: '读取桌宠自定义命令', readOnly: true,
+        description: '列出本次客户端会话的自定义命令；传 command 可查看该命令的全部步骤和版本。',
+        parameters: { command: 'string?' },
+        handler: (args) => {
+          if (args.command) {
+            const entry = customCommands.get(normalizeName(args.command));
+            if (!entry) throw commandError('未找到该自定义命令', 'unsupported_command');
+            return { ...entry.recipe, recipeRevision: entry.recipeRevision, persistence: 'session' };
+          }
+          return { commands: Array.from(customCommands.values(), (entry) => ({
+            command: entry.recipe.command, title: entry.recipe.title,
+            recipeRevision: entry.recipeRevision, stepCount: entry.recipe.steps.length
+          })), total: customCommands.size, persistence: 'session' };
+        }
+      }
+    ]);
+    customCommandsInstalled = true;
   }
 
   function resolve(value) {
@@ -590,7 +762,8 @@
       ? commandOrEnvelope
       : { command: commandOrEnvelope, parameters };
     const definition = resolve(envelope.command || envelope.name);
-    const safeParameters = sanitizeValue(envelope.parameters ?? envelope.arguments ?? parameters ?? {});
+    const safeParameters = sanitizeValue(envelope.parameters ?? envelope.arguments ?? parameters ?? {}, 0,
+      definition.command === 'app.commands.register' ? 8 : 5);
     assertRequiredParameters(definition, safeParameters);
     assertParameterTypes(definition, safeParameters);
     const confirmation = confirmationFor(definition, safeParameters, context);
@@ -607,7 +780,8 @@
       ? commandOrEnvelope
       : { command: commandOrEnvelope, parameters };
     const definition = resolve(envelope.command || envelope.name);
-    const safeParameters = sanitizeValue(envelope.parameters ?? envelope.arguments ?? parameters ?? {});
+    const safeParameters = sanitizeValue(envelope.parameters ?? envelope.arguments ?? parameters ?? {}, 0,
+      definition.command === 'app.commands.register' ? 8 : 5);
     assertRequiredParameters(definition, safeParameters);
     assertParameterTypes(definition, safeParameters);
     const confirmation = confirmationFor(definition, safeParameters, context);
@@ -652,7 +826,8 @@
     }
     try {
       const result = await invoke;
-      const safeResult = sanitizeValue(result ?? { ok: true });
+      const safeResult = sanitizeValue(result ?? { ok: true }, 0,
+        ['app.commands.register', 'app.commands.custom.query'].includes(definition.command) ? 8 : 5);
       assertExecutableUndo(definition, safeResult, automatic);
       if (operationKey) {
         operationReceipts.set(operationKey, {
@@ -723,6 +898,7 @@
     protocolVersion: COMMAND_PROTOCOL_VERSION,
     register,
     registerMany,
+    installCustomCommands,
     execute,
     inspect,
     resolve: (name) => publicDefinition(resolve(name)),

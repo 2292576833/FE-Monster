@@ -28,6 +28,20 @@ private final class RoundedContentView: NSView {
     }
 }
 
+@MainActor
+private final class WeakScriptMessageHandler: NSObject, WKScriptMessageHandler {
+    weak var target: WKScriptMessageHandler?
+
+    init(target: WKScriptMessageHandler) {
+        self.target = target
+        super.init()
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        target?.userContentController(userContentController, didReceive: message)
+    }
+}
+
 final class FeMonsterWindowController: NSWindowController,
     NSWindowDelegate,
     WKScriptMessageHandler,
@@ -41,6 +55,25 @@ final class FeMonsterWindowController: NSWindowController,
     private let webView: WKWebView
     private var bridgeRemoved = false
     private var trustedOrigin: (scheme: String, host: String, port: Int)?
+    private var applicationURL: URL?
+    private var webProcessFailures: [Date] = []
+    private var desktopTimer: Timer?
+    private var playbackTimer: Timer?
+    private var snapshotPending = false
+    private var playbackProbePending = false
+    private var navigationGeneration = 0
+    private(set) var systemAudioEnabled = false
+    private var playbackActivity: NSObjectProtocol?
+    private var latestDesktopSnapshot: [String: Any] = [:]
+    private var latestLyricsState: [String: Any] = [:]
+    private var latestWallpaperState: [String: Any] = [:]
+    private lazy var desktopPet = makeDesktopPet()
+    private lazy var desktopScene = makeDesktopScene()
+    private lazy var desktopLyrics = makeDesktopLyrics()
+    private lazy var macCapture = MacCaptureService(window: window, send: { [weak self] payload in
+        if let enabled = payload["systemAudio"] as? Bool { self?.systemAudioEnabled = enabled }
+        self?.dispatchBridgeMessage(payload)
+    })
     private lazy var recordingToolbar = RecordingToolbarController { [weak self] action in
         self?.invokeRecordingAction(action)
     }
@@ -61,7 +94,8 @@ final class FeMonsterWindowController: NSWindowController,
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
-        configuration.applicationNameForUserAgent = "FE-Monster-Mac/1.8.8"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+        configuration.applicationNameForUserAgent = "FE-Monster-Mac/\(version)"
 
         webView = WKWebView(frame: .zero, configuration: configuration)
         hostView = RoundedContentView(frame: NSRect(
@@ -79,7 +113,7 @@ final class FeMonsterWindowController: NSWindowController,
         )
         super.init(window: window)
 
-        userContentController.add(self, name: Self.bridgeName)
+        userContentController.add(WeakScriptMessageHandler(target: self), name: Self.bridgeName)
         configureWindow(window)
         configureWebView()
         showLoadingPage()
@@ -89,17 +123,26 @@ final class FeMonsterWindowController: NSWindowController,
         fatalError("init(coder:) has not been implemented")
     }
 
-    deinit {
-        removeBridgeHandler()
-    }
-
     /// Direct counterpart of CoreWebView2.Navigate(options.Url).
     func loadApplication(at url: URL) {
+        macCapture.shutdown()
+        stopDesktopRuntime()
+        applicationURL = url
         trustedOrigin = origin(of: url)
         webView.load(URLRequest(url: url))
+        startPlaybackActivityMonitor()
+    }
+
+    func reloadApplication() {
+        guard let applicationURL, !bridgeRemoved else { return }
+        webProcessFailures.removeAll()
+        loadApplication(at: applicationURL)
     }
 
     func showStartupFailure(_ message: String) {
+        macCapture.shutdown()
+        stopDesktopRuntime()
+        trustedOrigin = nil
         let escaped = htmlEscaped(message)
         webView.loadHTMLString(
             """
@@ -121,6 +164,8 @@ final class FeMonsterWindowController: NSWindowController,
 
     /// Direct counterpart of FeMonsterForm.OnFormClosing.
     func prepareForTermination() {
+        macCapture.shutdown()
+        stopDesktopRuntime()
         recordingToolbar.close()
         webView.stopLoading()
         removeBridgeHandler()
@@ -196,6 +241,16 @@ final class FeMonsterWindowController: NSWindowController,
             handleRenderCapabilitiesMessage(payload)
         case "fe-recording-toolbar":
             handleRecordingToolbarMessage(payload)
+        case "fe-desktop-scene":
+            handleDesktopScene(payload)
+        case "fe-pet-desktop":
+            handleDesktopPet(payload)
+        case "fe-desktop-lyrics":
+            handleDesktopLyrics(payload)
+        case "fe-wallpaper":
+            handleWallpaper(payload)
+        case "fe-mac-capture":
+            macCapture.handle(payload)
         default:
             break
         }
@@ -223,6 +278,233 @@ final class FeMonsterWindowController: NSWindowController,
             return nil
         }
         return payload
+    }
+
+    private func makeDesktopSurface(url: URL, transparent: Bool) -> DesktopWebSurface {
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = webView.configuration.websiteDataStore
+        configuration.processPool = webView.configuration.processPool
+        configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
+        configuration.mediaTypesRequiringUserActionForPlayback = []
+        configuration.applicationNameForUserAgent = webView.configuration.applicationNameForUserAgent
+        let content = WKUserContentController()
+        content.addUserScript(WKUserScript(source: Self.compatibilityBridgeScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        content.add(WeakScriptMessageHandler(target: self), name: Self.bridgeName)
+        configuration.userContentController = content
+        return DesktopWebSurface(url: url, configuration: configuration, uiDelegate: self, transparent: transparent)
+    }
+
+    private func makeDesktopPet() -> DesktopPetHost {
+        let host = DesktopPetHost { [unowned self] url, transparent in self.makeDesktopSurface(url: url, transparent: transparent) }
+        host.stateChanged = { [weak self] in self?.postDesktopPetResult(requestID: "") }
+        host.onError = { [weak self] error in self?.postDesktopPetResult(requestID: "", error: error); self?.showMainWindow() }
+        return host
+    }
+
+    private func makeDesktopScene() -> DesktopSceneHost {
+        let host = DesktopSceneHost { [unowned self] url, transparent in self.makeDesktopSurface(url: url, transparent: transparent) }
+        host.onError = { [weak self] error in self?.postDesktopSceneResult(error: error) }
+        return host
+    }
+
+    private func makeDesktopLyrics() -> DesktopLyricsHost {
+        let host = DesktopLyricsHost { [unowned self] url, transparent in self.makeDesktopSurface(url: url, transparent: transparent) }
+        host.stateChanged = { [weak self] in self?.postDesktopLyricsResult(requestID: "") }
+        host.onError = { [weak self] error in self?.postDesktopLyricsResult(requestID: "", error: error) }
+        return host
+    }
+
+    var desktopPetVisible: Bool { desktopPet.isVisible }
+    var desktopSceneEnabled: Bool { desktopScene.isEnabled && !desktopScene.isWallpaper }
+    var desktopLyricsEnabled: Bool { desktopLyrics.isEnabled }
+    var desktopLyricsLocked: Bool { desktopLyrics.isLocked }
+
+    func showMainWindow() {
+        if window?.isMiniaturized == true { window?.deminiaturize(nil) }
+        window?.makeKeyAndOrderFront(nil)
+        NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+
+    func toggleDesktopPet() { handleDesktopPet(["action": "toggle"]) }
+    func toggleDesktopScene() { handleDesktopScene(["action": "toggle", "snapshot": latestDesktopSnapshot]) }
+    func toggleDesktopLyrics() { handleDesktopLyrics(["action": "toggle", "state": latestLyricsState]) }
+    func toggleDesktopLyricsLock() { desktopLyrics.setLocked(!desktopLyrics.isLocked) }
+
+    func setSystemAudioEnabled(_ enabled: Bool) {
+        guard let applicationURL, trustedOrigin != nil else { return }
+        var components = URLComponents(url: applicationURL, resolvingAgainstBaseURL: false)
+        components?.path = ""; components?.query = nil; components?.fragment = nil
+        macCapture.handle(["action": enabled ? "system-audio-start" : "system-audio-stop", "requestId": "", "backendURL": components?.url?.absoluteString ?? ""])
+    }
+
+    private func handleDesktopPet(_ payload: [String: Any]) {
+        let action = (payload["action"] as? String ?? "query").lowercased()
+        let requestID = payload["requestId"] as? String ?? ""
+        guard let applicationURL, trustedOrigin != nil else { postDesktopPetResult(requestID: requestID, error: "本机页面尚未就绪。"); return }
+        switch action {
+        case "enable", "show": desktopPet.show(at: applicationURL); window?.orderOut(nil)
+        case "toggle":
+            if desktopPet.isVisible { desktopPet.hide(); showMainWindow() }
+            else { desktopPet.show(at: applicationURL); window?.orderOut(nil) }
+        case "hide": desktopPet.hide()
+        case "disable", "show-main": desktopPet.disable(); showMainWindow()
+        case "move": desktopPet.moveBy(dx: number(payload["dx"]), dy: number(payload["dy"])); return
+        case "move-end": desktopPet.endMove(); return
+        case "panel": desktopPet.setPanel(payload); return
+        case "bubble": desktopPet.setBubble(payload); return
+        case "position-set":
+            desktopPet.glideTo(payload) { [weak self] error in self?.postDesktopPetResult(requestID: requestID, error: error ?? "") }
+            return
+        case "query", "ready", "position-query": break
+        default: postDesktopPetResult(requestID: requestID, error: "未知桌面宠物操作：\(action)"); return
+        }
+        postDesktopPetResult(requestID: requestID)
+    }
+
+    private func postDesktopPetResult(requestID: String, error: String = "") {
+        let payload: [String: Any] = ["type": "fe-pet-desktop-result", "requestId": requestID,
+            "supported": true, "enabled": desktopPet.isEnabled, "visible": desktopPet.isVisible,
+            "hostMode": "appkit-transparent-wkwebview", "bounds": desktopPet.queryBounds(), "error": error]
+        dispatchBridgeMessage(payload)
+    }
+
+    private func handleDesktopScene(_ payload: [String: Any]) {
+        let action = (payload["action"] as? String ?? "query").lowercased()
+        if let snapshot = payload["snapshot"] as? [String: Any] { latestDesktopSnapshot = snapshot }
+        switch action {
+        case "hide", "disable": desktopScene.disable()
+        case "toggle" where desktopSceneEnabled: desktopScene.disable()
+        case "update": if desktopSceneEnabled { desktopScene.update(latestDesktopSnapshot) }
+        case "query", "ready": break
+        case "enable", "show", "toggle":
+            guard let applicationURL, trustedOrigin != nil else { postDesktopSceneResult(error: "本机页面尚未就绪。"); return }
+            desktopScene.enable(at: applicationURL, snapshot: latestDesktopSnapshot)
+            startDesktopSynchronization()
+        default: postDesktopSceneResult(error: "未知桌面场景操作：\(action)"); return
+        }
+        // Continuous frame updates must not produce repeated UI toast results.
+        if action != "update" { postDesktopSceneResult() }
+    }
+
+    private func postDesktopSceneResult(error: String = "") {
+        dispatchBridgeMessage(["type": "fe-desktop-scene-result", "enabled": desktopSceneEnabled, "supported": true, "error": error])
+    }
+
+    private func handleDesktopLyrics(_ payload: [String: Any]) {
+        let action = (payload["action"] as? String ?? "query").lowercased()
+        let requestID = payload["requestId"] as? String ?? ""
+        if let incoming = payload["state"] as? [String: Any] ?? payload["snapshot"] as? [String: Any] {
+            latestLyricsState = latestLyricsState.merging(incoming) { _, value in value }
+        }
+        switch action {
+        case "hide", "disable", "close": desktopLyrics.close()
+        case "toggle" where desktopLyrics.isEnabled: desktopLyrics.close()
+        case "enable", "show", "toggle":
+            guard let applicationURL, trustedOrigin != nil else { postDesktopLyricsResult(requestID: requestID, error: "本机页面尚未就绪。"); return }
+            desktopLyrics.show(at: applicationURL, state: latestLyricsState)
+            startDesktopSynchronization()
+        case "update": desktopLyrics.update(latestLyricsState)
+        case "lock": desktopLyrics.setLocked(payload["locked"] as? Bool ?? true)
+        case "capture": desktopLyrics.setPointerCapture(payload["active"] as? Bool == true)
+        case "bounds": desktopLyrics.setHotBounds(payload["bounds"] as? [String: Any] ?? payload)
+        case "move": desktopLyrics.moveBy(dx: number(payload["dx"]), dy: number(payload["dy"]))
+        case "query", "ready": break
+        default: postDesktopLyricsResult(requestID: requestID, error: "未知桌面歌词操作：\(action)"); return
+        }
+        postDesktopLyricsResult(requestID: requestID)
+    }
+
+    private func postDesktopLyricsResult(requestID: String, error: String = "") {
+        var payload = desktopLyrics.query()
+        payload["type"] = "fe-desktop-lyrics-result"; payload["requestId"] = requestID
+        payload["ok"] = error.isEmpty; payload["error"] = error
+        dispatchBridgeMessage(payload)
+    }
+
+    private func handleWallpaper(_ payload: [String: Any]) {
+        let action = (payload["action"] as? String ?? "query").lowercased()
+        let requestID = payload["requestId"] as? String ?? ""
+        if let state = payload["state"] as? [String: Any] { latestWallpaperState = latestWallpaperState.merging(state) { _, value in value } }
+        var error = ""
+        switch action {
+        case "hide", "disable", "close": desktopScene.disable()
+        case "toggle" where desktopScene.isWallpaper: desktopScene.disable()
+        case "show", "enable", "toggle":
+            if let applicationURL, trustedOrigin != nil { desktopScene.enable(at: applicationURL, snapshot: latestWallpaperState, wallpaper: true); startDesktopSynchronization() }
+            else { error = "本机页面尚未就绪。" }
+        case "update": if desktopScene.isWallpaper { desktopScene.update(latestWallpaperState) }
+        case "query", "ready": break
+        default: error = "未知动态壁纸操作：\(action)"
+        }
+        dispatchBridgeMessage(["type": "fe-wallpaper-result", "requestId": requestID, "ok": error.isEmpty, "supported": true, "enabled": desktopScene.isWallpaper, "error": error])
+    }
+
+    private func startDesktopSynchronization() {
+        guard desktopTimer == nil else { return }
+        desktopTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+            DispatchQueue.main.async { [weak self] in self?.synchronizeDesktopSnapshot() }
+        }
+        if let desktopTimer { RunLoop.main.add(desktopTimer, forMode: .common) }
+        synchronizeDesktopSnapshot()
+    }
+
+    private func synchronizeDesktopSnapshot() {
+        guard !snapshotPending, !bridgeRemoved, desktopScene.isEnabled || desktopLyrics.isEnabled else {
+            if !desktopScene.isEnabled && !desktopLyrics.isEnabled { desktopTimer?.invalidate(); desktopTimer = nil }
+            return
+        }
+        snapshotPending = true
+        let generation = navigationGeneration
+        webView.evaluateJavaScript("window.feMonsterDesktopSnapshot && window.feMonsterDesktopSnapshot();") { [weak self] result, _ in
+            guard let self, self.navigationGeneration == generation else { return }
+            self.snapshotPending = false
+            guard let envelope = result as? [String: Any], !self.bridgeRemoved else { return }
+            if let snapshot = envelope["snapshot"] as? [String: Any] {
+                self.latestDesktopSnapshot = snapshot
+                if self.desktopSceneEnabled { self.desktopScene.update(snapshot) }
+            }
+            if let state = envelope["lyrics"] as? [String: Any] { self.latestLyricsState = self.latestLyricsState.merging(state) { _, value in value }; self.desktopLyrics.update(state) }
+            if let state = envelope["wallpaper"] as? [String: Any], self.desktopScene.isWallpaper {
+                self.latestWallpaperState = self.latestWallpaperState.merging(state) { _, value in value }
+                self.desktopScene.update(self.latestWallpaperState)
+            }
+        }
+    }
+
+    private func startPlaybackActivityMonitor() {
+        playbackTimer?.invalidate()
+        playbackTimer = Timer.scheduledTimer(withTimeInterval: 0.75, repeats: true) { [weak self] _ in
+            DispatchQueue.main.async { [weak self] in self?.pollPlaybackActivity() }
+        }
+        if let playbackTimer { RunLoop.main.add(playbackTimer, forMode: .common) }
+    }
+
+    private func pollPlaybackActivity() {
+        guard !bridgeRemoved, !playbackProbePending else { return }
+        playbackProbePending = true
+        let generation = navigationGeneration
+        webView.evaluateJavaScript("typeof isPlaybackClockRunning === 'function' && isPlaybackClockRunning();") { [weak self] result, error in
+            guard let self, self.navigationGeneration == generation else { return }
+            self.playbackProbePending = false
+            guard error == nil, let playing = result as? Bool else { return }
+            if playing {
+                if self.playbackActivity == nil { self.playbackActivity = ProcessInfo.processInfo.beginActivity(options: [.userInitiatedAllowingIdleSystemSleep, .latencyCritical], reason: "FE Monster continuous music playback") }
+            } else if let activity = self.playbackActivity {
+                ProcessInfo.processInfo.endActivity(activity); self.playbackActivity = nil
+            }
+        }
+    }
+
+    private func stopDesktopRuntime() {
+        navigationGeneration += 1
+        systemAudioEnabled = false
+        desktopTimer?.invalidate(); desktopTimer = nil
+        playbackTimer?.invalidate(); playbackTimer = nil
+        snapshotPending = false
+        playbackProbePending = false
+        if let activity = playbackActivity { ProcessInfo.processInfo.endActivity(activity); playbackActivity = nil }
+        desktopPet.disable(); desktopScene.disable(); desktopLyrics.close()
     }
 
     /// Direct counterpart of FeMonsterForm.ApplyWindowAction/MoveWindowBy.
@@ -387,6 +669,9 @@ final class FeMonsterWindowController: NSWindowController,
             "window.chrome && window.chrome.webview && " +
                 "window.chrome.webview.__dispatch && window.chrome.webview.__dispatch(\(json));"
         )
+        desktopPet.post(payload)
+        desktopLyrics.post(payload)
+        desktopScene.post(payload)
     }
 
     private func invokeJavaScript(_ source: String) {
@@ -418,6 +703,37 @@ final class FeMonsterWindowController: NSWindowController,
     }
 
     // MARK: - Navigation, external windows and downloads
+
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        macCapture.shutdown()
+        guard let applicationURL, !bridgeRemoved else { return }
+        let now = Date()
+        webProcessFailures.removeAll { now.timeIntervalSince($0) > 60 }
+        webProcessFailures.append(now)
+        guard webProcessFailures.count <= 3 else {
+            showStartupFailure("页面渲染进程连续退出。可按 ⌘R 重新载入；若仍失败，请重新启动应用。")
+            return
+        }
+        recordingToolbar.hide()
+        loadApplication(at: applicationURL)
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        showNavigationFailure(error)
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        showNavigationFailure(error)
+    }
+
+    private func showNavigationFailure(_ error: Error) {
+        guard !bridgeRemoved, applicationURL != nil else { return }
+        let code = (error as NSError).code
+        // Canceled navigations and download hand-offs are expected WebKit events.
+        guard code != NSURLErrorCancelled,
+              !((error as NSError).domain == "WebKitErrorDomain" && code == 102) else { return }
+        showStartupFailure("页面加载失败：\(error.localizedDescription)。可按 ⌘R 重试。")
+    }
 
     func webView(
         _ webView: WKWebView,
@@ -471,6 +787,74 @@ final class FeMonsterWindowController: NSWindowController,
 
     func webView(
         _ webView: WKWebView,
+        requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+        initiatedByFrame frame: WKFrameInfo,
+        type: WKMediaCaptureType,
+        decisionHandler: @escaping (WKPermissionDecision) -> Void
+    ) {
+        decisionHandler(isTrustedMainFrame(frame) ? .prompt : .deny)
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        runJavaScriptAlertPanelWithMessage message: String,
+        initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping () -> Void
+    ) {
+        guard isTrustedMainFrame(frame) else { completionHandler(); return }
+        let alert = pageAlert(message)
+        alert.addButton(withTitle: "确定")
+        present(alert, in: webView.window) { _ in completionHandler() }
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        runJavaScriptConfirmPanelWithMessage message: String,
+        initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping (Bool) -> Void
+    ) {
+        guard isTrustedMainFrame(frame) else { completionHandler(false); return }
+        let alert = pageAlert(message)
+        alert.addButton(withTitle: "确定")
+        alert.addButton(withTitle: "取消")
+        present(alert, in: webView.window) { completionHandler($0 == .alertFirstButtonReturn) }
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        runJavaScriptTextInputPanelWithPrompt prompt: String,
+        defaultText: String?,
+        initiatedByFrame frame: WKFrameInfo,
+        completionHandler: @escaping (String?) -> Void
+    ) {
+        guard isTrustedMainFrame(frame) else { completionHandler(nil); return }
+        let alert = pageAlert(prompt)
+        alert.addButton(withTitle: "确定")
+        alert.addButton(withTitle: "取消")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+        field.stringValue = defaultText ?? ""
+        alert.accessoryView = field
+        alert.window.initialFirstResponder = field
+        present(alert, in: webView.window) { completionHandler($0 == .alertFirstButtonReturn ? field.stringValue : nil) }
+    }
+
+    private func pageAlert(_ message: String) -> NSAlert {
+        let alert = NSAlert()
+        alert.messageText = "FE Monster"
+        alert.informativeText = message
+        return alert
+    }
+
+    private func present(_ alert: NSAlert, in parent: NSWindow?, completion: @escaping (NSApplication.ModalResponse) -> Void) {
+        if let window = parent ?? NSApplication.shared.keyWindow ?? window {
+            alert.beginSheetModal(for: window, completionHandler: completion)
+        } else {
+            completion(alert.runModal())
+        }
+    }
+
+    func webView(
+        _ webView: WKWebView,
         navigationAction: WKNavigationAction,
         didBecome download: WKDownload
     ) {
@@ -494,7 +878,7 @@ final class FeMonsterWindowController: NSWindowController,
         let panel = NSSavePanel()
         panel.nameFieldStringValue = safeSuggestedFilename(suggestedFilename)
         panel.canCreateDirectories = true
-        if let window {
+        if let window = NSApplication.shared.keyWindow ?? window, window.isVisible {
             panel.beginSheetModal(for: window) { result in
                 completionHandler(result == .OK ? panel.url : nil)
             }
@@ -532,7 +916,7 @@ final class FeMonsterWindowController: NSWindowController,
         panel.allowsMultipleSelection = parameters.allowsMultipleSelection
         panel.canCreateDirectories = false
 
-        if let window {
+        if let window = webView.window ?? NSApplication.shared.keyWindow ?? window, window.isVisible {
             panel.beginSheetModal(for: window) { response in
                 completionHandler(response == .OK ? panel.urls : nil)
             }
@@ -581,7 +965,8 @@ final class FeMonsterWindowController: NSWindowController,
     }
 
     private func number(_ value: Any?) -> CGFloat {
-        CGFloat((value as? NSNumber)?.doubleValue ?? 0)
+        let result = (value as? NSNumber)?.doubleValue ?? 0
+        return CGFloat(result.isFinite ? result : 0)
     }
 
     private func htmlEscaped(_ value: String) -> String {
@@ -603,21 +988,31 @@ final class FeMonsterWindowController: NSWindowController,
     /// WebView2 compatibility surface used unchanged by web/app.js.
     private static let compatibilityBridgeScript = #"""
     (() => {
+      if (!['127.0.0.1', 'localhost', '::1', '[::1]'].includes(window.location.hostname)) return;
+      window.FE_MONSTER_PLATFORM = 'macos';
       if (window.chrome?.webview?.__feMonsterMac) return;
 
       const listeners = new Set();
+      const replay = new Map();
+      const replayTypes = new Set(['fe-desktop-scene-state', 'fe-desktop-lyrics-state', 'fe-wallpaper-state', 'fe-pet-desktop-result']);
       const webview = {
         __feMonsterMac: true,
         postMessage(value) {
           window.webkit.messageHandlers.feMonster.postMessage(value);
         },
         addEventListener(type, listener) {
-          if (type === 'message' && typeof listener === 'function') listeners.add(listener);
+          if (type === 'message' && typeof listener === 'function') {
+            listeners.add(listener);
+            for (const data of replay.values()) {
+              try { listener.call(webview, Object.freeze({ data })); } catch (error) { console.error(error); }
+            }
+          }
         },
         removeEventListener(type, listener) {
           if (type === 'message') listeners.delete(listener);
         },
         __dispatch(data) {
+          if (replayTypes.has(data?.type)) replay.set(data.type, data);
           const event = Object.freeze({ data });
           for (const listener of [...listeners]) {
             try { listener.call(webview, event); } catch (error) { console.error(error); }
@@ -643,6 +1038,82 @@ final class FeMonsterWindowController: NSWindowController,
         chromeObject.webview = webview;
         window.chrome = chromeObject;
       }
+
+      const pending = new Map();
+      const prefix = Date.now().toString(36) + Math.random().toString(36).slice(2);
+      let sequence = 0;
+      function nativeRequest(type, action, payload = {}) {
+        const requestId = `mac-desktop-${prefix}-${++sequence}`;
+        return new Promise((resolve, reject) => {
+          const timer = setTimeout(() => { pending.delete(requestId); reject(new Error('桌面窗口未在限定时间内响应')); }, 5000);
+          pending.set(requestId, { resolve, reject, timer });
+          webview.postMessage({ ...payload, type, action, requestId });
+        });
+      }
+      webview.addEventListener('message', event => {
+        const data = event.data;
+        const call = pending.get(data?.requestId);
+        if (!call || !['fe-desktop-lyrics-result', 'fe-wallpaper-result'].includes(data.type)) return;
+        pending.delete(data.requestId); clearTimeout(call.timer);
+        if (data.error || data.ok === false) call.reject(new Error(data.error || '桌面操作失败'));
+        else call.resolve(data);
+      });
+      function observe(type, callback) {
+        if (typeof callback !== 'function') return () => {};
+        const listener = event => { if (event.data?.type === type) callback(event.data.state || {}); };
+        webview.addEventListener('message', listener);
+        return () => webview.removeEventListener('message', listener);
+      }
+      window.desktopOverlay = {
+        supported: true,
+        platform: 'macos',
+        onLyricsState: callback => observe('fe-desktop-lyrics-state', callback),
+        onWallpaperState: callback => observe('fe-wallpaper-state', callback),
+        showLyrics: state => nativeRequest('fe-desktop-lyrics', 'show', { state }),
+        openLyrics: state => nativeRequest('fe-desktop-lyrics', 'show', { state }),
+        toggleLyrics: state => nativeRequest('fe-desktop-lyrics', 'toggle', { state }),
+        closeLyrics: () => nativeRequest('fe-desktop-lyrics', 'close'),
+        updateLyrics: state => nativeRequest('fe-desktop-lyrics', 'update', { state }),
+        setLyricsState: state => nativeRequest('fe-desktop-lyrics', 'update', { state }),
+        getLyricsState: () => nativeRequest('fe-desktop-lyrics', 'query'),
+        setLyricsPointerCapture: active => nativeRequest('fe-desktop-lyrics', 'capture', { active: !!active }),
+        setLyricsLockState: locked => nativeRequest('fe-desktop-lyrics', 'lock', { locked: !!locked }),
+        setLyricsHotBounds: bounds => nativeRequest('fe-desktop-lyrics', 'bounds', { bounds }),
+        moveLyricsBy: (dx, dy) => nativeRequest('fe-desktop-lyrics', 'move', { dx, dy }),
+        showWallpaper: state => nativeRequest('fe-wallpaper', 'show', { state }),
+        toggleWallpaper: state => nativeRequest('fe-wallpaper', 'toggle', { state }),
+        closeWallpaper: () => nativeRequest('fe-wallpaper', 'close'),
+        updateWallpaper: state => nativeRequest('fe-wallpaper', 'update', { state }),
+        setWallpaperState: state => nativeRequest('fe-wallpaper', 'update', { state }),
+        getWallpaperState: () => nativeRequest('fe-wallpaper', 'query')
+      };
+
+      // Called by the native timer even while the main WebView is minimized.
+      window.feMonsterDesktopSnapshot = () => {
+        try {
+          if (typeof desktopSceneSnapshot !== 'function') return null;
+          const snapshot = desktopSceneSnapshot();
+          const lyric = snapshot.lyricPlayback || {};
+          const song = lyric.song || {};
+          const style = window.getComputedStyle?.(document.querySelector('.stage') || document.documentElement);
+          function color(key, fallback) {
+            const value = style?.getPropertyValue(key)?.trim() || '';
+            if (/^#[0-9a-f]{3,8}$/i.test(value)) return value;
+            const channels = value.match(/^rgba?\(\s*(\d+)\D+(\d+)\D+(\d+)/i);
+            return channels ? '#' + channels.slice(1,4).map(v => Math.min(255,Number(v)).toString(16).padStart(2,'0')).join('') : fallback;
+          }
+          const colors = { primary: color('--lyric-primary','#f6fdff'), secondary: color('--lyric-glow','#a8f6ff'),
+            highlight: color('--lyric-highlight','#fff0b8'), glow: color('--lyric-glow','#9cffdf') };
+          const lyrics = { text: lyric.displayText || song.title || 'FE Monster', progress: Math.max(0,Math.min(1,(Number(lyric.progressPercent)||0)/100)),
+            playing: lyric.playing === true, effectiveLyricTime: lyric.effectiveLyricTime,
+            lyricLineStartTime: lyric.lyricLineStartTime, lyricLineEndTime: lyric.lyricLineEndTime,
+            colors, playback: { time: lyric.position, duration: lyric.duration, playing: lyric.playing, rate: lyric.playbackRate },
+            fontFamily: typeof activeTextFontFamilyStack === 'function' ? activeTextFontFamilyStack() : style?.fontFamily };
+          return JSON.parse(JSON.stringify({ snapshot, lyrics,
+            wallpaper: { title: song.title || 'FE Monster', artist: song.artist || '', cover: song.cover || '',
+              playing: lyric.playing === true, opacity: snapshot.wallpaperOpacity, colors } }));
+        } catch (error) { return null; }
+      };
 
       const originalFetch = window.fetch.bind(window);
       window.fetch = function(input, init) {

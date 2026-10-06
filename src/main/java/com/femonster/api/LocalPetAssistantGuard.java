@@ -71,6 +71,11 @@ final class LocalPetAssistantGuard {
         }
     }
 
+    /** Local encrypted-memory routes use the same loopback/same-origin boundary. */
+    static void requireLocalMemory(HttpExchange exchange) {
+        require(exchange);
+    }
+
     private static boolean isApplicationLoopbackHost(String host) {
         if (host == null) return false;
         String normalized = host.toLowerCase();

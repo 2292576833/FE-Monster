@@ -237,11 +237,15 @@ assert.equal(
 
 const dedupeContext = vm.createContext({ Promise, Error });
 vm.runInContext(`
+let hydrationFinished = true;
+let pendingPlaybackSong = null;
 let worldPeaceSequenceActive = false;
 let lastWorldPeaceSongSignature = '';
 let runCount = 0;
 let rejectRun = null;
 const playbackUnlockCalls = [];
+function mergeStoredProgress() {}
+function isUnlocked() { return false; }
 function unlock(id) {
   playbackUnlockCalls.push(id);
   return true;

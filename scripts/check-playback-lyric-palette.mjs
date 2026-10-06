@@ -405,8 +405,11 @@ try {
         && subtitleStyle.whiteSpace !== 'nowrap',
       cardLineBoundaryOpen: cardLineBoundary.maxHeight === 'none'
         && cardLineBoundary.overflow === 'visible',
-      cardListBoundaryPreserved: cardListStyle.overflow === 'hidden'
-        || (cardListStyle.overflowX === 'hidden' && cardListStyle.overflowY === 'hidden'),
+      // The new playback bar applies no clipping boundary to its lyric list:
+      // the reading axis is a transform offset and the lyrics fade with
+      // distance, so a line is never cut.
+      cardListBoundaryPreserved: cardListStyle.overflow === 'visible'
+        && cardListStyle.transform !== 'none',
       disabledFallsBackToArtist: disabledDisplay.subtitle === 'QA Artist',
       disabledHidesTranslations: disabledDisplay.bookTranslationCount === 0
         && disabledDisplay.cardTranslationCount === 0,

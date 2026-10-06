@@ -36,6 +36,8 @@ const sandbox = vm.createContext({
 });
 
 vm.runInContext([
+  topLevelFunction('exactPetMessageTime'),
+  topLevelFunction('visiblePetMessage'),
   topLevelFunction('normalizeStoredMessages'),
   topLevelFunction('mergeServerHistoryMessages'),
   topLevelFunction('recentVisibleConversation'),

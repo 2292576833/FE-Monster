@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,6 +26,7 @@ const buildScript = text("Build/build-macos.sh");
 const runScript = text("Build/run-dev.sh");
 const syncScript = text("Build/sync-shared-resources.sh");
 const infoPlist = text("Build/Info.plist");
+const productVersion = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).version;
 
 requirePattern(packageSwift, /\.macOS\(\.v13\)/, "Swift package must target macOS 13+");
 requirePattern(mainSwift, /applicationWillTerminate/, "AppDelegate must stop the backend");
@@ -81,17 +83,34 @@ for (const key of [
 ]) {
   requirePattern(infoPlist, new RegExp(`<key>${key}</key>`), `Info.plist ${key}`);
 }
-requirePattern(infoPlist, /<string>1\.8\.8<\/string>/, "Info.plist version 1.8.8");
+if (!infoPlist.includes(`<string>${productVersion}</string>`)) {
+  throw new Error("macOS Info.plist version differs from the shared product version");
+}
+requirePattern(buildScript, /CFBundleShortVersionString/, "bundle version generated at build time");
+requirePattern(text("Build/build-java.sh"), /-classpath/, "SQLite Java compile dependencies");
+requirePattern(text("Build/build-java.sh"), /--manifest/, "runtime Class-Path manifest");
+requirePattern(syncScript, /plugins\/music-api/, "automatic music API bootstrap path");
+requirePattern(syncScript, /native\/audio-sources/, "audio source runtime bundled");
+requirePattern(syncScript, /npm ci/, "locked production dependencies installed");
+requirePattern(syncScript, /libfe-monster-keychain\.dylib/, "Keychain native library bundled");
+requirePattern(syncScript, /native\/macos\/build-audio\.sh/, "CoreAudio Rust OBR native build");
+requirePattern(syncScript, /libfe-monster-coreaudio\.dylib/, "native audio output bundled");
+requirePattern(buildScript, /bundle-node\.sh/, "standalone Node always bundled");
+requirePattern(buildScript, /java\.sql/, "SQLite module available in jlink runtime");
+requirePattern(buildScript, /hdiutil create/, "installable DMG creation");
+requirePattern(infoPlist, /<key>LSMinimumSystemVersion<\/key>\s*<string>13\.5<\/string>/,
+  "bundled Node requires macOS 13.5+");
 
 const sourceText = [mainSwift, optionsSwift, backendSwift, windowSwift, toolbarSwift].join("\n");
 if (/\b(?:powershell(?:\.exe)?|cmd\.exe|taskkill|pkill)\b/i.test(sourceText)) {
   throw new Error("macOS native source contains a forbidden Windows/broad process command");
 }
 
-for (const generated of [".build-macos", "dist", path.join("App", ".build")]) {
-  if (existsSync(path.join(macRoot, generated))) {
-    throw new Error(`Generated macOS directory must not be committed: ${generated}`);
-  }
+const generatedDirectories = [".build-macos", "dist", path.join("App", ".build")];
+const tracked = spawnSync("git", ["ls-files", "--", ...generatedDirectories.map((directory) =>
+  path.relative(root, path.join(macRoot, directory)))], { cwd: root, encoding: "utf8", windowsHide: true });
+if (tracked.status === 0 && tracked.stdout.trim()) {
+  throw new Error("Generated macOS artifacts must not be tracked in Git");
 }
 
 const sourceFiles = readdirSync(path.join(macRoot, "App", "Sources", "FEMonsterMac"))
@@ -101,6 +120,6 @@ process.stdout.write(`${JSON.stringify({
   ok: true,
   macRoot,
   swiftFiles: sourceFiles,
-  version: "1.8.8",
-  generatedArtifacts: false,
+  version: productVersion,
+  generatedArtifacts: generatedDirectories.some((directory) => existsSync(path.join(macRoot, directory))),
 }, null, 2)}\n`);

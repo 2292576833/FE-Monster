@@ -5,6 +5,13 @@
 #define FE_RUST_UPMIX_ABI_VERSION 1u
 #define FE_RUST_UPMIX_OK 0
 
+// Passive upmixing uses a fixed streaming STFT.  Keep these values in the
+// public bridge contract so the native host and the Rust DSP cannot silently
+// drift apart when the realtime tuning is changed.
+#define FE_RUST_UPMIX_STFT_FFT_SIZE 2048u
+#define FE_RUST_UPMIX_STFT_HOP_SIZE 512u
+#define FE_RUST_UPMIX_STFT_OVERLAP_PERCENT 75u
+
 #if defined(_WIN32)
 #define FE_RUST_UPMIX_CALL __cdecl
 #else
@@ -31,6 +38,10 @@ typedef struct FeRustUpmixConfig {
 
 typedef uint32_t(FE_RUST_UPMIX_CALL* FeRustUpmixAbiVersionFn)(void);
 typedef void*(FE_RUST_UPMIX_CALL* FeRustUpmixCreateFn)(const FeRustUpmixConfig* config);
+typedef int32_t(FE_RUST_UPMIX_CALL* FeRustUpmixUpdateFn)(
+    void* handle,
+    const FeRustUpmixConfig* config
+);
 typedef int32_t(FE_RUST_UPMIX_CALL* FeRustUpmixProcessFn)(
     void* handle,
     const float* interleaved_stereo,

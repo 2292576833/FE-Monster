@@ -1594,7 +1594,9 @@ internal static class SetupEngine
                 }
             }
 
-            (long bundleExtractedBytes, long payloadExtractedBytes) = InspectBundleSpaceRequirements(bundleZip);
+            (long bundleExtractedBytes, long payloadExtractedBytes, int maxRelativePathLength) = InspectBundleSpaceRequirements(bundleZip);
+            tempRoot = EnsurePayloadTempPath(tempRoot, preferredInstallDir, exePath, maxRelativePathLength);
+            bundleZip = Path.Combine(tempRoot, BundleFileName);
             EnsureFreeSpace(
                 tempRoot,
                 checked(bundleExtractedBytes + payloadExtractedBytes + 512L * 1024L * 1024L),
@@ -1625,7 +1627,7 @@ internal static class SetupEngine
         throw new InvalidOperationException("Setup payload was not found.");
     }
 
-    private static (long BundleExtractedBytes, long PayloadExtractedBytes) InspectBundleSpaceRequirements(
+    private static (long BundleExtractedBytes, long PayloadExtractedBytes, int MaxRelativePathLength) InspectBundleSpaceRequirements(
         string bundleZip
     )
     {
@@ -1646,11 +1648,42 @@ internal static class SetupEngine
         using Stream manifestInput = manifestEntry.Open();
         using JsonDocument document = JsonDocument.Parse(manifestInput);
         long payloadExtractedBytes = document.RootElement.GetProperty("requiredInstallBytes").GetInt64();
+        int maxRelativePathLength = document.RootElement.GetProperty("maxRelativePathLength").GetInt32();
         if (bundleExtractedBytes <= 0 || payloadExtractedBytes <= 0)
         {
             throw new InvalidDataException("Setup payload disk-space metadata is invalid.");
         }
-        return (bundleExtractedBytes, payloadExtractedBytes);
+        if (maxRelativePathLength <= 0)
+        {
+            throw new InvalidDataException("Setup payload path-length metadata is invalid.");
+        }
+        return (bundleExtractedBytes, payloadExtractedBytes, maxRelativePathLength);
+    }
+
+    private static bool FitsPayloadPathBudget(string tempRoot, int maxRelativePathLength) =>
+        (long)Path.Combine(tempRoot, "payload", "FE Monster").Length + 1 + maxRelativePathLength <= SafeLegacyPathLimit;
+
+    private static string EnsurePayloadTempPath(
+        string tempRoot, string preferredInstallDir, string exePath, int maxRelativePathLength
+    )
+    {
+        if (FitsPayloadPathBudget(tempRoot, maxRelativePathLength)) return tempRoot;
+
+        // .NET can extract paths that Windows PowerShell 5.1 cannot inspect.
+        // Choose the extraction root using the payload's recorded longest path,
+        // before any payload file reaches the PowerShell installer.
+        string shorterRoot = CreateWritableTempRoot(preferredInstallDir, exePath, maxRelativePathLength);
+        try
+        {
+            File.Move(Path.Combine(tempRoot, BundleFileName), Path.Combine(shorterRoot, BundleFileName));
+        }
+        catch
+        {
+            try { Directory.Delete(shorterRoot, false); } catch { }
+            throw;
+        }
+        try { Directory.Delete(tempRoot, false); } catch { }
+        return shorterRoot;
     }
 
     public static PayloadPreparation PreparePayload(string tempRoot)
@@ -1935,7 +1968,9 @@ internal static class SetupEngine
         return startInfo;
     }
 
-    private static string CreateWritableTempRoot(string preferredInstallDir, string exePath)
+    private static string CreateWritableTempRoot(
+        string preferredInstallDir, string exePath, int maxRelativePathLength = 0
+    )
     {
         string localFallback = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FE Monster Setup", "Temp");
         List<string> candidateBases = new();
@@ -1943,11 +1978,11 @@ internal static class SetupEngine
         {
             string fullInstallDir = Path.GetFullPath(Environment.ExpandEnvironmentVariables(preferredInstallDir));
             string? existingParent = Path.GetDirectoryName(fullInstallDir);
-            while (!string.IsNullOrWhiteSpace(existingParent) && !Directory.Exists(existingParent))
+            while (!string.IsNullOrWhiteSpace(existingParent))
             {
+                if (Directory.Exists(existingParent)) candidateBases.Add(existingParent);
                 existingParent = Path.GetDirectoryName(existingParent);
             }
-            if (!string.IsNullOrWhiteSpace(existingParent)) candidateBases.Add(existingParent);
         }
         catch
         {
@@ -1963,11 +1998,20 @@ internal static class SetupEngine
         foreach (string candidateBase in candidateBases.Distinct(StringComparer.OrdinalIgnoreCase))
         {
             if (string.IsNullOrWhiteSpace(candidateBase)) continue;
+            string? candidate = null;
+            bool candidateCreated = false;
             try
             {
-                Directory.CreateDirectory(candidateBase);
-                string candidate = Path.Combine(candidateBase, ".fms-" + Guid.NewGuid().ToString("N").Substring(0, 12));
+                string fullBase = Path.GetFullPath(candidateBase);
+                if (HasReparsePointAncestor(fullBase)) continue;
+                candidate = Path.Combine(fullBase, ".fms-" + Guid.NewGuid().ToString("N").Substring(0, 12));
+                if (maxRelativePathLength > 0 && !FitsPayloadPathBudget(candidate, maxRelativePathLength)) continue;
+                if (Directory.Exists(candidate) || File.Exists(candidate)) continue;
+                // A drive root may be the only existing same-drive parent.
+                // Only the new random child is owned or cleaned up by setup.
+                if (!Directory.Exists(fullBase)) Directory.CreateDirectory(fullBase);
                 Directory.CreateDirectory(candidate);
+                candidateCreated = true;
                 string probe = Path.Combine(candidate, "write.test");
                 File.WriteAllText(probe, "ok", Encoding.ASCII);
                 File.Delete(probe);
@@ -1975,9 +2019,23 @@ internal static class SetupEngine
             }
             catch
             {
+                if (candidateCreated && candidate != null)
+                {
+                    try { File.Delete(Path.Combine(candidate, "write.test")); } catch { }
+                    try { Directory.Delete(candidate, false); } catch { }
+                }
             }
         }
         throw new IOException("No writable temporary directory is available for FE Monster setup.");
+    }
+
+    private static bool HasReparsePointAncestor(string directory)
+    {
+        for (DirectoryInfo? current = new(directory); current != null; current = current.Parent)
+        {
+            if (current.Exists && (current.Attributes & FileAttributes.ReparsePoint) != 0) return true;
+        }
+        return false;
     }
 
     private static void EnsureFreeSpace(string path, long requiredBytes, string label)

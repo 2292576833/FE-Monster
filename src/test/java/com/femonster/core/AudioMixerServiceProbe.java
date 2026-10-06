@@ -305,7 +305,7 @@ public final class AudioMixerServiceProbe {
         Map<String, Object> presetPayload = service.presets();
         require(number(presetPayload, "presetVersion").longValue() == 1, "preset version mismatch");
         List<Object> presets = SimpleJson.asList(presetPayload.get("presets"));
-        require(presets.size() == 14, "all fourteen presets must be present");
+        require(presets.size() == 15, "all fifteen presets must be present");
         List<String> ids = new ArrayList<>();
         List<String> labels = new ArrayList<>();
         Map<String, Map<String, Object>> parametersById = new LinkedHashMap<>();
@@ -323,11 +323,11 @@ public final class AudioMixerServiceProbe {
             "clean", "bathroom", "hall", "surround-3d",
             "cinema", "vocal-clear", "bass-boost", "night",
             "wide-chorus", "classic-flanger", "flowing-phaser",
-            "ping-pong-delay", "nearfield-studio", "immersive-live"
+            "ping-pong-delay", "nearfield-studio", "immersive-live", "clear-spatial"
         )), "preset IDs/order changed");
         require(labels.equals(List.of(
             "纯净", "浴室", "大厅", "3D环绕", "影院", "人声清晰", "低频增强", "夜间",
-            "宽阔合唱", "经典镶边", "流动移相", "乒乓回声", "近场工作室", "沉浸现场"
+            "宽阔合唱", "经典镶边", "流动移相", "乒乓回声", "近场工作室", "沉浸现场", "清晰空间"
         )), "preset labels changed");
         require(Boolean.TRUE.equals(parametersById.get("wide-chorus").get("chorusEnabled"))
                 && number(parametersById.get("wide-chorus"), "chorusMix").doubleValue() == 0.30,
@@ -353,6 +353,21 @@ public final class AudioMixerServiceProbe {
                 && "music-detail".equals(live.get("upmixAlgorithm"))
                 && number(live, "obrSpatialWidth").doubleValue() == 1.15,
             "immersive live snapshot mismatch");
+        Map<String, Object> clearSpatial = parametersById.get("clear-spatial");
+        Map<String, Object> expectedSpatial = new LinkedHashMap<>(clean);
+        expectedSpatial.put("upmixEnabled", true);
+        expectedSpatial.put("obrEnabled", true);
+        expectedSpatial.put("obrSpatialWidth", 1.10);
+        require(expectedSpatial.equals(clearSpatial),
+            "clear spatial must only enable Matrix Decode/Direct and bounded width, with neutral Mixer gains");
+        require("clean".equals(service.snapshot().get("selectedPreset")) && !Files.exists(stateFile),
+            "listing clear spatial must not select it or write the user's configuration");
+        Map<String, Object> applied = service.applyPreset("clear-spatial", 0L);
+        require("clear-spatial".equals(applied.get("selectedPreset"))
+                && expectedSpatial.equals(parameters(applied)), "clear spatial snapshot was not applied");
+        AudioMixerService restored = new AudioMixerService(stateFile, new FakeNative(false, false, false));
+        require("clear-spatial".equals(restored.snapshot().get("selectedPreset"))
+                && expectedSpatial.equals(parameters(restored.snapshot())), "clear spatial did not round-trip");
     }
 
     private static void migratesCompleteV1SurroundAtomically(Path directory) throws Exception {

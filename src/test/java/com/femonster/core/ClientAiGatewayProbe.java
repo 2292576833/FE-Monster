@@ -29,8 +29,26 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class ClientAiGatewayProbe {
     private ClientAiGatewayProbe() {}
 
+    private static void memorySharingContract(Path directory) throws Exception {
+        try (ClientAiGateway gateway = new ClientAiGateway(directory)) {
+            gateway.configure(Map.of("modelMode", "custom", "model", Map.of("provider", "deepseek",
+                "baseUrl", "https://api.deepseek.com/v1", "model", "deepseek-chat")));
+            require(!SimpleJson.asBoolean(SimpleJson.asMap(gateway.snapshot().get("model")).get("memorySharingEnabled"), false), "MEMORY_SHARED_WITHOUT_CONSENT");
+            gateway.configure(Map.of("model", Map.of("memorySharingEnabled", true)));
+            require(SimpleJson.asBoolean(SimpleJson.asMap(gateway.snapshot().get("model")).get("memorySharingEnabled"), false), "MEMORY_CONSENT_NOT_SAVED");
+        }
+        try (ClientAiGateway gateway = new ClientAiGateway(directory)) {
+            require(SimpleJson.asBoolean(SimpleJson.asMap(gateway.snapshot().get("model")).get("memorySharingEnabled"), false), "MEMORY_CONSENT_NOT_DURABLE");
+            gateway.configure(Map.of("model", Map.of("model", "deepseek-reasoner")));
+            require(SimpleJson.asBoolean(SimpleJson.asMap(gateway.snapshot().get("model")).get("memorySharingEnabled"), false), "SAME_DESTINATION_LOST_CONSENT");
+            gateway.configure(Map.of("model", Map.of("baseUrl", "https://api.deepseek.com/other")));
+            require(!SimpleJson.asBoolean(SimpleJson.asMap(gateway.snapshot().get("model")).get("memorySharingEnabled"), false), "CHANGED_DESTINATION_INHERITED_CONSENT");
+        }
+    }
+
     public static void main(String[] args) throws Exception {
         Path root = Files.createTempDirectory("fe-client-ai-gateway-");
+        memorySharingContract(root.resolve("memory-consent"));
         ExecutorService httpExecutor = Executors.newCachedThreadPool();
         ExecutorService probeExecutor = Executors.newSingleThreadExecutor();
         HttpServer trusted = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -148,6 +166,10 @@ public final class ClientAiGatewayProbe {
             require(trustedHits.get() == beforeEarlyCancel,
                 "an already cancelled request reached the upstream service");
             int beforeChat = trustedHits.get();
+            ClientAiGateway revisionGateway = gateway;
+            expectCode(() -> revisionGateway.execute(ClientAiGateway.Kind.CHAT,
+                Map.of("messages", List.of()), "stale-memory-consent", 0), "client_ai_bad_request");
+            require(trustedHits.get() == beforeChat, "STALE_MEMORY_REACHED_CHANGED_ENDPOINT");
             try (ClientAiGateway.UpstreamResponse response = gateway.execute(
                 ClientAiGateway.Kind.CHAT,
                 Map.of("stream", false, "messages", List.of(Map.of("role", "user", "content", "hi"))),

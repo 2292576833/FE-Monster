@@ -21,16 +21,17 @@ check('manual offset is rounded, bounded, saved, and restored', /function normal
   && /function loadLyricClockOffsetPreference[\s\S]*?localStorage\.getItem\(LYRIC_CLOCK_OFFSET_PREFERENCE_KEY\)/.test(app)
   && /function saveLyricClockOffsetPreference[\s\S]*?localStorage\.setItem\(LYRIC_CLOCK_OFFSET_PREFERENCE_KEY/.test(app));
 check('audio element remains the authoritative lyric clock', /function currentPlaybackLyricTime[\s\S]*?els\.audio\.currentTime/.test(app));
-check('multi-row lyrics cancel the legacy timestamp delay and follow the audible media clock',
-  /MULTI_ROW_LYRIC_VISUAL_LEAD_SECONDS\s*=\s*LYRIC_TIMESTAMP_COMPENSATION_SECONDS/.test(app)
-  && /function playbackLyricVisualLeadSeconds[\s\S]*?state\.multiRowLyricsEnabled[\s\S]*?MULTI_ROW_LYRIC_VISUAL_LEAD_SECONDS/.test(app));
+check('all lyric presets use zero synthetic visual lead',
+  /MULTI_ROW_LYRIC_VISUAL_LEAD_SECONDS\s*=\s*0/.test(app)
+  && /BOOK_LYRIC_VISUAL_LEAD_SECONDS\s*=\s*0/.test(app)
+  && /FOCUS_ECHO_VISUAL_LEAD_SECONDS\s*=\s*0/.test(app)
+  && /function playbackLyricVisualLeadSeconds\(\)\s*\{\s*return\s+0\s*;\s*\}/.test(app));
 check('lyric frame identity includes the multi-row clock mode',
   /const signature = `\$\{state\.lyricSignature\}\|\$\{state\.textPreset\}\|\$\{state\.multiRowLyricsEnabled \? 1 : 0\}`/.test(app));
-check('browser output latency only applies to the audible Web Audio media path', /function lyricAudioOutputLatencySeconds[\s\S]*?sourceMode !== 'media'[\s\S]*?outputConnected !== true/.test(app));
-check('native OBR lyrics use measured native output latency only on the native graph',
-  /function lyricAudioOutputLatencySeconds[\s\S]*?nativeGraph\?\.nativeStream === true[\s\S]*?nativeOutputLatencySeconds/.test(app));
-check('audio output latency includes both context latency components', /function lyricAudioOutputLatencySeconds[\s\S]*?context\.baseLatency[\s\S]*?context\.outputLatency/.test(app));
-check('timeline applies base latency, output latency, and manual offset', /function lyricTimelineTime[\s\S]*?lyricAudioOutputLatencySeconds[\s\S]*?lyricClockOffsetSeconds/.test(app));
+check('timeline reads media time, measured native queue latency, and the explicit user offset',
+  /function lyricTimelineTime[\s\S]*?Number\(currentTime\)[\s\S]*?lyricClockOffsetSeconds/.test(app)
+  && /function lyricTimelineTime[\s\S]*?- lyricAudioOutputLatencySeconds\(\)/.test(app)
+  && /function lyricAudioOutputLatencySeconds[\s\S]*?nativeOutputLatencySeconds[\s\S]*?ordinary media\/WebAudio path[\s\S]*?return 0/.test(app));
 check('playback-card lyrics receive the raw authoritative clock and calibrate once', /function setPlaybackLyricLine[\s\S]*?updateQishuiPlaybackLyrics\([\s\S]*?currentPlaybackLyricTime\(\)/.test(app));
 check('offset change resynchronizes every lyric surface immediately', /function setLyricClockOffsetSeconds[\s\S]*?resetLyricFrameSync\(\)[\s\S]*?syncPlaybackLyricToCurrentTime\(\)/.test(app));
 check('only minus and plus controls remain', /id="qishuiPlaybackLyricLaterButton"/.test(html)

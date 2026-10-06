@@ -1,0 +1,32 @@
+.particle-lyrics-scene { position:absolute; inset:0; z-index:5; overflow:hidden; pointer-events:none; }
+.particle-lyrics-scene[hidden], .particle-lyrics-settings[hidden], .particle-setting[hidden] { display:none; }
+.particle-lyrics-core, .particle-lyrics-canvas { position:absolute; inset:0; display:block; width:100%; height:100%; }
+.particle-lyrics-interaction { position:absolute; z-index:1; pointer-events:auto; touch-action:none; cursor:grab; user-select:none; }
+.particle-lyrics-interaction[hidden] { display:none; }
+.particle-lyrics-interaction:focus-visible { outline:1px dashed rgba(166,230,241,.7); outline-offset:6px; border-radius:8px; }
+.particle-lyrics-interaction[data-dragging="true"] { cursor:grabbing; }
+.particle-lyrics-accessible { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.diy-text-page[data-active-text-preset="particle-lyrics"] .diy-text-composer { display:none; }
+.particle-lyrics-settings { padding:12px 0 28px; color:var(--text-primary,#ecf6fa); }
+.particle-settings-note { margin:0 0 18px; font-size:12px; line-height:1.8; opacity:.7; }
+.particle-settings-group { border-top:1px solid rgba(184,224,240,.14); padding:4px 0 12px; }
+.particle-settings-group summary { cursor:pointer; font-size:13px; letter-spacing:.06em; padding:14px 2px; font-weight:600; }
+.particle-setting { display:grid; grid-template-columns:minmax(0,1fr) 64px; align-items:center; gap:8px 12px; padding:10px 4px; }
+.particle-setting label { font-size:12px; line-height:1.5; }
+.particle-setting output { grid-column:2; grid-row:1; text-align:right; font-size:11px; font-variant-numeric:tabular-nums; color:#a6e6f1; }
+.particle-setting input[type="range"], .particle-setting select { grid-column:1/-1; width:100%; accent-color:#9ee7ed; }
+.particle-setting textarea { grid-column:1/-1; width:100%; box-sizing:border-box; min-height:84px; resize:vertical; padding:10px 12px; border:1px solid rgba(167,216,232,.2); border-radius:6px; background:#172127; color:#eff7fa; font:inherit; line-height:1.6; }
+.particle-shape-editor { grid-column:1/-1; min-width:0; }
+.particle-shape-help,.particle-shape-status { margin:6px 0 10px; color:#b6cdd7; font-size:11px; line-height:1.7; }
+.particle-shape-canvas { display:block; width:100%; height:auto; aspect-ratio:4/3; border:1px solid rgba(167,216,232,.25); border-radius:8px; touch-action:none; cursor:crosshair; }
+.particle-shape-tools { display:flex; flex-wrap:wrap; gap:7px; margin-top:10px; }
+.particle-shape-tools select { width:auto; flex:1 1 110px; min-width:0; }
+.particle-shape-tools button { min-height:34px; padding:6px 10px; border:1px solid rgba(167,216,232,.2); border-radius:6px; background:rgba(167,216,232,.08); color:inherit; cursor:pointer; font:inherit; font-size:12px; }
+.particle-shape-tools button:disabled { opacity:.4; cursor:default; }
+.particle-shape-status { min-height:19px; margin-bottom:0; }
+.particle-setting select { min-height:34px; border:1px solid rgba(167,216,232,.2); border-radius:6px; background:#172127; color:#eff7fa; padding:5px 9px; }
+.particle-setting input[type="color"] { grid-column:1/-1; width:100%; height:28px; padding:0; border:1px solid rgba(167,216,232,.2); background:transparent; cursor:pointer; }
+.particle-setting input[type="checkbox"] { justify-self:end; width:17px; height:17px; accent-color:#9ee7ed; }
+.particle-settings-reset { margin:16px 4px 0; padding:10px 16px; border-radius:6px; color:inherit; background:rgba(167,216,232,.08); border:1px solid rgba(167,216,232,.2); cursor:pointer; }
+.particle-setting :is(input,select,textarea,button,canvas):focus-visible, .particle-settings-reset:focus-visible, .particle-settings-group summary:focus-visible { outline:2px solid #a6e6f1; outline-offset:3px; }
+@media (prefers-reduced-motion:reduce) { .particle-lyrics-scene { transition:none; } }

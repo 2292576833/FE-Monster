@@ -46,18 +46,25 @@ struct ClientOptions {
 
         let defaultURL = "http://127.0.0.1:3000/?client=embedded&render=webkit&audio=webaudio"
         let rawURL = nonEmpty(values["--url"]) ?? defaultURL
-        let parsedURL = URL(string: rawURL) ?? URL(string: defaultURL)!
+        let candidateURL = URL(string: rawURL)
+        let parsedURL = candidateURL.flatMap { candidate in
+            ["http", "https"].contains(candidate.scheme?.lowercased() ?? "") && candidate.host != nil
+                ? candidate : nil
+        } ?? URL(string: defaultURL)!
+        // Finder can inherit variables from a developer's shell. Installed applications
+        // must resolve their own resources rather than silently launch a different copy.
+        let isPackagedApplication = Bundle.main.bundleURL.pathExtension.lowercased() == "app"
         let root = fileURL(
             nonEmpty(values["--root"])
-                ?? nonEmpty(environment["FE_MONSTER_ROOT"])
+                ?? (isPackagedApplication ? nil : nonEmpty(environment["FE_MONSTER_ROOT"]))
         )
         let jar = fileURL(
             nonEmpty(values["--jar"])
-                ?? nonEmpty(environment["FE_MONSTER_JAR"])
+                ?? (isPackagedApplication ? nil : nonEmpty(environment["FE_MONSTER_JAR"]))
         )
         let java = fileURL(
             nonEmpty(values["--java"])
-                ?? nonEmpty(environment["FE_MONSTER_JAVA"])
+                ?? (isPackagedApplication ? nil : nonEmpty(environment["FE_MONSTER_JAVA"]))
         )
 
         return ClientOptions(
@@ -65,7 +72,7 @@ struct ClientOptions {
             width: CGFloat(max(860, integer(values["--width"], fallback: 1600))),
             height: CGFloat(max(560, integer(values["--height"], fallback: 900))),
             gpuAcceleration: boolean(values["--gpu"], fallback: true),
-            startServer: !flags.contains("--no-server"),
+            startServer: !flags.contains("--no-server") && parsedURL.scheme?.lowercased() == "http",
             rootOverride: root,
             jarOverride: jar,
             javaOverride: java
@@ -74,7 +81,7 @@ struct ClientOptions {
 
     static func isLoopbackHost(_ host: String?) -> Bool {
         guard let host = host?.lowercased() else { return false }
-        return host == "127.0.0.1" || host == "localhost" || host == "::1"
+        return host == "127.0.0.1" || host == "localhost" || host == "::1" || host == "[::1]"
     }
 
     private static func nonEmpty(_ value: String?) -> String? {

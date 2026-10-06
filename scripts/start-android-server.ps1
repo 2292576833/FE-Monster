@@ -12,7 +12,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $rootPath = Split-Path -Parent $PSScriptRoot
 $buildScript = Join-Path $rootPath 'build.cmd'
-$jarPath = Join-Path $rootPath 'out\fe-monster-java.jar'
+. (Join-Path $rootPath 'scripts\java-build-artifacts.ps1')
 $communityScript = Join-Path $PSScriptRoot 'start-community-server.ps1'
 
 function Set-OptionalEnvironmentValue {
@@ -152,6 +152,8 @@ if ($LASTEXITCODE -ne 0) {
   exit $LASTEXITCODE
 }
 
+$jarPath = Resolve-JavaRunJar -Root $rootPath
+if ([string]::IsNullOrWhiteSpace($jarPath)) { $jarPath = Join-Path $rootPath 'out\fe-monster-java.jar' }
 if (!(Test-Path $jarPath)) {
   throw "Missing Java jar: $jarPath"
 }

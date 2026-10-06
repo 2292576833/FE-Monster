@@ -60,8 +60,11 @@ check('current row has continuously changing scroll highlight', () => {
   assert.equal(sandbox.computeMultiLyricHighlightProgress(10, 14, 15), 1);
   assert.match(appSource, /--multi-row-progress/,
     'the computed progress must reach the rendered multi-row lyric');
-  assert.ok((appSource.match(/computeMultiLyricHighlightProgress\s*\(/g) || []).length >= 2,
-    'the real render path must call the progress helper');
+  assert.match(
+    appSource,
+    /function multiRowLyricHighlightProgress[\s\S]*?lyricProgressForLineAtTime\(line, displayTime, endTime/,
+    'the real render path must use the provider-aware lyric progress helper',
+  );
 });
 
 check('near-identical adjacent lyric event is deduplicated', () => {

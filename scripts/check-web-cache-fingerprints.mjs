@@ -11,6 +11,8 @@ const manifestPath = path.join(projectRoot, manifestRelative);
 const args = process.argv.slice(2);
 const writeManifest = args.includes('--write');
 const checkCopies = args.includes('--copies');
+const packageMetadata = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
+const currentVersion = packageMetadata.displayVersion || packageMetadata.version;
 const versionPattern = /^[a-z0-9][a-z0-9._-]{5,}$/u;
 
 const toPosix = (value) => value.replaceAll(path.sep, '/');
@@ -198,7 +200,16 @@ function resolveCopyRoots() {
     }
   };
   add('installer-payload', path.join(projectRoot, 'out', 'installer', 'work', 'payload', 'FE Monster'));
-  if (process.env.LOCALAPPDATA) add('installed-client', path.join(process.env.LOCALAPPDATA, 'FE Monster'));
+  if (process.env.LOCALAPPDATA) {
+    const installedRoot = path.join(process.env.LOCALAPPDATA, 'FE Monster');
+    const installedManifest = path.join(installedRoot, 'payload-integrity.json');
+    try {
+      const installedVersion = JSON.parse(fs.readFileSync(installedManifest, 'utf8')).appVersion;
+      if (installedVersion === currentVersion) add('installed-client', installedRoot);
+    } catch {
+      // An older/unmanaged local install is not a copy of the current release.
+    }
+  }
   for (const argument of args) {
     if (argument.startsWith('--copy-root=')) add('explicit-copy', argument.slice('--copy-root='.length));
   }
@@ -231,9 +242,13 @@ function checkCopy(rootEntry, expected) {
 
 function checkInstallerArtifacts(copies, expected) {
   const distRoot = path.join(projectRoot, 'dist');
+  const currentInstallerPattern = new RegExp(
+    `^FE-Monster-Setup-${currentVersion.replaceAll('.', '\\.')}(-Offline)?\\.exe$`,
+    'iu',
+  );
   const executables = fs.existsSync(distRoot)
     ? fs.readdirSync(distRoot)
-      .filter((name) => /^FE-Monster-Setup-.*\.exe$/iu.test(name))
+      .filter((name) => currentInstallerPattern.test(name))
       .map((name) => path.join(distRoot, name))
     : [];
   const newestSource = Math.max(

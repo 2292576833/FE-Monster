@@ -79,6 +79,12 @@ public final class MemorySanitizerProbe {
             knowledge
         );
         require(sanitized.equals(knowledge), "KNOWLEDGE_FIELDS_CHANGED");
+        knowledge.put("entityId", "pet.preference.music_affinity.e572c8c4");
+        knowledge.put("source", "pet-preference-learning");
+        knowledge.put("value", "{\"entityId\":\"pet.preference.music_affinity.e572c8c4\",\"subject\":\"爵士\"}");
+        require(MemorySanitizer.sanitize(MemorySanitizer.Stream.KNOWLEDGE, "user.fact", knowledge).equals(knowledge),
+            "PREFERENCE_IDENTIFIER_MISCLASSIFIED_AS_JWT");
+        assertNestedRejected("note", "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJmaXh0dXJlIn0.signaturefixture", "MEMORY_SECRET_REJECTED");
         expectCode(
             () -> MemorySanitizer.sanitize(MemorySanitizer.Stream.CHAT, "library.playlist_snapshot", knowledge),
             "MEMORY_TYPE_NOT_ALLOWED"
@@ -111,6 +117,12 @@ public final class MemorySanitizerProbe {
         offsetTime.put("occurredAt", "2026-08-27T18:11:12+08:00");
         expectCode(
             () -> MemorySanitizer.sanitize(MemorySanitizer.Stream.CHAT, "chat.message", offsetTime),
+            "MEMORY_TIMESTAMP_INVALID"
+        );
+        Map<String, Object> badConversationStart = validChat();
+        badConversationStart.put("conversationStartedAt", "2026-08-27 10:00:00");
+        expectCode(
+            () -> MemorySanitizer.sanitize(MemorySanitizer.Stream.CHAT, "chat.message", badConversationStart),
             "MEMORY_TIMESTAMP_INVALID"
         );
         Map<String, Object> millisecondZero = validChat();
@@ -278,6 +290,7 @@ public final class MemorySanitizerProbe {
         Map<String, Object> chat = new LinkedHashMap<>();
         chat.put("messageId", "message:0001");
         chat.put("conversationId", "conversation:0001");
+        chat.put("conversationStartedAt", "2026-08-27T10:00:00.000Z");
         chat.put("traceId", "trace:0001");
         chat.put("turnId", "turn:0001");
         chat.put("role", "user");

@@ -1,8 +1,11 @@
 package com.femonster.core;
 
 import com.femonster.json.SimpleJson;
+import com.femonster.memory.CanonicalMemoryJson;
+import com.femonster.memory.LocalAiMemoryService;
 
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -40,15 +43,32 @@ public final class PetPersonalizationService {
     private final Path storeDirectory;
     private final AccountSource source;
     private final Clock clock;
+    private final boolean diskPersistenceEnabled;
+    private final LocalAiMemoryService encryptedMemory;
     private final Map<String, Long> refreshedAt = new ConcurrentHashMap<>();
     private final Map<String, Object> scopeLocks = new ConcurrentHashMap<>();
 
     public PetPersonalizationService(Path storeDirectory, AccountSource source, Clock clock) {
+        this(storeDirectory, source, clock, true, null);
+    }
+
+    public PetPersonalizationService(
+        Path storeDirectory,
+        AccountSource source,
+        Clock clock,
+        boolean diskPersistenceEnabled
+    ) {
+        this(storeDirectory, source, clock, diskPersistenceEnabled, null);
+    }
+
+    public PetPersonalizationService(Path storeDirectory, AccountSource source, Clock clock, boolean diskPersistenceEnabled, LocalAiMemoryService encryptedMemory) {
         this.storeDirectory = Objects.requireNonNull(storeDirectory, "storeDirectory")
             .toAbsolutePath()
             .normalize();
         this.source = Objects.requireNonNull(source, "source");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.diskPersistenceEnabled = diskPersistenceEnabled;
+        this.encryptedMemory = encryptedMemory;
     }
 
     /** Refreshes online when needed, otherwise returns only the previously sanitized cache. */
@@ -68,6 +88,7 @@ public final class PetPersonalizationService {
                 providerLabel,
                 accountPayload
             );
+            migrateLegacyIfPossible(snapshot, scope, provider);
             long now = clock.millis();
             Map<String, Object> cached = snapshot.snapshot(scope);
             Long lastRefresh = refreshedAt.get(scope);
@@ -76,13 +97,59 @@ public final class PetPersonalizationService {
             }
             try {
                 Map<String, Object> fresh = snapshot.refresh(scope);
+                if (encryptedMemory != null && available(fresh)) {
+                    try {
+                        encryptedMemory.rememberPersonalization(provider, fresh);
+                    } catch (RuntimeException unavailable) {
+                        // The server response remains authoritative; a locked local vault is
+                        // retried on the next refresh and never turns online data into cache.
+                    }
+                }
                 refreshedAt.put(scope, now);
                 return response("server", false, fresh);
             } catch (Exception ignored) {
                 Map<String, Object> offline = snapshot.snapshot(scope);
+                if (!available(offline) && encryptedMemory != null) {
+                    try {
+                        offline = snapshot.sanitizeEncryptedProjection(encryptedMemory.personalization(provider));
+                    } catch (RuntimeException unavailable) {
+                        offline = emptyProjection();
+                    }
+                }
                 return response(available(offline) ? "cache" : "none", true, offline);
             }
         }
+    }
+
+    private void migrateLegacyIfPossible(PetPersonalizationSnapshot snapshot, String scope, String provider) {
+        if (encryptedMemory == null) return;
+        Map<String, Object> legacy = snapshot.legacySnapshot(scope);
+        if (isEmpty(legacy)) return;
+        try {
+            if (encryptedMemory.migratePersonalization(provider, legacy)
+                && sameCanonicalProjection(legacy, snapshot.sanitizeEncryptedProjection(encryptedMemory.personalization(provider)))) {
+                // A delete failure deliberately leaves the original source in place for retry;
+                // it is never renamed into a plaintext quarantine area.
+                snapshot.deleteLegacyAfterEncryptedCommit(scope);
+            }
+        } catch (RuntimeException unavailable) {
+            // The encrypted commit was not confirmed.  Keep the legacy source intact and do
+            // not report a migration; offline use still fails closed without plaintext fallback.
+        }
+    }
+
+    private boolean sameCanonicalProjection(Map<String, Object> left, Map<String, Object> right) {
+        try {
+            byte[] leftBytes = CanonicalMemoryJson.encode(CanonicalMemoryJson.immutableObject(left));
+            byte[] rightBytes = CanonicalMemoryJson.encode(CanonicalMemoryJson.immutableObject(right));
+            return MessageDigest.isEqual(leftBytes, rightBytes);
+        } catch (RuntimeException invalid) {
+            return false;
+        }
+    }
+
+    private boolean isEmpty(Map<String, Object> projection) {
+        return SimpleJson.asList(projection.get("memories")).isEmpty() && SimpleJson.asMap(projection.get("habits")).isEmpty();
     }
 
     /** Drops the current authenticated account's cached projection after a forget operation. */
@@ -95,6 +162,12 @@ public final class PetPersonalizationService {
         if (scope.isBlank()) return;
         Object lock = scopeLocks.computeIfAbsent(scope, ignored -> new Object());
         synchronized (lock) {
+            if (encryptedMemory != null) {
+                // The durable trusted record is invalidated first.  If this fails, do not clear
+                // the in-memory/plaintext caches: otherwise the old encrypted snapshot could be
+                // recovered by a later offline read.
+                encryptedMemory.forgetPersonalization(provider);
+            }
             snapshotFor(scope, provider, providerLabel, accountPayload).invalidate(scope);
             refreshedAt.remove(scope);
         }
@@ -121,7 +194,7 @@ public final class PetPersonalizationService {
                 requireSameScope(scope, requestedScope);
                 return requireSuccessful(source.habits(provider, providerLabel, account), "habits");
             }
-        }, clock);
+        }, clock, diskPersistenceEnabled);
     }
 
     private String resolveScope(

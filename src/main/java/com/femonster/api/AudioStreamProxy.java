@@ -218,7 +218,7 @@ final class AudioStreamProxy {
         StreamPlan plan
     ) throws IOException, InterruptedException {
         HttpResponse<InputStream> response = initial;
-        long written = 0;
+        CopyProgress progress = new CopyProgress();
         int attempts = 0;
         IOException lastFailure = null;
         boolean resumed = false;
@@ -226,10 +226,14 @@ final class AudioStreamProxy {
         while (true) {
             long remaining = plan.expectedBytes() < 0
                 ? Long.MAX_VALUE
-                : plan.expectedBytes() - written;
+                : plan.expectedBytes() - progress.written;
             try (InputStream input = response.body()) {
-                written += copyObservable(input, output, remaining);
+                copyObservable(input, output, remaining, progress);
                 lastFailure = null;
+            } catch (DownstreamWriteException failure) {
+                // A browser seek/track switch closes its previous response. Fetching
+                // that response again cannot repair its output and wastes bandwidth.
+                throw failure;
             } catch (SocketTimeoutException timeout) {
                 bodyIdleTimeouts.incrementAndGet();
                 lastFailure = timeout;
@@ -237,11 +241,11 @@ final class AudioStreamProxy {
                 lastFailure = failure;
             }
 
-            if (plan.expectedBytes() < 0 || written == plan.expectedBytes()) {
+            if (plan.expectedBytes() < 0 || progress.written == plan.expectedBytes()) {
                 if (resumed) resumedStreams.incrementAndGet();
                 return;
             }
-            if (written > plan.expectedBytes()) {
+            if (progress.written > plan.expectedBytes()) {
                 throw new IOException("audio stream exceeded its declared range");
             }
             if (!plan.resumable() || attempts >= MAX_RESUME_ATTEMPTS) {
@@ -252,7 +256,7 @@ final class AudioStreamProxy {
 
             attempts += 1;
             resumeAttempts.incrementAndGet();
-            long nextOffset = Math.addExact(plan.startOffset(), written);
+            long nextOffset = Math.addExact(plan.startOffset(), progress.written);
             HttpResponse<InputStream> resumedResponse;
             try {
                 resumedResponse = sendFollowingRedirects(
@@ -275,7 +279,8 @@ final class AudioStreamProxy {
     private long copyObservable(
         InputStream input,
         OutputStream output,
-        long maximumBytes
+        long maximumBytes,
+        CopyProgress progress
     ) throws IOException {
         ArrayBlockingQueue<BodyChunk> chunks = new ArrayBlockingQueue<>(3);
         var reader = BODY_READERS.submit(() -> readBody(input, chunks));
@@ -303,8 +308,14 @@ final class AudioStreamProxy {
                 if (chunk.bytes().length > maximumBytes - written) {
                     throw new IOException("audio upstream returned bytes beyond the declared range");
                 }
-                output.write(chunk.bytes());
+                try {
+                    output.write(chunk.bytes());
+                } catch (IOException failure) {
+                    throw new DownstreamWriteException(failure);
+                }
                 written += chunk.bytes().length;
+                // Commit per successful write, including when a later read throws.
+                progress.written += chunk.bytes().length;
                 bytesForwarded.addAndGet(chunk.bytes().length);
                 if (written == maximumBytes) {
                     complete = true;
@@ -632,6 +643,16 @@ final class AudioStreamProxy {
 
     private record BodyChunk(byte[] bytes, IOException failure, boolean end) {
         private static final BodyChunk END = new BodyChunk(null, null, true);
+    }
+
+    private static final class CopyProgress {
+        private long written;
+    }
+
+    private static final class DownstreamWriteException extends IOException {
+        private DownstreamWriteException(IOException cause) {
+            super("audio downstream closed while copying", cause);
+        }
     }
 
     private static boolean isRedirect(int status) {

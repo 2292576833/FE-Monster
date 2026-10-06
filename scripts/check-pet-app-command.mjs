@@ -324,7 +324,9 @@ for (const command of [
   'playback.volume.set', 'music.search', 'music.search.play', 'music.play.similar',
   'navigation.open', 'community.page.open', 'scene.preset.set', 'lyrics.mode.set',
   'lyrics.offset.adjust', 'wallpaper.setting.set',
-  'app.parameters.catalog.query', 'app.parameters.current.query', 'app.parameters.batch.apply',
+  'app.parameters.catalog.query', 'app.parameters.current.query', 'app.parameters.coverage.query', 'app.parameters.batch.apply',
+  'pet.memory.status.query', 'pet.memory.records.query', 'pet.memory.records.forget',
+  'pet.voice.catalog.query', 'pet.voice.select',
   'scene.preset.catalog.query', 'scene.preset.search',
   'community.state.query', 'community.friends.query', 'community.friend.request.send',
   'community.messages.query', 'community.message.send', 'community.square.query', 'community.square.post',
@@ -334,6 +336,18 @@ for (const command of [
 ]) {
   assert.ok(appSource.includes(`command: '${command}'`), `missing app command ${command}`);
 }
+const memoryForgetDefinition = appSource.slice(
+  appSource.indexOf("command: 'pet.memory.records.forget'"),
+  appSource.indexOf("command: 'pet.mascot.visibility.query'")
+);
+assert.match(memoryForgetDefinition, /requiresConfirmation:\s*true/,
+  'destructive local-memory deletion does not require confirmation');
+assert.ok(petSource.includes('/^pet\\.memory\\.records\\.(?:query|list)$/'),
+  'arbitrary custom models can read private local-memory records');
+assert.match(petSource, /voices: \(\) => Object\.freeze/,
+  'pet assistant does not expose a bounded voice catalog to the app command layer');
+assert.match(petSource, /selectVoice: \(voiceId\) => persistVoiceSelection\(voiceId\)/,
+  'pet assistant does not expose voice selection to the app command layer');
 assert.match(appSource, /petAssistantEditSimilarity/);
 assert.match(appSource, /const attempted = \[\]/,
   'parameter rollback does not include the currently failing setter');
@@ -343,9 +357,39 @@ assert.match(appSource, /petAssistantCommunityFriendRequestSummary/,
   'friend queries still expose unbounded raw request records');
 assert.match(appSource, /\['range', 'number', 'checkbox', 'color'\]/,
   'number inputs are missing from the real parameter catalog');
+assert.match(appSource, /FeMonsterParameters\?\.replaceOwner|FeMonsterParameters\.replaceOwner/,
+  'the application parameter commands do not consume the explicit registry');
+assert.match(appSource, /\[data-pet-parameter-key\]/,
+  'dynamic settings without generated element IDs are missing from the parameter catalog');
+assert.match(appSource, /control\?\.dataset\?\.petParameterKey/,
+  'stable semantic parameter keys are ignored in favor of generated DOM IDs');
+assert.match(appSource, /mixerController\?\.settled/,
+  'audio parameters can report success before the revision-aware mixer queue settles');
+assert.match(appSource, /change\.entry\.impact\s*===\s*['"]high['"]/,
+  'generic high-impact parameters do not enter the confirmation boundary');
+assert.match(appSource, /FeMonsterParameters\?\.apply|FeMonsterParameters\.apply/,
+  'parameter application bypasses registry read-back verification');
 assert.match(appSource, /PET_MUSIC_ALIASES/);
 assert.match(appSource, /request\.title && request\.artist/);
 assert.match(appSource, /(?:类似\|相似\|similar)/);
+const musicSearchDefinition = appSource.slice(
+  appSource.indexOf("command: 'music.search'"),
+  appSource.indexOf("command: 'music.search.play'")
+);
+assert.match(musicSearchDefinition, /if \(!songs\.length\) throw new Error/,
+  'an empty music search is still reported as a successful command');
+assert.match(musicSearchDefinition, /els\.searchInput\.value\s*=\s*request\.query/,
+  'pet music search results do not synchronize the visible search input');
+assert.match(musicSearchDefinition, /setSearchSuggestionsOpen\(true\)/,
+  'pet music search results remain hidden after a successful command');
+const searchAndPlayStart = appSource.indexOf('async function petAssistantSearchAndPlayFuzzy(');
+const searchAndPlayEnd = appSource.indexOf('\nasync function petAssistantPlaySimilar(', searchAndPlayStart);
+assert.match(appSource.slice(searchAndPlayStart, searchAndPlayEnd), /played:\s*true/,
+  'search-and-play does not return an explicit playback state change');
+assert.match(petSource, /function clientAiDirectCommandRequest/,
+  'local text and voice commands lack deterministic core command routing');
+assert.match(petSource, /没有返回匹配的状态变更回执/,
+  'local mutating commands can still succeed without a matching client receipt');
 assert.doesNotMatch(`${commandSource}\n${appSource}\n${petSource}`, /\beval\s*\(|new Function\s*\(/);
 assert.doesNotMatch(commandSource, /querySelector|getElementById|\.click\s*\(/,
   'generic command bus must not expose arbitrary DOM clicking');

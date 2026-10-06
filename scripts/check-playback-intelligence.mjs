@@ -9,9 +9,29 @@ const source = readFileSync(path.join(root, 'web', 'playback-intelligence.js'), 
 const storageValues = new Map();
 const playlistPlays = [];
 const automatedCommands = [];
+const durableEvents = [];
+const preferenceSummaries = [];
+let durableId = 0;
 let currentIdentity = 'netease:fixture-user';
-const window = {};
-vm.runInNewContext(source, { window }, { filename: 'playback-intelligence.js' });
+const window = {
+  FeMonsterPetPreferenceMemory: {
+    async observePlaybackSummary(value) {
+      preferenceSummaries.push(JSON.parse(JSON.stringify(value)));
+      return { written: 1 };
+    }
+  },
+  FeLocalMemory: {
+    createId() {
+      durableId += 1;
+      return `00000000-0000-4000-8000-${String(durableId).padStart(12, '0')}`;
+    },
+    append(event) {
+      durableEvents.push(JSON.parse(JSON.stringify(event)));
+      return { accepted: true, eventId: this.createId(), receipt: Promise.resolve({ recordedAt: '2026-08-29T00:00:00.000Z' }) };
+    }
+  }
+};
+vm.runInNewContext(source, { window, TextEncoder }, { filename: 'playback-intelligence.js' });
 
 const intelligence = window.FeMonsterPlaybackIntelligence.create({
   player: {
@@ -82,6 +102,29 @@ assert.deepEqual(
   },
   'snapshot should use the live player clock instead of a delayed backend poll'
 );
+
+const durableBefore = durableEvents.length;
+await intelligence.notify('track-start', {
+  song: { id: 'kg|fixture|track', name: 'Durable Signal', artist: 'FE', provider: 'kugou' },
+  positionSeconds: 0,
+  durationSeconds: 180
+});
+await intelligence.notify('progress', {
+  songId: 'kg|fixture|track', positionSeconds: 1.2, durationSeconds: 180
+});
+await intelligence.notify('track-complete', {
+  song: { id: 'kg|fixture|track', name: 'Durable Signal', artist: 'FE', provider: 'kugou' },
+  positionSeconds: 180,
+  durationSeconds: 180
+});
+const durablePair = durableEvents.slice(durableBefore);
+assert.deepEqual(durablePair.map((event) => event.type), ['playback.started', 'playback.completed'],
+  'only semantic playback boundaries should enter durable memory');
+assert.equal(durablePair[0].payload.traceId, durablePair[1].payload.traceId,
+  'a start/completion pair must retain one causal playback trace');
+assert.doesNotMatch(durablePair[0].payload.songId, /\|/,
+  'provider song ids must be encoded into the Java vault correlation-id alphabet');
+assert.equal(durablePair[1].payload.durationMs, 180000);
 
 assert.deepEqual(
   JSON.parse(JSON.stringify(await intelligence.execute('queue.query', { cursor: 3, limit: 2 }))),
@@ -226,6 +269,8 @@ assert.equal(habitSummary.topSongs[0].starts, 3);
 assert.equal(habitSummary.topSongs[0].completes, 3);
 assert.equal(habitSummary.topArtists[0].name, 'Nova');
 assert.ok(habitSummary.topSongs[0].confidence >= 0.5);
+assert.ok(preferenceSummaries.some((entry) => entry.summary?.topSongs?.some((song) => song.name === 'Aurora')),
+  'qualified playback habits were not offered to the encrypted preference learner');
 
 currentIdentity = 'qq:another-user';
 const isolatedSummary = await intelligence.execute('habit.summary');

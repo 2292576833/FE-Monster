@@ -8,8 +8,16 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public final class MusicProviderRegistry {
+    @FunctionalInterface
+    public interface PlaybackResolver {
+        PlaybackSource resolve(String provider, Song song, String quality, Supplier<PlaybackSource> builtin);
+    }
+
+    private static final PlaybackResolver BUILTIN_RESOLVER = (provider, song, quality, builtin) -> builtin.get();
+    private volatile PlaybackResolver playbackResolver = BUILTIN_RESOLVER;
     private static final long PROVIDER_ACCESS_RECHECK_NANOS = TimeUnit.SECONDS.toNanos(1);
     private static final Consumer<String> NO_PROVIDER_ACCESS = provider -> {
     };
@@ -67,6 +75,11 @@ public final class MusicProviderRegistry {
 
     public void resetProviderAccess() {
         providerAccessAt.clear();
+    }
+
+    /** Changes URL resolution only; accounts, catalogues and active playback stay intact. */
+    public void setPlaybackResolver(PlaybackResolver resolver) {
+        playbackResolver = resolver == null ? BUILTIN_RESOLVER : resolver;
     }
 
     public Map<String, Object> providersPayload() {
@@ -167,19 +180,28 @@ public final class MusicProviderRegistry {
     }
 
     public String songUrl(String provider, String id, String quality) {
-        return get(provider).songUrl(id, quality);
+        return resolvePlayback(provider, songIdentity(provider, id), quality).url();
     }
 
     public PlaybackSource resolvePlayback(String provider, Song song, String quality) {
-        return get(provider).resolvePlayback(song, quality);
+        String normalized = normalize(provider);
+        return playbackResolver.resolve(normalized, song, quality,
+            () -> get(normalized).resolvePlayback(song, quality));
     }
 
     public Map<String, Object> songUrlPayload(String provider, String id, String quality) {
-        return get(provider).songUrlPayload(id, quality);
+        return resolvePlayback(provider, songIdentity(provider, id), quality).toMap();
     }
 
     public Map<String, Object> songUrlPayload(String provider, Song song, String quality) {
-        return get(provider).resolvePlayback(song, quality).toMap();
+        return resolvePlayback(provider, song, quality).toMap();
+    }
+
+    private static Song songIdentity(String provider, String id) {
+        Song song = new Song();
+        song.provider = normalize(provider);
+        song.id = id;
+        return song;
     }
 
     public Map<String, Object> lyricPayload(String provider, String songId) {

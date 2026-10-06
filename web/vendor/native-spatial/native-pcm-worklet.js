@@ -200,6 +200,10 @@ class FeNativePcmBridgeProcessor extends AudioWorkletProcessor {
         poolEpoch: this.poolEpoch,
         timelineEpoch: this.timelineEpoch,
         frames: FE_NATIVE_PCM_TRANSPORT_FRAMES,
+        captureEndFrame: typeof currentFrame === 'number'
+          ? currentFrame + frame + 1
+          : this.blocksWritten * FE_NATIVE_PCM_TRANSPORT_FRAMES,
+        captureSampleRate: typeof sampleRate === 'number' ? sampleRate : 48000,
         blocks: this.blocksWritten,
         inputRms
       }, [block.buffer]);

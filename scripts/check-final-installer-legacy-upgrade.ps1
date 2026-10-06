@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
   [string]$Root = '',
+  [string]$WinFormsSourceDir = '',
   [Parameter(Mandatory = $true)]
   [string]$SetupExe,
   [Parameter(Mandatory = $true)]
@@ -69,9 +70,19 @@ $packagePath = Join-Path $rootPath 'package.json'
 if (!(Test-Path -LiteralPath $packagePath -PathType Leaf)) {
   throw "Repository package.json was not found: $packagePath"
 }
-$expectedAppVersion = [string](Get-Content -Raw -LiteralPath $packagePath | ConvertFrom-Json).version
+. (Join-Path $rootPath 'scripts\release-version.ps1')
+$expectedAppVersion = (Get-FeMonsterReleaseVersion (Get-Content -Raw -LiteralPath $packagePath | ConvertFrom-Json)).DisplayVersion
 if ([string]::IsNullOrWhiteSpace($expectedAppVersion)) {
   throw 'Repository package.json does not contain an application version.'
+}
+$winFormsReferenceRoot = if ([string]::IsNullOrWhiteSpace($WinFormsSourceDir)) {
+  Join-Path $rootPath 'native\windows\build\winforms'
+} else {
+  (Resolve-Path -LiteralPath $WinFormsSourceDir).Path
+}
+$referenceClient = Get-Item -LiteralPath (Join-Path $winFormsReferenceRoot 'FE Monster.exe')
+if ([string]$referenceClient.VersionInfo.ProductVersion -cne $expectedAppVersion) {
+  throw 'Reference client version does not match the release. Supply the exact -WinFormsSourceDir used for packaging.'
 }
 
 $setupPath = (Resolve-Path -LiteralPath $SetupExe).Path
@@ -80,11 +91,11 @@ if (!(Test-Path -LiteralPath $setupPath -PathType Leaf)) {
 }
 $testPath = [IO.Path]::GetFullPath($TestRoot).TrimEnd('\', '/')
 $testDriveRoot = [IO.Path]::GetPathRoot($testPath)
-if (![string]::Equals($testDriveRoot, 'E:\', [StringComparison]::OrdinalIgnoreCase)) {
-  throw "The legacy-upgrade fixture must use an explicit E: test root: $testPath"
+if ([string]::Equals($testDriveRoot, [IO.Path]::GetPathRoot($Env:SystemRoot), [StringComparison]::OrdinalIgnoreCase)) {
+  throw "The legacy-upgrade fixture must use an explicit non-system-drive test root: $testPath"
 }
 if ([string]::Equals($testPath, $testDriveRoot.TrimEnd('\', '/'), [StringComparison]::OrdinalIgnoreCase)) {
-  throw "The E: drive root itself cannot be used as the test root: $testPath"
+  throw "The drive root itself cannot be used as the test root: $testPath"
 }
 if (Test-Path -LiteralPath $testPath) {
   throw "The isolated legacy-upgrade test root must not already exist: $testPath"
@@ -423,6 +434,9 @@ $releaseCriticalFiles = @(
 $releaseCriticalHashes = [ordered]@{}
 foreach ($relativePath in $releaseCriticalFiles) {
   $sourceFile = Join-Path $rootPath $relativePath
+  if ($relativePath -ceq 'native\windows\build\winforms\FE Monster.exe') {
+    $sourceFile = Join-Path $winFormsReferenceRoot 'FE Monster.exe'
+  }
   $installedFile = Join-Path $installPath $relativePath
   if (!(Test-Path -LiteralPath $sourceFile -PathType Leaf)) {
     throw "Repository release-critical file is missing: $relativePath"
@@ -496,6 +510,7 @@ $setupSignature = Get-AuthenticodeSignature -LiteralPath $setupPath
   setupProductVersion = $setupProductVersion
   authenticode = [string]$setupSignature.Status
   installedClientVersion = $installedClientVersion
+  winFormsSourceDir = $winFormsReferenceRoot
   manifestFileCount = $manifestEntries.Count
   releaseCriticalHashes = $releaseCriticalHashes
 } | ConvertTo-Json -Depth 5

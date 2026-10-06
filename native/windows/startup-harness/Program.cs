@@ -29,7 +29,7 @@ static async Task<BackendStartupProbeResult> Probe(
     return await BackendStartupProbe.ProbeOnceAsync(client, new Uri("http://127.0.0.1:30123/"));
 }
 
-const string validVersion = "{\"version\":\"2.1.1\"}";
+const string validVersion = "{\"version\":\"2.1.2\"}";
 const string validIndex = "<!doctype html><title>FE Monster Java</title><section id=\"bootScreen\"></section>";
 
 BackendStartupProbeResult falseReady = await Probe(
@@ -58,6 +58,12 @@ if (automatic.Contains("disable-software-rasterizer", StringComparison.OrdinalIg
     throw new InvalidOperationException("Automatic rendering still prevents Chromium's software fallback.");
 
 string software = WebViewStartupPolicy.BrowserArguments(gpuRequested: false);
+foreach (string arguments in new[] { automatic, software })
+{
+    foreach (string flag in new[] { "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows" })
+        if (!arguments.Contains(flag, StringComparison.Ordinal))
+            throw new InvalidOperationException($"Background PCM transport can be throttled: {flag}");
+}
 if (!software.Contains("--disable-gpu", StringComparison.OrdinalIgnoreCase)
     || software.Contains("disable-software-rasterizer", StringComparison.OrdinalIgnoreCase))
     throw new InvalidOperationException("Explicit software rendering is not available.");

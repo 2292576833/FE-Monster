@@ -50,9 +50,12 @@ try {
     'src', 'test', 'java', 'com', 'femonster', 'core',
     'NeteaseUserLibraryContractProbe.java'
   );
+  const persistenceProbe = path.join(root, 'src', 'test', 'java', 'com', 'femonster', 'music',
+    'GenericMusicClientSessionPersistenceProbe.java');
+  const switchProbe = path.join(root, 'scripts', 'java', 'OfficialBrowserAccountSwitchProbe.java');
   run(javac, [
     '-encoding', 'UTF-8', '--release', '17', '-cp', classes, '-d', scratch,
-    probe, qualificationProbe, neteaseLibraryProbe
+    probe, qualificationProbe, neteaseLibraryProbe, persistenceProbe, switchProbe
   ]);
   const output = run(java, ['-cp', `${scratch}${path.delimiter}${classes}`, 'com.femonster.core.BrowserLoginSynchronizationProbe']);
   assert.match(output, /Browser login synchronization probe: OK/);
@@ -66,6 +69,12 @@ try {
     'com.femonster.core.NeteaseUserLibraryContractProbe'
   ]);
   assert.match(neteaseLibraryOutput, /NeteaseUserLibraryContractProbe passed/);
+  const persistenceOutput = run(java, ['-cp', `${scratch}${path.delimiter}${classes}`,
+    'com.femonster.music.GenericMusicClientSessionPersistenceProbe']);
+  assert.match(persistenceOutput, /GenericMusicClientSessionPersistenceProbe passed/);
+  const switchOutput = run(java, ['-cp', `${scratch}${path.delimiter}${classes}`,
+    'OfficialBrowserAccountSwitchProbe']);
+  assert.match(switchOutput, /Official browser account-switch isolation PASS/);
   const latencyMatch = output.match(/Browser login long-poll wake latency:\s*(\d+(?:\.\d+)?)\s*ms/);
   assert.ok(latencyMatch, 'long-poll wake latency measurement was not reported');
   const wakeLatencyMilliseconds = Number(latencyMatch[1]);

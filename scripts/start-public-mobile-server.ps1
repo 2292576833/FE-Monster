@@ -14,7 +14,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $rootPath = (Resolve-Path $Root).Path
 $outDir = Join-Path $rootPath 'out'
-$jarPath = Join-Path $outDir 'fe-monster-java.jar'
+. (Join-Path $rootPath 'scripts\java-build-artifacts.ps1')
+$jarPath = Resolve-JavaRunJar -Root $rootPath
+if ([string]::IsNullOrWhiteSpace($jarPath)) { $jarPath = Join-Path $outDir 'fe-monster-java.jar' }
 $communityScript = Join-Path $PSScriptRoot 'start-community-server.ps1'
 $publicProxyScript = Join-Path $PSScriptRoot 'public-mobile-proxy.js'
 $downloadSiteScript = Join-Path $PSScriptRoot 'start-download-site.ps1'
@@ -97,6 +99,8 @@ if ($LASTEXITCODE -ne 0 -or !(Test-HttpEndpoint "http://127.0.0.1:$CommunityPort
 
 if (!(Test-Path $jarPath)) {
   & $buildScript
+  $jarPath = Resolve-JavaRunJar -Root $rootPath
+  if ([string]::IsNullOrWhiteSpace($jarPath)) { $jarPath = Join-Path $outDir 'fe-monster-java.jar' }
   if ($LASTEXITCODE -ne 0 -or !(Test-Path $jarPath)) {
     throw "FE Monster Java gateway build failed: $jarPath"
   }

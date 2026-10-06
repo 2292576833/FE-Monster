@@ -672,11 +672,174 @@ public final class SqliteEncryptedMemoryStore implements LocalMemoryStore {
         return append(events, MemorySanitizer.Stream.KNOWLEDGE);
     }
 
+    @Override
+    public boolean appendTrustedPersonalization(String scope, Map<String, Object> projection) {
+        if (scope == null || projection == null || projection.isEmpty()) throw failure(LocalMemoryException.Code.INVALID_ARGUMENT);
+        return execute(() -> {
+            String value = new String(
+                CanonicalMemoryJson.encode(CanonicalMemoryJson.immutableObject(projection)),
+                StandardCharsets.UTF_8
+            );
+            String eventId = trustedPersonalizationId(scope);
+            byte[] proofInput = trustedPersonalizationProofInput(scope, value);
+            byte[] proof = crypto.backupMac(proofInput);
+            try {
+                Instant now = Instant.now();
+                Map<String, Object> payload = new LinkedHashMap<>();
+                payload.put("occurredAt", now.toString());
+                payload.put("sourceSequence", 0L);
+                payload.put("source", "system");
+                payload.put("entityId", "pet.personalization.internal.v1");
+                payload.put("title", "sanitized_snapshot");
+                payload.put("value", value);
+                payload.put("producerProof", Base64.getEncoder().encodeToString(proof));
+                LocalMemoryEvent event = new LocalMemoryEvent(
+                    eventId, MemorySanitizer.Stream.KNOWLEDGE, scope, "user.fact", now, 0L, payload
+                );
+                return replaceTrustedPersonalizationOnStoreThread(event);
+            } finally {
+                clear(proofInput);
+                clear(proof);
+            }
+        });
+    }
+
+    @Override
+    public Map<String, Object> trustedPersonalization(String scope) {
+        if (scope == null) throw failure(LocalMemoryException.Code.INVALID_ARGUMENT);
+        return execute(() -> {
+            Map<String, Object> value = trustedPersonalizationOnStoreThread(scope);
+            return value == null ? Map.of() : CanonicalMemoryJson.immutableObject(value);
+        });
+    }
+
+    @Override
+    public boolean forgetTrustedPersonalization(String scope) {
+        if (scope == null) throw failure(LocalMemoryException.Code.INVALID_ARGUMENT);
+        String eventId = trustedPersonalizationId(scope);
+        ForgetRequest request = new ForgetRequest(
+            scope, Set.of(eventId), null, null, Set.of(), null, false
+        );
+        return execute(() -> {
+            StreamDescriptor knowledge = descriptor(MemorySanitizer.Stream.KNOWLEDGE);
+            StoredRow row = readRowById(requireConnection(), knowledge, eventId);
+            if (row == null || row.deletedAt() != null) {
+                if (row != null) row.clearSecrets();
+                return false;
+            }
+            try {
+                // The fixed id alone is not sufficient: authenticate the reserved
+                // producer payload before granting the internal delete capability.
+                if (trustedPersonalizationOnStoreThread(scope) == null) {
+                    throw failure(LocalMemoryException.Code.INTEGRITY);
+                }
+            } finally {
+                row.clearSecrets();
+            }
+            return forgetOnStoreThread(request, MemorySanitizer.Stream.KNOWLEDGE, true).count() > 0;
+        });
+    }
+
+    private Map<String, Object> trustedPersonalizationOnStoreThread(String scope) throws SQLException {
+        String eventId = trustedPersonalizationId(scope);
+        StoredRow row = readRowById(requireConnection(), descriptor(MemorySanitizer.Stream.KNOWLEDGE), eventId);
+        if (row == null) return null;
+        try {
+            if (row.deletedAt() != null) return null;
+            DecryptedEnvelope envelope = decryptAndVerify(requireConnection(), MemorySanitizer.Stream.KNOWLEDGE, scope, row);
+            Map<String, Object> payload = envelope.payload();
+            if (!"system".equals(payload.get("source"))
+                || !"pet.personalization.internal.v1".equals(payload.get("entityId"))
+                || !(payload.get("value") instanceof String value)
+                || !(payload.get("producerProof") instanceof String encoded)) return null;
+            byte[] input = trustedPersonalizationProofInput(scope, value);
+            byte[] expected = crypto.backupMac(input);
+            byte[] actual = null;
+            try {
+                try { actual = Base64.getDecoder().decode(encoded); }
+                catch (IllegalArgumentException invalid) { return null; }
+                if (!MessageDigest.isEqual(expected, actual)) return null;
+                return SimpleJson.parseObjectStrict(value);
+            } catch (RuntimeException invalid) {
+                return null;
+            } finally {
+                clear(input); clear(expected); clear(actual);
+            }
+        } finally {
+            row.clearSecrets();
+        }
+    }
+
+    private String trustedPersonalizationId(String scope) {
+        byte[] input = ("trusted-personalization/v1\0" + scope).getBytes(StandardCharsets.UTF_8);
+        byte[] token = crypto.internalMac(input);
+        try { return UUID.nameUUIDFromBytes(token).toString(); }
+        finally { clear(input); clear(token); }
+    }
+
+    private boolean replaceTrustedPersonalizationOnStoreThread(LocalMemoryEvent event) {
+        Connection database = requireConnection();
+        boolean previousAutoCommit;
+        try {
+            previousAutoCommit = database.getAutoCommit();
+            database.setAutoCommit(false);
+        } catch (SQLException failure) {
+            throw mapFailure(failure);
+        }
+        try {
+            MemorySanitizer.Stream existing = findStreamForId(database, event.eventId());
+            if (existing != null && existing != MemorySanitizer.Stream.KNOWLEDGE) {
+                throw failure(LocalMemoryException.Code.CONFLICT);
+            }
+            if (existing == MemorySanitizer.Stream.KNOWLEDGE) {
+                try (PreparedStatement tokens = database.prepareStatement(
+                    "DELETE FROM knowledge_search_tokens WHERE event_id=?")) {
+                    tokens.setString(1, event.eventId());
+                    tokens.executeUpdate();
+                }
+                try (PreparedStatement row = database.prepareStatement(
+                    "DELETE FROM knowledge_records WHERE event_id=?")) {
+                    row.setString(1, event.eventId());
+                    row.executeUpdate();
+                }
+            }
+            AppendResult result = appendOne(database, event);
+            database.commit();
+            hardenDatabaseFiles();
+            Object encoded = event.payload().get("value");
+            Map<String, Object> expected = encoded instanceof String value
+                ? SimpleJson.parseObjectStrict(value)
+                : Map.of();
+            Map<String, Object> actual = trustedPersonalizationOnStoreThread(event.scope());
+            if (actual == null || !MessageDigest.isEqual(
+                CanonicalMemoryJson.encode(CanonicalMemoryJson.immutableObject(expected)),
+                CanonicalMemoryJson.encode(CanonicalMemoryJson.immutableObject(actual)))) {
+                throw failure(LocalMemoryException.Code.INTEGRITY);
+            }
+            return result != null;
+        } catch (SQLException | IOException | RuntimeException problem) {
+            rollbackOrLock(database);
+            throw mapFailure(problem);
+        } finally {
+            restoreAutoCommitOrLock(database, previousAutoCommit);
+        }
+    }
+
+    private static byte[] trustedPersonalizationProofInput(String scope, String value) {
+        return ("trusted-personalization/v1\\0" + scope + "\\0" + value).getBytes(StandardCharsets.UTF_8);
+    }
+
     private List<AppendResult> append(
         List<LocalMemoryEvent> events,
         MemorySanitizer.Stream expectedStream
     ) {
         List<LocalMemoryEvent> bounded = LocalMemoryStore.Bounds.batch(events, expectedStream);
+        for (LocalMemoryEvent event : bounded) {
+            if (event.stream() == MemorySanitizer.Stream.KNOWLEDGE
+                && MemorySanitizer.isReservedTrustedPayload(event.payload())) {
+                throw failure(LocalMemoryException.Code.INVALID_ARGUMENT);
+            }
+        }
         return execute(() -> appendOnStoreThread(bounded));
     }
 
@@ -910,7 +1073,7 @@ public final class SqliteEncryptedMemoryStore implements LocalMemoryStore {
         return execute(() -> {
             List<StoredEvent> rows = queryRows(
                 requireConnection(), stream, query.scope(), query.types(), query.limit(),
-                query.before(), query.text(), null
+                query.before(), query.text(), query.traceId(), query.conversationId(), query.operationId()
             );
             boolean hasMore = rows.size() > query.limit();
             List<StoredEvent> page = hasMore ? List.copyOf(rows.subList(0, query.limit())) : List.copyOf(rows);
@@ -932,7 +1095,7 @@ public final class SqliteEncryptedMemoryStore implements LocalMemoryStore {
                 query.limit() - 1,
                 null,
                 null,
-                query.traceId()
+                query.traceId(), null, null
             );
             List<StoredEvent> operations = queryRows(
                 database,
@@ -942,7 +1105,7 @@ public final class SqliteEncryptedMemoryStore implements LocalMemoryStore {
                 query.limit() - 1,
                 null,
                 null,
-                query.traceId()
+                query.traceId(), null, null
             );
             return new TraceResult(chats, operations);
         });
@@ -956,7 +1119,9 @@ public final class SqliteEncryptedMemoryStore implements LocalMemoryStore {
         int requestedLimit,
         Cursor before,
         String search,
-        String traceId
+        String traceId,
+        String conversationId,
+        String operationId
     ) throws SQLException {
         StreamDescriptor descriptor = descriptor(stream);
         String scopeHash = scopeHash(scope);
@@ -973,6 +1138,16 @@ public final class SqliteEncryptedMemoryStore implements LocalMemoryStore {
             if (traceId != null) {
                 if (stream == MemorySanitizer.Stream.KNOWLEDGE) throw failure(LocalMemoryException.Code.INVALID_ARGUMENT);
                 sql.append(" AND trace_id=?");
+            }
+            byte[] conversationToken = null;
+            if (conversationId != null) {
+                if (stream != MemorySanitizer.Stream.CHAT) throw failure(LocalMemoryException.Code.INVALID_ARGUMENT);
+                conversationToken = conversationToken(conversationId);
+                sql.append(" AND conversation_token=?");
+            }
+            if (operationId != null) {
+                if (stream != MemorySanitizer.Stream.OPERATION) throw failure(LocalMemoryException.Code.INVALID_ARGUMENT);
+                sql.append(" AND operation_id=?");
             }
             if (before != null) {
                 sql.append(" AND (COALESCE(occurred_at,-9223372036854775808) < ?")
@@ -999,6 +1174,8 @@ public final class SqliteEncryptedMemoryStore implements LocalMemoryStore {
                 statement.setString(parameter++, scopeHash);
                 for (String type : types) statement.setString(parameter++, type);
                 if (traceId != null) statement.setString(parameter++, traceId);
+                if (conversationToken != null) statement.setBytes(parameter++, conversationToken);
+                if (operationId != null) statement.setString(parameter++, operationId);
                 if (before != null) {
                     long cursorOccurred = before.occurredAtMillis() == null
                         ? Long.MIN_VALUE
@@ -1014,13 +1191,20 @@ public final class SqliteEncryptedMemoryStore implements LocalMemoryStore {
                     statement.setLong(parameter++, before.sourceSequence());
                     statement.setString(parameter++, before.eventId());
                 }
-                statement.setInt(parameter, Math.min(MAX_RESULTS + 1, requestedLimit + 1));
+                // One reserved trusted snapshot may be filtered after
+                // decryption. Fetch one extra candidate so hiding it cannot
+                // truncate a public page or make a later cursor unreachable.
+                statement.setInt(parameter, Math.min(MAX_RESULTS + 2, requestedLimit + 2));
                 try (ResultSet result = statement.executeQuery()) {
                     while (result.next()) {
                         StoredRow row = storedRow(result);
                         try {
                             DecryptedEnvelope envelope = decryptAndVerify(database, stream, scope, row);
                             Map<String, Object> payload = envelope.payload();
+                            if (stream == MemorySanitizer.Stream.KNOWLEDGE
+                                && MemorySanitizer.isReservedTrustedPayload(payload)) {
+                                continue;
+                            }
                             LocalMemoryEvent event = new LocalMemoryEvent(
                                 row.eventId(), stream, scope, row.type(),
                                 payloadOccurredAt(payload, row.occurredAt()),
@@ -1113,7 +1297,11 @@ public final class SqliteEncryptedMemoryStore implements LocalMemoryStore {
                 payload,
                 encryptedDeletedAt != null
             );
-            return new DecryptedEnvelope(payload, encryptedRecordedAt, encryptedDeletedAt);
+            return new DecryptedEnvelope(
+                restorePublicNumberTypes(payload),
+                encryptedRecordedAt,
+                encryptedDeletedAt
+            );
         } catch (LocalMemoryException problem) {
             throw problem;
         } catch (RuntimeException problem) {
@@ -1162,6 +1350,58 @@ public final class SqliteEncryptedMemoryStore implements LocalMemoryStore {
         return leftEncoded.equals(rightEncoded);
     }
 
+    /**
+     * Canonical JSON freezes accepted decimal values as BigDecimal so their
+     * authenticated byte representation is stable. Public memory events,
+     * however, deliberately accept only JSON reader number classes. Restore
+     * those classes after integrity verification so an accepted Double can be
+     * reopened without widening the public append boundary to arbitrary Java
+     * BigDecimal or BigInteger values.
+     */
+    private static Map<String, Object> restorePublicNumberTypes(Map<String, Object> payload) {
+        Object restored = restorePublicNumberType(payload);
+        if (!(restored instanceof Map<?, ?> map)) {
+            throw failure(LocalMemoryException.Code.INTEGRITY);
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> typed = (Map<String, Object>) map;
+        return typed;
+    }
+
+    private static Object restorePublicNumberType(Object value) {
+        if (value instanceof BigDecimal decimal) {
+            double restored = decimal.doubleValue();
+            if (!Double.isFinite(restored)
+                || BigDecimal.valueOf(restored).compareTo(decimal) != 0) {
+                throw failure(LocalMemoryException.Code.INTEGRITY);
+            }
+            return restored;
+        }
+        if (value instanceof BigInteger integer) {
+            try {
+                return integer.longValueExact();
+            } catch (ArithmeticException problem) {
+                throw failure(LocalMemoryException.Code.INTEGRITY);
+            }
+        }
+        if (value instanceof Map<?, ?> map) {
+            LinkedHashMap<String, Object> restored = new LinkedHashMap<>(map.size());
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                if (!(entry.getKey() instanceof String key)) {
+                    throw failure(LocalMemoryException.Code.INTEGRITY);
+                }
+                restored.put(key, restorePublicNumberType(entry.getValue()));
+            }
+            return restored;
+        }
+        if (value instanceof List<?> list) {
+            ArrayList<Object> restored = new ArrayList<>(list.size());
+            for (Object item : list) restored.add(restorePublicNumberType(item));
+            return restored;
+        }
+        return value;
+    }
+
     @Override
     public ForgetResult forgetChats(ForgetRequest request) {
         return forget(request, MemorySanitizer.Stream.CHAT);
@@ -1180,10 +1420,14 @@ public final class SqliteEncryptedMemoryStore implements LocalMemoryStore {
     private ForgetResult forget(ForgetRequest request, MemorySanitizer.Stream stream) {
         if (request == null) throw failure(LocalMemoryException.Code.INVALID_ARGUMENT);
         request.requireStream(stream);
-        return execute(() -> forgetOnStoreThread(request, stream));
+        return execute(() -> forgetOnStoreThread(request, stream, false));
     }
 
-    private ForgetResult forgetOnStoreThread(ForgetRequest request, MemorySanitizer.Stream stream) {
+    private ForgetResult forgetOnStoreThread(
+        ForgetRequest request,
+        MemorySanitizer.Stream stream,
+        boolean allowReservedTrusted
+    ) {
         Connection database = requireConnection();
         StreamDescriptor descriptor = descriptor(stream);
         SqlFilter filter = forgetFilter(request, stream);
@@ -1207,6 +1451,13 @@ public final class SqliteEncryptedMemoryStore implements LocalMemoryStore {
                         DecryptedEnvelope envelope = decryptAndVerify(
                             database, stream, request.scope(), row
                         );
+                        if (stream == MemorySanitizer.Stream.KNOWLEDGE
+                            && MemorySanitizer.isReservedTrustedPayload(envelope.payload())) {
+                            if (!allowReservedTrusted) continue;
+                            if (trustedPersonalizationOnStoreThread(request.scope()) == null) {
+                                throw failure(LocalMemoryException.Code.INTEGRITY);
+                            }
+                        }
                         LocalMemoryEvent event = new LocalMemoryEvent(
                             row.eventId(), stream, request.scope(), row.type(),
                             payloadOccurredAt(envelope.payload(), row.occurredAt()),

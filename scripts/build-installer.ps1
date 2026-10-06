@@ -1,9 +1,11 @@
 param(
   [string]$OutputDir = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..')).Path 'dist'),
   [switch]$SkipBuild,
+  [string]$WinFormsSourceDir = '',
   [switch]$NoNodeBundle,
   [switch]$ReusePayloadZip,
   [switch]$StageOnly,
+  [switch]$PackageOnly,
   [switch]$EmbedPayload,
   [switch]$AllowEmbeddedPayload,
   [ValidateSet('Online', 'Offline')]
@@ -11,6 +13,7 @@ param(
   [string]$BundledSceneServerRoot = $Env:FE_MONSTER_BUNDLED_SCENE_SERVER_ROOT,
   [string]$CommunityServerUrl = $Env:FE_MONSTER_RELEASE_COMMUNITY_URL,
   [string]$CommunityServerTlsPins = $Env:FE_MONSTER_RELEASE_COMMUNITY_TLS_PINS,
+  [switch]$SkipDeveloperCommunityHealthCheck,
   [string]$SignCertificateThumbprint = $Env:FE_MONSTER_SIGN_CERTIFICATE_THUMBPRINT,
   [string]$TimestampUrl = $(if ([string]::IsNullOrWhiteSpace($Env:FE_MONSTER_SIGN_TIMESTAMP_URL)) { 'http://timestamp.digicert.com' } else { $Env:FE_MONSTER_SIGN_TIMESTAMP_URL }),
   [switch]$RequireSignature
@@ -19,13 +22,15 @@ param(
 $ErrorActionPreference = 'Stop'
 $rootPath = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $packageMetadata = Get-Content -LiteralPath (Join-Path $rootPath 'package.json') -Raw | ConvertFrom-Json
-$appVersion = [string]$packageMetadata.version
-if ($appVersion -notmatch '^\d+\.\d+\.\d+$') {
-  throw "package.json contains an invalid release version: $appVersion"
-}
+. (Join-Path $rootPath 'scripts\release-version.ps1')
+$releaseVersion = Get-FeMonsterReleaseVersion $packageMetadata
+$appVersion = $releaseVersion.DisplayVersion
 $includeOfflineWebView2 = $WebView2Mode -eq 'Offline'
 $installerFlavorSuffix = if ($includeOfflineWebView2) { '-Offline' } else { '' }
 $outputPath = [System.IO.Path]::GetFullPath($OutputDir)
+if ($PackageOnly -and !$PSBoundParameters.ContainsKey('OutputDir')) {
+  $outputPath = Join-Path $outputPath 'package-only'
+}
 $workRoot = Join-Path $rootPath 'out\installer\work'
 $payloadParent = Join-Path $workRoot 'payload'
 $payloadRoot = Join-Path $payloadParent 'FE Monster'
@@ -48,6 +53,29 @@ if (!$PSBoundParameters.ContainsKey('EmbedPayload')) {
 }
 if ($NoNodeBundle) {
   throw '-NoNodeBundle is not supported: FE Monster requires bundled Node.js for imported music API plugins.'
+}
+if (![string]::IsNullOrWhiteSpace($WinFormsSourceDir) -and !$SkipBuild) {
+  throw '-WinFormsSourceDir requires -SkipBuild; publish the isolated client first.'
+}
+if ($PackageOnly -and ($StageOnly -or $ReusePayloadZip)) {
+  throw '-PackageOnly cannot be combined with -StageOnly or -ReusePayloadZip; a fresh validated payload is required.'
+}
+if (
+  $PackageOnly -and
+  (![string]::IsNullOrWhiteSpace($CommunityServerUrl) -or
+    ![string]::IsNullOrWhiteSpace($CommunityServerTlsPins))
+) {
+  throw '-PackageOnly must use the workspace community URL and TLS pins, not explicit release overrides.'
+}
+if ($SkipDeveloperCommunityHealthCheck -and !$StageOnly) {
+  throw '-SkipDeveloperCommunityHealthCheck is restricted to -StageOnly local payload validation.'
+}
+if (
+  $SkipDeveloperCommunityHealthCheck -and
+  (![string]::IsNullOrWhiteSpace($CommunityServerUrl) -or
+    ![string]::IsNullOrWhiteSpace($CommunityServerTlsPins))
+) {
+  throw '-SkipDeveloperCommunityHealthCheck cannot be combined with explicit release community settings.'
 }
 if (
   $ReusePayloadZip -and
@@ -112,6 +140,130 @@ function Copy-File {
   if (!(Test-Path $Source)) { throw "Missing file: $Source" }
   New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
   Copy-Item -LiteralPath $Source -Destination $Destination -Force
+}
+
+function Stage-AudioSourceRuntime {
+  $audioSourceRuntimeSource = Join-Path $rootPath 'native\audio-sources'
+  $audioSourceRuntimeDestination = Join-Path $payloadRoot 'native\audio-sources'
+  if (!(Test-Path -LiteralPath $audioSourceRuntimeSource -PathType Container)) {
+    throw "Audio source runtime source directory is missing: $audioSourceRuntimeSource"
+  }
+
+  $audioSourceRuntimeModules = @(
+    Get-ChildItem -LiteralPath $audioSourceRuntimeSource -Filter '*.mjs' -File |
+      Sort-Object -Property Name
+  )
+  if ($audioSourceRuntimeModules.Count -eq 0) {
+    throw "Audio source runtime contains no production .mjs modules: $audioSourceRuntimeSource"
+  }
+  foreach ($module in $audioSourceRuntimeModules) {
+    Copy-File $module.FullName (Join-Path $audioSourceRuntimeDestination $module.Name)
+  }
+  foreach ($metadata in @(
+    'package.json',
+    'package-lock.json',
+    'THIRD_PARTY_NOTICES.md'
+  )) {
+    Copy-File `
+      (Join-Path $audioSourceRuntimeSource $metadata) `
+      (Join-Path $audioSourceRuntimeDestination $metadata)
+  }
+
+  $audioSourceNodeModules = Join-Path $audioSourceRuntimeSource 'node_modules'
+  if (!(Test-Path -LiteralPath $audioSourceNodeModules -PathType Container)) {
+    throw 'Audio source runtime dependencies are missing. Restore the pinned dependency tree before building the installer; packaging will not download it.'
+  }
+  foreach ($dependencyFile in @(
+    '.package-lock.json',
+    '@jitl\quickjs-wasmfile-release-sync\dist\emscripten-module.wasm',
+    '@jitl\quickjs-wasmfile-release-sync\LICENSE',
+    'quickjs-emscripten\LICENSE',
+    'quickjs-emscripten-core\LICENSE',
+    'ipaddr.js\LICENSE'
+  )) {
+    $dependencyPath = Join-Path $audioSourceNodeModules $dependencyFile
+    if (!(Test-Path -LiteralPath $dependencyPath -PathType Leaf)) {
+      throw "Audio source runtime dependencies are missing required file: $dependencyFile"
+    }
+  }
+
+  # quickjs-emscripten 的 ESM 入口会静态 import 全部四个 wasm 变体，
+  # 因此四个变体包都必须分发；但每个包内只有部分文件会被加载。
+  # 整目录复制会把 TypeScript 声明、source map、浏览器/Cloudflare 变体
+  # 一并带入，其中 dist/emscripten-module.cloudflare.d.ts 一类的相对路径
+  # 长达 110 字符，把 payload 内最长相对路径顶到 112 字符，深层安装目录
+  # 会因此越过 SafeLegacyPathLimit(240) 被拒绝安装。
+  $audioSourceRuntimePackages = @(
+    '@jitl\quickjs-wasmfile-release-sync',
+    '@jitl\quickjs-wasmfile-debug-sync',
+    '@jitl\quickjs-wasmfile-release-asyncify',
+    '@jitl\quickjs-wasmfile-debug-asyncify',
+    '@jitl\quickjs-ffi-types',
+    'quickjs-emscripten',
+    'quickjs-emscripten-core',
+    'ipaddr.js'
+  )
+  $audioSourcePackageRoot = Join-Path $audioSourceRuntimeDestination 'node_modules'
+  New-Item -ItemType Directory -Path $audioSourcePackageRoot -Force | Out-Null
+  # 只保留运行时会被加载的文件：可执行脚本、WASM、包清单与许可证。
+  # TypeScript 声明、source map、浏览器/Cloudflare 变体和文档在 Node 运行时
+  # 从不加载，却把 payload 内最长相对路径推高到接近 Windows 传统路径上限，
+  # 进而压缩可用的安装目录深度。
+  # Node 只解析 exports 的 import/require 条件；iife、browser 与 workerd
+  # (cloudflare) 变体永远不会被 Node 加载，排除后可以显著压缩
+  # emscripten-module.* 这类最长的相对路径。
+  $audioSourceExcludedNames = @(
+    'emscripten-module.browser.mjs',
+    'emscripten-module.browser.js',
+    'emscripten-module.cloudflare.cjs',
+    'emscripten-module.cloudflare.js'
+  )
+  $audioSourceRuntimeExtensions = @('.js', '.mjs', '.cjs', '.wasm', '.json')
+  foreach ($runtimePackage in $audioSourceRuntimePackages) {
+    $packageSource = Join-Path $audioSourceNodeModules $runtimePackage
+    if (!(Test-Path -LiteralPath $packageSource -PathType Container)) {
+      throw "Audio source runtime dependency package is missing: $runtimePackage"
+    }
+    $packageDestination = Join-Path $audioSourcePackageRoot $runtimePackage
+    New-Item -ItemType Directory -Path $packageDestination -Force | Out-Null
+    $packageFiles = @(Get-ChildItem -LiteralPath $packageSource -Recurse -File)
+    if ($packageFiles.Count -eq 0) {
+      throw "Audio source runtime dependency package is empty: $runtimePackage"
+    }
+    foreach ($packageFile in $packageFiles) {
+      $packageRelative = $packageFile.FullName.Substring($packageSource.Length).TrimStart('\')
+      $keepFile = $audioSourceRuntimeExtensions -contains $packageFile.Extension.ToLowerInvariant() -or
+        $packageFile.Name -like 'LICENSE*' -or
+        $packageFile.Name -eq 'THIRD_PARTY_NOTICES.md'
+      if ($audioSourceExcludedNames -contains $packageFile.Name) { $keepFile = $false }
+      if (!$keepFile) { continue }
+      $packageTarget = Join-Path $packageDestination $packageRelative
+      New-Item -ItemType Directory -Path (Split-Path -Parent $packageTarget) -Force | Out-Null
+      Copy-Item -LiteralPath $packageFile.FullName -Destination $packageTarget -Force
+    }
+    # npm 解析包入口依赖 package.json，必须存在。
+    if (!(Test-Path -LiteralPath (Join-Path $packageDestination 'package.json') -PathType Leaf)) {
+      throw "Audio source runtime dependency package lost its manifest: $runtimePackage"
+    }
+  }
+  $audioSourceRootManifest = Join-Path $audioSourceNodeModules '.package-lock.json'
+  if (Test-Path -LiteralPath $audioSourceRootManifest -PathType Leaf) {
+    Copy-File $audioSourceRootManifest (Join-Path $audioSourcePackageRoot '.package-lock.json')
+  }
+
+  # 打包自检：payload 内最长相对路径必须留在 Windows 传统路径上限内，
+  # 否则深层安装目录会复现本次“缺少必需文件”的失败。
+  $audioSourceMaxRelativePath = 0
+  Get-ChildItem -LiteralPath $audioSourceRuntimeDestination -Recurse -File | ForEach-Object {
+    $relativeLength = $_.FullName.Substring($audioSourceRuntimeDestination.Length).TrimStart('\').Length
+    if ($relativeLength -gt $audioSourceMaxRelativePath) { $audioSourceMaxRelativePath = $relativeLength }
+  }
+  # 安装器用 installDir + 1 + maxRelativePathLength <= 240 判定目标目录是否可安装。
+  # 这里守住 110 的上限，保证至少 129 字符深的安装目录仍可用，同时防止
+  # TypeScript 声明、source map 或浏览器变体重新混入 payload。
+  if ($audioSourceMaxRelativePath -gt 110) {
+    throw "Audio source payload contains an over-long relative path ($audioSourceMaxRelativePath characters; limit 110); deep install roots would exceed the Windows legacy path limit."
+  }
 }
 
 function Get-NativeAudioSourceFiles {
@@ -240,10 +392,13 @@ function Assert-NativeAudioBuildPair {
 }
 
 function Resolve-NativeAudioRuntimeSource {
+  . (Join-Path $rootPath 'scripts\native-audio-artifacts.ps1')
+  $published = Resolve-NativeAudioRunDll -Root $rootPath
   $candidates = @(
     (Join-Path $rootPath 'native\windows\build'),
     (Join-Path $rootPath 'native\windows\build-next')
   )
+  if (![string]::IsNullOrWhiteSpace($published)) { $candidates = @((Split-Path -Parent $published)) + $candidates }
   $complete = foreach ($candidate in $candidates) {
     try {
       Assert-NativeAudioBuildPair -Directory $candidate
@@ -255,7 +410,7 @@ function Resolve-NativeAudioRuntimeSource {
     Sort-Object CreatedAtUtc -Descending |
     Select-Object -First 1
   if ($null -eq $selected) {
-    throw 'No hash-verified native audio build pair was found under build or build-next.'
+    throw 'No hash-verified native audio build pair was found in the published runtime, build or build-next.'
   }
   return [string]$selected.Path
 }
@@ -439,8 +594,16 @@ function Build-App {
   }
 
   Invoke-Step 'Building Java jar' {
-    & cmd.exe /c "`"$rootPath\build.cmd`""
-    if ($LASTEXITCODE -ne 0) { throw "build.cmd failed with exit code $LASTEXITCODE" }
+    # Invoke the PowerShell build entry point directly. cmd.exe silently drops
+    # overlong PATH values, which can make build.cmd report that PowerShell is
+    # missing on otherwise valid developer machines.
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $rootPath 'scripts\build-java.ps1') -Root $rootPath
+    if ($LASTEXITCODE -ne 0) { throw "build-java.ps1 failed with exit code $LASTEXITCODE" }
+  }
+
+  Invoke-Step 'Building encrypted-memory WinCrypto bridge' {
+    & powershell.exe -NoProfile -File (Join-Path $rootPath 'scripts\build-wincrypto.ps1') -Root $rootPath
+    if ($LASTEXITCODE -ne 0) { throw "build-wincrypto.ps1 failed with exit code $LASTEXITCODE" }
   }
 
   $xaudioDll = Join-Path $rootPath 'native\windows\build\fe-monster-xaudio2.dll'
@@ -522,7 +685,9 @@ function Stage-JavaRuntime {
     throw "The selected Java installation is not a JDK with jlink/jdeps: $javaHome"
   }
 
-  $jar = Join-Path $rootPath 'out\fe-monster-java.jar'
+  . (Join-Path $rootPath 'scripts\java-build-artifacts.ps1')
+  $jar = Resolve-JavaRunJar -Root $rootPath
+  if ([string]::IsNullOrWhiteSpace($jar)) { $jar = Join-Path $rootPath 'out\fe-monster-java.jar' }
   if (!(Test-Path -LiteralPath $jar -PathType Leaf)) {
     throw "Java jar was not found before runtime staging: $jar"
   }
@@ -540,6 +705,7 @@ function Stage-JavaRuntime {
   foreach ($module in ((($moduleOutput | Out-String).Trim() -split ',') + @(
     'java.desktop',
     'java.net.http',
+    'java.sql',
     'jdk.crypto.ec',
     'jdk.httpserver'
   ))) {
@@ -670,7 +836,8 @@ function New-PayloadIntegrityManifest {
     'native/windows/build/winforms/FE Monster.exe',
     'native/windows/build/winforms/WebView2Loader.dll',
     'native/windows/build/fe-monster-xaudio2.dll',
-    'native/windows/build/fe_monster_upmix.dll'
+    'native/windows/build/fe_monster_upmix.dll',
+    'native/windows/build/fe-monster-wincrypto.dll'
   )) {
     [void]$nativeAmd64RelativeFiles.Add($relative)
   }
@@ -1121,7 +1288,13 @@ function Stage-CommunityServerConfiguration {
       ConvertTo-NormalizedCommunityTlsPins (Get-Content -LiteralPath $communityPinFile -Raw)
     )
   }
-  Assert-CommunityServerHealth -CommunityBaseUrl $validatedCommunityUrl -TlsPins $normalizedTlsPins
+  if ($PackageOnly) {
+    Write-Warning 'Package-only build requested: public community connectivity is deferred. This local installer is not approved for publication until the pinned HTTPS health check passes.'
+  } elseif ($SkipDeveloperCommunityHealthCheck) {
+    Write-Warning 'Skipping the developer community health probe for StageOnly local payload validation. Formal installer builds still require a healthy service.'
+  } else {
+    Assert-CommunityServerHealth -CommunityBaseUrl $validatedCommunityUrl -TlsPins $normalizedTlsPins
+  }
 
   $destination = Join-Path $payloadRoot 'data\community-server-url.txt'
   New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
@@ -1166,9 +1339,19 @@ function Stage-Payload {
     if (Test-Path $source) { Copy-File $source (Join-Path $payloadRoot $file) }
   }
 
-  foreach ($dir in @('web', 'scripts', 'src')) {
+  foreach ($dir in @('web', 'scripts')) {
     Copy-Dir (Join-Path $rootPath $dir) (Join-Path $payloadRoot $dir)
   }
+  # The compiled community implementation is already in the application JAR.
+  # Distribute its license, but never its proprietary implementation sources.
+  Copy-DirExcept `
+    (Join-Path $rootPath 'src') `
+    (Join-Path $payloadRoot 'src') `
+    @((Join-Path $rootPath 'src\community-proprietary'))
+  foreach ($licenseFile in @('LICENSES\COMMUNITY-PROPRIETARY.txt', 'COMMUNITY_LICENSE_BOUNDARY.md')) {
+    Copy-File (Join-Path $rootPath $licenseFile) (Join-Path $payloadRoot $licenseFile)
+  }
+  Stage-AudioSourceRuntime
 
   $stagedScripts = Join-Path $payloadRoot 'scripts'
   $scriptsBeforeBytes = (
@@ -1230,7 +1413,41 @@ function Stage-Payload {
 
   Stage-CommunityServerConfiguration
 
-  Copy-File (Join-Path $rootPath 'out\fe-monster-java.jar') (Join-Path $payloadRoot 'out\fe-monster-java.jar')
+  . (Join-Path $rootPath 'scripts\java-build-artifacts.ps1')
+  $payloadJavaJar = Resolve-JavaRunJar -Root $rootPath
+  if ([string]::IsNullOrWhiteSpace($payloadJavaJar)) { $payloadJavaJar = Join-Path $rootPath 'out\fe-monster-java.jar' }
+  Copy-File $payloadJavaJar (Join-Path $payloadRoot 'out\fe-monster-java.jar')
+  $localMemoryReceiptRelative = 'third_party\java\local-memory\dependencies.json'
+  $localMemoryReceiptSource = Join-Path $rootPath $localMemoryReceiptRelative
+  & powershell.exe -NoProfile -File (Join-Path $rootPath 'scripts\check-local-memory-dependencies.ps1') -Root $rootPath
+  if ($LASTEXITCODE -ne 0) {
+    throw "check-local-memory-dependencies.ps1 failed with exit code $LASTEXITCODE"
+  }
+  $localMemoryReceipt = Get-Content -LiteralPath $localMemoryReceiptSource -Raw -Encoding UTF8 | ConvertFrom-Json
+  $localMemoryJarNames = @($localMemoryReceipt.artifacts | ForEach-Object { [string]$_.file })
+  $expectedLocalMemoryJarNames = @(
+    'sqlite-jdbc-3.53.2.1-without-natives.jar',
+    'sqlite-jdbc-3.53.2.1-natives-windows.jar',
+    'slf4j-api-1.7.36.jar'
+  )
+  if (($localMemoryJarNames -join '|') -cne ($expectedLocalMemoryJarNames -join '|')) {
+    throw 'Pinned local-memory dependency receipt contains an unexpected artifact set.'
+  }
+  foreach ($artifact in @($localMemoryReceipt.artifacts)) {
+    $source = Join-Path $rootPath ('out\lib\' + [string]$artifact.file)
+    if ((Get-FileSha256 $source) -cne ([string]$artifact.sha256).ToLowerInvariant()) {
+      throw "Built local-memory dependency hash mismatch: $($artifact.file)"
+    }
+    Copy-File $source (Join-Path $payloadRoot ('out\lib\' + [string]$artifact.file))
+  }
+  Copy-File `
+    $localMemoryReceiptSource `
+    (Join-Path $payloadRoot 'third_party\java\local-memory\dependencies.json')
+  foreach ($license in @($localMemoryReceipt.licenses)) {
+    Copy-File `
+      (Join-Path $rootPath ('third_party\java\local-memory\' + [string]$license.file)) `
+      (Join-Path $payloadRoot ('third_party\java\local-memory\' + [string]$license.file))
+  }
   $nativeBuildSource = Join-Path $rootPath 'native\windows\build'
   $nativeAudioSource = Resolve-NativeAudioRuntimeSource
   $nativeBuildDestination = Join-Path $payloadRoot 'native\windows\build'
@@ -1241,6 +1458,9 @@ function Stage-Payload {
     (Join-Path $nativeAudioSource 'fe_monster_upmix.dll') `
     (Join-Path $nativeBuildDestination 'fe_monster_upmix.dll')
   Copy-File `
+    (Join-Path $nativeBuildSource 'fe-monster-wincrypto.dll') `
+    (Join-Path $nativeBuildDestination 'fe-monster-wincrypto.dll')
+  Copy-File `
     (Join-Path $nativeAudioSource 'native-audio-build.json') `
     (Join-Path $nativeBuildDestination 'native-audio-build.json')
   $null = Assert-NativeAudioBuildPair -Directory $nativeBuildDestination
@@ -1248,7 +1468,17 @@ function Stage-Payload {
   if (Test-Path -LiteralPath $nativeLicenses -PathType Container) {
     Copy-Dir $nativeLicenses (Join-Path $nativeBuildDestination 'licenses')
   }
-  $winformsSource = Join-Path $nativeBuildSource 'winforms'
+  $winformsSource = if ([string]::IsNullOrWhiteSpace($WinFormsSourceDir)) {
+    Join-Path $nativeBuildSource 'winforms'
+  } else {
+    (Resolve-Path -LiteralPath $WinFormsSourceDir -ErrorAction Stop).Path
+  }
+  $publishedClient = Join-Path $winformsSource 'FE Monster.exe'
+  Assert-X64Pe $publishedClient 'Published Windows client'
+  $publishedVersion = (Get-Item -LiteralPath $publishedClient).VersionInfo.ProductVersion
+  if ($publishedVersion -cne $appVersion) {
+    throw "Published client version '$publishedVersion' does not match release '$appVersion'. Rebuild the client before packaging."
+  }
   Copy-DirExcept `
     $winformsSource `
     (Join-Path $nativeBuildDestination 'winforms') `
@@ -1274,11 +1504,11 @@ function Stage-Payload {
     (Join-Path $rootPath 'dist\plugins\FE-Monster-Netease-API-Plugin-4.32.0.zip') `
     (Join-Path $payloadRoot 'plugins\music-api\FE-Monster-Netease-API-Plugin-4.32.0.zip')
   Copy-File `
-    (Join-Path $rootPath 'dist\plugins\FE-Monster-QQ-API-Plugin-2.4.1.zip') `
-    (Join-Path $payloadRoot 'plugins\music-api\FE-Monster-QQ-API-Plugin-2.4.1.zip')
+    (Join-Path $rootPath 'dist\plugins\FE-Monster-QQ-API-Plugin-2.4.2.zip') `
+    (Join-Path $payloadRoot 'plugins\music-api\FE-Monster-QQ-API-Plugin-2.4.2.zip')
   Copy-File `
-    (Join-Path $rootPath 'dist\plugins\FE-Monster-Kugou-API-Plugin-2.0.7.zip') `
-    (Join-Path $payloadRoot 'plugins\music-api\FE-Monster-Kugou-API-Plugin-2.0.7.zip')
+    (Join-Path $rootPath 'dist\plugins\FE-Monster-Kugou-API-Plugin-2.0.8.zip') `
+    (Join-Path $payloadRoot 'plugins\music-api\FE-Monster-Kugou-API-Plugin-2.0.8.zip')
   Copy-File `
     (Join-Path $rootPath 'dist\plugins\FE-Monster-Qishui-OpenAPI-Plugin-3.1.1.zip') `
     (Join-Path $payloadRoot 'plugins\music-api\FE-Monster-Qishui-OpenAPI-Plugin-3.1.1.zip')
@@ -1309,13 +1539,29 @@ function Stage-Payload {
 
   $requiredPayloadItems = @(
     'out\fe-monster-java.jar',
+    'out\lib\sqlite-jdbc-3.53.2.1-without-natives.jar',
+    'out\lib\sqlite-jdbc-3.53.2.1-natives-windows.jar',
+    'out\lib\slf4j-api-1.7.36.jar',
+    'third_party\java\local-memory\dependencies.json',
+    'third_party\java\local-memory\LICENSE-SQLITE-JDBC.txt',
+    'third_party\java\local-memory\LICENSE-SLF4J.txt',
     'web\index.html',
     'web\cache-fingerprints.json',
+    'web\app.js',
+    'web\styles.css',
+    'web\audio-source-manager.js',
+    'web\audio-source-manager.css',
     'web\client-ai-service.js',
     'web\pet-affect-plan.js',
     'web\settings-center.js',
     'web\audio-mixer-ui.js',
     'web\audio-mixer-visuals.js',
+    'web\local-memory-client.js',
+    'web\pet-memory-recall.js',
+    'web\pet-preference-policy.js',
+    'web\pet-preference-memory.js',
+    'web\app-parameter-registry.js',
+    'web\lyric-highlight-particles.js',
     'web\runtime-module-loader.js',
     'web\app-command.js',
     'web\playback-intelligence.js',
@@ -1365,10 +1611,22 @@ function Stage-Payload {
     'native\windows\build\winforms\WebView2Loader.dll',
     'native\windows\build\fe-monster-xaudio2.dll',
     'native\windows\build\fe_monster_upmix.dll',
+    'native\windows\build\fe-monster-wincrypto.dll',
     'native\windows\build\native-audio-build.json',
+    'native\audio-sources\lx-runner.mjs',
+    'native\audio-sources\media-relay.mjs',
+    'native\audio-sources\network.mjs',
+    'native\audio-sources\relay.mjs',
+    'native\audio-sources\runtime.mjs',
+    'native\audio-sources\package.json',
+    'native\audio-sources\package-lock.json',
+    'native\audio-sources\THIRD_PARTY_NOTICES.md',
+    'native\audio-sources\node_modules\@jitl\quickjs-wasmfile-release-sync\dist\emscripten-module.wasm',
+    'native\audio-sources\node_modules\quickjs-emscripten\LICENSE',
+    'native\audio-sources\node_modules\ipaddr.js\LICENSE',
     'plugins\music-api\FE-Monster-Netease-API-Plugin-4.32.0.zip',
-    'plugins\music-api\FE-Monster-QQ-API-Plugin-2.4.1.zip',
-    'plugins\music-api\FE-Monster-Kugou-API-Plugin-2.0.7.zip',
+    'plugins\music-api\FE-Monster-QQ-API-Plugin-2.4.2.zip',
+    'plugins\music-api\FE-Monster-Kugou-API-Plugin-2.0.8.zip',
     'plugins\music-api\FE-Monster-Qishui-OpenAPI-Plugin-3.1.1.zip'
   )
   if ($includeOfflineWebView2) {
@@ -1387,7 +1645,8 @@ function Stage-Payload {
     'native\windows\build\winforms\FE Monster.exe',
     'native\windows\build\winforms\WebView2Loader.dll',
     'native\windows\build\fe-monster-xaudio2.dll',
-    'native\windows\build\fe_monster_upmix.dll'
+    'native\windows\build\fe_monster_upmix.dll',
+    'native\windows\build\fe-monster-wincrypto.dll'
   )) {
     Assert-X64Pe (Join-Path $payloadRoot $nativeRelative) $nativeRelative
   }
@@ -1445,11 +1704,11 @@ function Assert-PluginOnlyPayloadZip {
     if (!($entries -contains 'fe monster/plugins/music-api/fe-monster-netease-api-plugin-4.32.0.zip')) {
       throw 'Payload is missing the bundled Netease 4.32.0 bootstrap package.'
     }
-    if (!($entries -contains 'fe monster/plugins/music-api/fe-monster-qq-api-plugin-2.4.1.zip')) {
-      throw 'Payload is missing the bundled QQ 2.4.1 bootstrap package.'
+    if (!($entries -contains 'fe monster/plugins/music-api/fe-monster-qq-api-plugin-2.4.2.zip')) {
+      throw 'Payload is missing the bundled QQ 2.4.2 bootstrap package.'
     }
-    if (!($entries -contains 'fe monster/plugins/music-api/fe-monster-kugou-api-plugin-2.0.7.zip')) {
-      throw 'Payload is missing the bundled Kugou 2.0.7 migration package.'
+    if (!($entries -contains 'fe monster/plugins/music-api/fe-monster-kugou-api-plugin-2.0.8.zip')) {
+      throw 'Payload is missing the bundled Kugou 2.0.8 migration package.'
     }
     if (!($entries -contains 'fe monster/plugins/music-api/fe-monster-qishui-openapi-plugin-3.1.1.zip')) {
       throw 'Payload is missing the bundled Qishui OpenAPI 3.1.1 migration package.'
@@ -1512,6 +1771,9 @@ function Protect-AndDescribeInstaller {
     app = 'FE Monster'
     appVersion = $appVersion
     webView2Mode = $WebView2Mode.ToLowerInvariant()
+    packageOnly = [bool]$PackageOnly
+    communityHealthVerified = !$PackageOnly
+    publicationRequiresCommunityHealthCheck = [bool]$PackageOnly
     architecture = 'x64'
     minimumWindows = "10.0.$minimumWindowsBuild"
     installer = Split-Path -Leaf $installerExe
@@ -1629,6 +1891,13 @@ Invoke-Step 'Validating cross-computer runtime dependency resilience' {
   }
 }
 
+Invoke-Step 'Validating audio source packaging contract' {
+  & node (Join-Path $rootPath 'scripts\check-audio-source-packaging.mjs')
+  if ($LASTEXITCODE -ne 0) {
+    throw "Audio source packaging contract check failed with exit code $LASTEXITCODE"
+  }
+}
+
 Invoke-Step 'Validating camera hand-control removal' {
   & node (Join-Path $rootPath 'scripts\check-camera-hand-control-removed.mjs')
   if ($LASTEXITCODE -ne 0) {
@@ -1661,17 +1930,17 @@ if ($ReusePayloadZip) {
   if ($LASTEXITCODE -ne 0) {
     throw "Staged payload ordinary JS/DLL integrity check failed with exit code $LASTEXITCODE"
   }
+  & powershell.exe `
+    -NoProfile `
+    -ExecutionPolicy Bypass `
+    -File (Join-Path $rootPath 'scripts\check-windows-installer-contract.ps1') `
+    -Root $rootPath `
+    -WebView2Mode $WebView2Mode `
+    -PayloadRoot $payloadRoot
+  if ($LASTEXITCODE -ne 0) {
+    throw "Staged payload validation failed with exit code $LASTEXITCODE"
+  }
   if ($StageOnly) {
-    & powershell.exe `
-      -NoProfile `
-      -ExecutionPolicy Bypass `
-      -File (Join-Path $rootPath 'scripts\check-windows-installer-contract.ps1') `
-      -Root $rootPath `
-      -WebView2Mode $WebView2Mode `
-      -PayloadRoot $payloadRoot
-    if ($LASTEXITCODE -ne 0) {
-      throw "Staged payload validation failed with exit code $LASTEXITCODE"
-    }
     Write-Host "Staged and validated Windows x64 payload: $payloadRoot"
     return
   }
@@ -1684,6 +1953,9 @@ Protect-AndDescribeInstaller
 
 $size = [math]::Round((Get-Item $installerExe).Length / 1MB, 2)
 Write-Host "Built installer: $installerExe ($size MB)"
+if ($PackageOnly) {
+  Write-Warning 'Local package created; community connectivity is not verified and no GitHub publication has been performed.'
+}
 if (Test-Path $setupBundleOutput) {
   $bundleSize = [math]::Round((Get-Item $setupBundleOutput).Length / 1MB, 2)
   Write-Host "Built setup bundle: $setupBundleOutput ($bundleSize MB)"

@@ -458,8 +458,8 @@ try {
       ));
     const textPresetCards = Array.from(document.querySelectorAll('.diy-preset-card[data-text-preset]'));
     const textPresetIds = textPresetCards.map((card) => card.dataset.textPreset).sort();
-    const restoredTextPresetCards = textPresetCards.length === 2
-      && textPresetIds.join('|') === 'depth|focus-echo'
+    const restoredTextPresetCards = textPresetCards.length === 3
+      && textPresetIds.join('|') === 'depth|focus-echo|particle-lyrics'
       && document.getElementById('diyLyricPreset')?.dataset.textPreset === 'depth'
       && document.getElementById('diyFocusEchoTextPreset')?.dataset.textPreset === 'focus-echo'
       && !document.getElementById('diyWordGlowTextPreset');
@@ -922,13 +922,42 @@ try {
     mobile: false
   });
 
+  const bookSettings = await evaluate(`(() => {
+    setDiyPreset('book');
+    setDiyPage('preset');
+    syncTextComposerControls();
+    const slider = document.getElementById('bookLyricLineCount');
+    const control = document.getElementById('bookLyricLineCountControl');
+    const editable = !!slider && !slider.matches(':disabled') && !control.hidden
+      && getComputedStyle(control).display !== 'none';
+    const inScene = !!control.closest('#diyPresetPage #scenePresetSettingsContent')
+      && !document.getElementById('scenePresetSettingsGroup').hidden
+      && document.getElementById('scenePresetSettingsTitle').textContent.includes('书页歌词')
+      && !control.closest('#textComposerControl');
+    slider.value = '5';
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+    slider.dispatchEvent(new Event('change', { bubbles: true }));
+    const persisted = JSON.parse(localStorage.getItem(TEXT_COMPOSER_PREFS_KEY) || '{}').settings?.bookLyricLineCount;
+    const output = document.getElementById('bookLyricLineCountValue').textContent;
+    const keptInTemplate = textComposerTemplateSettings('depth').bookLyricLineCount;
+    const author = document.getElementById('bookLyricArtist');
+    const underCover = !!author?.closest('.book-lyric-cover-column') && !author.closest('.book-lyric-page');
+    setDiyPreset('cube');
+    const hiddenForOtherScene = control.hidden && getComputedStyle(control).display === 'none';
+    setDiyPreset('book');
+    const restored = !control.hidden && slider.value === '5';
+    return { pass: editable && inScene && hiddenForOtherScene && restored && state.textComposerSettings.bookLyricLineCount === 5 && persisted === 5
+      && output === '5 行' && keptInTemplate === 5 && underCover,
+      editable, inScene, hiddenForOtherScene, restored, persisted, output, keptInTemplate, underCover };
+  })()`);
   const visualLanguagePass = playlistSurface.pass === true
     && visualLanguageSurfaces.pass === true;
   const composerPass = composerSemantics.pass === true
     && composerInteraction.pass === true
     && composerPersistence.pass === true
     && composerSliderLayout.pass === true
-    && composerNarrowLayout.pass === true;
+    && composerNarrowLayout.pass === true
+    && bookSettings.pass === true;
   const result = {
     pass: visualLanguagePass && (visualLanguageOnly || composerPass),
     scope: visualLanguageOnly ? 'visual-language' : 'full',
@@ -940,7 +969,8 @@ try {
     composerInteraction,
     composerPersistence,
     composerSliderLayout,
-    composerNarrowLayout
+    composerNarrowLayout,
+    bookSettings
   };
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   process.exitCode = result.pass ? 0 : 1;

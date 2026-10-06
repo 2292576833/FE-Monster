@@ -52,21 +52,27 @@ public final class LocalClientLauncher {
 
     public static Map<String, Object> runtimePayload(Map<String, Object> nativeAudio, Map<String, Object> settings) {
         boolean nativeAudioActive = Boolean.TRUE.equals(nativeAudio.get("active"));
-        boolean mac = System.getProperty("os.name", "").toLowerCase().contains("mac");
+        String operatingSystem = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        boolean mac = operatingSystem.contains("mac") || operatingSystem.contains("darwin");
         Map<String, Object> effectiveSettings = effectiveRenderSettings(settings);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("ok", true);
         body.put("clientMode", "embedded");
+        String cpu = System.getProperty("os.arch", "").toLowerCase(java.util.Locale.ROOT);
+        body.put("architecture", cpu.equals("aarch64") || cpu.equals("arm64") ? "arm64"
+            : cpu.equals("amd64") || cpu.equals("x86_64") ? "x86_64" : cpu);
         body.put("renderPreset", mac ? "metal-webgl" : "directx11");
         body.put("renderBackend", mac ? "wkwebview-metal-webgl" : "chromium-angle-d3d11");
-        body.put("audioBackend", nativeAudioActive ? "xaudio2" : "html-audio-fallback");
-        body.put("audioSpatialBackend", mac ? "web-audio-panner" : "x3daudio");
-        body.put("audioDecoder", mac ? "webkit-media" : "media-foundation");
+        body.put("audioBackend", nativeAudioActive ? SimpleJson.asString(nativeAudio.get("backend"), mac ? "coreaudio" : "xaudio2") : "html-audio-fallback");
+        body.put("audioSpatialBackend", mac && !nativeAudioActive ? "web-audio-panner"
+            : SimpleJson.asString(nativeAudio.get("spatialBackend"), mac ? "google-obr" : "x3daudio"));
+        body.put("audioDecoder", SimpleJson.asString(nativeAudio.get("decoder"), mac ? "webkit-media" : "media-foundation"));
         body.put("settings", effectiveSettings);
         body.put("nativeAudio", nativeAudio);
         body.put("launchFlags", mac ? List.of() : launchFlags(effectiveSettings));
         body.put("note", mac
-            ? "WKWebView uses WebKit's Metal-backed compositor and Web Audio fallback."
+            ? (nativeAudioActive ? "WKWebView renders through Metal; CoreAudio provides native mixer, Rust upmix and Google OBR output."
+                : "WKWebView renders through Metal; Web Audio keeps playback available while native audio is unavailable.")
             : (nativeAudioActive
                 ? "DirectX 11 is used through Chromium ANGLE; audio is routed through the native XAudio2/X3DAudio bridge."
                 : "DirectX 11 is used through Chromium ANGLE; build native/windows/fe-monster-xaudio2.dll to enable XAudio2/X3DAudio audio."));
@@ -176,10 +182,16 @@ public final class LocalClientLauncher {
     }
 
     private static List<String> launchFlags(Map<String, Object> settings) {
+        List<String> flags = new ArrayList<>(List.of(
+            "--disable-background-timer-throttling",
+            "--disable-renderer-backgrounding",
+            "--disable-backgrounding-occluded-windows"
+        ));
         if (!setting(settings, "gpuAcceleration", true)) {
-            return List.of(GPU_DISABLED_FLAG, "--autoplay-policy=no-user-gesture-required");
+            flags.add(GPU_DISABLED_FLAG);
+            flags.add("--autoplay-policy=no-user-gesture-required");
+            return flags;
         }
-        List<String> flags = new ArrayList<>();
         if (isWindows() || setting(settings, "directX11", true)) {
             flags.add("--use-gl=angle");
             flags.add("--use-angle=default");
@@ -213,7 +225,7 @@ public final class LocalClientLauncher {
 
     private static void applyBorderlessWindow(Path root, long processId, boolean shapeOnly, boolean fullscreen) {
         String os = System.getProperty("os.name", "").toLowerCase();
-        if (!os.contains("win")) return;
+        if (!os.startsWith("windows")) return;
         Path script = root.resolve("scripts").resolve("make-window-borderless.ps1").toAbsolutePath().normalize();
         if (!Files.isRegularFile(script)) return;
         List<String> command = new ArrayList<>(List.of(

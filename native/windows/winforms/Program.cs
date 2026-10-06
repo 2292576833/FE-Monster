@@ -299,7 +299,8 @@ internal sealed class BackendHost : IDisposable
         string root = ResolveRoot();
         string dataDirectory = ResolveStableDataDirectory(root);
         string javaExe = ResolveJava(root);
-        string jar = Path.Combine(root, "out", "fe-monster-java.jar");
+        string jar = JavaBuildArtifact.Resolve(root)
+            ?? throw new FileNotFoundException("FE Monster Java jar was not found.");
         int port = ReserveLocalPort();
         string baseUrl = $"http://127.0.0.1:{port}/";
         string clientUrl = baseUrl + "?client=embedded&render=directx11&audio=xaudio2";
@@ -412,7 +413,7 @@ internal sealed class BackendHost : IDisposable
             try
             {
                 string root = Path.GetFullPath(candidate);
-                if (File.Exists(Path.Combine(root, "out", "fe-monster-java.jar")) &&
+                if (JavaBuildArtifact.Resolve(root) is not null &&
                     File.Exists(Path.Combine(root, "web", "index.html")))
                 {
                     return root;

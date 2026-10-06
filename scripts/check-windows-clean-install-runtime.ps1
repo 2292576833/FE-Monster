@@ -7,7 +7,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $rootPath = (Resolve-Path -LiteralPath $Root).Path
-$expectedAppVersion = [string](Get-Content -Raw -LiteralPath (Join-Path $rootPath 'package.json') | ConvertFrom-Json).version
+. (Join-Path $rootPath 'scripts\release-version.ps1')
+$expectedAppVersion = (Get-FeMonsterReleaseVersion (Get-Content -Raw -LiteralPath (Join-Path $rootPath 'package.json') | ConvertFrom-Json)).DisplayVersion
 if ([string]::IsNullOrWhiteSpace($PayloadRoot)) {
   $PayloadRoot = Join-Path $rootPath 'out\installer\work\payload\FE Monster'
 }
@@ -27,6 +28,10 @@ if ($RequireSignature -and $setupAuthenticodeStatus -ne 'Valid') {
   throw "Bundled setup Authenticode signature is not valid: $setupAuthenticodeStatus"
 }
 $ripgrep = (Get-Command rg.exe -ErrorAction Stop).Source
+$cleanInstallTempRoot = Join-Path $rootPath 'tmp\windows-clean-install-runtime'
+New-Item -ItemType Directory -Path $cleanInstallTempRoot -Force | Out-Null
+$Env:TEMP = $cleanInstallTempRoot
+$Env:TMP = $cleanInstallTempRoot
 $testRoot = Join-Path ([System.IO.Path]::GetTempPath()) (
   'fe-monster-clean-install-runtime-' + [guid]::NewGuid().ToString('N')
 )
@@ -35,6 +40,9 @@ $probeDataDir = Join-Path $testRoot 'clean-data'
 $installLog = Join-Path $testRoot 'install.log'
 $backendLog = Join-Path $testRoot 'backend.log'
 $backendProcess = $null
+$memoryWriteVerified = $false
+$memoryRestartVerified = $false
+$memoryPlaintextScanPassed = $false
 $savedEnvironment = @{}
 
 function Save-EnvironmentValue {
@@ -106,6 +114,45 @@ function Stop-TestProcesses {
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 }
 
+function Start-TestBackend {
+  param(
+    [string]$Java,
+    [string]$Jar,
+    [string]$InstallRoot,
+    [int]$Port
+  )
+
+  $Env:FE_MONSTER_PORT = [string]$Port
+  $startInfo = [Diagnostics.ProcessStartInfo]::new()
+  $startInfo.FileName = $Java
+  $startInfo.WorkingDirectory = $InstallRoot
+  $startInfo.UseShellExecute = $false
+  $startInfo.CreateNoWindow = $true
+  $startInfo.RedirectStandardOutput = $true
+  $startInfo.RedirectStandardError = $true
+  $startInfo.Arguments = '-jar "' + $Jar.Replace('"', '\"') + '" --server'
+  $script:backendProcess = [Diagnostics.Process]::new()
+  $script:backendProcess.StartInfo = $startInfo
+  if (!$script:backendProcess.Start()) { throw 'Installed Java backend process did not start.' }
+  # Drain both streams asynchronously so provider output cannot fill an OS
+  # pipe during the clean-install and restart checks.
+  $script:backendProcess.BeginOutputReadLine()
+  $script:backendProcess.BeginErrorReadLine()
+  return "http://127.0.0.1:$Port"
+}
+
+function Stop-TestBackend {
+  param([string]$BaseUrl)
+
+  try {
+    [void](Invoke-RestMethod -UseBasicParsing -Uri "$BaseUrl/api/app/quit" -TimeoutSec 2)
+  } catch { }
+  if ($null -ne $script:backendProcess) {
+    [void]$script:backendProcess.WaitForExit(5000)
+    if (!$script:backendProcess.HasExited) { throw 'Installed backend did not stop cleanly.' }
+  }
+}
+
 function Invoke-CleanInstaller {
   param(
     [string]$InstallTarget,
@@ -151,10 +198,23 @@ function Invoke-CleanInstaller {
   $setupProcess = [Diagnostics.Process]::new()
   $setupProcess.StartInfo = $setupInfo
   if (!$setupProcess.Start()) { throw 'Bundled setup executable did not start.' }
-  $setupProcess.BeginOutputReadLine()
-  $setupProcess.BeginErrorReadLine()
+  $setupStdout = $setupProcess.StandardOutput.ReadToEndAsync()
+  $setupStderr = $setupProcess.StandardError.ReadToEndAsync()
   $setupProcess.WaitForExit()
-  return $setupProcess.ExitCode
+  $setupExitCode = $setupProcess.ExitCode
+  $setupOutput = $setupStdout.Result + [Environment]::NewLine + $setupStderr.Result
+  if ($setupExitCode -ne 0) {
+    $sessionLogDirectory = Join-Path (Split-Path -Parent $InstallTarget) '.fe-monster-setup-state\logs'
+    if (Test-Path -LiteralPath $sessionLogDirectory -PathType Container) {
+      foreach ($sessionLog in Get-ChildItem -LiteralPath $sessionLogDirectory -File -Filter '*.log' | Sort-Object LastWriteTime) {
+        $setupOutput += [Environment]::NewLine + '--- ' + $sessionLog.Name + ' ---' + [Environment]::NewLine +
+          (Get-Content -Raw -LiteralPath $sessionLog.FullName)
+      }
+    }
+  }
+  [IO.File]::WriteAllText($ProcessLog, $setupOutput, [Text.UTF8Encoding]::new($false))
+  $setupProcess.Dispose()
+  return $setupExitCode
 }
 
 try {
@@ -191,6 +251,27 @@ try {
   $java = Assert-File 'runtime\java\bin\java.exe'
   $jar = Assert-File 'out\fe-monster-java.jar'
   [void](Assert-File 'native\windows\build\winforms\FE Monster.exe')
+  foreach ($desktopRuntime in @(
+    'web\index.html',
+    'web\cache-fingerprints.json',
+    'web\app.js',
+    'web\local-memory-client.js',
+    'web\pet-memory-recall.js',
+    'web\pet-preference-policy.js',
+    'web\pet-preference-memory.js',
+    'web\app-parameter-registry.js',
+    'web\app-command.js',
+    'web\playback-intelligence.js',
+    'web\pet-assistant.js',
+    'web\pet-particle-orb.js',
+    'web\soundscape-runtime.js',
+    'web\assets\soundscape-workshop\runtime.html',
+    'web\assets\soundscape-workshop\bridge.js',
+    'web\assets\soundscape-workshop\assets\index-CSU_B_T9.js',
+    'web\assets\soundscape-workshop\assets\index-DgmMz9-g.css'
+  )) {
+    [void](Assert-File $desktopRuntime)
+  }
 
   $nodePath = (& $node -p 'process.execPath').Trim()
   if ($LASTEXITCODE -ne 0 -or ![string]::Equals(
@@ -212,8 +293,8 @@ try {
 
   $expectedPlugins = [ordered]@{
     netease = '4.32.0'
-    qq = '2.4.1'
-    kugou = '2.0.7'
+    qq = '2.4.2'
+    kugou = '2.0.8'
     qishui = '3.1.1'
   }
   foreach ($entry in $expectedPlugins.GetEnumerator()) {
@@ -257,6 +338,41 @@ try {
     ('sha256:' + ('A' * 64)),
     [Text.UTF8Encoding]::new($false)
   )
+  # Synthetic data in this test's GUID-scoped installation only. Verify the
+  # same preservation contract in both staged-payload and final-EXE modes.
+  $upgradeUserFixtures = [ordered]@{
+    'data\community-device-credentials.json' = '{"deviceId":"upgrade-fixture","privateKey":"preserve-fixture-key"}'
+    'data\client-preferences.json' = '{"schemaVersion":1,"theme":"preserve-user-theme"}'
+    'data\netease-auth.json' = '{"provider":"netease","token":"preserve-fixture-netease"}'
+    'data\qq-auth.json' = '{"provider":"qq","token":"preserve-fixture-qq"}'
+    'data\kugou-auth.json' = '{"provider":"kugou","token":"preserve-fixture-kugou"}'
+    'data\qishui-auth.json' = '{"provider":"qishui","token":"preserve-fixture-qishui"}'
+    'data\playback-state.json' = '{"position":123.5,"trackId":"preserve-fixture-track"}'
+    'data\playback-queue.json' = '{"tracks":["fixture-first","fixture-second"],"selectedIndex":1}'
+    'data\official-browser-login\qq\profile.json' = '{"cookie":"preserve-fixture-browser-login"}'
+    'data\community-account-profiles\qq-user.json' = '{"feId":"12345678","nickname":"preserve-fixture-profile"}'
+    'data\together-listening\history.json' = '{"sessions":["preserve-fixture-history"]}'
+    'data\pet-personalization\memory.json' = '{"memory":"preserve-fixture-pet-history"}'
+    'data\client-ai\state.json' = '{"provider":"custom","apiKey":"preserve-fixture-local-config"}'
+    'data\wallpapers\user-import.bin' = 'preserve-fixture-wallpaper-bytes'
+    'WebView2\Default\Local Storage\leveldb\000003.log' = 'preserve-fixture-legacy-webview-storage'
+    'WebView2\DesktopHostV2\Default\Local Storage\leveldb\000003.log' = 'preserve-fixture-current-webview-storage'
+    'logs\user-diagnostic.log' = 'preserve-fixture-diagnostic-log'
+    'public-access.key' = 'preserve-fixture-public-access-key'
+  }
+  $upgradeUserHashes = @{}
+  foreach ($relativePath in $upgradeUserFixtures.Keys) {
+    $fixturePath = Join-Path $installPath $relativePath
+    New-Item -ItemType Directory -Path (Split-Path -Parent $fixturePath) -Force | Out-Null
+    [IO.File]::WriteAllText($fixturePath, [string]$upgradeUserFixtures[$relativePath], [Text.UTF8Encoding]::new($false))
+    $upgradeUserHashes[$relativePath] = (Get-FileHash -LiteralPath $fixturePath -Algorithm SHA256).Hash
+  }
+  foreach ($relativePath in @('data\machine-id.txt', 'data\client-install-id.txt')) {
+    $identityPath = Join-Path $installPath $relativePath
+    if (Test-Path -LiteralPath $identityPath -PathType Leaf) {
+      $upgradeUserHashes[$relativePath] = (Get-FileHash -LiteralPath $identityPath -Algorithm SHA256).Hash
+    }
+  }
   $upgradeOutput = Join-Path $testRoot 'upgrade-process.log'
   $upgradeExitCode = Invoke-CleanInstaller -InstallTarget $installPath -ProcessLog $upgradeOutput
   if ($upgradeExitCode -ne 0) {
@@ -271,6 +387,13 @@ try {
   }
   if (Test-Path -LiteralPath $obsoleteProgramResidue) {
     throw 'Clean upgrade retained an obsolete program file that is absent from the new payload.'
+  }
+  foreach ($relativePath in $upgradeUserHashes.Keys) {
+    $preservedPath = Join-Path $installPath $relativePath
+    if (!(Test-Path -LiteralPath $preservedPath -PathType Leaf) -or
+        (Get-FileHash -LiteralPath $preservedPath -Algorithm SHA256).Hash -cne $upgradeUserHashes[$relativePath]) {
+      throw "Clean upgrade changed or removed a user record: $relativePath"
+    }
   }
   $actualCommunityUrlBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($communityUrlFile))
   $actualCommunityPinBase64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($communityPinFile))
@@ -302,31 +425,65 @@ try {
   $port = Get-FreeLocalPort
   $Env:FE_MONSTER_ROOT = $installPath
   $Env:FE_MONSTER_DATA_DIR = $probeDataDir
-  $Env:FE_MONSTER_PORT = [string]$port
   $Env:FE_MONSTER_NODE = $node
   $Env:FE_MUSIC_API_AUTOSTART = '0'
 
-  $startInfo = [Diagnostics.ProcessStartInfo]::new()
-  $startInfo.FileName = $java
-  $startInfo.WorkingDirectory = $installPath
-  $startInfo.UseShellExecute = $false
-  $startInfo.CreateNoWindow = $true
-  $startInfo.RedirectStandardOutput = $true
-  $startInfo.RedirectStandardError = $true
-  $startInfo.Arguments = '-jar "' + $jar.Replace('"', '\"') + '" --server'
-  $backendProcess = [Diagnostics.Process]::new()
-  $backendProcess.StartInfo = $startInfo
-  if (!$backendProcess.Start()) { throw 'Installed Java backend process did not start.' }
-  # Drain both redirected streams asynchronously so a verbose provider cannot
-  # fill an OS pipe and deadlock this long-running clean-install gate.
-  $backendProcess.BeginOutputReadLine()
-  $backendProcess.BeginErrorReadLine()
-
-  $baseUrl = "http://127.0.0.1:$port"
+  $baseUrl = Start-TestBackend -Java $java -Jar $jar -InstallRoot $installPath -Port $port
   $versionInfo = Wait-Json "$baseUrl/api/app/version" 25
   if ([string]$versionInfo.version -cne $expectedAppVersion) {
     throw "Installed backend reports version '$($versionInfo.version)', expected '$expectedAppVersion'."
   }
+
+  $memoryHeaders = @{
+    Origin = $baseUrl
+    'Sec-Fetch-Site' = 'same-origin'
+  }
+  $memoryEventId = [guid]::NewGuid().ToString()
+  $memoryConversationId = 'release-' + [guid]::NewGuid().ToString('N')
+  $memoryTraceId = 'trace-' + [guid]::NewGuid().ToString('N')
+  $memoryTurnId = 'turn-' + [guid]::NewGuid().ToString('N')
+  $memoryOccurredAt = [DateTime]::UtcNow.ToString(
+    "yyyy-MM-dd'T'HH:mm:ss.fff'Z'",
+    [Globalization.CultureInfo]::InvariantCulture
+  )
+  $memoryCanary = 'FE_MEMORY_RELEASE_CANARY_' + [guid]::NewGuid().ToString('N')
+  $memoryWriteBody = [ordered]@{
+    provider = 'netease'
+    event = [ordered]@{
+      eventId = $memoryEventId
+      stream = 'chat'
+      type = 'chat.message'
+      occurredAt = $memoryOccurredAt
+      sourceSequence = 1
+      payload = [ordered]@{
+        messageId = $memoryEventId
+        conversationId = $memoryConversationId
+        traceId = $memoryTraceId
+        turnId = $memoryTurnId
+        role = 'user'
+        text = $memoryCanary
+        source = 'app'
+        modelOrigin = 'local'
+        timeAccuracy = 'exact'
+        occurredAt = $memoryOccurredAt
+        sourceSequence = 1
+      }
+    }
+  } | ConvertTo-Json -Depth 8 -Compress
+  $memoryWrite = Invoke-RestMethod `
+    -UseBasicParsing `
+    -Method Post `
+    -Uri "$baseUrl/api/local-memory/events" `
+    -Headers $memoryHeaders `
+    -ContentType 'application/json; charset=utf-8' `
+    -Body $memoryWriteBody `
+    -TimeoutSec 20
+  $memoryReceipt = @($memoryWrite.results | Where-Object { $_.eventId -eq $memoryEventId }) | Select-Object -First 1
+  if (!$memoryWrite.ok -or $null -eq $memoryReceipt -or [string]::IsNullOrWhiteSpace([string]$memoryReceipt.recordedAt)) {
+    throw 'Clean installed backend did not durably accept the encrypted-memory canary.'
+  }
+  $memoryWriteVerified = $true
+
   $configuration = Wait-Json "$baseUrl/api/music-apis" 10
   $providerStartupMilliseconds = [ordered]@{}
   foreach ($entry in $expectedPlugins.GetEnumerator()) {
@@ -350,9 +507,49 @@ try {
     }
   }
 
-  try { [void](Invoke-RestMethod -UseBasicParsing -Uri "$baseUrl/api/app/quit" -TimeoutSec 2) } catch {}
-  [void]$backendProcess.WaitForExit(5000)
-  if (!$backendProcess.HasExited) { throw 'Installed backend did not stop cleanly.' }
+  Stop-TestBackend -BaseUrl $baseUrl
+
+  $restartPort = Get-FreeLocalPort
+  $restartBaseUrl = Start-TestBackend -Java $java -Jar $jar -InstallRoot $installPath -Port $restartPort
+  $restartVersion = Wait-Json "$restartBaseUrl/api/app/version" 25
+  if ([string]$restartVersion.version -cne $expectedAppVersion) {
+    throw 'Restarted installed backend did not report the expected version.'
+  }
+  $restartHeaders = @{
+    Origin = $restartBaseUrl
+    'Sec-Fetch-Site' = 'same-origin'
+  }
+  $encodedConversation = [Uri]::EscapeDataString($memoryConversationId)
+  $memoryAfterRestart = Invoke-RestMethod `
+    -UseBasicParsing `
+    -Uri "$restartBaseUrl/api/local-memory/chats?provider=netease&conversation=$encodedConversation&types=chat.message&limit=10" `
+    -Headers $restartHeaders `
+    -TimeoutSec 20
+  $reloaded = @($memoryAfterRestart.records | Where-Object { $_.eventId -eq $memoryEventId }) | Select-Object -First 1
+  if (!$memoryAfterRestart.ok -or $null -eq $reloaded -or [string]$reloaded.payload.text -cne $memoryCanary) {
+    throw 'Encrypted-memory canary was not recovered after an installed-backend restart.'
+  }
+  $memoryRestartVerified = $true
+  Stop-TestBackend -BaseUrl $restartBaseUrl
+
+  $memoryVaultRoot = Join-Path $probeDataDir 'local-ai-memory'
+  if (!(Test-Path -LiteralPath $memoryVaultRoot -PathType Container)) {
+    throw 'Clean installed backend did not create a local encrypted-memory vault.'
+  }
+  foreach ($vaultFileName in @('memory.db', 'vault-key.dpapi', 'vault-meta.json')) {
+    if (@(Get-ChildItem -LiteralPath $memoryVaultRoot -Recurse -File -Filter $vaultFileName).Count -ne 1) {
+      throw "Clean installed encrypted-memory vault has an unexpected $vaultFileName count."
+    }
+  }
+  $plaintextLeak = & $ripgrep -a -l -F -- $memoryCanary $memoryVaultRoot 2> $null | Select-Object -First 1
+  $plaintextScanExitCode = $LASTEXITCODE
+  if ($plaintextScanExitCode -eq 0 -or ![string]::IsNullOrWhiteSpace([string]$plaintextLeak)) {
+    throw "Encrypted-memory plaintext canary reached persistent vault artifact: $plaintextLeak"
+  }
+  if ($plaintextScanExitCode -ne 1) {
+    throw "Encrypted-memory plaintext scan failed with ripgrep exit code $plaintextScanExitCode."
+  }
+  $memoryPlaintextScanPassed = $true
 
   [pscustomobject]@{
     passed = $true
@@ -368,9 +565,13 @@ try {
     publicCommunityUrl = $communityUri.AbsoluteUri
     tlsPinCount = $pins.Count
     upgradePreservedUserData = $true
+    upgradePreservedFileCount = $upgradeUserHashes.Count
     upgradeRemovedObsoleteProgramFiles = $true
     upgradeRestoredReleaseCommunityConfiguration = $true
     cleanDataDirectory = $true
+    memoryWriteVerified = $memoryWriteVerified
+    memoryRestartVerified = $memoryRestartVerified
+    memoryPlaintextScanPassed = $memoryPlaintextScanPassed
   } | ConvertTo-Json -Depth 4
 } finally {
   Stop-TestProcesses

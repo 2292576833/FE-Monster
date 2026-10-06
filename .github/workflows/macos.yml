@@ -1,0 +1,75 @@
+name: macOS bundle verification
+
+on:
+  push:
+    branches:
+      - codex/macos-native-port-20261007
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-check:
+    # Official standard runner labels and architectures:
+    # https://docs.github.com/en/actions/reference/runners/github-hosted-runners
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15-intel
+            arch: x86_64
+          - runner: macos-15
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify source contracts before generated directories exist
+        run: |
+          node scripts/check-macos-port.mjs
+          node 'FE moster苹果端/App/Tests/check-webview-bridge.mjs'
+          bash 'FE moster苹果端/App/Tests/check-desktop-geometry.sh'
+          node scripts/check-background-playback.mjs
+          node scripts/check-macos-capture.mjs
+          node scripts/check-macos-update.mjs
+          node scripts/check-macos-native-audio.mjs
+          mkdir -p .tmp/capture-probe
+          javac --release 17 -d .tmp/capture-probe src/main/java/com/femonster/api/NativeCapturePcm.java src/test/java/com/femonster/api/NativeCapturePcmProbe.java
+          java -cp .tmp/capture-probe com.femonster.api.NativeCapturePcmProbe
+          cargo --version
+          cmake --version
+      - name: Build native Swift host, bundled runtimes and DMG
+        env:
+          FE_MONSTER_CODESIGN: adhoc
+          FE_MONSTER_DMG: '1'
+        run: bash 'FE moster苹果端/Build/build-macos.sh'
+      - name: Verify the built bundle on its native architecture
+        env:
+          FE_MONSTER_EXPECTED_ARCH: ${{ matrix.arch }}
+        run: bash 'FE moster苹果端/Build/check-bundle.sh'
+      - name: Verify Keychain protection with the bundled Java runtime
+        run: node scripts/check-macos-keychain.mjs
+      - name: Keep verified installers as CI artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: fe-monster-macos-${{ matrix.arch }}
+          path: |
+            FE moster苹果端/dist/*.dmg
+            FE moster苹果端/dist/*.dmg.sha256
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

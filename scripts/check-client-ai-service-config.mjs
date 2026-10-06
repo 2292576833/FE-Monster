@@ -177,6 +177,23 @@ async function fakeFetch(url, options = {}) {
         }],
       });
     }
+    if (parsed.payload?.scenario === 'object-tool-call') {
+      return jsonResponse({ choices: [{ message: { tool_calls: [{ id: 'object-1',
+        function: { name: 'control_app', arguments: { command: 'playback.pause', arguments: {} } }
+      }] } }] });
+    }
+    if (parsed.payload?.scenario === 'fragmented-tool-call') {
+      const packets = [
+        { choices: [{ delta: { tool_calls: [{ index: 0, id: 'fragment-1', function: {
+          name: 'control_', arguments: '{"command":"playback.'
+        } }] } }] },
+        { choices: [{ delta: { tool_calls: [{ index: 0, function: {
+          name: 'app', arguments: 'pause","arguments":{}}'
+        } }] } }] }
+      ];
+      return new Response(packets.map((packet) => `data: ${JSON.stringify(packet)}\n\n`).join('')
+        + 'data: [DONE]\n\n', { headers: { 'Content-Type': 'text/event-stream' } });
+    }
     const bytes = new TextEncoder().encode([
       'data: {"choices":[{"delta":{"content":"Hello"}}]}',
       '',
@@ -259,6 +276,10 @@ await service.save({
 const switchRequest = requests.filter((entry) => entry.url === '/api/client-ai/config' && entry.method === 'POST').at(-1);
 assert.equal(Object.hasOwn(switchRequest.body.model, 'apiKey'), false,
   'provider switch sent the previous or blank key');
+await service.save({ model: { memorySharingEnabled: true } });
+assert.equal(requests.filter((entry) => entry.url === '/api/client-ai/config' && entry.method === 'POST')
+  .at(-1).body.model.memorySharingEnabled, true, 'consent was dropped before reaching local configuration');
+assert.equal(service.load().model.memorySharingEnabled, true, 'persisted consent was dropped from public snapshot');
 
 const deltas = [];
 const streamed = await service.chatStream(service.load(), [{ role: 'user', content: 'hi' }], {
@@ -298,6 +319,14 @@ assert.deepEqual(structuredClone(jsonToolCallResult.toolCalls), expectedJsonTool
 assert.deepEqual(structuredClone(jsonToolCallCallbacks), expectedJsonToolCalls,
   'ordinary application/json tool calls did not reach onToolCalls');
 assert.equal(jsonToolCallResult.text, '', 'a tool-only JSON response invented assistant text');
+for (const scenario of ['fragmented-tool-call', 'object-tool-call']) {
+  const result = await service.chatStream(service.load(), [{ role: 'user', content: '暂停' }], {
+    requestId: scenario, body: { scenario }
+  });
+  assert.equal(result.toolCalls[0]?.name, 'control_app', `${scenario} lost the executable tool name`);
+  assert.deepEqual(JSON.parse(result.toolCalls[0].arguments), { command: 'playback.pause', arguments: {} },
+    `${scenario} lost the command arguments`);
+}
 
 await assert.rejects(
   service.chatStream(service.load(), [{ role: 'user', content: 'truncate' }], {

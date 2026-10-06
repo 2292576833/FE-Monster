@@ -174,6 +174,7 @@ function fakeElement() {
   };
   const context = {
     QISHUI_GUEST_MATCH_CACHE_MS: 10 * 60 * 1000,
+    QISHUI_GUEST_MATCH_CACHE_LIMIT: 128,
     QISHUI_GUEST_FALLBACK_PROVIDERS: Object.freeze(['netease', 'qq', 'kugou']),
     state: {
       qishuiGuestMatches: { cache: new Map(), requests: new Map() }
@@ -203,6 +204,7 @@ function fakeElement() {
     }
   };
   vm.runInNewContext([
+    functionBlock('setBoundedCacheValue'),
     functionBlock('normalizeQishuiMatchText'),
     functionBlock('qishuiGuestMatchScore'),
     functionBlock('qishuiGuestMatchCacheKey'),
@@ -273,6 +275,7 @@ function fakeElement() {
   };
   const context = {
     state,
+    audioSourceLibraryAllows: () => true,
     isLocalSong: () => false,
     isQishuiMetadataSong: (song) => song?.sourceRef?.metadataOnly === true,
     resolveQishuiMetadataViaGuestSearch: async () => publicMatch,
@@ -290,10 +293,13 @@ function fakeElement() {
     refreshPlayerState: async () => {},
     updateShelfCurrentSong: () => {},
     closePlaylistShelf: () => {},
+    clamp: (value, min, max) => Math.max(min, Math.min(max, value)),
+    petAssistantSongSummary: song => song,
     toast: () => {},
     safeText: (value, fallback = '') => value || fallback
   };
   vm.runInNewContext([
+    functionBlock('playPlaylistTracks'),
     functionBlock('playShelfSong'),
     'this.play = playShelfSong;'
   ].join('\n'), context, { filename: 'qishui-shelf-playback.vm.js' });

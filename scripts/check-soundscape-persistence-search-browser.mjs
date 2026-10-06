@@ -54,6 +54,9 @@ function fixtureWav() {
 const wav = fixtureWav();
 
 function apiFixture(url) {
+  if (url.pathname === '/api/audio-sources') {
+    return { ok: true, selected: 'builtin', runtimeReady: true, builtins: [], custom: [] };
+  }
   if (url.pathname === '/api/music-apis') {
     return {
       ok: true,
@@ -455,6 +458,30 @@ try {
     suggestionsHidden: document.getElementById('searchSuggestions')?.hidden === true
   })`);
 
+  await evaluate(`(() => {
+    const context = window.FeMonsterSearchContext;
+    window.__expandedSearchPlaybackCompleted = false;
+    window.FeMonsterSearchContext = {
+      ...context,
+      playSearchSuggestion: async (song) => {
+        const result = await context.playSearchSuggestion(song);
+        window.__expandedSearchPlaybackCompleted = true;
+        return result;
+      }
+    };
+    document.querySelector('.search-suggestion-expand').click();
+  })()`);
+  await waitFor(`document.querySelectorAll('.search-results-window-item').length === 1`);
+  await evaluate(`document.querySelector('.search-results-window-play').click()`);
+  await waitFor(`window.__expandedSearchPlaybackCompleted === true`);
+  const expandedSelection = await evaluate(`({
+    songId: state.currentSong?.id || '',
+    open: document.getElementById('searchResultsWindow').hidden === false,
+    resultCount: document.querySelectorAll('.search-results-window-item').length
+  })`);
+  await evaluate(`document.getElementById('searchResultsWindowClose').click()`);
+  const expandedManualClose = await evaluate(`document.getElementById('searchResultsWindow').hidden === true`);
+
   const checks = {
     soundscapeParametersPersistAcrossRestart: soundscapeParameterBeforeRestart.runtime === 1.4
       && soundscapeParameterBeforeRestart.stored === 1.4
@@ -477,6 +504,9 @@ try {
     searchSelectionLoadsSong: selection.songId === 'edge-search-song'
       && selection.title === '真实搜索结果'
       && requestLog.some((entry) => entry.startsWith('GET /api/player/load?')),
+    expandedPlaybackKeepsResultsOpen: expandedSelection.songId === 'edge-search-song'
+      && expandedSelection.open && expandedSelection.resultCount === 1,
+    expandedSearchStillClosesManually: expandedManualClose,
     noPageErrors: browserErrors.length === 0
   };
   const report = {
@@ -495,6 +525,7 @@ try {
     searchState,
     resultBox,
     selection,
+    expandedSelection,
     requests: requestLog.filter((entry) => /\/api\/(?:search|player\/load)/.test(entry)),
     browserErrors
   };

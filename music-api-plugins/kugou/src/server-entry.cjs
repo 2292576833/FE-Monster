@@ -42,7 +42,7 @@ const commentMusic = loadUpstream("module/comment_music.js", () => require("../.
 const playlistTracksAdd = loadUpstream("module/playlist_tracks_add.js", () => require("../../../node_modules/kugoumusicapi/module/playlist_tracks_add.js"));
 const { createRequest } = loadUpstream("util/request.js", () => require("../../../node_modules/kugoumusicapi/util/request.js"));
 
-const VERSION = "2.0.7";
+const VERSION = "2.0.8";
 const UPSTREAM_VERSION = "1.5.1";
 const SOURCE_COMMIT = "283f1e97b110726b208a64b486a657c0fc0a6126";
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -926,7 +926,7 @@ async function lyricPayload(params) {
   const result = await callModule(lyric, {
     id: candidate.id,
     accesskey: candidate.accesskey,
-    fmt: "lrc",
+    fmt: "krc",
     decode: true,
     cookie
   }, { idempotent: true });
@@ -940,7 +940,7 @@ async function lyricPayload(params) {
     ok: true,
     provider: "kugou",
     lyric: text,
-    lrc: { lyric: text }
+    klyric: { lyric: text }
   };
 }
 

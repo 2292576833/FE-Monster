@@ -25,7 +25,8 @@ const result = {
     && /function consumeOrbFrameBudget\(now\)[\s\S]*?frameBudgetCarryMs/s.test(app)
     && /function drawOrb\(now = performance\.now\(\)\)[\s\S]*?consumeOrbFrameBudget\(now\)[\s\S]*?requestOrbFrame\(\);[\s\S]*?return;/s.test(app),
   playbackUiAndPresetsBypassSoftwareFrameCap:
-    /function playbackFrameRateUncapped\(\)\s*\{\s*return state\.playbackPage\s*&&\s*isPlaybackClockRunning\(\);\s*\}/s.test(app)
+    /function playbackFrameRateUncapped\(\)[\s\S]*?return state\.playbackPage\s*&&\s*\(isPlaybackClockRunning\(\)/s.test(app)
+    && /function playbackFrameRateUncapped\(\)[\s\S]*?isHarmonicStatePreset\(\)[\s\S]*?state\.harmonicState\.runtime[\s\S]*?els\.harmonicStateScene\?\.hidden === false/s.test(app)
     && /function consumeOrbFrameBudget\(now\)\s*\{\s*if \(playbackFrameRateUncapped\(\)\)[\s\S]*?frameBudgetCarryMs\s*=\s*0;\s*return true;[\s\S]*?const budgetMs = orbFrameBudgetMs\(\);/s.test(app)
     && /function updatePlaybackSceneMotion\(\)[\s\S]*?updateDynamicCubeMotion\(\);[\s\S]*?updateFreeCubeMotion\(\);[\s\S]*?updateVoidPrismMotion\(\);[\s\S]*?updateChladniMotion\(\);[\s\S]*?updateSonicTopographyMotion\(\);/s.test(app),
   bootCanvasStopsBehindLightfall:

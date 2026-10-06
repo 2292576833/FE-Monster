@@ -1,0 +1,12 @@
+{
+  "name": "fe-audio-sources-runtime",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": { "test": "node --test test/*.test.mjs" },
+  "dependencies": {
+    "ipaddr.js": "2.5.0",
+    "quickjs-emscripten": "0.32.0"
+  }
+}

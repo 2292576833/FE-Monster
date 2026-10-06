@@ -48,10 +48,12 @@ public final class BrowserLoginSynchronizationProbe {
 
         verifyPublicFallbackCannotCompleteLogin();
         verifyAuthenticatedEmptyLibraryCompletesLogin();
-        verifyManagedKugouQrCompletesWithoutBrowserCookies();
+        verifyManagedKugouQrCompletesWithoutBrowserCookies(false);
+        verifyManagedKugouQrCompletesWithoutBrowserCookies(true);
 
         long wakeLatencyNanos = verifyLongPollWakeup(registry);
         verifySlowSynchronizationCompletesInsideBudget();
+        verifyRetryCompletesAfterBrowserClosed();
         verifyBoundedSlowSynchronization();
         verifyBoundedPermanentPlaylistFailure();
         verifyTerminalSessionRetention();
@@ -91,8 +93,9 @@ public final class BrowserLoginSynchronizationProbe {
     }
 
     @SuppressWarnings("unchecked")
-    private static void verifyManagedKugouQrCompletesWithoutBrowserCookies() throws Exception {
+    private static void verifyManagedKugouQrCompletesWithoutBrowserCookies(boolean delayedLibrary) throws Exception {
         ManagedKugouProvider provider = new ManagedKugouProvider();
+        provider.pendingLibraryCalls = delayedLibrary ? 1 : 0;
         MusicProviderRegistry registry = new MusicProviderRegistry(provider);
         Path dataDir = Files.createTempDirectory("fe-monster-kugou-managed-qr-");
         try (OfficialBrowserLoginService service = new OfficialBrowserLoginService(dataDir, registry)) {
@@ -131,6 +134,11 @@ public final class BrowserLoginSynchronizationProbe {
             ((Map<String, Object>) sessionsField.get(service)).put("managed-kugou-session", session);
 
             invokeMonitor(service, session);
+            if (delayedLibrary) {
+                require("sync-retrying".equals(service.status("kugou", "managed-kugou-session").get("phase")),
+                    "managed Kugou temporary library failure did not remain retryable");
+                invokeMonitor(service, session);
+            }
             Map<String, Object> status = service.status("kugou", "managed-kugou-session");
             require("success".equals(status.get("phase")), "managed Kugou QR did not complete: " + status);
             require(Boolean.TRUE.equals(status.get("accountReady")), "managed Kugou account was not ready");
@@ -190,6 +198,36 @@ public final class BrowserLoginSynchronizationProbe {
             require(provider.interrupted, "timed-out provider synchronization was not cancelled");
             require(provider.clearCalls >= 2,
                 "timed-out synchronization did not clear both the previous and failed imported session");
+        } finally {
+            Files.deleteIfExists(dataDir);
+        }
+    }
+
+    private static void verifyRetryCompletesAfterBrowserClosed() throws Exception {
+        StubProvider provider = new StubProvider();
+        provider.includeCredentials = true;
+        Path dataDir = Files.createTempDirectory("fe-monster-login-closed-browser-retry-");
+        try (OfficialBrowserLoginService service = new OfficialBrowserLoginService(
+            dataDir, new MusicProviderRegistry(provider), Duration.ofMillis(100), Duration.ofMillis(500)
+        )) {
+            Object session = installAuthenticatedSession(service, "closed-browser-retry");
+            invokeMonitor(service, session);
+            Map<String, Object> pending = service.status("qq", "closed-browser-retry");
+            require("sync-retrying".equals(pending.get("phase")), "temporary library failure did not remain retryable");
+            require(!pending.containsKey("accountPayload"), "unverified login exposed an account snapshot");
+            Method exited = OfficialBrowserLoginService.class.getDeclaredMethod("browserExited", session.getClass());
+            exited.setAccessible(true);
+            exited.invoke(service, session);
+            invokeMonitor(service, session);
+            Map<String, Object> success = service.status("qq", "closed-browser-retry");
+            require("success".equals(success.get("phase")),
+                "closing the official window discarded captured credentials needed for synchronization");
+            Map<?, ?> verified = (Map<?, ?>) success.get("accountPayload");
+            require(Boolean.TRUE.equals(verified.get("loggedIn")), "verified account was missing from the success notification");
+            require("10001".equals(((Map<?, ?>) verified.get("account")).get("userId")),
+                "verified account identity was lost from the success notification");
+            require(!success.toString().contains("secret"), "browser login status exposed provider credentials");
+            require(provider.clearCalls == 1, "successful retry cleared the imported account");
         } finally {
             Files.deleteIfExists(dataDir);
         }
@@ -292,24 +330,20 @@ public final class BrowserLoginSynchronizationProbe {
     ) throws Exception {
         Map<String, Object> status = service.status("qq", sessionId);
         boolean observedRetrying = false;
-        boolean observedCookieInvalidation = false;
+        boolean observedCookieRetention = false;
         Field cookiesField = session.getClass().getDeclaredField("authenticatedCookies");
         cookiesField.setAccessible(true);
         for (int attempt = 0; attempt < maximumAttempts && !Boolean.TRUE.equals(status.get("terminal")); attempt++) {
-            Map<?, ?> currentCookies = (Map<?, ?>) cookiesField.get(session);
-            if (currentCookies.isEmpty()) {
-                cookiesField.set(session, Map.of("uin", "10001", "qm_keyst", "secret"));
-            }
             invokeMonitor(service, session);
             status = service.status("qq", sessionId);
             observedRetrying |= "sync-retrying".equals(status.get("phase"));
-            observedCookieInvalidation |= "sync-retrying".equals(status.get("phase"))
-                && ((Map<?, ?>) cookiesField.get(session)).isEmpty();
+            observedCookieRetention |= "sync-retrying".equals(status.get("phase"))
+                && !((Map<?, ?>) cookiesField.get(session)).isEmpty();
             if (!Boolean.TRUE.equals(status.get("terminal"))) Thread.sleep(retryDelayMillis);
         }
         require(observedRetrying, "provider failure skipped the visible retrying state");
-        require(observedCookieInvalidation,
-            "provider failure froze the first browser-cookie snapshot instead of observing a new scan");
+        require(observedCookieRetention,
+            "provider failure discarded the captured browser credentials needed for a retry after the window closes");
         return status;
     }
 
@@ -391,6 +425,7 @@ public final class BrowserLoginSynchronizationProbe {
 
     private static final class StubProvider implements MusicProviderClient {
         private boolean remembered;
+        private boolean includeCredentials;
         private int playlistCalls;
         int clearCalls;
 
@@ -400,7 +435,8 @@ public final class BrowserLoginSynchronizationProbe {
         @Override public Map<String, Object> serviceStatus() { return Map.of("ok", true); }
         @Override public Map<String, Object> accountPayload() {
             require(remembered, "account was read before browser cookies were persisted");
-            return Map.of("ok", true, "loggedIn", true, "account", Map.of("userId", "10001"));
+            return Map.of("ok", true, "loggedIn", true, "account", includeCredentials
+                ? Map.of("userId", "10001", "vipToken", "secret") : Map.of("userId", "10001"));
         }
         @Override public void rememberBrowserSession(Map<String, String> cookies) { remembered = true; }
         @Override public void clearBrowserSession() { clearCalls += 1; remembered = false; }
@@ -453,6 +489,7 @@ public final class BrowserLoginSynchronizationProbe {
     private static final class ManagedKugouProvider implements MusicProviderClient {
         private int pollCalls;
         private int browserCookieImports;
+        private int pendingLibraryCalls;
 
         @Override public String id() { return "kugou"; }
         @Override public String label() { return "Kugou Music"; }
@@ -473,6 +510,7 @@ public final class BrowserLoginSynchronizationProbe {
         }
         @Override public void rememberBrowserSession(Map<String, String> cookies) { browserCookieImports += 1; }
         @Override public Map<String, Object> userPlaylistsPayload() {
+            if (pendingLibraryCalls-- > 0) return Map.of("ok", false, "loggedIn", true, "userLibrary", false, "playlists", List.of());
             return Map.of(
                 "ok", true,
                 "loggedIn", true,

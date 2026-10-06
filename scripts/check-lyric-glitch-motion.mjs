@@ -155,9 +155,9 @@ const textPresetCardIds = textPresetCardTags
 
 const expectedBeatSettings = ["glitchBeatSensitivity", "glitchBeatDuration"];
 const staticChecks = {
-  restoredTextPresetCardsAreLimited: textPresetCardTags.length === 2
-    && textPresetCardValues.join("|") === "depth|focus-echo"
-    && textPresetCardIds.join("|") === "diyFocusEchoTextPreset|diyLyricPreset"
+  restoredTextPresetCardsAreLimited: textPresetCardTags.length === 3
+    && textPresetCardValues.join("|") === "depth|focus-echo|particle-lyrics"
+    && textPresetCardIds.join("|") === "diyFocusEchoTextPreset|diyLyricPreset|diyParticleLyricsPreset"
     && !/\bid=(["'])diyWordGlowTextPreset\1/i.test(html)
     && !/\bid=(["'])diyGlitchTextPreset\1/i.test(html),
   beatControlsExistInGlitchGroup: !!sensitivityInput
@@ -246,7 +246,7 @@ const staticChecks = {
       .test(setPlaybackLine + subtitleLayout),
   playbackCardLyricsUseTimedFlipSeam:
     /startQishuiLyricTransition/.test(playbackCardLyrics)
-    && /getBoundingClientRect/.test(startPlaybackCardLyricTransition)
+    && /snapshots instanceof Map/.test(startPlaybackCardLyricTransition)
     && /\.animate\s*\(/.test(startPlaybackCardLyricTransition)
     && /animation\.currentTime/.test(syncPlaybackCardLyricTransition)
     && /playbackTime/.test(playbackCardLyrics),
@@ -385,9 +385,9 @@ if (runEdgeDomProbe) try {
             .sort()
             .join("|");
           const ids = cards.map((card) => card.id).sort().join("|");
-          return cards.length === 2
-            && values === "depth|focus-echo"
-            && ids === "diyFocusEchoTextPreset|diyLyricPreset"
+          return cards.length === 3
+            && values === "depth|focus-echo|particle-lyrics"
+            && ids === "diyFocusEchoTextPreset|diyLyricPreset|diyParticleLyricsPreset"
             && !document.getElementById("diyWordGlowTextPreset");
         })(),
         beatControlsAreMounted: !!document.getElementById("textGlitchBeatSensitivity")

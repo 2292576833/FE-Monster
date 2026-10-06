@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import vm from 'node:vm';
 
 const root = path.resolve(import.meta.dirname, '..');
 const app = fs.readFileSync(path.join(root, 'web', 'app.js'), 'utf8');
@@ -65,7 +66,25 @@ const clearCommunityDanmakuBubbles = functionBody('clearCommunityDanmakuBubbles'
 const startBackgroundPolling = functionBody('startBackgroundPolling');
 const renderShelfSongsInto = functionBody('renderShelfSongsInto');
 const createShelfSongButton = functionBody('createShelfSongButton');
+const createReusableShelfSongCoverImage = functionBody('createReusableShelfSongCoverImage');
+const shelfSongPoolRange = functionBody('shelfSongPoolRange');
 const setSongFocus = functionBody('setSongFocus');
+
+const poolState = { activePlaylistSongs: [] };
+const poolRange = vm.runInNewContext(`
+  ${app.match(/const PLAYLIST_SONG_RENDER_RADIUS = \d+;/)?.[0]}
+  ${app.match(/const PLAYLIST_SONG_RENDER_BUFFER = \d+;/)?.[0]}
+  ${shelfSongPoolRange}; shelfSongPoolRange`, {
+  state: poolState, clamp: (value, min, max) => Math.min(max, Math.max(min, value))
+});
+const poolBoundsValid = [0, 1, 15, 2000].every(count => {
+  poolState.activePlaylistSongs = Array(count);
+  return [-20, 0, count / 2, count + 20].every(focus => {
+    const range = poolRange(focus);
+    return range.capacity <= 15 && range.capacity <= count && range.start >= 0
+      && range.end < count && range.end - range.start + 1 === range.capacity;
+  });
+});
 
 function referenceSpectrumBands(data, sampleRate) {
   const values = new Float64Array(512);
@@ -156,12 +175,15 @@ const checks = {
     && /document\.hidden/.test(startBackgroundPolling),
   songListUsesBoundedWindow:
     renderShelfSongsInto.length > 0
-    && /PLAYLIST_SONG_RENDER_RADIUS\s*\+\s*PLAYLIST_SONG_RENDER_BUFFER/.test(renderShelfSongsInto)
+    && /shelfSongPoolRange\(focusIndex\)/.test(renderShelfSongsInto)
+    && poolBoundsValid
     && /for\s*\(let\s+index\s*=\s*start;\s*index\s*<=\s*end;/.test(renderShelfSongsInto),
   songCoversAreLazy:
     createShelfSongButton.length > 0
-    && /image\.loading\s*=\s*['"]lazy['"]/.test(createShelfSongButton)
-    && /image\.dataset\.src/.test(createShelfSongButton),
+    && /createReusableShelfSongCoverImage\(cover\)/.test(createShelfSongButton)
+    && /image\.loading\s*=\s*['"]lazy['"]/.test(createReusableShelfSongCoverImage)
+    && /coverImage\.dataset\.src/.test(createShelfSongButton)
+    && !/coverImage\.src\s*=/.test(createShelfSongButton),
   songFocusAvoidsTransientArrays:
     setSongFocus.length > 0
     && !/songButtonCache\.map\s*\(/.test(setSongFocus)

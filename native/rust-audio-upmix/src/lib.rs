@@ -5,6 +5,7 @@ use mixer_effects::{
     EffectsRack, ModulationControl, PhaserControl,
 };
 use std::cell::UnsafeCell;
+use std::collections::VecDeque;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
@@ -18,6 +19,15 @@ const RESULT_UNSUPPORTED: i32 = -2;
 const RESULT_PROCESS_FAILED: i32 = -3;
 const RESULT_PANIC: i32 = -4;
 const MAX_FRAMES_PER_CALL: usize = 65_536;
+
+/// Passive upmixing is intentionally processed with a streaming STFT rather
+/// than one FFT per transport batch.  A 2048 point window and 512 point hop
+/// give 75% overlap while keeping the algorithmic delay at 1536 frames
+/// (32 ms at 48 kHz, inside the requested 20–40 ms range).
+pub const UPMIX_STFT_FFT_SIZE: usize = 2048;
+pub const UPMIX_STFT_HOP_SIZE: usize = 512;
+pub const UPMIX_STFT_OVERLAP_PERCENT: usize = 75;
+pub const UPMIX_STFT_LATENCY_FRAMES: usize = UPMIX_STFT_FFT_SIZE - UPMIX_STFT_HOP_SIZE;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -37,6 +47,8 @@ pub struct FeRustUpmixConfig {
 
 struct UpmixHandle {
     upmixer: SurroundUpmixer,
+    sample_rate: u32,
+    algorithm: UpmixAlgorithm,
     output_channels: usize,
     left_scratch: Vec<f32>,
     right_scratch: Vec<f32>,
@@ -44,6 +56,14 @@ struct UpmixHandle {
     lfe_alpha: f32,
     lfe_gain: f32,
     lfe_state: f32,
+    passive_input_left: VecDeque<f32>,
+    passive_input_right: VecDeque<f32>,
+    passive_output: Vec<VecDeque<f32>>,
+    passive_ola: Vec<Vec<f32>>,
+    passive_weight: Vec<f32>,
+    passive_window_left: Vec<f32>,
+    passive_window_right: Vec<f32>,
+    passive_delay_frames: usize,
 }
 
 fn finite_in_range(value: f32, minimum: f32, maximum: f32) -> bool {
@@ -82,6 +102,16 @@ fn low_pass_alpha(cutoff_hz: f32, sample_rate: u32) -> f32 {
 fn reset_handle(handle: &mut UpmixHandle) {
     handle.upmixer.reset();
     handle.lfe_state = 0.0;
+    handle.passive_input_left.clear();
+    handle.passive_input_right.clear();
+    for channel in &mut handle.passive_output {
+        channel.clear();
+    }
+    for channel in &mut handle.passive_ola {
+        channel.clear();
+    }
+    handle.passive_weight.clear();
+    handle.passive_delay_frames = UPMIX_STFT_LATENCY_FRAMES;
 }
 
 fn create_handle(config: &FeRustUpmixConfig) -> Option<Box<UpmixHandle>> {
@@ -100,6 +130,8 @@ fn create_handle(config: &FeRustUpmixConfig) -> Option<Box<UpmixHandle>> {
     let upmixer = SurroundUpmixer::new(config.sample_rate, algorithm, upmix_config).ok()?;
     Some(Box::new(UpmixHandle {
         upmixer,
+        sample_rate: config.sample_rate,
+        algorithm,
         output_channels: config.output_channels as usize,
         left_scratch: vec![0.0; 4096],
         right_scratch: vec![0.0; 4096],
@@ -107,7 +139,150 @@ fn create_handle(config: &FeRustUpmixConfig) -> Option<Box<UpmixHandle>> {
         lfe_alpha: low_pass_alpha(config.lfe_crossover_hz, config.sample_rate),
         lfe_gain: config.lfe_gain,
         lfe_state: 0.0,
+        passive_input_left: VecDeque::with_capacity(UPMIX_STFT_FFT_SIZE * 2),
+        passive_input_right: VecDeque::with_capacity(UPMIX_STFT_FFT_SIZE * 2),
+        passive_output: (0..config.output_channels as usize)
+            .map(|_| VecDeque::with_capacity(UPMIX_STFT_FFT_SIZE))
+            .collect(),
+        passive_ola: (0..config.output_channels as usize)
+            .map(|_| Vec::with_capacity(UPMIX_STFT_FFT_SIZE))
+            .collect(),
+        passive_weight: Vec::with_capacity(UPMIX_STFT_FFT_SIZE),
+        passive_window_left: vec![0.0; UPMIX_STFT_FFT_SIZE],
+        passive_window_right: vec![0.0; UPMIX_STFT_FFT_SIZE],
+        passive_delay_frames: UPMIX_STFT_LATENCY_FRAMES,
     }))
+}
+
+fn update_handle(handle: &mut UpmixHandle, config: &FeRustUpmixConfig) -> i32 {
+    if !validate_config(config)
+        || config.sample_rate != handle.sample_rate
+        || config.output_channels as usize != handle.output_channels
+        || algorithm_from_id(config.algorithm) != Some(handle.algorithm)
+    {
+        return RESULT_INVALID_ARGUMENT;
+    }
+    let upmix_config = UpmixConfig {
+        center_width_hz: config.center_width_hz,
+        lfe_crossover_hz: config.lfe_crossover_hz,
+        lfe_gain: config.lfe_gain,
+        center_gain: config.center_gain,
+        surround_gain: config.surround_gain,
+        decorrelation_amount: config.decorrelation_amount,
+    };
+    let Some(upmixer) =
+        SurroundUpmixer::new(handle.sample_rate, handle.algorithm, upmix_config).ok()
+    else {
+        return RESULT_PROCESS_FAILED;
+    };
+    handle.upmixer = upmixer;
+    handle.persistent_lfe = matches!(config.algorithm, 1 | 2);
+    handle.lfe_alpha = low_pass_alpha(config.lfe_crossover_hz, config.sample_rate);
+    handle.lfe_gain = config.lfe_gain;
+    RESULT_OK
+}
+
+fn passive_hann(index: usize) -> f32 {
+    // The periodic form gives a constant overlap-add sum for four windows.
+    0.5 - 0.5 * (std::f32::consts::TAU * index as f32 / UPMIX_STFT_FFT_SIZE as f32).cos()
+}
+
+fn process_passive_stft(handle: &mut UpmixHandle, frame_count: usize, output: &mut [f32]) -> i32 {
+    for frame in 0..frame_count {
+        handle
+            .passive_input_left
+            .push_back(handle.left_scratch[frame]);
+        handle
+            .passive_input_right
+            .push_back(handle.right_scratch[frame]);
+    }
+
+    while handle.passive_input_left.len() >= UPMIX_STFT_FFT_SIZE {
+        for index in 0..UPMIX_STFT_FFT_SIZE {
+            let window = passive_hann(index);
+            handle.passive_window_left[index] = handle.passive_input_left[index] * window;
+            handle.passive_window_right[index] = handle.passive_input_right[index] * window;
+        }
+
+        let channels_51 = match handle
+            .upmixer
+            .upmix_stereo_to_51(&handle.passive_window_left, &handle.passive_window_right)
+        {
+            Ok(channels) => channels,
+            Err(_) => return RESULT_PROCESS_FAILED,
+        };
+        let channels = if handle.output_channels == 8 {
+            match handle.upmixer.upmix_51_to_71(&channels_51) {
+                Ok(channels) => channels,
+                Err(_) => return RESULT_PROCESS_FAILED,
+            }
+        } else {
+            channels_51
+        };
+        if channels.len() != handle.output_channels
+            || channels
+                .iter()
+                .any(|channel| channel.len() != UPMIX_STFT_FFT_SIZE)
+        {
+            return RESULT_PROCESS_FAILED;
+        }
+
+        if handle.passive_weight.len() < UPMIX_STFT_FFT_SIZE {
+            handle.passive_weight.resize(UPMIX_STFT_FFT_SIZE, 0.0);
+        }
+        for channel in &mut handle.passive_ola {
+            if channel.len() < UPMIX_STFT_FFT_SIZE {
+                channel.resize(UPMIX_STFT_FFT_SIZE, 0.0);
+            }
+        }
+        for index in 0..UPMIX_STFT_FFT_SIZE {
+            let window = passive_hann(index);
+            handle.passive_weight[index] += window * window;
+            for channel in 0..handle.output_channels {
+                handle.passive_ola[channel][index] += channels[channel][index] * window;
+            }
+        }
+
+        for index in 0..UPMIX_STFT_HOP_SIZE {
+            let weight = handle.passive_weight[index];
+            for channel in 0..handle.output_channels {
+                let sample = if weight > 1.0e-6 {
+                    handle.passive_ola[channel][index] / weight
+                } else {
+                    0.0
+                };
+                handle.passive_output[channel].push_back(if sample.is_finite() {
+                    sample
+                } else {
+                    0.0
+                });
+            }
+        }
+
+        for channel in 0..handle.output_channels {
+            handle.passive_ola[channel].drain(..UPMIX_STFT_HOP_SIZE);
+            handle.passive_ola[channel].resize(UPMIX_STFT_FFT_SIZE, 0.0);
+        }
+        handle.passive_weight.drain(..UPMIX_STFT_HOP_SIZE);
+        handle.passive_weight.resize(UPMIX_STFT_FFT_SIZE, 0.0);
+        for _ in 0..UPMIX_STFT_HOP_SIZE {
+            handle.passive_input_left.pop_front();
+            handle.passive_input_right.pop_front();
+        }
+    }
+
+    for frame in 0..frame_count {
+        for channel in 0..handle.output_channels {
+            let sample = if handle.passive_delay_frames > 0 {
+                0.0
+            } else {
+                handle.passive_output[channel].pop_front().unwrap_or(0.0)
+            };
+            output[frame * handle.output_channels + channel] = sample;
+        }
+        handle.passive_delay_frames = handle.passive_delay_frames.saturating_sub(1);
+    }
+    RESULT_OK
 }
 
 fn process_block(
@@ -131,6 +306,10 @@ fn process_block(
     for (index, frame) in input.chunks_exact(2).enumerate() {
         handle.left_scratch[index] = if frame[0].is_finite() { frame[0] } else { 0.0 };
         handle.right_scratch[index] = if frame[1].is_finite() { frame[1] } else { 0.0 };
+    }
+
+    if handle.algorithm == UpmixAlgorithm::Passive {
+        return process_passive_stft(handle, frame_count, output);
     }
 
     let mut channels_51 = match handle.upmixer.upmix_stereo_to_51(
@@ -204,6 +383,32 @@ pub unsafe extern "C" fn fe_rust_upmix_create(
             .unwrap_or(std::ptr::null_mut())
     }));
     result.unwrap_or(std::ptr::null_mut())
+}
+
+/// Updates continuous passive-upmix parameters in place.  The algorithm and
+/// output layout are intentionally fixed for a live handle; topology changes
+/// are still handled by the native transition path.
+///
+/// # Safety
+///
+/// `handle` must come from `fe_rust_upmix_create`, and `config` must point to
+/// a readable `FeRustUpmixConfig` for the duration of this call.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fe_rust_upmix_update(
+    handle: *mut std::ffi::c_void,
+    config: *const FeRustUpmixConfig,
+) -> i32 {
+    if handle.is_null() || config.is_null() {
+        return RESULT_INVALID_ARGUMENT;
+    }
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        // SAFETY: The caller contract requires both pointers to remain valid
+        // for the duration of this synchronous update.
+        let upmixer = unsafe { &mut *handle.cast::<UpmixHandle>() };
+        let copied = unsafe { *config };
+        update_handle(upmixer, &copied)
+    }));
+    result.unwrap_or(RESULT_PANIC)
 }
 
 /// Processes interleaved stereo float PCM into interleaved 5.1 or 7.1 PCM.
@@ -502,7 +707,7 @@ fn clean_params() -> FeRustMixerParams {
 /// Returns a complete deterministic snapshot for a stable preset id:
 /// clean, bathroom, hall, surround-3d, cinema, vocal-clear, bass-boost, night,
 /// wide-chorus, classic-flanger, flowing-phaser, ping-pong-delay,
-/// nearfield-studio, immersive-live.
+/// nearfield-studio, immersive-live, clear-spatial.
 pub fn mixer_preset_params(id: u32) -> Option<FeRustMixerParams> {
     let mut p = clean_params();
     match id {
@@ -631,6 +836,9 @@ pub fn mixer_preset_params(id: u32) -> Option<FeRustMixerParams> {
             p.reverb_wet = 0.20;
             p.reverb_dry = 1.0;
         }
+        // Spatial controls belong to Java/native OBR. Preserve unity Mixer
+        // processing; append the stable id without renumbering older presets.
+        14 => {}
         _ => return None,
     }
     Some(p)
@@ -1675,6 +1883,62 @@ mod tests {
             surround_gain: 0.5,
             decorrelation_amount: 0.7,
         }
+    }
+
+    #[test]
+    fn passive_stft_contract_matches_realtime_budget() {
+        assert_eq!(UPMIX_STFT_FFT_SIZE, 2048);
+        assert_eq!(UPMIX_STFT_HOP_SIZE, 512);
+        assert_eq!(UPMIX_STFT_OVERLAP_PERCENT, 75);
+        assert_eq!(UPMIX_STFT_FFT_SIZE - UPMIX_STFT_HOP_SIZE, 1536);
+    }
+
+    #[test]
+    fn passive_stft_keeps_stream_continuous_across_transport_splits() {
+        let mut passive = config(6);
+        passive.algorithm = 0;
+        let total_frames = 8192_usize;
+        let batch_frames = 4096_usize;
+        let input: Vec<f32> = (0..total_frames * 2)
+            .map(|index| {
+                let frame = index / 2;
+                let phase = frame as f32 * 233.0 * std::f32::consts::TAU / 48_000.0;
+                if index % 2 == 0 {
+                    phase.sin() * 0.25
+                } else {
+                    (phase + 0.17).sin() * 0.21
+                }
+            })
+            .collect();
+        let mut one_call = create_handle(&passive).expect("one-call handle");
+        let mut one_output = vec![0.0_f32; total_frames * 6];
+        assert_eq!(
+            process_block(&mut one_call, &input, total_frames, &mut one_output),
+            RESULT_OK
+        );
+
+        let mut split = create_handle(&passive).expect("split handle");
+        let mut split_output = vec![0.0_f32; total_frames * 6];
+        for batch in 0..2 {
+            let input_start = batch * batch_frames * 2;
+            let output_start = batch * batch_frames * 6;
+            assert_eq!(
+                process_block(
+                    &mut split,
+                    &input[input_start..input_start + batch_frames * 2],
+                    batch_frames,
+                    &mut split_output[output_start..output_start + batch_frames * 6],
+                ),
+                RESULT_OK
+            );
+        }
+        for (index, (one, split)) in one_output.iter().zip(split_output).enumerate() {
+            assert!(
+                (one - split).abs() < 1.0e-5,
+                "passive STFT split diverged at sample {index}: {one} vs {split}"
+            );
+        }
+        assert!(one_output.iter().any(|sample| sample.abs() > 1.0e-4));
     }
 
     #[test]

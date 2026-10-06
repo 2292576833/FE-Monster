@@ -522,10 +522,18 @@
   let localSoundPreferencePresent = false;
   let localStatePresent = false;
   let activeScope = '';
+  let resolvedAccountScope = null;
   let activeStorageKey = STORAGE_KEY;
   let activeProvider = loadActiveProvider();
   let achievementState = loadState();
+  const scopeStateCache = new Map();
   let hydrationFinished = false;
+  // Whether the app backend answered for this account scope.  Its per-account
+  // file is the durable store, and it must be written even while the community
+  // mirror is unreachable; the mirror is a backup, not the local copy.
+  let localBackendHydrated = false;
+  let pendingPlaybackSong = null;
+  const pendingUnlocks = new Map();
   let serverHydrated = false;
   let hydrationRetryTimer = 0;
   let persistQueuedDuringHydration = false;
@@ -694,29 +702,49 @@
     const previousScope = activeScope;
     const previousState = normalizeState(achievementState);
     const previousPresent = localStatePresent;
+    // The web view is recreated for every launch, so the state of the scope we
+    // leave behind is kept in memory as well as in its own storage slot.
+    // Switching back restores that account instead of starting it over.
+    if (previousScope) scopeStateCache.set(previousScope, previousState);
     activeScope = normalizedScope;
     activeStorageKey = storageKeyForScope(normalizedScope);
+    const cached = scopeStateCache.get(normalizedScope);
     const loaded = readStoredState(activeStorageKey, normalizedScope === 'anonymous');
+    const targetState = cached ? normalizeState(cached) : loaded.state;
+    const targetPresent = Boolean(cached) || loaded.present;
     let migrateUnscoped = false;
-    if (!loaded.present && previousScope === '' && normalizedScope !== 'anonymous' && previousPresent) {
+    if (!targetPresent && previousScope === '' && normalizedScope !== 'anonymous' && previousPresent) {
       try {
         migrateUnscoped = !window.localStorage.getItem(ACCOUNT_MIGRATION_STORAGE_KEY);
       } catch (error) {}
     }
-    achievementState = migrateUnscoped ? previousState : loaded.state;
-    localStatePresent = migrateUnscoped || loaded.present;
-    localThemePreferencePresent = migrateUnscoped
+    // Achievements never regress, so progress earned while no platform account
+    // was resolved follows the account the listener signs into.  Moving between
+    // two signed-in accounts, or signing out, stays strictly partitioned.
+    const carryUnscopedProgress = !targetPresent
+      && normalizedScope !== 'anonymous'
+      && (previousScope === '' || previousScope === 'anonymous')
+      && previousPresent;
+    achievementState = (carryUnscopedProgress || migrateUnscoped)
+      ? {
+        ...mergeAchievementStates(previousState, targetState),
+        themes: previousState.themes,
+        settings: previousState.settings
+      }
+      : targetState;
+    localStatePresent = carryUnscopedProgress || migrateUnscoped || targetPresent;
+    localThemePreferencePresent = carryUnscopedProgress || migrateUnscoped
       ? localThemePreferencePresent
       : loaded.themePreferencePresent;
-    localSoundPreferencePresent = migrateUnscoped
+    localSoundPreferencePresent = carryUnscopedProgress || migrateUnscoped
       ? localSoundPreferencePresent
       : loaded.soundPreferencePresent;
     if (migrateUnscoped) {
       try {
         window.localStorage.setItem(ACCOUNT_MIGRATION_STORAGE_KEY, normalizedScope);
       } catch (error) {}
-      saveLocalState();
     }
+    if (carryUnscopedProgress || migrateUnscoped) saveLocalState();
   }
 
   function stateApiUrl() {
@@ -1201,24 +1229,46 @@
     }
   }
 
-  function statePayload() {
+  function statePayload(state = achievementState) {
     return {
       version: STORAGE_VERSION,
-      progress: achievementState.progress,
-      unlocked: achievementState.unlocked,
-      themes: achievementState.themes,
-      settings: achievementState.settings,
-      ornaments: achievementState.ornaments
+      progress: state.progress,
+      unlocked: state.unlocked,
+      themes: state.themes,
+      settings: state.settings,
+      ornaments: state.ornaments
     };
+  }
+
+  function mergeStoredProgress() {
+    const stored = readStoredState(activeStorageKey, false);
+    const current = normalizeState(achievementState);
+    // Another view may have earned an achievement since this one loaded. Keep
+    // both the live dedupe state and the persisted copy monotonic.
+    achievementState = stored.present
+      ? {
+        ...current,
+        progress: mergeProgress(current.progress, stored.state.progress),
+        unlocked: mergeUnlocked(current.unlocked, stored.state.unlocked),
+        ornaments: mergeOrnaments(
+          current.ornaments,
+          stored.state.ornaments,
+          mergeUnlocked(current.unlocked, stored.state.unlocked)
+        )
+      }
+      : current;
+    return achievementState;
   }
 
   function saveLocalState() {
     try {
+      const merged = mergeStoredProgress();
       window.localStorage.setItem(activeStorageKey, JSON.stringify({
-        ...statePayload(),
+        ...statePayload(merged),
         themePreferenceSaved: localThemePreferencePresent
       }));
       localStatePresent = true;
+      scopeStateCache.set(activeScope || 'anonymous', merged);
     } catch (error) {}
   }
 
@@ -1239,9 +1289,12 @@
     if (sync?.scope && activeScope && sync.scope !== activeScope) {
       throw new Error('achievement save returned a stale account scope');
     }
-    if (sync?.remoteRequired === true && sync?.serverSynced !== true) {
-      throw new Error('achievement server backup is pending');
-    }
+    // The app backend already merged and persisted this account's state before
+    // answering.  A pending community mirror upload is a deferred backup, not a
+    // failed local save: treating it as a failure left the durable per-account
+    // file unwritten, so the next launch started from an empty profile.
+    const cloudBackupPending = sync?.remoteRequired === true && sync?.serverSynced !== true;
+    if (cloudBackupPending) scheduleHydrationRetry();
     const serverState = normalizeState(responsePayload);
     const localSnapshot = normalizeState(achievementState);
     const mergedProgress = mergeProgress(localSnapshot.progress, serverState.progress);
@@ -1268,8 +1321,15 @@
     return statePayload();
   }
 
+  // The account store lives in the app backend's data directory; that file is
+  // the durable copy for this machine.  The community mirror is optional, so a
+  // reachable local backend is enough to save progress.
+  function localPersistenceReady() {
+    return hydrationFinished && (serverHydrated || localBackendHydrated);
+  }
+
   async function drainPersistQueue() {
-    if (persistDrainActive || !hydrationFinished || !serverHydrated) return;
+    if (persistDrainActive || !localPersistenceReady()) return;
     persistDrainActive = true;
     try {
       while (persistCompletedRevision < persistRequestedRevision) {
@@ -1308,7 +1368,7 @@
 
   function requestServerPersist() {
     persistRequestedRevision += 1;
-    if (!hydrationFinished || !serverHydrated) {
+    if (!localPersistenceReady()) {
       persistQueuedDuringHydration = true;
       return;
     }
@@ -1336,7 +1396,7 @@
         wait(Math.max(0, deadline - Date.now()))
       ]);
     }
-    if (!serverHydrated) return false;
+    if (!serverHydrated && !localBackendHydrated) return false;
     const targetRevision = persistRequestedRevision;
     if (persistCompletedRevision >= targetRevision) return true;
     void drainPersistQueue();
@@ -1374,6 +1434,24 @@
       }
     });
     return merged;
+  }
+
+  // Union of two achievement states for the same listener.  Used when progress
+  // earned without a resolved platform account is carried into the account the
+  // user signs into; progress takes the maximum and unlocks/claims keep their
+  // earliest timestamp so a later merge can never shrink the profile.
+  function mergeAchievementStates(base, incoming) {
+    const left = normalizeState(base);
+    const right = normalizeState(incoming);
+    const unlocked = mergeUnlocked(left.unlocked, right.unlocked);
+    return {
+      version: STORAGE_VERSION,
+      progress: mergeProgress(left.progress, right.progress),
+      unlocked,
+      themes: right.themes,
+      settings: right.settings,
+      ornaments: mergeOrnaments(left.ornaments, right.ornaments, unlocked)
+    };
   }
 
   function equipmentOrderKey(equipment) {
@@ -1435,6 +1513,7 @@
     let responseSync = null;
     for (const retryDelay of HYDRATE_RETRY_DELAYS) {
       if (retryDelay > 0) await wait(retryDelay);
+      if (generation !== syncGeneration) return statePayload();
       try {
         const response = await window.fetch(stateApiUrl(), { cache: 'no-store' });
         if (!response.ok) throw new Error(`achievement load failed: ${response.status}`);
@@ -1444,16 +1523,47 @@
           ? responsePayload._sync
           : null;
         if (responseSync?.provider) activeProvider = String(responseSync.provider);
-        if (responseSync?.scope) {
-          adoptScope(responseSync.scope);
-          setRememberedCommunityScope(activeProvider, responseSync.scope);
+        const responseScope = String(responseSync?.scope || '').trim();
+        // The backend persists the last confirmed music-platform account, so an
+        // account scope is authoritative even while the local music client has
+        // not resolved its session yet. A response that only remembers the
+        // account never outranks a live account this client already knows.
+        const responseRemembered = responseSync?.remembered === true;
+        const liveScope = resolvedAccountScope && resolvedAccountScope !== 'anonymous'
+          ? resolvedAccountScope
+          : '';
+        if (responseScope && responseScope !== 'anonymous') {
+          if (responseRemembered && liveScope && liveScope !== responseScope) {
+            throw new Error('achievement load returned a remembered scope older than the live account');
+          }
+          if (!responseRemembered && resolvedAccountScope !== null
+            && responseScope !== resolvedAccountScope) {
+            throw new Error('achievement load returned a stale account scope');
+          }
+          if (activeScope !== responseScope) adoptScope(responseScope);
+          if (!responseRemembered) resolvedAccountScope = responseScope;
+          setRememberedCommunityScope(activeProvider, responseScope);
+        } else if (responseScope === 'anonymous'
+          && ((resolvedAccountScope === null && activeScope && activeScope !== 'anonymous') || liveScope)) {
+          // Keep the account partition until the backend either confirms the
+          // login or definitively answers for the signed-out state.
+          throw new Error('achievement load resolved before remembered account');
+        } else if (responseScope === 'anonymous') {
+          if (activeScope !== 'anonymous') adoptScope('anonymous');
+          setRememberedCommunityScope(activeProvider, 'anonymous');
         }
+        // The app backend answered for this account scope, so its per-account
+        // file can be written from now on.  The community mirror is a deferred
+        // backup: waiting for it kept every launch's unlocks out of the durable
+        // store and made the profile look reset after a restart.
+        localBackendHydrated = true;
         serverState = normalizeState(responsePayload);
         break;
       } catch (error) {
       }
     }
 
+    if (generation !== syncGeneration) return statePayload();
     if (serverState) {
       localSnapshot = normalizeState(achievementState);
       const mergedProgress = mergeProgress(localSnapshot.progress, serverState.progress);
@@ -1488,6 +1598,14 @@
     }
 
     hydrationFinished = true;
+    const waitingUnlocks = [...pendingUnlocks];
+    pendingUnlocks.clear();
+    waitingUnlocks.forEach(([id, options]) => unlock(id, options));
+    if (pendingPlaybackSong) {
+      const song = pendingPlaybackSong;
+      pendingPlaybackSong = null;
+      handlePlaybackStarted(song);
+    }
     maybeUnlockCompletionist();
     if (serverHydrated) {
       persistQueuedDuringHydration = false;
@@ -1503,6 +1621,7 @@
 
   function handleCommunityAccountChange(event) {
     const detail = event?.detail && typeof event.detail === 'object' ? event.detail : {};
+    if (detail.resolved === false) return;
     const provider = String(detail.provider || activeProvider || 'netease').trim().toLowerCase();
     if (!/^(?:netease|qq|kugou|qishui)$/.test(provider)) return;
     const account = detail.account && typeof detail.account === 'object' ? detail.account : {};
@@ -1513,12 +1632,20 @@
     const nextScope = detail.loggedIn === true && accountId
       ? `${provider}:${accountId}`
       : 'anonymous';
+    const resolvingInitialAccount = resolvedAccountScope === null
+      && (!activeScope || activeScope === 'anonymous')
+      && nextScope !== 'anonymous';
+    resolvedAccountScope = nextScope;
     if (provider === activeProvider && nextScope === activeScope) {
       if (nextScope === 'anonymous') setRememberedCommunityScope(provider, nextScope);
       return;
     }
 
     syncGeneration += 1;
+    if (!resolvingInitialAccount) {
+      pendingPlaybackSong = null;
+      pendingUnlocks.clear();
+    }
     activeProvider = provider;
     flushChallengeListening();
     window.clearTimeout(hydrationRetryTimer);
@@ -1530,6 +1657,7 @@
     persistCompletedRevision = 0;
     persistQueuedDuringHydration = false;
     serverHydrated = false;
+    localBackendHydrated = false;
     hydrationFinished = false;
     adoptScope(nextScope);
     setRememberedCommunityScope(provider, nextScope);
@@ -1543,19 +1671,17 @@
 
   function handleCommunityProfile(event) {
     const detail = event?.detail && typeof event.detail === 'object' ? event.detail : {};
-    if (detail.provider) activeProvider = String(detail.provider).trim().toLowerCase();
-    if (detail.loggedIn === false || detail.hasCommunityIdentity === false) {
-      setRememberedCommunityScope(activeProvider, 'anonymous');
-      if (activeScope !== 'anonymous') adoptScope('anonymous');
-      loadChallengeEvidenceOutbox();
+    if (detail.resolved === false) return;
+    if (detail.loggedIn === false) {
+      handleCommunityAccountChange({ detail: { ...detail, account: {} } });
       return;
     }
-    if (detail.hasCommunityIdentity === true || detail.profile?.feId) {
-      const accountId = String(detail.account?.userId || '').trim();
-      if ((!activeScope || activeScope === 'anonymous') && accountId) {
-        adoptScope(`${activeProvider}:${accountId}`);
-        setRememberedCommunityScope(activeProvider, activeScope);
-      }
+    const hasCommunityIdentity = detail.hasCommunityIdentity === true || !!detail.profile?.feId;
+    const accountId = String(detail.account?.userId || '').trim();
+    if (accountId && (detail.loggedIn === true || hasCommunityIdentity)) {
+      handleCommunityAccountChange({ detail: { ...detail, loggedIn: true } });
+    }
+    if (hasCommunityIdentity) {
       rememberCommunityIdentity(detail.profile?.feId, activeScope);
       loadChallengeEvidenceOutbox();
       void flushChallengeEvidence();
@@ -2521,7 +2647,12 @@
   }
 
   function handlePlaybackStarted(song) {
-    if (!isWorldPeaceSong(song)) {
+    if (!hydrationFinished) {
+      pendingPlaybackSong = song;
+      return false;
+    }
+    mergeStoredProgress();
+    if (!isWorldPeaceSong(song) || isUnlocked('world-peace')) {
       lastWorldPeaceSongSignature = '';
       unlock('first-play');
       return false;
@@ -2545,7 +2676,18 @@
 
   function unlock(id, options = {}) {
     const achievement = catalogById.get(id);
-    if (!achievement || isUnlocked(id)) return false;
+    if (!achievement || isUnlocked(id) || pendingUnlocks.has(id)) return false;
+    // All entry points (game, playback and community rewards) must restore the
+    // account history before deciding whether an unlock deserves a notification.
+    if (!hydrationFinished) {
+      pendingUnlocks.set(id, { ...options, unlockedAt: normalizeTimestamp(options.unlockedAt) || Date.now() });
+      return true;
+    }
+    mergeStoredProgress();
+    if (isUnlocked(id)) {
+      render();
+      return false;
+    }
     if (id === 'completionist' && !completionistProgress().eligible) return false;
     const requestedTimestamp = normalizeTimestamp(options.unlockedAt);
     achievementState.unlocked[id] = { unlockedAt: requestedTimestamp || Date.now() };

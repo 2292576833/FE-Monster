@@ -39,17 +39,23 @@ namespace {
 
 constexpr uint32_t kFramesPerRenderBlock = 256;
 constexpr uint32_t kFramesPerTransportBatch = 4096;
+constexpr uint32_t kObrSamplePoints = FE_AUDIO_OBR_SAMPLE_POINTS;
+static_assert(kObrSamplePoints == 8192u);
 constexpr uint32_t kDefaultQueuedBuffers = 12;
 constexpr uint32_t kPrerollQueuedBuffers = 24;
 constexpr uint32_t kMixerConsecutiveFailureLimit = 3;
 constexpr uint32_t kTimelineResetFadeSteps = 8;
 constexpr LONGLONG kTimelineResetFadeStepHundredNanoseconds = 20'000;
+constexpr uint32_t kSourceVoiceFadeSteps = 8;
+constexpr DWORD kSourceVoiceFadeStepMilliseconds = 4;
+constexpr uint32_t kUnderrunFadeInactive = UINT32_MAX;
 constexpr DWORD kCreateWaitableTimerHighResolution = 0x00000002;
 // Measured from the pinned third-order Google OBR Direct/Ambient/Reverberant
 // assets at 48 kHz: the main binaural impulse arrives at frame 103/104 for a
 // +/-30 degree stereo object.  Aligning dry to frame 104 prevents the wet/dry
 // blend from combining a delayed HRIR with a zero-latency copy.
 constexpr uint32_t kObrDryCompensationFramesAt48Khz = 104;
+constexpr uint64_t kUnsequencedSubmission = UINT64_MAX;
 constexpr float kPi = 3.14159265358979323846f;
 int kRustUpmixModuleAnchor = 0;
 
@@ -285,6 +291,30 @@ bool SpatialAlgorithmUsesChannelRouter(const FeAudioSpatialControlParams& spatia
         || spatial.upmix_algorithm == FE_RUST_UPMIX_MUSIC_DETAIL;
 }
 
+bool SpatialControlsRequireModuleRebuild(
+    const FeAudioSpatialControlParams& previous,
+    const FeAudioSpatialControlParams& next
+) {
+    // These fields change the number or type of DSP objects.  All continuous
+    // gains, crossover values, wet/dry controls and spatial width can be
+    // applied to the existing handles while the transition is faded out.
+    return previous.upmix_algorithm != next.upmix_algorithm
+        || previous.upmix_output_channels != next.upmix_output_channels
+        || previous.obr_filter_profile != next.obr_filter_profile;
+}
+
+bool SpatialControlsRequireUpmixUpdate(
+    const FeAudioSpatialControlParams& previous,
+    const FeAudioSpatialControlParams& next
+) {
+    return previous.upmix_center_width_hz != next.upmix_center_width_hz
+        || previous.upmix_lfe_crossover_hz != next.upmix_lfe_crossover_hz
+        || previous.upmix_center_gain != next.upmix_center_gain
+        || previous.upmix_surround_gain != next.upmix_surround_gain
+        || previous.upmix_lfe_gain != next.upmix_lfe_gain
+        || previous.upmix_decorrelation_amount != next.upmix_decorrelation_amount;
+}
+
 FeRustChannelRouterParams ChannelRouterParamsFromSpatial(
     const FeAudioSpatialControlParams& spatial
 ) {
@@ -380,6 +410,9 @@ public:
         create_ = reinterpret_cast<FeRustUpmixCreateFn>(
             GetProcAddress(module_, "fe_rust_upmix_create")
         );
+        update_ = reinterpret_cast<FeRustUpmixUpdateFn>(
+            GetProcAddress(module_, "fe_rust_upmix_update")
+        );
         process_ = reinterpret_cast<FeRustUpmixProcessFn>(
             GetProcAddress(module_, "fe_rust_upmix_process")
         );
@@ -389,7 +422,7 @@ public:
         destroy_ = reinterpret_cast<FeRustUpmixDestroyFn>(
             GetProcAddress(module_, "fe_rust_upmix_destroy")
         );
-        if (!abi_version_ || !create_ || !process_ || !reset_ || !destroy_
+        if (!abi_version_ || !create_ || !update_ || !process_ || !reset_ || !destroy_
             || abi_version_() != FE_RUST_UPMIX_ABI_VERSION) {
             last_result_ = HRESULT_FROM_WIN32(ERROR_REVISION_MISMATCH);
             Shutdown();
@@ -417,6 +450,27 @@ public:
         output_channels_ = output_channels;
         last_result_ = FE_RUST_UPMIX_OK;
         return true;
+    }
+
+    bool Update(uint32_t sample_rate, const FeAudioSpatialControlParams& params) {
+        if (!Ready() || update_ == nullptr) {
+            last_result_ = E_HANDLE;
+            return false;
+        }
+        FeRustUpmixConfig config{};
+        config.struct_size = sizeof(config);
+        config.abi_version = FE_RUST_UPMIX_ABI_VERSION;
+        config.sample_rate = sample_rate;
+        config.output_channels = params.upmix_output_channels;
+        config.algorithm = params.upmix_algorithm;
+        config.center_width_hz = params.upmix_center_width_hz;
+        config.lfe_crossover_hz = params.upmix_lfe_crossover_hz;
+        config.lfe_gain = params.upmix_lfe_gain;
+        config.center_gain = params.upmix_center_gain;
+        config.surround_gain = params.upmix_surround_gain;
+        config.decorrelation_amount = params.upmix_decorrelation_amount;
+        last_result_ = update_(handle_, &config);
+        return last_result_ == FE_RUST_UPMIX_OK;
     }
 
     bool Process(
@@ -461,6 +515,7 @@ public:
         output_channels_ = 0;
         abi_version_ = nullptr;
         create_ = nullptr;
+        update_ = nullptr;
         process_ = nullptr;
         reset_ = nullptr;
         destroy_ = nullptr;
@@ -476,6 +531,7 @@ private:
     uint32_t output_channels_ = 0;
     FeRustUpmixAbiVersionFn abi_version_ = nullptr;
     FeRustUpmixCreateFn create_ = nullptr;
+    FeRustUpmixUpdateFn update_ = nullptr;
     FeRustUpmixProcessFn process_ = nullptr;
     FeRustUpmixResetFn reset_ = nullptr;
     FeRustUpmixDestroyFn destroy_ = nullptr;
@@ -982,7 +1038,7 @@ public:
     void STDMETHODCALLTYPE OnVoiceProcessingPassStart(UINT32) override {}
     void STDMETHODCALLTYPE OnVoiceProcessingPassEnd() override {}
     void STDMETHODCALLTYPE OnStreamEnd() override {}
-    void STDMETHODCALLTYPE OnBufferStart(void*) override {}
+    void STDMETHODCALLTYPE OnBufferStart(void* context) override;
     void STDMETHODCALLTYPE OnLoopEnd(void*) override {}
     void STDMETHODCALLTYPE OnVoiceError(void*, HRESULT error) override;
     void STDMETHODCALLTYPE OnBufferEnd(void* context) override;
@@ -1129,7 +1185,7 @@ public:
 
         running_.store(true);
         renderer_ready_.store(
-            !SpatialObrEnabled()
+            mode_ != FE_AUDIO_MODE_OBR_BINAURAL
                 || (obr_renderer_ != nullptr && obr_input_ != nullptr && obr_output_ != nullptr)
         );
         last_hresult_.store(S_OK);
@@ -1145,18 +1201,101 @@ public:
     }
 
     HRESULT SetMuted(bool muted) {
+        std::lock_guard<std::mutex> spatial_guard(spatial_control_mutex_);
         muted_.store(muted);
         if (source_voice_ == nullptr) return RememberFailure(E_HANDLE);
-        const HRESULT result = source_voice_->SetVolume(muted ? 0.0f : 1.0f);
+        const HRESULT result = FadeSourceVoiceTo(muted ? 0.0f : 1.0f);
         if (FAILED(result)) return RememberFailure(result);
         return S_OK;
     }
 
-    HRESULT ResetTimeline() {
+    HRESULT SetOutputGain(float gain, uint64_t generation, uint64_t sequence, int64_t expires_at_unix_ms) {
         std::lock_guard<std::mutex> spatial_guard(spatial_control_mutex_);
+        if (!std::isfinite(gain) || gain < 0.0f || gain > 1.0f || sequence == 0
+            || sequence == kUnsequencedSubmission) return E_INVALIDARG;
+        if (generation != timeline_generation_.load()) return E_ABORT;
+        if (!running_.load() || source_voice_ == nullptr || engine_ == nullptr) return E_HANDLE;
+        const int64_t now = CurrentUnixMilliseconds();
+        if (!ValidOutputGainLeaseDeadline(expires_at_unix_ms, now)) return E_ABORT;
+        const int64_t deadline_tick = OutputGainLeaseTickDeadline(expires_at_unix_ms, now);
+        if (deadline_tick <= CurrentMonotonicMilliseconds()) return E_ABORT;
+        if (sequence < output_gain_lease_sequence_
+            || (sequence == output_gain_lease_sequence_ && gain != output_gain_lease_target_)) return E_ABORT;
+        DWORD settle_ms = 0;
+        const HRESULT settle_result = SourceGainSettleMilliseconds(&settle_ms);
+        if (FAILED(settle_result)) return RememberFailure(settle_result);
+        const int64_t operation_budget_ms = static_cast<int64_t>(kSourceVoiceFadeSteps)
+            * kSourceVoiceFadeStepMilliseconds + settle_ms + 15;
+        if (expires_at_unix_ms <= CurrentUnixMilliseconds()
+            || deadline_tick - CurrentMonotonicMilliseconds() <= operation_budget_ms) return E_ABORT;
+        if (sequence == output_gain_lease_sequence_) {
+            if (!ExtendOutputGainLease(expires_at_unix_ms, deadline_tick)) return E_ABORT;
+        } else {
+            output_gain_lease_sequence_ = sequence;
+            output_gain_lease_target_ = gain;
+            output_gain_lease_deadline_ms_.store(expires_at_unix_ms);
+            output_gain_lease_deadline_tick_ms_.store(deadline_tick);
+        }
+        muted_.store(gain == 0.0f);
+        const HRESULT result = FadeSourceVoiceTo(gain);
+        if (FAILED(result)) return RememberFailure(result);
+        // Control-thread only. Allow multiple processing quanta and the
+        // reported output latency to settle before acknowledging the gain.
+        // Device latency is an estimate, not a physical-output timestamp.
+        Sleep(settle_ms);
+        const int64_t deadline = output_gain_lease_deadline_ms_.load();
+        if (deadline <= CurrentUnixMilliseconds()
+            || output_gain_lease_deadline_tick_ms_.load() <= CurrentMonotonicMilliseconds()) {
+            output_gain_lease_deadline_tick_ms_.store(-1);
+            // If the control thread stalled past its lease, let the sample
+            // envelope finish before forcing the voice's control gain to zero.
+            Sleep(15);
+            (void)source_voice_->SetVolume(0.0f);
+            muted_.store(true);
+            return E_ABORT;
+        }
+        return S_OK;
+    }
+
+    HRESULT RenewOutputGainLease(uint64_t generation, uint64_t sequence, int64_t expires_at_unix_ms) {
+        std::lock_guard<std::mutex> spatial_guard(spatial_control_mutex_);
+        if (generation != timeline_generation_.load() || sequence == 0
+            || sequence != output_gain_lease_sequence_) return E_ABORT;
+        if (!running_.load() || source_voice_ == nullptr) return E_HANDLE;
+        const int64_t now = CurrentUnixMilliseconds();
+        if (!ValidOutputGainLeaseDeadline(expires_at_unix_ms, now)
+            || !ExtendOutputGainLease(expires_at_unix_ms, OutputGainLeaseTickDeadline(expires_at_unix_ms, now))) return E_ABORT;
+        return S_OK;
+    }
+
+    HRESULT ResetTimeline() {
+        return ResetTimelineForGeneration(timeline_generation_.load(), 0);
+    }
+
+    HRESULT InitializeTimelineGeneration(uint64_t generation) {
+        std::lock_guard<std::mutex> spatial_guard(spatial_control_mutex_);
+        if (generation == 0 || generation == kUnsequencedSubmission) return E_INVALIDARG;
+        if (timeline_generation_.load() != 0) return E_ABORT;
+        timeline_generation_.store(generation);
+        return S_OK;
+    }
+
+    HRESULT ResetTimelineForGeneration(uint64_t expected_generation, uint64_t next_generation) {
+        std::lock_guard<std::mutex> spatial_guard(spatial_control_mutex_);
+        if (expected_generation != timeline_generation_.load()) return E_ABORT;
+        if (next_generation == 0) next_generation = expected_generation + 1u;
+        if (next_generation <= expected_generation || next_generation == kUnsequencedSubmission) {
+            return E_INVALIDARG;
+        }
         if (!running_.load() || source_voice_ == nullptr || engine_ == nullptr) {
             return RememberFailure(E_HANDLE);
         }
+        // Invalidate and wake old submissions before flushing. They must not
+        // render into the new voice after waiting for queue capacity.
+        timeline_generation_.store(next_generation);
+        last_submission_sequence_ = kUnsequencedSubmission;
+        last_submission_result_ = S_OK;
+        buffer_available_cv_.notify_all();
 
         // The browser crossfades to its direct path before requesting this
         // reset. Mute first, then remove every buffer from the obsolete media
@@ -1171,6 +1310,9 @@ public:
             // XAudio2 has no built-in voice-volume ramp. Apply a short cosine
             // envelope from this control/API thread; the browser dry path uses
             // the complementary sine curve. Neither audio render thread waits.
+            float initial_gain = 0.0f;
+            source_voice_->GetVolume(&initial_gain);
+            initial_gain = ClampFinite(initial_gain, 0.0f, 1.0f, 0.0f);
             HANDLE fade_timer = CreateWaitableTimerExW(
                 nullptr,
                 nullptr,
@@ -1183,7 +1325,7 @@ public:
             for (uint32_t step = 1; step <= kTimelineResetFadeSteps; ++step) {
                 const float progress = static_cast<float>(step)
                     / static_cast<float>(kTimelineResetFadeSteps);
-                const float gain = std::cos(progress * kPi * 0.5f);
+                const float gain = initial_gain * std::cos(progress * kPi * 0.5f);
                 const HRESULT fade_result = source_voice_->SetVolume(gain);
                 if (FAILED(fade_result)) {
                     result = fade_result;
@@ -1207,6 +1349,8 @@ public:
         if (FAILED(flush_result) && SUCCEEDED(result)) result = flush_result;
         source_voice_->DestroyVoice();
         source_voice_ = nullptr;
+        ResetUnderrunEnvelope();
+        ResetOutputGainLease();
 
         {
             std::scoped_lock lock(buffer_mutex_);
@@ -1701,94 +1845,132 @@ public:
         return FE_RUST_CHANNEL_ROUTER_OK;
     }
 
-    HRESULT Submit(const float* interleaved_pcm, uint32_t frame_count) {
+    HRESULT Submit(
+        const float* interleaved_pcm,
+        uint32_t frame_count,
+        uint64_t expected_generation = kUnsequencedSubmission,
+        uint64_t sequence = kUnsequencedSubmission
+    ) {
         if (interleaved_pcm == nullptr || frame_count == 0) return E_INVALIDARG;
-        if (!running_.load() || source_voice_ == nullptr) return E_HANDLE;
+        const uint64_t submission_generation = expected_generation == kUnsequencedSubmission
+            ? timeline_generation_.load()
+            : expected_generation;
 
         // Serialize transport scratch ownership, but never make the UI/control
         // plane wait behind XAudio2 queue backpressure. The short spatial lock
         // below protects only DSP state and is reacquired for each render block.
         std::lock_guard<std::mutex> submit_guard(submit_mutex_);
-        bool submission_rust_upmixed = false;
-        uint64_t submission_upmix_generation = 0;
         {
             std::lock_guard<std::mutex> spatial_guard(spatial_control_mutex_);
-            submission_rust_upmixed = SpatialUpmixEnabled()
-                && frame_count <= kFramesPerTransportBatch
-                && TryRustUpmixBlock(interleaved_pcm, frame_count);
-            submission_upmix_generation = upmix_generation_;
-        }
-        uint32_t source_offset = 0;
-        while (source_offset < frame_count) {
-            const uint32_t frames_this_block = std::min(
-                kFramesPerRenderBlock,
-                frame_count - source_offset
-            );
-            {
-                std::unique_lock wait_lock(queue_wait_mutex_);
-                const bool queue_ready = buffer_available_cv_.wait_for(
-                    wait_lock,
-                    std::chrono::milliseconds(250),
-                    [this]() {
-                        return !running_.load()
-                            || buffers_queued_.load() < max_queued_buffers_;
-                    }
-                );
-                if (!queue_ready || !running_.load()) {
-                    dropped_buffers_.fetch_add(1);
-                    return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+            if (submission_generation != timeline_generation_.load()) return E_ABORT;
+            if (!running_.load() || source_voice_ == nullptr) return E_HANDLE;
+            if (sequence != kUnsequencedSubmission) {
+                if (last_submission_sequence_ != kUnsequencedSubmission
+                    && sequence <= last_submission_sequence_) {
+                    return sequence == last_submission_sequence_ ? last_submission_result_ : S_OK;
                 }
+                // Keep a receipt even on partial failure: retrying that body
+                // must never duplicate the prefix already given to XAudio2.
+                last_submission_sequence_ = sequence;
+                last_submission_result_ = E_PENDING;
             }
-            if (buffers_queued_.load() >= max_queued_buffers_) {
-                dropped_buffers_.fetch_add(1);
-                return HRESULT_FROM_WIN32(ERROR_RETRY);
-            }
-
-            QueuedAudioBuffer* rendered = AcquireBuffer();
-            if (rendered == nullptr) {
-                dropped_buffers_.fetch_add(1);
-                return HRESULT_FROM_WIN32(ERROR_RETRY);
-            }
-            const float* block = interleaved_pcm
-                + static_cast<size_t>(source_offset) * input_channels_;
-            HRESULT result = S_OK;
+        }
+        const HRESULT submission_result = [&]() -> HRESULT {
+            bool submission_rust_upmixed = false;
+            uint64_t submission_upmix_generation = 0;
             {
                 std::lock_guard<std::mutex> spatial_guard(spatial_control_mutex_);
-                // A control commit may rebuild/clear the upmix scratch while
-                // Submit is waiting for queue space. The generation guard
-                // prevents stale batch scratch from crossing that boundary.
-                const bool block_rust_upmixed = submission_rust_upmixed
-                    && submission_upmix_generation == upmix_generation_
-                    && SpatialUpmixEnabled();
-                if (mode_ == FE_AUDIO_MODE_OBR_BINAURAL) {
-                    result = RenderSpatialBlock(
-                        block,
-                        frames_this_block,
-                        source_offset,
-                        block_rust_upmixed,
-                        &rendered->samples
+                if (submission_generation != timeline_generation_.load()) return E_ABORT;
+                submission_rust_upmixed = SpatialUpmixEnabled()
+                    && frame_count <= kFramesPerTransportBatch
+                    && TryRustUpmixBlock(interleaved_pcm, frame_count);
+                submission_upmix_generation = upmix_generation_;
+            }
+            uint32_t source_offset = 0;
+            while (source_offset < frame_count) {
+                const uint32_t frames_this_block = std::min(
+                    kFramesPerRenderBlock,
+                    frame_count - source_offset
+                );
+                {
+                    std::unique_lock wait_lock(queue_wait_mutex_);
+                    const bool queue_ready = buffer_available_cv_.wait_for(
+                        wait_lock,
+                        std::chrono::milliseconds(250),
+                        [this, submission_generation]() {
+                            return !running_.load()
+                                || submission_generation != timeline_generation_.load()
+                                || buffers_queued_.load() < max_queued_buffers_;
+                        }
                     );
-                } else if (mode_ == FE_AUDIO_MODE_X3D_SPEAKER) {
-                    result = RenderX3dSpeakerBlock(
-                        block,
-                        frames_this_block,
-                        &rendered->samples
-                    );
-                } else {
-                    result = RenderDryBlock(block, frames_this_block, &rendered->samples);
+                    if (!queue_ready || !running_.load()) {
+                        dropped_buffers_.fetch_add(1);
+                        return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+                    }
                 }
-            }
-            if (FAILED(result)) {
-                ReleaseBuffer(rendered);
-                return RememberFailure(result);
-            }
+                // Pool ownership, DSP and voice enqueue are one reset boundary.
+                // The potentially long capacity wait above holds no spatial lock.
+                std::lock_guard<std::mutex> spatial_guard(spatial_control_mutex_);
+                if (submission_generation != timeline_generation_.load()) return E_ABORT;
+                if (!running_.load() || source_voice_ == nullptr) return E_HANDLE;
+                if (buffers_queued_.load() >= max_queued_buffers_) {
+                    dropped_buffers_.fetch_add(1);
+                    return HRESULT_FROM_WIN32(ERROR_RETRY);
+                }
 
-            result = QueueRenderedBlock(rendered);
-            if (FAILED(result)) return RememberFailure(result);
-            frames_processed_.fetch_add(frames_this_block);
-            source_offset += frames_this_block;
+                QueuedAudioBuffer* rendered = AcquireBuffer();
+                if (rendered == nullptr) {
+                    dropped_buffers_.fetch_add(1);
+                    return HRESULT_FROM_WIN32(ERROR_RETRY);
+                }
+                const float* block = interleaved_pcm
+                    + static_cast<size_t>(source_offset) * input_channels_;
+                HRESULT result = S_OK;
+                {
+                    // A control commit may rebuild/clear the upmix scratch while
+                    // Submit is waiting for queue space. The generation guard
+                    // prevents stale batch scratch from crossing that boundary.
+                    const bool block_rust_upmixed = submission_rust_upmixed
+                        && submission_upmix_generation == upmix_generation_
+                        && SpatialUpmixEnabled();
+                    if (mode_ == FE_AUDIO_MODE_OBR_BINAURAL) {
+                        result = RenderSpatialBlock(
+                            block,
+                            frames_this_block,
+                            source_offset,
+                            block_rust_upmixed,
+                            &rendered->samples
+                        );
+                    } else if (mode_ == FE_AUDIO_MODE_X3D_SPEAKER) {
+                        result = RenderX3dSpeakerBlock(
+                            block,
+                            frames_this_block,
+                            &rendered->samples
+                        );
+                    } else {
+                        result = RenderDryBlock(block, frames_this_block, &rendered->samples);
+                    }
+                }
+                if (FAILED(result)) {
+                    ReleaseBuffer(rendered);
+                    return RememberFailure(result);
+                }
+
+                result = QueueRenderedBlock(rendered);
+                if (FAILED(result)) return RememberFailure(result);
+                frames_processed_.fetch_add(frames_this_block);
+                source_offset += frames_this_block;
+            }
+            return S_OK;
+        }();
+        if (sequence != kUnsequencedSubmission) {
+            std::lock_guard<std::mutex> spatial_guard(spatial_control_mutex_);
+            if (submission_generation == timeline_generation_.load()
+                && sequence == last_submission_sequence_) {
+                last_submission_result_ = submission_result;
+            }
         }
-        return S_OK;
+        return submission_result;
     }
 
     void GetStatus(FeAudioPipelineStatus* status) const {
@@ -1932,6 +2114,82 @@ public:
         status->obr_effective = SpatialObrEnabled() && renderer_ready_.load() ? 1u : 0u;
     }
 
+    void OnBufferStart(QueuedAudioBuffer* buffer) noexcept {
+        if (buffer == nullptr || source_voice_ == nullptr || !running_.load()
+            || timeline_resetting_.load() || buffer->samples.empty()) return;
+        // GetState observes the actual voice queue, not the application's
+        // reservation counter (which can include an in-flight submission).
+        XAUDIO2_VOICE_STATE voice_state{};
+        source_voice_->GetState(&voice_state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
+        const bool last_buffer = voice_state.BuffersQueued <= 1;
+        int64_t lease_tick = output_gain_lease_deadline_tick_ms_.load();
+        const int64_t lease_now_tick = lease_tick != 0 ? CurrentMonotonicMilliseconds() : 0;
+        const int64_t lease_deadline = output_gain_lease_deadline_ms_.load();
+        const int64_t lease_now = lease_tick > 0 ? CurrentUnixMilliseconds() : 0;
+        if (lease_tick > 0 && (lease_tick <= lease_now_tick || lease_deadline <= lease_now)) {
+            // A concurrent renewal wins if it published a newer deadline.
+            const int64_t elapsed = std::max(lease_now_tick - lease_tick, lease_now - lease_deadline);
+            if (output_gain_lease_deadline_tick_ms_.compare_exchange_strong(lease_tick, -1)) {
+                output_gain_lease_expired_at_tick_ms_ = lease_now_tick - elapsed;
+            }
+            lease_tick = output_gain_lease_deadline_tick_ms_.load();
+        }
+        const bool lease_expired = lease_tick < 0;
+        if (lease_expired) {
+            // Do not replay a fade-in/out burst after a long empty-queue gap:
+            // elapsed wall time also consumes the expired lease's envelope.
+            const int64_t elapsed = output_gain_lease_expired_at_tick_ms_ > 0
+                ? std::max<int64_t>(0, lease_now_tick - output_gain_lease_expired_at_tick_ms_) : 15;
+            output_gain_lease_envelope_ = std::min(output_gain_lease_envelope_,
+                std::max(0.0f, 1.0f - static_cast<float>(elapsed) / 15.0f));
+        } else {
+            output_gain_lease_expired_at_tick_ms_ = 0;
+        }
+        if (!last_buffer && underrun_fade_in_frame_ == kUnderrunFadeInactive
+            && !lease_expired && output_gain_lease_envelope_ == 1.0f) return;
+        const uint32_t channels = mode_ == FE_AUDIO_MODE_X3D_SPEAKER ? 1u : 2u;
+        const uint32_t frames = static_cast<uint32_t>(buffer->samples.size() / channels);
+        if (frames == 0) return;
+        const uint32_t fade_in_frames = std::max(2u, sample_rate_ / 100u);
+        const uint32_t fade_out_frames = std::min(frames, std::max(2u, sample_rate_ / 200u));
+        const uint32_t fade_out_start = frames - fade_out_frames;
+        const float lease_step = 1.0f / static_cast<float>(std::max(1u, sample_rate_ * 15u / 1000u));
+        // OnBufferStart runs before the first byte is consumed; XAudio2 permits
+        // writing that buffer here. This bounded loop allocates nothing and
+        // never locks or waits. Fully buffered steady playback returns above
+        // without changing a single PCM sample or any DSP history.
+        for (uint32_t frame = 0; frame < frames; ++frame) {
+            float gain = 1.0f;
+            if (underrun_fade_in_frame_ != kUnderrunFadeInactive) {
+                gain = static_cast<float>(underrun_fade_in_frame_)
+                    / static_cast<float>(fade_in_frames - 1u);
+                if (++underrun_fade_in_frame_ >= fade_in_frames) {
+                    underrun_fade_in_frame_ = kUnderrunFadeInactive;
+                }
+            }
+            if (last_buffer && frame >= fade_out_start) {
+                gain *= fade_out_frames > 1u
+                    ? static_cast<float>(frames - 1u - frame) / static_cast<float>(fade_out_frames - 1u)
+                    : 0.0f;
+            }
+            if (lease_expired) {
+                output_gain_lease_envelope_ = std::max(0.0f, output_gain_lease_envelope_ - lease_step);
+            } else if (output_gain_lease_envelope_ < 1.0f) {
+                output_gain_lease_envelope_ = std::min(1.0f, output_gain_lease_envelope_ + lease_step);
+            }
+            gain *= output_gain_lease_envelope_;
+            if (gain != 1.0f) {
+                const size_t offset = static_cast<size_t>(frame) * channels;
+                for (uint32_t channel = 0; channel < channels; ++channel) {
+                    buffer->samples[offset + channel] *= gain;
+                }
+            }
+        }
+        // A successor may arrive after the tail was attenuated. It must still
+        // start at zero, whether or not the queue actually became empty.
+        if (last_buffer) underrun_fade_in_frame_ = 0;
+    }
+
     void OnBufferEnd(QueuedAudioBuffer* buffer) {
         if (!ReleaseBuffer(buffer)) return;
         const uint32_t queued_before = buffers_queued_.fetch_sub(1);
@@ -1955,6 +2213,81 @@ public:
     }
 
 private:
+    static int64_t CurrentUnixMilliseconds() noexcept {
+        FILETIME file_time{};
+        GetSystemTimePreciseAsFileTime(&file_time);
+        const uint64_t ticks = (static_cast<uint64_t>(file_time.dwHighDateTime) << 32u)
+            | static_cast<uint64_t>(file_time.dwLowDateTime);
+        return static_cast<int64_t>(ticks / 10'000u) - 11'644'473'600'000LL;
+    }
+
+    static bool ValidOutputGainLeaseDeadline(int64_t deadline, int64_t now) noexcept {
+        // Browser leases last 1000 ms. Bound clock skew/request mistakes so an
+        // accidental far-future timestamp cannot leave native output enabled.
+        return deadline > now && deadline - now <= 1500;
+    }
+
+    static int64_t CurrentMonotonicMilliseconds() noexcept {
+        return static_cast<int64_t>(GetTickCount64());
+    }
+
+    int64_t OutputGainLeaseTickDeadline(int64_t deadline, int64_t now) const noexcept {
+        // A delayed first/new-sequence request must not gain extra lifetime if
+        // the wall clock moved backward while it was in flight. Each timeline
+        // anchors the absolute deadline to uptime; current wall time can only
+        // shorten that bound. Recreating the timeline re-establishes the anchor.
+        return std::min(output_gain_clock_anchor_tick_ms_ + deadline - output_gain_clock_anchor_wall_ms_,
+            CurrentMonotonicMilliseconds() + deadline - now);
+    }
+
+    bool ExtendOutputGainLease(int64_t deadline, int64_t next_tick) noexcept {
+        int64_t current_tick = output_gain_lease_deadline_tick_ms_.load();
+        while (current_tick > CurrentMonotonicMilliseconds()
+            && next_tick > CurrentMonotonicMilliseconds()
+            && deadline > CurrentUnixMilliseconds()
+            && output_gain_lease_deadline_ms_.load() > CurrentUnixMilliseconds()) {
+            // Publish wall time first; the monotonic CAS is the lease commit.
+            // An expiry racing this CAS wins permanently for this sequence.
+            output_gain_lease_deadline_ms_.store(std::max(deadline, output_gain_lease_deadline_ms_.load()));
+            if (output_gain_lease_deadline_tick_ms_.compare_exchange_weak(
+                current_tick, std::max(current_tick, next_tick))) return true;
+        }
+        return false;
+    }
+
+    HRESULT SourceGainSettleMilliseconds(DWORD* milliseconds) noexcept {
+        XAUDIO2_PERFORMANCE_DATA performance{};
+        engine_->GetPerformanceData(&performance);
+        if (mastering_voice_ == nullptr) return E_HANDLE;
+        XAUDIO2_VOICE_DETAILS details{};
+        mastering_voice_->GetVoiceDetails(&details);
+        if (details.InputSampleRate == 0) return E_HANDLE;
+        const uint64_t latency_ms = (static_cast<uint64_t>(performance.CurrentLatencyInSamples) * 1000u
+            + details.InputSampleRate - 1u) / details.InputSampleRate;
+        // Refuse an uncertain/long-latency handoff before raising voice gain.
+        // The bounded control wait fits the normal production preroll.
+        if (latency_ms > 64u) return HRESULT_FROM_WIN32(ERROR_TIMEOUT);
+        *milliseconds = std::max<DWORD>(32u, static_cast<DWORD>(latency_ms) + 8u);
+        return S_OK;
+    }
+
+    void ResetOutputGainLease() noexcept {
+        // Only call after DestroyVoice has joined all voice callbacks.
+        output_gain_lease_deadline_ms_.store(0);
+        output_gain_lease_deadline_tick_ms_.store(0);
+        output_gain_lease_sequence_ = 0;
+        output_gain_lease_target_ = 0.0f;
+        output_gain_lease_envelope_ = 1.0f;
+        output_gain_lease_expired_at_tick_ms_ = 0;
+        output_gain_clock_anchor_wall_ms_ = CurrentUnixMilliseconds();
+        output_gain_clock_anchor_tick_ms_ = CurrentMonotonicMilliseconds();
+    }
+
+    void ResetUnderrunEnvelope() noexcept {
+        // Only call after DestroyVoice has joined all voice callbacks.
+        underrun_fade_in_frame_ = kUnderrunFadeInactive;
+    }
+
     static uint32_t NormalizeVirtualChannels(uint32_t channels) {
         if (channels == 6 || channels == 8) return channels;
         return 2;
@@ -2006,7 +2339,9 @@ private:
         }
         bool legacy_upmix_ready = false;
         bool channel_router_ready = false;
-        if (SpatialUpmixEnabled() && (input_channels_ == 1 || input_channels_ == 2)) {
+        if (mode_ == FE_AUDIO_MODE_OBR_BINAURAL
+            && (input_channels_ == 1 || input_channels_ == 2)
+            && (virtual_channels_ == 6 || virtual_channels_ == 8)) {
             // Algorithm 0 is the legacy passive/OxiMedia upmixer. A retained
             // advanced-channel snapshot must not silently replace it after a
             // graph rebuild. Explicit channel controls remain available for
@@ -2036,7 +2371,9 @@ private:
             }
             channel_router_active_ = channel_router_ready;
             legacy_upmix_ready = rust_upmixer_.Initialize(sample_rate_, spatial_controls_);
-            rust_upmix_active_.store(legacy_upmix_ready || channel_router_ready);
+            rust_upmix_active_.store(
+                SpatialUpmixEnabled() && (legacy_upmix_ready || channel_router_ready)
+            );
             rust_upmix_last_result_.store(
                 channel_router_ready
                     ? rust_channel_router_.LastResult()
@@ -2074,8 +2411,12 @@ private:
         ));
         std::fill(obr_dry_delay_line_.begin(), obr_dry_delay_line_.end(), 0.0f);
         obr_dry_delay_cursor_ = 0;
-        if (SpatialObrEnabled()) {
-            const uint32_t channels = SpatialBedChannels();
+        if (mode_ == FE_AUDIO_MODE_OBR_BINAURAL
+            && (virtual_channels_ == 6 || virtual_channels_ == 8)) {
+            // Build the OBR object set while the route is disabled as well.
+            // Toggling OBR then only changes the route flag; it does not tear
+            // down the live renderer at the next zero crossing.
+            const uint32_t channels = virtual_channels_;
             try {
                 auto renderer = std::make_unique<obr::ObrImpl>(
                     static_cast<int>(kFramesPerRenderBlock),
@@ -2635,7 +2976,37 @@ private:
             channel_router_params_present_ = true;
         }
         spatial_controls_ = spatial_pending_controls_;
-        const HRESULT result = RebuildSpatialModules();
+        const bool requires_module_rebuild = SpatialControlsRequireModuleRebuild(
+            previous,
+            spatial_controls_
+        );
+        HRESULT result = S_OK;
+        if (requires_module_rebuild) {
+            result = RebuildSpatialModules();
+        } else {
+            // Keep the OBR renderer, Rust handle and preallocated transport
+            // buffers alive for continuous control changes.  Recreating them
+            // here used to make every mixer/OBR slider adjustment invalidate
+            // the render generation and starve XAudio2.
+            if (SpatialUpmixEnabled()
+                && SpatialControlsRequireUpmixUpdate(previous, spatial_controls_)
+                && !channel_router_active_
+                && rust_upmixer_.Ready()
+                && !rust_upmixer_.Update(sample_rate_, spatial_controls_)) {
+                result = E_FAIL;
+            }
+            if (previous.upmix_enabled != spatial_controls_.upmix_enabled) {
+                rust_upmix_active_.store(
+                    SpatialUpmixEnabled()
+                        && (channel_router_active_ || rust_upmixer_.Ready())
+                );
+            }
+            spatial_cache_revision_ = 0;
+            spatial_cache_router_revision_ = 0;
+            spatial_cache_generation_ = 0;
+            spatial_cache_uses_explicit_router_ = false;
+            obr_position_revision_ = 0;
+        }
         if (FAILED(result)) {
             spatial_controls_ = previous;
             channel_router_params_ = previous_router_params;
@@ -3117,24 +3488,66 @@ private:
         return result;
     }
 
-    void Shutdown() {
+    HRESULT FadeSourceVoiceTo(float target) noexcept {
+        if (source_voice_ == nullptr) return E_HANDLE;
+        float initial = target;
+        source_voice_->GetVolume(&initial);
+        if (!std::isfinite(initial)) return source_voice_->SetVolume(target);
+        if (initial == target) return S_OK;
+        // A voice that has not started has no audible boundary to smooth.
+        if (!voice_started_.load()) return source_voice_->SetVolume(target);
+
+        // Only API/control threads call this helper. The fixed 32 ms ramp fits
+        // inside the normal preroll and never waits on the audio callback.
+        // XAudio2 applies voice gain at its processing quantum, so these are
+        // bounded control steps, not a sample-accurate PCM envelope.
+        HANDLE fade_timer = CreateWaitableTimerExW(
+            nullptr, nullptr, kCreateWaitableTimerHighResolution, TIMER_ALL_ACCESS
+        );
+        if (fade_timer == nullptr) {
+            fade_timer = CreateWaitableTimerW(nullptr, FALSE, nullptr);
+        }
+        HRESULT result = S_OK;
+        for (uint32_t step = 1; step <= kSourceVoiceFadeSteps; ++step) {
+            const float progress = static_cast<float>(step) / static_cast<float>(kSourceVoiceFadeSteps);
+            const float gain = step == kSourceVoiceFadeSteps ? target : initial + (target - initial) * progress;
+            result = source_voice_->SetVolume(gain);
+            if (FAILED(result)) break;
+            bool waited = false;
+            if (fade_timer != nullptr) {
+                LARGE_INTEGER due_time{};
+                due_time.QuadPart = -static_cast<LONGLONG>(kSourceVoiceFadeStepMilliseconds) * 10'000;
+                if (SetWaitableTimer(fade_timer, &due_time, 0, nullptr, nullptr, FALSE)) {
+                    waited = WaitForSingleObject(fade_timer, kSourceVoiceFadeStepMilliseconds + 10) == WAIT_OBJECT_0;
+                }
+            }
+            // Preserve a timed fade even when high-resolution timers are not
+            // available. This fallback still runs exclusively on the caller.
+            if (!waited) Sleep(kSourceVoiceFadeStepMilliseconds);
+        }
+        if (fade_timer != nullptr) CloseHandle(fade_timer);
+        return result;
+    }
+
+    void Shutdown() noexcept {
         running_.store(false);
         renderer_ready_.store(false);
-        voice_started_.store(false);
         buffer_available_cv_.notify_all();
         if (source_voice_ != nullptr) {
+            // A failed/device-lost volume command must not prevent teardown.
+            (void)FadeSourceVoiceTo(0.0f);
             source_voice_->Stop(0);
             source_voice_->FlushSourceBuffers();
             source_voice_->DestroyVoice();
             source_voice_ = nullptr;
         }
+        voice_started_.store(false);
         {
             std::scoped_lock lock(buffer_mutex_);
             free_buffers_.clear();
-            for (const auto& buffer : buffer_pool_) {
-                buffer->in_use = false;
-                free_buffers_.push_back(buffer.get());
-            }
+            // DestroyVoice has joined callbacks. The pool is about to be
+            // destroyed, so rebuilding its free list only risks allocating
+            // during destructor cleanup.
             buffers_queued_.store(0);
         }
         obr_output_.reset();
@@ -3218,6 +3631,9 @@ private:
     uint32_t obr_dry_delay_cursor_ = 0;
     const bool probe_disable_obr_dry_alignment_ = false;
     std::mutex submit_mutex_;
+    std::atomic<uint64_t> timeline_generation_{0};
+    uint64_t last_submission_sequence_ = kUnsequencedSubmission;
+    HRESULT last_submission_result_ = S_OK;
     std::mutex mixer_control_mutex_;
     FeRustMixerParams mixer_committed_params_{};
     bool mixer_committed_params_present_ = false;
@@ -3237,6 +3653,17 @@ private:
     bool spatial_transition_retry_required_ = false;
     bool spatial_transition_retry_requested_ = false;
     float output_limiter_gain_ = 1.0f;
+    // Callback-owned; control code only resets it after DestroyVoice joins.
+    uint32_t underrun_fade_in_frame_ = kUnderrunFadeInactive;
+    std::atomic<int64_t> output_gain_lease_deadline_ms_{0};
+    // Monotonic deadline is also the atomic expiry latch: -1 cannot renew.
+    std::atomic<int64_t> output_gain_lease_deadline_tick_ms_{0};
+    uint64_t output_gain_lease_sequence_ = 0;
+    float output_gain_lease_target_ = 0.0f;
+    float output_gain_lease_envelope_ = 1.0f;
+    int64_t output_gain_lease_expired_at_tick_ms_ = 0;
+    int64_t output_gain_clock_anchor_wall_ms_ = CurrentUnixMilliseconds();
+    int64_t output_gain_clock_anchor_tick_ms_ = CurrentMonotonicMilliseconds();
     float obr_input_headroom_gain_ = 1.0f;
     mutable std::mutex pose_mutex_;
     FeAudioPose pose_{};
@@ -3298,6 +3725,10 @@ private:
     std::atomic<float> x3d_matrix_right_{0.0f};
     std::atomic<int32_t> last_hresult_{S_OK};
 };
+
+void STDMETHODCALLTYPE SourceVoiceCallback::OnBufferStart(void* context) {
+    if (owner_ != nullptr) owner_->OnBufferStart(static_cast<QueuedAudioBuffer*>(context));
+}
 
 void STDMETHODCALLTYPE SourceVoiceCallback::OnBufferEnd(void* context) {
     if (owner_ != nullptr) {
@@ -3362,6 +3793,57 @@ FE_AUDIO_PIPELINE_API int32_t fe_audio_pipeline_set_muted(
 ) {
     if (handle == nullptr) return E_HANDLE;
     return FromHandle(handle)->SetMuted(muted != 0);
+}
+
+FE_AUDIO_PIPELINE_API int32_t fe_audio_pipeline_set_output_gain(
+    FeAudioPipelineHandle handle,
+    uint64_t generation,
+    uint64_t sequence,
+    float gain,
+    int64_t expires_at_unix_ms
+) {
+    if (handle == nullptr) return E_HANDLE;
+    return FromHandle(handle)->SetOutputGain(gain, generation, sequence, expires_at_unix_ms);
+}
+
+FE_AUDIO_PIPELINE_API int32_t fe_audio_pipeline_renew_output_gain_lease(
+    FeAudioPipelineHandle handle,
+    uint64_t generation,
+    uint64_t sequence,
+    int64_t expires_at_unix_ms
+) {
+    if (handle == nullptr) return E_HANDLE;
+    return FromHandle(handle)->RenewOutputGainLease(generation, sequence, expires_at_unix_ms);
+}
+
+FE_AUDIO_PIPELINE_API int32_t fe_audio_pipeline_initialize_generation(
+    FeAudioPipelineHandle handle,
+    uint64_t generation
+) {
+    if (handle == nullptr) return E_HANDLE;
+    return FromHandle(handle)->InitializeTimelineGeneration(generation);
+}
+
+FE_AUDIO_PIPELINE_API int32_t fe_audio_pipeline_submit_generation(
+    FeAudioPipelineHandle handle,
+    const float* interleaved_pcm,
+    uint32_t frame_count,
+    uint64_t generation,
+    uint64_t sequence
+) {
+    if (handle == nullptr) return E_HANDLE;
+    if (generation == 0 || generation == kUnsequencedSubmission) return E_INVALIDARG;
+    return FromHandle(handle)->Submit(interleaved_pcm, frame_count, generation, sequence);
+}
+
+FE_AUDIO_PIPELINE_API int32_t fe_audio_pipeline_reset_timeline_generation(
+    FeAudioPipelineHandle handle,
+    uint64_t expected_generation,
+    uint64_t next_generation
+) {
+    if (handle == nullptr) return E_HANDLE;
+    if (expected_generation == 0 || next_generation == 0) return E_INVALIDARG;
+    return FromHandle(handle)->ResetTimelineForGeneration(expected_generation, next_generation);
 }
 
 FE_AUDIO_PIPELINE_API int32_t fe_audio_pipeline_reset_timeline(

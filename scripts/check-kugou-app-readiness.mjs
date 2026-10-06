@@ -6,7 +6,7 @@ import path from 'node:path';
 
 const workspaceRoot = path.resolve('.');
 const jar = path.resolve(process.env.FE_TEST_JAR || 'out/fe-monster-java.jar');
-const pluginZip = path.resolve('dist/plugins/FE-Monster-Kugou-API-Plugin-2.0.7.zip');
+const pluginZip = path.resolve('dist/plugins/FE-Monster-Kugou-API-Plugin-2.0.8.zip');
 const javaCandidates = [
   process.env.FE_TEST_JAVA,
   process.env.FE_JAVA26_HOME ? path.join(process.env.FE_JAVA26_HOME, 'bin', 'java.exe') : '',

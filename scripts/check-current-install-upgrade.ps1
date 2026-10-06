@@ -1,10 +1,16 @@
 param(
-  [string]$SetupExe = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..')).Path 'dist\FE-Monster-Setup-2.1.1.exe'),
+  [string]$SetupExe = '',
   [string]$InstallDir = (Join-Path $Env:LOCALAPPDATA 'FE Monster'),
   [string]$PayloadRoot = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..')).Path 'out\installer\work\payload\FE Monster')
 )
 
 $ErrorActionPreference = 'Stop'
+if ([string]::IsNullOrWhiteSpace($SetupExe)) {
+  $rootPath = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+  . (Join-Path $rootPath 'scripts\release-version.ps1')
+  $release = Get-FeMonsterReleaseVersion (Get-Content -LiteralPath (Join-Path $rootPath 'package.json') -Raw | ConvertFrom-Json)
+  $SetupExe = Join-Path $rootPath "dist\FE-Monster-Setup-$($release.DisplayVersion).exe"
+}
 $setup = (Resolve-Path -LiteralPath $SetupExe).Path
 $install = [IO.Path]::GetFullPath($InstallDir)
 $payload = (Resolve-Path -LiteralPath $PayloadRoot).Path

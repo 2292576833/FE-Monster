@@ -25,6 +25,7 @@ const clock = functionSource('currentPlaybackLyricTime');
 const progress = functionSource('updateProgress');
 const playbackLyrics = functionSource('updateQishuiPlaybackLyrics');
 const transition = functionSource('syncQishuiLyricTransition');
+const nativeContinuitySetter = functionSource('setAudioCurrentTimeWithNativeContinuity');
 
 // Replay the native range event order. A drag may emit dozens of input events,
 // followed by both pointerup and change. Only the first commit is allowed to
@@ -36,7 +37,19 @@ const eventSequence = [
   'change'
 ];
 const previewMediaWrites = occurrences(preview, /els\.audio\.currentTime\s*=/g);
+const previewNativeContinuityCalls = occurrences(
+  preview,
+  /\bsetAudioCurrentTimeWithNativeContinuity\s*\(/g
+);
 const commitMediaWrites = occurrences(commit, /els\.audio\.currentTime\s*=/g);
+const commitNativeContinuityCalls = occurrences(
+  commit,
+  /\bsetAudioCurrentTimeWithNativeContinuity\s*\(/g
+);
+const sharedSetterMediaWrites = occurrences(
+  nativeContinuitySetter,
+  /els\.audio\.currentTime\s*=/g
+);
 let dragging = false;
 let mediaSeekWrites = 0;
 let commitCalls = 0;
@@ -45,11 +58,13 @@ for (const event of eventSequence) {
     dragging = true;
   } else if (event === 'input') {
     dragging = true;
-    mediaSeekWrites += previewMediaWrites;
+    mediaSeekWrites += previewMediaWrites
+      + previewNativeContinuityCalls * sharedSetterMediaWrites;
   } else if ((event === 'pointerup' || event === 'change') && dragging) {
     dragging = false;
     commitCalls += 1;
-    mediaSeekWrites += commitMediaWrites;
+    mediaSeekWrites += commitMediaWrites
+      + commitNativeContinuityCalls * sharedSetterMediaWrites;
   }
 }
 
@@ -58,7 +73,22 @@ assert.equal(
   0,
   'drag preview must not seek the audio element on every input event'
 );
-assert.equal(commitMediaWrites, 1, 'drag release must contain one media seek write');
+assert.equal(
+  previewNativeContinuityCalls,
+  0,
+  'drag preview must not call the shared native-continuity seek setter'
+);
+assert.equal(commitMediaWrites, 0, 'drag release must not bypass the shared seek setter');
+assert.equal(
+  commitNativeContinuityCalls,
+  1,
+  'drag release must call setAudioCurrentTimeWithNativeContinuity exactly once'
+);
+assert.equal(
+  sharedSetterMediaWrites,
+  1,
+  'the shared native-continuity setter must write els.audio.currentTime exactly once'
+);
 assert.equal(commitCalls, 1, 'pointerup + change must collapse to one commit');
 assert.equal(mediaSeekWrites, 1, 'the complete drag sequence must issue one media seek');
 
@@ -80,7 +110,7 @@ assert.equal(
 
 assert.match(
   preview,
-  /pendingSeekTarget\s*=\s*target[\s\S]*?updateQishuiPlaybackProgress\(target[\s\S]*?syncPlaybackLyricAtTime\(target\)/,
+  /pendingSeekTarget\s*=\s*target[\s\S]*?updateQishuiPlaybackProgress\(target[\s\S]*?syncPlaybackLyricAtTime\(target,\s*\{\s*authoritativeSample:\s*true\s*\}\)/,
   'every input must update the preview clock, progress, and lyrics immediately'
 );
 assert.match(
@@ -90,13 +120,13 @@ assert.match(
 );
 assert.match(clock, /progressDragging/, 'the preview clock must only override media time while dragging');
 assert.ok(
-  clock.indexOf('if (els.audio?.src && Number.isFinite(audioTime))')
-    < clock.indexOf('if (Number.isFinite(handoffTarget))'),
-  'after drag release, a usable media.currentTime must outrank the synthetic handoff target'
+  clock.indexOf('if (Number.isFinite(handoffTarget))')
+    < clock.indexOf('if (els.audio?.src && Number.isFinite(audioTime))'),
+  'after drag release, the bounded handoff clock must outrank a stale media.currentTime until seek settles'
 );
 assert.match(
   progress,
-  /currentPlaybackLyricTime\(audioCurrent\)[\s\S]*?syncPlaybackLyricAtTime\(current\)/,
+  /currentPlaybackLyricTime\(audioCurrent\)[\s\S]*?syncPlaybackLyricAtTime\(current,\s*\{\s*authoritativeSample:\s*true\s*\}\)/,
   'timeupdate must preserve the preview clock while dragging'
 );
 assert.match(
@@ -114,19 +144,26 @@ const maximumAgeMatch = app.match(/const QISHUI_SEEK_HANDOFF_MAX_MS\s*=\s*([0-9.
 assert.ok(maximumAgeMatch, 'the unavailable-media handoff fallback must have an explicit maximum age');
 const handoffMaximumAge = Number(maximumAgeMatch[1]);
 
-function resolveHandoffClock({ audioTime, target, age, hasSource = true }) {
-  if (hasSource && Number.isFinite(audioTime)) return audioTime;
+function resolveHandoffClock({ audioTime, target, age, seeking = false, readyState = 4, hasSource = true }) {
+  const settled = hasSource
+    && Number.isFinite(audioTime)
+    && !seeking
+    && readyState >= 2
+    && Math.abs(audioTime - target) <= 0.08;
+  if (settled) return audioTime;
   if (hasSource && age <= handoffMaximumAge) return target;
-  return audioTime;
+  return Number.isFinite(audioTime) ? audioTime : target;
 }
 
 const target = 91.4;
 const staleFirstFrame = resolveHandoffClock({
   audioTime: 17.2,
   target,
-  age: 16
+  age: 16,
+  seeking: true,
+  readyState: 1
 });
-assert.equal(staleFirstFrame, 17.2, 'after release, lyric state must remain at the real media time until seek settles');
+assert.equal(staleFirstFrame, target, 'after release, stale pre-seek media time must not flash the old lyric');
 const unavailableClockFallback = resolveHandoffClock({
   audioTime: Number.NaN,
   target,
@@ -146,12 +183,14 @@ console.log(JSON.stringify({
   eventSequence,
   previewEvents: eventSequence.filter((event) => event === 'input').length,
   commitCalls,
+  commitNativeContinuityCalls,
+  sharedSetterMediaWrites,
   mediaSeekWrites,
   backendSeekCalls: occurrences(commit, /\/api\/player\/seek/g),
   sourceRebuilds: occurrences(`${preview}\n${commit}`, /(?:audio|els\.audio)\.src\s*=/g),
   pauses: occurrences(`${preview}\n${commit}`, /\.pause\(/g),
   loads: occurrences(`${preview}\n${commit}`, /\.load\(/g),
-  releasedLogicalAdvanceErrorSeconds: Math.abs(staleFirstFrame - 17.2),
+  releasedLogicalAdvanceErrorSeconds: Math.abs(staleFirstFrame - target),
   unavailableClockFallbackSeconds: unavailableClockFallback,
   settledMediaClockErrorSeconds: Math.abs(settledFrame - settledAudioTime),
   unavailableClockFallbackMaximumAgeMs: handoffMaximumAge

@@ -146,6 +146,9 @@ const sandbox = {
       after: { 'ui.sonic-center-color-input': window.__sceneColor },
     };
   },
+  petAssistantParameterBatchRequiresConfirmation() {
+    return false;
+  },
   async requestActionConfirmation(payload, inspection) {
     window.__confirmationRequests.push({ payload, inspection });
     return window.__confirmationDecisions.shift() === true;

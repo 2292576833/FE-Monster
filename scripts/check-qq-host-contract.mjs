@@ -32,7 +32,7 @@ const assertStaticContract = () => {
   assert.match(buildScript, /patch-runtime\.cjs/,
     'QQ package build must apply the private-library runtime patch');
   const manifest = JSON.parse(readFileSync(path.join(root, 'music-api-plugins/qq/music-api-package.json'), 'utf8'));
-  assert.equal(manifest.version, '2.4.1', 'patched QQ wrapper version must be 2.4.1');
+  assert.equal(manifest.version, '2.4.2', 'native-QRC QQ wrapper version must be 2.4.2');
 };
 
 const assertRuntimePatch = () => {
@@ -53,7 +53,34 @@ var extractPlaylists = (payload) => {
 var getErrorMessage = (payload) => {
   return payload?.message || "error";
 };
-module.exports = { extractPlaylists };
+var decodeLyricField = (value) => {
+	if (typeof value !== "string" || !value) return "";
+	try {
+		return Buffer.from(value, "base64").toString() || value;
+	} catch {
+		return value;
+	}
+};
+var normalizeLyricResponse = (resData, isFormat) => {
+	const lyricString = decodeLyricField(resData?.lyric);
+	const lyric = isFormat && lyricString ? lyricParse(lyricString) : lyricString;
+	return {
+		...resData,
+		lyric
+	};
+};
+var hasNegativeBizCode = (data) => {
+	return false;
+};
+var fetchLyricByMusicu = async () => ({});
+var getLyric = async () => {
+	let payload = {};
+	if (hasNegativeBizCode(payload)) try {
+		let fallbackPayload = await fetchLyricByMusicu({});
+	} catch {}
+	return normalizeLyricResponse(payload, false);
+};
+module.exports = { extractPlaylists, normalizeLyricResponse, shouldFetchNativeQrc };
 `;
   rmSync(fixtureRoot, { recursive: true, force: true });
   mkdirSync(dist, { recursive: true });
@@ -65,8 +92,20 @@ module.exports = { extractPlaylists };
       const api = require(${JSON.stringify(path.join(dist, 'services.cjs'))});
       const value = api.extractPlaylists({data:{mydiss:{list:[]},mymusic:[{dissid:'liked'}],createdList:[{dissid:'created'},{dissid:'liked'}]}});
       if (value.length !== 2 || value[0].dissid !== 'liked' || value[1].dissid !== 'created') process.exit(1);
+      const qrc = '[1000,2000](1000,500,0)逐(1500,500,0)字';
+      const normalized = api.normalizeLyricResponse({
+        lyric: Buffer.from('[00:01.000]逐字').toString('base64'),
+        qrc: Buffer.from(qrc).toString('base64'),
+        trans: Buffer.from('[00:01.000]word').toString('base64')
+      }, false);
+      if (normalized.qrc !== qrc || normalized.trans !== '[00:01.000]word') process.exit(2);
+      if (!api.shouldFetchNativeQrc({lyric: normalized.lyric})) process.exit(3);
+      if (api.shouldFetchNativeQrc({qrc})) process.exit(4);
     `;
     run(process.execPath, ['-e', probe]);
+    const patched = readFileSync(path.join(dist, 'services.cjs'), 'utf8');
+    assert.match(patched, /if \(shouldFetchNativeQrc\(payload\)\) try/,
+      'successful legacy LRC responses must still request native QRC from Musicu');
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }

@@ -1,0 +1,754 @@
+/* Playback card settings and the compact Three.js playback surface. The runtime
+ * owns song state, particle work and positioning; these rules only provide a
+ * responsive visual shell and semantic control states. */
+
+.playback-card-settings-content {
+  gap: 12px;
+  padding: 10px 12px 15px;
+}
+
+.playback-card-settings-hint,
+.playback-card-fixed-note {
+  margin: 0;
+  color: rgba(201, 224, 213, 0.72);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.playback-card-fixed-note {
+  border-inline-start: 2px solid rgba(151, 255, 213, 0.5);
+  padding-inline-start: 9px;
+}
+
+.playback-card-fixed-note strong {
+  color: rgba(228, 255, 242, 0.96);
+  font-variant-numeric: tabular-nums;
+}
+
+.playback-card-setting {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  color: rgba(227, 245, 237, 0.78);
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.playback-card-setting > span:first-child {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.playback-card-setting select,
+.playback-card-setting input:not([type="range"]):not([type="color"]) {
+  width: 100%;
+  min-width: 0;
+  min-height: 35px;
+  border: 1px solid rgba(174, 239, 211, 0.18);
+  border-radius: 10px;
+  padding: 0 9px;
+  color: rgba(246, 255, 250, 0.95);
+  background: rgba(3, 20, 14, 0.68);
+  font: inherit;
+}
+
+.playback-card-setting select:is(:hover, :focus-visible) {
+  border-color: rgba(151, 255, 213, 0.56);
+  background: rgba(7, 37, 26, 0.84);
+}
+
+.playback-card-setting--range > span {
+  font-size: 12px;
+}
+
+.playback-card-setting--range output {
+  color: rgba(177, 244, 211, 0.9);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.playback-card-setting--range > input[type="range"] {
+  width: 100%;
+  min-width: 0;
+  min-height: 26px;
+}
+
+.playback-card-setting small {
+  color: rgba(201, 224, 213, 0.6);
+  font-size: 10px;
+  font-weight: 550;
+  line-height: 1.5;
+}
+
+.playback-card-settings-section {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(151, 255, 213, 0.12);
+  border-radius: 15px;
+  padding: 12px;
+  background: rgba(8, 39, 28, 0.22);
+}
+
+.playback-card-settings-section h3 {
+  margin: 0;
+  color: rgba(239, 255, 247, 0.9);
+  font-size: 11px;
+  font-weight: 820;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.playback-card-color-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.playback-card-setting--color {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  color: rgba(227, 245, 237, 0.7);
+}
+
+.playback-card-setting--color input[type="color"] {
+  box-sizing: border-box;
+  width: 44px;
+  height: 29px;
+  padding: 3px;
+  border: 1px solid rgba(174, 239, 211, 0.22);
+  border-radius: 8px;
+  background: rgba(3, 20, 14, 0.72);
+  cursor: pointer;
+}
+
+.playback-card-color-grid.is-cover .playback-card-setting--color,
+.playback-card-color-grid.is-gradient .playback-card-setting--color:last-child,
+.playback-card-color-grid.is-solid .playback-card-setting--color:not(:last-child) {
+  opacity: 0.46;
+}
+
+.playback-card-color-grid.is-cover .playback-card-setting--color input,
+.playback-card-color-grid.is-gradient .playback-card-setting--color:last-child input,
+.playback-card-color-grid.is-solid .playback-card-setting--color:not(:last-child) input {
+  pointer-events: none;
+  filter: saturate(0.25);
+}
+
+.playback-card-setting-toggle {
+  min-height: 35px;
+  align-items: center;
+}
+
+.playback-card-setting-toggle span {
+  color: rgba(232, 250, 241, 0.82);
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.playback-card-reset {
+  min-height: 37px;
+  margin-block-start: 2px;
+  border: 1px solid rgba(151, 255, 213, 0.22);
+  border-radius: 10px;
+  color: rgba(230, 255, 244, 0.9);
+  background: rgba(34, 98, 72, 0.25);
+}
+
+.playback-card-reset:is(:hover, :focus-visible) {
+  border-color: rgba(151, 255, 213, 0.62);
+  background: rgba(45, 122, 88, 0.38);
+}
+
+@media (max-width: 640px) {
+  .playback-card-color-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ------------------------------------------------------------------------- */
+/* Compact playback card                                                     */
+
+#compactPlaybackCard.compact-playback-card {
+  --compact-card-size: 232px;
+  --compact-card-radius: 52px;
+  --compact-card-opacity: 0.92;
+  --compact-card-border-width: 3px;
+  --compact-card-angle: 135deg;
+  --compact-card-color-start: #243b43;
+  --compact-card-color-end: #b48865;
+  --compact-card-solid-color: #243b43;
+  --compact-cover-a: var(--compact-card-color-a, #243b43);
+  --compact-cover-b: var(--compact-card-color-b, #6b7e70);
+  --compact-cover-c: var(--compact-card-color-c, var(--compact-card-color-b, #b48865));
+  --compact-volume-progress: 0.8;
+  --compact-volume-pulse: 0;
+  --compact-volume-start: #72e6ff;
+  --compact-volume-end: #b69cff;
+  --compact-volume-stroke-width: 1.6px;
+  position: fixed;
+  z-index: 92;
+  display: block;
+  box-sizing: border-box;
+  width: var(--compact-card-size);
+  height: var(--compact-card-size);
+  min-width: 180px;
+  min-height: 180px;
+  max-width: min(300px, calc(100vw - 24px));
+  max-height: min(300px, calc(100dvh - 24px));
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--compact-card-radius);
+  color: rgba(249, 255, 251, 0.95);
+  background:
+    linear-gradient(var(--compact-card-angle),
+      color-mix(in srgb, var(--compact-card-color-start) 86%, transparent),
+      color-mix(in srgb, var(--compact-card-color-end) 68%, transparent));
+  box-shadow:
+    0 22px 48px rgba(0, 0, 0, 0.34),
+    0 5px 15px color-mix(in srgb, var(--compact-cover-a) 36%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  opacity: var(--compact-card-opacity);
+  isolation: isolate;
+  contain: layout paint style;
+  user-select: none;
+  touch-action: none;
+  transition:
+    width 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 240ms ease,
+    opacity 180ms ease;
+}
+
+#compactPlaybackCard.compact-playback-card::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border: var(--compact-card-border-width) solid transparent;
+  border-radius: inherit;
+  background:
+    conic-gradient(
+      from var(--compact-card-angle),
+      color-mix(in srgb, var(--compact-volume-start) 92%, transparent),
+      color-mix(in srgb, var(--compact-cover-a) 60%, transparent) 32%,
+      color-mix(in srgb, var(--compact-volume-end) 92%, transparent) 64%,
+      color-mix(in srgb, var(--compact-volume-start) 92%, transparent)
+    ) border-box;
+  -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: calc(0.3 + var(--compact-volume-pulse) * 0.52);
+  filter: saturate(calc(1 + var(--compact-volume-pulse) * 0.55));
+  pointer-events: none;
+  /* The SVG perimeter below is the single source of truth for the volume
+   * slider. Keep the older decorative border out of the way so it cannot
+   * look like a second, detached outline. */
+  display: none;
+}
+
+#compactPlaybackCard.compact-playback-card::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 12% 4%, rgba(255, 255, 255, 0.27), transparent 42%),
+    linear-gradient(180deg, transparent 38%, rgba(1, 6, 9, 0.64) 100%),
+    linear-gradient(var(--compact-card-angle), color-mix(in srgb, var(--compact-cover-a) 28%, transparent), transparent 52%, color-mix(in srgb, var(--compact-cover-c) 36%, transparent));
+  pointer-events: none;
+}
+
+#compactPlaybackCard.compact-playback-card[data-color-mode="cover"] {
+  --compact-card-color-start: var(--compact-cover-a);
+  --compact-card-color-end: var(--compact-cover-c);
+}
+
+#compactPlaybackCard.compact-playback-card[data-color-mode="solid"] {
+  background: var(--compact-card-solid-color);
+}
+
+#compactPlaybackCard.compact-playback-card[data-dragging="true"],
+#compactPlaybackCard.compact-playback-card.is-dragging {
+  cursor: grabbing;
+  box-shadow:
+    0 28px 58px rgba(0, 0, 0, 0.46),
+    0 0 0 5px color-mix(in srgb, var(--compact-volume-start) 25%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.44);
+}
+
+#compactPlaybackCard.compact-playback-card.is-pressing {
+  cursor: grab;
+  box-shadow:
+    0 24px 52px rgba(0, 0, 0, 0.4),
+    0 0 0 3px color-mix(in srgb, var(--compact-volume-start) 20%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.42);
+  transform: scale(0.985);
+  transition: transform 120ms ease, box-shadow 180ms ease;
+}
+
+#compactPlaybackCard.compact-playback-card:focus-within {
+  box-shadow:
+    0 22px 48px rgba(0, 0, 0, 0.34),
+    0 0 0 3px color-mix(in srgb, var(--compact-volume-start) 66%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+#compactPlaybackCard.compact-playback-card[hidden] {
+  display: none;
+}
+
+.compact-playback-canvas {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  border-radius: inherit;
+  opacity: 0.84;
+  pointer-events: none;
+}
+
+.compact-playback-sheen {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 18% 4%, rgba(255, 255, 255, 0.2), transparent 36%),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.1), transparent 34%, transparent 72%, rgba(255, 255, 255, 0.04));
+  mix-blend-mode: screen;
+  opacity: calc(0.42 + var(--compact-volume-pulse) * 0.2);
+  transform: translate3d(calc(var(--compact-volume-pulse) * 2px), 0, 0);
+  transition: opacity 180ms ease, transform 180ms ease;
+  pointer-events: none;
+}
+
+.compact-playback-content {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: grid;
+  grid-template-rows: 1fr auto auto auto;
+  align-content: end;
+  gap: 8px;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  padding: clamp(14px, 8%, 21px);
+  border-radius: inherit;
+  background:
+    linear-gradient(180deg, rgba(3, 7, 10, 0.02) 26%, rgba(1, 5, 7, 0.7) 100%),
+    linear-gradient(145deg, color-mix(in srgb, var(--compact-cover-a) 8%, transparent), transparent 52%);
+  pointer-events: none;
+}
+
+.compact-playback-heading {
+  display: grid;
+  align-content: end;
+  min-width: 0;
+  gap: 3px;
+  margin-block-start: auto;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.68);
+}
+
+.compact-playback-heading > :is(#compactPlaybackTitle, #compactPlaybackArtist, .compact-playback-title, .compact-playback-artist) {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#compactPlaybackTitle,
+.compact-playback-title {
+  color: rgba(255, 255, 255, 0.97);
+  font-size: clamp(13px, 7%, 17px);
+  font-weight: 820;
+  line-height: 1.18;
+}
+
+#compactPlaybackArtist,
+.compact-playback-artist {
+  color: rgba(237, 248, 247, 0.68);
+  font-size: clamp(10px, 5.2%, 12px);
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.compact-playback-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.compact-playback-actions button,
+#compactPlaybackReturn,
+#compactPlaybackReturnButton,
+.compact-playback-return {
+  display: grid;
+  flex: 0 0 auto;
+  width: clamp(26px, 15%, 34px);
+  height: clamp(26px, 15%, 34px);
+  min-width: 26px;
+  min-height: 26px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+  padding: 0;
+  color: rgba(251, 255, 255, 0.88);
+  background: rgba(4, 13, 15, 0.36);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  font: 800 clamp(10px, 5%, 13px)/1 system-ui, sans-serif;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: transform 150ms ease, color 150ms ease, background 150ms ease, border-color 150ms ease;
+}
+
+.compact-playback-actions button:hover,
+.compact-playback-actions button:focus-visible,
+#compactPlaybackReturn:hover,
+#compactPlaybackReturn:focus-visible,
+#compactPlaybackReturnButton:hover,
+#compactPlaybackReturnButton:focus-visible,
+.compact-playback-return:hover,
+.compact-playback-return:focus-visible {
+  border-color: rgba(191, 255, 230, 0.74);
+  color: #fff;
+  background: rgba(54, 126, 100, 0.54);
+  transform: translateY(-1px);
+}
+
+.compact-playback-actions button:active,
+#compactPlaybackReturn:active,
+#compactPlaybackReturnButton:active,
+.compact-playback-return:active {
+  transform: translateY(1px) scale(0.95);
+}
+
+.compact-playback-actions button[data-action="play"],
+#compactPlaybackPlay {
+  width: clamp(34px, 19%, 43px);
+  height: clamp(34px, 19%, 43px);
+  color: rgba(8, 26, 19, 0.92);
+  background: rgba(227, 255, 241, 0.9);
+  border-color: rgba(255, 255, 255, 0.7);
+  font-size: clamp(12px, 6.5%, 16px);
+}
+
+.compact-playback-progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  pointer-events: auto;
+}
+
+.compact-playback-progress-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  pointer-events: auto;
+}
+
+#compactPlaybackProgress {
+  width: 100%;
+  min-width: 0;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--compact-volume-start);
+  cursor: pointer;
+}
+
+.compact-playback-time {
+  color: rgba(240, 250, 247, 0.73);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+#compactPlaybackReturn {
+  position: static;
+  z-index: 4;
+  width: 25px;
+  height: 25px;
+  opacity: 0.7;
+}
+
+#compactPlaybackReturnButton {
+  position: static;
+  z-index: 4;
+  width: 25px;
+  height: 25px;
+  opacity: 0.7;
+}
+
+.compact-playback-volume {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  border-radius: inherit;
+  outline: none;
+  pointer-events: none;
+  color: var(--compact-volume-start);
+  filter: drop-shadow(0 0 calc(2px + var(--compact-volume-pulse) * 8px) color-mix(in srgb, var(--compact-volume-end) 80%, transparent));
+}
+
+.compact-playback-volume > svg {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.compact-playback-volume :is(.compact-playback-volume-track, [data-volume-track]) {
+  fill: none;
+  stroke: var(--compact-volume-gradient, url("#compactPlaybackVolumeGradient"));
+  stroke-width: var(--compact-volume-stroke-width);
+  opacity: 0.28;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.compact-playback-volume :is(.compact-playback-volume-fill, [data-volume-fill]) {
+  fill: none;
+  stroke: var(--compact-volume-gradient, url("#compactPlaybackVolumeGradient"));
+  stroke-width: max(1.2px, calc(var(--compact-volume-stroke-width) + var(--compact-volume-pulse) * 0.9px));
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: calc(1 - var(--compact-volume-progress));
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+  filter: drop-shadow(0 0 calc(1px + var(--compact-volume-pulse) * 7px) var(--compact-volume-end));
+}
+
+.compact-playback-volume :is(.compact-playback-volume-hit, [data-volume-hit]) {
+  fill: none;
+  stroke: transparent;
+  stroke-width: max(24px, calc(var(--compact-card-border-width) + 20px));
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  pointer-events: stroke;
+  cursor: ew-resize;
+}
+
+.compact-playback-drag-hint {
+  position: absolute;
+  z-index: 3;
+  right: 16%;
+  bottom: 13%;
+  max-width: 52%;
+  overflow: hidden;
+  color: rgba(246, 255, 252, 0.52);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+#compactPlaybackCard.compact-playback-card:hover .compact-playback-drag-hint,
+#compactPlaybackCard.compact-playback-card[data-dragging="true"] .compact-playback-drag-hint {
+  opacity: 0.76;
+  transform: translateY(0);
+}
+
+.compact-playback-volume:is(:focus, :focus-visible) {
+  outline: 2px solid color-mix(in srgb, var(--compact-volume-start) 86%, white);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #compactPlaybackCard.compact-playback-card,
+  .compact-playback-actions button,
+  #compactPlaybackReturn,
+  #compactPlaybackReturnButton {
+    transition: none;
+  }
+  #compactPlaybackCard.compact-playback-card::before,
+  .compact-playback-volume {
+    filter: none;
+  }
+}
+
+@media (max-width: 500px) {
+  #compactPlaybackCard.compact-playback-card {
+    max-width: calc(100vw - 18px);
+    max-height: calc(100dvh - 18px);
+  }
+}
+
+/* The mode button lives in the existing playback view controls. */
+.qishui-playback-mode-toggle {
+  position: relative;
+}
+
+.qishui-playback-mode-toggle span,
+.qishui-playback-mode-toggle span::before,
+.qishui-playback-mode-toggle span::after {
+  display: block;
+  box-sizing: border-box;
+  width: 13px;
+  height: 9px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+}
+
+.qishui-playback-mode-toggle span {
+  position: relative;
+  border-radius: 50%;
+  width: 5px;
+  height: 5px;
+  margin: auto;
+  border-width: 2px;
+}
+
+.qishui-playback-mode-toggle span::before,
+.qishui-playback-mode-toggle span::after {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  top: -2px;
+}
+
+.qishui-playback-mode-toggle span::before { right: 7px; }
+.qishui-playback-mode-toggle span::after { left: 7px; }
+.qishui-playback-mode-toggle.is-card-mode span { transform: rotate(45deg); }
+
+#runtimeSettingsButton.compact-playback-settings-button {
+  position: fixed;
+  z-index: 94;
+  top: auto;
+  right: auto;
+  left: 18px;
+  bottom: 18px;
+  display: grid !important;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(184, 239, 213, 0.28);
+  border-radius: 50%;
+  color: rgba(235, 255, 245, 0.86);
+  background: rgba(5, 20, 15, 0.54);
+  pointer-events: auto !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+#runtimeSettingsButton.compact-playback-settings-button::before {
+  content: "⚙";
+  display: block;
+  font: 400 18px/1 "Segoe UI Symbol", "Segoe UI", system-ui, sans-serif;
+}
+
+#runtimeSettingsButton.compact-playback-settings-button > span {
+  display: none;
+}
+
+#runtimeSettingsButton.compact-playback-settings-button[hidden] {
+  display: none !important;
+}
+
+
+/* The phone header has several positioned utility buttons. Keep the settings
+ * hit target above that row so the top-right gear stays clickable. */
+#qishuiPlaybackPhone #runtimeSettingsButton.qishui-playback-settings-button {
+  z-index: 1200;
+}
+
+/* The compact card controls keep their generous hit areas for pointer and
+ * keyboard use, while the visual chrome is reduced to the glyph itself. */
+#compactPlaybackCard.compact-playback-card .compact-playback-actions button,
+#compactPlaybackCard.compact-playback-card #compactPlaybackReturn,
+#compactPlaybackCard.compact-playback-card #compactPlaybackReturnButton,
+#compactPlaybackCard.compact-playback-card .compact-playback-return {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: rgba(248, 255, 252, 0.68) !important;
+  opacity: 0.72;
+}
+
+#compactPlaybackCard.compact-playback-card .compact-playback-actions button:hover,
+#compactPlaybackCard.compact-playback-card #compactPlaybackReturn:hover,
+#compactPlaybackCard.compact-playback-card #compactPlaybackReturnButton:hover,
+#compactPlaybackCard.compact-playback-card .compact-playback-return:hover {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.96) !important;
+  opacity: 1;
+  outline: none;
+}
+
+#compactPlaybackCard.compact-playback-card .compact-playback-actions button:focus-visible,
+#compactPlaybackCard.compact-playback-card .compact-playback-return:focus-visible {
+  outline: 1px solid var(--compact-volume-start) !important;
+  outline-offset: 2px;
+}
+
+#compactPlaybackCard.compact-playback-card .compact-playback-actions button::before,
+#compactPlaybackCard.compact-playback-card .compact-playback-actions button::after,
+#compactPlaybackCard.compact-playback-card .compact-playback-actions button > .rb-border-glow-mount {
+  display: none !important;
+}
+
+#compactPlaybackCard.compact-playback-card .compact-playback-actions button:active,
+#compactPlaybackCard.compact-playback-card #compactPlaybackReturn:active,
+#compactPlaybackCard.compact-playback-card #compactPlaybackReturnButton:active,
+#compactPlaybackCard.compact-playback-card .compact-playback-return:active {
+  background: transparent !important;
+  opacity: 0.94;
+}
+
+#compactPlaybackCard.compact-playback-card .compact-playback-actions button[data-action="play"],
+#compactPlaybackCard.compact-playback-card #compactPlaybackPlay {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: rgba(248, 255, 252, 0.78) !important;
+  box-shadow: none !important;
+}
+
+/* The volume path is drawn against the card's actual rounded rectangle. Keep
+ * the hit path broad enough for touch without moving the visible slider away
+ * from the four outer edges. */
+#compactPlaybackCard.compact-playback-card .compact-playback-volume,
+#compactPlaybackCard.compact-playback-card .compact-playback-volume > svg {
+  inset: 0;
+  overflow: visible;
+}
+
+/* Achievement notices are informational and never contain controls. Keep
+ * them from stealing the settings hit area when they briefly slide over the
+ * top-right corner of the playback phone. */
+.achievement-toast {
+  pointer-events: none;
+}

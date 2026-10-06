@@ -2086,6 +2086,14 @@ public final class AudioMixerService {
         live.put("obrFilterProfile", "direct");
         live.put("obrSpatialWidth", 1.15);
         putPreset(presets, "immersive-live", "沉浸现场", live);
+
+        // Optional headphone route; keep the neutral Mixer, existing Matrix
+        // Decode 5.1 defaults and a single Direct binaural renderer.
+        Map<String, Object> clearSpatial = copyParameters(clean);
+        clearSpatial.put("upmixEnabled", true);
+        clearSpatial.put("obrEnabled", true);
+        clearSpatial.put("obrSpatialWidth", 1.10);
+        putPreset(presets, "clear-spatial", "清晰空间", clearSpatial);
         return presets;
     }
 

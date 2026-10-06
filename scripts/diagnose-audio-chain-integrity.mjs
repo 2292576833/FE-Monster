@@ -758,7 +758,12 @@ try {
     if (maximumFrozenMs >= 260) {
       errors.push('Normal playback currentTime froze for ' + Math.round(maximumFrozenMs) + ' ms');
     }
-    if (jitterEvents.some((event) => event.type === 'waiting' || event.type === 'stalled')) {
+    // Loading a fresh media source may emit waiting before its first playing
+    // event. Count rebuffering only after playback has actually started;
+    // the samples above independently detect a stalled media clock.
+    const jitterPlayingAt = jitterEvents.find((event) => event.type === 'playing')?.at ?? startedAt;
+    if (jitterEvents.some((event) => event.at > jitterPlayingAt
+      && (event.type === 'waiting' || event.type === 'stalled'))) {
       errors.push('Normal playback emitted waiting/stalled under above-realtime jitter stream');
     }
     for (const [name, listener] of listeners) audio.removeEventListener(name, listener);

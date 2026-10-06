@@ -104,12 +104,23 @@ public final class PetPersonalizationSnapshot {
     private final Path storeDirectory;
     private final Source source;
     private final Clock clock;
+    private final boolean diskPersistenceEnabled;
     private final Map<String, Map<String, Object>> loaded = new ConcurrentHashMap<>();
 
     public PetPersonalizationSnapshot(Path storeDirectory, Source source, Clock clock) {
+        this(storeDirectory, source, clock, true);
+    }
+
+    /**
+     * Disk persistence is disabled while the encrypted local-memory vault is
+     * available.  The projection remains usable in memory, but no sanitized
+     * personalization JSON is written beside an encrypted vault.
+     */
+    public PetPersonalizationSnapshot(Path storeDirectory, Source source, Clock clock, boolean diskPersistenceEnabled) {
         this.storeDirectory = Objects.requireNonNull(storeDirectory, "storeDirectory").toAbsolutePath().normalize();
         this.source = Objects.requireNonNull(source, "source");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.diskPersistenceEnabled = diskPersistenceEnabled;
     }
 
     /** Pulls both server projections, filters them, and atomically replaces this scope's cache. */
@@ -131,6 +142,9 @@ public final class PetPersonalizationSnapshot {
 
         Map<String, Object> cached = loaded.get(accountScope);
         if (cached == null) {
+            // With encrypted memory ownership enabled, the legacy file is migration input only.
+            // It must never become an offline plaintext fallback after an unavailable commit.
+            if (!diskPersistenceEnabled) return emptyProjection();
             cached = load(accountScope);
             if (cached == null) return emptyProjection();
             loaded.put(accountScope, cached);
@@ -147,6 +161,36 @@ public final class PetPersonalizationSnapshot {
             persistQuietly(accountScope, current);
         }
         return copy(current);
+    }
+
+    /** Reads only a pre-existing sanitized legacy JSON file for encrypted migration. */
+    public synchronized Map<String, Object> legacySnapshot(String scope) {
+        Path file = fileFor(normalizedScope(scope));
+        if (!Files.isRegularFile(file)) return emptyProjection();
+        try {
+            return sanitizePersistedProjection(SimpleJson.parseObjectStrict(Files.readString(file, StandardCharsets.UTF_8)), clock.millis());
+        } catch (IOException | RuntimeException failure) {
+            return emptyProjection();
+        }
+    }
+
+    /** Removes plaintext only after the caller confirms the encrypted commit. */
+    public synchronized boolean deleteLegacyAfterEncryptedCommit(String scope) {
+        Path file = fileFor(normalizedScope(scope));
+        if (!Files.isRegularFile(file)) return true;
+        try {
+            Files.delete(file);
+            return true;
+        } catch (IOException failure) {
+            // The caller cannot claim completion; the original plaintext remains for retry.
+            return false;
+        }
+    }
+
+    /** Re-applies the strict projection allowlist after encrypted record decryption. */
+    public synchronized Map<String, Object> sanitizeEncryptedProjection(Map<String, Object> projection) {
+        if (projection == null) return emptyProjection();
+        return copy(sanitizePersistedProjection(projection, clock.millis()));
     }
 
     /** Invalidates a scope after a forget or privacy change, including its durable copy. */
@@ -282,6 +326,7 @@ public final class PetPersonalizationSnapshot {
     }
 
     private Map<String, Object> load(String scope) {
+        if (!diskPersistenceEnabled) return null;
         Path file = fileFor(scope);
         if (!Files.isRegularFile(file)) return null;
         try {
@@ -300,6 +345,7 @@ public final class PetPersonalizationSnapshot {
     }
 
     private void persist(String scope, Map<String, Object> projection) throws IOException {
+        if (!diskPersistenceEnabled) return;
         Files.createDirectories(storeDirectory);
         Path destination = fileFor(scope);
         Path temporary = storeDirectory.resolve("." + UUID.randomUUID() + ".tmp");

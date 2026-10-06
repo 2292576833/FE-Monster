@@ -13,6 +13,7 @@ $runtimeOutputDir = Join-Path $nativeSourceDir 'build'
 $obrRevision = '478dc7c752d5eccae534635139ff0253eee3a14a'
 $obrRepository = 'https://github.com/google/obr.git'
 $nativeAudioBuildManifestName = 'native-audio-build.json'
+. (Join-Path $rootPath 'scripts\native-audio-artifacts.ps1')
 
 function Get-TextSha256 {
   param([Parameter(Mandatory)][string]$Value)
@@ -265,6 +266,8 @@ if (!$SkipProbe) {
   }
 }
 
+$immutableDll = Publish-NativeAudioArtifactPair -Root $rootPath -SourceDirectory $stagingOutputDir
+Write-Host "Published immutable native audio pair: $immutableDll"
 $installedDll = Join-Path $runtimeOutputDir 'fe-monster-xaudio2.dll'
 $installedRustUpmixDll = Join-Path $runtimeOutputDir 'fe_monster_upmix.dll'
 $installedBuildManifest = Join-Path $runtimeOutputDir $nativeAudioBuildManifestName
@@ -284,13 +287,19 @@ try {
   $nextDll = Join-Path $nextRuntimeDir 'fe-monster-xaudio2.dll'
   $nextRustUpmixDll = Join-Path $nextRuntimeDir 'fe_monster_upmix.dll'
   $nextBuildManifest = Join-Path $nextRuntimeDir $nativeAudioBuildManifestName
-  Copy-Item -LiteralPath $stagedDll -Destination $nextDll -Force
-  Copy-Item -LiteralPath $stagedRustUpmixDll -Destination $nextRustUpmixDll -Force
-  Copy-Item -LiteralPath $stagedBuildManifest -Destination $nextBuildManifest -Force
-  $verifiedRuntime = @($nextDll, $nextRustUpmixDll, $nextBuildManifest)
-  Write-Warning "The running app is using the installed native audio DLL. The verified replacement is ready for the next launch under $nextRuntimeDir."
+  try {
+    Copy-Item -LiteralPath $stagedDll -Destination $nextDll -Force
+    Copy-Item -LiteralPath $stagedRustUpmixDll -Destination $nextRustUpmixDll -Force
+    Copy-Item -LiteralPath $stagedBuildManifest -Destination $nextBuildManifest -Force
+    $verifiedRuntime = @($nextDll, $nextRustUpmixDll, $nextBuildManifest)
+  } catch {
+    $verifiedRuntime = @($immutableDll)
+    Write-Warning 'Both compatibility native audio directories are in use; the immutable pair remains available for the next launch.'
+  }
+  Write-Warning "The running app keeps its existing DLLs. The next launch will use $immutableDll."
 }
 
 Write-Host "Built $($verifiedRuntime -join ', ')"
 Write-Host "Rust upmix: oximedia-audiopost 0.2.0 (locked)"
-Write-Host "Verified Google OBR revision $obrRevision through $probe"
+if ($SkipProbe) { Write-Host "Built pinned Google OBR revision $obrRevision (native probe skipped)." }
+else { Write-Host "Verified Google OBR revision $obrRevision through $probe" }

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (relative) => readFile(path.join(root, relative), 'utf8');
@@ -26,15 +27,27 @@ assert.match(routes, /longParam\(query, "generation", 0\)/,
   'Native stream, activation, pause and stop calls must carry a generation.');
 assert.match(app, /async function invalidateNativeGoogleObrTimeline/,
   'The web clock must have one awaitable native timeline invalidation seam.');
-assert.match(app, /function beginNativeSpatialTimelineTransition[\s\S]{0,900}type: 'reset-timeline'/,
+const transitionSource = app.match(/function beginNativeSpatialTimelineTransition[\s\S]*?\n}/)?.[0];
+assert.ok(transitionSource, 'The native timeline transition must exist.');
+assert.match(transitionSource, /graph\.captureTimelineEpoch\s*=[\s\S]*type: 'reset-timeline'/,
   'A seek must rotate the AudioWorklet capture epoch before post-seek PCM is accepted.');
-assert.match(app, /function setAudioCurrentTimeWithNativeContinuity[\s\S]{0,700}els\.audio\.currentTime = Number\(target\)/,
-  'The media clock must move immediately while native reset/preroll runs off the UI thread.');
-assert.doesNotMatch(
-  app.match(/function setAudioCurrentTimeWithNativeContinuity[\s\S]*?\n}/)?.[0] || '',
-  /await /,
-  'The immediate seek handoff must not await HTTP, JNI, flush or preroll.'
-);
+const seekSource = app.match(/function setAudioCurrentTimeWithNativeContinuity[\s\S]*?\n}/)?.[0];
+assert.ok(seekSource, 'The media clock must expose a native continuity seek seam.');
+const pendingReset = new Promise(() => {});
+const audio = { currentTime: 0, src: 'fixture', paused: false, ended: false };
+const seekContext = vm.createContext({
+  Number, Math, Promise, performance,
+  els: { audio }, state: { audioPositionSync: {}, qishuiPlaybackCard: {} },
+  beginNativeSpatialTimelineTransition: () => pendingReset
+});
+vm.runInContext(seekSource, seekContext);
+assert.equal(seekContext.setAudioCurrentTimeWithNativeContinuity(42.5), pendingReset);
+assert.equal(audio.currentTime, 42.5,
+  'The media clock must move synchronously while native reset remains unresolved.');
+seekContext.setAudioCurrentTimeWithNativeContinuity(-2);
+assert.equal(audio.currentTime, 0, 'Negative seek targets must clamp to the media start.');
+seekContext.setAudioCurrentTimeWithNativeContinuity(Number.NaN);
+assert.equal(audio.currentTime, 0, 'Invalid seek targets must preserve the media clock.');
 assert.match(app, /els\.progressRange\.addEventListener\('input', \(\) =>[\s\S]{0,500}setAudioCurrentTimeWithNativeContinuity/,
   'Continuous progress scrubbing must use the non-blocking generation handoff.');
 assert.match(app, /els\.progressRange\.addEventListener\('change', async[\s\S]{0,900}await ensureAudioAnalysis\(\{ announceObrFailure: false \}\)/,

@@ -13,15 +13,15 @@ function constant(name) {
   return Number(value);
 }
 
-function lyricTimelineTime(currentTime, visualLead, compensation) {
-  return Math.max(0, Number(currentTime) + Number(visualLead) - compensation);
+function lyricTimelineTime(currentTime) {
+  return Math.max(0, Number(currentTime));
 }
 
 function findLyricIndexAtTime(lines, currentTime, visualLead, compensation) {
   let low = 0;
   let high = lines.length - 1;
   let found = -1;
-  const time = lyricTimelineTime(currentTime, visualLead, compensation);
+  const time = lyricTimelineTime(currentTime);
   while (low <= high) {
     const mid = Math.floor((low + high) / 2);
     if (lines[mid].time <= time) {
@@ -71,12 +71,12 @@ if (/\b(?:frameInterval|lastPaintAt)\b/.test(drawOrbSource)) {
 }
 
 const effectiveLead = bookLead - compensation;
-if (effectiveLead < 0.08 || effectiveLead > 0.18) {
-  throw new Error(`Book lyric effective lead should be 80-180ms, got ${effectiveLead.toFixed(3)}s`);
+if (effectiveLead !== 0) {
+  throw new Error(`Book lyric must use zero synthetic lead, got ${effectiveLead.toFixed(3)}s`);
 }
 
-if (glyphLead < 0.035 || glyphLead > 0.07) {
-  throw new Error(`Book glyph lead should stay subtle, got ${glyphLead.toFixed(3)}s`);
+if (glyphLead !== 0) {
+  throw new Error(`Book glyph timing must not advance ahead of its real timestamp, got ${glyphLead.toFixed(3)}s`);
 }
 
 const lines = [
@@ -98,8 +98,8 @@ if (indexBeforeLeadWindow !== 0) {
   throw new Error(`Book lyric switched too early before the lead window: ${indexBeforeLeadWindow}`);
 }
 
-if (indexInsideLeadWindow !== 1 || indexAtTimestamp !== 1) {
-  throw new Error(`Book lyric did not switch promptly near the next timestamp: ${indexInsideLeadWindow}/${indexAtTimestamp}`);
+if (indexInsideLeadWindow !== 0 || indexAtTimestamp !== 1) {
+  throw new Error(`Book lyric did not switch exactly at the next timestamp: ${indexInsideLeadWindow}/${indexAtTimestamp}`);
 }
 
 console.log(JSON.stringify({
@@ -111,5 +111,5 @@ console.log(JSON.stringify({
   displayAdaptiveFrameClock: true,
   scrollMinStep,
   lyricSyncRunsEveryAnimationFrame: true,
-  switchedAtSecondsBeforeTimestamp: Number(effectiveLead.toFixed(3))
+  switchedAtSecondsBeforeTimestamp: 0
 }, null, 2));

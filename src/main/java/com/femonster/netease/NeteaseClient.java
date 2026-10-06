@@ -72,6 +72,15 @@ public final class NeteaseClient implements MusicProviderClient {
                 request,
                 HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
             );
+            // Playback resolution needs the transport status even when an
+            // upstream gateway returns HTML. Preserve other API payloads.
+            if ("/song/url/v1".equals(path) && response.statusCode() >= 400) {
+                return SimpleJson.stringify(Map.of(
+                    "ok", false, "code", response.statusCode(),
+                    "retryable", response.statusCode() >= 500,
+                    "error", label() + " API HTTP " + response.statusCode()
+                ));
+            }
             return response.body();
         } catch (IOException | InterruptedException | IllegalArgumentException e) {
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
@@ -81,6 +90,7 @@ public final class NeteaseClient implements MusicProviderClient {
             error.put("label", label());
             error.put("baseUrl", baseUrl);
             error.put("error", label() + " API unavailable at " + baseUrl + ": " + exceptionDetail(e));
+            error.put("retryable", e instanceof IOException && !Thread.currentThread().isInterrupted());
             return SimpleJson.stringify(error);
         }
     }
@@ -200,33 +210,56 @@ public final class NeteaseClient implements MusicProviderClient {
     }
 
     public String songUrl(String id, String quality) {
-        if (id == null || id.isBlank()) return "";
-        Map<String, String> params = new LinkedHashMap<>();
-        params.put("id", id);
-        if (quality != null && !quality.isBlank()) params.put("level", quality);
-        Object root = jsonGet("/song/url/v1", params);
-        List<Object> data = SimpleJson.asList(SimpleJson.asMap(root).get("data"));
-        if (data.isEmpty()) return "";
-        return SimpleJson.asString(SimpleJson.asMap(data.get(0)).get("url"), "");
+        return SimpleJson.asString(songUrlPayload(id, quality).get("url"), "");
     }
 
     public Map<String, Object> songUrlPayload(String id, String quality) {
-        String url = songUrl(id, quality);
+        Map<String, Object> root = Map.of();
+        String url = "";
+        if (id != null && !id.isBlank()) {
+            Map<String, String> params = new LinkedHashMap<>();
+            params.put("id", id);
+            if (quality != null && !quality.isBlank()) params.put("level", quality);
+            for (int attempt = 0; attempt < 2; attempt++) {
+                if (Thread.currentThread().isInterrupted()) break;
+                root = SimpleJson.asMap(jsonGet("/song/url/v1", params));
+                List<Object> data = SimpleJson.asList(root.get("data"));
+                if (!data.isEmpty()) url = SimpleJson.asString(SimpleJson.asMap(data.get(0)).get("url"), "");
+                int code = SimpleJson.asInt(root.get("code"), 0);
+                boolean transientFailure = Boolean.TRUE.equals(root.get("retryable")) || (code >= 500 && code < 600);
+                // Retry only a temporary transport/service failure. Missing URLs,
+                // account restrictions and rate limits remain authoritative.
+                if (!url.isBlank() || !transientFailure) break;
+            }
+        }
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("provider", "netease");
         body.put("url", url);
         body.put("playable", !url.isBlank());
+        if (url.isBlank()) {
+            String message = SimpleJson.asString(root.get("error"), SimpleJson.asString(root.get("message"), "当前音质暂无可播放地址"));
+            body.put("error", message);
+        }
         return body;
     }
 
     @Override
     public Map<String, Object> lyricPayload(String songId) {
+        Map<String, String> params = Map.of("id", songId == null ? "" : songId);
         Map<String, Object> body = new LinkedHashMap<>(SimpleJson.asMap(jsonGet(
-            "/lyric",
-            Map.of("id", songId == null ? "" : songId)
+            "/lyric/new",
+            params
         )));
+        if (!hasLyricTrack(body, "lrc") && !hasLyricTrack(body, "yrc")) {
+            body = new LinkedHashMap<>(SimpleJson.asMap(jsonGet("/lyric", params)));
+        }
         body.putIfAbsent("provider", "netease");
         return body;
+    }
+
+    private static boolean hasLyricTrack(Map<String, Object> payload, String name) {
+        Map<String, Object> track = SimpleJson.asMap(payload.get(name));
+        return !SimpleJson.asString(track.get("lyric"), "").isBlank();
     }
 
     @Override
@@ -544,8 +577,10 @@ public final class NeteaseClient implements MusicProviderClient {
 
     private synchronized void rememberCookie(String nextCookie) {
         if (nextCookie.equals(cookie)) return;
-        cookie = nextCookie;
-        if (authFile == null) return;
+        if (authFile == null) {
+            cookie = nextCookie;
+            return;
+        }
         try {
             Path parent = authFile.getParent();
             if (parent != null) Files.createDirectories(parent);
@@ -560,8 +595,9 @@ public final class NeteaseClient implements MusicProviderClient {
             } catch (AtomicMoveNotSupportedException ignored) {
                 Files.move(temp, authFile, StandardCopyOption.REPLACE_EXISTING);
             }
-        } catch (IOException ignored) {
-            // Keep the in-memory cookie for this session even if persistence fails.
+            cookie = nextCookie;
+        } catch (IOException error) {
+            throw new IllegalStateException("unable to save NetEase browser session", error);
         }
     }
 

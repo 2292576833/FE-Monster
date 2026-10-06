@@ -14,6 +14,7 @@ const dataDirectory = mkdtempSync(path.join(tmpdir(), 'fe-monster-achievement-pe
 const expectedState = Object.freeze({
   version: 2,
   unlocked: Object.freeze({
+    'first-play': Object.freeze({ unlockedAt: 1712345677901 }),
     'world-peace': Object.freeze({ unlockedAt: 1712345678901 }),
     'first-danmaku': Object.freeze({ unlockedAt: 1712345679901 }),
     completionist: Object.freeze({ unlockedAt: 1712345680901 })
@@ -174,6 +175,11 @@ async function requestState(port, method, body) {
 
 function assertState(actual, label) {
   assert.equal(actual.version, expectedState.version, `${label}: version was not preserved`);
+  assert.equal(
+    actual.unlocked?.['first-play']?.unlockedAt,
+    expectedState.unlocked['first-play'].unlockedAt,
+    `${label}: first-play unlock timestamp was not preserved`
+  );
   assert.equal(
     actual.unlocked?.['world-peace']?.unlockedAt,
     expectedState.unlocked['world-peace'].unlockedAt,

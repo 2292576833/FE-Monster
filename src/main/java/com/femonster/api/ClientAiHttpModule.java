@@ -150,7 +150,8 @@ final class ClientAiHttpModule {
                     ? ClientAiGateway.Kind.TTS
                     : ClientAiGateway.Kind.CHAT;
                 String requestId = SimpleJson.asString(root.get("requestId"), "");
-                handleUpstream(exchange, kind, SimpleJson.asMap(root.get("payload")), requestId);
+                handleUpstream(exchange, kind, SimpleJson.asMap(root.get("payload")), requestId,
+                    SimpleJson.asLong(root.get("expectedConfigRevision"), -1));
             }
             default -> HttpUtil.notFound(exchange);
         }
@@ -256,9 +257,10 @@ final class ClientAiHttpModule {
         HttpExchange exchange,
         ClientAiGateway.Kind kind,
         Map<String, Object> payload,
-        String requestId
+        String requestId,
+        long expectedRevision
     ) throws IOException {
-        try (ClientAiGateway.UpstreamResponse response = gateway.execute(kind, payload, requestId)) {
+        try (ClientAiGateway.UpstreamResponse response = gateway.execute(kind, payload, requestId, expectedRevision)) {
             if (!response.streaming()) {
                 HttpUtil.sendBytes(exchange, response.status(), response.contentType(), response.body());
                 return;

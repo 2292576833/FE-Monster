@@ -6,6 +6,10 @@ import vm from 'node:vm';
 const root = path.resolve(import.meta.dirname, '..');
 const desktopLyrics = fs.readFileSync(path.join(root, 'web', 'desktop-lyrics.html'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'web', 'app.js'), 'utf8');
+const interpolationHorizon = Number(app.match(
+  /const\s+DESKTOP_SCENE_LYRIC_EXTRAPOLATION_MAX_SECONDS\s*=\s*([0-9.]+)/,
+)?.[1]);
+assert.ok(Number.isFinite(interpolationHorizon), 'desktop lyric interpolation horizon must exist');
 
 function extractFunction(source, name) {
   const start = source.indexOf(`function ${name}(`);
@@ -24,6 +28,7 @@ const context = vm.createContext({
   Math,
   Number,
   isFinite,
+  DESKTOP_SCENE_LYRIC_EXTRAPOLATION_MAX_SECONDS: interpolationHorizon,
   clamp(value, min, max, fallback) {
     const numeric = Number(value);
     return Math.max(min, Math.min(max, Number.isFinite(numeric) ? numeric : fallback));
@@ -61,17 +66,25 @@ vm.runInContext(
 const effectiveClock = {
   time: 10.2,
   updatedAt: 1000,
-  playing: true
+  playing: true,
+  playbackRate: 1
 };
+const expectedInterpolatedTime = 10.2 + Math.min(0.5, interpolationHorizon);
 assert.equal(
   context.readSceneTime(effectiveClock, 1500, 0.22),
-  10.42,
-  'desktop scene must render the latest calibrated media sample without recalibrating it'
+  expectedInterpolatedTime,
+  'desktop scene must smoothly interpolate from the latest calibrated media sample'
 );
 assert.equal(
   context.readSceneTime(effectiveClock, 61_000, 0.22),
-  10.42,
-  'desktop scene must not create a second performance-based playback clock'
+  10.2 + interpolationHorizon,
+  'desktop scene interpolation must stop at a bounded horizon when snapshots disappear'
+);
+effectiveClock.playing = false;
+assert.equal(
+  context.readSceneTime(effectiveClock, 61_000, 0.22),
+  10.2,
+  'paused desktop lyrics must not advance from the presentation clock'
 );
 assert.match(
   app,
@@ -117,5 +130,5 @@ assert.match(
 console.log(JSON.stringify({
   ok: true,
   effectiveProgress: context.read(snapshot),
-  mirroredSceneTime: context.readSceneTime(effectiveClock, 1500, 0.22)
+  mirroredSceneTime: expectedInterpolatedTime
 }, null, 2));

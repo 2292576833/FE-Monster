@@ -43,7 +43,8 @@ assert.match(service, /"\/login\/qr\/view"\.equals\(uri\.getPath\(\)\)/,
 assert.match(service, /!key\.equals\(queryKey\)/,
   'Kugou QR display does not bind the local page to the provider-issued key');
 assert.doesNotMatch(service, /official-login|--app=http:\/\/127\.0\.0\.1/);
-assert.match(service, /new ServerSocket\(0, 1, java\.net\.InetAddress\.getLoopbackAddress\(\)\)/);
+assert.match(service, /new ServerSocket\(0, 1, java\.net\.InetAddress\.getByName\("127\.0\.0\.1"\)\)/,
+  'the debug-port reservation must use the same IPv4 loopback address as Chromium');
 assert.match(service, /command\.put\("method", "Storage\.getCookies"\)/);
 assert.match(service, /if \(!spec\.matchesDomain\(domain\)\) continue/);
 assert.match(service, /music\.synchronizeBrowserSession\(session\.provider, cookies\)/);
@@ -62,7 +63,7 @@ assert.match(musicApiConfig, /boolean loginQr = false;/,
 assert.doesNotMatch(musicApiConfig, /pluginSlot\([^\n]+, true\)/,
   'desktop provider defaults must not advertise embedded QR login');
 assert.match(context, /new OfficialBrowserLoginService\(paths\.dataDir, music\)/);
-assert.match(context, /browserLogin\.close\(\)/);
+assert.match(context, /browserLogin(?:\.close\(\)|::close)/);
 
 assert.match(netease, /rememberBrowserSession\(Map<String, String> cookies\)/);
 assert.match(generic, /rememberBrowserSession\(Map<String, String> cookies\)/);
