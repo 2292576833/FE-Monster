@@ -69,7 +69,7 @@ file(READ
 )
 string(REPLACE
   "NextPowTwo(frames_per_buffer) * 2"
-  "8192"
+  "static_cast<size_t>(8192)"
   FE_OBR_FFT_MANAGER_TEXT
   "${FE_OBR_FFT_MANAGER_TEXT}"
 )

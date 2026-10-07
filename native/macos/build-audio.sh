@@ -45,7 +45,8 @@ cmake -S "${audio_source}" -B "${build_directory}/cmake" \
   -DFE_JNI_INCLUDE_DIR="${jdk}/include" -DFE_JNI_PLATFORM_INCLUDE_DIR="${jdk}/include/darwin" \
   -DFE_RUST_AUDIO_LIBRARY="${output_directory}/libfe_monster_upmix.dylib" \
   -DFE_RUNTIME_OUTPUT_DIR="${output_directory}"
-cmake --build "${build_directory}/cmake" --parallel
+cmake --build "${build_directory}/cmake" --target \
+  fe_monster_coreaudio fe_pcm_queue_probe fe_coreaudio_dsp_probe --parallel
 # Native CPU probes can run for the host architecture. Cross-architecture
 # binaries are built but must be checked on their corresponding macOS runner.
 if [[ "${architecture}" == "$(uname -m)" ]]; then

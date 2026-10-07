@@ -213,10 +213,10 @@ try {
     assert.match(pipelineSource, /GetProcAddress\(module_, "fe_rust_upmix_update"\)/);
     assert.match(nativeCmake, /FE_OBR_FFT_MANAGER_SOURCE/);
     assert.match(nativeCmake, /NextPowTwo\(frames_per_buffer\) \* 2/);
-    assert.match(nativeCmake, /"8192"/);
+    assert.match(nativeCmake, /"static_cast<size_t>\(8192\)"/);
     assert.match(wasmCmake, /FE_OBR_FFT_MANAGER_SOURCE/);
     assert.match(wasmCmake, /NextPowTwo\(frames_per_buffer\) \* 2/);
-    assert.match(wasmCmake, /"8192"/);
+    assert.match(wasmCmake, /"static_cast<size_t>\(8192\)"/);
   });
 
   contract('queueBackpressureDoesNotBlockMixerControls', () => {
@@ -276,7 +276,7 @@ try {
     checks,
     failures,
     contract: {
-      presets: 14,
+      presets: 15,
       nativeVectorValues: 68,
       routes: [
         'stereo-mixer-out',

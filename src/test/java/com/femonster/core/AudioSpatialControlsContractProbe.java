@@ -149,7 +149,7 @@ public final class AudioSpatialControlsContractProbe {
 
         Map<String, Object> presetPayload = service.presets();
         List<Object> presets = SimpleJson.asList(presetPayload.get("presets"));
-        require(presets.size() == 14, "the fourteen shipped preset identities must remain");
+        require(presets.size() == 15, "the fifteen shipped preset identities must remain");
         List<String> ids = new ArrayList<>();
         Map<String, Object> surround = Map.of();
         for (Object value : presets) {
@@ -165,7 +165,7 @@ public final class AudioSpatialControlsContractProbe {
             "clean", "bathroom", "hall", "surround-3d",
             "cinema", "vocal-clear", "bass-boost", "night",
             "wide-chorus", "classic-flanger", "flowing-phaser", "ping-pong-delay",
-            "nearfield-studio", "immersive-live"
+            "nearfield-studio", "immersive-live", "clear-spatial"
         )), "preset identities or order changed");
         require(Boolean.TRUE.equals(surround.get("upmixEnabled")),
             "3D surround must use the real upmixer");

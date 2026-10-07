@@ -27,6 +27,7 @@ assert(!native.includes('system(') && !native.includes('popen('));
 const cmake = readFileSync(path.join(root, 'native/macos/CMakeLists.txt'), 'utf8');
 assert(cmake.includes('CMAKE_POSITION_INDEPENDENT_CODE ON'));
 assert(cmake.includes('INSTALL_RPATH "@loader_path"'));
+assert(cmake.includes('"static_cast<size_t>(8192)"'), 'FFT tuning must preserve the original size_t expression type');
 const build = readFileSync(path.join(root, 'native/macos/build-audio.sh'), 'utf8');
 assert(build.includes('aarch64-apple-darwin') && build.includes('x86_64-apple-darwin'));
 assert(build.includes('cargo build --locked'));

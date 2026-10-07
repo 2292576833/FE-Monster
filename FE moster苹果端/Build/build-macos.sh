@@ -113,7 +113,8 @@ if [[ "${FE_MONSTER_DMG:-1}" != "0" ]]; then
   ln -s /Applications "${DMG_ROOT}/Applications"
   DMG_PATH="${MAC_DIST_ROOT}/FE-Monster-${DISPLAY_VERSION}-$(uname -m).dmg"
   hdiutil create -volname "FE Monster" -srcfolder "${DMG_ROOT}" -ov -format UDZO "${DMG_PATH}"
-  shasum -a 256 "${DMG_PATH}" > "${DMG_PATH}.sha256"
+  # Use a relative filename so downloaded checksums work on the user's Mac.
+  (cd "${MAC_DIST_ROOT}" && shasum -a 256 "$(basename -- "${DMG_PATH}")" > "$(basename -- "${DMG_PATH}").sha256")
 fi
 
 note "macOS 应用已生成：${APP_BUNDLE}"
