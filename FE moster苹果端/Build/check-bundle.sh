@@ -138,11 +138,11 @@ JAVA
 ) > "${SCRATCH}/backend.log" 2>&1 &
 BACKEND_PID=$!
 
-"${BUNDLED_NODE}" --input-type=module - "${SCRATCH}" "${BACKEND_PID}" "${SOURCE_PROJECT_ROOT}" <<'NODE'
+"${BUNDLED_NODE}" --input-type=module - "${SCRATCH}" "${BACKEND_PID}" "${SOURCE_PROJECT_ROOT}" "${APP_RESOURCES}" <<'NODE'
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-const [scratch,pidText,projectRoot]=process.argv.slice(2);
+const [scratch,pidText,projectRoot,appResources]=process.argv.slice(2);
 const expectedVersion=JSON.parse(fs.readFileSync(path.join(projectRoot,'package.json'),'utf8')).version;
 const pause=()=>new Promise(resolve=>setTimeout(resolve,150));
 const deadline=Date.now()+60_000;
@@ -170,6 +170,31 @@ while(Date.now()<deadline) {
   await pause();
 }
 assert.ok(fs.existsSync(path.join(scratch,'base-url.txt')),'Bundled Java did not become ready within 60 seconds');
+async function checkNativeAudioRuntime() {
+  // This read-only route calls nativeInit/native status through the packaged
+  // JVM. Merely verifying a dylib's signature cannot detect JNI/dyld failures.
+  const response=await fetch(`${base}api/audio/runtime`,{signal:AbortSignal.timeout(5000)});
+  assert.equal(response.status,200,'The native audio runtime route must be available');
+  const nativeAudio=await response.json();
+  const diagnostics=JSON.stringify({status:nativeAudio.status,error:nativeAudio.error,dll:nativeAudio.dll});
+  assert.equal(nativeAudio.macos,true,`The bundled JVM must select macOS native audio: ${diagnostics}`);
+  assert.equal(nativeAudio.windows,false,'macOS must not resolve a Windows audio library');
+  // nativeInit constructs an AudioComponent, but starts no device or capture.
+  // A headless runner may fail initialization; both statuses prove System.load
+  // and the nativeInit JNI symbol succeeded. load-failed never qualifies.
+  assert.ok(['ready','init-failed'].includes(nativeAudio.status),`Bundled CoreAudio JNI failed to load: ${diagnostics}`);
+  assert.equal(nativeAudio.active,nativeAudio.status==='ready',`Native availability must match initialization: ${diagnostics}`);
+  assert.equal(nativeAudio.error,nativeAudio.status==='ready'?'':'nativeInit returned false',`Unexpected native initialization error: ${diagnostics}`);
+  assert.equal(nativeAudio.backend,nativeAudio.active?'coreaudio':'html-audio-fallback');
+  assert.equal(nativeAudio.spatialBackend,'google-obr');
+  assert.equal(nativeAudio.decoder,'webkit-media');
+  assert.equal(fs.realpathSync(nativeAudio.dll),fs.realpathSync(path.join(appResources,'native/macos/libfe-monster-coreaudio.dylib')),
+    'JNI must load this signed app bundle\'s CoreAudio library');
+  assert.equal(nativeAudio.captureRunning,false,'Runtime verification must not start system sound capture');
+  assert.equal(nativeAudio.spatialPipeline?.running,false,'Runtime verification must not start a CoreAudio output stream');
+  return {status:nativeAudio.status,initialized:nativeAudio.active,backend:nativeAudio.backend};
+}
+const nativeAudio=await checkNativeAudioRuntime();
 for(const route of ['', 'index.html']) {
   const response=await fetch(base+route,{signal:AbortSignal.timeout(5000)});
   assert.equal(response.status,200,`App shell ${route||'/'} must return HTTP 200`);
@@ -194,7 +219,7 @@ for(const id of ['netease','qq','kugou','qishui']) {
   assert.ok(fs.existsSync(packageRoot),`${id} extracted package must exist`);
 }
 assert.ok(fs.existsSync(path.join(scratch,'data','music-api','providers.json')),'Provider configuration must persist in isolated user data');
-console.log(JSON.stringify({ok:true,platform:process.platform,architecture:process.arch,version:expectedVersion,cleanInstallProviders:4,pluginAutostart:false}));
+console.log(JSON.stringify({ok:true,platform:process.platform,architecture:process.arch,version:expectedVersion,nativeAudio,cleanInstallProviders:4,pluginAutostart:false}));
 NODE
 BASE_URL="$(cat "${SCRATCH}/base-url.txt")"
 curl --fail --silent --show-error --noproxy '*' --max-time 5 "${BASE_URL}api/app/window/quit" >/dev/null
@@ -205,4 +230,4 @@ done
 if kill -0 "${BACKEND_PID}" 2>/dev/null; then fail "Bundled Java did not shut down through its quit endpoint."; fi
 wait "${BACKEND_PID}" || fail "Bundled Java exited with a failure status."
 BACKEND_PID=""
-note "Bundle architecture, signing, Java/Node, SQLite, app shell, clean-install API imports and graceful shutdown passed."
+note "Bundle architecture, signing, Java/Node, CoreAudio JNI loading, SQLite, app shell, clean-install API imports and graceful shutdown passed."

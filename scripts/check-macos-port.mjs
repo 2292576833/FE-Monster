@@ -1,5 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import assert from "node:assert/strict";
+import vm from "node:vm";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -27,6 +29,7 @@ const runScript = text("Build/run-dev.sh");
 const syncScript = text("Build/sync-shared-resources.sh");
 const infoPlist = text("Build/Info.plist");
 const productVersion = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).version;
+const bundleCheck = text("Build/check-bundle.sh");
 
 requirePattern(packageSwift, /\.macOS\(\.v13\)/, "Swift package must target macOS 13+");
 requirePattern(mainSwift, /applicationWillTerminate/, "AppDelegate must stop the backend");
@@ -100,6 +103,42 @@ requirePattern(buildScript, /java\.sql/, "SQLite module available in jlink runti
 requirePattern(buildScript, /hdiutil create/, "installable DMG creation");
 requirePattern(infoPlist, /<key>LSMinimumSystemVersion<\/key>\s*<string>13\.5<\/string>/,
   "bundled Node requires macOS 13.5+");
+
+// Run the bundle's actual read-only JNI verification against representative
+// HTTP responses. Native loading itself is exercised by this script on Mac CI.
+const nativeCheckStart = bundleCheck.indexOf("async function checkNativeAudioRuntime() {");
+const nativeCheckEnd = bundleCheck.indexOf("\nconst nativeAudio=await checkNativeAudioRuntime();", nativeCheckStart);
+assert.ok(nativeCheckStart >= 0 && nativeCheckEnd > nativeCheckStart, "bundle verification must exercise CoreAudio JNI over HTTP");
+const nativeCheckSource = bundleCheck.slice(nativeCheckStart, nativeCheckEnd);
+const fixtureAudio = {
+  status: "ready", error: "", active: true, macos: true, windows: false,
+  backend: "coreaudio", spatialBackend: "google-obr", decoder: "webkit-media",
+  dll: "/installed/FE Monster.app/Contents/Resources/App/native/macos/libfe-monster-coreaudio.dylib",
+  captureRunning: false, spatialPipeline: { running: false },
+};
+function runNativeCheck(overrides = {}, responseStatus = 200) {
+  const context = {
+    assert, path: path.posix, AbortSignal, base: "http://127.0.0.1:31555/",
+    appResources: "/installed/FE Monster.app/Contents/Resources/App",
+    fs: { realpathSync: value => value },
+    fetch: async url => {
+      assert.equal(url, "http://127.0.0.1:31555/api/audio/runtime");
+      return { status: responseStatus, json: async () => ({ ...fixtureAudio, ...overrides }) };
+    },
+  };
+  vm.createContext(context);
+  vm.runInContext(nativeCheckSource, context, { filename: "check-bundle.sh JNI validation" });
+  return context.checkNativeAudioRuntime();
+}
+assert.equal((await runNativeCheck()).initialized, true);
+assert.equal((await runNativeCheck({ status: "init-failed", active: false, backend: "html-audio-fallback", error: "nativeInit returned false" })).initialized, false);
+for (const overrides of [
+  { status: "load-failed", active: false, error: "dlopen missing symbol" },
+  { status: "dll-missing", active: false }, { status: "unsupported-os", active: false },
+  { macos: false, windows: true }, { dll: "/different/install/libfe-monster-coreaudio.dylib" },
+  { error: "UnsatisfiedLinkError" }, { captureRunning: true }, { spatialPipeline: { running: true } },
+]) await assert.rejects(runNativeCheck(overrides));
+await assert.rejects(runNativeCheck({}, 500));
 
 const sourceText = [mainSwift, optionsSwift, backendSwift, windowSwift, toolbarSwift].join("\n");
 if (/\b(?:powershell(?:\.exe)?|cmd\.exe|taskkill|pkill)\b/i.test(sourceText)) {

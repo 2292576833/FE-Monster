@@ -10,6 +10,7 @@ struct ClientOptions {
     let rootOverride: URL?
     let jarOverride: URL?
     let javaOverride: URL?
+    let ciSmokeReport: URL?
 
     var serverBaseURL: URL {
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
@@ -75,7 +76,8 @@ struct ClientOptions {
             startServer: !flags.contains("--no-server") && parsedURL.scheme?.lowercased() == "http",
             rootOverride: root,
             jarOverride: jar,
-            javaOverride: java
+            javaOverride: java,
+            ciSmokeReport: smokeReportURL(values["--ci-smoke-report"])
         )
     }
 
@@ -106,5 +108,21 @@ struct ClientOptions {
         guard let path = nonEmpty(path) else { return nil }
         return URL(fileURLWithPath: NSString(string: path).expandingTildeInPath)
             .standardizedFileURL
+    }
+
+    /// An explicit test invocation must use a fresh directory directly below
+    /// the OS temporary directory; never reuse an installed account profile.
+    private static func smokeReportURL(_ path: String?) -> URL? {
+        guard let path = nonEmpty(path), NSString(string: path).isAbsolutePath else { return nil }
+        let report = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath()
+        let parent = report.deletingLastPathComponent()
+        let temporary = FileManager.default.temporaryDirectory.standardizedFileURL.resolvingSymlinksInPath()
+        guard report.pathExtension == "json",
+              parent.deletingLastPathComponent().path == temporary.path,
+              parent.lastPathComponent.hasPrefix("fe-monster-native-ui."),
+              FileManager.default.fileExists(atPath: parent.path),
+              !FileManager.default.fileExists(atPath: report.path),
+              !FileManager.default.fileExists(atPath: parent.appendingPathComponent("data").path) else { return nil }
+        return report
     }
 }

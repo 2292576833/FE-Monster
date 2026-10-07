@@ -56,6 +56,9 @@ final class FeMonsterWindowController: NSWindowController,
     private var bridgeRemoved = false
     private var trustedOrigin: (scheme: String, host: String, port: Int)?
     private var applicationURL: URL?
+    private var applicationNavigation: WKNavigation?
+    private var smokeProbeStarted = false
+    var onSmokeResult: ((Result<[String: Any], Error>) -> Void)?
     private var webProcessFailures: [Date] = []
     private var desktopTimer: Timer?
     private var playbackTimer: Timer?
@@ -90,7 +93,7 @@ final class FeMonsterWindowController: NSWindowController,
 
         let configuration = WKWebViewConfiguration()
         configuration.userContentController = userContentController
-        configuration.websiteDataStore = .default()
+        configuration.websiteDataStore = options.ciSmokeReport == nil ? .default() : .nonPersistent()
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
@@ -129,7 +132,7 @@ final class FeMonsterWindowController: NSWindowController,
         stopDesktopRuntime()
         applicationURL = url
         trustedOrigin = origin(of: url)
-        webView.load(URLRequest(url: url))
+        applicationNavigation = webView.load(URLRequest(url: url))
         startPlaybackActivityMonitor()
     }
 
@@ -703,6 +706,82 @@ final class FeMonsterWindowController: NSWindowController,
     }
 
     // MARK: - Navigation, external windows and downloads
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        guard options.ciSmokeReport != nil, !smokeProbeStarted,
+              navigation === applicationNavigation,
+              let url = webView.url, let applicationURL,
+              ClientOptions.isLoopbackHost(url.host),
+              !shouldOpenExternally(url), url.path == applicationURL.path else { return }
+        smokeProbeStarted = true
+        guard window?.isVisible == true, webView.bounds.width > 0, webView.bounds.height > 0 else {
+            onSmokeResult?(.failure(NSError(domain: "FEMonsterUISmoke", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "The native window/WebView is not visible."])))
+            return
+        }
+        let expectedVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        webView.callAsyncJavaScript(
+            """
+            if (!window.FeMonsterBootstrapReady || typeof window.FeMonsterBootstrapReady.then !== 'function')
+              throw new Error('The real app.js bootstrap Promise is missing');
+            let bootstrapTimeout;
+            try {
+              await Promise.race([window.FeMonsterBootstrapReady, new Promise((_, reject) => {
+                bootstrapTimeout = setTimeout(() => reject(new Error('The real app.js bootstrap did not complete')), 60000);
+              })]);
+            } finally { clearTimeout(bootstrapTimeout); }
+            if (!['deferred','started'].includes(document.documentElement.dataset.interactiveServices)
+                || document.readyState !== 'complete' || !document.querySelector('#bootScreen')
+                || !document.querySelector('#audio') || window.FE_MONSTER_PLATFORM !== 'macos'
+                || !window.FeMonsterPlaybackContext?.state || !window.FeMonsterAppCommands
+                || typeof isPlaybackClockRunning !== 'function'
+                || typeof window.feMonsterRecordingNativeReady !== 'function') {
+              throw new Error('The bundled app DOM, JavaScript, or native platform bridge is missing');
+            }
+            const bridge = window.chrome?.webview;
+            if (!bridge?.postMessage || !bridge.addEventListener || !bridge.removeEventListener)
+              throw new Error('The WK native message bridge is missing');
+            const capabilities = await new Promise((resolve, reject) => {
+              const timeout = setTimeout(() => { bridge.removeEventListener('message', receive); reject(new Error('Native bridge round trip timed out')); }, 5000);
+              function receive(event) {
+                if (event.data?.requestId !== requestId) return;
+                clearTimeout(timeout); bridge.removeEventListener('message', receive);
+                resolve(event.data);
+              }
+              bridge.addEventListener('message', receive);
+              bridge.postMessage({type:'fe-render-capabilities', requestId});
+            });
+            if (capabilities.type !== 'fe-render-capabilities-result' || capabilities.host?.backend !== 'wkwebview-metal')
+              throw new Error('Native bridge returned an invalid response');
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 5000);
+            let response, version;
+            try {
+              response = await fetch('/api/app/version', {signal:controller.signal, cache:'no-store'});
+              version = await response.json();
+            } finally { clearTimeout(timeout); }
+            if (response.status !== 200 || version.ok !== true || version.name !== 'FE Monster Java' || version.version !== expectedVersion)
+              throw new Error('WK fetch did not reach the expected bundled Java backend');
+            return {didFinish:true, bootstrapResolved:true, bootstrap:document.documentElement.dataset.interactiveServices,
+              platform:window.FE_MONSTER_PLATFORM, bridgeRoundTrip:true, fetchStatus:response.status,
+              version:version.version, url:location.href, viewport:{width:innerWidth,height:innerHeight}};
+            """,
+            arguments: ["requestId": "ci-ui-" + UUID().uuidString, "expectedVersion": expectedVersion],
+            in: nil, in: .page
+        ) { [weak self] result in
+            guard let self, !self.bridgeRemoved else { return }
+            switch result {
+            case .success(let value):
+                guard let evidence = value as? [String: Any] else {
+                    self.onSmokeResult?(.failure(NSError(domain: "FEMonsterUISmoke", code: 2,
+                        userInfo: [NSLocalizedDescriptionKey: "WK returned no structured UI evidence."])))
+                    return
+                }
+                self.onSmokeResult?(.success(evidence))
+            case .failure(let error): self.onSmokeResult?(.failure(error))
+            }
+        }
+    }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         macCapture.shutdown()

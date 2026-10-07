@@ -2,8 +2,20 @@
 #undef NDEBUG
 #endif
 #include "fe_coreaudio_dsp.h"
-#include <cassert>
 #include <iostream>
+#include <sstream>
+
+namespace {
+std::string probe_stage = "startup";
+void require(bool passed, const char* expression, int line) {
+    if (!passed) {
+        std::ostringstream message;
+        message << "DSP probe failed at line " << line << ": " << expression << "; stage=" << probe_stage;
+        throw std::runtime_error(message.str());
+    }
+}
+}
+#define REQUIRE(expression) require((expression), #expression, __LINE__)
 
 using fe::mac_audio::DspGraph;
 FeAudioSpatialControlParams controls(uint32_t channels, uint32_t algorithm, bool upmix, bool obr) {
@@ -33,6 +45,46 @@ FeRustMixerParams cleanMixer() {
     return p;
 }
 int main() {
+    std::cerr << std::unitbuf;
+    try {
+    probe_stage = "8192 FFT / 256-frame round trip";
+    std::cerr << "[DSP] " << probe_stage << '\n';
+    obr::FftManager fft(DspGraph::kQuantum);
+    REQUIRE(fft.GetFftSize() == FE_AUDIO_OBR_SAMPLE_POINTS);
+    obr::AudioBuffer fft_input(1, DspGraph::kQuantum), fft_frequency(1, fft.GetFftSize()), fft_output(1, DspGraph::kQuantum);
+    fft_input.Clear(); fft_input[0][0] = .25f;
+    fft.FreqFromTimeDomain(fft_input[0], &fft_frequency[0]);
+    fft.TimeFromFreqDomain(fft_frequency[0], &fft_output[0]);
+    fft.ApplyReverseFftScaling(&fft_output[0]);
+    REQUIRE(std::abs(fft_output[0][0] - .25f) < 1e-6f);
+    for (uint32_t f = 1; f < DspGraph::kQuantum; ++f) REQUIRE(std::abs(fft_output[0][f]) < 1e-6f);
+    probe_stage = "FFT magnitude bins and partitioned convolution / direct FIR reference";
+    std::cerr << "[DSP] " << probe_stage << '\n';
+    obr::AudioBuffer canonical(1, fft.GetFftSize()), magnitudes(1, fft.GetFftSize() / 2 + 1);
+    fft.GetCanonicalFormatFreqBuffer(fft_frequency[0], &canonical[0]);
+    fft.MagnitudeFromCanonicalFreqBuffer(canonical[0], &magnitudes[0]);
+    // OBR deliberately uses one Newton iteration for its scalar magnitude
+    // remainder, whose relative error can approach 0.2 percent.
+    for (uint32_t bin = 0; bin < magnitudes.num_frames(); ++bin)
+        REQUIRE(std::abs(magnitudes[0][bin] - .25f) < .0006f);
+    constexpr uint32_t filter_length = 768, signal_length = 256 * 8;
+    obr::AudioBuffer kernel(1, filter_length);
+    kernel.Clear(); kernel[0][0] = .5f; kernel[0][255] = .125f; kernel[0][256] = -.25f;
+    kernel[0][511] = .2f; kernel[0][512] = .0625f; kernel[0][700] = .1f;
+    obr::PartitionedFftFilter filter(filter_length, DspGraph::kQuantum, &fft);
+    filter.SetTimeDomainKernel(kernel[0]);
+    std::array<float, signal_length> signal{}, reference{};
+    signal[0] = .5f; signal[255] = -.25f; signal[256] = .125f; signal[511] = .75f;
+    for (uint32_t f = 0; f < signal_length; ++f)
+        for (uint32_t tap = 0; tap < filter_length && tap <= f; ++tap)
+            reference[f] += signal[f - tap] * kernel[0][tap];
+    for (uint32_t offset = 0; offset < signal_length; offset += DspGraph::kQuantum) {
+        for (uint32_t f = 0; f < DspGraph::kQuantum; ++f) fft_input[0][f] = signal[offset + f];
+        fft.FreqFromTimeDomain(fft_input[0], &fft_frequency[0]);
+        filter.Filter(fft_frequency[0]); filter.GetFilteredSignal(&fft_output[0]);
+        for (uint32_t f = 0; f < DspGraph::kQuantum; ++f)
+            REQUIRE(std::abs(fft_output[0][f] - reference[offset + f]) < 1e-5f);
+    }
     std::array<float, 4096 * 2> input{}, output{};
     for (uint32_t f = 0; f < 4096; ++f) {
         input[f * 2] = .15f * std::sin(6.283185307179586 * 440 * f / 48000);
@@ -41,38 +93,56 @@ int main() {
     // All four signal routes and all actual portable upmix algorithms.
     for (auto channels : {6u, 8u}) for (auto algorithm : {0u, 1u, 2u, 4u})
         for (bool upmix : {false, true}) for (bool obr : {false, true}) {
+            probe_stage = "layout=" + std::to_string(channels) + " algorithm=" + std::to_string(algorithm)
+                + " upmix=" + std::to_string(upmix) + " obr=" + std::to_string(obr);
+            std::cerr << "[DSP] constructing " << probe_stage << '\n';
             DspGraph graph(48000, controls(channels, algorithm, upmix, obr));
-            assert(graph.stageMixer(7, cleanMixer(), 0) == 0);
-            assert(graph.stageMixer(6, cleanMixer(), 0) == -2);
-            for (int block = 0; block < 4; ++block) assert(graph.process(input.data(), 4096, 2, output.data()) == 0);
+            std::cerr << "[DSP] staging controls " << probe_stage << '\n';
+            REQUIRE(graph.stageMixer(7, cleanMixer(), 0) == 0);
+            REQUIRE(graph.stageMixer(6, cleanMixer(), 0) == -2);
+            for (int block = 0; block < 4; ++block) {
+                std::cerr << "[DSP] process block=" << block << ' ' << probe_stage << '\n';
+                REQUIRE(graph.process(input.data(), 4096, 2, output.data()) == 0);
+            }
             float peak = 0;
-            for (float value : output) { assert(std::isfinite(value)); peak = std::max(peak, std::abs(value)); }
-            assert(peak > 1e-5f && peak <= .9441f);
-            assert(graph.mixer_calls > 0);
-            assert((graph.upmix_calls > 0) == upmix);
-            assert((graph.obr_calls > 0) == obr);
-            if (upmix) assert(graph.last_upmix_order < graph.last_mixer_order);
-            if (obr) assert(graph.last_mixer_order < graph.last_obr_order);
+            for (float value : output) { REQUIRE(std::isfinite(value)); peak = std::max(peak, std::abs(value)); }
+            REQUIRE(peak > 1e-5f && peak <= .9441f);
+            REQUIRE(graph.mixer_calls > 0);
+            REQUIRE((graph.upmix_calls > 0) == upmix);
+            REQUIRE((graph.obr_calls > 0) == obr);
+            if (upmix) REQUIRE(graph.last_upmix_order < graph.last_mixer_order);
+            if (obr) REQUIRE(graph.last_mixer_order < graph.last_obr_order);
         }
     // Every canonical bed channel must reach stereo output in a channel test.
+    probe_stage = "PCM fragmentation invariance";
+    std::cerr << "[DSP] " << probe_stage << '\n';
     DspGraph whole(48000, controls(6, 1, true, true));
     DspGraph fragmented(48000, controls(6, 1, true, true));
     std::array<float, 4096 * 2> fragment_output{}, whole_output{};
-    assert(whole.process(input.data(), 4096, 2, whole_output.data()) == 0);
+    REQUIRE(whole.process(input.data(), 4096, 2, whole_output.data()) == 0);
     for (uint32_t offset = 0; offset < 4096; offset += 128)
-        assert(fragmented.process(input.data() + offset * 2, 128, 2, fragment_output.data() + offset * 2) == 0);
-    for (uint32_t i = 0; i < 4096 * 2; ++i) assert(std::abs(fragment_output[i] - whole_output[i]) < 1e-6f);
+        REQUIRE(fragmented.process(input.data() + offset * 2, 128, 2, fragment_output.data() + offset * 2) == 0);
+    for (uint32_t i = 0; i < 4096 * 2; ++i) REQUIRE(std::abs(fragment_output[i] - whole_output[i]) < 1e-6f);
+    probe_stage = "live control state inheritance";
+    std::cerr << "[DSP] " << probe_stage << '\n';
     DspGraph control_candidate(48000, controls(6, 1, true, true), false);
     control_candidate.inheritState(whole, 128);
-    assert(control_candidate.process(input.data(), 4096, 2, whole_output.data()) == 0);
-    assert(std::any_of(whole_output.begin(), whole_output.end(), [](float value) { return std::abs(value) > 1e-5f; }));
+    REQUIRE(control_candidate.process(input.data(), 4096, 2, whole_output.data()) == 0);
+    REQUIRE(std::any_of(whole_output.begin(), whole_output.end(), [](float value) { return std::abs(value) > 1e-5f; }));
     DspGraph graph(48000, controls(8, 1, true, false));
     std::array<float, 4096 * 8> bed{};
     for (uint32_t channel = 0; channel < 8; ++channel) {
+        probe_stage = "channel signal=" + std::to_string(channel);
+        std::cerr << "[DSP] " << probe_stage << '\n';
         bed.fill(0);
         for (uint32_t f = 0; f < 4096; ++f) bed[f * 8 + channel] = .1f;
-        assert(graph.process(input.data(), 4096, 2, output.data(), bed.data()) == 0);
-        assert(std::any_of(output.begin(), output.end(), [](float value) { return std::abs(value) > 1e-5f; }));
+        REQUIRE(graph.process(input.data(), 4096, 2, output.data(), bed.data()) == 0);
+        REQUIRE(std::any_of(output.begin(), output.end(), [](float value) { return std::abs(value) > 1e-5f; }));
     }
     std::cout << "Mac portable DSP: 32 routes, gain safety, revision/order, 7.1 channel tests PASS\n";
+    return 0;
+    } catch (const std::exception& failure) {
+        std::cerr << "[DSP] " << failure.what() << "; stage=" << probe_stage << '\n';
+        return 1;
+    }
 }

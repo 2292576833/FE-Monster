@@ -38,6 +38,17 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
+      - name: Restore native build dependencies
+        id: native-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            .tmp/coreaudio-${{ matrix.arch }}
+            .tmp/google-obr-native-478dc7c752d5
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: macos-native-v1-${{ matrix.arch }}-${{ github.sha }}
+          restore-keys: macos-native-v1-${{ matrix.arch }}-
       - name: Verify source contracts before generated directories exist
         run: |
           node scripts/check-macos-port.mjs
@@ -63,6 +74,8 @@ jobs:
         run: bash 'FE moster苹果端/Build/check-bundle.sh'
       - name: Verify Keychain protection with the bundled Java runtime
         run: node scripts/check-macos-keychain.mjs
+      - name: Verify the packaged native window and actual frontend startup
+        run: bash 'FE moster苹果端/Build/check-native-ui.sh'
       - name: Keep verified installers as CI artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -73,3 +86,25 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
+      - name: Save native build dependencies
+        if: always() && steps.native-cache.outcome == 'success'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            .tmp/coreaudio-${{ matrix.arch }}
+            .tmp/google-obr-native-478dc7c752d5
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: macos-native-v1-${{ matrix.arch }}-${{ github.sha }}
+      - name: Preserve native failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-diagnostics-${{ matrix.arch }}-${{ github.run_id }}
+          path: |
+            .tmp/coreaudio-${{ matrix.arch }}/cmake/Testing/Temporary/*.log
+            ~/Library/Logs/DiagnosticReports/*fe*.*
+            FE moster苹果端/.build-macos/native-ui-smoke/*
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7

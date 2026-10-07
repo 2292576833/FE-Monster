@@ -8,6 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var mainWindowController: FeMonsterWindowController?
     private var statusItem: NSStatusItem?
     private var terminationSignal: DispatchSourceSignal?
+    private var smokeDeadline: Timer?
+    private var smokeEvidence: [String: Any]?
 
     init(options: ClientOptions) {
         self.options = options
@@ -21,19 +23,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         installMenu()
         let controller = FeMonsterWindowController(options: options)
         mainWindowController = controller
+        if options.ciSmokeReport != nil {
+            controller.onSmokeResult = { [weak self] result in
+                switch result {
+                case .success(let evidence): self?.finishSmoke(evidence)
+                case .failure(let error): self?.finishSmoke(["ok": false, "error": error.localizedDescription])
+                }
+            }
+            let timer = Timer(timeInterval: 120, repeats: false) { [weak self] _ in
+                DispatchQueue.main.async { self?.finishSmoke(["ok": false, "error": "Native UI smoke timed out."]) }
+            }
+            smokeDeadline = timer
+            RunLoop.main.add(timer, forMode: .common)
+        }
         controller.showWindow(nil)
         installStatusMenu()
         NSApplication.shared.activate(ignoringOtherApps: true)
-        backend.onUnexpectedExit = { [weak controller] message in
+        backend.onUnexpectedExit = { [weak self, weak controller] message in
             controller?.showStartupFailure(message)
+            self?.finishSmoke(["ok": false, "error": message])
         }
 
-        backend.start { [weak controller] result in
+        backend.start { [weak self, weak controller] result in
             switch result {
             case .success(let url):
                 controller?.loadApplication(at: url)
             case .failure(let error):
                 controller?.showStartupFailure(error.localizedDescription)
+                self?.finishSmoke(["ok": false, "error": error.localizedDescription])
             }
         }
     }
@@ -45,11 +62,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     /// Direct counterpart of FeMonsterForm.OnFormClosing lifecycle cleanup.
     func applicationWillTerminate(_ notification: Notification) {
+        smokeDeadline?.invalidate()
         terminationSignal?.cancel()
         terminationSignal = nil
         mainWindowController?.prepareForTermination()
         backend.stopSynchronously()
+        writeSmokeReportAfterShutdown()
         if let statusItem { NSStatusBar.system.removeStatusItem(statusItem) }
+    }
+
+    private func finishSmoke(_ evidence: [String: Any]) {
+        guard options.ciSmokeReport != nil, smokeEvidence == nil else { return }
+        smokeEvidence = evidence
+        smokeDeadline?.invalidate()
+        NSApplication.shared.terminate(nil)
+    }
+
+    private func writeSmokeReportAfterShutdown() {
+        guard let report = options.ciSmokeReport else { return }
+        var evidence = smokeEvidence ?? ["ok": false, "error": "The app terminated before UI verification."]
+        let javaPID = backend.ownedProcessIdentifier ?? 0
+        evidence["mainPID"] = Int(ProcessInfo.processInfo.processIdentifier)
+        evidence["javaPID"] = Int(javaPID)
+        evidence["javaExited"] = javaPID > 0 && Darwin.kill(javaPID, 0) != 0 && errno == ESRCH
+        evidence["gracefulJavaShutdown"] = backend.didShutDownGracefully
+        evidence["dataDirectory"] = report.deletingLastPathComponent().appendingPathComponent("data").path
+        evidence["bundlePath"] = Bundle.main.bundleURL.resolvingSymlinksInPath().path
+        evidence["ok"] = evidence["didFinish"] as? Bool == true
+            && evidence["bootstrapResolved"] as? Bool == true
+            && evidence["bridgeRoundTrip"] as? Bool == true
+            && evidence["javaExited"] as? Bool == true && backend.didShutDownGracefully
+        do {
+            let data = try JSONSerialization.data(withJSONObject: evidence, options: [.prettyPrinted, .sortedKeys])
+            try data.write(to: report, options: .atomic)
+        } catch {
+            fputs("Native UI smoke report failed: \(error.localizedDescription)\n", stderr)
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -173,6 +221,10 @@ enum FeMonsterApplication {
     static func main() {
         let application = NSApplication.shared
         let options = ClientOptions.parse(Array(CommandLine.arguments.dropFirst()))
+        if CommandLine.arguments.contains(where: { $0.lowercased() == "--ci-smoke-report" }), options.ciSmokeReport == nil {
+            fputs("--ci-smoke-report requires a fresh fe-monster-native-ui.* directory below the OS temporary directory.\n", stderr)
+            exit(64)
+        }
         let delegate = AppDelegate(options: options)
         application.setActivationPolicy(.regular)
         application.delegate = delegate

@@ -217,6 +217,14 @@ try {
     assert.match(wasmCmake, /FE_OBR_FFT_MANAGER_SOURCE/);
     assert.match(wasmCmake, /NextPowTwo\(frames_per_buffer\) \* 2/);
     assert.match(wasmCmake, /"static_cast<size_t>\(8192\)"/);
+    for (const cmake of [nativeCmake, wasmCmake]) {
+      assert.ok(cmake.includes('"${FE_OBR_DECODER_NEEDLE}" "fft_manager->GetFftSize()"'),
+        'decoder frequency allocation must follow the configured FFT size');
+      assert.ok(cmake.includes('"${FE_OBR_DECODER_SOURCE}"'),
+        'OBR must build the decoder with the corrected frequency allocation');
+      assert.ok(cmake.includes('"frames_per_buffer_" "(fft_size_ / 2)" FE_OBR_FFT_BINS'),
+        'magnitude and phase indices must follow the actual half-spectrum');
+    }
   });
 
   contract('queueBackpressureDoesNotBlockMixerControls', () => {

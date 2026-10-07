@@ -78,10 +78,42 @@ string(FIND "${FE_OBR_FFT_MANAGER_TEXT}" "${FE_OBR_FFT_NEEDLE}" FE_OBR_FFT_NEEDL
 if(FE_OBR_FFT_NEEDLE_POSITION GREATER_EQUAL 0)
   message(FATAL_ERROR "Unable to apply the 8192-point OBR FFT tuning")
 endif()
+# Frequency magnitude/phase utilities index FFT bins, not render frames. Keep
+# their half-spectrum lengths consistent with the enlarged transform as well.
+string(FIND "${FE_OBR_FFT_MANAGER_TEXT}" "void FftManager::MagnitudeFromCanonicalFreqBuffer(" FE_OBR_BINS_BEGIN)
+string(FIND "${FE_OBR_FFT_MANAGER_TEXT}" "void FftManager::FreqDomainConvolution(" FE_OBR_BINS_END)
+if(FE_OBR_BINS_BEGIN LESS 0 OR FE_OBR_BINS_END LESS FE_OBR_BINS_BEGIN)
+  message(FATAL_ERROR "Unable to locate the OBR magnitude/phase FFT-bin utilities")
+endif()
+math(EXPR FE_OBR_BINS_LENGTH "${FE_OBR_BINS_END} - ${FE_OBR_BINS_BEGIN}")
+string(SUBSTRING "${FE_OBR_FFT_MANAGER_TEXT}" 0 ${FE_OBR_BINS_BEGIN} FE_OBR_FFT_PREFIX)
+string(SUBSTRING "${FE_OBR_FFT_MANAGER_TEXT}" ${FE_OBR_BINS_BEGIN} ${FE_OBR_BINS_LENGTH} FE_OBR_FFT_BINS)
+string(SUBSTRING "${FE_OBR_FFT_MANAGER_TEXT}" ${FE_OBR_BINS_END} -1 FE_OBR_FFT_SUFFIX)
+string(REPLACE "frames_per_buffer_" "(fft_size_ / 2)" FE_OBR_FFT_BINS "${FE_OBR_FFT_BINS}")
+set(FE_OBR_FFT_MANAGER_TEXT "${FE_OBR_FFT_PREFIX}${FE_OBR_FFT_BINS}${FE_OBR_FFT_SUFFIX}")
 file(WRITE "${FE_OBR_FFT_MANAGER_SOURCE}" "${FE_OBR_FFT_MANAGER_TEXT}")
 
-set(OBR_CORE_SOURCES
+# The decoder's frequency input must use the same size as FftManager. Keeping
+# the upstream 2 * render-quantum allocation after increasing the FFT would
+# let PFFFT write 8192 floats into a 512-float buffer on the first OBR block.
+set(FE_OBR_DECODER_SOURCE
+  "${CMAKE_CURRENT_BINARY_DIR}/fe_obr_ambisonic_binaural_decoder_8192.cc"
+)
+file(READ
   "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/ambisonic_binaural_decoder.cc"
+  FE_OBR_DECODER_TEXT
+)
+set(FE_OBR_DECODER_NEEDLE "NextPowTwo(frames_per_buffer) * kNumStereoChannels")
+string(FIND "${FE_OBR_DECODER_TEXT}" "${FE_OBR_DECODER_NEEDLE}" FE_OBR_DECODER_NEEDLE_POSITION)
+if(FE_OBR_DECODER_NEEDLE_POSITION LESS 0)
+  message(FATAL_ERROR "Unable to locate the OBR decoder frequency-buffer allocation")
+endif()
+string(REPLACE "${FE_OBR_DECODER_NEEDLE}" "fft_manager->GetFftSize()"
+  FE_OBR_DECODER_TEXT "${FE_OBR_DECODER_TEXT}")
+file(WRITE "${FE_OBR_DECODER_SOURCE}" "${FE_OBR_DECODER_TEXT}")
+
+set(OBR_CORE_SOURCES
+  "${FE_OBR_DECODER_SOURCE}"
   "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/dsp_utils.cc"
   "${FE_OBR_FFT_MANAGER_SOURCE}"
   "${OBR_SOURCE_DIR}/obr/ambisonic_binaural_decoder/partitioned_fft_filter.cc"

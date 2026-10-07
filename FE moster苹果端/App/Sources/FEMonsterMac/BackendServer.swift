@@ -45,6 +45,8 @@ final class BackendServer {
     private var completed = false
     private var ready = false
     private var stopping = false
+    private var launchedProcessIdentifier: pid_t?
+    private var gracefulShutdown = false
     private var startupDeadline = Date.distantPast
     var onUnexpectedExit: ((String) -> Void)?
     private let localSession: URLSession = {
@@ -59,6 +61,9 @@ final class BackendServer {
         self.options = options
         runtimeBaseURL = options.serverBaseURL
     }
+
+    var ownedProcessIdentifier: pid_t? { queue.sync { launchedProcessIdentifier } }
+    var didShutDownGracefully: Bool { queue.sync { gracefulShutdown } }
 
     /// macOS counterpart of scripts/launch-fe-monster.ps1 and FeMonsterJavaApp startup.
     func start(completion: @escaping (Result<URL, Error>) -> Void) {
@@ -90,16 +95,21 @@ final class BackendServer {
 
         guard let process = snapshot.1, process.isRunning else {
             queue.sync {
+                if let process = snapshot.1, !process.isRunning {
+                    gracefulShutdown = process.terminationReason == .exit && process.terminationStatus == 0
+                }
                 outputPipe?.fileHandleForReading.readabilityHandler = nil
                 outputPipe = nil
             }
             return
         }
 
-        let gracefulDeadline = Date().addingTimeInterval(1.2)
+        let gracefulDeadline = Date().addingTimeInterval(options.ciSmokeReport == nil ? 1.2 : 8)
         while process.isRunning, Date() < gracefulDeadline {
             Thread.sleep(forTimeInterval: 0.04)
         }
+        let exitedGracefully = !process.isRunning
+            && process.terminationReason == .exit && process.terminationStatus == 0
         if process.isRunning {
             process.terminate()
         }
@@ -113,6 +123,7 @@ final class BackendServer {
         }
 
         queue.sync {
+            gracefulShutdown = exitedGracefully
             outputPipe?.fileHandleForReading.readabilityHandler = nil
             outputPipe = nil
             self.process = nil
@@ -160,6 +171,9 @@ final class BackendServer {
         environment["FE_MONSTER_WEB_ROOT"] = root.appendingPathComponent("web").path
         environment["FE_MONSTER_DATA_DIR"] = dataDirectory.path
         environment["FE_MONSTER_MAIN_PID"] = String(ProcessInfo.processInfo.processIdentifier)
+        if options.ciSmokeReport != nil {
+            environment["FE_MUSIC_API_AUTOSTART"] = "0"
+        }
         if Bundle.main.bundleURL.pathExtension.lowercased() == "app" {
             environment.removeValue(forKey: "FE_MONSTER_DEV")
             environment.removeValue(forKey: "FE_MONSTER_COREAUDIO_LIBRARY")
@@ -203,6 +217,7 @@ final class BackendServer {
                 withIntermediateDirectories: true
             )
             try process.run()
+            launchedProcessIdentifier = process.processIdentifier
             self.process = process
             outputPipe = pipe
             startupDeadline = Date().addingTimeInterval(45)
@@ -406,6 +421,9 @@ final class BackendServer {
     }
 
     private func applicationSupportDirectory(in root: URL) throws -> URL {
+        if let report = options.ciSmokeReport {
+            return report.deletingLastPathComponent().appendingPathComponent("data", isDirectory: true)
+        }
         let environment = ProcessInfo.processInfo.environment
         if Bundle.main.bundleURL.pathExtension.lowercased() != "app",
            environment["FE_MONSTER_DEV"] == "1",

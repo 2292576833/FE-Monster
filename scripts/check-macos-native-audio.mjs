@@ -28,6 +28,11 @@ const cmake = readFileSync(path.join(root, 'native/macos/CMakeLists.txt'), 'utf8
 assert(cmake.includes('CMAKE_POSITION_INDEPENDENT_CODE ON'));
 assert(cmake.includes('INSTALL_RPATH "@loader_path"'));
 assert(cmake.includes('"static_cast<size_t>(8192)"'), 'FFT tuning must preserve the original size_t expression type');
+assert(cmake.includes('"${FE_OBR_DECODER_NEEDLE}" "fft_manager->GetFftSize()"'),
+  'decoder frequency buffer must match the configured FFT size');
+assert(cmake.includes('"${FE_OBR_DECODER_SOURCE}"'), 'OBR must build the corrected decoder source');
+assert(cmake.includes('"frames_per_buffer_" "(fft_size_ / 2)" FE_OBR_FFT_BINS'),
+  'magnitude and phase utilities must index the actual FFT bins');
 const build = readFileSync(path.join(root, 'native/macos/build-audio.sh'), 'utf8');
 assert(build.includes('aarch64-apple-darwin') && build.includes('x86_64-apple-darwin'));
 assert(build.includes('cargo build --locked'));

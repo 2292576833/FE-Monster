@@ -50088,4 +50088,5 @@ window.FeMonsterSearchContext = {
   scheduleSearchSuggestions
 };
 window.dispatchEvent(new CustomEvent('fe-monster-playback-context-ready'));
-init().catch((error) => toast(error.message));
+window.FeMonsterBootstrapReady = init();
+window.FeMonsterBootstrapReady.catch((error) => toast(error.message));

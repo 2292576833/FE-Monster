@@ -24,8 +24,8 @@
     },
     {
       "path": "web/app.js",
-      "version": "20261007-playback-macos-sync-3",
-      "sha256": "024a1b75538bc9464444e91a2c027e8fb69219c109e73bb379f21ac9c0f3e544"
+      "version": "20261007-playback-macos-sync-4",
+      "sha256": "3a2b173e8b5b141df33a97a6b0b308f3426bd3489e2d248b80924f110b7a7fcc"
     },
     {
       "path": "web/assets/soundscape-workshop/assets/index-CSU_B_T9.js",
