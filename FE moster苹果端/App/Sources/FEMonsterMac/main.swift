@@ -167,9 +167,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 }
 
-let application = NSApplication.shared
-let options = ClientOptions.parse(Array(CommandLine.arguments.dropFirst()))
-let delegate = AppDelegate(options: options)
-application.setActivationPolicy(.regular)
-application.delegate = delegate
-application.run()
+@main
+@MainActor
+enum FeMonsterApplication {
+    static func main() {
+        let application = NSApplication.shared
+        let options = ClientOptions.parse(Array(CommandLine.arguments.dropFirst()))
+        let delegate = AppDelegate(options: options)
+        application.setActivationPolicy(.regular)
+        application.delegate = delegate
+
+        // NSApplication's delegate is weak; retain it for the entire event loop.
+        withExtendedLifetime(delegate) {
+            application.run()
+        }
+    }
+}

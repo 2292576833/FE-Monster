@@ -13,7 +13,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "FEMonsterMac",
-            path: "Sources/FEMonsterMac"
+            path: "Sources/FEMonsterMac",
+            // Compile the explicit @main entry in main.swift as a declaration,
+            // so AppKit starts synchronously on the main actor.
+            swiftSettings: [.unsafeFlags(["-parse-as-library"])]
         )
     ]
 )
