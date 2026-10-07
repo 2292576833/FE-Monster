@@ -223,6 +223,13 @@ enum FeMonsterApplication {
         let options = ClientOptions.parse(Array(CommandLine.arguments.dropFirst()))
         if CommandLine.arguments.contains(where: { $0.lowercased() == "--ci-smoke-report" }), options.ciSmokeReport == nil {
             fputs("--ci-smoke-report requires a fresh fe-monster-native-ui.* directory below the OS temporary directory.\n", stderr)
+            if let index = CommandLine.arguments.firstIndex(where: { $0.lowercased() == "--ci-smoke-report" }),
+               index + 1 < CommandLine.arguments.count {
+                let received = URL(fileURLWithPath: CommandLine.arguments[index + 1]).standardizedFileURL.resolvingSymlinksInPath()
+                let parent = received.deletingLastPathComponent()
+                let temporary = FileManager.default.temporaryDirectory.standardizedFileURL.resolvingSymlinksInPath()
+                fputs("Native UI smoke path diagnostic: received=\(received.path.debugDescription) parent=\(parent.path.debugDescription) parentRoot=\(parent.deletingLastPathComponent().path.debugDescription) temporary=\(temporary.path.debugDescription) parentRootComponents=\(parent.deletingLastPathComponent().pathComponents) temporaryComponents=\(temporary.pathComponents)\n", stderr)
+            }
             exit(64)
         }
         let delegate = AppDelegate(options: options)

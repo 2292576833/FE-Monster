@@ -6,6 +6,26 @@ import Foundation
 @MainActor
 struct DesktopGeometryCheck {
     static func main() {
+        precondition(CommandLine.arguments.count == 3)
+        let report = URL(fileURLWithPath: CommandLine.arguments[1])
+        let temporary = FileManager.default.temporaryDirectory.standardizedFileURL.resolvingSymlinksInPath()
+        let smokeOptions = ClientOptions.parse(["--ci-smoke-report", report.path])
+        precondition(smokeOptions.ciSmokeReport != nil,
+            "Shell mktemp smoke directory must pass: report=\(report.path.debugDescription) temporary=\(temporary.path.debugDescription)")
+        precondition(ClientOptions.parse(["--ci-smoke-report", CommandLine.arguments[2]]).ciSmokeReport == nil,
+            "An ordinary temporary directory must not qualify as an isolated smoke profile")
+        precondition(ClientOptions.parse(["--ci-smoke-report", "relative/report.json"]).ciSmokeReport == nil)
+        let data = report.deletingLastPathComponent().appendingPathComponent("data", isDirectory: true)
+        try! FileManager.default.createDirectory(at: data, withIntermediateDirectories: false)
+        precondition(ClientOptions.parse(["--ci-smoke-report", report.path]).ciSmokeReport == nil,
+            "An existing data profile must never be reused by the smoke test")
+        try! FileManager.default.removeItem(at: data)
+        precondition(FileManager.default.createFile(atPath: report.path, contents: Data("{}".utf8)))
+        precondition(ClientOptions.parse(["--ci-smoke-report", report.path]).ciSmokeReport == nil,
+            "A previous smoke report must not qualify as fresh evidence")
+        try! FileManager.default.removeItem(at: report)
+        print("Native shell mktemp / Swift temporary-root validation passed.")
+
         let area = NSRect(x: -1920, y: 0, width: 1920, height: 1080)
         let offscreen = NSRect(x: -2600, y: -500, width: 300, height: 340)
         let clamped = DesktopGeometry.clamp(offscreen, to: area)

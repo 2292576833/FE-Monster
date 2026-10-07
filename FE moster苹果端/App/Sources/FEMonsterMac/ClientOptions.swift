@@ -117,10 +117,15 @@ struct ClientOptions {
         let report = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath()
         let parent = report.deletingLastPathComponent()
         let temporary = FileManager.default.temporaryDirectory.standardizedFileURL.resolvingSymlinksInPath()
+        var parentIsDirectory: ObjCBool = false
         guard report.pathExtension == "json",
-              parent.deletingLastPathComponent().path == temporary.path,
+              // Directory URLs can preserve a trailing slash in .path. Compare
+              // canonical components so /var and /private/var aliases, and the
+              // shell's pwd -P directory, identify the same actual temporary root.
+              parent.deletingLastPathComponent().pathComponents == temporary.pathComponents,
               parent.lastPathComponent.hasPrefix("fe-monster-native-ui."),
-              FileManager.default.fileExists(atPath: parent.path),
+              FileManager.default.fileExists(atPath: parent.path, isDirectory: &parentIsDirectory),
+              parentIsDirectory.boolValue,
               !FileManager.default.fileExists(atPath: report.path),
               !FileManager.default.fileExists(atPath: parent.appendingPathComponent("data").path) else { return nil }
         return report
