@@ -32,5 +32,5 @@ else
   install -m 0755 "${CACHE}/node-${VERSION}-darwin-${ARCH}/bin/node" "${DESTINATION}/node"
   install -m 0644 "${CACHE}/node-${VERSION}-darwin-${ARCH}/LICENSE" "${DESTINATION}/LICENSE"
 fi
-lipo -verify_arch "$(uname -m)" "${DESTINATION}/node"
+lipo "${DESTINATION}/node" -verify_arch "$(uname -m)"
 "${DESTINATION}/node" -e 'if(Number(process.versions.node.split(".")[0])<20)process.exit(1)'

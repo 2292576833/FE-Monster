@@ -159,10 +159,10 @@ verify_app() {
   for executable in "$app/Contents/MacOS/$EXECUTABLE" \
     "$app/Contents/Resources/App/runtime/node/node" "$app/Contents/Resources/App/runtime/java/bin/java"; do
     [[ -x "$executable" && ! -L "$executable" ]] || die "Update lacks its standalone runtime"
-    /usr/bin/lipo -verify_arch "$ARCH" "$executable"
+    /usr/bin/lipo "$executable" -verify_arch "$ARCH"
   done
   /usr/bin/find "$app/Contents" -type f \( -name '*.dylib' -o -name '*.jnilib' \) -print0 | \
-    while IFS= read -r -d '' library; do /usr/bin/lipo -verify_arch "$ARCH" "$library"; done
+    while IFS= read -r -d '' library; do /usr/bin/lipo "$library" -verify_arch "$ARCH"; done
   minimum="$(plist "$app" LSMinimumSystemVersion)"
   [[ "$minimum" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || die "Update minimum macOS version is invalid"
   IFS=. read -r min_major min_minor min_patch <<< "$minimum"

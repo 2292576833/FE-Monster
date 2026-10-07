@@ -103,6 +103,13 @@ requirePattern(buildScript, /java\.sql/, "SQLite module available in jlink runti
 requirePattern(buildScript, /hdiutil create/, "installable DMG creation");
 requirePattern(infoPlist, /<key>LSMinimumSystemVersion<\/key>\s*<string>13\.5<\/string>/,
   "bundled Node requires macOS 13.5+");
+for (const script of readdirSync(path.join(macRoot, "Build")).filter(name => name.endsWith(".sh"))) {
+  const source = text(`Build/${script}`);
+  for (const command of source.split(/\r?\n/).filter(line => /\blipo\b[^\n]*-verify_arch/.test(line))) {
+    assert.match(command, /(?:^|[;\s])(?:\/usr\/bin\/)?lipo\s+"[^"]+"\s+-verify_arch\s+"/,
+      `${script}: Apple lipo requires the input file before -verify_arch`);
+  }
+}
 
 // Run the bundle's actual read-only JNI verification against representative
 // HTTP responses. Native loading itself is exercised by this script on Mac CI.

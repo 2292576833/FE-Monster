@@ -85,7 +85,7 @@ fi
 
 bash "${SCRIPT_DIR}/bundle-node.sh" "${RESOURCES_DIR}/App"
 if [[ -x "${RESOURCES_DIR}/App/runtime/java/bin/java" ]]; then
-  lipo -verify_arch "$(uname -m)" "${RESOURCES_DIR}/App/runtime/java/bin/java"
+  lipo "${RESOURCES_DIR}/App/runtime/java/bin/java" -verify_arch "$(uname -m)"
 fi
 
 case "${FE_MONSTER_CODESIGN:-none}" in

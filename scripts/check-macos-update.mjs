@@ -53,6 +53,8 @@ elif command == 'codesign':
 elif command == 'spctl':
     if scenario == 'gatekeeper': sys.exit(32)
 elif command == 'lipo':
+    if len(args) != 3 or args[1] != '-verify_arch' or args[2] != 'arm64' or not local(args[0]).is_file():
+        raise RuntimeError('Apple lipo requires: lipo <input_file> -verify_arch <architecture>')
     if scenario == 'arch': sys.exit(33)
 elif command == 'sw_vers': print('13.5.0')
 elif command == 'curl': local(args[args.index('--output') + 1]).write_bytes(b'verified-test-dmg')

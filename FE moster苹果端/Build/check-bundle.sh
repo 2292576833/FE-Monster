@@ -23,7 +23,7 @@ ARCH="$(uname -m)"
 for binary in "${APP_BUNDLE}/Contents/MacOS/FE Monster" "${BUNDLED_JAVA}" "${BUNDLED_NODE}" "${KEYCHAIN_LIBRARY}" \
   "${APP_RESOURCES}/native/macos/libfe-monster-coreaudio.dylib" "${APP_RESOURCES}/native/macos/libfe_monster_upmix.dylib"; do
   [[ -x "${binary}" ]] || fail "Missing executable/native library: ${binary}"
-  lipo -verify_arch "${ARCH}" "${binary}"
+  lipo "${binary}" -verify_arch "${ARCH}"
 done
 plutil -lint "${APP_BUNDLE}/Contents/Info.plist"
 codesign --verify --deep --strict "${APP_BUNDLE}"
