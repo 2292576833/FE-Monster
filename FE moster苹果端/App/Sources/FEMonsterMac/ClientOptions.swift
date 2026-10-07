@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 /// Direct macOS translation of native/windows/winforms/ClientOptions.cs.
@@ -114,20 +115,44 @@ struct ClientOptions {
     /// the OS temporary directory; never reuse an installed account profile.
     private static func smokeReportURL(_ path: String?) -> URL? {
         guard let path = nonEmpty(path), NSString(string: path).isAbsolutePath else { return nil }
-        let report = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath()
+        let report = URL(fileURLWithPath: path).standardizedFileURL
         let parent = report.deletingLastPathComponent()
-        let temporary = FileManager.default.temporaryDirectory.standardizedFileURL.resolvingSymlinksInPath()
         var parentIsDirectory: ObjCBool = false
         guard report.pathExtension == "json",
-              // Directory URLs can preserve a trailing slash in .path. Compare
-              // canonical components so /var and /private/var aliases, and the
-              // shell's pwd -P directory, identify the same actual temporary root.
-              parent.deletingLastPathComponent().pathComponents == temporary.pathComponents,
               parent.lastPathComponent.hasPrefix("fe-monster-native-ui."),
               FileManager.default.fileExists(atPath: parent.path, isDirectory: &parentIsDirectory),
               parentIsDirectory.boolValue,
-              !FileManager.default.fileExists(atPath: report.path),
-              !FileManager.default.fileExists(atPath: parent.appendingPathComponent("data").path) else { return nil }
-        return report
+              (try? FileManager.default.destinationOfSymbolicLink(atPath: parent.path)) == nil,
+              let canonicalParent = canonicalExistingPath(parent.path),
+              let canonicalTemporary = canonicalExistingPath(FileManager.default.temporaryDirectory.path),
+              (canonicalParent as NSString).deletingLastPathComponent == canonicalTemporary else { return nil }
+        // realpath only receives existing directories. Resolving the nonexistent
+        // report leaf through Foundation can produce a different /var alias.
+        let canonicalReport = URL(fileURLWithPath: canonicalParent, isDirectory: true)
+            .appendingPathComponent(report.lastPathComponent, isDirectory: false)
+        guard !pathEntryExists(canonicalReport.path),
+              !pathEntryExists((canonicalParent as NSString).appendingPathComponent("data")) else { return nil }
+        return canonicalReport
+    }
+
+    static func canonicalExistingPath(_ path: String) -> String? {
+        guard let resolved = path.withCString({ Darwin.realpath($0, nil) }) else { return nil }
+        defer { Darwin.free(resolved) }
+        return String(cString: resolved)
+    }
+
+    private static func pathEntryExists(_ path: String) -> Bool {
+        FileManager.default.fileExists(atPath: path)
+            || (try? FileManager.default.destinationOfSymbolicLink(atPath: path)) != nil
+    }
+
+    static func smokeReportPathDiagnostics(_ path: String) -> String {
+        let report = URL(fileURLWithPath: path).standardizedFileURL
+        let parent = report.deletingLastPathComponent()
+        let temporary = FileManager.default.temporaryDirectory
+        let parentRealpath = canonicalExistingPath(parent.path)
+        let temporaryRealpath = canonicalExistingPath(temporary.path)
+        let parentRoot = parentRealpath.map { ($0 as NSString).deletingLastPathComponent }
+        return "received=\(report.path.debugDescription) parent=\(parent.path.debugDescription) temporary=\(temporary.path.debugDescription) parentRealpath=\(parentRealpath.debugDescription) parentRootRealpath=\(parentRoot.debugDescription) temporaryRealpath=\(temporaryRealpath.debugDescription)"
     }
 }

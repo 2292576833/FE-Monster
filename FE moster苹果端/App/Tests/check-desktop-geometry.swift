@@ -8,13 +8,20 @@ struct DesktopGeometryCheck {
     static func main() {
         precondition(CommandLine.arguments.count == 3)
         let report = URL(fileURLWithPath: CommandLine.arguments[1])
-        let temporary = FileManager.default.temporaryDirectory.standardizedFileURL.resolvingSymlinksInPath()
         let smokeOptions = ClientOptions.parse(["--ci-smoke-report", report.path])
         precondition(smokeOptions.ciSmokeReport != nil,
-            "Shell mktemp smoke directory must pass: report=\(report.path.debugDescription) temporary=\(temporary.path.debugDescription)")
+            "Shell mktemp smoke directory must pass: \(ClientOptions.smokeReportPathDiagnostics(report.path))")
+        precondition(smokeOptions.ciSmokeReport?.deletingLastPathComponent().path
+            == ClientOptions.canonicalExistingPath(report.deletingLastPathComponent().path))
         precondition(ClientOptions.parse(["--ci-smoke-report", CommandLine.arguments[2]]).ciSmokeReport == nil,
             "An ordinary temporary directory must not qualify as an isolated smoke profile")
         precondition(ClientOptions.parse(["--ci-smoke-report", "relative/report.json"]).ciSmokeReport == nil)
+        let alias = report.deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent(report.deletingLastPathComponent().lastPathComponent + ".alias")
+        try! FileManager.default.createSymbolicLink(at: alias, withDestinationURL: report.deletingLastPathComponent())
+        precondition(ClientOptions.parse(["--ci-smoke-report", alias.appendingPathComponent("report.json").path]).ciSmokeReport == nil,
+            "The fresh profile parent itself must not be a symbolic link")
+        try! FileManager.default.removeItem(at: alias)
         let data = report.deletingLastPathComponent().appendingPathComponent("data", isDirectory: true)
         try! FileManager.default.createDirectory(at: data, withIntermediateDirectories: false)
         precondition(ClientOptions.parse(["--ci-smoke-report", report.path]).ciSmokeReport == nil,
