@@ -1,0 +1,288 @@
+name: Windows 2.2.5 online installer
+
+# Local draft: no cloud run has been performed. Uploading the allowlisted
+# source input, pushing this workflow and starting CI require user approval.
+# Reuse the validated application binaries for this installer-flavor change.
+# The standard builder still stages a fresh payload and runs all its gates.
+on:
+  # A new workflow cannot initially be dispatched solely from a feature
+  # branch. This narrowly scoped push registers/runs the reviewed workflow
+  # without requiring a merge into main. Other branches do not run it.
+  push:
+    branches:
+      - codex/windows-online-2.2.5-*
+    paths:
+      - .github/workflows/windows-online.yml
+      - .github/windows-online-input.json
+  workflow_dispatch:
+    inputs:
+      source_input_release_id:
+        description: Numeric ID of the approved temporary draft release
+        required: true
+        type: string
+      source_input_release_tag:
+        description: Exact draft tag to cross-check against that release ID
+        required: true
+        type: string
+      source_input_sha256:
+        description: Approved SHA-256 of FE-Monster-2.2.5-Online-Source-Input.zip
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  package-and-check:
+    if: github.repository == '2292576833/FE-Monster' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/windows-online-2.2.5-')))
+    runs-on: windows-2022
+    timeout-minutes: 60
+    # Draft assets are visible only with push access. This job uses the token
+    # for fixed GitHub API GET requests only; it never mutates a release/ref.
+    # Only the download step exposes it as an environment variable. Input
+    # sources are not uploaded as an Actions artifact in this public repo.
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: powershell
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      DOTNET_GENERATE_ASPNET_CERTIFICATE: 'false'
+      FE_MONSTER_RELEASE_COMMUNITY_URL: ''
+      FE_MONSTER_RELEASE_COMMUNITY_TLS_PINS: ''
+      FE_MONSTER_BUNDLED_SCENE_SERVER_ROOT: ''
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          distribution: temurin
+          # Adoptium's SemVer for OpenJDK 17.0.20.1+1 is 17.0.20+101.
+          java-version: '17.0.20+101'
+          architecture: x64
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '24.21.0'
+          architecture: x64
+          package-manager-cache: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '8.0.425'
+
+      - name: Download and verify the approved draft input
+        id: input
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_RELEASE_ID: ${{ inputs.source_input_release_id }}
+          SOURCE_RELEASE_TAG: ${{ inputs.source_input_release_tag }}
+          SOURCE_SHA256: ${{ inputs.source_input_sha256 }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($Env:GITHUB_EVENT_NAME -ceq 'push') {
+            $config = Get-Content -LiteralPath (Join-Path $Env:GITHUB_WORKSPACE '.github/windows-online-input.json') -Raw | ConvertFrom-Json
+            if ([string]$config.source_input_asset_name -cne 'FE-Monster-2.2.5-Online-Source-Input.zip') { throw 'Unexpected configured source asset name.' }
+            $Env:SOURCE_RELEASE_ID = [string]$config.source_input_release_id
+            $Env:SOURCE_RELEASE_TAG = [string]$config.source_input_release_tag
+            $Env:SOURCE_SHA256 = [string]$config.source_input_sha256
+          }
+          if ($Env:SOURCE_RELEASE_ID -notmatch '^[1-9][0-9]{0,18}$') { throw 'A numeric release ID is required.' }
+          if ($Env:SOURCE_SHA256 -notmatch '^[0-9a-fA-F]{64}$') { throw 'A SHA-256 input is required.' }
+          if ([string]::IsNullOrWhiteSpace($Env:SOURCE_RELEASE_TAG) -or $Env:SOURCE_RELEASE_TAG -match '[\r\n]') { throw 'An exact release tag is required.' }
+          $reportRoot = Join-Path $Env:GITHUB_WORKSPACE 'cloud-reports'
+          New-Item -ItemType Directory -Path $reportRoot -Force | Out-Null
+          $apiRoot = 'https://api.github.com/repos/2292576833/FE-Monster'
+          $headers = @{
+            Authorization = 'Bearer ' + $Env:GH_TOKEN
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2026-03-10'
+          }
+          $release = Invoke-RestMethod -Uri ($apiRoot + '/releases/' + $Env:SOURCE_RELEASE_ID) -Headers $headers -Method Get -TimeoutSec 60
+          if (!$release.draft -or [string]$release.tag_name -cne $Env:SOURCE_RELEASE_TAG) { throw 'The release must be the exact approved draft.' }
+          $assets = @($release.assets | Where-Object { $_.name -ceq 'FE-Monster-2.2.5-Online-Source-Input.zip' -and $_.state -ceq 'uploaded' })
+          if ($assets.Count -ne 1 -or [long]$assets[0].size -le 0 -or [long]$assets[0].size -gt 1GB) { throw 'The expected draft input asset is missing or has an invalid size.' }
+          $asset = $assets[0]
+          $zipPath = Join-Path $Env:RUNNER_TEMP 'FE-Monster-2.2.5-Online-Source-Input.zip'
+          if (Test-Path -LiteralPath $zipPath) { throw 'The input download target already exists.' }
+          # Do not forward Authorization to the signed asset storage redirect.
+          Add-Type -AssemblyName System.Net.Http
+          $handler = [Net.Http.HttpClientHandler]::new()
+          $handler.AllowAutoRedirect = $false
+          $client = [Net.Http.HttpClient]::new($handler)
+          $client.Timeout = [TimeSpan]::FromMinutes(10)
+          $client.DefaultRequestHeaders.Authorization = [Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer', $Env:GH_TOKEN)
+          $client.DefaultRequestHeaders.Accept.ParseAdd('application/octet-stream')
+          $client.DefaultRequestHeaders.UserAgent.ParseAdd('FE-Monster-Cloud-Package/2.2.5')
+          $client.DefaultRequestHeaders.Add('X-GitHub-Api-Version', '2026-03-10')
+          $response = $null
+          $storageClient = $null
+          try {
+            $response = $client.GetAsync(($apiRoot + '/releases/assets/' + [long]$asset.id), [Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
+            if ([int]$response.StatusCode -in @(301, 302, 303, 307, 308)) {
+              $location = $response.Headers.Location
+              if ($null -eq $location -or !$location.IsAbsoluteUri -or $location.Scheme -cne 'https' -or $location.Host -notin @('release-assets.githubusercontent.com', 'objects.githubusercontent.com')) { throw 'Unexpected asset storage redirect.' }
+              $response.Dispose()
+              $storageHandler = [Net.Http.HttpClientHandler]::new()
+              $storageHandler.AllowAutoRedirect = $false
+              $storageClient = [Net.Http.HttpClient]::new($storageHandler)
+              $storageClient.Timeout = [TimeSpan]::FromMinutes(10)
+              $response = $storageClient.GetAsync($location, [Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
+            }
+            if ([int]$response.StatusCode -ne 200) { throw ('Draft asset GET failed: HTTP ' + [int]$response.StatusCode) }
+            $stream = $response.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
+            $file = [IO.File]::Open($zipPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write)
+            try { $stream.CopyTo($file) } finally { $file.Dispose(); $stream.Dispose() }
+          } finally {
+            if ($null -ne $response) { $response.Dispose() }
+            if ($null -ne $storageClient) { $storageClient.Dispose() }
+            $client.Dispose()
+          }
+          if ((Get-Item -LiteralPath $zipPath).Length -ne [long]$asset.size) { throw 'Downloaded asset length differs from release metadata.' }
+          $zipHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($zipHash -cne $Env:SOURCE_SHA256.ToLowerInvariant()) { throw 'Downloaded source input SHA-256 differs from the approved input.' }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $sourceRoot = Join-Path $Env:RUNNER_TEMP 'fe-monster-online-source'
+          if (Test-Path -LiteralPath $sourceRoot) { throw 'The extraction target must be fresh.' }
+          $sourceBoundary = [IO.Path]::GetFullPath($sourceRoot).TrimEnd('\') + '\'
+          function Assert-InputRelativePath([string]$relative) {
+            if ([string]::IsNullOrWhiteSpace($relative) -or $relative -match '[\\:\x00-\x1f]' -or $relative.StartsWith('/')) { throw 'Invalid ZIP path.' }
+            foreach ($segment in $relative.TrimEnd('/').Split('/')) {
+              if ($segment -in @('', '.', '..') -or $segment -match '[. ]$' -or $segment -match '^(?i:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)') { throw 'Unsafe Windows ZIP path.' }
+            }
+            if ($relative -match '^(?i:(?:\.git|\.github|\.tools|\.tmp|tmp|output|artifacts|runtime)/|src/community-proprietary/)' -or $relative -match '^(?i:data/)' -and $relative -notin @('data/community-server-url.txt', 'data/community-server-tls-pin.txt')) { throw 'Excluded local or proprietary content appears in the input.' }
+            if ($relative -match '(?i)(?:^|/)(?:run-jar\.txt|run-audio\.txt|pet-secrets\.json|.*\.WebView2)(?:/|$)') { throw 'Machine-specific runtime state appears in the input.' }
+            $target = [IO.Path]::GetFullPath((Join-Path $sourceRoot $relative.Replace('/', '\')))
+            if (!$target.StartsWith($sourceBoundary, [StringComparison]::OrdinalIgnoreCase)) { throw 'ZIP path escapes the source root.' }
+          }
+          $archive = [IO.Compression.ZipFile]::OpenRead($zipPath)
+          try {
+            if ($archive.Entries.Count -gt 20000) { throw 'Input ZIP has too many entries.' }
+            $names = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+            $files = @{}
+            [long]$totalBytes = 0
+            foreach ($entry in $archive.Entries) {
+              # Windows PowerShell 5.1 CreateFromDirectory uses backslashes.
+              # Canonicalize before checking traversal or manifest coverage.
+              $relative = $entry.FullName.Replace('\', '/')
+              Assert-InputRelativePath $relative
+              if (!$names.Add($relative.TrimEnd('/'))) { throw 'Duplicate or case-colliding ZIP entry.' }
+              if ((($entry.ExternalAttributes -shr 16) -band 0xF000) -eq 0xA000) { throw 'Symlinks are not permitted in source input.' }
+              $totalBytes += $entry.Length
+              if ($totalBytes -gt 2GB) { throw 'Input ZIP expands beyond its size limit.' }
+              if (!$relative.EndsWith('/')) { $files[$relative] = $entry }
+            }
+            $manifestEntry = $files['source-input-manifest.json']
+            if ($null -eq $manifestEntry -or $manifestEntry.Length -gt 8MB) { throw 'Input integrity manifest is missing or oversized.' }
+            $reader = [IO.StreamReader]::new($manifestEntry.Open(), [Text.Encoding]::UTF8, $true)
+            try { $manifest = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
+            if ([int]$manifest.schemaVersion -ne 1 -or [string]$manifest.appVersion -cne '2.2.5') { throw 'Input manifest schema/version is invalid.' }
+            $manifestNames = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+            foreach ($item in @($manifest.files)) {
+              $relative = [string]$item.path
+              Assert-InputRelativePath $relative
+              if ($relative -ceq 'source-input-manifest.json' -or !$manifestNames.Add($relative) -or !$files.ContainsKey($relative) -or [string]$item.sha256 -notmatch '^[0-9a-fA-F]{64}$' -or [long]$item.length -ne $files[$relative].Length) { throw 'Input manifest contains an invalid file entry.' }
+            }
+            if ($manifestNames.Count -ne $files.Count - 1) { throw 'Every input file must be covered by the integrity manifest.' }
+            [IO.Compression.ZipFile]::ExtractToDirectory($zipPath, $sourceRoot)
+            foreach ($item in @($manifest.files)) {
+              $target = Join-Path $sourceRoot ([string]$item.path).Replace('/', '\')
+              if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant() -cne ([string]$item.sha256).ToLowerInvariant()) { throw 'Extracted file does not match input integrity manifest.' }
+            }
+          } finally { $archive.Dispose() }
+          foreach ($required in @('package.json', 'scripts/build-installer.ps1', 'scripts/check-windows-installer-contract.ps1', 'out/fe-monster-java.jar', 'out/release-2.2.5/winforms/FE Monster.exe', 'native/windows/build/fe-monster-xaudio2.dll', 'native/windows/build/fe_monster_upmix.dll', 'native/windows/build/fe-monster-wincrypto.dll', 'native/windows/build/native-audio-build.json', 'data/community-server-url.txt', 'data/community-server-tls-pin.txt')) {
+            if (!(Test-Path -LiteralPath (Join-Path $sourceRoot $required) -PathType Leaf)) { throw ('Required build input is missing: ' + $required) }
+          }
+          [ordered]@{ passed = $true; appVersion = '2.2.5'; releaseId = [long]$release.id; draft = $true; assetId = [long]$asset.id; inputBytes = [long]$asset.size; inputSha256 = $zipHash; verifiedFileCount = $manifestNames.Count; proprietarySourcesIncluded = $false; inputUploadedAsActionsArtifact = $false } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $reportRoot 'input-verification.json') -Encoding UTF8
+          Add-Content -LiteralPath $Env:GITHUB_OUTPUT -Value ('source_root=' + $sourceRoot)
+          Add-Content -LiteralPath $Env:GITHUB_OUTPUT -Value ('report_root=' + $reportRoot)
+
+      - name: Check toolchain and restore the locked source runtime
+        working-directory: ${{ steps.input.outputs.source_root }}
+        env:
+          REPORT_ROOT: ${{ steps.input.outputs.report_root }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($Env:GH_TOKEN -or $Env:GITHUB_TOKEN) { throw 'Application steps must not receive GitHub credentials.' }
+          $releaseText = Get-Content -LiteralPath (Join-Path $Env:JAVA_HOME 'release') -Raw
+          if ($releaseText -notmatch '(?m)^JAVA_RUNTIME_VERSION="17\.0\.20\.1\+1"\s*$') { throw 'The exact verified Java 17 build was not selected.' }
+          Add-Content -LiteralPath $Env:GITHUB_ENV -Value ('FE_JAVA17_HOME=' + $Env:JAVA_HOME)
+          if ((& node.exe --version).Trim() -cne 'v24.21.0' -or $LASTEXITCODE -ne 0) { throw 'Node 24.21.0 is required.' }
+          if (Test-Path -LiteralPath 'global.json') { throw 'An unexpected SDK selector is present in the input.' }
+          '{"sdk":{"version":"8.0.425","rollForward":"disable"}}' | Set-Content -LiteralPath 'global.json' -Encoding ASCII
+          if ((& dotnet.exe --version).Trim() -cne '8.0.425' -or $LASTEXITCODE -ne 0) { throw '.NET SDK 8.0.425 is required.' }
+          # Populate self-contained win-x64 runtime packs from the official
+          # feed before the normal setup publish on this clean worker.
+          & dotnet.exe restore native/windows/setup/FeMonsterSetup.csproj -r win-x64 -p:SelfContained=true --source https://api.nuget.org/v3/index.json *> (Join-Path $Env:REPORT_ROOT 'setup-runtime-restore.log')
+          if ($LASTEXITCODE -ne 0) { throw 'Official NuGet setup runtime restore failed.' }
+          & npm.cmd ci --prefix native/audio-sources --omit=dev --ignore-scripts --no-audit --no-fund *> (Join-Path $Env:REPORT_ROOT 'audio-runtime-restore.log')
+          $restoreExit = $LASTEXITCODE
+          if ($restoreExit -ne 0) { throw ('Locked audio runtime restore failed: ' + $restoreExit) }
+          if (!(Get-Command rg.exe -ErrorAction SilentlyContinue)) {
+            & choco.exe install ripgrep --yes --no-progress *> (Join-Path $Env:REPORT_ROOT 'ripgrep-install.log')
+            if ($LASTEXITCODE -ne 0 -or !(Get-Command rg.exe -ErrorAction SilentlyContinue)) { throw 'ripgrep is required for the clean-runtime verification.' }
+          }
+
+      - name: Run the normal online installer builder with fresh staging
+        working-directory: ${{ steps.input.outputs.source_root }}
+        env:
+          REPORT_ROOT: ${{ steps.input.outputs.report_root }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($Env:GH_TOKEN -or $Env:GITHUB_TOKEN) { throw 'Build steps must not receive GitHub credentials.' }
+          $builderLog = Join-Path $Env:REPORT_ROOT 'installer-build-online.log'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/build-installer.ps1 -SkipBuild -WinFormsSourceDir out/release-2.2.5/winforms -OutputDir dist/release-2.2.5 -WebView2Mode Online -PackageOnly *> $builderLog
+          $buildExit = $LASTEXITCODE
+          Get-Content -LiteralPath $builderLog -Tail 35
+          if ($buildExit -ne 0) { throw ('Standard installer builder failed: ' + $buildExit) }
+          $diagnostics = Get-Content -LiteralPath dist/release-2.2.5/FE-Monster-Setup-2.2.5.diagnostics.json -Raw | ConvertFrom-Json
+          if ($diagnostics.webView2Mode -cne 'online' -or !$diagnostics.packageOnly) { throw 'Unexpected installer flavor or publication mode.' }
+          if (Test-Path -LiteralPath 'out/installer/work/payload/FE Monster/runtime/installers/MicrosoftEdgeWebView2RuntimeInstallerX64.exe') { throw 'Online installer contains the offline WebView2 runtime.' }
+
+      - name: Verify the final EXE in a fresh Chinese installation directory
+        working-directory: ${{ steps.input.outputs.source_root }}
+        env:
+          REPORT_ROOT: ${{ steps.input.outputs.report_root }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $index = Get-Content -LiteralPath web/index.html -Raw
+          $cacheMatch = [regex]::Match($index, 'app\.js\?v=([^"&\s]+)')
+          if (!$cacheMatch.Success) { throw 'The source frontend cache token is missing.' }
+          $testRoot = Join-Path (Get-Location).Path 'out/release-2.2.5/online-first-install-中文目录'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/check-final-installer-isolated-install.ps1 -SetupExe dist/release-2.2.5/FE-Monster-Setup-2.2.5.exe -TestRoot $testRoot -WinFormsSourceDir out/release-2.2.5/winforms -ExpectedCacheToken $cacheMatch.Groups[1].Value *> (Join-Path $Env:REPORT_ROOT 'final-first-install.json')
+          if ($LASTEXITCODE -ne 0) { throw 'The final EXE failed its isolated installation verification.' }
+
+      - name: Verify bundled runtimes, upgrade preservation and encrypted memory
+        working-directory: ${{ steps.input.outputs.source_root }}
+        env:
+          REPORT_ROOT: ${{ steps.input.outputs.report_root }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/check-windows-clean-install-runtime.ps1 -SetupExe dist/release-2.2.5/FE-Monster-Setup-2.2.5.exe *> (Join-Path $Env:REPORT_ROOT 'final-clean-runtime.json')
+          if ($LASTEXITCODE -ne 0) { throw 'The final EXE failed clean-runtime/upgrade verification.' }
+          # This package stays unsigned. Community health and real account
+          # authorization still require separate verification before release.
+
+      - name: Keep the verified online installer
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: fe-monster-2.2.5-windows-online-${{ github.run_id }}
+          path: |
+            ${{ steps.input.outputs.source_root }}/dist/release-2.2.5/FE-Monster-Setup-2.2.5.exe
+            ${{ steps.input.outputs.source_root }}/dist/release-2.2.5/FE-Monster-Setup-2.2.5.exe.sha256
+            ${{ steps.input.outputs.source_root }}/dist/release-2.2.5/FE-Monster-Setup-2.2.5.diagnostics.json
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
+      - name: Preserve build and verification diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: fe-monster-2.2.5-online-diagnostics-${{ github.run_id }}
+          # Fixed reports only: no source ZIP, user data, browser profiles,
+          # environment dumps, GitHub credentials or signed asset URLs.
+          path: cloud-reports/*
+          if-no-files-found: warn
+          retention-days: 3
