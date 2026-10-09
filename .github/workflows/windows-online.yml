@@ -204,10 +204,31 @@ jobs:
           & npm.cmd ci --prefix native/audio-sources --omit=dev --ignore-scripts --no-audit --no-fund *> (Join-Path $Env:REPORT_ROOT 'audio-runtime-restore.log')
           $restoreExit = $LASTEXITCODE
           if ($restoreExit -ne 0) { throw ('Locked audio runtime restore failed: ' + $restoreExit) }
-          if (!(Get-Command rg.exe -ErrorAction SilentlyContinue)) {
-            & choco.exe install ripgrep --yes --no-progress *> (Join-Path $Env:REPORT_ROOT 'ripgrep-install.log')
-            if ($LASTEXITCODE -ne 0 -or !(Get-Command rg.exe -ErrorAction SilentlyContinue)) { throw 'ripgrep is required for the clean-runtime verification.' }
-          }
+          # Pin the official upstream tool and checksum instead of depending
+          # on the Chocolatey package feed for this required plaintext scan.
+          $rgRoot = Join-Path $Env:RUNNER_TEMP 'fe-monster-ripgrep-15.2.0'
+          if (Test-Path -LiteralPath $rgRoot) { throw 'The ripgrep tool directory must be fresh.' }
+          New-Item -ItemType Directory -Path $rgRoot | Out-Null
+          $rgZip = Join-Path $rgRoot 'ripgrep-15.2.0-x86_64-pc-windows-msvc.zip'
+          $rgUrl = 'https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-pc-windows-msvc.zip'
+          & curl.exe --fail --location --proto '=https' --proto-redir '=https' --retry 3 --retry-delay 3 --connect-timeout 15 --max-time 60 --output $rgZip $rgUrl *> (Join-Path $Env:REPORT_ROOT 'ripgrep-download.log')
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $rgZip -PathType Leaf)) { throw 'Official ripgrep download failed.' }
+          if ((Get-Item -LiteralPath $rgZip).Length -ne 1789611 -or
+              (Get-FileHash -LiteralPath $rgZip -Algorithm SHA256).Hash.ToLowerInvariant() -cne '71b2fef860abe467217a538ff31de02f5258807c0129f771846f87bd029aafc5') { throw 'Official ripgrep archive integrity check failed.' }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $rgArchive = [IO.Compression.ZipFile]::OpenRead($rgZip)
+          $rgExe = Join-Path $rgRoot 'rg.exe'
+          try {
+            $rgEntries = @($rgArchive.Entries | Where-Object { $_.FullName.Replace('\', '/') -ceq 'ripgrep-15.2.0-x86_64-pc-windows-msvc/rg.exe' })
+            if ($rgEntries.Count -ne 1 -or $rgEntries[0].Length -le 0 -or $rgEntries[0].Length -gt 10MB) { throw 'Official ripgrep executable entry is invalid.' }
+            [IO.Compression.ZipFileExtensions]::ExtractToFile($rgEntries[0], $rgExe, $false)
+          } finally { $rgArchive.Dispose() }
+          $rgVersion = @(& $rgExe --version)
+          if ($LASTEXITCODE -ne 0 -or $rgVersion.Count -eq 0 -or $rgVersion[0] -cne 'ripgrep 15.2.0') { throw 'The pinned ripgrep tool did not start.' }
+          $Env:PATH = $rgRoot + ';' + $Env:PATH
+          Add-Content -LiteralPath $Env:GITHUB_PATH -Value $rgRoot
+          if (!(Get-Command rg.exe -ErrorAction SilentlyContinue)) { throw 'ripgrep is required for the clean-runtime verification.' }
+          [ordered]@{ version = '15.2.0'; source = $rgUrl; archiveSha256 = (Get-FileHash -LiteralPath $rgZip -Algorithm SHA256).Hash.ToLowerInvariant(); archiveBytes = (Get-Item -LiteralPath $rgZip).Length; verified = $true } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $Env:REPORT_ROOT 'ripgrep-tool-verification.json') -Encoding UTF8
       - name: Run the normal online installer builder with fresh staging
         working-directory: ${{ steps.input.outputs.source_root }}
         env:
