@@ -45,7 +45,10 @@ jobs:
       contents: write
     defaults:
       run:
-        shell: powershell
+        # PS5 treats redirected Java -version stderr as NativeCommandError
+        # under ErrorActionPreference=Stop. Use pwsh for capture; explicit
+        # powershell.exe children retain the existing Windows PS5 semantics.
+        shell: pwsh
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
       DOTNET_NOLOGO: '1'
