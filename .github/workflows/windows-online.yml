@@ -1,13 +1,7 @@
+# Builds the user-authorized temporary input for Windows 2.2.5 online verification.
+# Original fixture commands/checks/timeouts retained; step watchdogs and bounded diagnostics are added.
 name: Windows 2.2.5 online installer
-
-# Local draft: no cloud run has been performed. Uploading the allowlisted
-# source input, pushing this workflow and starting CI require user approval.
-# Reuse the validated application binaries for this installer-flavor change.
-# The standard builder still stages a fresh payload and runs all its gates.
 on:
-  # A new workflow cannot initially be dispatched solely from a feature
-  # branch. This narrowly scoped push registers/runs the reviewed workflow
-  # without requiring a merge into main. Other branches do not run it.
   push:
     branches:
       - codex/windows-online-2.2.5-*
@@ -28,53 +22,42 @@ on:
         description: Approved SHA-256 of FE-Monster-2.2.5-Online-Source-Input.zip
         required: true
         type: string
-
 permissions:
   contents: read
-
 jobs:
   package-and-check:
     if: github.repository == '2292576833/FE-Monster' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/codex/windows-online-2.2.5-')))
     runs-on: windows-2022
     timeout-minutes: 60
-    # Draft assets are visible only with push access. This job uses the token
-    # for fixed GitHub API GET requests only; it never mutates a release/ref.
-    # Only the download step exposes it as an environment variable. Input
-    # sources are not uploaded as an Actions artifact in this public repo.
     permissions:
       contents: write
     defaults:
       run:
-        # PS5 treats redirected Java -version stderr as NativeCommandError
-        # under ErrorActionPreference=Stop. Use pwsh for capture; explicit
-        # powershell.exe children retain the existing Windows PS5 semantics.
         shell: pwsh
     env:
-      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
-      DOTNET_NOLOGO: '1'
-      DOTNET_GENERATE_ASPNET_CERTIFICATE: 'false'
-      FE_MONSTER_RELEASE_COMMUNITY_URL: ''
-      FE_MONSTER_RELEASE_COMMUNITY_TLS_PINS: ''
-      FE_MONSTER_BUNDLED_SCENE_SERVER_ROOT: ''
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "1"
+      DOTNET_GENERATE_ASPNET_CERTIFICATE: "false"
+      FE_MONSTER_RELEASE_COMMUNITY_URL: ""
+      FE_MONSTER_RELEASE_COMMUNITY_TLS_PINS: ""
+      FE_MONSTER_BUNDLED_SCENE_SERVER_ROOT: ""
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
         with:
           distribution: temurin
-          # Adoptium's SemVer for OpenJDK 17.0.20.1+1 is 17.0.20+101.
-          java-version: '17.0.20+101'
+          java-version: 17.0.20+101
           architecture: x64
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
-          node-version: '24.21.0'
+          node-version: 24.21.0
           architecture: x64
           package-manager-cache: false
-      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
-          dotnet-version: '8.0.425'
-
+          dotnet-version: 8.0.425
       - name: Download and verify the approved draft input
         id: input
         env:
@@ -200,7 +183,6 @@ jobs:
           [ordered]@{ passed = $true; appVersion = '2.2.5'; releaseId = [long]$release.id; draft = $true; assetId = [long]$asset.id; inputBytes = [long]$asset.size; inputSha256 = $zipHash; verifiedFileCount = $manifestNames.Count; proprietarySourcesIncluded = $false; inputUploadedAsActionsArtifact = $false } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $reportRoot 'input-verification.json') -Encoding UTF8
           Add-Content -LiteralPath $Env:GITHUB_OUTPUT -Value ('source_root=' + $sourceRoot)
           Add-Content -LiteralPath $Env:GITHUB_OUTPUT -Value ('report_root=' + $reportRoot)
-
       - name: Check toolchain and restore the locked source runtime
         working-directory: ${{ steps.input.outputs.source_root }}
         env:
@@ -226,7 +208,6 @@ jobs:
             & choco.exe install ripgrep --yes --no-progress *> (Join-Path $Env:REPORT_ROOT 'ripgrep-install.log')
             if ($LASTEXITCODE -ne 0 -or !(Get-Command rg.exe -ErrorAction SilentlyContinue)) { throw 'ripgrep is required for the clean-runtime verification.' }
           }
-
       - name: Run the normal online installer builder with fresh staging
         working-directory: ${{ steps.input.outputs.source_root }}
         env:
@@ -242,7 +223,436 @@ jobs:
           $diagnostics = Get-Content -LiteralPath dist/release-2.2.5/FE-Monster-Setup-2.2.5.diagnostics.json -Raw | ConvertFrom-Json
           if ($diagnostics.webView2Mode -cne 'online' -or !$diagnostics.packageOnly) { throw 'Unexpected installer flavor or publication mode.' }
           if (Test-Path -LiteralPath 'out/installer/work/payload/FE Monster/runtime/installers/MicrosoftEdgeWebView2RuntimeInstallerX64.exe') { throw 'Online installer contains the offline WebView2 runtime.' }
-
+          [ordered]@{ schemaVersion = 1; appVersion = '2.2.5'; webView2Mode = 'online'; candidateOnly = $true; verified = $false; builderAndPayloadContractPassed = $true; finalInstallationAndRuntimeChecksPassed = $false; installerSha256 = (Get-FileHash -LiteralPath 'dist/release-2.2.5/FE-Monster-Setup-2.2.5.exe' -Algorithm SHA256).Hash.ToLowerInvariant() } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $Env:REPORT_ROOT 'candidate-installer-status.json') -Encoding UTF8
+          Write-Output 'Candidate EXE: verified=false; builder contract passed; final installation/runtime gates are pending; diagnostic use only.'
+      - name: Keep candidate installer for diagnosis (verified=false)
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: fe-monster-2.2.5-windows-online-candidate-${{ github.run_id }}
+          path: |
+            ${{ steps.input.outputs.source_root }}/dist/release-2.2.5/FE-Monster-Setup-2.2.5.exe
+            ${{ steps.input.outputs.source_root }}/dist/release-2.2.5/FE-Monster-Setup-2.2.5.exe.sha256
+            ${{ steps.input.outputs.source_root }}/dist/release-2.2.5/FE-Monster-Setup-2.2.5.diagnostics.json
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
+      - name: Compare owned Java launcher version probes in ASCII and Chinese paths
+        timeout-minutes: 1
+        working-directory: ${{ steps.input.outputs.source_root }}
+        env:
+          REPORT_ROOT: ${{ steps.input.outputs.report_root }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($Env:GH_TOKEN -or $Env:GITHUB_TOKEN) { throw 'Diagnostic steps must not receive GitHub credentials.' }
+          $watch = [Diagnostics.Stopwatch]::StartNew()
+          $source = [IO.Path]::GetFullPath((Get-Location).Path).TrimEnd('\')
+          $runnerTemp = [IO.Path]::GetFullPath($Env:RUNNER_TEMP).TrimEnd('\')
+          $workspace = [IO.Path]::GetFullPath($Env:GITHUB_WORKSPACE).TrimEnd('\')
+          $reports = [IO.Path]::GetFullPath($Env:REPORT_ROOT).TrimEnd('\')
+          if (!$source.Equals((Join-Path $runnerTemp 'fe-monster-online-source'), [StringComparison]::OrdinalIgnoreCase) -or
+              !$reports.Equals((Join-Path $workspace 'cloud-reports'), [StringComparison]::OrdinalIgnoreCase)) { throw 'Java diagnostic boundary is invalid.' }
+          function Assert-JavaProbePath([string]$Path, [string]$Boundary) {
+            $full = [IO.Path]::GetFullPath($Path).TrimEnd('\')
+            $base = [IO.Path]::GetFullPath($Boundary).TrimEnd('\')
+            if (!$full.Equals($base, [StringComparison]::OrdinalIgnoreCase) -and !$full.StartsWith($base + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Java probe path escapes its boundary.' }
+            while ($true) {
+              if (Test-Path -LiteralPath $full) {
+                $entry = Get-Item -LiteralPath $full -Force
+                if (($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Reparse points are excluded from Java diagnostics.' }
+              }
+              if ($full.Equals($base, [StringComparison]::OrdinalIgnoreCase)) { break }
+              $full = Split-Path -Parent $full
+              if ([string]::IsNullOrWhiteSpace($full)) { throw 'Java probe boundary cannot be resolved.' }
+            }
+          }
+          Assert-JavaProbePath $source $runnerTemp
+          Assert-JavaProbePath $reports $workspace
+          $reportPath = Join-Path $reports 'java-runtime-readonly-preflight.json'
+          Assert-JavaProbePath $reportPath $workspace
+          $result = [ordered]@{ schemaVersion = 1; diagnosticOnly = $true; isolatedRuntimeCopy = $true; accountsRead = $false; operatingSystemChanged = $false; maximumStepSeconds = 60; maximumProbeMilliseconds = 5000; maximumBytesPerOutputStream = 8192; runtimeCopyVerified = $false; copiedRuntimeFiles = 0; probes = @(); completed = $false; elapsedSeconds = 0 }
+          function Save-JavaProbeReport {
+            $result.elapsedSeconds = [Math]::Round($watch.Elapsed.TotalSeconds, 3)
+            $result | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath $reportPath -Encoding UTF8
+          }
+          Save-JavaProbeReport
+          $asciiRuntime = Join-Path $source 'out/installer/work/payload/FE Monster/runtime/java'
+          $unicodeRuntime = Join-Path $source 'tmp/java-launcher-probe-中文'
+          Assert-JavaProbePath $asciiRuntime $source
+          Assert-JavaProbePath $unicodeRuntime $source
+          if (Test-Path -LiteralPath $unicodeRuntime) { throw 'The isolated Java runtime copy must be fresh.' }
+          if ($asciiRuntime -match '[^\x00-\x7f]') { throw 'The reference Java runtime path must be ASCII.' }
+          $runtimeEntries = @(Get-ChildItem -LiteralPath $asciiRuntime -Recurse -Force)
+          foreach ($entry in $runtimeEntries) { Assert-JavaProbePath $entry.FullName $asciiRuntime }
+          New-Item -ItemType Directory -Path (Split-Path -Parent $unicodeRuntime) -Force | Out-Null
+          Copy-Item -LiteralPath $asciiRuntime -Destination $unicodeRuntime -Recurse
+          foreach ($file in @($runtimeEntries | Where-Object { !$_.PSIsContainer })) {
+            $relative = $file.FullName.Substring($asciiRuntime.Length).TrimStart('\')
+            $copied = Join-Path $unicodeRuntime $relative
+            Assert-JavaProbePath $copied $unicodeRuntime
+            if ((Get-Item -LiteralPath $copied).Length -ne $file.Length -or
+                (Get-FileHash -LiteralPath $copied -Algorithm SHA256).Hash -cne (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash) { throw 'The isolated Java copy differs from its verified payload source.' }
+            $result.copiedRuntimeFiles += 1
+          }
+          $result.runtimeCopyVerified = $true
+          Save-JavaProbeReport
+          function Pump-BoundedJavaOutput([hashtable]$State, [IO.Stream]$Stream) {
+            while ($null -ne $State.Task -and $State.Task.IsCompleted) {
+              try { $count = $State.Task.GetAwaiter().GetResult() }
+              catch { $State.Task = $null; $State.Ended = $true; return }
+              $State.Count += $count
+              if ($count -eq 0 -or $State.Count -ge 8192) { $State.Task = $null; $State.Ended = $true; return }
+              $State.Task = $Stream.ReadAsync($State.Buffer, $State.Count, 8192 - $State.Count)
+            }
+          }
+          function Invoke-BoundedJavaVersion([string]$Executable, [string]$Label) {
+            Assert-JavaProbePath $Executable $source
+            $record = [ordered]@{ label = $Label; relativeExecutable = $Executable.Substring($source.Length).TrimStart('\').Replace('\', '/'); arguments = '-version'; exists = (Test-Path -LiteralPath $Executable -PathType Leaf); started = $false; exitCode = $null; timedOut = $false; outputPipeTimedOut = $false; stdout = ''; stderr = ''; stdoutBytes = 0; stderrBytes = 0; stdoutCapped = $false; stderrCapped = $false; elapsedSeconds = 0 }
+            $probeWatch = [Diagnostics.Stopwatch]::StartNew()
+            $process = $null
+            if (!$record.exists) { return $record }
+            try {
+              $start = [Diagnostics.ProcessStartInfo]::new()
+              $start.FileName = $Executable
+              $start.Arguments = '-version'
+              $start.WorkingDirectory = Split-Path -Parent $Executable
+              $start.UseShellExecute = $false
+              $start.CreateNoWindow = $true
+              $start.RedirectStandardOutput = $true
+              $start.RedirectStandardError = $true
+              $process = [Diagnostics.Process]::Start($start)
+              $record.started = $true
+              $outState = @{ Buffer = (New-Object byte[] 8192); Count = 0; Task = $null; Ended = $false }
+              $errState = @{ Buffer = (New-Object byte[] 8192); Count = 0; Task = $null; Ended = $false }
+              $outState.Task = $process.StandardOutput.BaseStream.ReadAsync($outState.Buffer, 0, 8192)
+              $errState.Task = $process.StandardError.BaseStream.ReadAsync($errState.Buffer, 0, 8192)
+              do {
+                Pump-BoundedJavaOutput $outState $process.StandardOutput.BaseStream
+                Pump-BoundedJavaOutput $errState $process.StandardError.BaseStream
+                if ($process.HasExited -and $outState.Ended -and $errState.Ended) { break }
+                [void]$process.WaitForExit(25)
+                if ($process.HasExited) { Start-Sleep -Milliseconds 10 }
+              } while ($probeWatch.ElapsedMilliseconds -lt 5000)
+              $record.timedOut = !$process.HasExited
+              $record.outputPipeTimedOut = !$outState.Ended -or !$errState.Ended
+              if (!$process.HasExited) {
+                try { $process.Kill($true) } catch { }
+                [void]$process.WaitForExit(500)
+              }
+              Pump-BoundedJavaOutput $outState $process.StandardOutput.BaseStream
+              Pump-BoundedJavaOutput $errState $process.StandardError.BaseStream
+              if ($process.HasExited) { $record.exitCode = $process.ExitCode }
+              $record.stdoutBytes = $outState.Count
+              $record.stderrBytes = $errState.Count
+              $record.stdout = [Text.Encoding]::UTF8.GetString($outState.Buffer, 0, $outState.Count)
+              $record.stderr = [Text.Encoding]::UTF8.GetString($errState.Buffer, 0, $errState.Count)
+              $record.stdoutCapped = $outState.Count -ge 8192
+              $record.stderrCapped = $errState.Count -ge 8192
+            } catch { $record['errorType'] = $_.Exception.GetType().FullName }
+            finally {
+              if ($null -ne $process) {
+                if (!$process.HasExited) { try { $process.Kill($true) } catch { } }
+                $process.Dispose()
+              }
+              $record.elapsedSeconds = [Math]::Round($probeWatch.Elapsed.TotalSeconds, 3)
+            }
+            return $record
+          }
+          foreach ($runtime in @(@{ root = $asciiRuntime; label = 'ascii' }, @{ root = $unicodeRuntime; label = 'chinese' })) {
+            foreach ($launcher in @('java.exe', 'FE Monster Backend.exe')) {
+              $record = Invoke-BoundedJavaVersion (Join-Path $runtime.root ('bin/' + $launcher)) ($runtime.label + ':' + $launcher)
+              $result.probes += $record
+              Save-JavaProbeReport
+              Write-Output ('Java launcher diagnostic (isolatedRuntimeCopy=true): ' + ($record | ConvertTo-Json -Depth 4 -Compress))
+            }
+          }
+          $result.completed = $true
+          Save-JavaProbeReport
+          Write-Output ('Java launcher preflight completed: fourComparisons={0}; runtimeCopyVerified={1}; elapsedSeconds={2}; diagnosticOnly=true; existingGatesRemainRequired=true' -f $result.probes.Count, $result.runtimeCopyVerified, $result.elapsedSeconds)
+      - name: Inspect WebView2 registry and runtime with bounded read-only probes
+        timeout-minutes: 1
+        working-directory: ${{ steps.input.outputs.source_root }}
+        env:
+          REPORT_ROOT: ${{ steps.input.outputs.report_root }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($Env:GH_TOKEN -or $Env:GITHUB_TOKEN) { throw 'Diagnostic steps must not receive GitHub credentials.' }
+          $watch = [Diagnostics.Stopwatch]::StartNew()
+          $workspace = [IO.Path]::GetFullPath($Env:GITHUB_WORKSPACE).TrimEnd('\')
+          $reports = [IO.Path]::GetFullPath($Env:REPORT_ROOT).TrimEnd('\')
+          if (!$reports.Equals((Join-Path $workspace 'cloud-reports'), [StringComparison]::OrdinalIgnoreCase)) { throw 'Unexpected preflight report boundary.' }
+          function Assert-PreflightPlainPath([string]$Path, [string]$Boundary) {
+            $full = [IO.Path]::GetFullPath($Path).TrimEnd('\')
+            $base = [IO.Path]::GetFullPath($Boundary).TrimEnd('\')
+            if (!$full.Equals($base, [StringComparison]::OrdinalIgnoreCase) -and !$full.StartsWith($base + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Preflight path escapes its boundary.' }
+            while ($true) {
+              if (Test-Path -LiteralPath $full) {
+                $entry = Get-Item -LiteralPath $full -Force
+                if (($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Preflight reparse points are excluded.' }
+              }
+              if ($full.Equals($base, [StringComparison]::OrdinalIgnoreCase)) { break }
+              $full = Split-Path -Parent $full
+              if ([string]::IsNullOrWhiteSpace($full)) { throw 'Preflight boundary cannot be resolved.' }
+            }
+          }
+          Assert-PreflightPlainPath $reports $workspace
+          $reportPath = Join-Path $reports 'webview2-readonly-preflight.json'
+          Assert-PreflightPlainPath $reportPath $workspace
+          $result = [ordered]@{ schemaVersion = 1; readOnly = $true; maximumStepSeconds = 60; maximumProbeMilliseconds = 5000; maximumProbes = 8; registry = @(); candidates = @(); completed = $false; elapsedSeconds = 0 }
+          function Save-PreflightReport {
+            $result.elapsedSeconds = [Math]::Round($watch.Elapsed.TotalSeconds, 3)
+            $result | ConvertTo-Json -Depth 7 | Set-Content -LiteralPath $reportPath -Encoding UTF8
+          }
+          Save-PreflightReport
+          $id = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          $registryPaths = @(
+            ('HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\' + $id),
+            ('HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\' + $id),
+            ('HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients\' + $id)
+          )
+          $standardLocations = @(
+            (Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Microsoft\EdgeWebView\Application'),
+            (Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'Microsoft\EdgeWebView\Application'),
+            (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Microsoft\EdgeWebView\Application')
+          )
+          $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+          $probeCount = 0
+          foreach ($registryPath in $registryPaths) {
+            $properties = Get-ItemProperty -LiteralPath $registryPath -Name @('pv', 'location') -ErrorAction SilentlyContinue
+            $version = if ($null -eq $properties) { '' } else { [string]$properties.pv }
+            $location = if ($null -eq $properties) { '' } else { [string]$properties.location }
+            $parsed = $null
+            $validVersion = [version]::TryParse($version, [ref]$parsed) -and $parsed -gt [version]'0.0.0.0'
+            $result.registry += [ordered]@{ path = $registryPath; pv = $version; location = $location; versionValid = $validVersion }
+            Save-PreflightReport
+            if (!$validVersion) { continue }
+            $locations = @($location) + $standardLocations
+            foreach ($candidateLocation in $locations) {
+              if ([string]::IsNullOrWhiteSpace($candidateLocation) -or $watch.Elapsed.TotalSeconds -gt 45) { continue }
+              $candidate = $null
+              $record = $null
+              try {
+                $candidateRoot = [IO.Path]::GetFullPath($candidateLocation).TrimEnd('\')
+                # Only local paths, never UNC/network discovery from registry content.
+                if ($candidateRoot -notmatch '^[A-Za-z]:\\' -or $candidateRoot.StartsWith('\\')) { continue }
+                $candidate = Join-Path $candidateRoot (Join-Path $parsed.ToString() 'msedgewebview2.exe')
+                if (!$seen.Add($candidate)) { continue }
+                Assert-PreflightPlainPath $candidate $candidateRoot
+                $exists = Test-Path -LiteralPath $candidate -PathType Leaf
+                $record = [ordered]@{ registryPath = $registryPath; executable = $candidate; exists = $exists; productVersion = ''; matchesRegistryVersion = $false; probeStarted = $false; probeExitCode = $null; probeTimedOut = $false; probeSkippedByBudget = $false }
+                $result.candidates += $record
+                if ($exists) {
+                  $record.productVersion = [string]([Diagnostics.FileVersionInfo]::GetVersionInfo($candidate).ProductVersion)
+                  $fileVersion = $null
+                  $record.matchesRegistryVersion = [version]::TryParse($record.productVersion, [ref]$fileVersion) -and $fileVersion -eq $parsed
+                  if ($record.matchesRegistryVersion) {
+                    if ($probeCount -ge 8 -or $watch.Elapsed.TotalSeconds -gt 44) {
+                      $record.probeSkippedByBudget = $true
+                    } else {
+                      $start = [Diagnostics.ProcessStartInfo]::new()
+                      $start.FileName = $candidate
+                      $start.Arguments = '--embedded-browser-webview=1 --version'
+                      $start.UseShellExecute = $false
+                      $start.CreateNoWindow = $true
+                      # Own these pipes so the diagnostic child cannot inherit the
+                      # workflow's output pipe or delay its result after a timeout.
+                      $start.RedirectStandardOutput = $true
+                      $start.RedirectStandardError = $true
+                      $process = [Diagnostics.Process]::Start($start)
+                      $record.probeStarted = $true
+                      $probeCount += 1
+                      try {
+                        if ($process.WaitForExit(5000)) { $record.probeExitCode = $process.ExitCode }
+                        else {
+                          $record.probeTimedOut = $true
+                          # Kill only this owned read-only probe tree, never setup/app.
+                          try { $process.Kill($true) } catch { }
+                          [void]$process.WaitForExit(500)
+                        }
+                      } finally { $process.Dispose() }
+                    }
+                  }
+                }
+              } catch {
+                if ($null -ne $record) { $record['errorType'] = $_.Exception.GetType().FullName }
+              }
+              Save-PreflightReport
+            }
+          }
+          $result.completed = $true
+          Save-PreflightReport
+          $matching = @($result.candidates | Where-Object { $_.matchesRegistryVersion }).Count
+          $successful = @($result.candidates | Where-Object { $_.probeStarted -and !$_.probeTimedOut -and $_.probeExitCode -eq 0 }).Count
+          $timeouts = @($result.candidates | Where-Object { $_.probeTimedOut }).Count
+          Write-Output ('WebView2 read-only preflight: registryRecords={0}; matchingExecutables={1}; probes={2}; successfulProbes={3}; timedOutProbes={4}; elapsedSeconds={5}; noInstallationPerformed=true' -f $result.registry.Count, $matching, $probeCount, $successful, $timeouts, $result.elapsedSeconds)
+      - name: Prepare bounded synthetic-install diagnostic capture
+        working-directory: ${{ steps.input.outputs.source_root }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $collectorPath = Join-Path $Env:RUNNER_TEMP 'fe-monster-bounded-install-diagnostics.ps1'
+          @'
+          param(
+            [ValidateSet('Observe', 'Publish')][string]$Action,
+            [string]$SourceRoot,
+            [ValidateSet('first-install', 'clean-runtime')][string]$Kind,
+            [string]$BufferRoot,
+            [string]$ReportRoot
+          )
+          $ErrorActionPreference = 'Stop'
+          $source = [IO.Path]::GetFullPath($SourceRoot).TrimEnd('\')
+          $buffer = [IO.Path]::GetFullPath($BufferRoot).TrimEnd('\')
+          $runnerTemp = [IO.Path]::GetFullPath($Env:RUNNER_TEMP).TrimEnd('\')
+          $bufferLeaf = Split-Path -Leaf $buffer
+          if (!$source.Equals((Join-Path $runnerTemp 'fe-monster-online-source'), [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Only the fixed cloud source root can be inspected.'
+          }
+          if (!(Split-Path -Parent $buffer).Equals($runnerTemp, [StringComparison]::OrdinalIgnoreCase) -or
+              $bufferLeaf -notmatch '^fe-monster-diag-(first-install|clean-runtime)-[0-9a-f]{32}$' -or
+              !$bufferLeaf.StartsWith('fe-monster-diag-' + $Kind + '-', [StringComparison]::Ordinal)) {
+            throw 'Diagnostic buffer boundary is invalid.'
+          }
+          function Assert-PlainPath([string]$Path, [string]$Boundary) {
+            $full = [IO.Path]::GetFullPath($Path).TrimEnd('\')
+            $base = [IO.Path]::GetFullPath($Boundary).TrimEnd('\')
+            if (!$full.Equals($base, [StringComparison]::OrdinalIgnoreCase) -and
+                !$full.StartsWith($base + '\', [StringComparison]::OrdinalIgnoreCase)) {
+              throw 'Diagnostic path escapes its boundary.'
+            }
+            $current = $full
+            while ($true) {
+              if (Test-Path -LiteralPath $current) {
+                $item = Get-Item -LiteralPath $current -Force
+                if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                  throw 'Reparse points are excluded from diagnostic capture.'
+                }
+              }
+              if ($current.Equals($base, [StringComparison]::OrdinalIgnoreCase)) { break }
+              $current = Split-Path -Parent $current
+              if ([string]::IsNullOrWhiteSpace($current)) { throw 'Diagnostic boundary could not be resolved.' }
+            }
+          }
+          Assert-PlainPath $source $runnerTemp
+          Assert-PlainPath $buffer $runnerTemp
+          function Read-BoundedTail([string]$Path) {
+            $tail = [Collections.Generic.Queue[string]]::new()
+            $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+            try {
+              # Snapshot the length and read at most 2 MiB. A growing file or a huge
+              # single line cannot extend the observer's read or its memory allocation.
+              $length = $stream.Length
+              $header = New-Object byte[] 4
+              $headerLength = $stream.Read($header, 0, 4)
+              $encoding = [Text.Encoding]::UTF8
+              $bomLength = 0
+              $unitBytes = 1
+              if ($headerLength -ge 2 -and $header[0] -eq 255 -and $header[1] -eq 254) {
+                $encoding = [Text.Encoding]::Unicode; $bomLength = 2; $unitBytes = 2
+              } elseif ($headerLength -ge 2 -and $header[0] -eq 254 -and $header[1] -eq 255) {
+                $encoding = [Text.Encoding]::BigEndianUnicode; $bomLength = 2; $unitBytes = 2
+              } elseif ($headerLength -ge 3 -and $header[0] -eq 239 -and $header[1] -eq 187 -and $header[2] -eq 191) {
+                $bomLength = 3
+              }
+              $start = [Math]::Max($bomLength, $length - (2MB - 4))
+              if ($unitBytes -eq 2 -and (($start - $bomLength) % 2) -ne 0) { $start += 1 }
+              $bytes = New-Object byte[] ([int]($length - $start))
+              [void]$stream.Seek($start, [IO.SeekOrigin]::Begin)
+              $read = 0
+              while ($read -lt $bytes.Length) {
+                $chunk = $stream.Read($bytes, $read, $bytes.Length - $read)
+                if ($chunk -eq 0) { break }
+                $read += $chunk
+              }
+              $text = $encoding.GetString($bytes, 0, $read)
+              if ($start -gt $bomLength) {
+                $firstNewline = $text.IndexOf([char]10)
+                if ($firstNewline -ge 0) { $text = $text.Substring($firstNewline + 1) }
+              }
+              $lines = [regex]::Split($text, '\r\n|\n|\r')
+              $lineCount = $lines.Length
+              if ($lineCount -gt 0 -and $lines[$lineCount - 1] -eq '') { $lineCount -= 1 }
+              foreach ($index in ([Math]::Max(0, $lineCount - 200)..($lineCount - 1))) {
+                if ($index -lt 0 -or $index -ge $lineCount) { continue }
+                $line = $lines[$index]
+                if ($line.Length -gt 4000) { $line = $line.Substring(0, 3988) + '[truncated]' }
+                $tail.Enqueue($line)
+              }
+            } finally { $stream.Dispose() }
+            return ,$tail.ToArray()
+          }
+          function Publish-KnownSessionTails {
+            $expectedReports = [IO.Path]::GetFullPath((Join-Path $Env:GITHUB_WORKSPACE 'cloud-reports')).TrimEnd('\')
+            $reports = [IO.Path]::GetFullPath($ReportRoot).TrimEnd('\')
+            if (!$reports.Equals($expectedReports, [StringComparison]::OrdinalIgnoreCase)) { throw 'Unexpected diagnostic report directory.' }
+            Assert-PlainPath $reports $Env:GITHUB_WORKSPACE
+            New-Item -ItemType Directory -Path $reports -Force | Out-Null
+            $count = 0
+            foreach ($file in @(Get-ChildItem -LiteralPath $buffer -File | Where-Object { $_.Name -match '^tail-[0-9]{2}\.log$' } | Sort-Object Name | Select-Object -First 10)) {
+              Assert-PlainPath $file.FullName $buffer
+              $count += 1
+              # Both sequential fixtures share ten public tail slots in total.
+              $target = Join-Path $reports ('install-session-{0:D2}.log' -f $count)
+              Assert-PlainPath $target $Env:GITHUB_WORKSPACE
+              [IO.File]::WriteAllLines($target, (Read-BoundedTail $file.FullName), [Text.UTF8Encoding]::new($false))
+            }
+            $metadataTarget = Join-Path $reports ($Kind + '-diagnostic-capture.json')
+            Assert-PlainPath $metadataTarget $Env:GITHUB_WORKSPACE
+            [ordered]@{ schemaVersion = 1; capture = $Kind; savedFiles = $count; maximumFiles = 10; maximumLinesPerFile = 200; maximumCharactersPerLine = 4000; maximumBytesReadPerFile = 2MB; sampledBeforeFixtureCleanup = ($count -gt 0); userDataIncluded = $false; browserProfilesIncluded = $false } | ConvertTo-Json | Set-Content -LiteralPath $metadataTarget -Encoding UTF8
+            return
+          }
+          if ($Action -eq 'Publish') {
+            Publish-KnownSessionTails
+            return
+          }
+          $captured = @{}
+          $stopSignal = Join-Path $buffer 'stop.txt'
+          function Save-KnownSessionTails {
+            $testRoots = @()
+            if ($Kind -eq 'first-install') {
+              $candidate = Join-Path $source 'out/release-2.2.5/online-first-install-中文目录'
+              if (Test-Path -LiteralPath $candidate -PathType Container) {
+                Assert-PlainPath $candidate $source
+                $testRoots = @($candidate)
+              }
+            } else {
+              $container = Join-Path $source 'tmp/windows-clean-install-runtime'
+              if (Test-Path -LiteralPath $container -PathType Container) {
+                Assert-PlainPath $container $source
+                $testRoots = @(Get-ChildItem -LiteralPath $container -Directory | Where-Object { $_.Name -match '^fe-monster-clean-install-runtime-[0-9a-f]{32}$' } | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 10 | ForEach-Object {
+                  Assert-PlainPath $_.FullName $source
+                  $_.FullName
+                })
+              }
+            }
+            foreach ($testRoot in $testRoots) {
+              $logs = Join-Path $testRoot '.fe-monster-setup-state/logs'
+              if (!(Test-Path -LiteralPath $logs -PathType Container)) { continue }
+              Assert-PlainPath $logs $source
+              $sessionFiles = @(Get-ChildItem -LiteralPath $logs -File | Where-Object { $_.Name -match '^(install-[0-9]{8}-[0-9]{6}-[0-9]+(-[0-9a-f]{32})?|dependencies-[0-9]+)\.log$' } | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 10)
+              foreach ($file in $sessionFiles) {
+                Assert-PlainPath $file.FullName $logs
+                if (!$captured.ContainsKey($file.FullName)) {
+                  if ($captured.Count -ge 10) { continue }
+                  $captured[$file.FullName] = ('tail-{0:D2}.log' -f ($captured.Count + 1))
+                }
+                try {
+                  $target = Join-Path $buffer $captured[$file.FullName]
+                  Assert-PlainPath $target $buffer
+                  [IO.File]::WriteAllLines($target, (Read-BoundedTail $file.FullName), [Text.UTF8Encoding]::new($false))
+                } catch {
+                  # Fixture cleanup can race this read. Keep the preceding bounded sample.
+                }
+              }
+            }
+          }
+          while ($true) {
+            try { Save-KnownSessionTails } catch { }
+            # Publish every bounded sample so step cancellation does not depend on
+            # the parent finally block running before the always-artifact step.
+            try { Publish-KnownSessionTails } catch { }
+            if (Test-Path -LiteralPath $stopSignal -PathType Leaf) { break }
+            Start-Sleep -Milliseconds 500
+          }
+          '@ | Set-Content -LiteralPath $collectorPath -Encoding UTF8
       - name: Verify the final EXE in a fresh Chinese installation directory
         working-directory: ${{ steps.input.outputs.source_root }}
         env:
@@ -253,23 +663,71 @@ jobs:
           $cacheMatch = [regex]::Match($index, 'app\.js\?v=([^"&\s]+)')
           if (!$cacheMatch.Success) { throw 'The source frontend cache token is missing.' }
           $testRoot = Join-Path (Get-Location).Path 'out/release-2.2.5/online-first-install-中文目录'
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/check-final-installer-isolated-install.ps1 -SetupExe dist/release-2.2.5/FE-Monster-Setup-2.2.5.exe -TestRoot $testRoot -WinFormsSourceDir out/release-2.2.5/winforms -ExpectedCacheToken $cacheMatch.Groups[1].Value *> (Join-Path $Env:REPORT_ROOT 'final-first-install.json')
-          if ($LASTEXITCODE -ne 0) { throw 'The final EXE failed its isolated installation verification.' }
-
+          $collectorPath = Join-Path $Env:RUNNER_TEMP 'fe-monster-bounded-install-diagnostics.ps1'
+          $captureRoot = Join-Path $Env:RUNNER_TEMP ('fe-monster-diag-first-install-' + [guid]::NewGuid().ToString('N'))
+          $observer = $null
+          $testExit = $null
+          try {
+            New-Item -ItemType Directory -Path $captureRoot | Out-Null
+            $observer = Start-Job -FilePath $collectorPath -ArgumentList 'Observe', (Get-Location).Path, 'first-install', $captureRoot, $Env:REPORT_ROOT
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/check-final-installer-isolated-install.ps1 -SetupExe dist/release-2.2.5/FE-Monster-Setup-2.2.5.exe -TestRoot $testRoot -WinFormsSourceDir out/release-2.2.5/winforms -ExpectedCacheToken $cacheMatch.Groups[1].Value *> (Join-Path $Env:REPORT_ROOT 'final-first-install.json')
+            $testExit = $LASTEXITCODE
+          } finally {
+            try {
+              Set-Content -LiteralPath (Join-Path $captureRoot 'stop.txt') -Value 'stop' -Encoding ASCII
+              if ($null -ne $observer) {
+                $null = Wait-Job -Job $observer -Timeout 5
+                if ($observer.State -eq 'Running') { Stop-Job -Job $observer }
+                Receive-Job -Job $observer -ErrorAction SilentlyContinue | Out-Null
+                Remove-Job -Job $observer -Force -ErrorAction SilentlyContinue
+              }
+              if ($null -eq $testExit -or $testExit -ne 0) {
+                & $collectorPath -Action Publish -SourceRoot (Get-Location).Path -Kind 'first-install' -BufferRoot $captureRoot -ReportRoot $Env:REPORT_ROOT
+              }
+            } catch {
+              Write-Warning 'Bounded installer diagnostic capture was unavailable; the original verification result is preserved.'
+            }
+          }
+          if ($testExit -ne 0) { throw 'The final EXE failed its isolated installation verification.' }
+        timeout-minutes: 15
       - name: Verify bundled runtimes, upgrade preservation and encrypted memory
         working-directory: ${{ steps.input.outputs.source_root }}
         env:
           REPORT_ROOT: ${{ steps.input.outputs.report_root }}
         run: |
           $ErrorActionPreference = 'Stop'
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/check-windows-clean-install-runtime.ps1 -SetupExe dist/release-2.2.5/FE-Monster-Setup-2.2.5.exe *> (Join-Path $Env:REPORT_ROOT 'final-clean-runtime.json')
-          if ($LASTEXITCODE -ne 0) { throw 'The final EXE failed clean-runtime/upgrade verification.' }
+          $collectorPath = Join-Path $Env:RUNNER_TEMP 'fe-monster-bounded-install-diagnostics.ps1'
+          $captureRoot = Join-Path $Env:RUNNER_TEMP ('fe-monster-diag-clean-runtime-' + [guid]::NewGuid().ToString('N'))
+          $observer = $null
+          $testExit = $null
+          try {
+            New-Item -ItemType Directory -Path $captureRoot | Out-Null
+            $observer = Start-Job -FilePath $collectorPath -ArgumentList 'Observe', (Get-Location).Path, 'clean-runtime', $captureRoot, $Env:REPORT_ROOT
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/check-windows-clean-install-runtime.ps1 -SetupExe dist/release-2.2.5/FE-Monster-Setup-2.2.5.exe *> (Join-Path $Env:REPORT_ROOT 'final-clean-runtime.json')
+            $testExit = $LASTEXITCODE
+          } finally {
+            try {
+              Set-Content -LiteralPath (Join-Path $captureRoot 'stop.txt') -Value 'stop' -Encoding ASCII
+              if ($null -ne $observer) {
+                $null = Wait-Job -Job $observer -Timeout 5
+                if ($observer.State -eq 'Running') { Stop-Job -Job $observer }
+                Receive-Job -Job $observer -ErrorAction SilentlyContinue | Out-Null
+                Remove-Job -Job $observer -Force -ErrorAction SilentlyContinue
+              }
+              if ($null -eq $testExit -or $testExit -ne 0) {
+                & $collectorPath -Action Publish -SourceRoot (Get-Location).Path -Kind 'clean-runtime' -BufferRoot $captureRoot -ReportRoot $Env:REPORT_ROOT
+              }
+            } catch {
+              Write-Warning 'Bounded installer diagnostic capture was unavailable; the original verification result is preserved.'
+            }
+          }
+          if ($testExit -ne 0) { throw 'The final EXE failed clean-runtime/upgrade verification.' }
           # This package stays unsigned. Community health and real account
           # authorization still require separate verification before release.
-
+        timeout-minutes: 15
       - name: Keep the verified online installer
         if: success()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: fe-monster-2.2.5-windows-online-${{ github.run_id }}
           path: |
@@ -281,11 +739,9 @@ jobs:
           compression-level: 0
       - name: Preserve build and verification diagnostics
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: fe-monster-2.2.5-online-diagnostics-${{ github.run_id }}
-          # Fixed reports only: no source ZIP, user data, browser profiles,
-          # environment dumps, GitHub credentials or signed asset URLs.
           path: cloud-reports/*
           if-no-files-found: warn
           retention-days: 3
