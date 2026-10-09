@@ -224,7 +224,9 @@ jobs:
             [IO.Compression.ZipFileExtensions]::ExtractToFile($rgEntries[0], $rgExe, $false)
           } finally { $rgArchive.Dispose() }
           $rgVersion = @(& $rgExe --version)
-          if ($LASTEXITCODE -ne 0 -or $rgVersion.Count -eq 0 -or $rgVersion[0] -cne 'ripgrep 15.2.0') { throw 'The pinned ripgrep tool did not start.' }
+          $rgVersionExit = $LASTEXITCODE
+          $rgVersion | Set-Content -LiteralPath (Join-Path $Env:REPORT_ROOT 'ripgrep-version.log') -Encoding UTF8
+          if ($rgVersionExit -ne 0 -or $rgVersion.Count -eq 0 -or $rgVersion[0] -cne 'ripgrep 15.2.0 (rev e89fff89ac)') { throw 'The pinned ripgrep tool did not start.' }
           $Env:PATH = $rgRoot + ';' + $Env:PATH
           Add-Content -LiteralPath $Env:GITHUB_PATH -Value $rgRoot
           if (!(Get-Command rg.exe -ErrorAction SilentlyContinue)) { throw 'ripgrep is required for the clean-runtime verification.' }
